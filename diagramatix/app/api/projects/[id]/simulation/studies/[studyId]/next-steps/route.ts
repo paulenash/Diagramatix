@@ -19,7 +19,7 @@ import { makeRedactor } from "@/app/lib/ai/redaction";
 import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { enterAiContext, AI_INVOCATION_POINTS } from "@/app/lib/ai/aiTelemetry";
-import { loadStudyRuns } from "@/app/lib/simulation/studyRuns";
+import { loadStudyRuns } from "@/app/lib/simulation/loadStudyRuns";
 import { suggestNextSteps } from "@/app/lib/simulation/nextSteps";
 import { buildNextStepsFacts, generateNextStepsNarrative, summariseNextSteps } from "@/app/lib/simulation/facts/nextStepsFacts";
 

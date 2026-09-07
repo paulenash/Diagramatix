@@ -1,21 +1,18 @@
 /**
- * Load every completed run of every scenario in a study — the run history the
- * comparison features read. Extracted from the ad-hoc queries in the `assess`
- * route so "Suggested next steps", parameter sweeps and the sensitivity/tornado
- * analysis all read the same shape from one place.
+ * The shape of a study's run history, and the pure helpers over it — shared by
+ * "Suggested next steps", parameter sweeps and the sensitivity analysis.
  *
- * Scoped by projectId as well as studyId: the scenario → study → project chain
- * is checked in the query itself, so a caller cannot reach another project's
- * study by guessing an id (same guarantee the assess route's own loaders give).
- *
- * Runs are returned newest-first per scenario, and runs that errored or never
- * finished are excluded — a run without metrics has nothing to say.
+ * THIS FILE MUST STAY FREE OF PRISMA. It is reachable from a client component
+ * (StudyManager → nextSteps → here), so importing the DB here drags Prisma and
+ * `node:module` into the browser bundle and the PRODUCTION BUILD FAILS — which is
+ * exactly what happened when the query lived here. Neither `tsc` nor the unit
+ * tests catch it; only `npm run build` does. The query now lives in
+ * `loadStudyRuns.ts`, and tests/simulation/next-steps.test.ts pins the rule.
  */
 
-import { prisma } from "@/app/lib/db";
 import type { RunMetrics } from "./results";
 import type { OverrideSet } from "./overrides";
-import { DEFAULT_RUN_CONFIG, type ScenarioRunConfig } from "./types";
+import type { ScenarioRunConfig } from "./types";
 
 export interface StudyRun {
   scenarioId: string;
@@ -46,54 +43,6 @@ export interface StudyRun {
    */
   scenarioOverrides: OverrideSet;
   metrics: RunMetrics;
-}
-
-/**
- * Every completed run in `studyId`, newest-first within each scenario, then by
- * scenario name so the ordering is stable across calls. Returns `[]` when the
- * study does not exist, does not belong to `projectId`, or has no finished runs.
- */
-export async function loadStudyRuns(studyId: string, projectId: string): Promise<StudyRun[]> {
-  const scenarios = await prisma.simulationScenario.findMany({
-    where: { studyId, study: { projectId } },
-    orderBy: { name: "asc" },
-    select: {
-      id: true,
-      name: true,
-      isBaseline: true,
-      overrides: true,
-      runs: {
-        where: { error: null, finishedAt: { not: null } },
-        orderBy: { startedAt: "desc" },
-        select: { id: true, name: true, pinned: true, configSnapshot: true, metrics: true, startedAt: true },
-      },
-    },
-  });
-
-  const out: StudyRun[] = [];
-  for (const sc of scenarios) {
-    const scenarioOverrides = (sc.overrides ?? {}) as unknown as OverrideSet;
-    for (const run of sc.runs) {
-      // A run row exists from the moment the run starts; metrics are written
-      // when it finishes. Belt-and-braces alongside the finishedAt filter —
-      // a metrics-less run would break every downstream reader.
-      const metrics = run.metrics as unknown as RunMetrics | null;
-      if (!metrics || !metrics.stats) continue;
-      out.push({
-        scenarioId: sc.id,
-        scenarioName: sc.name,
-        isBaselineScenario: sc.isBaseline,
-        runId: run.id,
-        runName: run.name ?? null,
-        pinned: run.pinned,
-        startedAt: run.startedAt.toISOString(),
-        config: { ...DEFAULT_RUN_CONFIG, ...((run.configSnapshot ?? {}) as unknown as ScenarioRunConfig) },
-        scenarioOverrides,
-        metrics,
-      });
-    }
-  }
-  return out;
 }
 
 /** The most recent completed run of each scenario, keyed by scenario id. The

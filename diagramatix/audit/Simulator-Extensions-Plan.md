@@ -192,6 +192,13 @@ The scenarios `POST` now accepts an explicit `overrides` object (applied after `
 is what makes one click enough. AI narration has its own telemetry point, `simulation.next-steps`,
 so it is not billed as an assessment.
 
+**A build failure worth remembering.** The first cut put `loadStudyRuns` (a Prisma query) in
+`studyRuns.ts`, `nextSteps.ts` imported a pure helper from that same file, and `StudyManager` — a
+client component — imported a constant from `nextSteps`. Three ordinary-looking imports put Prisma in
+the browser bundle and broke the deploy. The query now lives in `loadStudyRuns.ts`; `studyRuns.ts`
+is types and pure helpers only and says so in its header; and T3387/T3388 walk the import graph so
+the next one costs a second instead of a deploy.
+
 **Smaller item 04 — a named baseline and a trend.** `SimulationScenario.isBaseline` exists but is
 scenario-level; pinning a *run* needs `SimulationRun.baseline Boolean @default(false)` (schema
 change). The trend chart across runs since the baseline goes in
@@ -427,6 +434,12 @@ claim that a pooled p95 flatters a process, and it should be legible in a single
 
 ## Verification
 
+- **`npm run build` — NOT OPTIONAL, and run it before pushing.** `tsc` and the unit suite were both
+  fully green while a client component transitively imported Prisma, which broke the production
+  build, the deploy, the CI `test` job (it builds after testing) and the CI `e2e` job (its server
+  builds first). One root cause, four red jobs, and nothing local caught it. `tests/simulation/
+  client-bundle-hygiene.test.ts` now pins the specific invariant, but the build is the only thing
+  that bundles.
 - **Local:** `export PATH="$PATH:/c/Program Files/nodejs"; cd /c/Git/Diagramatix/diagramatix; npm run go`.
   Adopt each new example from the gallery and run its scenarios end to end.
 - **Unit:** `npx vitest run tests/simulation` after every phase; the full suite plus the simulation
