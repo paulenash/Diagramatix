@@ -1,0 +1,341 @@
+<title>The Diagramatix Simulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Spectral:wght@500;600&display=swap">
+
+<style>
+  :root {
+    --ground: #fbfbf9;
+    --panel: #ffffff;
+    --ink: #1a1d1a;
+    --muted: #666c65;
+    --faint: #8e948c;
+    --rule: #e3e6e0;
+    --rule-strong: #cdd2c9;
+    --accent: #1f6f4a;
+    --accent-soft: #e8f2ec;
+    --shadow: 0 1px 2px rgba(26, 29, 26, .05);
+  }
+  :root:not([data-theme="light"]) { color-scheme: light dark; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #111310; --panel: #171a15; --ink: #e7eae3; --muted: #9ba196;
+      --faint: #767c72; --rule: #262a22; --rule-strong: #363b31;
+      --accent: #63c08d; --accent-soft: #16281e;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .3);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #111310; --panel: #171a15; --ink: #e7eae3; --muted: #9ba196;
+    --faint: #767c72; --rule: #262a22; --rule-strong: #363b31;
+    --accent: #63c08d; --accent-soft: #16281e;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 16px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1140px; margin: 0 auto; padding: 0 28px 96px; }
+  .col { max-width: 68ch; }
+
+  .masthead {
+    padding: 76px 0 40px;
+    border-bottom: 2px solid var(--ink);
+    display: flex; flex-direction: column; gap: 18px;
+  }
+  .kicker {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent);
+  }
+  h1 {
+    font-family: Spectral, Georgia, serif; font-weight: 600;
+    font-size: clamp(2.4rem, 6vw, 3.6rem); line-height: 1.05; letter-spacing: -.018em;
+    margin: 0; text-wrap: balance; max-width: 18ch;
+  }
+  .standfirst { font-size: 1.12rem; color: var(--muted); max-width: 58ch; margin: 0; }
+
+  section { padding: 60px 0 0; }
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--faint); display: block; margin-bottom: 10px;
+  }
+  h2 {
+    font-family: Spectral, Georgia, serif; font-weight: 600;
+    font-size: clamp(1.55rem, 3vw, 2.05rem); line-height: 1.18; letter-spacing: -.012em;
+    margin: 0 0 16px; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; }
+  .lede { font-size: 1.05rem; color: var(--muted); }
+  strong { font-weight: 600; }
+  em { font-style: italic; }
+
+  .caps {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(272px, 1fr));
+    gap: 1px; background: var(--rule); border: 1px solid var(--rule); margin-top: 10px;
+  }
+  .cap { background: var(--panel); padding: 22px 22px 24px; display: flex; flex-direction: column; gap: 10px; }
+  .cap h4 { font-size: .95rem; font-weight: 600; margin: 0; letter-spacing: -.005em; }
+  .cap ul { margin: 0; padding-left: 17px; }
+  .cap li { margin-bottom: 6px; font-size: .885rem; color: var(--muted); line-height: 1.55; }
+  .cap li strong { color: var(--ink); font-weight: 500; }
+
+  .scroller { overflow-x: auto; margin-top: 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: .92rem; min-width: 560px; }
+  thead th {
+    text-align: left; font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-weight: 500; font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--faint); border-bottom: 1px solid var(--rule-strong);
+    padding: 0 20px 9px 0; vertical-align: bottom;
+  }
+  tbody td { padding: 13px 20px 13px 0; border-bottom: 1px solid var(--rule); vertical-align: top; color: var(--muted); }
+  tbody td:first-child { color: var(--ink); font-weight: 500; width: 38%; }
+  tbody tr:last-child td { border-bottom: none; }
+
+  footer {
+    margin-top: 68px; padding-top: 22px; border-top: 1px solid var(--rule);
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11.5px; color: var(--faint);
+  }
+  a { color: var(--accent); }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <span class="kicker">Diagramatix</span>
+    <h1>The Simulator</h1>
+    <p class="standfirst">
+      Run the process you have already drawn. Watch the work queue up, find where it waits, and test
+      a change before anyone has to live through it.
+    </p>
+  </header>
+
+  <section>
+    <span class="eyebrow">The idea</span>
+    <h2>The diagram is the model</h2>
+    <div class="col">
+      <p class="lede">
+        Most process simulators ask you to build a second thing — a model that has to be kept in step
+        with the diagram, and stops being in step the moment anyone is busy.
+      </p>
+      <p>
+        Diagramatix does not. The simulation numbers live on the BPMN you have already drawn: how
+        long a task takes, who does it, how often a decision goes each way. Draw the process once,
+        and it is ready to run.
+      </p>
+      <p>
+        What comes back is not an average. It is a <strong>distribution</strong> — the typical case,
+        the near-worst case, and how much they vary — because the question a department actually asks
+        is not &ldquo;how long does this take?&rdquo; but &ldquo;what can we promise and keep?&rdquo;
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">Setting it up</span>
+    <h2>From a drawing to something that runs</h2>
+
+    <div class="caps">
+      <div class="cap">
+        <h4>The numbers on the process</h4>
+        <ul>
+          <li>How long each task takes — a fixed time, or a <strong>range</strong>, because reality is not fixed</li>
+          <li>How often work arrives, and in what pattern</li>
+          <li>Which way each decision goes, as a percentage or as a rule about the case itself</li>
+          <li>One panel showing <strong>every number at once</strong>, editable in place, with the gaps visible</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>The people who do the work</h4>
+        <ul>
+          <li>Teams with a real <strong>headcount</strong>, so work has to wait for someone to be free</li>
+          <li>Cost per hour, and an efficiency factor</li>
+          <li><strong>Working hours</strong> — a team that works nine to five processes nothing at midnight, and the simulation knows it</li>
+          <li>Standing team definitions kept once for the organisation, adopted by any project</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Getting started quickly</h4>
+        <ul>
+          <li><strong>Fill in what is missing</strong> — sensible starting values for anything not yet entered, and it never overwrites what you typed</li>
+          <li>Filled-in numbers look different from measured ones, so an estimate never passes for a fact</li>
+          <li>A <strong>readiness check</strong> before every run, separating what would mislead you from what is merely assumed</li>
+          <li>A gallery of worked examples to open and take apart</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">What it models</span>
+    <h2>Processes as they actually behave</h2>
+    <div class="col">
+      <p class="lede">
+        The behaviour that makes real processes slow is exactly the behaviour most tools leave out.
+      </p>
+    </div>
+
+    <div class="caps">
+      <div class="cap">
+        <h4>Queueing</h4>
+        <ul>
+          <li>Work waits for a person, and the <strong>waiting is measured</strong> rather than assumed away — which is where most of the elapsed time in a real process goes</li>
+          <li>Queue lengths reported across the run, not only at the end</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Several processes, one team</h4>
+        <ul>
+          <li>Run a whole portfolio at once with the teams <strong>shared between processes</strong></li>
+          <li>So it can show one process starving another — what departments actually live with, and what a single-process tool cannot see at all</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>The full notation</h4>
+        <ul>
+          <li>Subprocesses, loops, and work that runs several times over in parallel</li>
+          <li><strong>Timeouts and escalations</strong> that race the task they are attached to</li>
+          <li>Exception handling and compensation</li>
+          <li>Deadlines counted in <strong>working</strong> time — two working days is not forty-eight hours</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">What you get back</span>
+    <h2>Four ways to see the answer</h2>
+
+    <div class="caps">
+      <div class="cap">
+        <h4>The heatmap</h4>
+        <ul>
+          <li>Your own diagram, each task <strong>tinted by how long work waits there</strong></li>
+          <li>The brightest box is the bottleneck. There is no chart to interpret</li>
+          <li>Waiting inside a collapsed subprocess shows on its box, so nothing hides</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>The replay</h4>
+        <ul>
+          <li>Watch the work move through the process, <strong>piling up where the queue is</strong></li>
+          <li>Stop it at any moment, add a person or push more work in, and let it run on — same past, different future</li>
+          <li>The fastest way to show someone why a process is slow</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>The report</h4>
+        <ul>
+          <li>How long a case takes: typical, near-worst, and the spread</li>
+          <li>How busy each team is, and a <strong>ranked list of bottlenecks</strong></li>
+          <li>What the process costs in staff time</li>
+          <li>A plain-English summary written from the computed figures, and only those figures</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>The trace</h4>
+        <ul>
+          <li>Every case a row, every step a column, the time spent in each</li>
+          <li>Filter it, sort it, <strong>export it to a spreadsheet</strong></li>
+          <li>For when someone wants to check the answer rather than take it</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">Asking questions</span>
+    <h2>Scenarios, and changing your mind</h2>
+    <div class="col">
+      <p>
+        A <strong>scenario</strong> is a version of the question. Change the team size, the arrival
+        rate, the way a decision splits. A scenario stores only what differs from the original, so
+        building the fifth one costs nothing.
+      </p>
+      <p>
+        You can also schedule things to happen <em>during</em> a run: put two more people on at nine,
+        take a team out for four hours, double the arrivals for three days, drop a backlog in at the
+        start. That is how you test a Monday morning rather than an average Tuesday.
+      </p>
+      <p>
+        Every run is reproducible. The same starting point gives the same answer, which means a
+        result can be checked, named, kept and compared against months later.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">Questions it answers</span>
+    <h2>What people use it for</h2>
+
+    <div class="scroller">
+      <table>
+        <thead>
+          <tr><th>The question</th><th>What it tells you</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Where does it actually get stuck?</td><td>The task where work waits longest — often not the one everybody blames</td></tr>
+          <tr><td>How many people do we need?</td><td>The headcount at which the promise you want to make starts holding</td></tr>
+          <tr><td>Is the redesign worth doing?</td><td>Both versions side by side, with the difference in time and in cost</td></tr>
+          <tr><td>What if we changed the policy?</td><td>What auto-approving, re-routing or re-prioritising would do, before anyone lives through it</td></tr>
+          <tr><td>Can we survive month-end?</td><td>What a tripled volume does to the backlog, and how long it takes to clear</td></tr>
+          <tr><td>What happens if two people are off?</td><td>How far behind you are by Friday</td></tr>
+          <tr><td>What can we promise?</td><td>The turnaround you would hit ninety-five times in a hundred — not the average, which you miss half the time</td></tr>
+          <tr><td>What does a case cost us?</td><td>Staff time and cost per case, and where it goes</td></tr>
+          <tr><td>Why does a two-hour job take two days?</td><td>The gap between working time and elapsed time, measured</td></tr>
+          <tr><td>Which process is starving the others?</td><td>Contention between processes drawing on the same team</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">Fitting in</span>
+    <h2>You do not have to start from scratch</h2>
+
+    <div class="caps">
+      <div class="cap">
+        <h4>Build it from what really happens</h4>
+        <ul>
+          <li>Point Diagramatix Process Mining at a real event log and it discovers the process <strong>and its numbers</strong></li>
+          <li>Real cycle times, real arrival rates, real routing percentages, and the hours the work actually happened in</li>
+          <li>A simulation of the process as it runs, not as it is documented</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Take it with you</h4>
+        <ul>
+          <li><strong>BPSim</strong> — the OMG interchange standard — in and out, so a modelling team can open your work in their own tool</li>
+          <li>Export a whole simulation as one file: diagrams, teams, calendars, scenarios</li>
+          <li>Send it to a colleague, or keep it as the record of what was decided and why</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">In short</span>
+    <h2>A process you can argue with</h2>
+    <div class="col">
+      <p>
+        A process diagram tells you what is supposed to happen. A simulation tells you what it costs,
+        where it hurts, and whether the change you are about to make is worth making.
+      </p>
+      <p>
+        Diagramatix puts the second one behind a button on the first.
+      </p>
+    </div>
+  </section>
+
+  <footer>Diagramatix &middot; the Simulator</footer>
+
+</div>

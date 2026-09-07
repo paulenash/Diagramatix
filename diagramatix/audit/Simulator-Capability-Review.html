@@ -1,0 +1,709 @@
+<title>Simulator Capability Review</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Spectral:wght@500;600&display=swap">
+
+<style>
+  :root {
+    --ground: #fbfbf9;
+    --panel: #ffffff;
+    --ink: #1a1d1a;
+    --muted: #666c65;
+    --faint: #8e948c;
+    --rule: #e3e6e0;
+    --rule-strong: #cdd2c9;
+    --accent: #1f6f4a;
+    --accent-soft: #e8f2ec;
+    --amber: #8a6416;
+    --amber-soft: #f7efdd;
+    --shadow: 0 1px 2px rgba(26, 29, 26, .05);
+  }
+  :root:not([data-theme="light"]) { color-scheme: light dark; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #111310; --panel: #171a15; --ink: #e7eae3; --muted: #9ba196;
+      --faint: #767c72; --rule: #262a22; --rule-strong: #363b31;
+      --accent: #63c08d; --accent-soft: #16281e; --amber: #d7a54a; --amber-soft: #2a2113;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .3);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #111310; --panel: #171a15; --ink: #e7eae3; --muted: #9ba196;
+    --faint: #767c72; --rule: #262a22; --rule-strong: #363b31;
+    --accent: #63c08d; --accent-soft: #16281e; --amber: #d7a54a; --amber-soft: #2a2113;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 16px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1140px; margin: 0 auto; padding: 0 28px 96px; }
+  .col { max-width: 68ch; }
+
+  .masthead {
+    padding: 72px 0 40px;
+    border-bottom: 2px solid var(--ink);
+    display: flex; flex-direction: column; gap: 18px;
+  }
+  .kicker {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent);
+  }
+  h1 {
+    font-family: Spectral, Georgia, serif; font-weight: 600;
+    font-size: clamp(2.1rem, 5vw, 3.1rem); line-height: 1.08; letter-spacing: -.015em;
+    margin: 0; text-wrap: balance; max-width: 20ch;
+  }
+  .standfirst { font-size: 1.08rem; color: var(--muted); max-width: 62ch; margin: 0; }
+  .meta {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11.5px; color: var(--faint);
+    display: flex; flex-wrap: wrap; gap: 6px 22px; padding-top: 6px;
+  }
+
+  section { padding: 56px 0 0; }
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--faint); display: block; margin-bottom: 10px;
+  }
+  h2 {
+    font-family: Spectral, Georgia, serif; font-weight: 600;
+    font-size: clamp(1.5rem, 3vw, 1.95rem); line-height: 1.2; letter-spacing: -.01em;
+    margin: 0 0 14px; text-wrap: balance;
+  }
+  h3 {
+    font-weight: 600; font-size: .82rem; letter-spacing: .07em; text-transform: uppercase;
+    color: var(--accent); margin: 40px 0 14px;
+  }
+  p { margin: 0 0 16px; }
+  .lede { font-size: 1.04rem; color: var(--muted); }
+  strong { font-weight: 600; }
+  em { font-style: italic; }
+
+  .caps {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(268px, 1fr));
+    gap: 1px; background: var(--rule); border: 1px solid var(--rule); margin-top: 8px;
+  }
+  .cap { background: var(--panel); padding: 20px 20px 22px; display: flex; flex-direction: column; gap: 9px; }
+  .cap h4 { font-size: .95rem; font-weight: 600; margin: 0; letter-spacing: -.005em; }
+  .cap ul { margin: 0; padding-left: 17px; }
+  .cap li { margin-bottom: 5px; font-size: .885rem; color: var(--muted); line-height: 1.55; }
+  .cap li strong { color: var(--ink); font-weight: 500; }
+
+  .scroller { overflow-x: auto; margin-top: 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: .89rem; min-width: 640px; }
+  thead th {
+    text-align: left; font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-weight: 500; font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--faint); border-bottom: 1px solid var(--rule-strong);
+    padding: 0 14px 8px 0; vertical-align: bottom;
+  }
+  tbody td { padding: 12px 14px 12px 0; border-bottom: 1px solid var(--rule); vertical-align: top; color: var(--muted); }
+  tbody td:first-child { color: var(--ink); font-weight: 500; width: 27%; }
+  tbody tr:last-child td { border-bottom: none; }
+  .tool { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .8rem; color: var(--ink); white-space: nowrap; }
+
+  /* ── Extension entries ──────────────────────────────────────────────── */
+  .exts { margin-top: 10px; }
+  .ext {
+    border-top: 1px solid var(--rule);
+    padding: 24px 0;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 11px;
+  }
+  .exts > .ext:first-child { border-top: 2px solid var(--ink); }
+  @media (min-width: 860px) {
+    .ext { grid-template-columns: minmax(0, 1fr) 176px; column-gap: 36px; }
+    .ext-tags { grid-column: 2; grid-row: 1 / span 3; padding-top: 4px; }
+  }
+  .ext h4 {
+    font-family: Spectral, Georgia, serif; font-size: 1.18rem; font-weight: 600;
+    margin: 0; letter-spacing: -.005em; text-wrap: balance;
+  }
+  .ext p { margin: 0; font-size: .93rem; color: var(--muted); max-width: 74ch; }
+  .ext .why {
+    font-size: .875rem; color: var(--ink);
+    border-left: 2px solid var(--accent); padding-left: 14px; max-width: 72ch;
+  }
+  .ext-tags { display: flex; flex-wrap: wrap; gap: 6px; align-content: start; }
+  .chip {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 10px; letter-spacing: .06em; text-transform: uppercase;
+    padding: 3px 8px; border: 1px solid var(--rule-strong); color: var(--muted); white-space: nowrap;
+  }
+  .chip.build { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
+  .chip.new { background: var(--amber-soft); border-color: transparent; color: var(--amber); }
+
+  /* ── Smaller items: a plain two-column list with room to breathe ─────── */
+  .smalls { list-style: none; padding: 0; margin: 16px 0 0; counter-reset: r; }
+  .smalls > li {
+    counter-increment: r;
+    display: flex;
+    align-items: baseline;
+    gap: 18px;
+    padding: 15px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .smalls > li:first-child { border-top: 1px solid var(--rule); }
+  .smalls .num {
+    flex: 0 0 auto;
+    width: 22px;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .82rem;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+  .smalls .body { flex: 1 1 auto; min-width: 0; font-size: .93rem; color: var(--muted); max-width: 82ch; }
+  .smalls .body strong { color: var(--ink); font-weight: 600; }
+
+  .note {
+    background: var(--panel); border: 1px solid var(--rule); border-left: 3px solid var(--accent);
+    padding: 18px 22px; margin: 24px 0 0; box-shadow: var(--shadow);
+  }
+  .note p:last-child { margin-bottom: 0; }
+  .note .eyebrow { color: var(--accent); }
+
+  .steps { display: grid; gap: 1px; background: var(--rule); border: 1px solid var(--rule); margin-top: 12px; }
+  .step { background: var(--panel); padding: 16px 20px; display: flex; gap: 16px; align-items: baseline; }
+  .step .n {
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .78rem;
+    color: var(--accent); flex: 0 0 auto; width: 20px; font-variant-numeric: tabular-nums;
+  }
+  .step .t { font-size: .91rem; color: var(--muted); }
+  .step .t strong { color: var(--ink); font-weight: 600; }
+
+  footer {
+    margin-top: 64px; padding-top: 22px; border-top: 1px solid var(--rule);
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11.5px; color: var(--faint);
+  }
+  a { color: var(--accent); }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <span class="kicker">Diagramatix &middot; internal review</span>
+    <h1>What the Simulator does, and what it should do next</h1>
+    <p class="standfirst">
+      A read of the Simulator as it stands from the user&rsquo;s side of the screen — what it can be
+      asked to do, the questions it already answers, and the eight additions that would make it
+      useful to a department trying to improve how it works, rather than to an analyst trying to
+      model one.
+    </p>
+    <div class="meta">
+      <span>7 September 2026</span>
+      <span>Read from the shipped code, not the roadmap</span>
+      <span>Companion to &ldquo;The Simulator&rdquo;, the external summary</span>
+    </div>
+  </header>
+
+  <!-- ═══ PART ONE ═══════════════════════════════════════════════════ -->
+  <section>
+    <span class="eyebrow">Capability</span>
+    <h2>What it does today</h2>
+    <div class="col">
+      <p class="lede">
+        A discrete-event engine sitting directly on the BPMN a user has already drawn. There is no
+        separate model to build and keep in step: the diagram <em>is</em> the model, and the
+        simulation parameters live on the elements.
+      </p>
+      <p>
+        That single decision shapes everything below. Every capability here is reachable from a
+        process someone drew for a different reason.
+      </p>
+    </div>
+
+    <h3>Building the model</h3>
+    <div class="caps">
+      <div class="cap">
+        <h4>Parameters on the diagram</h4>
+        <ul>
+          <li>Cycle, wait and setup times per element as <strong>five distributions</strong> — fixed, uniform, triangular, truncated normal, exponential</li>
+          <li>Arrival patterns on start events</li>
+          <li>Branch percentages on gateways, or <strong>expressions</strong> over case data</li>
+          <li>A <strong>Simulation Data panel</strong> showing every element&rsquo;s numbers at once, editable inline, with the gaps visible</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Teams and calendars</h4>
+        <ul>
+          <li>Teams as shared resource pools: capacity, cost per hour, efficiency</li>
+          <li><strong>Working calendars</strong> — weekly shift patterns per team, operating hours per arrival source, arrival-rate multipliers by window</li>
+          <li>Organisation-level <strong>master teams</strong> a project adopts as its own copy</li>
+          <li>Team names repaired to match swim-lane labels exactly</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Getting to a runnable state</h4>
+        <ul>
+          <li><strong>Fill missing</strong> — arrival rate, cycle times, a team per lane, an even branch split; never overwrites what a person entered</li>
+          <li><strong>Use diagram values</strong> — pull documented cycle times into the simulation</li>
+          <li>A <strong>readiness check</strong> on every run, separating &ldquo;this will mislead you&rdquo; from &ldquo;a default will be assumed&rdquo;</li>
+          <li>Filled values render differently, so a derived number never passes for a measured one</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>Running it</h3>
+    <div class="caps">
+      <div class="cap">
+        <h4>The engine</h4>
+        <ul>
+          <li>Tokens seize team capacity, so <strong>queues form</strong> and waiting is measured rather than assumed</li>
+          <li>Full BPMN behaviour: subprocesses, standard loops, sequential and parallel multi-instance, AND/OR joins, default flows</li>
+          <li><strong>Boundary events</strong> racing an activity&rsquo;s cycle time — interrupting and non-interrupting, timer, message, signal, conditional, escalation</li>
+          <li>Event subprocesses and compensation handlers</li>
+          <li>Timers that count <strong>working</strong> time, not elapsed time</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Scale and repeatability</h4>
+        <ul>
+          <li><strong>Monte-Carlo replications</strong> from a master seed — the same seed gives the same answer, always</li>
+          <li>Warm-up period discarded from the statistics</li>
+          <li>Linked subprocesses spliced in, so a portfolio runs as one network <strong>sharing its team pools</strong> — contention between processes is modelled, not ignored</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Scenarios</h4>
+        <ul>
+          <li>A <strong>study</strong> is a set of root processes; a <strong>scenario</strong> is a run configuration laid over it</li>
+          <li>Scenarios store only what <em>differs</em> from the baseline, so a what-if is cheap</li>
+          <li><strong>Planned interventions</strong> on the clock: change a capacity at hour nine, cut it for four hours, multiply arrivals, re-weight a branch, inject a backlog, take a team out entirely</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>Seeing the answer</h3>
+    <div class="caps">
+      <div class="cap">
+        <h4>Numbers</h4>
+        <ul>
+          <li>Flow time as <strong>mean, p5, p50, p95</strong>, with the run-to-run wobble reported separately from the case-to-case spread</li>
+          <li>A case-level distribution with a histogram — the typical case and the near-worst case, not just the average</li>
+          <li>Team utilisation, a <strong>ranked bottleneck list</strong>, busiest elements, queue lengths</li>
+          <li>Cost per team from busy hours &times; rate</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Pictures</h4>
+        <ul>
+          <li><strong>Heatmap</strong> over the diagram itself — each task tinted by its wait, hottest is the bottleneck. Heat inside a collapsed subprocess rolls up onto its box</li>
+          <li><strong>Live replay</strong> — tokens flowing through the process, visibly stacking where the queue is</li>
+          <li><strong>Token trace table</strong> — one row per case, one column per element, time spent in each, with filters and CSV out</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Comparing and keeping</h4>
+        <ul>
+          <li><strong>Run history</strong> — name a run and it is kept; unnamed runs are transient</li>
+          <li>Any two runs side by side with per-metric deltas</li>
+          <li><strong>AI assessment</strong> where every figure is computed first and handed to the model, so the prose reads naturally but cannot invent a statistic</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>The Operator console</h3>
+    <div class="col">
+      <p>
+        The most distinctive thing in the Simulator, and the hardest to put on a feature list. During
+        a replay you can stop at the current instant, add capacity or inject work, and
+        <strong>fork the timeline</strong>: the run continues from that moment with an identical past
+        and a different future. It is the difference between <em>reading</em> a result and
+        <em>arguing with</em> one.
+      </p>
+    </div>
+
+    <h3>Getting models in and out</h3>
+    <div class="caps">
+      <div class="cap">
+        <h4>Standards</h4>
+        <ul>
+          <li><strong>BPSim XML</strong> (OMG/WfMC) export and import — times, arrivals, teams and units, branch probabilities and source calendars round-trip</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Whole simulations</h4>
+        <ul>
+          <li>Export or import a complete simulation as one file: diagrams, team library, calendars, study and scenarios</li>
+          <li>A gallery of <strong>worked examples</strong> to adopt into your own project and take apart</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>From real event logs</h4>
+        <ul>
+          <li>Process Mining builds a <strong>digital twin</strong>: mined cycle-time distributions, the real arrival rate, branch probabilities from observed frequencies, teams, and a calendar derived from when work actually happened</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ PART TWO ═══════════════════════════════════════════════════ -->
+  <section>
+    <span class="eyebrow">Use cases</span>
+    <h2>The questions it can already answer</h2>
+    <div class="col">
+      <p class="lede">
+        Each of these is supported end to end today — the model, the run and the output all exist.
+        The middle column is the question in the words someone would actually use.
+      </p>
+    </div>
+
+    <div class="scroller">
+      <table>
+        <thead>
+          <tr><th>Use case</th><th>The question being asked</th><th>What answers it</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Find the constraint</td><td>Where does the work actually pile up, as opposed to where we think it does?</td><td class="tool">Heatmap &middot; bottleneck ranking</td></tr>
+          <tr><td>Size a team</td><td>How many assessors do we need for a five-day promise to hold?</td><td class="tool">Scenarios &middot; p95 flow time</td></tr>
+          <tr><td>Build the case for a change</td><td>If we redesign it this way, what actually improves, and by how much?</td><td class="tool">As-is / To-be compare</td></tr>
+          <tr><td>Test a policy first</td><td>What happens if we auto-approve everything under &pound;5,000?</td><td class="tool">Branch overrides &middot; compare</td></tr>
+          <tr><td>Survive a peak</td><td>Month-end doubles the volume for three days. Do we cope?</td><td class="tool">Planned interventions</td></tr>
+          <tr><td>Rehearse losing people</td><td>Two off sick on Monday — how far behind are we by Friday?</td><td class="tool">Outage intervention &middot; replay</td></tr>
+          <tr><td>Predict a service level</td><td>What can we promise and keep 95% of the time?</td><td class="tool">Case distribution &middot; p95</td></tr>
+          <tr><td>Cost the process</td><td>What does one case cost us in staff time?</td><td class="tool">Team cost &middot; utilisation</td></tr>
+          <tr><td>Model a shared team</td><td>Three processes draw on the same people. Which one starves?</td><td class="tool">Study portfolio &middot; shared pools</td></tr>
+          <tr><td>Work office hours</td><td>Why does a two-hour task take two days to come back?</td><td class="tool">Calendars &middot; working-time timers</td></tr>
+          <tr><td>Start from what really happens</td><td>Can we simulate the process as it runs, not as it is documented?</td><td class="tool">Mining digital twin</td></tr>
+          <tr><td>Take it elsewhere</td><td>Can our modelling team open this in their own tool?</td><td class="tool">BPSim XML</td></tr>
+          <tr><td>Explain it to someone</td><td>What is a bottleneck, and why is that one the bottleneck?</td><td class="tool">Live replay &middot; examples</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note col">
+      <span class="eyebrow">Worth naming</span>
+      <p>
+        Two of these are unusual in a tool at this price point. <strong>Shared resource pools across
+        a portfolio</strong> means the simulator can show one process starving another — the failure
+        mode most departments actually live with, and the one a single-process tool cannot see. And
+        <strong>working calendars</strong> turn the commonest complaint in back-office work
+        (&ldquo;a two-hour job takes two days&rdquo;) from a mystery into a measured quantity.
+      </p>
+    </div>
+  </section>
+
+  <!-- ═══ PART THREE ═════════════════════════════════════════════════ -->
+  <section>
+    <span class="eyebrow">Extensions</span>
+    <h2>What a department needs that isn&rsquo;t there yet</h2>
+    <div class="col">
+      <p class="lede">
+        The gap is not in the engine. The engine is more capable than most departments will ever
+        need. The gap is between <em>a correct simulation</em> and <em>a decision someone will sign
+        off</em>.
+      </p>
+      <p>
+        Each entry says what it is, why a department needs it, and whether it extends machinery that
+        already exists or is genuinely new. They are in the order I would build them.
+      </p>
+    </div>
+
+    <div class="exts">
+
+      <div class="ext">
+        <h4>Suggested next steps, from the runs already done</h4>
+        <p>
+          After two or three runs the session holds something nobody is using: a record of what was
+          tried and what it did. Read the current session&rsquo;s runs and the saved history for the
+          same processes, compute what changed between them, and produce a short ranked list of what
+          to try next — &ldquo;capacity on Assessment is where every improvement so far came from,
+          and it has not been taken past six&rdquo;, &ldquo;three runs varied the arrival rate and
+          none moved p95, so that is not your constraint&rdquo;, &ldquo;no scenario has yet tested
+          the Monday backlog you injected once by hand&rdquo;.
+        </p>
+        <p class="why">
+          A simulator answers the question you ask it. This is the first feature that would help
+          someone ask a better one — and it turns run history from an archive into an argument
+          about where to look next.
+        </p>
+        <div class="ext-tags">
+          <span class="chip build">Extends what exists</span>
+          <span class="chip">High value</span>
+          <span class="chip">Feasible now</span>
+        </div>
+      </div>
+
+      <div class="ext">
+        <h4>A business case, not a utilisation chart</h4>
+        <p>
+          Cost exists per team, from busy hours &times; rate. What a department has to produce is a
+          different shape: cost per case today, cost per case after, the annual difference, the
+          one-off cost of getting there, and the month it pays back. Add cost of waiting and cost of
+          rework alongside cost of doing, and generate the whole thing as a document — the machinery
+          that writes SOPs to Word is already in the building.
+        </p>
+        <p class="why">
+          No department head approves a change because a team is at 94% utilisation. They approve it
+          because of a number with a currency symbol and a date.
+        </p>
+        <div class="ext-tags">
+          <span class="chip build">Extends what exists</span>
+          <span class="chip">High value</span>
+        </div>
+      </div>
+
+      <div class="ext">
+        <h4>Tell them when a difference is real</h4>
+        <p>
+          The Simulator already separates run-to-run variation from case-to-case spread, which is
+          more statistical honesty than most tools offer. But it stops short of the verdict: when two
+          scenarios are compared, say plainly whether the difference is larger than the noise, and if
+          it is not, say how many more replications would settle it — then offer to run them.
+        </p>
+        <p class="why">
+          Someone will otherwise present a 4% improvement that is entirely sampling noise, and be
+          found out by the first person who reruns it.
+        </p>
+        <div class="ext-tags">
+          <span class="chip build">Extends what exists</span>
+          <span class="chip">High value</span>
+        </div>
+      </div>
+
+      <div class="ext">
+        <h4>Sweep a number instead of guessing at it</h4>
+        <p>
+          &ldquo;How many people do we need?&rdquo; is answered today by creating a scenario, running
+          it, and repeating. Let one parameter be swept across a range — team size 1 to 12, arrival
+          rate &plusmn;50% — and chart the response. The interesting feature of that curve is the
+          knee: the point where one more person stops buying much.
+        </p>
+        <p class="why">
+          The answer to a staffing question is a curve, not a number, and the curve is what stops the
+          conversation coming round again in six months.
+        </p>
+        <div class="ext-tags">
+          <span class="chip build">Extends what exists</span>
+          <span class="chip">High value</span>
+        </div>
+      </div>
+
+      <div class="ext">
+        <h4>Priorities and queue discipline</h4>
+        <p>
+          Every queue in the engine is first-in, first-out. Real departments are not: urgent cases
+          jump, complaints have a clock, a segment has its own service level, and someone is always
+          expediting. Add a priority on a case and a discipline on a team — FIFO, priority,
+          shortest-first — and report the service level <em>per segment</em> rather than pooled.
+        </p>
+        <p class="why">
+          A pooled p95 can look healthy while the segment that matters most misses its target
+          entirely. This is the commonest way a simulation flatters a process.
+        </p>
+        <div class="ext-tags">
+          <span class="chip new">New capability</span>
+          <span class="chip">High value</span>
+        </div>
+      </div>
+
+      <div class="ext">
+        <h4>Does this model match reality?</h4>
+        <p>
+          The mining twin builds a simulation from a real event log. The obvious next step closes the
+          loop: hold back part of the log, run the model, and compare the simulated flow-time
+          distribution against the observed one. Report the agreement as a figure and show the two
+          distributions overlaid.
+        </p>
+        <p class="why">
+          Every simulation is asked &ldquo;how do we know this is right?&rdquo; Today the answer is
+          judgement. It could be a number — and for a department presenting to a finance director,
+          that is the difference between a model and a spreadsheet with better graphics.
+        </p>
+        <div class="ext-tags">
+          <span class="chip build">Extends what exists</span>
+          <span class="chip">High value</span>
+        </div>
+      </div>
+
+      <div class="ext">
+        <h4>People who can do more than one job</h4>
+        <p>
+          A task draws on one team, and a team is a pool of interchangeable units. That is a poor fit
+          for a department where three people can handle assessments, one of them also handles
+          appeals, and the manager covers both when it gets bad. Skills — an eligibility set per task
+          and a preference order — would model that.
+        </p>
+        <p class="why">
+          Cross-skilling is one of the cheapest process improvements available, and the Simulator
+          cannot currently represent it, let alone quantify what it is worth.
+        </p>
+        <div class="ext-tags">
+          <span class="chip new">New capability</span>
+          <span class="chip">Medium value</span>
+        </div>
+      </div>
+
+      <div class="ext">
+        <h4>Which assumption is load-bearing?</h4>
+        <p>
+          A model has thirty numbers in it and most of them do not matter. Vary each in turn and rank
+          them by how much the answer moves — the standard tornado chart. It says where to spend
+          effort on better data, and where a rough guess is perfectly safe.
+        </p>
+        <p class="why">
+          It also disarms the meeting-room objection &ldquo;but you guessed that number&rdquo;: yes,
+          and here is the evidence that it makes no difference.
+        </p>
+        <div class="ext-tags">
+          <span class="chip build">Extends what exists</span>
+          <span class="chip">Medium value</span>
+        </div>
+      </div>
+
+    </div>
+
+    <h3>Smaller things, still worth doing</h3>
+    <ol class="smalls">
+      <li>
+        <span class="num">01</span>
+        <span class="body">
+          <strong>Rework and first-pass yield as a named parameter.</strong>
+          Loops can already model rework, but nobody thinks of it that way. Ask for &ldquo;what
+          proportion comes back?&rdquo; and report the cost of rework as its own line.
+        </span>
+      </li>
+      <li>
+        <span class="num">02</span>
+        <span class="body">
+          <strong>Holidays and absence.</strong>
+          Calendars repeat weekly. A department&rsquo;s year has bank holidays, a Christmas shutdown,
+          and a summer when a third of the team is away.
+        </span>
+      </li>
+      <li>
+        <span class="num">03</span>
+        <span class="body">
+          <strong>Batching and cut-off times.</strong>
+          Back-office work is full of &ldquo;posted at 4pm&rdquo; and &ldquo;processed in batches of
+          50&rdquo;, and both change queueing behaviour completely.
+        </span>
+      </li>
+      <li>
+        <span class="num">04</span>
+        <span class="body">
+          <strong>A named baseline and a trend.</strong>
+          Pin one run as the baseline and chart the headline metrics across every run since, so
+          improvement over months is visible rather than reconstructed from memory.
+        </span>
+      </li>
+      <li>
+        <span class="num">05</span>
+        <span class="body">
+          <strong>&ldquo;What if we automate this task?&rdquo; as one click.</strong>
+          Task Mining already scores tasks for automation potential. Wiring that to a scenario which
+          sets the task&rsquo;s time near zero and drops its resource demand turns a score into a
+          quantified saving.
+        </span>
+      </li>
+      <li>
+        <span class="num">06</span>
+        <span class="body">
+          <strong>Warm-up chosen for the user.</strong>
+          The engine discards a warm-up period the user has to pick. Detect when the system reaches
+          steady state and suggest it.
+        </span>
+      </li>
+    </ol>
+  </section>
+
+  <!-- ═══ FEASIBILITY ════════════════════════════════════════════════ -->
+  <section>
+    <span class="eyebrow">Feasibility</span>
+    <h2>Suggested next steps: how it would work</h2>
+    <div class="col">
+      <p class="lede">
+        Short answer: yes, and most of it is already built. The pattern this needs — compute every
+        figure deterministically, hand the model <em>only</em> those figures — is the pattern the
+        As-is / To-be assessment already uses.
+      </p>
+      <p>
+        The data exists too. Every run persists its configuration, its network and its full metrics,
+        keyed to a scenario; named runs are kept indefinitely. The history the feature would read is
+        sitting in the database being used for nothing but display.
+      </p>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <span class="n">1</span>
+        <span class="t"><strong>Gather.</strong> Every run of every scenario in this study — the ones from this session and the saved history — plus the runs of any process that appears in more than one study.</span>
+      </div>
+      <div class="step">
+        <span class="n">2</span>
+        <span class="t"><strong>Diff, deterministically.</strong> For each pair of runs: what changed in the configuration, and what changed in the outcome. Which levers have been pulled, over what range, and what each was worth. This is the whole trick — it is arithmetic, not judgement, and it is testable.</span>
+      </div>
+      <div class="step">
+        <span class="n">3</span>
+        <span class="t"><strong>Find the gaps.</strong> Which levers have never been tried. Which were tried once and abandoned. Which produced a difference inside the noise. Which bottleneck has been top of the ranking in every run and never addressed.</span>
+      </div>
+      <div class="step">
+        <span class="n">4</span>
+        <span class="t"><strong>Hand the model the facts, not the runs.</strong> A structured brief of maybe forty numbers, with the same rule the existing assessment uses: the model writes the prose and the ordering, and cannot state a figure it was not given.</span>
+      </div>
+      <div class="step">
+        <span class="n">5</span>
+        <span class="t"><strong>Make each suggestion actionable.</strong> Every item names the scenario it would create and the parameter it would change — so &ldquo;try eight assessors&rdquo; is a button, not a homework assignment.</span>
+      </div>
+    </div>
+
+    <div class="note col">
+      <span class="eyebrow">The one thing to get right</span>
+      <p>
+        The model must never see raw runs and be asked to spot the pattern. It would find one whether
+        or not it exists, and a fabricated trend in a document that goes to a finance director is the
+        worst possible failure for this feature. Every claim in the output must trace to a number
+        computed in step&nbsp;2 — which also means the suggestions can be unit-tested without an AI
+        call at all.
+      </p>
+    </div>
+
+    <div class="col">
+      <p style="margin-top: 22px;">
+        The honest limitation: with only one or two runs there is nothing to say, and the feature
+        should say so rather than inventing advice. It earns its place from about the third run
+        onward, which is also the point at which someone stops remembering what they have already
+        tried.
+      </p>
+    </div>
+  </section>
+
+  <!-- ═══ CLOSE ══════════════════════════════════════════════════════ -->
+  <section>
+    <span class="eyebrow">In short</span>
+    <h2>The engine is ahead of the argument</h2>
+    <div class="col">
+      <p>
+        The Simulator can already model things most departments will never need — compensation
+        handlers, non-interrupting boundary events racing a service time, parallel multi-instance
+        bodies. What it cannot yet do is hand someone the four things they need to walk into a
+        meeting: <strong>a cost with a date on it</strong>, <strong>a statement that the difference is
+        real</strong>, <strong>a curve rather than a point</strong>, and <strong>evidence that the
+        model resembles reality</strong>.
+      </p>
+      <p>
+        Three of those four extend machinery that already exists — and so does the fifth thing, the
+        one that would tell someone what to try next. That is the work I would do first.
+      </p>
+    </div>
+  </section>
+
+  <footer>
+    Read from the shipped code &mdash;
+    <span style="font-variant-numeric: tabular-nums;">7,200</span> lines of simulation library and
+    <span style="font-variant-numeric: tabular-nums;">4,800</span> of console, September 2026.
+  </footer>
+
+</div>
