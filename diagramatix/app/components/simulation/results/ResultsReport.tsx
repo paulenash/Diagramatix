@@ -120,6 +120,24 @@ export function ResultsReport({ runUrl, initial }: { runUrl: string; initial?: R
         )}
       </div>
 
+      {/* Where the elapsed time that is NOT work went. Split because the two have
+          different remedies: queueing is answered by capacity, an authored
+          waitTime is not. Absent on runs recorded before it was measured — and
+          absent must read as "not measured", never as "no waiting". */}
+      {stats.queueWait && stats.processWait && stats.completed.mean > 0 && (
+        <div>
+          <Heading>Waiting, per case ({unit})</Heading>
+          <div className="flex flex-wrap gap-x-6 gap-y-1">
+            <Metric label="Queueing for a person" value={(stats.queueWait.mean / stats.completed.mean).toFixed(1)} />
+            <Metric label="Waiting on the process" value={(stats.processWait.mean / stats.completed.mean).toFixed(1)} />
+          </div>
+          <p className="text-green-400/40 mt-1">
+            Queueing is what more capacity shortens. Waiting on the process — a courier, an overnight
+            batch, a customer deciding — is unchanged by staffing, and costs no resource hours at all.
+          </p>
+        </div>
+      )}
+
       {/* Busiest nodes */}
       {nodes.length > 0 && (
         <div>

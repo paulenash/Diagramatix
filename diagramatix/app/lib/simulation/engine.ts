@@ -130,7 +130,7 @@ export interface SimState {
   // Applied-intervention state (so an Operator fork preserves timed changes).
   arrivalMult?: Record<string, number>;
   edgeProb?: Record<string, number>;
-  acc: { arrived: number; completed: number; flowSum: number; flowCount: number; flowSamples?: number[]; perNode: Record<string, NodeAcc> };
+  acc: { arrived: number; completed: number; flowSum: number; flowCount: number; flowSamples?: number[]; processWaitTotal?: number; queueWaitTotal?: number; perNode: Record<string, NodeAcc> };
 }
 
 export class Engine {
@@ -181,6 +181,17 @@ export class Engine {
    *  Transient (pooled into a compact CaseDist at aggregate time); never persisted
    *  on the run except via a snapshot for Operator fork/resume. */
   private flowSamples: number[] = [];
+  /** Total authored NON-SEIZING wait (SimNode.waitTime) elapsed in the stats
+   *  window — the courier collecting, the customer deciding, the batch waiting
+   *  for tonight's run. Distinct from queue wait: nobody is working, and nobody
+   *  is waiting for a person either, so no amount of capacity shortens it.
+   *  Measured because it lengthens every case's elapsed time while costing
+   *  nothing in the resource-hours the cost model counts. */
+  private processWaitTotal = 0;
+  /** Total time tokens spent QUEUEING for a resource in the stats window (the
+   *  same quantity perNode.waitSum accumulates, summed across nodes). This one
+   *  capacity CAN shorten, which is why the two are reported apart. */
+  private queueWaitTotal = 0;
   private perNode = new Map<string, NodeAcc>();
   // indices
   private nodeById = new Map<string, SimNode>();
@@ -306,6 +317,7 @@ export class Engine {
   private resetStats(now: number): void {
     this.arrived = 0; this.completed = 0; this.flowSum = 0; this.flowCount = 0;
     this.flowSamples = [];
+    this.processWaitTotal = 0; this.queueWaitTotal = 0;
     this.perNode.clear();
     for (const p of this.pools.values()) p.resetStats(now);
   }
@@ -803,6 +815,7 @@ export class Engine {
       const acc = this.perNode.get(node.id) ?? { count: 0, waitSum: 0 };
       acc.count++; acc.waitSum += wait;
       this.perNode.set(node.id, acc);
+      this.queueWaitTotal += wait;
     }
     let dur = 0;
     if (node.setupTime) dur += sample(node.setupTime, this.rng);
@@ -857,6 +870,7 @@ export class Engine {
     if (node.waitTime) {
       const w = sample(node.waitTime, this.rng);
       if (w > 0) {
+        if (this.warmedUp) this.processWaitTotal += w;
         this.calendar.schedule(this.clock + w, { type: "WAIT_END", nodeId: node.id, tokenId: token.id });
         return;
       }
@@ -1064,6 +1078,8 @@ export class Engine {
       completed: this.completed,
       avgFlowTime: this.flowCount ? this.flowSum / this.flowCount : 0,
       flowSamples: this.flowSamples,
+      processWaitTotal: this.processWaitTotal,
+      queueWaitTotal: this.queueWaitTotal,
       perNode, perTeam,
     };
   }
@@ -1100,7 +1116,7 @@ export class Engine {
       arrivalsByNode: Object.fromEntries(this.arrivalsByNode),
       arrivalMult: Object.fromEntries(this.arrivalMult),
       edgeProb: Object.fromEntries(this.edgeProb),
-      acc: { arrived: this.arrived, completed: this.completed, flowSum: this.flowSum, flowCount: this.flowCount, flowSamples: [...this.flowSamples], perNode },
+      acc: { arrived: this.arrived, completed: this.completed, flowSum: this.flowSum, flowCount: this.flowCount, flowSamples: [...this.flowSamples], processWaitTotal: this.processWaitTotal, queueWaitTotal: this.queueWaitTotal, perNode },
     };
   }
 
@@ -1131,6 +1147,10 @@ export class Engine {
     e.edgeProb = new Map(Object.entries(snap.edgeProb ?? {}));
     e.arrived = snap.acc.arrived; e.completed = snap.acc.completed;
     e.flowSum = snap.acc.flowSum; e.flowCount = snap.acc.flowCount; e.flowSamples = [...(snap.acc.flowSamples ?? [])];
+    // Every accumulator has to survive a snapshot, or a resumed run silently
+    // reports less than it measured — which is exactly what the determinism test
+    // caught when these two were first added.
+    e.processWaitTotal = snap.acc.processWaitTotal ?? 0; e.queueWaitTotal = snap.acc.queueWaitTotal ?? 0;
     e.perNode = new Map(Object.entries(snap.acc.perNode).map(([id, a]) => [id, { ...a }]));
     return e;
   }

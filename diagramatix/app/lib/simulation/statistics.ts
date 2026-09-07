@@ -22,6 +22,15 @@ export interface RepStats {
   /** Flow time of every individual completed case this replication — pooled
    *  across replications into the case-level distribution (`caseFlow`). */
   flowSamples?: number[];
+  /** Where the elapsed time that is NOT work went, in clock units, summed over
+   *  the stats window. Two separate quantities because they have two different
+   *  remedies: `queueWaitTotal` is time spent waiting for a person and MORE
+   *  CAPACITY SHORTENS IT; `processWaitTotal` is authored non-seizing wait
+   *  (SimNode.waitTime — the courier, the overnight batch) and no amount of
+   *  capacity touches it. Optional: runs recorded before this was measured have
+   *  neither, and every reader must say so rather than report a zero. */
+  processWaitTotal?: number;
+  queueWaitTotal?: number;
   perNode: Record<string, NodeStat>;
   perTeam: Record<string, TeamStat>;
 }
@@ -92,6 +101,13 @@ export interface AggregatedStats {
    *  replications: true per-case p50/p95, spread (sd) + a histogram. Distinct
    *  from `flowTime`, which is the run-to-run variation of each run's mean. */
   caseFlow: CaseDist;
+  /** Total authored non-seizing wait across the run (clock units) — the courier,
+   *  the overnight batch. Undefined for runs recorded before it was measured;
+   *  never report that absence as zero waiting. */
+  processWait?: Stat;
+  /** Total time spent queueing for a resource across the run (clock units). The
+   *  half of the waiting that more capacity can actually shorten. */
+  queueWait?: Stat;
   perNode: Record<string, { count: Stat; wait: Stat }>;
   perTeam: Record<string, { utilization: Stat; avgQueue: Stat; maxQueue: Stat; cost: Stat }>;
 }
@@ -127,8 +143,17 @@ export function aggregate(reps: RepStats[]): AggregatedStats {
   // case-level distribution (percentiles describe cases, not run averages).
   const allCaseFlows: number[] = [];
   for (const r of reps) if (r.flowSamples) for (const v of r.flowSamples) allCaseFlows.push(v);
+  // Only report the wait split when the runs actually carry it: a replication
+  // that predates the measurement has no zero to average, it has no figure.
+  const hasWaitSplit = reps.length > 0 && reps.every((r) => typeof r.processWaitTotal === "number" && typeof r.queueWaitTotal === "number");
   return {
     replications: reps.length,
+    ...(hasWaitSplit
+      ? {
+          processWait: statOf(reps.map((r) => r.processWaitTotal!)),
+          queueWait: statOf(reps.map((r) => r.queueWaitTotal!)),
+        }
+      : {}),
     arrived: statOf(reps.map((r) => r.arrived)),
     completed: statOf(reps.map((r) => r.completed)),
     flowTime: statOf(reps.map((r) => r.avgFlowTime)),
