@@ -289,12 +289,20 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId,
   return (
     <div className="fixed inset-0 z-[60] bg-black text-green-400 font-mono overflow-hidden">
       <div className="absolute inset-0 opacity-30 pointer-events-none">
-        <MatrixRain fontSize={18} />
+        {/* The same BPMN cascade as the entry, running quietly behind the
+            console — katakana behind a process simulator was borrowed scenery. */}
+        <MatrixRain fontSize={22} glyphs="bpmn" />
       </div>
       <div className="relative z-10 flex flex-col h-full">
         <header className="flex items-center justify-between px-5 py-3 border-b border-green-500/40">
           <div className="flex items-center gap-3">
-            <span className="text-green-300 tracking-[0.3em] text-sm">◈ DiagramMATRIX SIMULATOR</span>
+            {/* The product's own mark and name. The film reference was in the
+                title of a screen customers see, and a trademark is not a place
+                to be clever. */}
+            <img src="/logos/diagramatix-icon.svg" alt="" aria-hidden className="w-5 h-5 shrink-0" />
+            <span className="text-green-300 tracking-[0.3em] text-sm whitespace-nowrap">
+              Diagramatix<sup className="tracking-normal text-[9px] align-super">™</sup> SIMULATOR
+            </span>
             {projectMode ? (
               <>
                 {projectName && <span className="text-green-300 text-xs">{projectName}</span>}

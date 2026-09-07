@@ -232,7 +232,7 @@ export function SimDataPanel({ data, onApplyData, onFillMissing, onUnfillMissing
   const flag = (bad: boolean) => <span className={bad ? "text-red-400" : "text-green-500/40"}>●</span>;
 
   return (
-    <div className="flex flex-col gap-3 text-[10px] w-max min-w-full mx-auto">
+    <div className="flex flex-col gap-3 text-[10px] w-full min-w-0">
       {/* Toolbar */}
       <div className="flex items-center gap-3 flex-wrap">
         {canUseDiagram && (
@@ -449,11 +449,16 @@ function Section({ title, cols, children }: { title: string; cols: { label: stri
   return (
     <div>
       <p className="text-green-400/70 uppercase tracking-widest text-[10px] mb-1">{title}</p>
-      {/* Header + rows share one container at their natural (min-w-max) width.
-          When a section is wider than the panel it WIDENS to fit and stays
-          centred (not a scroll box) — Paul. A scrollbar only appears if it
-          also exceeds the viewport (the outer console container). */}
-      <div className="flex justify-center">
+      {/* Header + rows share one container at their natural (min-w-max) width,
+          centred while they fit.
+          Paul, 2026-09-07: "Task fields overflow past the right hand boundary."
+          They did: the panel sized itself to its WIDEST section and the columns
+          then ran out over the border, because a grid child will not shrink
+          below its content unless it is told it may (min-w-0). Now the section
+          scrolls INSIDE the panel instead of escaping it — a scrollbar only when
+          it genuinely does not fit, which is what the original intent was; it
+          was simply measured against the viewport rather than the panel. */}
+      <div className="flex justify-center overflow-x-auto">
         <div className="min-w-max">
           <div className="flex items-center gap-2 text-green-400/40 pb-0.5 border-b border-green-500/20">
             {cols.map((c, i) => <span key={i} className={`${c.w} text-left`}>{c.label}</span>)}

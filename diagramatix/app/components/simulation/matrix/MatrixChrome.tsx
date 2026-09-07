@@ -36,7 +36,7 @@ export function MatrixButton({
 
 export function MatrixPanel({ title, children, className = "" }: { title?: string; children: React.ReactNode; className?: string }) {
   return (
-    <div className={`border border-green-500/40 rounded bg-black/60 ${className}`}>
+    <div className={`border border-green-500/40 rounded bg-black/60 min-w-0 ${className}`}>
       {title && (
         <div className="px-3 py-1.5 border-b border-green-500/30 text-[11px] font-mono uppercase tracking-widest text-green-400/80">
           {title}

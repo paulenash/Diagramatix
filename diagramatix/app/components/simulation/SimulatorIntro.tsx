@@ -36,8 +36,11 @@ export function SimulatorIntro({ onEnter }: { onEnter: () => void }) {
       onClick={enter}
       className="fixed inset-0 z-[60] bg-black overflow-hidden flex items-center justify-center cursor-pointer"
     >
+      {/* Twice the original 1,800ms, at the original rate — Paul, 2026-09-07:
+          "double the time for the initial cascade on entry and return to
+          original cascade speed". */}
       {phase === "rain" && (
-        <MatrixRain durationMs={3600} onDone={enter} glyphs="bpmn" speedDivisor={8} fontSize={22} />
+        <MatrixRain durationMs={3600} onDone={enter} glyphs="bpmn" fontSize={22} />
       )}
       <div className="relative z-10 text-center px-6 pointer-events-none">
         {phase === "typing" ? (

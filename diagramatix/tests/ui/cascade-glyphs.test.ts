@@ -92,13 +92,52 @@ describe("what falls in the cascade", () => {
 const read = (p: string) => fs.readFileSync(path.join(process.cwd(), p), "utf8");
 
 describe("the Simulator and Miner entries", () => {
-  it("T3332 the Simulator announces itself as Diagramatix, and cascades BPMN at half rate", () => {
+  it("T3332 the Simulator announces itself as Diagramatix, and cascades BPMN", () => {
     const src = read("app/components/simulation/SimulatorIntro.tsx");
     expect(src).toContain("Entering the Diagramatix Simulator");
-    expect(src, "the old DiagramMATRIX wording is gone").not.toContain("DiagramMATRIX");
     expect(src).toContain(`glyphs="bpmn"`);
-    // 8 frames between redraws is half the original 4 — bigger is slower.
-    expect(src).toContain("speedDivisor={8}");
+    // Twice the original 1,800ms, at the original rate: Paul tried half speed
+    // and preferred the cascade quick and the show longer.
+    expect(src).toContain("durationMs={3600}");
+    expect(src, "back to the original rate").not.toContain("speedDivisor");
+  });
+
+  it("T3336 nothing anywhere still calls it DiagramMATRIX", () => {
+    // It was in the TITLE of a screen customers see. A trademark is not a place
+    // to be clever, so the check is over the whole tree rather than one file.
+    const hits: string[] = [];
+    const walk = (dir: string) => {
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, e.name);
+        if (e.isDirectory()) { if (e.name !== "node_modules" && e.name !== ".next") walk(full); continue; }
+        if (!/.(tsx?|md)$/.test(e.name)) continue;
+        if (fs.readFileSync(full, "utf8").includes("DiagramMATRIX")) hits.push(full);
+      }
+    };
+    walk(path.join(process.cwd(), "app"));
+    expect(hits, hits.join(", ")).toEqual([]);
+  });
+
+  it("T3337 the Simulator title carries the logo and the trademark", () => {
+    const src = read("app/components/simulation/SimulatorConsole.tsx");
+    expect(src).toContain("/logos/diagramatix-icon.svg");
+    expect(src).toContain("Diagramatix");
+    expect(src, "the TM belongs on the name").toContain("™");
+  });
+
+  it("T3338 the console cascade is the same BPMN one as the entry", () => {
+    // Katakana behind a process simulator was borrowed scenery.
+    expect(read("app/components/simulation/SimulatorConsole.tsx")).toContain(`glyphs="bpmn"`);
+  });
+
+  it("T3339 a panel may shrink below its content, so fields cannot escape it", () => {
+    // Paul: "Task fields overflow past the right hand boundary." A grid child
+    // will not shrink below its content unless told it may, so the columns ran
+    // out over the border instead of scrolling inside it.
+    expect(read("app/components/simulation/matrix/MatrixChrome.tsx")).toContain("min-w-0");
+    const panel = read("app/components/simulation/SimDataPanel.tsx");
+    expect(panel).toContain("overflow-x-auto");
+    expect(panel, "the panel no longer sizes itself to its widest section").not.toContain("w-max min-w-full");
   });
 
   it("T3333 the Miner cascades brown rocks and BPMN", () => {

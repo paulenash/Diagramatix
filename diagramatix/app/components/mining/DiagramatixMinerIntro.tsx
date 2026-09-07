@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The DiagramatixMINER entry — same shape as the Simulator's DiagramMATRIX intro
+ * The DiagramatixMINER entry — same shape as the Simulator's own intro
  * but in a mining amber/brown palette: types "Entering DiagramatixMINER…", holds
  * it for a beat, plays a short amber digital-rain burst, then hands off to the
  * console. Skippable by click / any key.
@@ -36,7 +36,7 @@ export function DiagramatixMinerIntro({ onEnter }: { onEnter: () => void }) {
         <MatrixRain
           durationMs={5000} onDone={enter}
           color="#B45309" headColor="#FDE68A"
-          glyphs="rocks-and-bpmn" speedDivisor={8} fontSize={22}
+          glyphs="rocks-and-bpmn" fontSize={22}
         />
       )}
       <div className="relative z-10 text-center px-6 pointer-events-none">
