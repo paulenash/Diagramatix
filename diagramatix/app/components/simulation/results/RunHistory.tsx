@@ -3,19 +3,21 @@
 /**
  * Browsable Run History for one scenario. Lists its runs (named/pinned ones are
  * kept forever; unnamed ones are the transient recent few), and lets the user:
- * name a run (which pins it), pin/unpin, view its full results, delete it, and
- * select two runs to compare side by side (e.g. "Large Sales Team (25)" vs
- * "Small Sales Team (3)") with the grounded AI assessment.
+ * name a run (which pins it), pin/unpin, mark one as the BASELINE the trend is
+ * measured from, view its full results, delete it, and select two runs to compare
+ * side by side (e.g. "Large Sales Team (25)" vs "Small Sales Team (3)") with the
+ * grounded AI assessment.
  */
 
 import { useCallback, useEffect, useState } from "react";
 import type { RunMetrics, RunRow } from "@/app/lib/simulation/results";
 import { ResultsReport } from "./ResultsReport";
 import { CompareView, type CompareEntry } from "./CompareView";
+import { RunTrend } from "./RunTrend";
 import { PromptDialog } from "@/app/components/PromptDialog";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 
-type HistRun = Required<Pick<RunRow, "id">> & { name: string | null; pinned: boolean; metrics: RunMetrics | null; error: string | null; startedAt: string };
+type HistRun = Required<Pick<RunRow, "id">> & { name: string | null; pinned: boolean; baseline?: boolean; metrics: RunMetrics | null; error: string | null; startedAt: string };
 
 export function RunHistory({ historyUrl, runItemUrl, assessUrl, refreshKey }: {
   historyUrl: string; runItemUrl: (id: string) => string; assessUrl: string; refreshKey?: number;
@@ -26,6 +28,7 @@ export function RunHistory({ historyUrl, runItemUrl, assessUrl, refreshKey }: {
   const [selected, setSelected] = useState<string[]>([]);
   const [comparing, setComparing] = useState(false);
   const [renaming, setRenaming] = useState<HistRun | null>(null);
+  const [showTrend, setShowTrend] = useState(false);
   const [deleting, setDeleting] = useState<HistRun | null>(null);
 
   const load = useCallback(async () => {
@@ -90,6 +93,15 @@ export function RunHistory({ historyUrl, runItemUrl, assessUrl, refreshKey }: {
                     {r.pinned ? "★" : "☆"}
                   </button>
                 </td>
+                <td className="py-0.5 w-4 text-center">
+                  <button
+                    onClick={() => patch(r.id, { baseline: !r.baseline })}
+                    className={r.baseline ? "text-green-200" : "text-green-400/25 hover:text-green-400/60"}
+                    title={r.baseline ? "the baseline the trend is measured from (click to clear)" : "make this the baseline the trend is measured from"}
+                  >
+                    ⚑
+                  </button>
+                </td>
                 <td className="py-0.5">
                   <button onClick={() => setOpenId(openId === r.id ? null : r.id)} className="text-left text-green-300 hover:text-green-200 truncate max-w-[180px]" title="view results">
                     {openId === r.id ? "▾ " : "▸ "}{r.name ? <span className="text-green-200">{r.name}</span> : <span className="text-green-400/50">{label(r)}</span>}
@@ -103,6 +115,17 @@ export function RunHistory({ historyUrl, runItemUrl, assessUrl, refreshKey }: {
             ))}
           </tbody>
         </table>
+      )}
+
+      {runs.length > 0 && (
+        <button onClick={() => setShowTrend((v) => !v)} className="self-start text-[10px] text-green-400/60 hover:text-green-300">
+          {showTrend ? "▾ hide trend" : "◫ trend since baseline"}
+        </button>
+      )}
+      {showTrend && (
+        <div className="border border-green-500/30 rounded p-2">
+          <RunTrend runs={runs} />
+        </div>
       )}
 
       {selected.length === 2 && (

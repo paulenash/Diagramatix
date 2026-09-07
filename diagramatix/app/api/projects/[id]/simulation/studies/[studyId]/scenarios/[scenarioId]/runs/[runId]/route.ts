@@ -1,6 +1,8 @@
 /**
  * A single SimulationRun in the Run History.
- *  PATCH  — name / pin (or clear). Naming a run pins it so pruning keeps it.
+ *  PATCH  — name / pin (or clear), and pin as the scenario BASELINE. Naming a run
+ *           pins it so pruning keeps it; making it the baseline also pins it, and
+ *           clears the flag on the scenario's other runs (at most one baseline).
  *  DELETE — remove a saved run from the history.
  * Both require edit access and verify the run → scenario → study → project chain.
  */
@@ -44,18 +46,35 @@ export async function PATCH(req: Request, { params }: Params) {
   if (!(await ownRun(runId, scenarioId, studyId, id))) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
-  const data: { name?: string | null; pinned?: boolean } = {};
+  const data: { name?: string | null; pinned?: boolean; baseline?: boolean } = {};
   if ("name" in body) {
     const name = typeof body.name === "string" ? body.name.trim().slice(0, 120) : "";
     data.name = name || null;
     data.pinned = !!name; // naming keeps it; clearing the name unpins it
   }
   if ("pinned" in body && typeof body.pinned === "boolean") data.pinned = body.pinned;
+  const settingBaseline = body.baseline === true;
+  if ("baseline" in body && typeof body.baseline === "boolean") {
+    data.baseline = body.baseline;
+    // A baseline must survive pruning, or the trend loses the very run it is
+    // measured from. Making a run the baseline therefore pins it too.
+    if (settingBaseline) data.pinned = true;
+  }
   if (Object.keys(data).length === 0) return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
 
-  const run = await prisma.simulationRun.update({
-    where: { id: runId }, data,
-    select: { id: true, name: true, pinned: true, startedAt: true, finishedAt: true },
+  // At most one baseline per scenario: clear the others FIRST, in the same
+  // transaction, so a failure cannot leave the scenario with two (or none).
+  const run = await prisma.$transaction(async (tx) => {
+    if (settingBaseline) {
+      await tx.simulationRun.updateMany({
+        where: { scenarioId, baseline: true, id: { not: runId } },
+        data: { baseline: false },
+      });
+    }
+    return tx.simulationRun.update({
+      where: { id: runId }, data,
+      select: { id: true, name: true, pinned: true, baseline: true, startedAt: true, finishedAt: true },
+    });
   });
   return NextResponse.json({ run });
 }

@@ -1246,8 +1246,16 @@ export const SCHEMA_VERSION = "46";
  *   the curated diagram-model DDL in ddlGenerate.ts is unaffected. XSD unchanged.
  *   RECORDED LATE: the tables shipped in build 2381 (2026-09-01). The bump was
  *   missed then and is made here, at build 2412, rather than backdated.
+ * 2.6 (2026-09-07) — DB: SimulationRun.baseline.
+ *   Run History gains a pinned BASELINE — one run per scenario that every later
+ *   run is measured against, so improvement over months is read off a trend
+ *   rather than reconstructed from memory. Setting it clears the flag on the
+ *   scenario's other runs and pins the run, so pruning can never remove the
+ *   very reference the trend uses. One boolean column on an OPERATIONAL table:
+ *   the curated diagram-model DDL in ddlGenerate.ts is unaffected, and the XSD
+ *   export shape is unchanged.
  */
-export const PRODUCT_VERSION = "2.5";
+export const PRODUCT_VERSION = "2.6";
 
 /**
  * The structural (XSD) schema version of an export, as a single integer, tolerant of BOTH the

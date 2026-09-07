@@ -27,6 +27,8 @@ export interface RunRow {
   id: string;
   name?: string | null;
   pinned?: boolean;
+  /** The one run per scenario the Run History trend is measured from. */
+  baseline?: boolean;
   metrics: RunMetrics | null;
   error: string | null;
   startedAt: string;

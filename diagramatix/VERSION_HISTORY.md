@@ -15,6 +15,25 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.6.2479 — 2026-09-07 — The Simulator says what to try next, and what changed since
+
+- **Suggested next steps** — the Simulator reads a study's run history and ranks what to try
+  next, each with the evidence behind it: a team busiest in every run and never varied, a lever
+  still paying at the highest value tried, one tried once and abandoned, and one whose whole
+  range sits inside the run-to-run noise (a negative result, reported as plainly as a promising
+  one). Where a concrete value makes sense the suggestion is a button that creates the scenario.
+  Below three run scenarios it says there is not enough history rather than inventing advice.
+- **Run History baseline and trend** — pin one run per scenario as the baseline (⚑) and every
+  later run is charted against it, so improvement over months is visible instead of remembered.
+  A baseline is pinned automatically, so pruning can never remove the reference the trend uses.
+- Every figure in both is computed deterministically; AI only narrates the findings and cannot
+  add to them. Both work with AI turned off.
+- Fixed: a client component transitively imported Prisma, which broke the production build, the
+  deploy and both CI jobs while the unit suite stayed green. The DB query moved out of the
+  client-reachable module, and a test now walks the import graph so the next one costs a second.
+- Retired `scripts/gen-bpmn-examples.ts`: the committed simulator examples are the source of
+  truth. Re-running it degraded its own two examples, and it deleted the three it did not own.
+- Schema: product 2.5 → 2.6 (new column `SimulationRun.baseline`). XSD unchanged (still 46).
 ## 2.5.2412 — 2026-09-03 — The master prompt template was drawing the bugs
 
 Six defects in `DEFAULT_MD_PROMPT_BPMN`, two of which had been manufacturing

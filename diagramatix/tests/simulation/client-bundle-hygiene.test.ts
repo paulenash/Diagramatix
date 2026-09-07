@@ -30,6 +30,7 @@ const DB_IMPORTS = ['from "@/app/lib/db"', 'from "@prisma/'];
  *  erased at build time and cannot pull anything into the bundle). */
 const CLIENT_REACHABLE = [
   { entry: path.join(LIB, "simulation", "nextSteps.ts"), importedBy: "StudyManager.tsx" },
+  { entry: path.join(LIB, "simulation", "runTrend.ts"), importedBy: "RunTrend.tsx / RunHistory.tsx" },
 ];
 
 /** Relative import specifiers in a source file. Deliberately string-based: this

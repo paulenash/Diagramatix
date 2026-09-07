@@ -1763,6 +1763,11 @@ model SimulationRun {
   // per scenario. `pinned` is set true whenever a run is named.
   name            String?
   pinned          Boolean            @default(false)
+  // Run History baseline: ONE run per scenario can be pinned as the reference the
+  // trend is measured from, so improvement over months is visible rather than
+  // reconstructed from memory. Setting it clears the flag on the scenario’s other
+  // runs (see the runs/[runId] PATCH).
+  baseline        Boolean            @default(false)
   startedAt       DateTime           @default(now())
   finishedAt      DateTime?
 

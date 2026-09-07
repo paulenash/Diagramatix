@@ -141,8 +141,8 @@ is the tested route and the one that carries calendars. `validateExamplePackage`
 
 ## Phase 1 — Suggested next steps
 
-**Status:** 🔶 `In progress` — the suggestions themselves are **shipped**; smaller item 04 (named
-baseline + trend) is the remaining piece, and is what makes this phase change a stored shape.
+**Status:** ✅ `Shipped` — suggestions and smaller item 04 (named baseline + trend). Product version
+2.5 → 2.6 for the new column; XSD unchanged.
 
 - [x] `app/lib/simulation/nextSteps.ts` (pure)
   - `diffRuns(a, b)` — what changed in the configuration, what changed in the outcome
@@ -151,7 +151,7 @@ baseline + trend) is the remaining piece, and is what makes this phase change a 
     `{ title, evidence, scenarioName, overrides: OverrideSet }`
 - [x] `POST .../studies/[studyId]/next-steps` (facts + optional narration)
 - [x] "Next steps" card in `StudyManager.tsx` — via `results/NextStepsPanel.tsx`
-- [ ] Smaller item **04** — named baseline + trend
+- [x] Smaller item **04** — named baseline + trend
 
 **Levers** are exactly the `OverrideSet` keys in `app/lib/simulation/overrides.ts` (`NODE_KEYS`, team
 capacity, edge probability) plus the `PlannedInterventionKind` values in `types.ts`. Nothing new is
@@ -199,11 +199,21 @@ the browser bundle and broke the deploy. The query now lives in `loadStudyRuns.t
 is types and pure helpers only and says so in its header; and T3387/T3388 walk the import graph so
 the next one costs a second instead of a deploy.
 
-**Smaller item 04 — a named baseline and a trend.** `SimulationScenario.isBaseline` exists but is
-scenario-level; pinning a *run* needs `SimulationRun.baseline Boolean @default(false)` (schema
-change). The trend chart across runs since the baseline goes in
-`app/components/simulation/results/RunHistory.tsx`, in the hand-rolled SVG idiom of
-`FlowHistogram.tsx`.
+**Smaller item 04 — a named baseline and a trend. SHIPPED.** `SimulationRun.baseline` added (product
+version 2.5 → 2.6, Q1 only — no XSD change, and `ddlGenerate.ts` is untouched because SimulationRun
+is operational, not diagram-model). The ⚑ control sits beside the ★ pin in
+`results/RunHistory.tsx`; the chart is `results/RunTrend.tsx` over a pure `runTrend.ts`.
+
+Three decisions worth recording:
+
+- **Setting a baseline pins the run.** Otherwise pruning (keep-5 unpinned) could delete the very
+  reference the trend measures from. T3396 pins that contract from the pruning side.
+- **At most one baseline per scenario, cleared in the same transaction** as the new one is set, so a
+  failure cannot leave a scenario with two baselines or none.
+- **Runs before the baseline are excluded from the chart.** The baseline is the point the user chose
+  to measure from; putting earlier runs on the same axis would misrepresent it as a starting point.
+  And with no baseline pinned the panel says so rather than guessing one — "since when" is the
+  user's judgement, not the tool's.
 
 ---
 

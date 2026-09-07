@@ -41,7 +41,7 @@ export async function GET(_req: Request, { params }: Params) {
   const runs = await prisma.simulationRun.findMany({
     where: { scenarioId },
     orderBy: { startedAt: "desc" },
-    select: { id: true, name: true, pinned: true, metrics: true, error: true, startedAt: true, finishedAt: true },
+    select: { id: true, name: true, pinned: true, baseline: true, metrics: true, error: true, startedAt: true, finishedAt: true },
   });
   return NextResponse.json({ runs });
 }
