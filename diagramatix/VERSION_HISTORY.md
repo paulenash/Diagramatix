@@ -15,6 +15,25 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.7.2496 — 2026-09-08 — How do we know the model is right?
+
+- **Check the twin against reality.** The Miner can now compare the simulated flow-time
+  distribution against the one the business actually had, and report an agreement figure with
+  a verdict — the two curves overlaid, and a p50/p90/p95 table showing WHERE they differ.
+  Every simulation gets asked how we know it is right; the answer was judgement, and is now a
+  number.
+- **Hold data back at import.** Ask for a hold-back and the twin is fitted on the earlier
+  cases and tested against the later ones it never saw. Chronological, not random, because a
+  random split leaks the future into the fit. Without a hold-back the check still runs and is
+  labelled IN-SAMPLE — the model marking its own homework, said plainly rather than left for
+  the reader to work out.
+- The test is two-sample Kolmogorov-Smirnov: it assumes nothing about the shape, which
+  matters because process flow times are skewed and multi-modal. Below 20 cases either side
+  it REFUSES to answer, because a test on fewer fails to spot almost any difference and would
+  read as agreement when it means the data cannot tell.
+- Agreement is never worded as proof the model is correct. Failing to reject means the data
+  cannot tell the two apart, and the wording says so.
+- Schema: no bump (feature-only).
 ## 2.7.2492 — 2026-09-08 — Queues that behave like real ones
 
 - **Queue discipline** — a team can be first-in-first-out, priority, or shortest-job-first.

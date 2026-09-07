@@ -19,6 +19,7 @@ import { MiningSourcesPanel } from "./MiningSourcesPanel";
 import { LiveDemoPanel } from "./LiveDemoPanel";
 import { MiningInsightsPanel } from "./insights/MiningInsightsPanel";
 import { MiningLogViewer } from "./MiningLogViewer";
+import { ValidateTwinPanel } from "./ValidateTwinPanel";
 import type { LogMapping, MiningStats } from "@/app/lib/mining/types";
 import type { ConformanceResult } from "@/app/lib/mining/transitionConformance";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
@@ -893,6 +894,12 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
                 {selected.studyId && <span className="text-[10px] text-emerald-300">✓ twin study ready — opens in the Simulator</span>}
               </div>
             </div>
+
+            {/* The twin, checked against the log it came from. Only once there IS
+                a twin — the question has no meaning before that. */}
+            {selected.studyId && (
+              <ValidateTwinPanel validateUrl={`/api/projects/${projectId}/mining/runs/${selected.id}/validate`} />
+            )}
 
             {/* Explain results — lights up once fully mined. When the org allows AI it
                 narrates; when AI is off it falls back to a deterministic templated summary

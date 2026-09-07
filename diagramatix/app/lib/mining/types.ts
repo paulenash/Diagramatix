@@ -107,4 +107,9 @@ export interface Performance {
   activityResource: Record<string, string>;        // activity → dominant resource (→ simulation team)
   resourceConcurrency: Record<string, number>;     // resource → max simultaneous cases (→ team capacity)
   activeHours: number[];                           // 168 buckets, index = day(0=Mon)*24 + hour, event count
+  /** What the twin was fitted WITHOUT, when a hold-back was asked for at import.
+   *  Recorded here because it describes the FIT: the cases after `splitMs` were
+   *  kept aside so the model can later be tested on data it never saw. Absent =
+   *  fitted on everything, and any validation is in-sample and must say so. */
+  holdout?: { pct: number; splitMs: number | null; cases: number };
 }

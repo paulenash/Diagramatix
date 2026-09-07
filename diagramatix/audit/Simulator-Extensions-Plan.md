@@ -404,11 +404,11 @@ job, and assert the existing examples produce **bit-identical** results with the
 
 ## Phase 6 — Does this model match reality?
 
-**Status:** `Not started` · No engine change. Closes the Miner ↔ Simulator loop.
+**Status:** ✅ `Shipped` — no engine change, no version bump (feature-only).
 
-- [ ] `app/lib/simulation/validate.ts` — `compareDistributions(simulated, observed)`
-- [ ] `holdoutPct` in `app/lib/mining/calibrateSimulation.ts`
-- [ ] Overlaid distributions + agreement figure beside the twin
+- [x] `app/lib/simulation/validate.ts` — `compareDistributions(simulated, observed)`
+- [x] `holdoutPct` — at IMPORT, not calibration (see below)
+- [x] Overlaid distributions + agreement figure beside the twin
 
 Headline figure: two-sample **Kolmogorov–Smirnov D** — bounded 0..1, no distributional assumption —
 plus a p50/p90/p95 comparison table. Observed flow times already exist and are already persisted:
@@ -420,6 +420,26 @@ takes traces, so the split is a filter before the call — the fitting itself is
 
 > *Every simulation is asked "how do we know this is right?" Today the answer is judgement. It could
 > be a number.*
+
+**As built — one correction to the plan.** The hold-back could not go in
+`calibrateSimulation.ts`: calibration reads `run.performance`, which is computed at IMPORT from
+traces that no longer exist by then. So the split happens in the import route, and what was
+held back is recorded on `performance.holdout` — it describes the FIT, so that is where it
+belongs. Only `performance` is split; `analytics` still covers every case, because the Insights
+views describe what happened and must not be trimmed to suit a validation choice.
+
+Three decisions worth recording:
+
+- **Runs store a 101-point quantile vector** (`CaseDist.quantiles`), so the comparison can be
+  made from a saved run rather than requiring the simulation to happen again. The critical
+  value uses the TRUE case count, not 101 — passing 101 would make the test far too easy to
+  pass, and T3499 pins that.
+- **Units are converted explicitly.** Mining stores milliseconds and the twin runs in the
+  mined clock unit; comparing them unconverted would report total disagreement between two
+  identical processes.
+- **The honest floor is a refusal.** Below 20 cases either side it declines to answer, because
+  a KS test on a handful fails to reject almost anything — which would read as "excellent"
+  when it means "we cannot tell". The same reasoning as the Phase 1 three-run floor.
 
 ---
 

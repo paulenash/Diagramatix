@@ -14,6 +14,7 @@ import { gateFeature } from "@/app/lib/subscription-route";
 import { buildEventLog } from "@/app/lib/mining/parseEventLog";
 import { computePerformance } from "@/app/lib/mining/performance";
 import { computeAnalytics } from "@/app/lib/mining/analytics";
+import { splitByTime } from "@/app/lib/simulation/validate";
 import { computeGovernance, hasGovernance } from "@/app/lib/mining/governance";
 import type { LogMapping } from "@/app/lib/mining/types";
 
@@ -53,8 +54,31 @@ export async function POST(req: Request, { params }: Params) {
     return NextResponse.json({ error: "No usable events — check the case id + timestamp columns." }, { status: 400 });
   }
   // Performance + analytics + governance aggregates must be computed NOW — raw events are transient.
-  const performance = computePerformance(log.traces);
+  // HOLD-BACK (optional). A twin fitted on every case and then checked against
+  // those same cases is being marked on its own homework. When a holdout is
+  // asked for, performance is fitted on the EARLIER share only and the later
+  // cases are kept aside to test it — chronologically, because a random split
+  // would leak the future into the fit.
+  //
+  // Only `performance` is split: `analytics` still covers every case, because
+  // the Insights views describe what happened and must not be trimmed to suit
+  // a validation choice.
+  const holdoutPct = typeof body.holdoutPct === "number" && body.holdoutPct > 0 && body.holdoutPct < 0.9
+    ? body.holdoutPct
+    : 0;
+  const traceStart = (t: { events: { timestamp: number }[] }) => t.events[0]?.timestamp ?? 0;
+  const split = holdoutPct > 0
+    ? splitByTime(log.traces.map((t) => ({ startMs: traceStart(t), t })), holdoutPct)
+    : null;
+  const fitTraces = split ? split.fit.map((x) => x.t) : log.traces;
+  const performance = computePerformance(fitTraces);
   const analytics = computeAnalytics(log);
+  // What the twin was NOT allowed to see, recorded so a later validation can
+  // prove it is out-of-sample rather than asking anyone to take it on trust.
+  const holdout = split && split.holdout.length > 0
+    ? { pct: holdoutPct, splitMs: split.splitMs, cases: split.holdout.length }
+    : null;
+  if (holdout) performance.holdout = holdout;
   const governance = computeGovernance(log.traces);
   // Optional KPI/SLA config carried through from an example adoption (Slice 7); else null.
   const kpiConfig = body.kpiConfig && typeof body.kpiConfig === "object" ? body.kpiConfig : null;

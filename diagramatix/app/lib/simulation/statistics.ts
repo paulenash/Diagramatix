@@ -57,6 +57,17 @@ export interface CaseDist {
   p95: number;
   max: number;
   histogram: { min: number; binWidth: number; counts: number[] };
+  /**
+   * p0…p100 of the pooled case flow times — 101 numbers standing in for every
+   * case. Kept so the model can later be compared against a REAL event log
+   * (see simulation/validate.ts) without storing tens of thousands of samples,
+   * and so that comparison can be re-made from a saved run rather than
+   * requiring the run to happen again.
+   *
+   * Absent on runs recorded before it existed; every reader must fall back
+   * rather than treat absence as an empty distribution.
+   */
+  quantiles?: number[];
 }
 
 const HIST_BINS = 24;
@@ -76,7 +87,10 @@ export function caseDistOf(samples: number[]): CaseDist {
     const i = range > 0 ? Math.min(HIST_BINS - 1, Math.floor((v - min) / binWidth)) : 0;
     counts[i]++;
   }
-  return { count: n, mean, sd, min, p50: percentile(sorted, 50), p90: percentile(sorted, 90), p95: percentile(sorted, 95), max, histogram: { min, binWidth, counts } };
+  // 101 evenly spaced quantiles: a compact, lossless-enough empirical CDF for
+  // comparing this run against a real log later.
+  const quantiles = Array.from({ length: 101 }, (_, i) => percentile(sorted, i));
+  return { count: n, mean, sd, min, p50: percentile(sorted, 50), p90: percentile(sorted, 90), p95: percentile(sorted, 95), max, histogram: { min, binWidth, counts }, quantiles };
 }
 
 function percentile(sorted: number[], p: number): number {
