@@ -7,9 +7,20 @@
  *   exampleSeeds.ts imports (keeping the seed/tests free of file I/O).
  *
  * Run:  cd diagramatix && npx tsx scripts/gen-bpmn-examples.ts
+ *
+ * !! DO NOT RUN THIS WITHOUT READING audit/Simulator-Extensions-Plan.md section 0.4.
+ * The committed exampleData.json entries for BOTH slugs below are AHEAD of what
+ * this script now produces: calendars were added afterwards by
+ * backfill-example-calendars.cjs, team names were relabelled to lane labels, and
+ * the import -> BPSim -> autofill pipeline has moved since they were generated.
+ * Regenerating today gives loan-origination 25 connectors instead of 32, and
+ * car-repair 15 instead of 33 with no team and no calendar - materially worse
+ * examples. Test T0571 fails if you commit that, but this comment is the sooner
+ * check. (Writing the whole file, rather than merging by slug as main() now does,
+ * additionally DELETED the three examples this script does not own.)
  */
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { importBpmnXml } from "../app/lib/diagram/bpmn/importBpmnXml";
 import { parseBpsimScenarios } from "../app/lib/simulation/bpsim/importBpsim";
@@ -63,7 +74,10 @@ function teamsFromData(data: DiagramData): ExampleTeam[] {
   return [...names].map((name) => ({ name, capacity: 1 }));
 }
 
-async function build(meta: Meta): Promise<{ slug: string; title: string; concept: string; description: string; difficulty: string; package: ExamplePackage }> {
+/** One catalog entry as stored in exampleData.json. */
+interface GeneratedExample { slug: string; title: string; concept: string; description: string; difficulty: string; package: ExamplePackage }
+
+async function build(meta: Meta): Promise<GeneratedExample> {
   const xml = readFileSync(join(process.cwd(), EX, meta.file), "utf8");
   const r = await importBpmnXml(xml, meta.file);
   const scenarios = parseBpsimScenarios(xml, "minute");
@@ -95,7 +109,7 @@ async function build(meta: Meta): Promise<{ slug: string; title: string; concept
 }
 
 async function main() {
-  const examples = [];
+  const examples: GeneratedExample[] = [];
   for (const m of METAS) {
     const e = await build(m);
     const t = e.package.diagrams[0].data;
@@ -103,8 +117,24 @@ async function main() {
     examples.push(e);
   }
   const out = join(process.cwd(), "app/lib/simulation/exampleData.json");
-  writeFileSync(out, JSON.stringify({ examples }, null, 2), "utf8");
-  console.log(`Wrote ${out}`);
+
+  // MERGE by slug — never write the whole file. This generator owns ONLY its own
+  // METAS; exampleData.json also holds entries produced by other generators
+  // (gen-aardwolf-example.cjs, gen-sales-marketing-example.cjs) and
+  // `simple-process`, which no generator owns at all. A wholesale write deleted
+  // every one of them — irrecoverably for `simple-process`. Same merge shape as
+  // gen-aardwolf-example.cjs: replace an entry in place, append a new one.
+  const existing: GeneratedExample[] = existsSync(out)
+    ? ((JSON.parse(readFileSync(out, "utf8")) as { examples?: GeneratedExample[] }).examples ?? [])
+    : [];
+  const merged = [...existing];
+  for (const e of examples) {
+    const i = merged.findIndex((x) => x.slug === e.slug);
+    if (i >= 0) merged[i] = e;
+    else merged.push(e);
+  }
+  writeFileSync(out, JSON.stringify({ examples: merged }, null, 2) + "\n", "utf8");
+  console.log(`Wrote ${out} — ${merged.length} example(s): ${merged.map((e) => e.slug).join(", ")}`);
 }
 
 main().catch((err) => { console.error(err); process.exit(1); });

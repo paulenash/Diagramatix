@@ -4,7 +4,7 @@
  * what we pin. T0547-T0548.
  */
 import { describe, it, expect } from "vitest";
-import { buildComparisonFacts, summariseComparison } from "@/app/lib/simulation/assessFacts";
+import { buildComparisonFacts, summariseComparison } from "@/app/lib/simulation/facts/assessFacts";
 import type { RunMetrics } from "@/app/lib/simulation/results";
 
 const stat = (mean: number, p5 = mean, p50 = mean, p95 = mean) => ({ mean, p5, p50, p95 });

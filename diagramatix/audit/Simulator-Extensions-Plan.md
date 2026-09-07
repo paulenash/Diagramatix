@@ -7,7 +7,7 @@
 | **This document** | The **live worklist** for building them. Phases follow the review's own stated build order (value first). Every phase names the files it touches and the existing functions it reuses. |
 | **Scope** | All 8 extensions + all 6 smaller items. New worked examples are planned alongside, one per new capability. |
 | **How to use** | Work an item, tick its box and set **Status** → `In progress` / `Shipped (<commit>)` / `Won't do (<reason>)`. Keep the review as the historical argument; keep this as the burn-down. |
-| **Progress log** | *(empty — nothing started)* |
+| **Progress log** | **2026-09-07** — **Phase 0 complete.** 0.1 generator merges by slug (guarded by T3369, proven to fail on a simulated overwrite); 0.2 `studyRuns.ts` + `latestRunPerScenario` (T3370/T3371); 0.3 `facts/` established, `assessFacts.ts` moved, both importers repointed (no compat shim — there were only two). **New finding: 0.4** — the generator is stale relative to its own committed output; see below. 382 simulation tests green, typecheck unchanged. |
 
 **Status values:** `Not started` · `In progress` · `Shipped (<commit>)` · `Blocked (<on what>)` · `Won't do (<reason>)`
 
@@ -36,7 +36,7 @@ would tell someone what to try next.
 ## Ground rules (apply to every phase)
 
 1. **Compute first, narrate second.** Every phase producing prose follows the pattern already proven
-   in `app/lib/simulation/assessFacts.ts`: a pure `buildXFacts()` producing a structured figures
+   in `app/lib/simulation/facts/assessFacts.ts`: a pure `buildXFacts()` producing a structured figures
    object, a deterministic `summariseX()` fallback, and an AI `generateX()` that receives *only*
    those figures. The model never sees raw runs. This is what makes each phase unit-testable with no
    API call, and it is the review's own stated non-negotiable — *a fabricated trend in a document
@@ -59,36 +59,73 @@ would tell someone what to try next.
 
 ## Phase 0 — Foundations
 
-**Status:** `Not started` · Blocking: every later phase.
+**Status:** ✅ `Shipped` · Was blocking every later phase.
 
 ### 0.1 Fix the example-generator overwrite hazard ⚠️
 
-- [ ] `scripts/gen-bpmn-examples.ts` → merge by slug instead of overwriting
+- [x] `scripts/gen-bpmn-examples.ts` → merge by slug instead of overwriting
 
-`main()` builds `examples` from its own two `METAS`, then `writeFileSync`s `{ examples }` over
-`app/lib/simulation/exampleData.json`. That file holds **five** examples. Re-running the generator
-today silently destroys `simple-process`, `aardwolf-loan-comparison` and
-`sales-marketing-drill-through`.
+`main()` built `examples` from its own two `METAS`, then `writeFileSync`d `{ examples }` over
+`app/lib/simulation/exampleData.json` — a file holding **five**. It now merges by slug, the shape
+`scripts/gen-aardwolf-example.cjs` already used: replace an entry in place, append a new one.
 
-Adopt the merge-by-slug shape already used by `scripts/gen-aardwolf-example.cjs` — read the existing
-file, filter out only the slugs this script owns, push, write. **Blocks every phase that adds an
-example.**
+**Verified by running it.** All five slugs survive, and the three the generator does not own come
+back byte-identical. **T3369** guards it, and was proven to fail: simulating the old overwrite
+produces `examples lost from exampleData.json: simple-process, aardwolf-loan-comparison,
+sales-marketing-drill-through`. Every other assertion in that file iterates the survivors, so
+nothing else in the suite would have caught a deletion.
 
 ### 0.2 Shared study-runs loader
 
-- [ ] New `app/lib/simulation/studyRuns.ts`
+- [x] New `app/lib/simulation/studyRuns.ts`
 
-Phases 1, 4 and 8 all need "every run of every scenario in this study, with config, overrides and
-metrics". Extract the ad-hoc queries in `assess/route.ts` into `loadStudyRuns(studyId)` →
-`{ scenarioId, scenarioName, runId, runName, pinned, config: ScenarioRunConfig,
-overrides: OverrideSet, metrics: RunMetrics }[]`.
+Shipped as `loadStudyRuns(studyId, projectId)` — scoped by project as well as study, so a caller
+cannot reach another project’s study by guessing an id. Errored and unfinished runs are excluded.
+
+**A caveat that Phase 1 must respect.** A run does **not** snapshot its overrides; it snapshots the
+resulting `networkSnapshot`. So the field is named `scenarioOverrides`, not `overrides`: it is the
+scenario’s *current* set, exact for its latest run and merely indicative for older ones — editing a
+scenario rewrites the apparent history of every earlier run beneath it. `latestRunPerScenario()` is
+provided for the subset where the overrides are genuinely what ran. **Phase 1 must either restrict
+itself to that subset or derive the truth from `networkSnapshot` — it must not present the current
+overrides as history.**
 
 ### 0.3 Facts-module convention
 
-- [ ] Create `app/lib/simulation/facts/`, move `assessFacts.ts` under it unchanged (re-export for
-      compatibility)
+- [x] Create `app/lib/simulation/facts/`, move `assessFacts.ts` under it
+
+**Deviation from plan:** no re-export shim. The plan assumed compatibility mattered, but there were
+only **two** importers (the assess route and its test) — both repointed directly. A permanent shim
+for two call sites is dead weight.
 
 Phases 1, 2, 3, 6 and 8 each add a sibling. One place, one pattern, one test idiom.
+
+### 0.4 ⚠ The generator is stale relative to its own committed output — **do not run it**
+
+**Status:** `Not started` — found while verifying 0.1, and a separate hazard from it.
+
+Fixing the overwrite let the generator run safely for the three examples it does not own. It is still
+not safe for the **two it does**. Regenerating them produces materially worse packages than the ones
+committed:
+
+| Slug | Committed | Regenerated |
+|---|---|---|
+| `loan-origination` | 32 elements, 32 connectors, 3 teams, 1 calendar | 27, **25**, 4, **0** |
+| `car-repair-rework-loop` | 36 elements, 33 connectors, 1 team, 1 calendar | 35, **15**, **0**, **0** |
+
+Car repair loses **more than half its connectors** and its only team. The committed data is ahead of
+the generator — calendars were added by `backfill-example-calendars.cjs`, team names were relabelled
+to lane labels, and the `importBpmnXml` → `applyBpsimToDiagram` → `autofillSimulation` pipeline has
+moved since. The regenerated data was **not** committed.
+
+CI would catch it — **T0571** requires every example to carry a calendar its human teams follow — so
+this is a trap for whoever runs the generator, not a live defect. But it blocks the examples
+programme, because Phases 2/4/5/6/7 all add examples through these scripts.
+
+- [ ] Decide: repair the pipeline until regeneration is idempotent, or formally retire
+      `gen-bpmn-examples.ts` and treat the committed packages as the source of truth
+- [ ] Whichever way — the answer must be written at the top of the script, so the next person does not
+      discover this by running it
 
 ---
 
@@ -369,7 +406,9 @@ claim that a pooled p95 flatters a process, and it should be legible in a single
 - **BPSim round-trip:** `tests/simulation/bpsim*.test.ts` after Phases 5 and 7, including the explicit
   decision about what happens to skills and disciplines on export.
 - **Generator:** re-run every `gen-*` example script in sequence and confirm `exampleData.json` still
-  holds every slug — the specific failure 0.1 fixes.
+  holds every slug — the specific failure 0.1 fixes, now guarded by **T3369**. Necessary but **not
+  sufficient**: also diff the packages, because surviving the merge is not the same as surviving
+  intact (see **0.4** — `gen-bpmn-examples.ts` still degrades its own two examples).
 - **New tests** from **T3369**, appended to `tests/TESTS_SUMMARY.md`.
 - **Docs:** `schema/UPDATE_EVERYTHING.md` Steps 0–12 on Phases 1, 3, 5 and 7.
 

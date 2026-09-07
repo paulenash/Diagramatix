@@ -5,11 +5,18 @@
  *
  * Keep the Anthropic-facing logic here so the API route stays thin (mirrors
  * staffNarrative.ts).
+ *
+ * THE PATTERN for everything in this folder, and the reason the folder exists:
+ * a pure buildXFacts() that computes every figure, a summariseX() that renders
+ * those figures deterministically (the fallback when AI is off), and a
+ * generateX() that hands the model ONLY the facts object. The model writes the
+ * prose and the ordering; it can never state a number it was not given, and the
+ * whole thing is unit-testable without an API call.
  */
 import { makeAiClient } from "@/app/lib/ai/anthropicClient";
 import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import type { Redactor } from "@/app/lib/ai/redaction";
-import type { RunMetrics } from "./results";
+import type { RunMetrics } from "../results";
 
 // Model resolved centrally via getAiGenerateModel() (was pinned to claude-opus-4-8)
 // so all AI honours the single admin-controlled model. See enterprise/ ENT-08.

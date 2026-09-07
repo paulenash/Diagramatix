@@ -2475,6 +2475,9 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 | T0961 | `tests/ai/aiClient.test.ts` | A Moonshot client authenticates with Bearer (authToken), not `x-api-key`. |
 | T1061 | `tests/routing/boundary-event-side.test.ts` | A corner event whose target is BELOW exits the bottom, not the right. |
 | T1077 | `tests/archimate/catalogue-v32.test.ts` | Every dual-form type maps to a `-box` key whose `-icon` sibling exists, so image ingestion can pick either form. |
+| T3369 | `tests/simulation/exampleSeeds.test.ts` | Every catalog example is still present in exampleData.json - a generator must merge by slug, never overwrite the file. |
+| T3370 | `tests/simulation/study-runs.test.ts` | `latestRunPerScenario` keeps the newest run of each scenario regardless of input order. |
+| T3371 | `tests/simulation/study-runs.test.ts` | An empty run history yields no rows rather than throwing. |
 
 > **Keep this section in sync.** Whenever an e2e spec is added, removed, or changes what it asserts, update this section. It is hand-maintained, not generated.
 

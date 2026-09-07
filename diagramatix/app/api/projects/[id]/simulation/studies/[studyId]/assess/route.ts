@@ -15,7 +15,7 @@ import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { enterAiContext, AI_INVOCATION_POINTS } from "@/app/lib/ai/aiTelemetry";
 import type { RunMetrics } from "@/app/lib/simulation/results";
-import { buildComparisonFacts, generateSimAssessment, summariseComparison } from "@/app/lib/simulation/assessFacts";
+import { buildComparisonFacts, generateSimAssessment, summariseComparison } from "@/app/lib/simulation/facts/assessFacts";
 
 type Params = { params: Promise<{ id: string; studyId: string }> };
 
