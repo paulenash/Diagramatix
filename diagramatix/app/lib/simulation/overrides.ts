@@ -13,6 +13,7 @@
 
 import type { SimNetwork, SimNode, SimEdge, SimTeam } from "./model";
 import type { SimDist } from "./types";
+import type { QueueDiscipline } from "./resourcePool";
 
 /** The overridable subset of a node's simulation params. Every field optional
  *  + sparse: only defined keys replace the baseline value. */
@@ -29,6 +30,8 @@ export interface NodeOverride {
 
 export interface TeamOverride {
   capacity?: number;
+  /** "What if we triaged?" is a scenario, not a rebuild of the model. */
+  discipline?: QueueDiscipline;
 }
 
 export interface EdgeOverride {
@@ -110,6 +113,7 @@ export function applyOverrides(baseline: SimNetwork, ov?: OverrideSet): SimNetwo
       const team = byId.get(id);
       if (team) {
         if (patch.capacity !== undefined) team.capacity = patch.capacity;
+        if (patch.discipline !== undefined) team.discipline = patch.discipline;
       } else if (patch.capacity !== undefined) {
         const created: SimTeam = { id, capacity: patch.capacity };
         net.teams.push(created);

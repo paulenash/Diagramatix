@@ -18,7 +18,7 @@ import { makeRng, type Rng } from "./rng";
 import { sample } from "./distributions";
 import { compileExpr, type CompiledExpr, type Value } from "./expr";
 import type { SimNetwork, SimNode, SimEdge, EventSub, EventChannel } from "./model";
-import { SECONDS_PER_UNIT, type SimRunConfig, type PlannedIntervention } from "./types";
+import { SECONDS_PER_UNIT, type SimRunConfig, type PlannedIntervention, type SimDist } from "./types";
 import { isOpenAt, nextOpenAt, rateAt, boundariesIn, advanceWorkingClock, advanceWorkingDays, nextTimeOfDayClock } from "./calendar";
 import type { RepStats, NodeStat } from "./statistics";
 
@@ -55,6 +55,49 @@ interface Token {
 }
 
 function cloneStack(s: Frame[]): Frame[] { return s.map((f) => ({ ...f })); }
+
+/**
+ * Reserved token properties. Both are ORDINARY properties — declared in
+ * `network.properties`, set at a source, assigned at a gateway, or computed from
+ * an expression like any other. Nothing new was added to the token to support
+ * either; a model that never mentions them behaves exactly as it always did.
+ *
+ *   priority — higher is served sooner by a team whose queue discipline is
+ *              "priority". Ignored under FIFO.
+ *   segment  — the class of work this case belongs to ("urgent", "standard"),
+ *              so the service level can be reported PER SEGMENT. A pooled p95
+ *              can look healthy while the segment that matters most misses its
+ *              target entirely, which is the commonest way a simulation
+ *              flatters a process.
+ */
+export const PRIORITY_PROP = "priority";
+export const SEGMENT_PROP = "segment";
+
+/** A token property as a number, or undefined when unset/non-numeric. */
+function numProp(token: Token, name: string): number | undefined {
+  const v = token.props?.[name];
+  return typeof v === "number" && Number.isFinite(v) ? v : undefined;
+}
+
+/** A token property as a non-empty string, or undefined. */
+function strProp(token: Token, name: string): string | undefined {
+  const v = token.props?.[name];
+  return typeof v === "string" && v.trim() ? v.trim() : undefined;
+}
+
+/** The mean of a distribution — the expected service time a shortest-first queue
+ *  orders by. An approximation on purpose: the real duration is not known until
+ *  it is sampled, and a queue cannot see the future either. */
+function distMeanOf(d: SimDist): number | undefined {
+  switch (d.kind) {
+    case "fixed": return d.value;
+    case "uniform": return (d.min + d.max) / 2;
+    case "triangular": return (d.min + d.mode + d.max) / 3;
+    case "normal": return d.mean;
+    case "exponential": return d.mean;
+    default: return undefined;
+  }
+}
 
 /** How many times a loop / multi-instance spec says the work happens. */
 function loopCount(loop: NonNullable<SimNode["loop"]>) {
@@ -130,7 +173,7 @@ export interface SimState {
   // Applied-intervention state (so an Operator fork preserves timed changes).
   arrivalMult?: Record<string, number>;
   edgeProb?: Record<string, number>;
-  acc: { arrived: number; completed: number; flowSum: number; flowCount: number; flowSamples?: number[]; processWaitTotal?: number; queueWaitTotal?: number; perNode: Record<string, NodeAcc> };
+  acc: { arrived: number; completed: number; flowSum: number; flowCount: number; flowSamples?: number[]; flowBySegment?: Record<string, number[]>; processWaitTotal?: number; queueWaitTotal?: number; perNode: Record<string, NodeAcc> };
 }
 
 export class Engine {
@@ -181,6 +224,9 @@ export class Engine {
    *  Transient (pooled into a compact CaseDist at aggregate time); never persisted
    *  on the run except via a snapshot for Operator fork/resume. */
   private flowSamples: number[] = [];
+  /** The same cases, keyed by their `segment` property. Empty for a model that
+   *  declares no segments, and then omitted entirely from the results. */
+  private flowBySegment = new Map<string, number[]>();
   /** Total authored NON-SEIZING wait (SimNode.waitTime) elapsed in the stats
    *  window — the courier collecting, the customer deciding, the batch waiting
    *  for tonight's run. Distinct from queue wait: nobody is working, and nobody
@@ -224,7 +270,7 @@ export class Engine {
       }
       for (const es of n.eventSubs ?? []) this.esubById.set(es.id, es);
     }
-    for (const t of network.teams) this.pools.set(t.id, new ResourcePool<Pending>(t.capacity, 0));
+    for (const t of network.teams) this.pools.set(t.id, new ResourcePool<Pending>(t.capacity, 0, t.discipline ?? "fifo"));
   }
 
   /** Seed sources with their first arrival, and schedule any planned
@@ -317,6 +363,7 @@ export class Engine {
   private resetStats(now: number): void {
     this.arrived = 0; this.completed = 0; this.flowSum = 0; this.flowCount = 0;
     this.flowSamples = [];
+    this.flowBySegment.clear();
     this.processWaitTotal = 0; this.queueWaitTotal = 0;
     this.perNode.clear();
     for (const p of this.pools.values()) p.resetStats(now);
@@ -346,6 +393,13 @@ export class Engine {
     this.arrivalsByNode.set(nodeId, count + 1);
 
     const token: Token = { id: `t${this.nextTokenId++}`, enteredAt: this.clock, props: this.initProps(), callStack: [] };
+    // A SOURCE's own assignments run here, at creation. They were being skipped
+    // entirely: assignments are applied in enterNode, and a new token never
+    // "enters" the source it was born at — it is created and sent straight on. So
+    // "priority = 10 on the urgent stream", written on the source exactly as the
+    // model documents, silently did nothing. Nothing existing changes behaviour
+    // by fixing it, because any such assignment was already having no effect.
+    this.applyAssignments(token, node);
     this.tokens.set(token.id, token);
     if (this.warmedUp) this.arrived++;
     this.emit("spawn", token.id, nodeId);
@@ -798,7 +852,13 @@ export class Engine {
       const pool = this.pools.get(node.teamId);
       if (pool) {
         const pending: Pending = { tokenId: token.id, nodeId: node.id, units: plan.units, requestedAt: this.clock, plan };
-        const granted = pool.request(this.clock, plan.units, pending);
+        // Priority needs no new concept: it is an ordinary token property, so it
+        // can be set at a source, assigned at a gateway, or computed from an
+        // expression like any other. Under FIFO the pool ignores both of these.
+        const granted = pool.request(this.clock, plan.units, pending, {
+          priority: numProp(token, PRIORITY_PROP),
+          serviceEstimate: node.cycleTime ? distMeanOf(node.cycleTime) : undefined,
+        });
         if (granted) this.startService(token, node, 0, plan);
         else this.emit("queue", token.id, node.id); // queued — service starts on a future release
         return;
@@ -1036,7 +1096,12 @@ export class Engine {
       else this.branchJoin.delete(groupId);
     }
     this.emit("exit", token.id);
-    if (this.warmedUp && !token.internal) { const flow = this.clock - token.enteredAt; this.completed++; this.flowSum += flow; this.flowCount++; this.flowSamples.push(flow); }
+    if (this.warmedUp && !token.internal) {
+      const flow = this.clock - token.enteredAt;
+      this.completed++; this.flowSum += flow; this.flowCount++; this.flowSamples.push(flow);
+      const seg = strProp(token, SEGMENT_PROP);
+      if (seg) (this.flowBySegment.get(seg) ?? this.flowBySegment.set(seg, []).get(seg)!).push(flow);
+    }
     this.tokens.delete(token.id);
   }
 
@@ -1078,6 +1143,7 @@ export class Engine {
       completed: this.completed,
       avgFlowTime: this.flowCount ? this.flowSum / this.flowCount : 0,
       flowSamples: this.flowSamples,
+      ...(this.flowBySegment.size ? { flowSamplesBySegment: Object.fromEntries(this.flowBySegment) } : {}),
       processWaitTotal: this.processWaitTotal,
       queueWaitTotal: this.queueWaitTotal,
       perNode, perTeam,
@@ -1116,7 +1182,7 @@ export class Engine {
       arrivalsByNode: Object.fromEntries(this.arrivalsByNode),
       arrivalMult: Object.fromEntries(this.arrivalMult),
       edgeProb: Object.fromEntries(this.edgeProb),
-      acc: { arrived: this.arrived, completed: this.completed, flowSum: this.flowSum, flowCount: this.flowCount, flowSamples: [...this.flowSamples], processWaitTotal: this.processWaitTotal, queueWaitTotal: this.queueWaitTotal, perNode },
+      acc: { arrived: this.arrived, completed: this.completed, flowSum: this.flowSum, flowCount: this.flowCount, flowSamples: [...this.flowSamples], flowBySegment: Object.fromEntries(this.flowBySegment), processWaitTotal: this.processWaitTotal, queueWaitTotal: this.queueWaitTotal, perNode },
     };
   }
 
@@ -1151,6 +1217,7 @@ export class Engine {
     // reports less than it measured — which is exactly what the determinism test
     // caught when these two were first added.
     e.processWaitTotal = snap.acc.processWaitTotal ?? 0; e.queueWaitTotal = snap.acc.queueWaitTotal ?? 0;
+    e.flowBySegment = new Map(Object.entries(snap.acc.flowBySegment ?? {}).map(([k, v]) => [k, [...v]]));
     e.perNode = new Map(Object.entries(snap.acc.perNode).map(([id, a]) => [id, { ...a }]));
     return e;
   }

@@ -9,11 +9,37 @@
  * contention. Time-weighted utilisation + queue stats are accrued on every
  * state change (so they're exact, not sampled). The pool is fully serialisable
  * for SimState snapshot/resume, and `setCapacity` is the live Operator lever.
+ *
+ * QUEUE DISCIPLINE. Real departments are not first-in-first-out: urgent cases
+ * jump, complaints have a clock, someone is always expediting. The queue can
+ * therefore be ordered by priority or by shortest-job-first as well as by
+ * arrival. FIFO is the DEFAULT and is bit-identical to the behaviour before
+ * disciplines existed — a model that declares nothing runs exactly as it did.
+ *
+ * Ordering is always stable and deterministic: every request carries a monotonic
+ * arrival sequence, which breaks ties inside equal priority (so a priority queue
+ * is FIFO within each priority) and keeps a run reproducible.
+ *
+ * Head-of-line blocking is DELIBERATELY kept: if the request at the front does
+ * not fit, nothing behind it is served, even if it would. Serving past a blocked
+ * head would change every existing model's results and quietly turn a queue into
+ * something no department would recognise.
  */
+
+/** How a pool chooses who to serve next when capacity frees up. */
+export type QueueDiscipline = "fifo" | "priority" | "shortest-first";
 
 export interface QueuedRequest<R> {
   units: number;
   payload: R;
+  /** Higher is served sooner. Absent = 0, so an unprioritised model is FIFO. */
+  priority?: number;
+  /** Expected service time, for shortest-first. Absent sorts last, because a job
+   *  of unknown length must not jump ahead of one known to be short. */
+  serviceEstimate?: number;
+  /** Monotonic arrival order — the stable tie-break, and what keeps a priority
+   *  queue FIFO within each priority. */
+  seq: number;
 }
 
 export interface PoolStats {
@@ -25,6 +51,8 @@ export interface PoolStats {
 
 export interface PoolState<R> {
   capacity: number;
+  discipline?: QueueDiscipline;
+  seqCounter?: number;
   busyUnits: number;
   queue: QueuedRequest<R>[];
   busyArea: number;
@@ -37,6 +65,9 @@ export interface PoolState<R> {
 
 export class ResourcePool<R = unknown> {
   private capacity: number;
+  private discipline: QueueDiscipline;
+  /** Monotonic, so ordering never depends on array identity or insertion timing. */
+  private seqCounter = 0;
   /** The pool's current size. Read by the engine to decide how many instances
    *  of a parallel multi-instance activity can actually overlap. */
   get size(): number { return this.capacity; }
@@ -50,8 +81,9 @@ export class ResourcePool<R = unknown> {
   private lastUpdate = 0;
   private statsStart = 0;
 
-  constructor(capacity: number, now = 0) {
+  constructor(capacity: number, now = 0, discipline: QueueDiscipline = "fifo") {
     this.capacity = Math.max(0, capacity);
+    this.discipline = discipline;
     this.lastUpdate = now;
     this.statsStart = now;
   }
@@ -74,16 +106,42 @@ export class ResourcePool<R = unknown> {
   }
 
   /** Request `units` for `payload`. Returns true if granted immediately, false
-   *  if it was queued (the engine will be handed the payload again on release). */
-  request(now: number, units: number, payload: R): boolean {
+   *  if it was queued (the engine will be handed the payload again on release).
+   *  `opts` carries the case's priority and expected service time; both are
+   *  ignored under FIFO. */
+  request(now: number, units: number, payload: R, opts?: { priority?: number; serviceEstimate?: number }): boolean {
     this.accrue(now);
     if (this.busyUnits + units <= this.capacity) {
       this.busyUnits += units;
       return true;
     }
-    this.queue.push({ units, payload });
+    this.enqueue({ units, payload, seq: this.seqCounter++, ...(opts?.priority !== undefined ? { priority: opts.priority } : {}), ...(opts?.serviceEstimate !== undefined ? { serviceEstimate: opts.serviceEstimate } : {}) });
     if (this.queue.length > this.maxQueue) this.maxQueue = this.queue.length;
     return false;
+  }
+
+  /** Place a request according to the discipline. Stable in every case: equal
+   *  keys keep arrival order, so the result never depends on sort implementation. */
+  private enqueue(req: QueuedRequest<R>): void {
+    if (this.discipline === "fifo") { this.queue.push(req); return; }
+    const rank = this.discipline === "priority"
+      ? (q: QueuedRequest<R>) => -(q.priority ?? 0)                       // higher priority first
+      : (q: QueuedRequest<R>) => (q.serviceEstimate ?? Number.POSITIVE_INFINITY); // shortest first
+    const mine = rank(req);
+    let i = this.queue.length;
+    while (i > 0 && rank(this.queue[i - 1]) > mine) i--;
+    this.queue.splice(i, 0, req);
+  }
+
+  /** The live lever for queue discipline — changing it re-orders those already
+   *  waiting, which is what actually happens when a department starts triaging. */
+  setDiscipline(now: number, discipline: QueueDiscipline): void {
+    this.accrue(now);
+    this.discipline = discipline;
+    if (discipline === "fifo") { this.queue.sort((a, b) => a.seq - b.seq); return; }
+    const waiting = [...this.queue];
+    this.queue = [];
+    for (const q of waiting.sort((a, b) => a.seq - b.seq)) this.enqueue(q);
   }
 
   /** Release `units`; greedily grant queued requests that now fit (FIFO).
@@ -142,7 +200,7 @@ export class ResourcePool<R = unknown> {
 
   toJSON(): PoolState<R> {
     return {
-      capacity: this.capacity, busyUnits: this.busyUnits,
+      capacity: this.capacity, discipline: this.discipline, seqCounter: this.seqCounter, busyUnits: this.busyUnits,
       queue: this.queue.map((q) => ({ ...q })),
       busyArea: this.busyArea, queueArea: this.queueArea, capacityArea: this.capacityArea,
       maxQueue: this.maxQueue, lastUpdate: this.lastUpdate, statsStart: this.statsStart,
@@ -150,7 +208,10 @@ export class ResourcePool<R = unknown> {
   }
 
   static fromJSON<R>(s: PoolState<R>): ResourcePool<R> {
-    const p = new ResourcePool<R>(s.capacity, s.lastUpdate);
+    // An older snapshot has neither field; FIFO and a fresh counter reproduce
+    // exactly what that snapshot was doing when it was taken.
+    const p = new ResourcePool<R>(s.capacity, s.lastUpdate, s.discipline ?? "fifo");
+    p.seqCounter = s.seqCounter ?? 0;
     p.busyUnits = s.busyUnits;
     p.queue = s.queue.map((q) => ({ ...q }));
     p.busyArea = s.busyArea; p.queueArea = s.queueArea; p.capacityArea = s.capacityArea;

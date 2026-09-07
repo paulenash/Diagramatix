@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-09-07  ·  **Document version:** 7.0  ·  **Suite:** 411 test files · 2,773 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T3457  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-09-07  ·  **Document version:** 7.0  ·  **Suite:** 412 test files · 2,786 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T3470  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
@@ -34,9 +34,9 @@ Each test file has its own section below, grouped into layers. Within each secti
 | **Protects you against** | In plain terms, the real-world problem that would occur if this behaviour regressed. |
 | **How it would break (go red)** | The kind of code or data change that would make this specific test fail — i.e. what the test is watching. |
 
-**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T3458**, the one after **T3459**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
+**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T3471**, the one after **T3472**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T3457`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
+> **Highest ref allocated: `T3470`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -2564,6 +2564,19 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 | T3455 | `tests/simulation/sweep.test.ts` | A sweep over the work budget loses replications before steps - the curve keeps its shape. |
 | T3456 | `tests/simulation/sweep.test.ts` | A reasonable sweep passes through unclamped. |
 | T3457 | `tests/simulation/sweep.test.ts` | A sweep is never reduced below two points, which would not be a curve. |
+| T3458 | `tests/simulation/queue-discipline.test.ts` | A model declaring no queue discipline runs bit-identically to before. |
+| T3459 | `tests/simulation/queue-discipline.test.ts` | A segment-free model reports no per-segment split at all. |
+| T3460 | `tests/simulation/queue-discipline.test.ts` | FIFO serves in arrival order regardless of priority. |
+| T3461 | `tests/simulation/queue-discipline.test.ts` | A priority queue serves the urgent case first, and is FIFO within a priority. |
+| T3462 | `tests/simulation/queue-discipline.test.ts` | Shortest-first serves the quick job first; an unknown length never jumps ahead. |
+| T3463 | `tests/simulation/queue-discipline.test.ts` | Head-of-line blocking is kept: nothing is served past a request that does not fit. |
+| T3464 | `tests/simulation/queue-discipline.test.ts` | Changing discipline mid-run re-orders those already waiting. |
+| T3465 | `tests/simulation/queue-discipline.test.ts` | Discipline and queue order survive a snapshot. |
+| T3466 | `tests/simulation/queue-discipline.test.ts` | An older snapshot with no discipline resumes as FIFO. |
+| T3467 | `tests/simulation/queue-discipline.test.ts` | With no priorities assigned, a priority queue is a FIFO queue. |
+| T3468 | `tests/simulation/queue-discipline.test.ts` | The service level is reported per segment, alongside the pooled figure. |
+| T3469 | `tests/simulation/queue-discipline.test.ts` | Triaging gets urgent cases through faster, at the routine cases' expense. |
+| T3470 | `tests/simulation/queue-discipline.test.ts` | The pooled p95 can hide a segment shift - the argument for reporting segments. |
 
 > **Keep this section in sync.** Whenever an e2e spec is added, removed, or changes what it asserts, update this section. It is hand-maintained, not generated.
 

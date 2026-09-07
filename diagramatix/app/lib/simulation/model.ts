@@ -8,6 +8,7 @@
  */
 
 import type { SimDist, WorkCalendar } from "./types";
+import type { QueueDiscipline } from "./resourcePool";
 
 export type NodeKind = "source" | "task" | "gateway" | "delay" | "sink" | "subprocess";
 
@@ -155,6 +156,10 @@ export interface SimEdge {
 export interface SimTeam {
   id: string;
   capacity: number;
+  /** How the team's queue is ordered. Absent = "fifo", which is what every model
+   *  did before disciplines existed. See ResourcePool for why head-of-line
+   *  blocking is kept in every discipline. */
+  discipline?: QueueDiscipline;
   /** Working hours: the team is staffed at `capacity` during open windows and
    *  0 when closed (in-service tasks finish; new seizes wait). Absent → 24/7. */
   calendar?: WorkCalendar;

@@ -22,6 +22,12 @@ export interface RepStats {
   /** Flow time of every individual completed case this replication — pooled
    *  across replications into the case-level distribution (`caseFlow`). */
   flowSamples?: number[];
+  /** The same cases split by their `segment` token property, when the model uses
+   *  one. A POOLED p95 can look healthy while the segment that matters most
+   *  misses its target entirely — the commonest way a simulation flatters a
+   *  process — so the split is reported alongside, never instead. Absent when
+   *  the model declares no segments, which is most of them. */
+  flowSamplesBySegment?: Record<string, number[]>;
   /** Where the elapsed time that is NOT work went, in clock units, summed over
    *  the stats window. Two separate quantities because they have two different
    *  remedies: `queueWaitTotal` is time spent waiting for a person and MORE
@@ -101,6 +107,9 @@ export interface AggregatedStats {
    *  replications: true per-case p50/p95, spread (sd) + a histogram. Distinct
    *  from `flowTime`, which is the run-to-run variation of each run's mean. */
   caseFlow: CaseDist;
+  /** Case-level flow-time distribution PER SEGMENT ("urgent", "standard"),
+   *  pooled over every replication. Absent when the model uses no segments. */
+  caseFlowBySegment?: Record<string, CaseDist>;
   /** Total authored non-seizing wait across the run (clock units) — the courier,
    *  the overnight batch. Undefined for runs recorded before it was measured;
    *  never report that absence as zero waiting. */
@@ -143,6 +152,17 @@ export function aggregate(reps: RepStats[]): AggregatedStats {
   // case-level distribution (percentiles describe cases, not run averages).
   const allCaseFlows: number[] = [];
   for (const r of reps) if (r.flowSamples) for (const v of r.flowSamples) allCaseFlows.push(v);
+  // Pool each segment separately, so "urgent" is measured against its own target
+  // rather than being averaged away inside the whole.
+  const bySegment: Record<string, number[]> = {};
+  for (const r of reps) {
+    for (const [seg, vals] of Object.entries(r.flowSamplesBySegment ?? {})) {
+      (bySegment[seg] ??= []).push(...vals);
+    }
+  }
+  const caseFlowBySegment = Object.keys(bySegment).length
+    ? Object.fromEntries(Object.entries(bySegment).map(([seg, vals]) => [seg, caseDistOf(vals)]))
+    : undefined;
   // Only report the wait split when the runs actually carry it: a replication
   // that predates the measurement has no zero to average, it has no figure.
   const hasWaitSplit = reps.length > 0 && reps.every((r) => typeof r.processWaitTotal === "number" && typeof r.queueWaitTotal === "number");
@@ -160,6 +180,7 @@ export function aggregate(reps: RepStats[]): AggregatedStats {
     totalCost: statOf(totalCostPerRep),
     costPerCase: statOf(costPerCasePerRep),
     caseFlow: caseDistOf(allCaseFlows),
+    ...(caseFlowBySegment ? { caseFlowBySegment } : {}),
     perNode, perTeam,
   };
 }
