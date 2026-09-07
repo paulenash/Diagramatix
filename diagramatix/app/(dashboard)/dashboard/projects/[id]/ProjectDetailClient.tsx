@@ -547,6 +547,27 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
   // Project-level overlays — the Simulator and Process Mining consoles, opened
   // from the toolbar (same as the dashboard project menu).
   const [showSim, setShowSim] = useState(false);
+  /**
+   * The greeting for a freshly-loaded Simulation Example.
+   *
+   * Paul, 2026-09-07: land on the project as now, then ask whether to go
+   * straight in or look around first. Someone who chose a simulation example
+   * came to see a simulation, and the alternative is landing on a project page
+   * with no indication of which of its buttons is the point.
+   *
+   * The name arrives as a query parameter and is cleared the moment it is read,
+   * so a reload or a bookmark does not ask again.
+   */
+  const [simExample, setSimExample] = useState<string | null>(null);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    const name = url.searchParams.get("simExample");
+    if (!name) return;
+    setSimExample(name);
+    url.searchParams.delete("simExample");
+    window.history.replaceState(null, "", url.pathname + url.search);
+  }, []);
   const [showMining, setShowMining] = useState(false);
   // Simulation resources (people + automation) and working calendars are
   // PROJECT-level, shared by every process in it — so they are maintainable from
@@ -3597,6 +3618,42 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
       )}
 
       {/* Project-level Simulator + Process Mining consoles (full-screen overlays) */}
+      {/* The greeting for a freshly-loaded Simulation Example. Green and
+          monospaced to match the Simulator it offers, rather than the project
+          page it sits on: the point is that this is the Simulator's doorstep. */}
+      {simExample && !showSim && (
+        <div className="fixed inset-0 z-[70] bg-black/70 flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-lg border border-green-500/60 bg-black text-green-400 font-mono shadow-[0_0_40px_rgba(74,222,128,0.25)]">
+            <div className="px-5 py-3 border-b border-green-500/30 flex items-center gap-2">
+              <img src="/logos/diagramatix-icon.svg" alt="" aria-hidden className="w-5 h-5" />
+              <span className="tracking-[0.25em] text-green-300 text-xs">SIMULATION EXAMPLE</span>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <p className="text-sm text-green-200">
+                This is the Simulation Example, <strong className="text-green-100">{simExample}</strong>, home Project.
+              </p>
+              <p className="text-sm text-green-400/80">
+                Do you want to enter the Simulator immediately or explore the Project first?
+              </p>
+            </div>
+            <div className="flex justify-end gap-2 px-5 py-3 border-t border-green-500/30">
+              <button
+                onClick={() => setSimExample(null)}
+                className="px-3 py-1.5 text-xs border border-green-500/50 text-green-300 rounded hover:bg-green-500/10"
+              >
+                Explore Project
+              </button>
+              <button
+                autoFocus
+                onClick={() => { setSimExample(null); setShowSim(true); }}
+                className="px-3 py-1.5 text-xs font-medium rounded bg-green-500 text-black hover:bg-green-400"
+              >
+                Enter the Simulator
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {showSim && (
         <SimulatorOverlay
           projectId={project.id}

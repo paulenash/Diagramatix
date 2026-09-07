@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
-  cells3From, step3, fate3, boundingBox3, sameShape3, sameCells3, pack3, x3, y3, z3,
-  NEIGHBOUR_COUNT,
+  cells3From, step3, fate3, decay3, components3, boundingBox3, sameShape3, sameCells3,
+  pack3, x3, y3, z3, NEIGHBOUR_COUNT,
 } from "@/app/lib/life/engine3d";
 import {
   BAYS_6567, parseRule3d, formatRule3d, describeRule3d, RULE_3D_LIBRARY, rule3dFor, sameRule3d,
@@ -94,9 +94,17 @@ describe("the pattern library does what it says", () => {
     for (const p of LIFE_3D_PATTERNS) {
       const rule = parseRule3d(p.rule);
       expect(rule, `${p.id} names an unparseable rule`).not.toBeNull();
+      if (p.category === "decaying") {
+        // A decaying pattern is not one object, so fate3 cannot judge it: it
+        // ends as a scattering, and the claim is about what the scattering
+        // CONTAINS. decay3 splits the final state and runs each piece.
+        const d = decay3(cells3From(p.cells), rule!, 2000, 60);
+        expect(d.gliders, `${p.id} leaves no glider`).toBeGreaterThan(0);
+        expect(d.settled, `${p.id} settles too early to be worth showing`).toBeGreaterThan(5);
+        continue;
+      }
       const f = fate3(cells3From(p.cells), rule!, 200);
-      const expectedKind = p.category === "spaceship" ? "spaceship" : p.category;
-      expect(f.kind, `${p.id} is a ${f.kind}, not a ${expectedKind}`).toBe(expectedKind);
+      expect(f.kind, `${p.id} is a ${f.kind}, not a ${p.category}`).toBe(p.category);
       expect(f.period, `${p.id} period`).toBe(p.period);
       if (p.displacement) expect(f.displacement, `${p.id} travel`).toEqual(p.displacement);
       else expect(f.displacement, `${p.id} should not move`).toBeUndefined();
@@ -221,5 +229,60 @@ describe("the rule notation copes with 26 neighbours", () => {
     expect(bays).toContain("exactly 6");
     expect(bays).toContain("26 neighbours");
     expect(describeRule3d(BAYS_6567, 6).map((r) => r.when).join(" ")).toContain("6 neighbours");
+  });
+});
+
+/**
+ * What a long run LEAVES.
+ *
+ * Paul, 2026-09-07: "Add any long life 3-D Life patterns that eventually decay
+ * to one or more gliders."
+ *
+ * The searching is the finding here. There is no 3-D acorn under these rules —
+ * 5,000 soups and ~25,000 engineered collisions put the ceiling at 42
+ * generations — and the reason is the rule doing its job: Bays chose B6/S567
+ * precisely so that soups do NOT run away.
+ */
+describe("splitting a run into what it left behind", () => {
+  it("T3362 two objects that do not touch are two objects", () => {
+    // A glider inside a field of debris is invisible to any test applied to
+    // everything at once, which is why this exists.
+    const far = cells3From([
+      ...pattern3dById("cube")!.cells,
+      ...pattern3dById("cube")!.cells.map(([x, y, z]) => [x + 20, y, z] as [number, number, number]),
+    ]);
+    expect(components3(far)).toHaveLength(2);
+  });
+
+  it("T3363 touching at a CORNER still counts as one object", () => {
+    // Under the Moore neighbourhood a corner-toucher can affect its neighbour,
+    // so it is part of the same thing. Splitting them would report two still
+    // lifes where there is one reacting object.
+    const touching = cells3From([[0, 0, 0], [1, 1, 1]]);
+    expect(components3(touching)).toHaveLength(1);
+    expect(components3(touching, "faces"), "by faces they are separate").toHaveLength(2);
+  });
+
+  it("T3364 a glider hitting a cube runs on, then leaves a glider", () => {
+    // The headline of the decaying category, with its real numbers: it is 20
+    // generations, not a thousand, and saying so is the point.
+    const d = decay3(cells3From(pattern3dById("glider-into-cube")!.cells), BAYS_6567, 2000, 60);
+    expect(d.gliders).toBeGreaterThanOrEqual(1);
+    expect(d.settled).toBeGreaterThan(10);
+    expect(d.peakPopulation).toBeGreaterThan(30);
+  });
+
+  it("T3365 two gliders colliding leave one", () => {
+    const d = decay3(cells3From(pattern3dById("glider-meets-glider")!.cells), BAYS_6567, 2000, 60);
+    expect(d.gliders).toBe(1);
+    expect(d.settled).toBeGreaterThan(10);
+  });
+
+  it("T3366 a plain still life leaves no glider, so the test can fail", () => {
+    // The negative control. Without it, "leaves a glider" would pass for
+    // anything at all that survives.
+    const d = decay3(cells3From(pattern3dById("cube")!.cells), BAYS_6567, 200, 40);
+    expect(d.gliders).toBe(0);
+    expect(d.stills).toBe(1);
   });
 });

@@ -226,3 +226,86 @@ export function fate3(
   }
   return { kind: "growing", generation: limit, period: 0, population: cells.size, peakPopulation: peak };
 }
+
+/**
+ * Split a population into the objects it is actually made of.
+ *
+ * Two cubes belong to the same object when they touch — including at a corner,
+ * because the neighbourhood is what decides whether one can affect the other,
+ * and under the Moore neighbourhood a corner-toucher can.
+ *
+ * This is how a glider is spotted inside the debris of a long run: the final
+ * state of a methuselah is not one thing, it is a scattering of still lifes,
+ * oscillators and whatever is flying away, and each has to be judged on its own.
+ */
+export function components3(cells: Cells3, neighbourhood: Neighbourhood = "moore"): Cells3[] {
+  const offsets = neighbourhood === "faces" ? FACES : NEIGHBOURS;
+  const unseen = new Set(cells);
+  const out: Cells3[] = [];
+  while (unseen.size) {
+    const root = unseen.values().next().value as number;
+    unseen.delete(root);
+    const comp: Cells3 = new Set([root]);
+    const stack = [root];
+    while (stack.length) {
+      const k = stack.pop()!;
+      const x = x3(k), y = y3(k), z = z3(k);
+      for (const [dx, dy, dz] of offsets) {
+        const nk = pack3(x + dx, y + dy, z + dz);
+        if (!unseen.has(nk)) continue;
+        unseen.delete(nk);
+        comp.add(nk);
+        stack.push(nk);
+      }
+    }
+    out.push(comp);
+  }
+  return out;
+}
+
+/**
+ * Run a pattern out and report what it LEAVES — the 3-D methuselah question.
+ *
+ * Paul, 2026-09-07: "Add any long life 3-D Life patterns that eventually decay
+ * to one or more gliders."
+ *
+ * The population going quiet is the settling point, exactly as in two
+ * dimensions: escaping gliders keep it constant while they fly, and everything
+ * else has stopped changing. At that moment the state is split into its separate
+ * objects and each is judged on its own, because a glider inside a field of
+ * debris is invisible to any test applied to the whole.
+ */
+export interface Decay3 {
+  /** The generation after which the population never changed again. */
+  settled: number;
+  peakPopulation: number;
+  population: number;
+  /** Objects the run left behind, and how many of them fly. */
+  gliders: number;
+  stills: number;
+  oscillators: number;
+  /** True when it never went quiet inside the limit. */
+  gaveUp: boolean;
+}
+
+export function decay3(
+  start: Cells3, rule: Rule, limit = 2000, quiet = 60, neighbourhood: Neighbourhood = "moore",
+): Decay3 {
+  let cells = start;
+  let pop = cells.size, peak = cells.size, last = 0, g = 0;
+  for (g = 1; g <= limit; g++) {
+    cells = step3(cells, rule, undefined, neighbourhood);
+    peak = Math.max(peak, cells.size);
+    if (cells.size !== pop) { pop = cells.size; last = g; }
+    if (cells.size === 0) break;
+    if (g - last >= quiet) break;
+  }
+  let gliders = 0, stills = 0, oscillators = 0;
+  for (const comp of components3(cells, neighbourhood)) {
+    const f = fate3(comp, rule, 40, neighbourhood);
+    if (f.kind === "spaceship") gliders++;
+    else if (f.kind === "still") stills++;
+    else if (f.kind === "oscillator") oscillators++;
+  }
+  return { settled: last, peakPopulation: peak, population: pop, gliders, stills, oscillators, gaveUp: g > limit };
+}

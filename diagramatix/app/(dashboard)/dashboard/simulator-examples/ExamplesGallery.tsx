@@ -55,7 +55,14 @@ export function ExamplesGallery({ isAdmin }: { isAdmin: boolean }) {
       if (!res.ok) { setErr(json.error ?? "Could not load example"); return; }
       // Always land on the new project (not straight into a diagram) so the
       // user sees the whole adopted example — its diagrams, study and library.
-      if (json.projectId) router.push(`/dashboard/projects/${json.projectId}`);
+      // The example TITLE rides along, so the project can say what it is and
+      // offer the simulator straight away: someone who came here to see a
+      // simulation should not have to work out which button is the point.
+      const ex = examples.find((e) => e.id === id);
+      if (json.projectId) {
+        router.push(`/dashboard/projects/${json.projectId}`
+          + `?simExample=${encodeURIComponent(ex?.title ?? "Simulation Example")}`);
+      }
       else if (json.openDiagramId) router.push(`/diagram/${json.openDiagramId}`);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Could not load example");

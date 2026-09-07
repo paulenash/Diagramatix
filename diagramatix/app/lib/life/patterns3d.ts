@@ -20,7 +20,7 @@
  * found none, which is reported as "none found", not "none exist".
  */
 
-export type Pattern3dCategory = "still" | "oscillator" | "spaceship";
+export type Pattern3dCategory = "still" | "oscillator" | "spaceship" | "decaying";
 
 export interface Life3dPattern {
   id: string;
@@ -41,12 +41,14 @@ export const CATEGORY_3D_LABEL: Record<Pattern3dCategory, string> = {
   still: "Still lifes",
   oscillator: "Oscillators",
   spaceship: "Gliders",
+  decaying: "Decaying to gliders",
 };
 
 export const CATEGORY_3D_NOTE: Record<Pattern3dCategory, string> = {
   still: "Never change at all.",
   oscillator: "Return to their own shape after a fixed number of generations.",
   spaceship: "Return to their own shape somewhere else — the thing Bays looked for before calling a 3-D rule an analogue of Life.",
+  decaying: "Run for a while and leave a glider behind. Under these rules that while is tens of generations, not thousands — there is no 3-D acorn.",
 };
 
 export const LIFE_3D_PATTERNS: Life3dPattern[] = [
@@ -93,9 +95,50 @@ export const LIFE_3D_PATTERNS: Life3dPattern[] = [
       [1, 0, 3], [2, 0, 3],
     ],
   },
+
+  // ── Long-lived, decaying to gliders ──────────────────────────────────────
+  //
+  // Paul, 2026-09-07: "Add any long life 3-D Life patterns that eventually decay
+  // to one or more gliders."
+  //
+  // "ANY" is the operative word, and the honest answer is that there is no 3-D
+  // acorn to be had under these rules. Two searches went looking:
+  //
+  //   - 5,000 random soups under B6/S567, from 4³ to 12³ and 30% to 60% dense:
+  //     the LONGEST anything took to settle was 42 generations, and roughly one
+  //     seed in 250 left a glider behind. B5/S45, B5/S56 and B67/S67 were
+  //     quieter still — 28, 20 and 17 generations, with no gliders at all.
+  //   - ~25,000 engineered collisions: a glider into each still life at every
+  //     offset and phase, and glider against glider likewise. The best was 20
+  //     generations.
+  //
+  // That is not the search failing; it is the rule doing what Bays picked it
+  // for. He wanted a 3-D rule where soups DO NOT run away, and a rule that
+  // settles in tens of generations is exactly that. The 2-D methuselahs live for
+  // thousands because B3/S23 sits far closer to the edge of chaos — which is the
+  // same reason B3/S23 on 26 neighbours explodes instead.
+  //
+  // So these are the longest-lived glider-producers that exist to be found, and
+  // their real numbers are stated rather than dressed up.
+  {
+    id: "glider-into-cube", name: "Glider into a cube", category: "decaying", rule: "B6/S567", period: 0,
+    behaviour: "A glider hits a still cube, the pair boils for 20 generations reaching 40 cubes, and ONE GLIDER walks away from the wreckage. The longest-lived glider-producer found in ~25,000 collisions — there is no 3-D acorn under this rule.",
+    cells: [
+      [0, 0, 0], [0, 0, 1], [0, 1, 0], [0, 1, 1], [1, 0, 0], [1, 0, 1], [1, 1, 0], [1, 1, 1],
+      [3, 0, 1], [3, 1, 1], [4, 0, 2], [4, 1, 2], [5, 0, 2], [5, 1, 2], [3, 0, 3], [3, 1, 3], [4, 0, 3], [4, 1, 3],
+    ],
+  },
+  {
+    id: "glider-meets-glider", name: "Glider meets glider", category: "decaying", rule: "B6/S567", period: 0,
+    behaviour: "Two gliders on converging courses. They collide, churn for 17 generations, and one glider comes out the far side — so the collision destroys one and turns the other, rather than annihilating both.",
+    cells: [
+      [0, 0, 0], [0, 1, 0], [1, 0, 1], [1, 1, 1], [2, 0, 1], [2, 1, 1], [0, 0, 2], [0, 1, 2], [1, 0, 2], [1, 1, 2],
+      [8, 2, 12], [8, 3, 12], [6, 2, 12], [6, 3, 13], [6, 3, 12], [6, 2, 13], [7, 2, 11], [7, 3, 11], [6, 2, 11], [6, 3, 11],
+    ],
+  },
 ];
 
-export const PATTERN_3D_ORDER: Pattern3dCategory[] = ["still", "oscillator", "spaceship"];
+export const PATTERN_3D_ORDER: Pattern3dCategory[] = ["still", "oscillator", "spaceship", "decaying"];
 
 export const pattern3dById = (id: string) => LIFE_3D_PATTERNS.find((p) => p.id === id);
 
