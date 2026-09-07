@@ -7,7 +7,7 @@
 | **This document** | The **live worklist** for building them. Phases follow the review's own stated build order (value first). Every phase names the files it touches and the existing functions it reuses. |
 | **Scope** | All 8 extensions + all 6 smaller items. New worked examples are planned alongside, one per new capability. |
 | **How to use** | Work an item, tick its box and set **Status** → `In progress` / `Shipped (<commit>)` / `Won't do (<reason>)`. Keep the review as the historical argument; keep this as the burn-down. |
-| **Progress log** | **2026-09-07** — **Phase 0 complete.** 0.1 generator merges by slug (guarded by T3369, proven to fail on a simulated overwrite); 0.2 `studyRuns.ts` + `latestRunPerScenario` (T3370/T3371); 0.3 `facts/` established, `assessFacts.ts` moved, both importers repointed (no compat shim — there were only two). **New finding: 0.4** — the generator is stale relative to its own committed output; see below. 382 simulation tests green, typecheck unchanged. |
+| **Progress log** | **2026-09-07** — **Phase 0 shipped (`e290a9b4`)**, except the newly-found 0.4. 0.1 generator merges by slug (guarded by T3369, proven to fail on a simulated overwrite); 0.2 `studyRuns.ts` + `latestRunPerScenario` (T3370/T3371); 0.3 `facts/` established, `assessFacts.ts` moved, both importers repointed (no compat shim — there were only two). **New finding: 0.4** — the generator is stale relative to its own committed output; see below. 382 simulation tests green, typecheck unchanged. |
 
 **Status values:** `Not started` · `In progress` · `Shipped (<commit>)` · `Blocked (<on what>)` · `Won't do (<reason>)`
 
@@ -59,7 +59,8 @@ would tell someone what to try next.
 
 ## Phase 0 — Foundations
 
-**Status:** ✅ `Shipped` · Was blocking every later phase.
+**Status:** ✅ `Shipped (e290a9b4)` — 0.1, 0.2, 0.3. **0.4 remains open** (see below). Was blocking
+every later phase; Phase 1 is now unblocked.
 
 ### 0.1 Fix the example-generator overwrite hazard ⚠️
 
