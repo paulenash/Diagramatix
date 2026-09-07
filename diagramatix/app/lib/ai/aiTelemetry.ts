@@ -29,6 +29,7 @@ export const AI_INVOCATION_POINTS = {
   MiningExplain: "mining.explain", // plain-language mining explanation
   SimulationAssess: "simulation.assess", // as-is/to-be assessment
   SimulationNextSteps: "simulation.next-steps", // "what should I try next?" from the run history
+  SimulationBusinessCase: "simulation.business-case", // cost per case, annual saving, payback
   StaffNarrative: "staff.narrative",
   GenerateSop: "sop.generate", // BPMN → SOP document prose (whole/lane/pool/subprocess)
   ProcessDiff: "bpmn.process-diff", // Diff Processes: plain-English summary of the differences between two BPMN versions
@@ -91,6 +92,7 @@ export const AI_INVOCATION_POINT_LABELS: Record<string, string> = {
   [AI_INVOCATION_POINTS.MiningExplain]: "Mining Explain",
   [AI_INVOCATION_POINTS.SimulationAssess]: "Simulation Assessment",
   [AI_INVOCATION_POINTS.SimulationNextSteps]: "Simulation Next Steps",
+  [AI_INVOCATION_POINTS.SimulationBusinessCase]: "Simulation Business Case",
   [AI_INVOCATION_POINTS.StaffNarrative]: "Staff Narrative",
   [AI_INVOCATION_POINTS.GenerateSop]: "SOP Generate",
   [AI_INVOCATION_POINTS.DictationRefine]: "Dictation Refine",

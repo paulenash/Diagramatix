@@ -1631,6 +1631,12 @@ model SimulationStudy {
   createdBy   User?                 @relation("SimulationStudyAuthor", fields: [createdById], references: [id], onDelete: SetNull)
   roots       SimulationStudyRoot[]
   scenarios   SimulationScenario[]
+  // Business-case inputs the run figures cannot supply: one-off implementation
+  // cost, annual case volume, and an OPTIONAL business cost of delay per hour
+  // (penalties/lost revenue — never staff cost, which the doing line already
+  // carries). All optional; the case reports what it can and names what is
+  // missing rather than assuming a zero. See facts/businessCase.ts.
+  businessCase Json       @default("{}")
   createdAt   DateTime              @default(now())
   updatedAt   DateTime              @updatedAt
 

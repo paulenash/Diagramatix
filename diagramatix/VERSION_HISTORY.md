@@ -15,6 +15,23 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.7.2482 — 2026-09-07 — What the change is worth, with a date on it
+
+- **Business case** — cost per case before and after, the saving, the annual figure, the one-off
+  cost and the month it pays back, narrated in plain English and exportable to Word, Excel or PDF.
+  A missing input is reported as missing, never treated as zero, and a change that does not pay
+  back says so instead of producing a flattering month.
+- **The cost of waiting, at last.** Cost has always been busy resource-hours and nothing else, so a
+  process that took three weeks because of waiting cost the same as one that took three hours.
+  Waiting is now measured and reported in TWO parts, because they have different remedies:
+  queueing for a person, which more capacity shortens, and waiting on the process (a courier, an
+  overnight batch), which staffing does not change at all. Also shown per case in the results.
+- **Rework as a named parameter** — a loop-back is found by walking the flow and expressed as
+  "12.5% of cases come back, a first-pass yield of 87.5%", which is the same number the engine
+  already had, in the words people use.
+- **"What if we automate this task?"** as a runnable scenario: the step keeps a small residual time
+  and stops occupying a person, so a Task Mining score becomes a quantified saving.
+- Schema: product 2.6 → 2.7 (new column `SimulationStudy.businessCase`). XSD unchanged (still 46).
 ## 2.6.2479 — 2026-09-07 — The Simulator says what to try next, and what changed since
 
 - **Suggested next steps** — the Simulator reads a study's run history and ranks what to try

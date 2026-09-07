@@ -31,6 +31,7 @@ const DB_IMPORTS = ['from "@/app/lib/db"', 'from "@prisma/'];
 const CLIENT_REACHABLE = [
   { entry: path.join(LIB, "simulation", "nextSteps.ts"), importedBy: "StudyManager.tsx" },
   { entry: path.join(LIB, "simulation", "runTrend.ts"), importedBy: "RunTrend.tsx / RunHistory.tsx" },
+  { entry: path.join(LIB, "simulation", "rework.ts"), importedBy: "SimDataPanel / StudyManager" },
 ];
 
 /** Relative import specifiers in a source file. Deliberately string-based: this

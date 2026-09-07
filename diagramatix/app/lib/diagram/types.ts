@@ -1254,8 +1254,16 @@ export const SCHEMA_VERSION = "46";
  *   very reference the trend uses. One boolean column on an OPERATIONAL table:
  *   the curated diagram-model DDL in ddlGenerate.ts is unaffected, and the XSD
  *   export shape is unchanged.
+ * 2.7 (2026-09-07) — DB: SimulationStudy.businessCase.
+ *   The business case: cost per case before and after, the annual difference,
+ *   the one-off cost and the month it pays back, exportable to Word/Excel/PDF.
+ *   The column holds the three figures a simulation cannot know —
+ *   implementation cost, annual volume, and an OPTIONAL business cost of delay
+ *   per hour. All optional: the case reports what it can and names what is
+ *   missing rather than assuming a zero. Operational table, so ddlGenerate.ts
+ *   is unaffected and the XSD export shape is unchanged.
  */
-export const PRODUCT_VERSION = "2.6";
+export const PRODUCT_VERSION = "2.7";
 
 /**
  * The structural (XSD) schema version of an export, as a single integer, tolerant of BOTH the

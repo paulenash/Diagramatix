@@ -219,12 +219,12 @@ Three decisions worth recording:
 
 ## Phase 2 — A business case, not a utilisation chart
 
-**Status:** `Not started` · No engine change.
+**Status:** ✅ `Shipped` — including smaller items 01 and 05. Product version 2.6 → 2.7.
 
-- [ ] `app/lib/simulation/facts/businessCase.ts`
-- [ ] `buildBusinessCaseChapters()` + route `.../studies/[studyId]/business-case?format=docx|xlsx|pdf`
-- [ ] Smaller item **01** — rework / first-pass yield as a named parameter
-- [ ] Smaller item **05** — "what if we automate this task?" in one click
+- [x] `app/lib/simulation/facts/businessCase.ts`
+- [x] `buildBusinessCaseChapters()` + route `.../studies/[studyId]/business-case?format=docx|xlsx|pdf`
+- [x] Smaller item **01** — rework / first-pass yield as a named parameter
+- [x] Smaller item **05** — "what if we automate this task?" in one click
 
 `buildBusinessCaseFacts(base, tobe, inputs)` where `inputs = { implementationCost, annualVolume,
 workingDaysPerYear, costOfDelayPerCaseHour? }` stored on the study. Outputs: cost per case before and
@@ -234,6 +234,32 @@ cost of delay) and cost of *rework*.
 
 > *No department head approves a change because a team is at 94% utilisation. They approve it because
 > of a number with a currency symbol and a date.*
+
+**As built — the design changed after Paul's question.** The plan proposed asking for a "cost of delay
+per case-hour" as a new input. Checking the engine showed that was inventing an input for something
+already measurable: `waitTime` is a NON-SEIZING delay (it releases the resource, then waits), queue
+wait is emergent from contention, and `cost = busyTime × rate` prices NEITHER. So the gap was an
+unmeasured output, not a missing input.
+
+What shipped instead:
+
+- **Waiting is measured in the engine** and reported in **two** lines, never pooled: queueing for a
+  person (capacity shortens it) and waiting on the process (capacity does nothing). Pooling them
+  would produce cases recommending headcount to fix waiting headcount cannot touch.
+- **The delay rate is optional and is the BUSINESS cost of elapsed time only** — penalties, lost
+  revenue, working capital. Never staff cost, which the doing line already carries. Leave it blank
+  and waiting shows in hours with no money: "40 hours per case, 31 of it the courier" is an argument
+  on its own.
+- **A missing input is named, never assumed zero**, and a change that does not pay back says so
+  instead of producing a flattering month.
+- **The exported document carries the DETERMINISTIC narrative**, so a downloaded artefact is
+  reproducible and does not depend on an AI call succeeding at the moment someone clicks Export.
+
+Neither smaller item needed an engine change. Rework is the loop-back edge probability read the
+other way round (`branchProbability` on the diagram, `probability` on the override — two names for
+one quantity at two layers). Automation is one override that keeps a 5% residual time and drops the
+task's demand on the team; the residual is deliberately not zero, because a case built on "instant
+and free" is one nobody believes.
 
 **Smaller item 01 — rework / first-pass yield.** No engine change: a rework loop's loop-back edge
 already carries a probability. Surface it in `SimDataPanel.tsx` as "what proportion comes back?", and

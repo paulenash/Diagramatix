@@ -14,6 +14,7 @@ import type { ReadinessIssue } from "@/app/lib/simulation/readiness";
 import { ResultsReport } from "./results/ResultsReport";
 import { ScenarioCompare } from "./results/ScenarioCompare";
 import { NextStepsPanel } from "./results/NextStepsPanel";
+import { BusinessCasePanel } from "./results/BusinessCasePanel";
 import { MIN_OBSERVATIONS } from "@/app/lib/simulation/nextSteps";
 import type { OverrideSet } from "@/app/lib/simulation/overrides";
 import { RunHistory } from "./results/RunHistory";
@@ -240,6 +241,7 @@ function ScenarioList({ projectId, detail, diagrams, onChanged, onRan }: { proje
   const [openId, setOpenId] = useState<string | null>(null);
   const [comparing, setComparing] = useState(false);
   const [suggesting, setSuggesting] = useState(false);
+  const [casing, setCasing] = useState(false);
   const [pairing, setPairing] = useState(false);
   // Scenarios that have a completed run — DONE from a prior session (persisted
   // status) plus any run in this session — so "compare scenarios" only enables
@@ -322,6 +324,16 @@ function ScenarioList({ projectId, detail, diagrams, onChanged, onRan }: { proje
         )}
         {detail.scenarios.length >= 2 && (
           <button
+            onClick={() => { if (canCompare) setCasing((v) => !v); }}
+            disabled={!canCompare}
+            title={canCompare ? "What the change is worth: cost per case, a year, and when it pays back" : "Run both scenarios first"}
+            className={`text-[10px] ${canCompare ? "text-green-400/70 hover:text-green-300" : "text-green-400/25 cursor-not-allowed"}`}
+          >
+            {casing ? "▾ hide business case" : "£ business case"}
+          </button>
+        )}
+        {detail.scenarios.length >= 2 && (
+          <button
             onClick={() => { if (canCompare) setComparing((v) => !v); }}
             disabled={!canCompare}
             title={canCompare ? "Compare the scenarios' latest runs" : "Run both scenarios first, then compare"}
@@ -332,6 +344,15 @@ function ScenarioList({ projectId, detail, diagrams, onChanged, onRan }: { proje
         )}
       </div>
       {pairing && <AsIsToBeSetup diagrams={diagrams} onCreate={createAsIsToBe} />}
+      {casing && canCompare && (
+        <div className="border border-green-500/30 rounded p-2 mb-2">
+          <p className="text-green-400/70 uppercase tracking-widest text-[10px] mb-1.5">Business case</p>
+          <BusinessCasePanel
+            baseUrl={`/api/projects/${projectId}/simulation/studies/${detail.id}/business-case`}
+            scenarios={detail.scenarios.map((sc) => ({ id: sc.id, name: sc.name, isBaseline: sc.isBaseline }))}
+          />
+        </div>
+      )}
       {suggesting && (
         <div className="border border-green-500/30 rounded p-2 mb-2">
           <p className="text-green-400/70 uppercase tracking-widest text-[10px] mb-1.5">Suggested next steps</p>

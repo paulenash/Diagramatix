@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-09-07  ·  **Document version:** 7.0  ·  **Suite:** 406 test files · 2,714 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T3402  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-09-07  ·  **Document version:** 7.0  ·  **Suite:** 408 test files · 2,734 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T3421  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
@@ -34,9 +34,9 @@ Each test file has its own section below, grouped into layers. Within each secti
 | **Protects you against** | In plain terms, the real-world problem that would occur if this behaviour regressed. |
 | **How it would break (go red)** | The kind of code or data change that would make this specific test fail — i.e. what the test is watching. |
 
-**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T3403**, the one after **T3404**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
+**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T3422**, the one after **T3423**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T3402`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
+> **Highest ref allocated: `T3421`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -2509,6 +2509,25 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 | T3400 | `tests/simulation/wait-split.test.ts` | Waiting lengthens elapsed time while consuming no resource hours (so no cost). |
 | T3401 | `tests/simulation/wait-split.test.ts` | Warm-up discards both waits, like every other statistic. |
 | T3402 | `tests/simulation/wait-split.test.ts` | aggregate reports the wait split, and omits it for runs predating the measurement. |
+| T3403 | `tests/simulation/business-case.test.ts` | Waiting is reported in hours and left unpriced when no cost of delay is supplied. |
+| T3404 | `tests/simulation/business-case.test.ts` | A delay rate prices queue and process waiting separately, on top of the cost of doing. |
+| T3405 | `tests/simulation/business-case.test.ts` | A run predating the wait measurement is reported as unmeasured, never as zero waiting. |
+| T3406 | `tests/simulation/business-case.test.ts` | Saving per case, annual saving and payback months follow from the supplied inputs. |
+| T3407 | `tests/simulation/business-case.test.ts` | A missing input removes the figure it feeds and is named, never assumed to be zero. |
+| T3408 | `tests/simulation/business-case.test.ts` | A change that costs more produces no payback month, and says why. |
+| T3409 | `tests/simulation/business-case.test.ts` | The ramp-up caveat is stated whenever a payback month is. |
+| T3410 | `tests/simulation/business-case.test.ts` | The delay rate is described as business cost only, never staff cost. |
+| T3411 | `tests/simulation/business-case.test.ts` | The Word chapters carry the cost split, the worth and the assumptions. |
+| T3412 | `tests/simulation/business-case.test.ts` | The spreadsheet omits waiting rows entirely when waiting was never measured. |
+| T3413 | `tests/simulation/business-case.test.ts` | The deterministic summary states the saving, the payback and every assumption. |
+| T3414 | `tests/simulation/rework.test.ts` | A rework loop-back is found by walking the flow, not by geometry. |
+| T3415 | `tests/simulation/rework.test.ts` | The same number reads as a rework rate and a first-pass yield. |
+| T3416 | `tests/simulation/rework.test.ts` | A loop with no probability set is unset, not a zero rework rate. |
+| T3417 | `tests/simulation/rework.test.ts` | Setting the rework rate is an ordinary connector override, clamped to 0..1. |
+| T3418 | `tests/simulation/rework.test.ts` | A process with no loop-back reports no rework rather than inventing one. |
+| T3419 | `tests/simulation/rework.test.ts` | Automating a task keeps a residual time and drops its demand on the team. |
+| T3420 | `tests/simulation/rework.test.ts` | The automation residual scales with the task. |
+| T3421 | `tests/simulation/rework.test.ts` | The automation assumption travels with the proposal, including that building it is not free. |
 
 > **Keep this section in sync.** Whenever an e2e spec is added, removed, or changes what it asserts, update this section. It is hand-maintained, not generated.
 
