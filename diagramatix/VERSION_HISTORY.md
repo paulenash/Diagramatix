@@ -15,6 +15,21 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.7.2488 — 2026-09-08 — Sweep a number instead of guessing at it
+
+- **Parameter sweep** — run a whole range at once (team size 1 to 12, arrivals ±50%) and get the
+  response curve, with the **knee** marked: the point where one more person stops buying much. The
+  answer to a staffing question is a curve, not a number, and the curve is what stops the
+  conversation coming round again in six months.
+- It refuses to invent an elbow. A flat curve says the lever is not what is holding the process
+  back; a straight one says the knee is OUTSIDE the swept range and to sweep further. Both are
+  findings, and a fabricated knee would get staffed to.
+- Where the returns stop is decided by the significance test, not by eyeballing the gradient — the
+  shaded part of the curve is where further gains are inside the run-to-run noise.
+- Every point is saved as a pinned run, so a curve can be reopened and its individual runs
+  inspected. A sweep that would exceed the run budget loses replications before points, so the
+  curve keeps its shape, and says it was reduced rather than quietly returning a coarser one.
+- Schema: no bump (feature-only).
 ## 2.7.2485 — 2026-09-07 — Telling you when a difference is real
 
 - **Is the difference real?** Comparing two runs now says plainly whether the difference is larger

@@ -322,12 +322,13 @@ over a pilot replication's flow-time series. Needs completion *timestamps* along
 
 ## Phase 4 — Sweep a number instead of guessing at it
 
-**Status:** `Not started` · No engine change. Phase 8 depends on this.
+**Status:** ✅ `Shipped` — no engine change, no version bump (feature-only). **Phase 8 is now
+unblocked**: a tornado is N one-step sweeps over this machinery.
 
-- [ ] `app/lib/simulation/sweep.ts` — `buildSweep(lever, from, to, steps)` → N `OverrideSet`s
-- [ ] Knee detection (maximum curvature)
-- [ ] `maxSweepSteps` in `RUN_LIMITS`, `steps` folded into the `maxWork` clamp
-- [ ] Response-curve chart with the knee annotated
+- [x] `app/lib/simulation/sweep.ts` — `buildSweep(lever, from, to, steps)` → N `OverrideSet`s
+- [x] Knee detection (maximum distance from the chord)
+- [x] `maxSweepSteps` in `RUN_LIMITS`, via a dedicated `clampSweep`
+- [x] Response-curve chart with the knee annotated
 
 Each step runs through the existing `runMonteCarlo` against a network assembled once. The interesting
 feature of the curve is the **knee** — the point where one more person stops buying much — so
@@ -335,6 +336,18 @@ detecting and annotating it is the feature, not the chart.
 
 > *The answer to a staffing question is a curve, not a number, and the curve is what stops the
 > conversation coming round again in six months.*
+
+**As built.** Three decisions worth recording:
+
+- **The knee is maximum distance from the chord**, not maximum second derivative. Curvature on a
+  handful of noisy points is dominated by the noise; distance-to-chord is robust, and it is also
+  what a reader means by "the elbow". Below a 5% normalised distance it reports NO knee.
+- **Where the returns stop is a significance question, not a gradient one.** `diminishingFrom` is
+  the first point whose gain over the previous one fails the Phase 3 test — so a small improvement
+  on noisy runs is never dressed up as diminishing returns.
+- **`clampSweep` reduces replications before points.** A sweep with too few points is not a curve
+  at all, whereas fewer replications only widens the band — which the significance test then
+  reports honestly instead of hiding. The opposite of `clampRunConfig`'s order, deliberately.
 
 **⚠ Cost guard.** `runMonteCarlo` runs synchronously in the request, and `RUN_LIMITS.maxWork` guards
 *one* run; a sweep multiplies it by `steps`. Clamp hard here. This is the phase at which a

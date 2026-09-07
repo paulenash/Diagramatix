@@ -15,6 +15,8 @@ import { ResultsReport } from "./results/ResultsReport";
 import { ScenarioCompare } from "./results/ScenarioCompare";
 import { NextStepsPanel } from "./results/NextStepsPanel";
 import { BusinessCasePanel } from "./results/BusinessCasePanel";
+import { SweepPanel } from "./results/SweepPanel";
+import type { SweepLever } from "@/app/lib/simulation/sweep";
 import { MIN_OBSERVATIONS } from "@/app/lib/simulation/nextSteps";
 import type { OverrideSet } from "@/app/lib/simulation/overrides";
 import { RunHistory } from "./results/RunHistory";
@@ -389,6 +391,7 @@ function ScenarioList({ projectId, detail, diagrams, onChanged, onRan }: { proje
                 <ScenarioEditor
                   scenario={s} runUrl={`${base}/${s.id}/run`} diagrams={diagrams}
                   runItemUrl={(rid) => `${base}/${s.id}/runs/${rid}`}
+                  sweepUrl={`${base}/${s.id}/sweep`}
                   assessUrl={`/api/projects/${projectId}/simulation/studies/${detail.id}/assess`}
                   onSave={(cfg) => patchScenario(s.id, { runConfig: cfg })}
                   onSetVariant={(ids) => patchScenario(s.id, { variantRootIds: ids })}
@@ -456,7 +459,7 @@ function AsIsToBeSetup({ diagrams, onCreate }: { diagrams: DiagramLite[]; onCrea
   );
 }
 
-function ScenarioEditor({ scenario, runUrl, runItemUrl, assessUrl, diagrams, onSave, onSetVariant, onRan }: { scenario: ScenarioRow; runUrl: string; runItemUrl: (rid: string) => string; assessUrl: string; diagrams: DiagramLite[]; onSave: (cfg: ScenarioRunConfig) => void; onSetVariant: (ids: string[]) => void; onRan?: (cfg: ScenarioRunConfig) => void }) {
+function ScenarioEditor({ scenario, runUrl, runItemUrl, sweepUrl, assessUrl, diagrams, onSave, onSetVariant, onRan }: { scenario: ScenarioRow; runUrl: string; runItemUrl: (rid: string) => string; sweepUrl: string; assessUrl: string; diagrams: DiagramLite[]; onSave: (cfg: ScenarioRunConfig) => void; onSetVariant: (ids: string[]) => void; onRan?: (cfg: ScenarioRunConfig) => void }) {
   const initial: ScenarioRunConfig = { ...DEFAULT_RUN_CONFIG, ...(scenario.runConfig ?? {}) };
   const variantId = scenario.variantRootIds?.[0] ?? "";
   const [cfg, setCfg] = useState<ScenarioRunConfig>(initial);
@@ -470,6 +473,18 @@ function ScenarioEditor({ scenario, runUrl, runItemUrl, assessUrl, diagrams, onS
   const [lastRunId, setLastRunId] = useState<string | null>(null); // the just-finished run, for "save to history"
   const [naming, setNaming] = useState(false); // quick-name dialog for the last run
   const [showHistory, setShowHistory] = useState(false);
+  const [showSweep, setShowSweep] = useState(false);
+  // The levers come from the scenario's last run, so they are fetched only when
+  // the panel is opened — nothing to load for someone who never sweeps.
+  const [sweepLevers, setSweepLevers] = useState<SweepLever[] | null>(null);
+  const [sweepReason, setSweepReason] = useState<string | null>(null);
+  useEffect(() => {
+    if (!showSweep || sweepLevers) return;
+    fetch(sweepUrl)
+      .then((r) => (r.ok ? r.json() : { levers: [] }))
+      .then((j) => { setSweepLevers(j.levers ?? []); setSweepReason(j.reason ?? null); })
+      .catch(() => setSweepLevers([]));
+  }, [showSweep, sweepLevers, sweepUrl]);
 
   async function runScenario(force = false) {
     setRunning(true); setRunErr(null); setResult(null); setSetup(null);
@@ -621,6 +636,18 @@ function ScenarioEditor({ scenario, runUrl, runItemUrl, assessUrl, diagrams, onS
           <ResultsReport key={ran} runUrl={runUrl} />
         </div>
       )}
+
+      {/* Sweep one number across a range — the response curve and its knee. */}
+      <div className="mt-1 border-t border-green-500/20 pt-1">
+        <button onClick={() => setShowSweep((v) => !v)} className="text-green-400/70 hover:text-green-300 text-[11px]">
+          {showSweep ? "▾ Sweep a number" : "▸ Sweep a number"}
+        </button>
+        {showSweep && (
+          sweepLevers === null ? <p className="text-green-400/50 text-[10px] mt-1">Loading…</p>
+          : sweepLevers.length === 0 ? <p className="text-green-400/50 text-[10px] mt-1">{sweepReason ?? "Nothing to sweep yet."}</p>
+          : <SweepPanel sweepUrl={sweepUrl} levers={sweepLevers} />
+        )}
+      </div>
 
       {/* Run History — named/pinned runs + compare two saved runs. */}
       <div className="mt-1 border-t border-green-500/20 pt-1">

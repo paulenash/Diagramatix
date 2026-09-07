@@ -26,6 +26,11 @@ export const RUN_LIMITS = {
   maxReplications: 100,
   /** horizon × replications — the dominant cost term. */
   maxWork: 5_000_000,
+  /** Points in one parameter sweep. A sweep is N complete Monte-Carlos back to
+   *  back in a single request, so it multiplies every cost above by its step
+   *  count — the one place the existing budget could be blown through without
+   *  any single field looking unreasonable. */
+  maxSweepSteps: 24,
 } as const;
 
 export interface ClampRunConfigResult {
@@ -67,6 +72,42 @@ export function clampRunConfig(cfg: SimRunConfig): ClampRunConfigResult {
   if (warmUp !== rawWarm) clamped = true;
 
   return { cfg: { ...cfg, horizon, replications, warmUp }, clamped };
+}
+
+export interface ClampSweepResult {
+  cfg: SimRunConfig;
+  steps: number;
+  /** True when steps or replications were reduced — the caller must SAY so
+   *  rather than silently returning a coarser curve than was asked for. */
+  clamped: boolean;
+}
+
+/**
+ * Clamp a SWEEP to {@link RUN_LIMITS}. A sweep runs `steps` full Monte-Carlos
+ * synchronously in one request, so the work is `steps × horizon × replications`.
+ *
+ * Order matters, and differs from a single run: steps are reduced LAST. A sweep
+ * with too few points is not a curve at all, whereas fewer replications only
+ * widens the confidence band — which the significance test then reports honestly
+ * instead of hiding.
+ */
+export function clampSweep(cfg: SimRunConfig, steps: number): ClampSweepResult {
+  const base = clampRunConfig(cfg);
+  let clamped = base.clamped;
+  let s = Math.max(2, Math.min(RUN_LIMITS.maxSweepSteps, Math.floor(steps)));
+  if (s !== steps) clamped = true;
+
+  let { horizon, replications } = base.cfg;
+  if (s * horizon * replications > RUN_LIMITS.maxWork) {
+    replications = Math.max(1, Math.floor(RUN_LIMITS.maxWork / (s * horizon)));
+    clamped = true;
+  }
+  // Still too big even at one replication each — now the step count has to give.
+  if (s * horizon * replications > RUN_LIMITS.maxWork) {
+    s = Math.max(2, Math.floor(RUN_LIMITS.maxWork / (horizon * replications)));
+    clamped = true;
+  }
+  return { cfg: { ...base.cfg, replications }, steps: s, clamped };
 }
 
 export interface MonteCarloResult {
