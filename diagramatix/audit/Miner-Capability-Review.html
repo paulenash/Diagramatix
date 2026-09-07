@@ -1,0 +1,735 @@
+<title>Miner Capability Review</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Spectral:wght@500;600&display=swap">
+
+<style>
+  :root {
+    --ground: #fbfaf7;
+    --panel: #ffffff;
+    --ink: #1d1a16;
+    --muted: #6a6459;
+    --faint: #948d80;
+    --rule: #e7e2d8;
+    --rule-strong: #d2cbbd;
+    --accent: #8a5a12;
+    --accent-soft: #f5eddf;
+    --alt: #2c5f70;
+    --alt-soft: #e4eff2;
+    --shadow: 0 1px 2px rgba(29, 26, 22, .05);
+  }
+  :root:not([data-theme="light"]) { color-scheme: light dark; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #131110; --panel: #1a1714; --ink: #eae5dc; --muted: #a29a8d;
+      --faint: #7b7367; --rule: #2a2520; --rule-strong: #3a342c;
+      --accent: #d9a441; --accent-soft: #2b2113; --alt: #79b7c8; --alt-soft: #14262b;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .3);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #131110; --panel: #1a1714; --ink: #eae5dc; --muted: #a29a8d;
+    --faint: #7b7367; --rule: #2a2520; --rule-strong: #3a342c;
+    --accent: #d9a441; --accent-soft: #2b2113; --alt: #79b7c8; --alt-soft: #14262b;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 16px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1140px; margin: 0 auto; padding: 0 28px 96px; }
+  .col { max-width: 68ch; }
+
+  .masthead {
+    padding: 72px 0 40px;
+    border-bottom: 2px solid var(--ink);
+    display: flex; flex-direction: column; gap: 18px;
+  }
+  .kicker {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent);
+  }
+  h1 {
+    font-family: Spectral, Georgia, serif; font-weight: 600;
+    font-size: clamp(2.1rem, 5vw, 3.1rem); line-height: 1.08; letter-spacing: -.015em;
+    margin: 0; text-wrap: balance; max-width: 20ch;
+  }
+  .standfirst { font-size: 1.08rem; color: var(--muted); max-width: 62ch; margin: 0; }
+  .meta {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11.5px; color: var(--faint);
+    display: flex; flex-wrap: wrap; gap: 6px 22px; padding-top: 6px;
+  }
+
+  section { padding: 56px 0 0; }
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--faint); display: block; margin-bottom: 10px;
+  }
+  h2 {
+    font-family: Spectral, Georgia, serif; font-weight: 600;
+    font-size: clamp(1.5rem, 3vw, 1.95rem); line-height: 1.2; letter-spacing: -.01em;
+    margin: 0 0 14px; text-wrap: balance;
+  }
+  h3 {
+    font-weight: 600; font-size: .82rem; letter-spacing: .07em; text-transform: uppercase;
+    color: var(--accent); margin: 40px 0 14px;
+  }
+  p { margin: 0 0 16px; }
+  .lede { font-size: 1.04rem; color: var(--muted); }
+  strong { font-weight: 600; }
+  em { font-style: italic; }
+
+  .caps {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(268px, 1fr));
+    gap: 1px; background: var(--rule); border: 1px solid var(--rule); margin-top: 8px;
+  }
+  .cap { background: var(--panel); padding: 20px 20px 22px; display: flex; flex-direction: column; gap: 9px; }
+  .cap h4 { font-size: .95rem; font-weight: 600; margin: 0; letter-spacing: -.005em; }
+  .cap ul { margin: 0; padding-left: 17px; }
+  .cap li { margin-bottom: 5px; font-size: .885rem; color: var(--muted); line-height: 1.55; }
+  .cap li strong { color: var(--ink); font-weight: 500; }
+
+  .scroller { overflow-x: auto; margin-top: 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: .89rem; min-width: 640px; }
+  thead th {
+    text-align: left; font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-weight: 500; font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--faint); border-bottom: 1px solid var(--rule-strong);
+    padding: 0 14px 8px 0; vertical-align: bottom;
+  }
+  tbody td { padding: 12px 14px 12px 0; border-bottom: 1px solid var(--rule); vertical-align: top; color: var(--muted); }
+  tbody td:first-child { color: var(--ink); font-weight: 500; width: 30%; }
+  tbody tr:last-child td { border-bottom: none; }
+
+  /* ── Extension entries ──────────────────────────────────────────────── */
+  .exts { margin-top: 10px; }
+  .ext {
+    border-top: 1px solid var(--rule);
+    padding: 24px 0;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 11px;
+  }
+  .exts > .ext:first-child { border-top: 2px solid var(--ink); }
+  @media (min-width: 860px) {
+    .ext { grid-template-columns: minmax(0, 1fr) 176px; column-gap: 36px; }
+    .ext-tags { grid-column: 2; grid-row: 1 / span 3; padding-top: 4px; }
+  }
+  .ext h4 {
+    font-family: Spectral, Georgia, serif; font-size: 1.18rem; font-weight: 600;
+    margin: 0; letter-spacing: -.005em; text-wrap: balance;
+  }
+  .ext p { margin: 0; font-size: .93rem; color: var(--muted); max-width: 74ch; }
+  .ext .why {
+    font-size: .875rem; color: var(--ink);
+    border-left: 2px solid var(--accent); padding-left: 14px; max-width: 72ch;
+  }
+  .ext-tags { display: flex; flex-wrap: wrap; gap: 6px; align-content: start; }
+  .chip {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 10px; letter-spacing: .06em; text-transform: uppercase;
+    padding: 3px 8px; border: 1px solid var(--rule-strong); color: var(--muted); white-space: nowrap;
+  }
+  .chip.have { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
+  .chip.new { background: var(--alt-soft); border-color: transparent; color: var(--alt); }
+
+  /* ── Smaller items ──────────────────────────────────────────────────── */
+  .smalls { list-style: none; padding: 0; margin: 16px 0 0; counter-reset: r; }
+  .smalls > li {
+    counter-increment: r;
+    display: flex;
+    align-items: baseline;
+    gap: 18px;
+    padding: 15px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .smalls > li:first-child { border-top: 1px solid var(--rule); }
+  .smalls .num {
+    flex: 0 0 auto;
+    width: 22px;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .82rem;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+  .smalls .body { flex: 1 1 auto; min-width: 0; font-size: .93rem; color: var(--muted); max-width: 82ch; }
+  .smalls .body strong { color: var(--ink); font-weight: 600; }
+
+  .note {
+    background: var(--panel); border: 1px solid var(--rule); border-left: 3px solid var(--accent);
+    padding: 18px 22px; margin: 24px 0 0; box-shadow: var(--shadow); max-width: 76ch;
+  }
+  .note p:last-child { margin-bottom: 0; }
+  .note .eyebrow { color: var(--accent); }
+
+  .steps { display: grid; gap: 1px; background: var(--rule); border: 1px solid var(--rule); margin-top: 12px; }
+  .step { background: var(--panel); padding: 16px 20px; display: flex; gap: 16px; align-items: baseline; }
+  .step .n {
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .78rem;
+    color: var(--accent); flex: 0 0 auto; width: 20px; font-variant-numeric: tabular-nums;
+  }
+  .step .t { font-size: .91rem; color: var(--muted); }
+  .step .t strong { color: var(--ink); font-weight: 600; }
+
+  footer {
+    margin-top: 64px; padding-top: 22px; border-top: 1px solid var(--rule);
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11.5px; color: var(--faint);
+  }
+  a { color: var(--accent); }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <span class="kicker">Diagramatix &middot; internal review</span>
+    <h1>What the Miner does, and what it should do next</h1>
+    <p class="standfirst">
+      A read of DiagramatixMINER as it stands from the user&rsquo;s side of the screen &mdash; what it
+      can be asked to do, the questions it already answers, and the eight additions that would turn a
+      good discovery tool into something an operations team keeps coming back to.
+    </p>
+    <div class="meta">
+      <span>7 September 2026</span>
+      <span>Read from the shipped code, not the roadmap</span>
+      <span>Companion to &ldquo;The Miner&rdquo;, the external summary</span>
+    </div>
+  </header>
+
+  <!-- ═══ PART ONE ═══════════════════════════════════════════════════ -->
+  <section>
+    <span class="eyebrow">Capability</span>
+    <h2>What it does today</h2>
+    <div class="col">
+      <p class="lede">
+        The Miner takes an event log, reconstructs the process and the entity lifecycle from it, checks
+        both against a governed reference, and hands the result to the Simulator, the risk register and
+        the reporting stack. Everything below is shipped and reachable from the console.
+      </p>
+    </div>
+
+    <h3>Getting the log in</h3>
+    <div class="caps">
+      <div class="cap">
+        <h4>Formats</h4>
+        <ul>
+          <li>CSV / TSV, with delimiter and header detection</li>
+          <li><strong>XES</strong> (IEEE 1849) parsed to the same table</li>
+          <li><strong>OCEL 2.0</strong>, JSON and XML, distinguished from XES by its object-model markers</li>
+          <li>Everything converges on one <code>{headers, rows, mapping}</code> pipeline &mdash; one importer, three formats</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Mapping</h4>
+        <ul>
+          <li>Nine roles: case, activity, timestamp, state, resource, entity type, and Control / Risk / Policy ids</li>
+          <li>Only three are required; the rest are guessed and confirmable</li>
+          <li>No state column &rarr; an editable <strong>activity&rarr;state</strong> table, fillable from an existing State Machine</li>
+          <li>No resource column &rarr; an editable <strong>activity&rarr;team</strong> table, fillable from a BPMN&rsquo;s lanes</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Verifying before import</h4>
+        <ul>
+          <li>Usable vs dropped rows, distinct cases / activities / states, the detected timestamp format and the date span</li>
+          <li>Sample values per mapped role</li>
+          <li>Warnings for the classic mistakes: a single-valued case id, an unparseable timestamp, a free-text column mapped as state, mostly single-event cases</li>
+          <li>A full log viewer with filtering before you commit</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>What is mined</h3>
+    <div class="caps">
+      <div class="cap">
+        <h4>Compression and stats</h4>
+        <ul>
+          <li>Events &rarr; per-case traces &rarr; <strong>variants</strong> (distinct state/event sequences + frequency) &mdash; the bounded form everything downstream runs on</li>
+          <li>Headline stats: cases, events, activities, states, variants, span, rows dropped</li>
+          <li>A persisted per-case index (capped and strided at 50,000) so cases stay drillable without storing raw events</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Timing</h4>
+        <ul>
+          <li>Per-activity sojourn samples, median and p90, and <strong>total time consumed</strong> &mdash; the true bottleneck signal</li>
+          <li>Per-edge transition times, directly-follows counts</li>
+          <li>Case cycle time: median, p90, min, max</li>
+          <li>Inter-arrival gaps, resource concurrency, and a 168-bucket hour-of-week activity histogram</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Governance</h4>
+        <ul>
+          <li>Per control: <strong>expected</strong> (cases where a governed activity occurred), <strong>applied</strong> (cases where the control id was recorded), <strong>bypassed</strong>, effectiveness %</li>
+          <li>Risk and Policy traceability by distinct case count</li>
+          <li>Computed at import from transient traces &mdash; no per-event data is retained</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>Discovery</h3>
+    <div class="caps">
+      <div class="cap">
+        <h4>The process</h4>
+        <ul>
+          <li>Variants &rarr; directly-follows graph &rarr; a BPMN plan, with exclusive gateways at real splits and merges</li>
+          <li>Rendered by the same layout engine as every other BPMN, so the output is <strong>editable and simulatable</strong>, not a picture</li>
+          <li>Edge frequency badges carried onto the diagram</li>
+          <li>An optional <strong>AI-curated</strong> alternative that runs the mined paths through the app&rsquo;s own BPMN rules and prompt, with mined frequencies re-annotated afterwards so calibration still works</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>The lifecycle</h4>
+        <ul>
+          <li>State sequences &rarr; a UML state machine, transitions labelled with the triggering activity and carrying case counts</li>
+          <li>A structural <strong>coverage reconcile</strong> runs after generation: any state, entry, transition or terminal the generator dropped is added back</li>
+          <li>That rule exists because a tidied-up reference makes every case touching a dropped state fail conformance &mdash; the AI path in particular</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Object-centric</h4>
+        <ul>
+          <li>An OCEL log becomes a <strong>study</strong>: one run and one lifecycle per selected object type</li>
+          <li>A shared <strong>Domain Diagram</strong> &mdash; object types as classes, O2O relationships as associations, weighted by shared-event interaction strength</li>
+          <li>Dashed associations where two types synchronise behaviourally with no declared relationship</li>
+          <li>A study overview table showing each type&rsquo;s progress: lifecycle, process, conformance</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>Conformance</h3>
+    <div class="caps">
+      <div class="cap">
+        <h4>The replay</h4>
+        <ul>
+          <li>Every variant replayed over a reference state machine, matched by label</li>
+          <li><strong>Fitness</strong> = share of cases replaying cleanly</li>
+          <li>Five deviation kinds: undocumented transition, unknown state, unexpected entry, unexpected exit, dead transition &mdash; each with a case count and a severity</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>The reference</h4>
+        <ul>
+          <li>Created as a <strong>separate diagram</strong> (deterministic copy, or AI-curated) that discovery and refresh never overwrite</li>
+          <li>Chosen per run and persisted immediately, so the choice survives navigating away to edit it</li>
+          <li>The picker is scoped to the run&rsquo;s own entity, and excludes the run&rsquo;s discovered mirror</li>
+          <li>Disallowed transitions are flagged red on the discovered state machine</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>The Insights workbench</h3>
+    <div class="caps">
+      <div class="cap">
+        <h4>Activities and heat</h4>
+        <ul>
+          <li>Per-activity table: cases, occurrences, median, total time, teams and states, with multi-team and multi-state flagged</li>
+          <li>Heat over the discovered model by total time, frequency or average time &mdash; applied non-destructively, the saved diagram untouched</li>
+          <li>Mined time and dominant team captioned under each element</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Variants and cases</h4>
+        <ul>
+          <li>Pareto list with share and cumulative share; click to isolate a path, tick two to diff them</li>
+          <li>Case list sorted by cycle time, filterable by variant, with per-case drill-down</li>
+          <li>A self-contained replay: work flowing over the discovered model, weighted by variant frequency</li>
+          <li>An expanded full-screen view for every tab</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Outcomes and automation</h4>
+        <ul>
+          <li>A persisted case SLA, on-time / late split, and the activity and variant <strong>drivers of lateness</strong> ranked by lift</li>
+          <li>For task logs (auto-detected from the step vocabulary): automation score and verdict, ping-pong count, rework, an ROI estimate, and an exportable RPA spec and SOP</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Getting it out</h4>
+        <ul>
+          <li>Analysis report as Word, Excel or server-rendered PDF</li>
+          <li>Log export as XES or OCEL at variant-level fidelity</li>
+          <li>&ldquo;Explain results&rdquo; &mdash; narrated by the model from computed figures, with a deterministic fallback when AI is off</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>Live sources</h3>
+    <div class="caps">
+      <div class="cap">
+        <h4>Connectors</h4>
+        <ul>
+          <li><strong>Webhook</strong> push, authenticated by a minted key stored only as a SHA-256 hash and shown once</li>
+          <li><strong>Azure Blob</strong> container by SAS URL, and <strong>SharePoint</strong> folder via the Graph picker</li>
+          <li>A rolling capped buffer with a watermark cursor, so re-polling a folder does not double-count</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Refresh</h4>
+        <ul>
+          <li>Rebuilds the run from the buffer, then <strong>re-discovers and re-conforms in place</strong> on the existing diagrams</li>
+          <li>Only deterministic discovery re-runs automatically; AI curation stays manual because it costs quota</li>
+          <li>Manual refresh, plus scheduled polling per source</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>Where it connects</h3>
+    <div class="caps">
+      <div class="cap">
+        <h4>The Simulator</h4>
+        <ul>
+          <li>One click calibrates a digital twin: fitted service-time distributions (fixed or triangular), an exponential arrival fit, gateway branch probabilities from mined frequencies, per-task teams, and a <strong>working calendar derived from the hour-of-week histogram</strong></li>
+          <li>Hands off to the Simulator and returns to the same Miner screen on exit</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Risk &amp; Control</h4>
+        <ul>
+          <li>A control names the deviation it guards; conformance then measures whether it operated</li>
+          <li>Two evidence sources &mdash; Control IDs on events (preferred) and conformance deviations</li>
+          <li>Org-wide <strong>Compliance Monitoring</strong>: effectiveness over time per control, per project, and by APQC PCF category, with a per-run include/exclude switch</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>The example catalog</h4>
+        <ul>
+          <li>Five published examples: AP invoice lifecycle, order-to-cash, an activity-only service-desk log, a task-mining routine, and a live polling source</li>
+          <li>Adopt loads one into a fresh project with the console pre-opened and the log staged</li>
+          <li>Admins can capture any run back into the catalog as a draft example</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="note">
+      <span class="eyebrow">Worth naming</span>
+      <p>
+        Two decisions carry more weight than any single feature. The first: <strong>discovery is
+        deterministic by design</strong>. Every headline &mdash; the process, the lifecycle, the
+        fitness, the timings &mdash; is computed, and AI is only ever a second, optional, clearly
+        labelled curation on top. That is what makes a conformance number safe to put in front of an
+        auditor.
+      </p>
+      <p>
+        The second: <strong>a discovered diagram is an ordinary diagram</strong>. It goes into the
+        editor, the exporters, the Simulator and the risk register unchanged. Most mining tools end at
+        a picture in a viewer; this one ends in the same place all the other work lives.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">Use cases</span>
+    <h2>The questions it can already answer</h2>
+
+    <div class="scroller">
+      <table>
+        <thead>
+          <tr><th>Question</th><th>Answered by</th><th>Where</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>What is the real process?</td><td>Directly-follows discovery with gateways at genuine splits and merges</td><td>Discover process</td></tr>
+          <tr><td>How much variation is there?</td><td>Variant Pareto with share and cumulative share</td><td>Variants</td></tr>
+          <tr><td>Where does the time go?</td><td>Heat by total time / frequency / average, on the model</td><td>Insights</td></tr>
+          <tr><td>Which step is the bottleneck?</td><td>Activities ranked by total time consumed</td><td>Activities</td></tr>
+          <tr><td>What is the entity&rsquo;s real lifecycle?</td><td>State-machine discovery with coverage guaranteed</td><td>Discover state machine</td></tr>
+          <tr><td>Does reality match the rulebook?</td><td>Variant replay against a governed reference; fitness %</td><td>Conformance</td></tr>
+          <tr><td>What specifically deviates?</td><td>Five deviation kinds, each counted and severity-ranked</td><td>Conformance</td></tr>
+          <tr><td>Which moves are illegal?</td><td>Red transition flags on the discovered lifecycle</td><td>Discovered SM</td></tr>
+          <tr><td>Are the controls operating?</td><td>Expected / applied / bypassed per control id</td><td>Governance &rarr; RCM</td></tr>
+          <tr><td>Is compliance trending?</td><td>Org-wide effectiveness series by control, project and PCF category</td><td>Compliance Monitoring</td></tr>
+          <tr><td>Are we hitting the SLA?</td><td>Persisted case SLA, on-time / late split</td><td>Outcomes</td></tr>
+          <tr><td>What drives lateness?</td><td>Activity and variant lift among late cases</td><td>Outcomes</td></tr>
+          <tr><td>Which cases hurt?</td><td>Case list by cycle time, drill to the individual path</td><td>Cases</td></tr>
+          <tr><td>Can I show it moving?</td><td>Frequency-weighted token replay over the discovered model</td><td>Cases</td></tr>
+          <tr><td>What is a fix worth?</td><td>Calibrated twin: durations, arrivals, splits, teams, calendar</td><td>Calibrate &amp; simulate</td></tr>
+          <tr><td>Is this task automatable?</td><td>Automation score, ROI hours, ranked candidate routines</td><td>Automation</td></tr>
+          <tr><td>How is the task really done?</td><td>RPA spec and SOP generated from the observed routine</td><td>Automation</td></tr>
+          <tr><td>How do our objects relate?</td><td>OCEL study: a lifecycle per type plus a weighted object model</td><td>OCEL import</td></tr>
+          <tr><td>Is it still true?</td><td>Live source refresh, re-discovery and re-conformance in place</td><td>Live sources</td></tr>
+          <tr><td>Can I report it?</td><td>Word / Excel / PDF analysis, plus a plain-English explanation</td><td>Export, Explain</td></tr>
+          <tr><td>Can someone else verify it?</td><td>XES and OCEL export of the log itself</td><td>Export log</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══ PART TWO ═══════════════════════════════════════════════════ -->
+  <section>
+    <span class="eyebrow">Extensions</span>
+    <h2>What an operations team needs that isn&rsquo;t there yet</h2>
+    <div class="col">
+      <p class="lede">
+        The pattern across all eight: the Miner is very good at the <em>first</em> visit and thin on
+        every visit after it. It discovers, it measures, it reports &mdash; and then the analyst has
+        nowhere to go except back to the same three tabs. Several of these need no new mining at all;
+        the numbers are already computed and persisted, and nothing renders them.
+      </p>
+    </div>
+
+    <div class="exts">
+
+      <div class="ext">
+        <h4>The waiting between steps is measured, and never shown</h4>
+        <p>
+          Every run computes and stores per-edge metrics &mdash; how often each handover happened and
+          the median time it took. Nothing in the UI reads them. The heat map colours boxes only, and
+          the ranked bottleneck list is activities only. Put the heat on the arrows as well, and rank
+          <em>handovers</em> alongside steps: the slowest transition, not just the slowest task.
+        </p>
+        <p class="why">
+          In a real process most elapsed time is not inside a step, it is between them &mdash; sitting
+          in someone&rsquo;s queue, waiting for a batch run, bouncing back for more information. A tool
+          that only colours the boxes tells you where the work is, not where the delay is, and those
+          are usually different places. This is the single biggest gap between the Miner&rsquo;s
+          answers and the Simulator&rsquo;s, and the data for it is already in the database.
+        </p>
+        <div class="ext-tags">
+          <span class="chip have">Data already stored</span>
+          <span class="chip">Render only</span>
+          <span class="chip">Small</span>
+        </div>
+      </div>
+
+      <div class="ext">
+        <h4>You cannot slice the log</h4>
+        <p>
+          A run is all-or-nothing. There is no date filter, no team filter, no way to compare one
+          region against another, and the importer keeps only the nine mapped roles &mdash; every other
+          column in the file is discarded at parse time. So &ldquo;how did Q2 compare with Q3&rdquo;,
+          &ldquo;is the Melbourne team slower&rdquo; and &ldquo;do invoices over $10,000 take longer&rdquo;
+          are all unanswerable, even when the answer is sitting in the very spreadsheet that was
+          uploaded.
+        </p>
+        <p class="why">
+          Slicing is what turns a finding into a cause. &ldquo;Approval is the bottleneck&rdquo; is a
+          fact; &ldquo;approval is the bottleneck <em>only for high-value cases, and only since June</em>&rdquo;
+          is an action. Every other capability in the workbench &mdash; heat, variants, outcomes,
+          conformance &mdash; becomes several times more useful the moment it can be pointed at a
+          subset, and none of them need changing to gain it.
+        </p>
+        <div class="ext-tags">
+          <span class="chip new">Needs new data</span>
+          <span class="chip">Import + every tab</span>
+          <span class="chip">Largest</span>
+        </div>
+      </div>
+
+      <div class="ext">
+        <h4>Two runs, side by side</h4>
+        <p>
+          The example catalog deliberately ships several periods of the same process so you can watch
+          compliance decay &mdash; and there is no way to put two runs next to each other. Comparing
+          means opening one, writing the numbers down, and opening the other. A comparison view would
+          diff fitness, cycle time, variant mix, the bottleneck order, and per-activity time, and say
+          which deviations are new since last time.
+        </p>
+        <p class="why">
+          Nobody mines a process once. They mine it, change something, and mine it again &mdash; and
+          the entire value of the second run is the difference from the first. The Simulator already
+          establishes the pattern with its as-is / to-be assessment; the Miner, which has a much better
+          claim to it because both sides are measured rather than modelled, has nothing.
+        </p>
+        <div class="ext-tags">
+          <span class="chip have">Both runs persisted</span>
+          <span class="chip">New view</span>
+          <span class="chip">Medium</span>
+        </div>
+      </div>
+
+      <div class="ext">
+        <h4>From a deviation to the cases that caused it</h4>
+        <p>
+          Conformance reports a rule, a message and a case count. It never says <em>which</em> cases.
+          The information exists &mdash; each stored case carries the variant it followed, and each
+          variant carries the full state sequence that was replayed &mdash; so the offending case ids
+          are one join away from what is already persisted. Today the audit trail stops at a number.
+        </p>
+        <p class="why">
+          &ldquo;Fourteen cases skipped the credit check&rdquo; is where the conversation starts, not
+          where it ends. Nobody can act on it, and no auditor can accept it, without the fourteen. This
+          is the difference between a metric and evidence, and it is the same gap that makes the mined
+          control-effectiveness figure hard to defend in a review.
+        </p>
+        <div class="ext-tags">
+          <span class="chip have">Derivable today</span>
+          <span class="chip">Drill-through</span>
+          <span class="chip">Small</span>
+        </div>
+      </div>
+
+      <div class="ext">
+        <h4>Who hands work to whom</h4>
+        <p>
+          Resource is captured per event, a dominant team is computed per activity, and peak
+          concurrency per resource is measured for the twin. From that the Miner could draw the
+          standard resource views it currently has none of: a <strong>handover map</strong> between
+          teams, workload distribution, and the pairs that pass work back and forth. Instead the
+          resource dimension surfaces as one column in a table.
+        </p>
+        <p class="why">
+          Process problems are usually organisational problems wearing a process costume. The step
+          that takes four days often takes four days because it crosses three teams, and a
+          handover map makes that visible in one picture in a way no per-activity table can. It is
+          also the analysis business stakeholders recognise fastest, because it is about people
+          rather than boxes.
+        </p>
+        <div class="ext-tags">
+          <span class="chip have">Data already mined</span>
+          <span class="chip">New view</span>
+          <span class="chip">Medium</span>
+        </div>
+      </div>
+
+      <div class="ext">
+        <h4>Rework and loops for ordinary processes, not just task logs</h4>
+        <p>
+          Rework detection and ping-pong counting exist and are good &mdash; but they only run when the
+          log is recognised as a <em>task</em> log, and that recognition depends on activity labels
+          literally beginning with &ldquo;Switch to&rdquo; or &ldquo;Open&rdquo; and containing
+          &ldquo;Copy&rdquo; or &ldquo;Paste&rdquo;. A business process where &ldquo;Credit
+          check&rdquo; is performed three times on the same case gets no rework figure at all, because
+          its labels do not match a UI-step naming convention.
+        </p>
+        <p class="why">
+          Repetition is the most universally actionable finding in process mining and the easiest for a
+          business audience to accept &mdash; nobody argues that doing the same step four times is
+          fine. The analysis is already written and is not task-specific in substance, only in how it
+          is switched on. Generalising it costs little and gives every run a headline it currently
+          lacks.
+        </p>
+        <div class="ext-tags">
+          <span class="chip have">Analysis exists</span>
+          <span class="chip">Widen the trigger</span>
+          <span class="chip">Small</span>
+        </div>
+      </div>
+
+      <div class="ext">
+        <h4>Volume over time, and whether the backlog is growing</h4>
+        <p>
+          Throughput is computed at import &mdash; cases started and cases completed, bucketed across
+          the span of the log &mdash; persisted with the run, and never drawn. There is no arrivals
+          chart, no completion chart, and no way to see that the process took in more work than it
+          finished for six weeks running.
+        </p>
+        <p class="why">
+          Cycle time tells you how long a case takes; throughput tells you whether you are keeping up.
+          They fail independently, and the second is the one operations managers actually watch. A
+          process can have perfectly healthy cycle times and still be quietly accumulating a backlog
+          that will break it next quarter &mdash; and the Miner has already measured exactly that and
+          thrown the chart away.
+        </p>
+        <div class="ext-tags">
+          <span class="chip have">Data already stored</span>
+          <span class="chip">Render only</span>
+          <span class="chip">Small</span>
+        </div>
+      </div>
+
+      <div class="ext">
+        <h4>Watch it, rather than visit it</h4>
+        <p>
+          A live source ingests new events, rebuilds the run, re-discovers the process and re-runs
+          conformance &mdash; entirely on its own, and entirely silently. If fitness falls from 94% to
+          71%, if a brand-new undocumented transition appears this week, if the late rate doubles, or
+          if a source simply stops sending, nobody finds out until someone happens to open the console.
+        </p>
+        <p class="why">
+          The live-source machinery is the most valuable thing in the feature and the least used,
+          because it currently rewards nobody for turning it on. Thresholds plus a notification change
+          what the product <em>is</em>: from a study you commission to a monitor that tells you when
+          your process changed. Compliance Monitoring already stores the trend that an alarm would
+          watch &mdash; it just has no alarm.
+        </p>
+        <div class="ext-tags">
+          <span class="chip have">Trend already stored</span>
+          <span class="chip new">Thresholds + notify</span>
+          <span class="chip">Medium</span>
+        </div>
+      </div>
+
+    </div>
+
+    <h3>Smaller things, still worth doing</h3>
+    <ul class="smalls">
+      <li><span class="num">01</span><span class="body"><strong>The case list shows sixty rows and cannot be exported.</strong> The full per-case index is stored; a CSV of it would let anyone check the analysis in a spreadsheet, which is exactly what a sceptical stakeholder asks for first.</span></li>
+      <li><span class="num">02</span><span class="body"><strong>&ldquo;(sampled)&rdquo; is shown without saying what it means.</strong> Above fifty thousand cases the stored per-case index is strided down. The headline figures stay exact, but the label does not say so, and a reader cannot tell which numbers to trust.</span></li>
+      <li><span class="num">03</span><span class="body"><strong>The multi-team flag is a dead end.</strong> An activity performed by more than one team is highlighted amber &mdash; and cannot be clicked to see the split. That flag is often the most interesting row in the table.</span></li>
+      <li><span class="num">04</span><span class="body"><strong>Discovery has frequency filtering that is never exposed.</strong> The discovery API already accepts an edge threshold that trims rare paths, and the console never sends one. A &ldquo;simplify the map&rdquo; slider is the standard remedy for the first reaction most people have to a discovered model, and the engine behind it is done.</span></li>
+      <li><span class="num">05</span><span class="body"><strong>Older runs have to be re-imported to gain new analysis.</strong> The empty-state message says so out loud. A &ldquo;recompute&rdquo; action on the run would avoid asking the user to find the original file again &mdash; which, months later, they often cannot.</span></li>
+      <li><span class="num">06</span><span class="body"><strong>A manual run cannot be appended to.</strong> Only live sources accumulate. Importing next month&rsquo;s export means a whole new run, and therefore no continuity in a trend that only exists per run.</span></li>
+      <li><span class="num">07</span><span class="body"><strong>The automation ROI hard-codes its own key assumption.</strong> Hours saved is derived from a fixed seconds-per-step figure. Making it editable turns an illustrative number into one somebody is willing to sign.</span></li>
+      <li><span class="num">08</span><span class="body"><strong>The task SOP downloads as raw Markdown.</strong> The SOP generator already produces a styled Word document from a BPMN; the mined routine should go in the same door rather than out a second one.</span></li>
+      <li><span class="num">09</span><span class="body"><strong>Nothing masks values in an imported process log.</strong> The task-mining schema is explicit that values must be redacted, but a CSV import carries whatever is in the mapped columns &mdash; and case ids are frequently customer identifiers.</span></li>
+      <li><span class="num">10</span><span class="body"><strong>Connectors stop at webhook, Blob and SharePoint.</strong> A read-only database view or a REST endpoint is what most customers actually have, and asking them to build a webhook is asking for a project before they can see any value.</span></li>
+      <li><span class="num">11</span><span class="body"><strong>Conformance has no history of its own.</strong> Compliance Monitoring tracks controls over time across the org, but a single live run cannot show its own fitness moving &mdash; the one chart a process owner would check weekly.</span></li>
+    </ul>
+  </section>
+
+  <section>
+    <span class="eyebrow">Feasibility</span>
+    <h2>Slicing the log: how it would work</h2>
+    <div class="col">
+      <p>
+        The largest extension is also the one that changes the most existing screens, so it is worth
+        being concrete about what it actually requires. The short version: one new field on the run,
+        one filter component, and one predicate threaded through five tabs that already accept a
+        filtered case list.
+      </p>
+    </div>
+
+    <div class="steps">
+      <div class="step"><span class="n">1</span><span class="t"><strong>Keep the columns we currently throw away.</strong> At import, every unmapped column becomes a case attribute, taken from the case&rsquo;s first event. Attributes with too many distinct values to be a dimension are marked as such rather than dropped, so the user is told why they cannot filter on an invoice number.</span></div>
+      <div class="step"><span class="n">2</span><span class="t"><strong>Store them on the per-case index.</strong> The case index already persists one row per case with its variant, timestamps and cycle time. Attributes belong on that row. It is capped and strided, which is the right trade already made once.</span></div>
+      <div class="step"><span class="n">3</span><span class="t"><strong>One filter bar above the tabs.</strong> Date range, plus any attribute or team as a value picker. It produces a set of case indices and nothing else &mdash; a pure predicate over the stored index.</span></div>
+      <div class="step"><span class="n">4</span><span class="t"><strong>Recompute the derived views from the filtered set.</strong> Activity metrics, variant frequencies, cycle statistics and the outcome split are all aggregations over cases, computed in the browser from data already loaded. No new server call, no re-mining.</span></div>
+      <div class="step"><span class="n">5</span><span class="t"><strong>Leave conformance and discovery alone at first.</strong> Both replay variants rather than cases, so filtering them properly is a separate piece of work. Say so in the UI instead of pretending &mdash; a filter that silently does not apply to one panel is worse than one that says it does not.</span></div>
+    </div>
+
+    <div class="note">
+      <span class="eyebrow">The one thing to get right</span>
+      <p>
+        Every figure in the workbench must be either <strong>visibly filtered or visibly not</strong>.
+        The moment a heat map reflects the filter and a headline stat quietly does not, every number on
+        the screen becomes unciteable &mdash; and this is a product whose entire claim is that its
+        numbers can be cited. If a panel cannot honour the filter yet, it should say so on its face,
+        not average the two.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">In short</span>
+    <h2>The mining is ahead of the reading</h2>
+    <div class="col">
+      <p>
+        Very little of what follows is a mining problem. The engine already computes handover times,
+        throughput curves, resource concurrency and a per-case index, and persists all of it on every
+        run &mdash; three of the eight extensions above are render work over data sitting in the
+        database today.
+      </p>
+      <p>
+        What is missing is the second visit. The Miner answers &ldquo;what is happening&rdquo;
+        thoroughly and answers &ldquo;what changed&rdquo;, &ldquo;for which cases&rdquo; and
+        &ldquo;tell me when it moves&rdquo; not at all. Those three questions are what turn a discovery
+        exercise into something a team runs against its own process every month &mdash; and they are
+        the difference between a feature people admire in a demo and one they keep open.
+      </p>
+    </div>
+  </section>
+
+  <footer>Diagramatix &middot; DiagramatixMINER capability review</footer>
+
+</div>

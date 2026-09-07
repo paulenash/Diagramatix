@@ -1,0 +1,430 @@
+<title>DiagramatixMINER</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Spectral:wght@500;600&display=swap">
+
+<style>
+  :root {
+    --ground: #fbfaf7;
+    --panel: #ffffff;
+    --ink: #1d1a16;
+    --muted: #6a6459;
+    --faint: #948d80;
+    --rule: #e7e2d8;
+    --rule-strong: #d2cbbd;
+    --accent: #8a5a12;
+    --accent-soft: #f5eddf;
+    --shadow: 0 1px 2px rgba(29, 26, 22, .05);
+  }
+  :root:not([data-theme="light"]) { color-scheme: light dark; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #131110; --panel: #1a1714; --ink: #eae5dc; --muted: #a29a8d;
+      --faint: #7b7367; --rule: #2a2520; --rule-strong: #3a342c;
+      --accent: #d9a441; --accent-soft: #2b2113;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .3);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #131110; --panel: #1a1714; --ink: #eae5dc; --muted: #a29a8d;
+    --faint: #7b7367; --rule: #2a2520; --rule-strong: #3a342c;
+    --accent: #d9a441; --accent-soft: #2b2113;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 16px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1140px; margin: 0 auto; padding: 0 28px 96px; }
+  .col { max-width: 68ch; }
+
+  .masthead {
+    padding: 76px 0 40px;
+    border-bottom: 2px solid var(--ink);
+    display: flex; flex-direction: column; gap: 18px;
+  }
+  .kicker {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent);
+  }
+  h1 {
+    font-family: Spectral, Georgia, serif; font-weight: 600;
+    font-size: clamp(2.4rem, 6vw, 3.6rem); line-height: 1.05; letter-spacing: -.018em;
+    margin: 0; text-wrap: balance; max-width: 18ch;
+  }
+  .standfirst { font-size: 1.12rem; color: var(--muted); max-width: 58ch; margin: 0; }
+
+  section { padding: 60px 0 0; }
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--faint); display: block; margin-bottom: 10px;
+  }
+  h2 {
+    font-family: Spectral, Georgia, serif; font-weight: 600;
+    font-size: clamp(1.55rem, 3vw, 2.05rem); line-height: 1.18; letter-spacing: -.012em;
+    margin: 0 0 16px; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; }
+  .lede { font-size: 1.05rem; color: var(--muted); }
+  strong { font-weight: 600; }
+  em { font-style: italic; }
+
+  .caps {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(272px, 1fr));
+    gap: 1px; background: var(--rule); border: 1px solid var(--rule); margin-top: 10px;
+  }
+  .cap { background: var(--panel); padding: 22px 22px 24px; display: flex; flex-direction: column; gap: 10px; }
+  .cap h4 { font-size: .95rem; font-weight: 600; margin: 0; letter-spacing: -.005em; }
+  .cap ul { margin: 0; padding-left: 17px; }
+  .cap li { margin-bottom: 6px; font-size: .885rem; color: var(--muted); line-height: 1.55; }
+  .cap li strong { color: var(--ink); font-weight: 500; }
+
+  .scroller { overflow-x: auto; margin-top: 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: .92rem; min-width: 560px; }
+  thead th {
+    text-align: left; font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-weight: 500; font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--faint); border-bottom: 1px solid var(--rule-strong);
+    padding: 0 20px 9px 0; vertical-align: bottom;
+  }
+  tbody td { padding: 13px 20px 13px 0; border-bottom: 1px solid var(--rule); vertical-align: top; color: var(--muted); }
+  tbody td:first-child { color: var(--ink); font-weight: 500; width: 38%; }
+  tbody tr:last-child td { border-bottom: none; }
+
+  .note {
+    background: var(--panel); border: 1px solid var(--rule); border-left: 3px solid var(--accent);
+    padding: 18px 22px; margin: 26px 0 0; box-shadow: var(--shadow); max-width: 74ch;
+  }
+  .note p:last-child { margin-bottom: 0; }
+  .note .eyebrow { color: var(--accent); }
+
+  .steps { display: grid; gap: 1px; background: var(--rule); border: 1px solid var(--rule); margin-top: 12px; }
+  .step { background: var(--panel); padding: 16px 20px; display: flex; gap: 16px; align-items: baseline; }
+  .step .n {
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .78rem;
+    color: var(--accent); flex: 0 0 auto; width: 20px; font-variant-numeric: tabular-nums;
+  }
+  .step .t { font-size: .91rem; color: var(--muted); }
+  .step .t strong { color: var(--ink); font-weight: 600; }
+
+  footer {
+    margin-top: 68px; padding-top: 22px; border-top: 1px solid var(--rule);
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11.5px; color: var(--faint);
+  }
+  a { color: var(--accent); }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <span class="kicker">Diagramatix</span>
+    <h1>The Miner</h1>
+    <p class="standfirst">
+      Your systems already recorded what happened. Point the Miner at that record and it draws the
+      process people actually followed &mdash; then shows you where it went wrong.
+    </p>
+  </header>
+
+  <section>
+    <span class="eyebrow">The idea</span>
+    <h2>Nobody drew this diagram. The log did</h2>
+    <div class="col">
+      <p class="lede">
+        Every workflow system, ticketing tool and ERP writes down what it did and when. That record is
+        a description of the real process, and almost nobody reads it.
+      </p>
+      <p>
+        DiagramatixMINER reads it. Give it an export of events &mdash; a case, an activity, a timestamp
+        &mdash; and it reconstructs the process as a <strong>BPMN diagram you can open and edit</strong>,
+        plus the entity&rsquo;s lifecycle as a state machine. Not a report about the process. The process.
+      </p>
+      <p>
+        Then it does the thing a picture alone cannot: it holds the real behaviour up against the
+        process you <em>say</em> you follow, and counts the difference.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">Getting started</span>
+    <h2>From a spreadsheet to a process, in one sitting</h2>
+
+    <div class="steps">
+      <div class="step"><span class="n">1</span><span class="t"><strong>Drop in the log.</strong> CSV or TSV from any system, or the two interchange standards &mdash; XES (IEEE 1849) and OCEL 2.0, object-centric logs included.</span></div>
+      <div class="step"><span class="n">2</span><span class="t"><strong>Say which column is which.</strong> Case, activity and timestamp are all that is required. The columns are guessed for you; you confirm.</span></div>
+      <div class="step"><span class="n">3</span><span class="t"><strong>Check before you commit.</strong> A panel shows how many rows are usable, how many would be dropped, how the dates parsed, and warns when a column looks wrong &mdash; before anything is imported.</span></div>
+      <div class="step"><span class="n">4</span><span class="t"><strong>Import, and the analysis is already done.</strong> Cases, events, activities, states, distinct variants, the span of the data &mdash; and the whole Insights workbench underneath.</span></div>
+    </div>
+
+    <div class="note">
+      <span class="eyebrow">If the log is missing something</span>
+      <p>
+        Most real logs are thinner than the textbook. No column saying what state the entity ended in?
+        Fill an activity&rarr;state table by hand, or <strong>pull it from a State Machine you already
+        drew</strong>. No column saying who did the work? Fill the activity&rarr;team table from the
+        <strong>lanes of your own BPMN diagram</strong>. The models you already have complete the log.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">What it discovers</span>
+    <h2>Three things, from one log</h2>
+
+    <div class="caps">
+      <div class="cap">
+        <h4>The process</h4>
+        <ul>
+          <li>A real <strong>BPMN diagram</strong> &mdash; every path people took, with gateways where the work genuinely branches and rejoins</li>
+          <li>Built straight from the data, no AI required, so it is a faithful mirror of the log</li>
+          <li>Optionally <strong>AI-curated</strong> into a cleaner reading &mdash; tidy labels, noise dropped &mdash; as a separate diagram</li>
+          <li>It is an ordinary Diagramatix diagram: open it, edit it, export it, simulate it</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>The lifecycle</h4>
+        <ul>
+          <li>The <strong>state machine</strong> of the thing flowing through &mdash; every state the invoice, order or ticket was actually in, and what moved it</li>
+          <li>Every transition carries how many cases took it</li>
+          <li>A guarantee that matters: a generated lifecycle shows <strong>every state in the log</strong>, never a tidied-up subset</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>The governance</h4>
+        <ul>
+          <li>If the log carries Control, Risk or Policy identifiers, they are mined too</li>
+          <li>For each control: how often it <em>should</em> have operated, how often it <strong>actually did</strong>, and the shortfall</li>
+          <li>Evidence a control is working, rather than a note saying it exists</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">Reality vs the rulebook</span>
+    <h2>Conformance, and what it costs to be wrong</h2>
+    <div class="col">
+      <p class="lede">
+        Discovery tells you what happened. Conformance tells you whether it was allowed.
+      </p>
+      <p>
+        You pick a <strong>reference</strong> &mdash; the lifecycle as it is meant to run. The Miner can
+        create one for you from the mined behaviour, as a separate diagram you then edit into your
+        rulebook: prune the moves that should never happen. Discovery never overwrites it.
+      </p>
+      <p>
+        Then it replays every real case against that reference and reports a single number &mdash;
+        <strong>fitness</strong>, the share of cases that replay cleanly &mdash; plus each deviation,
+        what it means and how many cases did it: a transition nobody documented, a state that should not
+        exist, an entry or exit in the wrong place, a documented path nobody ever takes.
+      </p>
+      <p>
+        The deviations land back on the diagram. On the discovered state machine, every transition your
+        reference disallows turns <strong>red</strong>.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">The workbench</span>
+    <h2>Seven ways to read the same run</h2>
+
+    <div class="caps">
+      <div class="cap">
+        <h4>Activities</h4>
+        <ul>
+          <li>One row per step: cases, occurrences, median time, <strong>total time</strong></li>
+          <li>The team and the state each step produced &mdash; and an amber flag when a step is done by more than one team</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Insights &mdash; the heat map</h4>
+        <ul>
+          <li>The discovered diagram with each step <strong>tinted by where the time goes</strong></li>
+          <li>Colour by total time, by frequency, or by average time in step</li>
+          <li>The mined time and the owning team printed under each box, so the numbers sit on the picture</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Variants</h4>
+        <ul>
+          <li>Every distinct way the process was actually run, most common first, with a <strong>cumulative share</strong></li>
+          <li>Click one and its path lights up on the model; everything else fades</li>
+          <li>Tick two and it tells you exactly what differs</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Cases</h4>
+        <ul>
+          <li>Every case, sortable by cycle time &mdash; the <strong>worst offenders first</strong></li>
+          <li>Filter to one variant, click a case, see its path on the model</li>
+          <li>A live replay: work flowing over your discovered process, weighted by how often each path really happened</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Outcomes</h4>
+        <ul>
+          <li>Set a case SLA and get the <strong>on-time / late split</strong> straight away</li>
+          <li>Which steps are over-represented in late cases, and by how much</li>
+          <li>Which whole paths are the late ones</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Automation</h4>
+        <ul>
+          <li>For a task log &mdash; the UI steps inside one job &mdash; an <strong>automation score</strong> and a verdict</li>
+          <li>App ping-pong, rework, and the hours it would save</li>
+          <li>The strongest candidate routine as a step-by-step <strong>RPA specification</strong> you can hand to a build team, plus an SOP</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Export</h4>
+        <ul>
+          <li>The whole analysis as <strong>Word, Excel or PDF</strong> &mdash; summary, bottlenecks, variant Pareto, outcomes</li>
+          <li>The log itself back out as XES or OCEL, for anyone who wants to check it in their own tool</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Explain</h4>
+        <ul>
+          <li>Once the run is fully mined, a <strong>plain-English account</strong> of what was found &mdash; the real shape, the deviations and what they probably mean, the timing</li>
+          <li>Written from the computed figures, never instead of them</li>
+          <li>Works without AI too: the same summary, computed deterministically</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">Keeping it live</span>
+    <h2>A log that refreshes itself</h2>
+    <div class="col">
+      <p>
+        A mined process ages the day after you mine it. So a run can be attached to a <strong>live
+        source</strong>: a webhook your system posts events to, or a folder it drops files into &mdash;
+        Azure Blob storage or SharePoint.
+      </p>
+      <p>
+        New events arrive, the run rebuilds, and the discovered process, the lifecycle and the
+        conformance check all re-run <strong>in place, on the diagrams you already have</strong>. The
+        picture on the wall stays true without anyone re-importing anything.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">Many things at once</span>
+    <h2>When one case id isn&rsquo;t enough</h2>
+    <div class="col">
+      <p>
+        Real work rarely has one subject. An order has deliveries, which have items, which sit on
+        invoices &mdash; and forcing all of that into a single case id is how process mining usually
+        goes wrong.
+      </p>
+      <p>
+        Give the Miner an <strong>OCEL 2.0</strong> log and it does the honest thing: it mines
+        <strong>one lifecycle per object type</strong>, keeps them together as one study, and draws the
+        <strong>object model</strong> that binds them &mdash; a Domain Diagram whose associations are
+        weighted by how strongly the types actually interact, with a dashed line wherever two types
+        clearly work together but nobody ever declared a relationship between them.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">Questions it answers</span>
+    <h2>What people use it for</h2>
+
+    <div class="scroller">
+      <table>
+        <thead>
+          <tr><th>The question</th><th>What it tells you</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>What does our process actually look like?</td><td>A BPMN diagram of every path people really took &mdash; usually not the one on the wall</td></tr>
+          <tr><td>How many different ways is it being run?</td><td>The distinct variants, ranked, and how few of them cover most of the work</td></tr>
+          <tr><td>Where does the time go?</td><td>The heat map &mdash; the brightest box is where the hours are, not where the noise is</td></tr>
+          <tr><td>Which step is the bottleneck?</td><td>Steps ranked by total time consumed, with the median time in each</td></tr>
+          <tr><td>Are we doing it the way we said?</td><td>A fitness percentage: the share of cases that replay cleanly against your reference</td></tr>
+          <tr><td>What exactly is going wrong?</td><td>Each deviation named and counted &mdash; undocumented moves, unexpected entries and exits, states that should not exist</td></tr>
+          <tr><td>Which paths should not be possible?</td><td>The discovered lifecycle with every disallowed transition drawn in red</td></tr>
+          <tr><td>Do our controls actually operate?</td><td>Per control: expected, applied, bypassed &mdash; measured from the log, not asserted</td></tr>
+          <tr><td>Is compliance improving or slipping?</td><td>Control effectiveness over time across every project in the organisation, and by APQC category</td></tr>
+          <tr><td>Are we meeting the SLA?</td><td>The on-time / late split at whatever turnaround you promise</td></tr>
+          <tr><td>Why are cases late?</td><td>The steps and the paths over-represented in late cases, with the size of the effect</td></tr>
+          <tr><td>Which cases were the worst?</td><td>Every case ranked by cycle time, down to the individual sequence of steps it took</td></tr>
+          <tr><td>Can you show me rather than tell me?</td><td>A replay of real work flowing through the discovered process, weighted by how often each path happened</td></tr>
+          <tr><td>What would fixing it be worth?</td><td>A calibrated simulation &mdash; real durations, arrival rates, branch splits, teams and working hours, straight from the log</td></tr>
+          <tr><td>Who is doing what?</td><td>The team behind each step, and where a step is being done by more than one team</td></tr>
+          <tr><td>Is this job worth automating?</td><td>An automation score, the hours it would save, and the ranked candidate routines behind it</td></tr>
+          <tr><td>How is this task actually performed?</td><td>The real step-by-step routine as an RPA specification or an SOP &mdash; written from observed behaviour, not from memory</td></tr>
+          <tr><td>Where does the person waste effort?</td><td>App ping-pong bounces and the steps that get redone</td></tr>
+          <tr><td>How do our entities relate?</td><td>An object model mined from an OCEL log, with a lifecycle for every object type</td></tr>
+          <tr><td>Is this still true today?</td><td>A live source that keeps the run, the diagrams and the conformance check current on their own</td></tr>
+          <tr><td>Can I hand this to my manager?</td><td>The full analysis as Word, Excel or PDF, and a plain-English summary of what it found</td></tr>
+          <tr><td>Can our own analysts check it?</td><td>The log back out as XES or OCEL, for ProM, Celonis, Disco, Apromore or Signavio</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">Fitting in</span>
+    <h2>Where a mined process goes next</h2>
+
+    <div class="caps">
+      <div class="cap">
+        <h4>Into the Simulator</h4>
+        <ul>
+          <li>One button turns the mined run into a <strong>digital twin</strong>: fitted cycle-time distributions, the real arrival rate, gateway splits taken from observed frequencies, teams sized from how many cases each actually handled at once</li>
+          <li>Even the <strong>working calendar</strong> is mined &mdash; from the hours the work really happened in</li>
+          <li>So the <em>to-be</em> you test is a change to an <em>as-is</em> that was measured, not imagined</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Into governance</h4>
+        <ul>
+          <li>Conformance findings become <strong>control effectiveness</strong> in the Risk &amp; Control register</li>
+          <li>Runs roll up into org-wide <strong>Compliance Monitoring</strong> &mdash; the trend, per control, per project, per APQC category</li>
+          <li>A throwaway run can be excluded, so testing never pollutes the trend</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Learning it</h4>
+        <ul>
+          <li>A catalog of worked examples &mdash; invoices, order-to-cash, an activity-only service-desk log, a task-mining routine, and a live streaming source</li>
+          <li>One click loads any of them into a fresh project with the run already mined, ready to discover, conform and simulate</li>
+          <li>Some ship <strong>several periods of the same process</strong>, so you can watch compliance decay</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">In short</span>
+    <h2>The argument you cannot have without it</h2>
+    <div class="col">
+      <p>
+        Process improvement usually stalls in the same place: everyone in the room has a different
+        account of how the work is done, and none of them are wrong about their own part.
+      </p>
+      <p>
+        The Miner ends that conversation by producing the one version nobody has to take on trust
+        &mdash; the one the systems recorded while everybody was busy.
+      </p>
+    </div>
+  </section>
+
+  <footer>Diagramatix &middot; DiagramatixMINER</footer>
+
+</div>
