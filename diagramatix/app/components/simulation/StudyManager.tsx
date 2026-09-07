@@ -13,6 +13,9 @@ import { MatrixButton } from "./matrix/MatrixChrome";
 import type { ReadinessIssue } from "@/app/lib/simulation/readiness";
 import { ResultsReport } from "./results/ResultsReport";
 import { ScenarioCompare } from "./results/ScenarioCompare";
+import { NextStepsPanel } from "./results/NextStepsPanel";
+import { MIN_OBSERVATIONS } from "@/app/lib/simulation/nextSteps";
+import type { OverrideSet } from "@/app/lib/simulation/overrides";
 import { RunHistory } from "./results/RunHistory";
 import { PromptDialog } from "@/app/components/PromptDialog";
 import { summarizePackage, validateExamplePackage, type ExamplePackage } from "@/app/lib/simulation/examplePackage";
@@ -236,6 +239,7 @@ function ScenarioList({ projectId, detail, diagrams, onChanged, onRan }: { proje
   const [newName, setNewName] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
   const [comparing, setComparing] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
   const [pairing, setPairing] = useState(false);
   // Scenarios that have a completed run — DONE from a prior session (persisted
   // status) plus any run in this session — so "compare scenarios" only enables
@@ -249,6 +253,9 @@ function ScenarioList({ projectId, detail, diagrams, onChanged, onRan }: { proje
   const hasRun = (s: ScenarioRow) => s.status === "DONE" || ranIds.has(s.id);
   const ranCount = detail.scenarios.filter(hasRun).length;
   const canCompare = ranCount >= 2;
+  // The suggestions need a few scenarios to compare; below that the panel says so
+  // itself rather than being silently empty, so the button stays available.
+  const enoughForSuggestions = ranCount >= MIN_OBSERVATIONS;
 
   const base = `/api/projects/${projectId}/simulation/studies/${detail.id}/scenarios`;
 
@@ -260,6 +267,14 @@ function ScenarioList({ projectId, detail, diagrams, onChanged, onRan }: { proje
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, duplicateOf, isBaseline }),
     });
     if (res.ok) { setNewName(""); onChanged(); }
+  }
+
+  /** Create the scenario a suggestion proposes, overrides and all — one click. */
+  async function createSuggested(name: string, overrides: OverrideSet) {
+    const res = await fetch(base, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, overrides }),
+    });
+    if (res.ok) onChanged();
   }
 
   async function patchScenario(scenarioId: string, patch: Record<string, unknown>) {
@@ -296,6 +311,15 @@ function ScenarioList({ projectId, detail, diagrams, onChanged, onRan }: { proje
             {pairing ? "▾ hide" : "⇄ set up As-is vs To-be"}
           </button>
         )}
+        {detail.scenarios.length >= 1 && (
+          <button
+            onClick={() => setSuggesting((v) => !v)}
+            title={enoughForSuggestions ? "What the run history suggests trying next" : "Needs a few scenarios run before it can suggest anything"}
+            className="text-[10px] text-green-400/70 hover:text-green-300"
+          >
+            {suggesting ? "▾ hide next steps" : "◎ what next?"}
+          </button>
+        )}
         {detail.scenarios.length >= 2 && (
           <button
             onClick={() => { if (canCompare) setComparing((v) => !v); }}
@@ -308,6 +332,16 @@ function ScenarioList({ projectId, detail, diagrams, onChanged, onRan }: { proje
         )}
       </div>
       {pairing && <AsIsToBeSetup diagrams={diagrams} onCreate={createAsIsToBe} />}
+      {suggesting && (
+        <div className="border border-green-500/30 rounded p-2 mb-2">
+          <p className="text-green-400/70 uppercase tracking-widest text-[10px] mb-1.5">Suggested next steps</p>
+          <NextStepsPanel
+            nextStepsUrl={`/api/projects/${projectId}/simulation/studies/${detail.id}/next-steps`}
+            onCreateScenario={createSuggested}
+            refreshKey={ranIds.size}
+          />
+        </div>
+      )}
       {comparing && detail.scenarios.length >= 2 && (
         <div className="border border-green-500/30 rounded p-2 mb-2">
           <ScenarioCompare scenarios={detail.scenarios} runUrlFor={(sid) => `${base}/${sid}/run`} assessUrl={`/api/projects/${projectId}/simulation/studies/${detail.id}/assess`} />

@@ -141,16 +141,16 @@ is the tested route and the one that carries calendars. `validateExamplePackage`
 
 ## Phase 1 — Suggested next steps
 
-**Status:** `Not started` · The review's first extension, and the only one it wrote a feasibility
-section for. Changes a stored shape → docs pass required.
+**Status:** 🔶 `In progress` — the suggestions themselves are **shipped**; smaller item 04 (named
+baseline + trend) is the remaining piece, and is what makes this phase change a stored shape.
 
-- [ ] `app/lib/simulation/nextSteps.ts` (pure)
+- [x] `app/lib/simulation/nextSteps.ts` (pure)
   - `diffRuns(a, b)` — what changed in the configuration, what changed in the outcome
   - `leverHistory(runs)` — per lever: values tried, range covered, what each was worth
   - `suggestNextSteps(history)` → ranked `Suggestion[]`, each carrying
     `{ title, evidence, scenarioName, overrides: OverrideSet }`
-- [ ] `POST .../studies/[studyId]/next-steps` (facts + optional narration)
-- [ ] "Next steps" card in `StudyManager.tsx`
+- [x] `POST .../studies/[studyId]/next-steps` (facts + optional narration)
+- [x] "Next steps" card in `StudyManager.tsx` — via `results/NextStepsPanel.tsx`
 - [ ] Smaller item **04** — named baseline + trend
 
 **Levers** are exactly the `OverrideSet` keys in `app/lib/simulation/overrides.ts` (`NODE_KEYS`, team
@@ -172,6 +172,25 @@ than inventing advice.*
 
 **Each suggestion is a button.** Its `overrides` POST straight to the existing scenarios route, so
 "try eight assessors" creates the scenario rather than assigning homework.
+
+**As built.** Five rules ship, scored and ranked deterministically: `unaddressed-bottleneck` (100),
+`still-improving` (90), `abandoned-lever` (60), `untried-lever` (50 minus bottleneck rank), and
+`inside-noise` (40). Three decisions worth recording:
+
+- **Levers are enumerated from stored metrics alone** — `teamCapacities` gives every team,
+  `nodeLabels` gives every task and source. No `networkSnapshot` load and no extra query. Edge
+  probabilities are deliberately **out of scope**: metrics carry no edge list, so branch splits would
+  have been half-covered rather than covered.
+- **Only capacity suggestions carry a button.** Proposing a concrete cycle time is speculation;
+  proposing a headcount is not. Advisory findings carry no `overrides`, and the panel offers no
+  button for them — an inside-the-noise result is a reason to stop, not an action.
+- **`isInsideNoise()` is the one stand-in.** It compares the gap against the p5–p95 half-width,
+  because the per-replication vector a real test needs is not yet stored. **Phase 3 replaces that one
+  function** and nothing else here changes.
+
+The scenarios `POST` now accepts an explicit `overrides` object (applied after `duplicateOf`), which
+is what makes one click enough. AI narration has its own telemetry point, `simulation.next-steps`,
+so it is not billed as an assessment.
 
 **Smaller item 04 — a named baseline and a trend.** `SimulationScenario.isBaseline` exists but is
 scenario-level; pinning a *run* needs `SimulationRun.baseline Boolean @default(false)` (schema

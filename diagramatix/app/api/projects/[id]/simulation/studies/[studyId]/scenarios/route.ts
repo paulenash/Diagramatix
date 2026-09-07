@@ -41,6 +41,12 @@ export async function POST(req: Request, { params }: Params) {
     });
     if (src) { runConfig = src.runConfig; overrides = src.overrides; variantRootIds = src.variantRootIds; }
   }
+  // An explicit override set (the "Suggested next steps" cards post one, so a
+  // suggestion is a button rather than a set of instructions to follow by hand).
+  // Applied AFTER duplicateOf so it refines a clone rather than being lost to it.
+  if (body.overrides && typeof body.overrides === "object" && !Array.isArray(body.overrides)) {
+    overrides = { ...(overrides as Record<string, unknown>), ...(body.overrides as Record<string, unknown>) };
+  }
 
   const isBaseline = body.isBaseline === true;
   // Only one baseline per study.
