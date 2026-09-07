@@ -32,11 +32,13 @@ describe("starter examples are operational", () => {
 
   // Every OTHER assertion in this file iterates STARTER_EXAMPLES, so they all
   // still pass when an example is silently DELETED from exampleData.json - the
-  // survivors remain valid. That is not hypothetical: gen-bpmn-examples.ts used
-  // to write the whole file from its own two METAS, wiping the three entries it
-  // does not own (`simple-process` has no generator at all, so its loss was
-  // unrecoverable). It now merges by slug; this is the guard that keeps it that
-  // way. Extend the list when a new example ships - never shorten it to go green.
+  // survivors remain valid. That is not hypothetical: gen-bpmn-examples.ts wrote
+  // the whole file from its own two METAS, wiping the three entries it did not
+  // own. That script is now retired and deleted, and exampleData.json is the
+  // source of truth (see app/lib/simulation/exampleSeeds.ts) - but the two
+  // surviving per-example generators still rewrite entries, and a future one
+  // could too. Extend the list when a new example ships - never shorten it to go
+  // green.
   it("T3369 - every catalog example is still present (a generator must merge, not overwrite)", () => {
     const EXPECTED = [
       "simple-process",

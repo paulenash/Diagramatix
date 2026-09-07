@@ -8,9 +8,11 @@
  *
  * This derives ONLY what the file states. It deliberately does not autofill the
  * gaps: a file that names no resources yields no teams, and the user fills them
- * in with ⚙ Fill missing simulation data. (scripts/gen-bpmn-examples.ts takes a
- * different route on purpose — it autofills first and forces capacity 1, so the
- * shipped catalog examples show contention out of the box.)
+ * in with ⚙ Fill missing simulation data. (The now-retired
+ * scripts/gen-bpmn-examples.ts took a different route on purpose: it autofilled
+ * first and forced capacity 1, so the shipped catalog examples showed contention
+ * out of the box. Those examples are now authored data — see
+ * app/lib/simulation/exampleSeeds.ts.)
  */
 
 import type { DiagramData } from "@/app/lib/diagram/types";

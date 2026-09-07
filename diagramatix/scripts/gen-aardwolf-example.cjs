@@ -11,7 +11,17 @@
  * to the as-is diagram, To-be to the to-be diagram) — the shape the as-is/to-be
  * comparison feature consumes.
  *
- * Re-run with:  node scripts/gen-aardwolf-example.cjs
+ * Originally generated with: node scripts/gen-aardwolf-example.cjs
+ *
+ * !! RETIRED - DO NOT RUN. exampleData.json is now the SOURCE OF TRUTH
+ * (Paul’s decision, 2026-09-07); see app/lib/simulation/exampleSeeds.ts and
+ * audit/Simulator-Extensions-Plan.md section 0.4.
+ *
+ * This script is kept only as the record of how the package was first derived.
+ * It is STALE: it emits a package with NO calendars, so running it silently
+ * undoes backfill-example-calendars.cjs and drops the working calendar this
+ * example’s human teams follow. Test T0571 then fails. Edit exampleData.json
+ * directly instead.
  */
 const fs = require("fs");
 const path = require("path");

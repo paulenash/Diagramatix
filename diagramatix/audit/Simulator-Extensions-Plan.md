@@ -7,7 +7,7 @@
 | **This document** | The **live worklist** for building them. Phases follow the review's own stated build order (value first). Every phase names the files it touches and the existing functions it reuses. |
 | **Scope** | All 8 extensions + all 6 smaller items. New worked examples are planned alongside, one per new capability. |
 | **How to use** | Work an item, tick its box and set **Status** → `In progress` / `Shipped (<commit>)` / `Won't do (<reason>)`. Keep the review as the historical argument; keep this as the burn-down. |
-| **Progress log** | **2026-09-07** — **Phase 0 shipped (`e290a9b4`)**, except the newly-found 0.4. 0.1 generator merges by slug (guarded by T3369, proven to fail on a simulated overwrite); 0.2 `studyRuns.ts` + `latestRunPerScenario` (T3370/T3371); 0.3 `facts/` established, `assessFacts.ts` moved, both importers repointed (no compat shim — there were only two). **New finding: 0.4** — the generator is stale relative to its own committed output; see below. 382 simulation tests green, typecheck unchanged. |
+| **Progress log** | **2026-09-07** — **Phase 0 COMPLETE.** 0.1/0.2/0.3 `e290a9b4`; TESTS_SUMMARY header repaired `11eed0f1`; **0.4 closed by Paul’s decision — generator retired, committed examples are the source of truth** (this also supersedes the original "extend the generator" plan for new examples). 0.1 generator merges by slug (guarded by T3369, proven to fail on a simulated overwrite); 0.2 `studyRuns.ts` + `latestRunPerScenario` (T3370/T3371); 0.3 `facts/` established, `assessFacts.ts` moved, both importers repointed (no compat shim — there were only two). **New finding: 0.4** — the generator is stale relative to its own committed output; see below. 382 simulation tests green, typecheck unchanged. |
 
 **Status values:** `Not started` · `In progress` · `Shipped (<commit>)` · `Blocked (<on what>)` · `Won't do (<reason>)`
 
@@ -59,8 +59,8 @@ would tell someone what to try next.
 
 ## Phase 0 — Foundations
 
-**Status:** ✅ `Shipped (e290a9b4)` — 0.1, 0.2, 0.3. **0.4 remains open** (see below). Was blocking
-every later phase; Phase 1 is now unblocked.
+**Status:** ✅ `Shipped` — 0.1, 0.2, 0.3 (`e290a9b4`) and 0.4 (generator retired). Phase 1 is
+unblocked.
 
 ### 0.1 Fix the example-generator overwrite hazard ⚠️
 
@@ -101,32 +101,41 @@ for two call sites is dead weight.
 
 Phases 1, 2, 3, 6 and 8 each add a sibling. One place, one pattern, one test idiom.
 
-### 0.4 ⚠ The generator is stale relative to its own committed output — **do not run it**
+### 0.4 ✅ Generator retired — the committed examples are the source of truth
 
-**Status:** `Not started` — found while verifying 0.1, and a separate hazard from it.
+**Status:** ✅ `Shipped` — **Paul's decision, 2026-09-07: retire the script, treat the committed
+examples as the source of truth.**
 
-Fixing the overwrite let the generator run safely for the three examples it does not own. It is still
-not safe for the **two it does**. Regenerating them produces materially worse packages than the ones
-committed:
+Found while verifying 0.1. Fixing the overwrite made `gen-bpmn-examples.ts` safe for the three
+examples it did not own; it was never safe for the two it did. Regenerating produced materially worse
+packages than the committed ones:
 
 | Slug | Committed | Regenerated |
 |---|---|---|
 | `loan-origination` | 32 elements, 32 connectors, 3 teams, 1 calendar | 27, **25**, 4, **0** |
 | `car-repair-rework-loop` | 36 elements, 33 connectors, 1 team, 1 calendar | 35, **15**, **0**, **0** |
 
-Car repair loses **more than half its connectors** and its only team. The committed data is ahead of
-the generator — calendars were added by `backfill-example-calendars.cjs`, team names were relabelled
-to lane labels, and the `importBpmnXml` → `applyBpsimToDiagram` → `autofillSimulation` pipeline has
-moved since. The regenerated data was **not** committed.
+Checking the other two generators showed the same class of fault, milder: **every** generator emits a
+package with **no calendars**, because `backfill-example-calendars.cjs` ran after all of them and none
+were updated. `gen-aardwolf-example.cjs` and `gen-sales-marketing-example.cjs` each drop their
+example's working calendar, which T0571 requires.
 
-CI would catch it — **T0571** requires every example to carry a calendar its human teams follow — so
-this is a trap for whoever runs the generator, not a live defect. But it blocks the examples
-programme, because Phases 2/4/5/6/7 all add examples through these scripts.
+**What was done:**
 
-- [ ] Decide: repair the pipeline until regeneration is idempotent, or formally retire
-      `gen-bpmn-examples.ts` and treat the committed packages as the source of truth
-- [ ] Whichever way — the answer must be written at the top of the script, so the next person does not
-      discover this by running it
+- [x] `scripts/gen-bpmn-examples.ts` **deleted**. Its derivation from the OMG/WfMC BPSim files is
+      recorded in `exampleSeeds.ts` and preserved in git history.
+- [x] `exampleSeeds.ts` header rewritten — it previously told the reader to regenerate with the very
+      script that would have degraded the data. It now states that the committed JSON is authored,
+      that there is no regeneration step, and why.
+- [x] `gen-aardwolf-example.cjs` and `gen-sales-marketing-example.cjs` kept as provenance records but
+      banner-marked **RETIRED — DO NOT RUN**, naming the calendar loss and T0571.
+- [x] Stale pointers cleaned up in `bpsim/bpsimProject.ts` and the T3369 comment.
+
+**Consequence for the examples programme — this supersedes the earlier plan.** New examples are
+**authored packages**, not generated: either hand-written `ExamplePackage` data committed to
+`exampleData.json`, or captured out of a real project with the admin **Save as example** path, which
+is the tested route and the one that carries calendars. `validateExamplePackage` and
+`exampleSeeds.test.ts` — which runs every scenario of every example — are what keep them honest.
 
 ---
 
@@ -368,12 +377,13 @@ disarms *"but you guessed that number"* — yes, and here is the evidence that i
 
 ## Examples programme
 
-Every new capability gets a worked example that teaches exactly that capability. All merge by slug
-into the single `app/lib/simulation/exampleData.json`, which `exampleSeeds.ts` imports and
-`scripts/seed-simulation-examples.ts` seeds. Purpose-built teaching processes follow the
-`scripts/gen-aardwolf-example.cjs` merge-by-slug shape; anything derived from a real `.bpmn` goes
-through `gen-bpmn-examples.ts` — **once 0.1 has made it merge rather than overwrite.** Every new
-package must pass `validateExamplePackage` and be covered by `tests/simulation/exampleSeeds.test.ts`.
+Every new capability gets a worked example that teaches exactly that capability. All are **authored packages** committed to
+`app/lib/simulation/exampleData.json`, which `exampleSeeds.ts` imports and
+`scripts/seed-simulation-examples.ts` seeds. Per **0.4** there is no generator route any more: build
+each example in a real project and capture it with the admin **Save as example** path (the tested
+route, and the one that carries calendars), or hand-write the package. Every new package must pass
+`validateExamplePackage`, carry a working calendar for its human teams (**T0571**), and be added to
+the **T3369** slug list.
 
 | | Example | Slug | Teaches | Phase | Level |
 |---|---|---|---|---|---|
@@ -406,10 +416,10 @@ claim that a pooled p95 flatters a process, and it should be legible in a single
   aggregated stats with the new fields unset. **The single most important guard in this plan.**
 - **BPSim round-trip:** `tests/simulation/bpsim*.test.ts` after Phases 5 and 7, including the explicit
   decision about what happens to skills and disciplines on export.
-- **Generator:** re-run every `gen-*` example script in sequence and confirm `exampleData.json` still
-  holds every slug — the specific failure 0.1 fixes, now guarded by **T3369**. Necessary but **not
-  sufficient**: also diff the packages, because surviving the merge is not the same as surviving
-  intact (see **0.4** — `gen-bpmn-examples.ts` still degrades its own two examples).
+- **Examples:** do **not** run the `gen-*` scripts (**0.4** — they are retired and stale; each drops
+  its example’s calendar). `exampleData.json` is edited and committed directly, and is verified by
+  `exampleSeeds.test.ts`, which runs every scenario of every example, plus **T0571** (calendars) and
+  **T3369** (no example silently lost).
 - **New tests** from **T3369**, appended to `tests/TESTS_SUMMARY.md`.
 - **Docs:** `schema/UPDATE_EVERYTHING.md` Steps 0–12 on Phases 1, 3, 5 and 7.
 
