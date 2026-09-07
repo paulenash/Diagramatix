@@ -47,6 +47,39 @@ export interface CalendarInterval {
  *  "always open" (the safe engine fallback for an unconfigured calendar). */
 export interface WorkCalendar {
   intervals: CalendarInterval[];
+  /**
+   * Dated departures from the weekly pattern: bank holidays, the Christmas
+   * shutdown, the summer when a third of the team is away. A calendar repeats
+   * weekly and a department's YEAR does not.
+   *
+   * Each entry REPLACES the weekly pattern for that one date. Empty `intervals`
+   * means closed all day, which is the common case; a non-empty list means
+   * different hours (a half-day before a holiday).
+   *
+   * Requires `epochDate`: without a real date for sim t=0 an exception cannot be
+   * located, so exceptions are IGNORED and `calendarWarnings` says so rather
+   * than silently applying none of them.
+   */
+  exceptions?: CalendarException[];
+  /**
+   * The calendar date of sim clock t=0, "YYYY-MM-DD". The weekly pattern anchors
+   * t=0 to MONDAY 00:00, so this should be a Monday; `calendarWarnings` flags it
+   * when it is not, because otherwise the weekday pattern and the dated
+   * exceptions would disagree with each other by a constant offset.
+   */
+  epochDate?: string;
+}
+
+/** One dated departure from the weekly pattern. `day` is deliberately absent:
+ *  the date decides the day, and carrying a weekday too would let the two
+ *  disagree. */
+export interface CalendarException {
+  /** "YYYY-MM-DD". */
+  date: string;
+  /** Open windows for that date. EMPTY = closed all day. */
+  intervals: { start: string; end: string; rate?: number }[];
+  /** Shown in the editor: "Christmas Day", "Ann on leave". */
+  note?: string;
 }
 
 /** Run configuration for one scenario (≙ BPSim ScenarioParameters). */

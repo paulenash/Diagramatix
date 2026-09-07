@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-09-07  ·  **Document version:** 7.0  ·  **Suite:** 412 test files · 2,786 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T3470  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-09-07  ·  **Document version:** 7.0  ·  **Suite:** 414 test files · 2,808 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T3492  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
@@ -34,9 +34,9 @@ Each test file has its own section below, grouped into layers. Within each secti
 | **Protects you against** | In plain terms, the real-world problem that would occur if this behaviour regressed. |
 | **How it would break (go red)** | The kind of code or data change that would make this specific test fail — i.e. what the test is watching. |
 
-**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T3471**, the one after **T3472**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
+**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T3493**, the one after **T3494**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T3470`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
+> **Highest ref allocated: `T3492`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -2577,6 +2577,28 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 | T3468 | `tests/simulation/queue-discipline.test.ts` | The service level is reported per segment, alongside the pooled figure. |
 | T3469 | `tests/simulation/queue-discipline.test.ts` | Triaging gets urgent cases through faster, at the routine cases' expense. |
 | T3470 | `tests/simulation/queue-discipline.test.ts` | The pooled p95 can hide a segment shift - the argument for reporting segments. |
+| T3471 | `tests/simulation/calendar-exceptions.test.ts` | A calendar with no exceptions is untouched and reports none. |
+| T3472 | `tests/simulation/calendar-exceptions.test.ts` | Exceptions with no start date are reported, not silently ignored. |
+| T3473 | `tests/simulation/calendar-exceptions.test.ts` | A start date that is not a Monday is flagged, because every date would shift. |
+| T3474 | `tests/simulation/calendar-exceptions.test.ts` | A malformed or duplicated exception date is reported. |
+| T3475 | `tests/simulation/calendar-exceptions.test.ts` | A holiday closes the day the weekly pattern would open, and only that day. |
+| T3476 | `tests/simulation/calendar-exceptions.test.ts` | Work waiting on a holiday resumes the next working morning. |
+| T3477 | `tests/simulation/calendar-exceptions.test.ts` | Working time skips a holiday instead of consuming it. |
+| T3478 | `tests/simulation/calendar-exceptions.test.ts` | A holiday is not a working day, so a working-day deadline moves out. |
+| T3479 | `tests/simulation/calendar-exceptions.test.ts` | A run of closed days (a shutdown) is stepped over in one go. |
+| T3480 | `tests/simulation/calendar-exceptions.test.ts` | An exception can shorten a day rather than close it (a half-day). |
+| T3481 | `tests/simulation/calendar-exceptions.test.ts` | An exception can open a day the weekly pattern closes (a Saturday callout). |
+| T3482 | `tests/simulation/calendar-exceptions.test.ts` | A night shift on an exception does not spill into the next day. |
+| T3483 | `tests/simulation/batching.test.ts` | A task with no batch behaves exactly as before; a batch of one is not a batch. |
+| T3484 | `tests/simulation/batching.test.ts` | Cases wait until the batch is full, then all go together on one service. |
+| T3485 | `tests/simulation/batching.test.ts` | A part-full batch never goes on size alone, so those cases are still waiting. |
+| T3486 | `tests/simulation/batching.test.ts` | Batching costs the cases time and saves the team work. |
+| T3487 | `tests/simulation/batching.test.ts` | Whatever has gathered goes at the cut-off, full or not. |
+| T3488 | `tests/simulation/batching.test.ts` | Size and cut-off together: either rule can send the batch. |
+| T3489 | `tests/simulation/batching.test.ts` | The cut-off is armed once per batch, not once per arrival. |
+| T3490 | `tests/simulation/batching.test.ts` | A batch survives a snapshot: a resumed run matches the uninterrupted one. |
+| T3491 | `tests/simulation/batching.test.ts` | Monte-Carlo aggregation is unaffected by batching. |
+| T3492 | `tests/simulation/batching.test.ts` | A cut-off releases a straggler that size alone would leave waiting. |
 
 > **Keep this section in sync.** Whenever an e2e spec is added, removed, or changes what it asserts, update this section. It is hand-maintained, not generated.
 

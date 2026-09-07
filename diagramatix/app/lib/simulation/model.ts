@@ -92,6 +92,19 @@ export interface SimNode {
    *  multipliers for time-varying (peak/off-peak) arrivals. Absent → 24/7. */
   calendar?: WorkCalendar;
   // task
+  /**
+   * Batching and cut-off. Back-office work is full of "posted at 4pm" and
+   * "processed in batches of 50", and both change queueing behaviour
+   * completely: work accumulates doing nothing, then moves all at once.
+   *
+   * Cases entering this task WAIT until either `size` of them have gathered or
+   * the wall-clock `cutoff` ("16:00") arrives, whichever comes first. The
+   * batch then seizes the team ONCE, takes one service time, and every case in
+   * it moves on together — which is what a batch is.
+   *
+   * Absent (or with neither field set) = no batching, exactly as before.
+   */
+  batch?: { size?: number; cutoff?: string };
   cycleTime?: SimDist;
   setupTime?: SimDist;   // BPSim SetupTime, added before processing
   waitTime?: SimDist;    // BPSim WaitTime — non-seizing delay after service

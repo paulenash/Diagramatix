@@ -13,7 +13,7 @@
  * correctness-critical core, so they carry the bulk of the calendar tests.
  */
 
-import { SECONDS_PER_UNIT, type ClockUnit, type WorkCalendar, type CalendarInterval } from "./types";
+import { SECONDS_PER_UNIT, type ClockUnit, type WorkCalendar, type CalendarInterval, type CalendarException } from "./types";
 
 /** Day-of-week codes for the compact calendar string (0=Mon … 6=Sun). */
 const DAY_CODES = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"];
@@ -128,6 +128,81 @@ function timeOfWeek(t: number, weekLen: number): number {
   return ((t % weekLen) + weekLen) % weekLen;
 }
 
+/* ── Dated exceptions ──────────────────────────────────────────────────────
+ *
+ * A calendar repeats weekly; a department's year does not. Bank holidays, the
+ * Christmas shutdown and a summer of leave are DATED, so they need a real date
+ * for sim t=0 before they can be located at all.
+ *
+ * EVERYTHING BELOW IS GATED ON `hasExceptions`. A calendar without them takes
+ * exactly the path it always took — same functions, same arithmetic, same
+ * results — which is the only safe way to change a module this load-bearing.
+ */
+
+const DAY_MS = 86_400_000;
+
+/** "YYYY-MM-DD" → UTC midnight epoch ms, or null. UTC throughout: a simulation
+ *  clock has no timezone, and local time would shift every date by one somewhere
+ *  in the world. */
+function parseISODate(v: string | undefined): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec((v ?? "").trim());
+  if (!m) return null;
+  const ms = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return Number.isFinite(ms) ? ms : null;
+}
+
+/** The ISO date `dayIndex` days after the epoch. */
+function isoDateAt(epochMs: number, dayIndex: number): string {
+  return new Date(epochMs + dayIndex * DAY_MS).toISOString().slice(0, 10);
+}
+
+/** Does this calendar carry dated exceptions that can actually be located? */
+export function hasExceptions(cal: WorkCalendar): boolean {
+  return !!cal.epochDate && Array.isArray(cal.exceptions) && cal.exceptions.length > 0 && parseISODate(cal.epochDate) !== null;
+}
+
+/** Clock units per day. */
+function dayLengthClock(clockUnit: ClockUnit): number {
+  return 86400 / SECONDS_PER_UNIT[clockUnit];
+}
+
+/** Absolute day index of `t` (t=0 is day 0). */
+function dayIndexOf(t: number, clockUnit: ClockUnit): number {
+  return Math.floor(t / dayLengthClock(clockUnit));
+}
+
+/** The exception covering the day containing `t`, or undefined. */
+function exceptionAt(t: number, cal: WorkCalendar, clockUnit: ClockUnit): CalendarException | undefined {
+  const epoch = parseISODate(cal.epochDate);
+  if (epoch === null) return undefined;
+  const date = isoDateAt(epoch, dayIndexOf(t, clockUnit));
+  return (cal.exceptions ?? []).find((e) => e.date === date);
+}
+
+/** An exception's windows as ABSOLUTE clock offsets for the day containing `t`.
+ *  An exception never spills into the next day: it replaces one date, and a night
+ *  shift written on a holiday would otherwise silently re-open the following
+ *  morning, which nobody means by closing for Christmas. */
+function exceptionWindows(t: number, ex: CalendarException, clockUnit: ClockUnit): WeekWindow[] {
+  const spu = SECONDS_PER_UNIT[clockUnit];
+  const dayLen = dayLengthClock(clockUnit);
+  const dayStart = Math.floor(t / dayLen) * dayLen;
+  const out: WeekWindow[] = [];
+  for (const iv of ex.intervals ?? []) {
+    const a = hhmmToSeconds(iv.start), b = hhmmToSeconds(iv.end);
+    if (b <= a) continue; // zero-length, or a crossing window we deliberately clamp
+    out.push({ s: dayStart + a / spu, e: dayStart + b / spu, rate: typeof iv.rate === "number" && iv.rate > 0 ? iv.rate : 1 });
+  }
+  return out.sort((x, y) => x.s - y.s);
+}
+
+/** The window open at `t`, honouring a dated exception when one covers that day.
+ *  undefined when the day is closed, whether by the pattern or by an exception. */
+function windowAtWithExceptions(t: number, cal: WorkCalendar, clockUnit: ClockUnit): WeekWindow | undefined {
+  const ex = exceptionAt(t, cal, clockUnit);
+  if (!ex) return windowAt(t, intervalsToClock(cal, clockUnit), weekLengthClock(clockUnit));
+  return exceptionWindows(t, ex, clockUnit).find((w) => t >= w.s && t < w.e);
+}
 /** The window (if any) open at `t`. Empty calendar → a synthetic always-open
  *  window so callers uniformly see "open, rate 1". */
 function windowAt(t: number, windows: WeekWindow[], weekLen: number): WeekWindow | undefined {
@@ -138,6 +213,7 @@ function windowAt(t: number, windows: WeekWindow[], weekLen: number): WeekWindow
 
 /** Is the calendar open at clock time `t`? Empty calendar → always true. */
 export function isOpenAt(t: number, cal: WorkCalendar, clockUnit: ClockUnit): boolean {
+  if (hasExceptions(cal)) return windowAtWithExceptions(t, cal, clockUnit) !== undefined;
   const weekLen = weekLengthClock(clockUnit);
   return windowAt(t, intervalsToClock(cal, clockUnit), weekLen) !== undefined;
 }
@@ -145,6 +221,10 @@ export function isOpenAt(t: number, cal: WorkCalendar, clockUnit: ClockUnit): bo
 /** The arrival-rate multiplier in effect at `t`: the containing window's `rate`
  *  when open, or 0 when closed (no arrivals). Empty calendar → 1. */
 export function rateAt(t: number, cal: WorkCalendar, clockUnit: ClockUnit): number {
+  if (hasExceptions(cal)) {
+    const ew = windowAtWithExceptions(t, cal, clockUnit);
+    return ew ? ew.rate : 0;
+  }
   const weekLen = weekLengthClock(clockUnit);
   const w = windowAt(t, intervalsToClock(cal, clockUnit), weekLen);
   return w ? w.rate : 0;
@@ -156,6 +236,7 @@ export function rateAt(t: number, cal: WorkCalendar, clockUnit: ClockUnit): numb
 export function nextOpenAt(t: number, cal: WorkCalendar, clockUnit: ClockUnit): number {
   const windows = intervalsToClock(cal, clockUnit);
   if (windows.length === 0) return t;
+  if (hasExceptions(cal)) return nextOpenWithExceptions(t, cal, clockUnit, windows);
   const weekLen = weekLengthClock(clockUnit);
   const tow = timeOfWeek(t, weekLen);
   const weekStart = t - tow;
@@ -174,13 +255,59 @@ export function nextOpenAt(t: number, cal: WorkCalendar, clockUnit: ClockUnit): 
  * weekends, lunch) don't count. An always-open calendar (no windows) degrades to
  * plain elapsed time. Used for "working-time" timer delays ("10 working days").
  */
+/**
+ * The next open moment when dated exceptions are in play. Walks forward DAY BY
+ * DAY rather than jumping within a week, because the week is no longer periodic:
+ * a shutdown can close an arbitrary run of days.
+ *
+ * Bounded at two years. A calendar closed for two years is a modelling mistake,
+ * and returning `t` unchanged is the safe answer — the caller sees no progress
+ * rather than the engine looping forever.
+ */
+function nextOpenWithExceptions(t: number, cal: WorkCalendar, clockUnit: ClockUnit, windows: WeekWindow[]): number {
+  const dayLen = dayLengthClock(clockUnit);
+  const weekLen = weekLengthClock(clockUnit);
+  let cur = t;
+  for (let i = 0; i < 730; i++) {
+    const dayStart = Math.floor(cur / dayLen) * dayLen;
+    const ex = exceptionAt(cur, cal, clockUnit);
+    const towDayStart = timeOfWeek(dayStart, weekLen);
+    const dayWindows = ex
+      ? exceptionWindows(cur, ex, clockUnit)
+      : windows
+          .filter((w) => w.s < towDayStart + dayLen && w.e > towDayStart)
+          .map((w) => ({ s: dayStart - towDayStart + w.s, e: dayStart - towDayStart + w.e, rate: w.rate }));
+    if (dayWindows.some((w) => cur >= w.s && cur < w.e)) return cur;
+    const later = dayWindows.filter((w) => w.s > cur).sort((a, b) => a.s - b.s)[0];
+    if (later) return later.s;
+    cur = dayStart + dayLen; // nothing more today — try tomorrow from midnight
+  }
+  return t;
+}
 export function advanceWorkingClock(t: number, duration: number, cal: WorkCalendar, clockUnit: ClockUnit): number {
   if (duration <= 0) return t;
   const windows = intervalsToClock(cal, clockUnit);
   if (windows.length === 0) return t + duration; // always open → elapsed
   const weekLen = weekLengthClock(clockUnit);
+  const withEx = hasExceptions(cal);
   let cur = t, remaining = duration, guard = 0;
   while (remaining > 1e-9 && guard++ < 200000) {
+    // With exceptions the window must be resolved for the actual DAY: a holiday
+    // replaces the weekly pattern outright, so the weekly windows do not apply.
+    if (withEx) {
+      const ew = windowAtWithExceptions(cur, cal, clockUnit);
+      if (!ew) {
+        const jump = nextOpenAt(cur, cal, clockUnit);
+        if (jump <= cur) return cur; // nothing ever opens again — stop, do not spin
+        cur = jump;
+        continue;
+      }
+      const availEx = ew.e - cur;
+      if (availEx >= remaining) return cur + remaining;
+      remaining -= availEx;
+      cur = ew.e;
+      continue;
+    }
     const tow = timeOfWeek(cur, weekLen);
     const w = windows.find((win) => tow >= win.s && tow < win.e);
     if (!w) { cur = nextOpenAt(cur, cal, clockUnit); continue; } // jump over the closed gap
@@ -220,8 +347,14 @@ export function advanceWorkingDays(t: number, days: number, cal: WorkCalendar, c
   if (windows.length === 0) return t + days * (86400 / SECONDS_PER_UNIT[clockUnit]); // always open → elapsed
   const dayLen = 86400 / SECONDS_PER_UNIT[clockUnit];
   const weekLen = weekLengthClock(clockUnit);
-  /** Does the day containing `x` open at any point? */
+  const withEx = hasExceptions(cal);
+  /** Does the day containing `x` open at any point? A dated exception replaces the
+   *  weekly answer for that one day — which is the whole point of a holiday. */
   const opensOn = (x: number): boolean => {
+    if (withEx) {
+      const ex = exceptionAt(x, cal, clockUnit);
+      if (ex) return exceptionWindows(x, ex, clockUnit).length > 0;
+    }
     const dayStart = Math.floor(timeOfWeek(x, weekLen) / dayLen) * dayLen;
     return windows.some((w) => w.s < dayStart + dayLen && w.e > dayStart);
   };
@@ -318,5 +451,36 @@ export function calendarWarnings(cal: WorkCalendar): string[] {
       if (sorted[i].s < sorted[i - 1].e) { warnings.push(`${DAY[day] ?? day}: overlapping working windows`); break; }
     }
   }
+
+  // ── Dated exceptions: the two ways they silently do nothing ──────────
+  const exceptions = cal.exceptions ?? [];
+  if (exceptions.length > 0) {
+    const epoch = parseISODate(cal.epochDate);
+    if (epoch === null) {
+      // The commonest failure: holidays entered, no start date, so not one of
+      // them applies and nothing anywhere says why.
+      warnings.push(
+        `${exceptions.length} dated exception${exceptions.length === 1 ? " is" : "s are"} set but the calendar has no start date, ` +
+        "so none of them apply. Set the date that simulation day 1 represents."
+      );
+    } else {
+      // t=0 is Monday 00:00 in the weekly pattern. If the start date is not a
+      // Monday the weekday pattern and the dated exceptions disagree by a
+      // constant offset, and every holiday lands on the wrong day.
+      if (new Date(epoch).getUTCDay() !== 1) {
+        warnings.push(
+          `The start date ${cal.epochDate} is not a Monday. Simulation day 1 is treated as a Monday by the ` +
+          "weekly pattern, so the dated exceptions would land on the wrong weekday."
+        );
+      }
+      const seen = new Set();
+      for (const ex of exceptions) {
+        if (parseISODate(ex.date) === null) warnings.push(`Exception date "${ex.date}" is not a valid YYYY-MM-DD date, so it is ignored.`);
+        else if (seen.has(ex.date)) warnings.push(`Two exceptions are set for ${ex.date}; only the first applies.`);
+        else seen.add(ex.date);
+      }
+    }
+  }
+
   return warnings;
 }

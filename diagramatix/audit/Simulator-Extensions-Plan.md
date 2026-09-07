@@ -360,14 +360,16 @@ queued-and-polled job becomes a real requirement — note it, don't build it yet
 
 ## Phase 5 — Priorities and queue discipline
 
-**Status:** `Not started` · **First engine phase.** The engine-side smaller items are batched here so
-they share one release and one regression pass. Changes stored shapes → docs pass required.
+**Status:** ✅ `Shipped` — queue discipline, per-segment service level, holidays (item 02) and
+batching (item 03), in three commits sharing one regression pass. **Correction:** no version bump was
+needed. Nothing here is a physical DB change — the new fields live in the diagram/scenario JSON and
+in `metrics`, and per UPDATE_EVERYTHING Step 0 that is data, not structure.
 
-- [ ] `ResourcePool` gains `discipline: "fifo" | "priority" | "shortest-first"`
-- [ ] `SimTeam.discipline` + `TeamOverride.discipline`
-- [ ] Per-segment service level in `statistics.ts`
-- [ ] Smaller item **02** — holidays and absence
-- [ ] Smaller item **03** — batching and cut-off times
+- [x] `ResourcePool` gains `discipline: "fifo" | "priority" | "shortest-first"`
+- [x] `SimTeam.discipline` + `TeamOverride.discipline`
+- [x] Per-segment service level in `statistics.ts`
+- [x] Smaller item **02** — holidays and absence
+- [x] Smaller item **03** — batching and cut-off times
 
 The whole change lands cleanly in `app/lib/simulation/resourcePool.ts`, whose own header already
 names FIFO queueing as *"exactly where WAIT TIME comes from"*. `QueuedRequest` gains `priority` and

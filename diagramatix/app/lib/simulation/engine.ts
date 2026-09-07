@@ -22,7 +22,7 @@ import { SECONDS_PER_UNIT, type SimRunConfig, type PlannedIntervention, type Sim
 import { isOpenAt, nextOpenAt, rateAt, boundariesIn, advanceWorkingClock, advanceWorkingDays, nextTimeOfDayClock } from "./calendar";
 import type { RepStats, NodeStat } from "./statistics";
 
-type EventType = "GENERATE" | "SERVICE_END" | "WAIT_END" | "RESUME" | "EVENT_TRIGGER" | "INTERVENTION" | "CALENDAR_CAP" | "BOUNDARY_TRIGGER" | "CATCH_TIMEOUT";
+type EventType = "GENERATE" | "SERVICE_END" | "WAIT_END" | "RESUME" | "EVENT_TRIGGER" | "INTERVENTION" | "CALENDAR_CAP" | "BOUNDARY_TRIGGER" | "CATCH_TIMEOUT" | "BATCH_CUTOFF";
 /** Runtime form of a planned intervention carried on an INTERVENTION event.
  *  A revert event (scheduled after a `duration`) is the same shape with the
  *  captured prior value and no duration. */
@@ -173,7 +173,7 @@ export interface SimState {
   // Applied-intervention state (so an Operator fork preserves timed changes).
   arrivalMult?: Record<string, number>;
   edgeProb?: Record<string, number>;
-  acc: { arrived: number; completed: number; flowSum: number; flowCount: number; flowSamples?: number[]; flowBySegment?: Record<string, number[]>; processWaitTotal?: number; queueWaitTotal?: number; perNode: Record<string, NodeAcc> };
+  acc: { arrived: number; completed: number; flowSum: number; flowCount: number; flowSamples?: number[]; flowBySegment?: Record<string, number[]>; batchWaiting?: Record<string, string[]>; batchFollowers?: Record<string, string[]>; batchCutoffArmed?: string[]; processWaitTotal?: number; queueWaitTotal?: number; perNode: Record<string, NodeAcc> };
 }
 
 export class Engine {
@@ -238,6 +238,14 @@ export class Engine {
    *  same quantity perNode.waitSum accumulates, summed across nodes). This one
    *  capacity CAN shorten, which is why the two are reported apart. */
   private queueWaitTotal = 0;
+  /** Cases gathered at a batching task, waiting for the batch to go. */
+  private batchWaiting = new Map<string, string[]>();
+  /** Batch nodes that already have a cut-off event scheduled, so a second
+   *  arrival does not schedule a second one for the same batch. */
+  private batchCutoffArmed = new Set<string>();
+  /** Carrier token id → the followers travelling with it. The carrier does the
+   *  service (one seize, one duration) and they all move on together. */
+  private batchFollowers = new Map<string, string[]>();
   private perNode = new Map<string, NodeAcc>();
   // indices
   private nodeById = new Map<string, SimNode>();
@@ -375,6 +383,7 @@ export class Engine {
     if (ev.type === "CALENDAR_CAP") return this.applyCalendarCap(ev.nodeId, ev.cap ?? 0);
     if (ev.type === "INTERVENTION") return this.applyPlanned(ev.iv!);
     if (ev.type === "EVENT_TRIGGER") return this.onEventTrigger(ev.scopeInst!, ev.esubId!);
+    if (ev.type === "BATCH_CUTOFF") return this.releaseBatch(ev.nodeId, "cutoff");
     if (ev.tokenId && this.cancelledTokens.has(ev.tokenId)) return; // token was interrupted
     if (ev.type === "BOUNDARY_TRIGGER") return ev.scopeInst ? this.onScopeBoundaryTrigger(ev) : this.onBoundaryTrigger(ev);
     if (ev.type === "CATCH_TIMEOUT") return this.onCatchTimeout(ev);
@@ -846,7 +855,58 @@ export class Engine {
     return { passes, units: units * concurrency, concurrency };
   }
 
-  private startOrQueue(token: Token, node: SimNode): void {
+  /** Is this node actually batching? A `batch` with neither field set is not. */
+  private batchesAt(node: SimNode): boolean {
+    const b = node.batch;
+    return !!b && ((typeof b.size === "number" && b.size > 1) || !!b.cutoff);
+  }
+
+  /**
+   * Park a case at a batching task. It goes when `size` cases have gathered or
+   * when the cut-off arrives, whichever is first — the two rules a back office
+   * actually runs on.
+   */
+  private joinBatch(token: Token, node: SimNode): void {
+    const waiting = this.batchWaiting.get(node.id) ?? [];
+    waiting.push(token.id);
+    this.batchWaiting.set(node.id, waiting);
+    this.emit("queue", token.id, node.id);
+
+    const size = node.batch?.size;
+    if (typeof size === "number" && size > 1 && waiting.length >= size) return this.releaseBatch(node.id, "size");
+
+    // Arm the cut-off once per batch, not once per arrival.
+    const cutoff = node.batch?.cutoff;
+    if (cutoff && !this.batchCutoffArmed.has(node.id)) {
+      this.batchCutoffArmed.add(node.id);
+      this.calendar.schedule(nextTimeOfDayClock(this.clock, cutoff, this.config.clockUnit), { type: "BATCH_CUTOFF", nodeId: node.id });
+    }
+  }
+
+  /**
+   * Send the batch. The FIRST case carries it: it seizes the team once and takes
+   * one service time, and the rest travel with it — which is what a batch is, and
+   * why batching relieves a bottleneck while making individual cases wait longer.
+   */
+  private releaseBatch(nodeId: string, _reason: "size" | "cutoff"): void {
+    this.batchCutoffArmed.delete(nodeId);
+    const waiting = this.batchWaiting.get(nodeId) ?? [];
+    this.batchWaiting.delete(nodeId);
+    const node = this.nodeById.get(nodeId);
+    if (!node || waiting.length === 0) return;
+
+    // Cases interrupted while waiting are gone; the batch is what is left.
+    const live = waiting.filter((id) => this.tokens.has(id) && !this.cancelledTokens.has(id));
+    if (live.length === 0) return;
+
+    const carrier = this.tokens.get(live[0])!;
+    if (live.length > 1) this.batchFollowers.set(carrier.id, live.slice(1));
+    this.startOrQueue(carrier, node, true);
+  }
+
+  private startOrQueue(token: Token, node: SimNode, batchReleased = false): void {
+    // A batching task gathers cases instead of starting work on each one.
+    if (!batchReleased && this.batchesAt(node)) return this.joinBatch(token, node);
     const plan = this.repeatPlan(node);
     if (node.teamId) {
       const pool = this.pools.get(node.teamId);
@@ -967,6 +1027,16 @@ export class Engine {
   }
 
   private moveNext(token: Token, node: SimNode): void {
+    // A batch carrier takes its followers with it: one service, everybody moves.
+    const followers = this.batchFollowers.get(token.id);
+    if (followers) {
+      this.batchFollowers.delete(token.id);
+      for (const id of followers) {
+        const f = this.tokens.get(id);
+        if (f && !this.cancelledTokens.has(id)) this.moveNext(f, node);
+      }
+    }
+
     // Leaving a host activity forward ARMS its compensation handler(s) — the
     // host has now executed. (Not while compensation is already in progress.)
     if (node.compensationHandlers && node.compensationHandlers.length && !token.comp) {
@@ -1182,7 +1252,7 @@ export class Engine {
       arrivalsByNode: Object.fromEntries(this.arrivalsByNode),
       arrivalMult: Object.fromEntries(this.arrivalMult),
       edgeProb: Object.fromEntries(this.edgeProb),
-      acc: { arrived: this.arrived, completed: this.completed, flowSum: this.flowSum, flowCount: this.flowCount, flowSamples: [...this.flowSamples], flowBySegment: Object.fromEntries(this.flowBySegment), processWaitTotal: this.processWaitTotal, queueWaitTotal: this.queueWaitTotal, perNode },
+      acc: { arrived: this.arrived, completed: this.completed, flowSum: this.flowSum, flowCount: this.flowCount, flowSamples: [...this.flowSamples], flowBySegment: Object.fromEntries(this.flowBySegment), batchWaiting: Object.fromEntries(this.batchWaiting), batchFollowers: Object.fromEntries(this.batchFollowers), batchCutoffArmed: [...this.batchCutoffArmed], processWaitTotal: this.processWaitTotal, queueWaitTotal: this.queueWaitTotal, perNode },
     };
   }
 
@@ -1218,6 +1288,9 @@ export class Engine {
     // caught when these two were first added.
     e.processWaitTotal = snap.acc.processWaitTotal ?? 0; e.queueWaitTotal = snap.acc.queueWaitTotal ?? 0;
     e.flowBySegment = new Map(Object.entries(snap.acc.flowBySegment ?? {}).map(([k, v]) => [k, [...v]]));
+    e.batchWaiting = new Map(Object.entries(snap.acc.batchWaiting ?? {}).map(([k, v]) => [k, [...v]]));
+    e.batchFollowers = new Map(Object.entries(snap.acc.batchFollowers ?? {}).map(([k, v]) => [k, [...v]]));
+    e.batchCutoffArmed = new Set(snap.acc.batchCutoffArmed ?? []);
     e.perNode = new Map(Object.entries(snap.acc.perNode).map(([id, a]) => [id, { ...a }]));
     return e;
   }

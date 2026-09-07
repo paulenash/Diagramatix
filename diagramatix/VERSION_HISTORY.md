@@ -15,6 +15,26 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.7.2492 — 2026-09-08 — Queues that behave like real ones
+
+- **Queue discipline** — a team can be first-in-first-out, priority, or shortest-job-first.
+  Urgent cases jump, and the service level is reported **per segment** as well as pooled,
+  because a pooled p95 can look healthy while the segment that matters misses its target
+  entirely. Priority and segment are ordinary token properties: nothing new was added to the
+  model to carry them.
+- **Holidays and absence** — a calendar can now carry dated exceptions: a bank holiday, a
+  Christmas shutdown, a half-day, or a Saturday callout. Working-time and working-day
+  deadlines step over them, and a run of closed days is crossed in one jump.
+- **Batching and cut-off times** — a task can gather cases until there are N of them or until
+  a wall-clock cut-off ("posted at 4pm"), then send them all on one service. It makes the
+  team do less work and the cases wait longer, which is exactly the trade a back office is
+  making and could not previously be modelled at all.
+- Fixed: a **source's own assignments never ran**. They are applied on entry to a node, and a
+  new case never "enters" the source it was born at, so a priority or segment written on the
+  source silently did nothing.
+- Every addition is inert when unset: a model that declares none of it produces bit-identical
+  results, which the tests assert directly rather than assume.
+- Schema: no bump (feature-only).
 ## 2.7.2488 — 2026-09-08 — Sweep a number instead of guessing at it
 
 - **Parameter sweep** — run a whole range at once (team size 1 to 12, arrivals ±50%) and get the
