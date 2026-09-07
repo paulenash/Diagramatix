@@ -443,32 +443,127 @@ Three decisions worth recording:
 
 ---
 
-## Phase 7 — People who can do more than one job
+## Phase 7 — Skills: who can do what
 
-**Status:** `Not started` · **Largest engine change, and the cut line if time is short** — the
-review's own lowest-value entry of the eight. Changes stored shapes → docs pass required.
+**Status:** `Not started` · **Re-planned 2026-09-08 with Paul.** The original plan modelled this as
+cross-skilling within a team and proposed a bespoke "team members + skills" library UI. Paul's
+input replaced both: this is a **competency model**, and the data already exists in the ArchiMate
+diagrams a Business Architect maintains. The engine change is smaller than planned and the
+feature is considerably more useful.
 
-- [ ] `ResourcePool` holds named units, each with a skill set
-- [ ] `SimNode.requiredSkill?`, `SimNode.skillPreference?: string[]`
-- [ ] Team members + skills in the library UI
-- [ ] **Explicit decision** on BPSim export
+### The model
 
-`ResourcePool` is a *counted* pool; skills need *individual* units. Two options were considered:
+```
+Task    requires  { assess-credit, use-core-banking }      ALL of them (AND)
+Person  holds     { assess-credit, use-core-banking, approve-limits }
+Eligible  ⟺  holds ⊇ requires
+```
 
-- **(a)** one pool per skill sharing members — needs a global cross-pool allocator, and breaks the
-  "one pool per teamId" invariant the whole contention model rests on. **Rejected.**
-- **(b)** ✅ **the pool holds named units, each with a skill set.** `request(now, units, payload,
-  requiredSkill?)` matches eligible free units in preference order. Backwards compatible: no skills
-  declared = every unit eligible = today's behaviour exactly, and the time-weighted integrals
-  (`busyArea` / `queueArea` / `capacityArea`) are untouched.
+Skills are **orthogonal to teams**, which is what makes this cleaner than the role-per-team
+design it replaces:
 
-`skillPreference` is what makes *"the manager covers both when it gets bad"* expressible.
+| Concept | Carries |
+|---|---|
+| **Team** | who is in the pool, headcount, cost per hour, working calendar |
+| **Skill** | which of those people may take which task |
 
-**Decide explicitly:** BPSim has no skills concept. Either carry it in an extension namespace or drop
-it on export — and say which, in the exporter, rather than losing it silently.
+- `SimNode.requiredSkills?: string[]` — a SET, not the singular `requiredSkill` first planned.
+  **AND semantics** (Paul, 2026-09-08): a person must hold every listed skill.
+- `SimTeam.units?: { id, name, skills[] }[]` — named people. **Absent = a counted pool of
+  interchangeable units, exactly as today.**
+- **No proficiency levels** (Paul, 2026-09-08). A level implies *speed* as well as eligibility,
+  which reaches into cycle time — a much larger change, and a later slice if it is wanted at all.
+
+### Allocation: prefer the least flexible person who qualifies
+
+When several people could take the work, serve it with **the one holding the fewest skills that
+still qualifies**, tie-broken by unit id so a run stays reproducible. That keeps the multi-skilled
+people — the manager who can cover anything — free for the work only they can do, which is how a
+well-run team actually behaves.
+
+It also means the originally planned per-task `skillPreference` list **is not needed**: preference
+is derived from the skill sets rather than authored, so there is nothing extra to keep in step.
+
+### The one semantic decision that needs stating
+
+Every other discipline in the pool keeps **head-of-line blocking**: if the request at the front
+cannot be served, nothing behind it is. With skills that rule would leave an idle person doing
+nothing while work they *could* do sits behind work they cannot — and it would make the feature
+**understate the value of cross-skilling, the very thing it exists to quantify**.
+
+So, in the SKILLED path only, the pool serves the first request in queue order that has an
+eligible free person. Queue order is otherwise untouched, and the decision is confined to pools
+that declare named units:
+
+- **counted pool (no units declared)** → strict head-of-line blocking, byte-identical to today;
+- **skilled pool** → skill-aware skipping, in queue order.
+
+This is the one place Phase 7 deliberately diverges from Phase 5's rule, and the divergence is
+the point rather than an oversight.
+
+### Reading it from ArchiMate
+
+ArchiMate 3.x has **no first-class Skill element**. The conventional stand-in is Business Role,
+and it works because assignment runs both ways:
+
+| ArchiMate | Means |
+|---|---|
+| `business-actor` | a person |
+| `business-role` | a skill |
+| Actor —`archi-assignment`→ Role | that person **holds** the skill |
+| Role —`archi-assignment`→ Business Process / Function | that work **requires** the skill |
+
+A task needing two skills is two Roles assigned to the same Business Process — ordinary
+ArchiMate, not a hack. Capability and Resource (strategy layer) are deliberately NOT read: a
+Capability is something an organisation has, not a person, so it is the wrong grain for
+eligibility. Useful for reporting later.
+
+**Team membership stays in the team library.** ArchiMate supplies skills, not org structure —
+actors are matched to named units by NAME, the same label-matching the Miner already uses for
+activity→team from BPMN lanes. Giving ArchiMate a third, different matching rule would be the
+wrong kind of clever.
+
+### Linked to, read from, NOT driven live by
+
+The study records which ArchiMate diagram it drew from (the `linkedDiagramId` pattern already
+used for subprocess drill-through and the OCEL object model). But the fill is **read-once into an
+editable matrix**, following the Miner's "✨ Fill from Process Diagram" precedent.
+
+A live dependency would mean a run's results change silently because someone edited an
+architecture diagram last Tuesday — and reproducibility is what the whole Simulator rests on. The
+panel shows when the matrix was last filled and from where, so re-pulling is deliberate.
+
+**Unmatched names are the headline output, not a footnote.** An actor with no matching unit, a
+unit with no matching actor, a Business Process label matching no task — every one is reported.
+Silent non-matching is the failure mode this feature would otherwise have, and it is the same
+lesson as the calendar exceptions in Phase 5: the arithmetic was never the risk, the silence was.
+
+### Slices
+
+1. **Engine** — `PoolUnit`, skill-aware granting, least-flexible-first, skill-aware skipping.
+   Regression bar: a pool with no units declared produces bit-identical results.
+2. **ArchiMate read** — `app/lib/simulation/skillsFromArchimate.ts` (pure): actors, skills,
+   required-skills-per-work-label, and the unmatched report.
+3. **UI** — skills against each member in the team library; required skills in `SimDataPanel`;
+   the fill action with its provenance line.
+4. **BPSim** — see below.
+
+### BPSim: the explicit decision
+
+BPSim has no skills concept. **Decision: carry them in a Diagramatix extension namespace so a
+Diagramatix → BPSim → Diagramatix round trip is lossless, and WARN on export that other tools
+will ignore them.** Dropping silently would let a file produce different results elsewhere with
+no indication; an extension nobody reads is at least honest and lossless where it counts.
+*To confirm against the exporter when the slice is built — if it has no extension seam, the
+fallback is to drop with a visible warning, never a silent one.*
+
+### Version bump
+
+Named units with skills need somewhere to live on `SimulationTeam` (a `members Json` column is
+the likely shape). That IS a physical DB change → **Q1 yes → PRODUCT_VERSION.minor**, plus the
+`SCHEMA_CHANGELOG` header and a `VERSION_HISTORY` entry. Q2 no: no XSD shape change.
 
 ---
-
 ## Phase 8 — Which assumption is load-bearing?
 
 **Status:** `Not started` · Cheap **because** Phase 4 landed first — a tornado is N one-step sweeps.
