@@ -142,6 +142,23 @@
   }
   .chip.have { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
   .chip.new { background: var(--alt-soft); border-color: transparent; color: var(--alt); }
+  .chip.phase { background: transparent; border-color: var(--accent); color: var(--accent); }
+
+  /* A correction added after the code was read a second time. Deliberately set
+     BELOW the original argument rather than replacing it: the first reading is
+     part of the record, and a document that quietly rewrites itself cannot be
+     cited later. */
+  .corr {
+    margin-top: 14px; padding: 12px 16px; max-width: 76ch;
+    background: var(--alt-soft); border-left: 3px solid var(--alt);
+    font-size: .86rem; color: var(--ink);
+  }
+  .corr .lab {
+    display: block; font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--alt); margin-bottom: 5px;
+  }
+  .corr p { margin: 0; }
 
   /* ── Smaller items ──────────────────────────────────────────────────── */
   .smalls { list-style: none; padding: 0; margin: 16px 0 0; counter-reset: r; }
@@ -478,6 +495,22 @@
       </p>
     </div>
 
+    <div class="note" style="margin-bottom:26px">
+      <span class="eyebrow">Now planned &middot; 9 September 2026</span>
+      <p>
+        Every extension and smaller item below is scheduled in
+        <strong>Miner-Extensions-Plan.md</strong>, in the same folder. Nothing was dropped; two items
+        are re-specified rather than built as written, and each says so where it appears.
+      </p>
+      <p>
+        Writing that plan meant reading the code a second time, which found <strong>four claims here
+        that the code disproves</strong> and one thing this document does not mention at all &mdash;
+        that the Miner&rsquo;s routes were almost entirely ungated, so features sold by tier were
+        being given away. The corrections are set beneath the arguments they affect, in amber. The
+        original readings are left standing: they are part of the record.
+      </p>
+    </div>
+
     <div class="exts">
 
       <div class="ext">
@@ -499,6 +532,19 @@
           <span class="chip have">Data already stored</span>
           <span class="chip">Render only</span>
           <span class="chip">Small</span>
+          <span class="chip phase">Phase 4</span>
+          <span class="chip phase">Phase 3</span>
+        </div>
+        <div class="corr">
+          <span class="lab">Correction &middot; 9 Sep 2026</span>
+          <p>
+            &ldquo;Render only&rdquo; holds for the <em>table</em>, not for the arrows. There is no
+            connector colour field in the diagram model &mdash; <code>weight</code> exists and is
+            honoured only for the OCEL domain diagram&rsquo;s associations. Colouring an arrow means
+            changing the shared canvas renderer used by every diagram in the product. The plan splits
+            it: the handover table and per-connector duration labels need no renderer change and carry
+            the analysis; the coloured arrow is scoped separately, with a canvas regression bar.
+          </p>
         </div>
       </div>
 
@@ -523,6 +569,7 @@
           <span class="chip new">Needs new data</span>
           <span class="chip">Import + every tab</span>
           <span class="chip">Largest</span>
+          <span class="chip phase">Phases 1 + 4</span>
         </div>
       </div>
 
@@ -545,6 +592,7 @@
           <span class="chip have">Both runs persisted</span>
           <span class="chip">New view</span>
           <span class="chip">Medium</span>
+          <span class="chip phase">Phase 7</span>
         </div>
       </div>
 
@@ -566,6 +614,7 @@
           <span class="chip have">Derivable today</span>
           <span class="chip">Drill-through</span>
           <span class="chip">Small</span>
+          <span class="chip phase">Phase 5</span>
         </div>
       </div>
 
@@ -589,6 +638,17 @@
           <span class="chip have">Data already mined</span>
           <span class="chip">New view</span>
           <span class="chip">Medium</span>
+          <span class="chip phase">Phase 6</span>
+        </div>
+        <div class="corr">
+          <span class="lab">Correction &middot; 9 Sep 2026</span>
+          <p>
+            Mined, but not <em>kept</em>. Resource is captured per event and then reduced to one
+            dominant team per activity inside <code>computeAnalytics</code>; the per-resource counts
+            are discarded. A handover map built from what is stored today would be an approximation,
+            and it would mis-state precisely the multi-team activities that smaller item 03 flags
+            amber. An exact map needs the per-case resource vector kept at import.
+          </p>
         </div>
       </div>
 
@@ -613,6 +673,19 @@
           <span class="chip have">Analysis exists</span>
           <span class="chip">Widen the trigger</span>
           <span class="chip">Small</span>
+          <span class="chip phase">Phase 6</span>
+        </div>
+        <div class="corr">
+          <span class="lab">Correction &middot; 9 Sep 2026</span>
+          <p>
+            Half right, and the wrong half is dangerous. Rework detection really is label-agnostic
+            &mdash; it counts repeats within a variant and widening it is deleting a condition. But
+            ping-pong counting parses the labels (<code>Switch to X</code>, <code>Open X</code>,
+            <code>App: Step</code>) and returns <strong>zero</strong> on a business log. Shipping the
+            widened trigger without replacing it would put a confident wrong number on screen, which
+            is worse than an absent one. The business analogue is <em>team</em> ping-pong over the
+            resource sequence &mdash; a different function, over data the importer does not yet keep.
+          </p>
         </div>
       </div>
 
@@ -657,6 +730,7 @@
           <span class="chip have">Trend already stored</span>
           <span class="chip new">Thresholds + notify</span>
           <span class="chip">Medium</span>
+          <span class="chip phase">Phase 8</span>
         </div>
       </div>
 
@@ -666,16 +740,45 @@
     <ul class="smalls">
       <li><span class="num">01</span><span class="body"><strong>The case list shows sixty rows and cannot be exported.</strong> The full per-case index is stored; a CSV of it would let anyone check the analysis in a spreadsheet, which is exactly what a sceptical stakeholder asks for first.</span></li>
       <li><span class="num">02</span><span class="body"><strong>&ldquo;(sampled)&rdquo; is shown without saying what it means.</strong> Above fifty thousand cases the stored per-case index is strided down. The headline figures stay exact, but the label does not say so, and a reader cannot tell which numbers to trust.</span></li>
+      <li style="padding-left:0"><div class="corr" style="margin-top:10px"><span class="lab">Correction &middot; 9 Sep 2026</span><p>Under-rated here as a labelling nicety. It is a <strong>correctness precondition</strong> for extension 2: the moment a filter exists, the stride turns every filtered figure into an estimate, and a filter selecting a rare value may resolve to almost nothing. The rule this document sets &mdash; every figure visibly filtered or visibly not &mdash; needs a third state it does not name: <strong>visibly estimated</strong>.</p></div></li>
       <li><span class="num">03</span><span class="body"><strong>The multi-team flag is a dead end.</strong> An activity performed by more than one team is highlighted amber &mdash; and cannot be clicked to see the split. That flag is often the most interesting row in the table.</span></li>
       <li><span class="num">04</span><span class="body"><strong>Discovery has frequency filtering that is never exposed.</strong> The discovery API already accepts an edge threshold that trims rare paths, and the console never sends one. A &ldquo;simplify the map&rdquo; slider is the standard remedy for the first reaction most people have to a discovered model, and the engine behind it is done.</span></li>
       <li><span class="num">05</span><span class="body"><strong>Older runs have to be re-imported to gain new analysis.</strong> The empty-state message says so out loud. A &ldquo;recompute&rdquo; action on the run would avoid asking the user to find the original file again &mdash; which, months later, they often cannot.</span></li>
+      <li style="padding-left:0"><div class="corr" style="margin-top:10px"><span class="lab">Correction &middot; 9 Sep 2026</span><p>A recompute action cannot fix this for a manual run, because <strong>there is nothing to recompute from</strong> &mdash; the importer aggregates the raw events and discards them, by design. There are two honest answers, not one: a <em>real</em> recompute for live-source runs, whose windowed buffer still holds up to 100,000 raw rows, and a <em>derived-only</em> recompute for manual runs, which refuses by name anything needing per-event data. That constraint is why the plan front-loads storage: a field not captured at import is unavailable to that run forever.</p></div></li>
       <li><span class="num">06</span><span class="body"><strong>A manual run cannot be appended to.</strong> Only live sources accumulate. Importing next month&rsquo;s export means a whole new run, and therefore no continuity in a trend that only exists per run.</span></li>
+      <li style="padding-left:0"><div class="corr" style="margin-top:10px"><span class="lab">Correction &middot; 9 Sep 2026</span><p>Declined as written, and re-specified. Appending needs retained raw events, which do not exist and are not worth introducing for this. What the item actually asks for is <em>continuity of trend</em>, and a <strong>linked run series</strong> delivers that without the storage fork &mdash; the snapshot route already freezes a dated copy, it simply records no link back to the run it came from.</p></div></li>
       <li><span class="num">07</span><span class="body"><strong>The automation ROI hard-codes its own key assumption.</strong> Hours saved is derived from a fixed seconds-per-step figure. Making it editable turns an illustrative number into one somebody is willing to sign.</span></li>
       <li><span class="num">08</span><span class="body"><strong>The task SOP downloads as raw Markdown.</strong> The SOP generator already produces a styled Word document from a BPMN; the mined routine should go in the same door rather than out a second one.</span></li>
       <li><span class="num">09</span><span class="body"><strong>Nothing masks values in an imported process log.</strong> The task-mining schema is explicit that values must be redacted, but a CSV import carries whatever is in the mapped columns &mdash; and case ids are frequently customer identifiers.</span></li>
       <li><span class="num">10</span><span class="body"><strong>Connectors stop at webhook, Blob and SharePoint.</strong> A read-only database view or a REST endpoint is what most customers actually have, and asking them to build a webhook is asking for a project before they can see any value.</span></li>
       <li><span class="num">11</span><span class="body"><strong>Conformance has no history of its own.</strong> Compliance Monitoring tracks controls over time across the org, but a single live run cannot show its own fitness moving &mdash; the one chart a process owner would check weekly.</span></li>
+      <li style="padding-left:0"><div class="corr" style="margin-top:10px"><span class="lab">Correction &middot; 9 Sep 2026</span><p>Not a smaller thing: a <strong>prerequisite of extension 8</strong>. No history, no alarm &mdash; you cannot alert on &ldquo;fitness fell from 94% to 71%&rdquo; when each refresh overwrites the run and no prior value was ever kept.</p></div></li>
     </ul>
+
+    <div class="note" style="border-left-color: var(--alt)">
+      <span class="eyebrow" style="color: var(--alt)">Not on this list, and it should have been &middot; 9 September 2026</span>
+      <p>
+        <strong>The Miner was sold by tier and enforced in three routes out of twenty-six.</strong>
+        Discovery, conformance, calibration, validation, the AI explanation, both exporters, the
+        snapshot, the OCEL importer and every live-source route carried a project-access check and no
+        subscription check at all. The example gallery was the clearest case: the <em>link</em> was
+        hidden for users without the entitlement while the API behind it answered anyone signed in.
+        Hiding a door is not locking it.
+      </p>
+      <p>
+        Three further keys &mdash; Process Mining Examples, OCEL Support and Task Mining &mdash; were
+        declared in the feature registry, shipped as availability rows to the production matrix, and
+        enforced nowhere in the application. The Automation tab, the RPA specification and the
+        as-actually-done SOP were being given away on every plan.
+      </p>
+      <p>
+        Fixed on 9 September 2026, ahead of the plan and as its own change, because it is a revenue
+        defect rather than a renovation item. Twenty of the twenty-six routes now gate; the other six
+        are exempted by name with a reason &mdash; the public webhook has no session to check, the
+        cron poll runs as nobody, and four catalog routes are SuperAdmin-only. A test walks the route
+        tree so the twenty-seventh route cannot be added without one.
+      </p>
+    </div>
   </section>
 
   <section>
@@ -695,7 +798,9 @@
       <div class="step"><span class="n">2</span><span class="t"><strong>Store them on the per-case index.</strong> The case index already persists one row per case with its variant, timestamps and cycle time. Attributes belong on that row. It is capped and strided, which is the right trade already made once.</span></div>
       <div class="step"><span class="n">3</span><span class="t"><strong>One filter bar above the tabs.</strong> Date range, plus any attribute or team as a value picker. It produces a set of case indices and nothing else &mdash; a pure predicate over the stored index.</span></div>
       <div class="step"><span class="n">4</span><span class="t"><strong>Recompute the derived views from the filtered set.</strong> Activity metrics, variant frequencies, cycle statistics and the outcome split are all aggregations over cases, computed in the browser from data already loaded. No new server call, no re-mining.</span></div>
+      <div class="corr" style="margin-top:10px"><span class="lab">Correction &middot; 9 Sep 2026</span><p>True for variant frequencies, cycle statistics and the outcome split. <strong>Not true for activity metrics</strong>: the per-case index stores a case&rsquo;s id, variant, start, end, cycle time and event count &mdash; and <em>no per-event durations</em>. Under this step as written, the heat map &mdash; the flagship of the workbench &mdash; is the one panel that would have to say &ldquo;not filtered&rdquo;. The plan therefore stores the durations at import first, in a phase of its own, before any filter is built.</p></div>
       <div class="step"><span class="n">5</span><span class="t"><strong>Leave conformance and discovery alone at first.</strong> Both replay variants rather than cases, so filtering them properly is a separate piece of work. Say so in the UI instead of pretending &mdash; a filter that silently does not apply to one panel is worse than one that says it does not.</span></div>
+      <div class="corr" style="margin-top:10px"><span class="lab">Correction &middot; 9 Sep 2026</span><p>The right instinct, the wrong pair. Conformance replay is a <em>pure function</em> of the variants and the reference, fitness is weighted by case count, and the filtered variant counts are just a histogram over the filtered case set &mdash; so <strong>filtering conformance is nearly free</strong>. The genuinely un-filterable one is <strong>discovery</strong>, and for a different reason: it emits a <em>persisted diagram</em>, so a filtered discovery has to be an explicit &ldquo;discover from this slice&rdquo; action creating a new diagram, never a live overlay.</p></div>
     </div>
 
     <div class="note">
@@ -727,6 +832,19 @@
         exercise into something a team runs against its own process every month &mdash; and they are
         the difference between a feature people admire in a demo and one they keep open.
       </p>
+
+      <div class="corr" style="margin-top:18px">
+        <span class="lab">One word sharper &middot; 9 Sep 2026</span>
+        <p>
+          Reading the code again to write the plan moved this sentence slightly. &ldquo;The mining is
+          ahead of the reading&rdquo; is exactly right for three of the eight. But three more are
+          blocked on data the importer <em>computes and then discards inside the same function</em>
+          &mdash; per-event durations, per-case resources, the columns nobody mapped. The sharper
+          statement, and the one the plan is ordered around, is that <strong>the reading is ahead of
+          the storing, and the storing only happens once.</strong> A field not kept at import is not
+          missing until someone adds a recompute; it is gone.
+        </p>
+      </div>
     </div>
   </section>
 

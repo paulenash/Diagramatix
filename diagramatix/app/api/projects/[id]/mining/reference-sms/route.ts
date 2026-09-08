@@ -10,6 +10,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
+import { gateFeature } from "@/app/lib/subscription-route";
 import { isRelevantReference, runStates } from "@/app/lib/mining/referenceScope";
 import type { Variant } from "@/app/lib/mining/types";
 
@@ -24,6 +25,8 @@ export async function GET(req: Request, { params }: Params) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
+  const fg = await gateFeature(session?.user?.id ?? "", "processMining");
+  if (fg) return fg;
 
   const runId = new URL(req.url).searchParams.get("runId") ?? "";
   const diagrams = await prisma.diagram.findMany({

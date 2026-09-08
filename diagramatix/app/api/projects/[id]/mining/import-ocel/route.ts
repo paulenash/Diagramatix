@@ -14,6 +14,7 @@ import { auth } from "@/auth";
 import { prisma, pgPool } from "@/app/lib/db";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
+import { gateFeature } from "@/app/lib/subscription-route";
 import { buildOcelStudy } from "@/app/lib/mining/ocelStudy";
 import { buildDomainFromOcel } from "@/app/lib/mining/buildDomainFromOcel";
 
@@ -33,6 +34,11 @@ export async function POST(req: Request, { params }: Params) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
+  // Object-centric import is its own tier: OCEL is sold separately from ordinary
+  // process mining, so both keys have to pass.
+  const fg = await gateFeature(session?.user?.id ?? "", "processMining")
+    ?? await gateFeature(session?.user?.id ?? "", "process-mining-ocel");
+  if (fg) return fg;
   const userId = session?.user?.id ?? null;
 
   const body = await req.json().catch(() => ({}));

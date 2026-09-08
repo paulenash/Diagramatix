@@ -6,11 +6,16 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
+import { gateFeature } from "@/app/lib/subscription-route";
 import { summarizeMiningPackage, type MiningExamplePackage } from "@/app/lib/mining/examplePackage";
 
 export async function GET() {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // The gallery LINK was hidden for unentitled users and this list was not, so
+  // the catalog was one URL away. Hiding a door is not locking it.
+  const fg = await gateFeature(session.user.id ?? "", "process-mining-examples");
+  if (fg) return fg;
 
   const rows = await prisma.miningExample.findMany({
     where: { published: true },

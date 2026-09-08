@@ -8,6 +8,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
+import { gateFeature } from "@/app/lib/subscription-route";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -18,6 +19,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
+  const fg = await gateFeature(session?.user?.id ?? "", "processMining");
+  if (fg) return fg;
   const diagrams = await prisma.diagram.findMany({
     where: { projectId: id, type: { in: ["bpmn", "state-machine"] } },
     select: { id: true, name: true, type: true },

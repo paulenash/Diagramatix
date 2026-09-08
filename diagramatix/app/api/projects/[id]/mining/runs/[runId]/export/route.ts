@@ -9,6 +9,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
+import { gateFeature } from "@/app/lib/subscription-route";
 import { buildXes } from "@/app/lib/mining/formats/xes";
 import { buildOcel } from "@/app/lib/mining/formats/ocel";
 import type { Variant, MiningStats } from "@/app/lib/mining/types";
@@ -24,6 +25,8 @@ export async function GET(req: Request, { params }: Params) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
+  const fg = await gateFeature(session?.user?.id ?? "", "processMining");
+  if (fg) return fg;
 
   const run = await prisma.processMiningRun.findFirst({ where: { id: runId, projectId: id }, select: { name: true, variants: true, stats: true } });
   if (!run) return NextResponse.json({ error: "Not found" }, { status: 404 });

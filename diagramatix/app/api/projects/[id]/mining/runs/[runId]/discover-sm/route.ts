@@ -18,6 +18,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
+import { gateFeature } from "@/app/lib/subscription-route";
 import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
 import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
@@ -45,6 +46,8 @@ export async function POST(req: Request, { params }: Params) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
+  const fg = await gateFeature(session?.user?.id ?? "", "processMining");
+  if (fg) return fg;
 
   const body = await req.json().catch(() => ({}));
   const useAi = body?.ai === true;

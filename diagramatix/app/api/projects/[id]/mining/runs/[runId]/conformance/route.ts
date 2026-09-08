@@ -9,6 +9,7 @@ import { auth } from "@/auth";
 import { prisma, pgPool } from "@/app/lib/db";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
+import { gateFeature } from "@/app/lib/subscription-route";
 import { checkTransitionConformance, type ReferenceSm } from "@/app/lib/mining/transitionConformance";
 import { flagIllegalTransitions } from "@/app/lib/mining/flagIllegalTransitions";
 import type { Variant } from "@/app/lib/mining/types";
@@ -28,6 +29,8 @@ export async function POST(req: Request, { params }: Params) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
+  const fg = await gateFeature(session?.user?.id ?? "", "processMining");
+  if (fg) return fg;
 
   const run = await prisma.processMiningRun.findFirst({ where: { id: runId, projectId: id } });
   if (!run) return NextResponse.json({ error: "Not found" }, { status: 404 });

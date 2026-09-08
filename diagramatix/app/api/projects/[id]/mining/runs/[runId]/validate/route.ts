@@ -14,6 +14,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
+import { gateFeature } from "@/app/lib/subscription-route";
 import { compareDistributions } from "@/app/lib/simulation/validate";
 import { SECONDS_PER_UNIT, type ClockUnit } from "@/app/lib/simulation/types";
 import type { RunMetrics } from "@/app/lib/simulation/results";
@@ -31,6 +32,8 @@ export async function POST(_req: Request, { params }: Params) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
+  const fg = await gateFeature(session?.user?.id ?? "", "processMining");
+  if (fg) return fg;
 
   const run = await prisma.processMiningRun.findFirst({ where: { id: runId, projectId: id } });
   if (!run) return NextResponse.json({ error: "Not found" }, { status: 404 });

@@ -11,6 +11,7 @@ import { auth } from "@/auth";
 import { prisma, pgPool } from "@/app/lib/db";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
+import { gateFeature } from "@/app/lib/subscription-route";
 
 type Params = { params: Promise<{ id: string; runId: string }> };
 
@@ -23,6 +24,8 @@ export async function GET(_req: Request, { params }: Params) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
+  const fg = await gateFeature(session?.user?.id ?? "", "processMining");
+  if (fg) return fg;
   const run = await prisma.processMiningRun.findFirst({ where: { id: runId, projectId: id } });
   if (!run) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({ run });
@@ -40,6 +43,8 @@ export async function PATCH(req: Request, { params }: Params) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
+  const fg = await gateFeature(session?.user?.id ?? "", "processMining");
+  if (fg) return fg;
   const existing = await prisma.processMiningRun.findFirst({ where: { id: runId, projectId: id }, select: { id: true } });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const body = await req.json().catch(() => ({}));
@@ -73,6 +78,8 @@ export async function DELETE(_req: Request, { params }: Params) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
+  const fg = await gateFeature(session?.user?.id ?? "", "processMining");
+  if (fg) return fg;
   const existing = await prisma.processMiningRun.findFirst({ where: { id: runId, projectId: id } });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
   await prisma.processMiningRun.delete({ where: { id: runId } });

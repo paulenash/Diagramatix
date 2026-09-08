@@ -1,0 +1,512 @@
+# Diagramatix — Miner Extensions Plan
+
+| | |
+|---|---|
+| **Created** | 2026-09-09 |
+| **Source** | [`Miner-Capability-Review.html`](./Miner-Capability-Review.html) — the *Extensions* section: eight extensions + eleven smaller items, read from the shipped code |
+| **This document** | The **live worklist** for building them. Every phase names the files it touches and the existing functions it reuses. The review is the historical argument; this is the burn-down. |
+| **Scope** | All 8 extensions + all 11 smaller items. Nothing dropped — two are **re-specified** rather than built as written, and each says why on its face. |
+| **How to use** | Work an item, tick its box, set **Status** → `In progress` / `Shipped (<commit>)` / `Won't do (<reason>)`. Record what actually happened — including deviations — in the phase's own **As built** paragraph, so this doubles as a decision log. |
+| **Progress log** | **2026-09-09** — Plan written. Reconnaissance found **four things the review got wrong** and **one it does not mention at all** (the gating hole), all recorded below against the item they affect. **Step 1 SHIPPED**: 20 of 26 mining routes now carry a subscription gate (was 3), the three dormant tier keys are enforced, and `tests/mining/route-gating.test.ts` (T3609–T3613) enumerates the route tree so the twenty-seventh route cannot be added ungated. |
+
+**Status values:** `Not started` · `In progress` · `Shipped (<commit>)` · `Blocked (<on what>)` · `Won't do (<reason>)`
+
+---
+
+## Why
+
+The review closes with a judgement worth restating, because it is what every phase below is aimed at:
+
+> The mining is ahead of the reading.
+
+The Miner answers *what is happening* thoroughly. It answers *what changed*, *for which cases* and
+*tell me when it moves* not at all — and those three are what turn a discovery exercise into
+something a team runs against its own process every month.
+
+Reading the code sharpened that into something the review does not say, and it governs the ordering
+of everything below:
+
+> **The importer is the only moment the truth exists.** `buildEventLog` produces traces, four
+> functions aggregate them, and the raw events are then gone. `import/route.ts` says so out loud:
+> *"Performance + analytics + governance aggregates must be computed NOW — raw events are transient."*
+>
+> So the reading is ahead of the **storing**, and **the storing only happens once**. A field not
+> captured at import is unavailable to that run *forever* — not "until we add a recompute", because
+> there is nothing left to recompute from.
+
+Three of the eight extensions are render work over data already in the database. Three more are
+blocked on data the importer **computes and discards inside the same function**. That asymmetry is
+the plan.
+
+*(One exception, and it matters: `MiningSource.buffer` keeps up to 100k raw rows, and
+`refreshRunFromSource` re-runs the whole pipeline. Live sources really can recompute. Manual runs
+cannot. Phase 0.3 makes that distinction explicit rather than letting it be discovered.)*
+
+---
+
+## Ground rules (apply to every phase)
+
+1. **Store at import, or never.** Raw events are transient. Every phase that adds a stored field
+   states which side of that line it falls on, and what an older run without it will say instead.
+2. **Every figure is visibly filtered, visibly not filtered, or visibly estimated.** The review names
+   the first two. The 50,000-case stride forces the third: on a capped run a filtered figure is an
+   estimate, and a filter selecting a rare value may resolve to almost nothing. *"If a panel cannot
+   honour the filter yet, it should say so on its face, not average the two."*
+3. **Defaults preserve behaviour.** Every addition is inert when unset; the regression bar for
+   Phase 1 is bit-identical results for the five catalog examples with the new fields ignored.
+   Per `schema/UPDATE_EVERYTHING.md` Step 0, a new key inside an existing `Json` column is **data,
+   not structure** — no version bump. Only Phase 7 adds a real column.
+4. **Honest floors: refuse rather than flatter.** Below a support threshold, report the count and
+   decline the statistic. A median over two samples is not a median.
+5. **Tests** are numbered append-only from **T3609** and added to `tests/TESTS_SUMMARY.md`. Never
+   renumber or reuse.
+6. **`npm run build` is not optional.** `refreshRun.ts` imports Prisma and sits in `app/lib/mining/`
+   beside pure modules that client components import. That is the exact shape that broke the
+   Simulator's deploy with a green `tsc` and a green unit suite.
+
+---
+
+## Phase 0 — Foundations (blocking)
+
+**Status:** `In progress` — 0.1 shipped; 0.2–0.6 not started.
+
+Nothing here is a feature. All of it is a prerequisite, and each item costs an hour now and a week
+later.
+
+### 0.1 Close the gates ✅
+
+**Status:** ✅ `Shipped` — done ahead of the plan, as its own commit, because it is a revenue defect
+rather than a renovation item.
+
+- [x] `gateFeature(…, "processMining")` added to the 16 project-scoped routes that had none —
+      `discover`, `discover-sm`, `conformance`, `calibrate`, `validate`, `explain`, `export`,
+      `analysis-export`, `snapshot`, `import-ocel`, `runs`, `runs/[runId]` (all three handlers),
+      `diagrams`, `reference-sms`, `sources/[sourceId]`, `sources/[sourceId]/refresh`
+- [x] `process-mining-ocel` enforced on `import-ocel`; `process-mining-examples` on the gallery list
+- [x] `calibrate` requires **both** `processMining` and `simulator` — it spans two products
+- [x] `tests/mining/route-gating.test.ts` — T3609–T3613
+
+**As built.** Enforcement stood at **3 routes out of 26**; it now stands at 20, with the other six
+exempted *by name and with a reason* in the test: the public webhook (no session exists to check a
+subscription against), the cron poll (runs as nobody), and four SuperAdmin catalog routes (gated by
+role, not plan). The test enumerates the route tree rather than asserting a 403 per route — the
+failure that actually happened was a route nobody wired, not a route wired wrongly, and a
+twenty-seventh route added next month is caught the same way.
+
+The gallery was the sharpest case: the *link* was hidden for unentitled users while
+`GET /api/mining-examples` answered anyone signed in. **Hiding a door is not locking it.**
+
+**Not fixed here, and stated rather than left implied:** `task-mining` is still not enforced
+server-side. The Automation tab, the RPA spec and the SOP are computed **in the browser** from
+`variants` the run fetch already returns, so there is no server boundary to gate without moving that
+computation. Phase 6 touches those files and is where it belongs.
+
+**Safe because gaps fail open.** `getLevelMatrix` defaults every key to `available` and only
+restricts once a row explicitly says otherwise, so gating a key that has not been seeded is a no-op
+today and correct the moment it is seeded.
+
+### 0.2 Break up the console
+
+- [ ] Extract `ProcessMiningConsole.tsx` (**1,027 lines, one scroll, no tabs**) into
+      `app/components/mining/console/` — `RunList`, `ImportPanel`, `MappingPanel`, `DiscoverPanel`,
+      `ConformancePanel`, `TwinPanel` — behind a top-level tab shell
+
+`MiningSourcesPanel`, `LiveDemoPanel`, `MiningLogViewer` and `ValidateTwinPanel` already stand alone
+and simply move. **Behaviour-preserving, zero new features.** Five of the eight extensions add a
+panel to this file; doing it later means every phase's diff fights it.
+
+Verified by `e2e/mining-examples.spec.ts` plus adopting all five catalog examples.
+
+### 0.3 State the recompute contract, and build the honest half
+
+- [ ] `POST runs/[runId]/recompute`
+
+The contract: a run recomputes **from what is stored** — `variants`, `analytics`, `performance` —
+never from raw events, which do not exist. Conformance, variant analyses, outcome splits and report
+content recompute. Anything needing per-event data is **refused by name** with "re-import the log",
+never silently approximated. Live runs get the real thing by reusing `refreshRunFromSource` against
+`MiningSource.buffer`.
+
+Absorbs **smaller item 05** — correctly, rather than as advertised. See *Corrections*, below.
+
+### 0.4 A test floor under the modules about to change
+
+- [ ] Unit coverage for `exportAnalysis.ts`, `heat.ts`, `performance.ts`, `refreshRun.ts`, `pull.ts`
+
+None has any today, and phases 1–4 change all of them. Route coverage is Playwright-only.
+
+### 0.5 Decide the example-generator question
+
+- [ ] Regenerate-and-verify, or retire `scripts/gen-mining-examples.ts` and hand-maintain
+
+Line 486 writes `{ examples: [...] }` over `miningExampleData.json` **wholesale** — the same hazard
+that cost the Simulator three examples, where regenerating produced materially *worse* packages and
+the generator was retired. Phase 1 changes the shape baked into that 2.9 MB file. **Hard gate on
+Phase 1's exit criteria, not a nicety.**
+
+### 0.6 One JSON-write helper
+
+- [ ] `updateRunJson(runId, patch)`
+
+All JSON persistence bypasses Prisma via raw `pgPool` SQL across six call sites, each an untyped
+column name inside a string literal. Phases 1, 5 and 7 each add a seventh.
+
+**Regression bar for the whole phase:** no user-visible change whatsoever.
+
+---
+
+## Phase 1 — Keep what we are about to need; the importer only runs once
+
+**Status:** `Not started` · No UI but the mapping step. **This is the phase the ordering exists for.**
+
+- [ ] `CaseSummary.attrs` — unmapped columns as case attributes, from the case's first event
+- [ ] `CaseSummary.durs` — per-event sojourn, integer ms, aligned to the variant's event sequence
+- [ ] `CaseSummary.res` — indices into a new `RunAnalytics.resourceDict`
+- [ ] `RunAnalytics.attributes` (dictionary + cardinality + a reason string for columns too
+      high-cardinality to filter on) and `RunAnalytics.detail`
+- [ ] `ActivityMetric.resourceCounts` — already computed in `resByActivity` and thrown away
+- [ ] The **`useRunView()` seam** in `MiningInsightsPanel`, with an identity filter
+- [ ] Per-column **keep / hash / drop** on the mapping screen, defaulting to drop
+- [ ] Optional: the missing `.xlsx` importer
+
+**Absorbs.** The storage half of **extension 2**; **items 02, 03, 09**.
+
+**Why the seam ships now, with no filter behind it.** One rule, adopted here and enforced for the
+rest of the programme: **no panel reads the fetched `analytics` directly; every panel reads the run
+view.** It costs about an hour, and it converts Phase 4 from a six-panel retrofit into a single
+insertion. A panel that reads around the seam is a panel that will one day show unfiltered numbers
+beside filtered ones — the one failure that makes every number on the screen unciteable.
+
+**Why masking ships in this phase and not a later one.** This is the phase that starts persisting
+columns the importer previously discarded, in a product where case ids are frequently customer
+identifiers. A later phase cannot un-persist what shipped.
+
+**Files.** `app/lib/mining/analytics.ts`, `parseEventLog.ts`, `types.ts`,
+`app/api/projects/[id]/mining/import/route.ts`, `refreshRun.ts` (the live path must produce the same
+shape), `console/MappingPanel.tsx`, `examplePackage.ts`.
+
+**Reuses.** `resByActivity` (counts already computed), `variantIdx` (already the join key), and
+`Performance.holdout` as the precedent for how an optional stored fact declares its own absence.
+
+**Honest floor.** A `detail: "full" | "counts" | "none"` budget guard. When it trips, the vectors are
+omitted and every time-shaped figure a filter would later touch says **not filtered on this run** —
+never a silently unfiltered number beside a filtered one. Runs imported before this phase are
+`detail: "none"` and say so, in the existing `NoAnalytics` idiom.
+
+**Regression bar.** Bit-identical `stats`, `variants`, `performance`, `governance` and every
+pre-existing `analytics` field, for all five catalog examples, with the new fields ignored.
+
+---
+
+## Phase 2 — The twin is a claim; make it checkable, and make it reachable
+
+**Status:** `Not started` · The smallest phase, and the cheapest credibility in the programme.
+
+- [ ] `holdoutPct` reaches the UI — one control on the mapping screen
+- [ ] `studyId` / `diagramId` stop being discarded by the calibrate hand-off
+- [ ] A refreshed live run **marks its twin stale**, with the date it diverged
+
+No review extension — three verified defects that share one story: **the Miner → Simulator seam is
+unfinished.**
+
+- The import route accepts `holdoutPct`, `splitByTime` implements it, T3503–T3506 test it, and it has
+  **zero callers**. So every twin is validated in-sample, while the route's own message tells the
+  user to *"re-import the log with a hold-back"* — something no screen can do.
+- `calibrate` returns `{studyId, diagramId}` and the caller throws both away, dropping the user into
+  the Simulator in project mode to hunt for the mined twin among auto-seeded default studies.
+- `refreshRunFromSource` re-discovers and re-conforms in place but does not re-calibrate, so a twin
+  silently goes stale. **Recommend marking over silent re-calibration** — re-calibrating rewrites a
+  study the user may have edited.
+
+**Why here.** The Simulator's own examples programme lists `mined-twin-validated` as unstarted, and
+it is currently **unbuildable** because the hold-back it needs is unreachable. This phase unblocks a
+plan whose code already shipped.
+
+**Reuses.** `splitByTime`, `compareDistributions`, `Performance.holdout`, `ValidateTwinPanel` — all
+shipped and tested.
+
+---
+
+## Phase 3 — Most of the elapsed time is between the steps, not inside them
+
+**Status:** `Not started`
+
+- [ ] **(a)** A ranked **handover table** beside the bottleneck table, the in-step vs between-step
+      split of total elapsed time, and transition medians on the discovered model via the existing
+      `label` / `transitionCount` channels
+- [ ] **(b)** Arrow thickness or colour — scoped separately, as a **canvas** change
+- [ ] Smaller item **04** — the `edgeThreshold` slider
+
+**Absorbs.** **Extension 1**, **item 04**.
+
+**Reuses.** `analytics.edges` — `EdgeMetric{from,to,freq,medianMs}`, computed and persisted on every
+run since import and **read by nothing**.
+
+**⚠ The review's "render only / small" needs one correction.** There is no connector colour field in
+`app/lib/diagram/types.ts`; `weight` exists and is honoured only for `uml-association` (the OCEL
+domain diagram). Colouring an arrow means changing the **shared canvas renderer used by every diagram
+in the product**. Slice (a) is the analysis and needs no renderer change; slice (b) is the garnish and
+carries a canvas regression bar. **If (b) slips, the phase still lands.**
+
+**Why item 04 rides here.** An arrow-centric view is unreadable at full density, so the simplify
+control is the twin of arrow heat, not a stray polish item. It also repairs published documentation:
+`scripts/add-guide-mining-sample.ts` already tells users to *"leave the detail slider on all paths"* —
+**shipping the slider fixes the guide, which is better than editing the guide down.**
+
+**Honest floor.** An edge with fewer than N observations shows a frequency and no median.
+
+---
+
+## Phase 4 — Slicing is what turns a finding into a cause
+
+**Status:** `Not started` · The big one, and the one that pays back everything Phase 1 stored.
+
+- [ ] One filter bar above the tabs — date range plus any captured attribute or team
+- [ ] New pure `app/lib/mining/filterAnalytics.ts` — `filterAnalytics`, `filterVariants`
+- [ ] `insights/ThroughputChart.tsx` — arrivals and completions, brushable
+- [ ] Per-panel exactness chips using Phase 1's vocabulary
+- [ ] The exported report states the filter it was run under
+
+**Absorbs.** **Extension 2** (the UI half) and **extension 7**, paired deliberately: **the throughput
+chart *is* the date filter.** Volume over time is already computed (`analytics.throughput`, 30 buckets
+of `{t, started, completed}`), persisted since import and drawn nowhere; a brush over it is the best
+possible date-range control. One chart, two extensions, and *"is the backlog growing"* answered by the
+same pixels the user is dragging.
+
+**Reuses.** `computeOutcomes`, `variantPareto`, `applyHeat`, `buildAnalysisChapters` — every one takes
+`analytics` / `variants` as **parameters**, so all of them filter without modification once the seam
+feeds them. The Word and Excel reports filter for free.
+
+**⚠ Two corrections to the review's feasibility section.**
+- *"Leave conformance alone at first"* is more conservative than it needs to be.
+  `checkTransitionConformance(variants, ref)` is pure, fitness is case-count-weighted, and filtered
+  variant counts are just a histogram of `variantIdx` over the filtered case set. **Filtering
+  conformance is nearly free.** The genuinely un-filterable thing is **discovery**, because it emits a
+  *persisted diagram* — so a filtered discovery must be an explicit *"discover from this slice"*
+  action creating a new diagram, never a live overlay.
+- *"Activity metrics … computed in the browser from data already loaded"* is **false today**.
+  `CaseSummary` carries no durations. Under the review's own plan the heat map — its flagship — is
+  the one panel that would have to say "not filtered". That is the substance of Phase 1.
+
+**Honest floors — three of them, and they are the phase.**
+1. Below a case floor in the slice, report counts and refuse distributions.
+2. When `analytics.capped`, every filtered figure is an estimate from a 1-in-N stride and says so.
+3. Time-shaped figures are exact only when `detail === "full"`; otherwise the chip reads *not
+   filtered* and the number shown is the whole-run number, visibly marked. **Never averaged.**
+
+---
+
+## Phase 5 — Fourteen cases skipped the credit check; here they are
+
+**Status:** `Not started`
+
+- [ ] `ConformanceViolation.variantIdxs`, joined to `analytics.cases`
+- [ ] Click a violation → the cases; click a case → its path, and (with Phase 1's `durs`) its timeline
+- [ ] Smaller item **01** — the whole per-case index out as CSV
+
+**Absorbs.** **Extension 4**, **item 01**. Both are the same argument: *evidence, not a metric.* The
+case list is capped at 60 rows with no export, and a sceptical stakeholder asks for the rest first.
+
+**Reuses.** `conformance` is a stored `Json` column and the replay is a pure function of
+`(variants, ref)` — both stored. **This is the first payoff of the 0.3 recompute contract: every
+existing run gains case attribution without a re-import.**
+
+**Honest floor — the most important in the programme.** With a strided case index the fourteen cases
+may resolve to nine. The UI must read **"14 cases · 9 identifiable in the stored sample"**. Never a
+silently short list presented as the list — that is exactly what stops an auditor trusting the tool.
+
+---
+
+## Phase 6 — Who hands work to whom, and who does the same thing three times
+
+**Status:** `Not started`
+
+- [ ] Handover map between teams, workload distribution, and the pairs that pass work back and forth
+- [ ] Rework and ping-pong generalised to ordinary business processes
+- [ ] Item **03** — the amber multi-team row becomes clickable onto its split
+- [ ] Item **07** — the automation ROI's seconds-per-step becomes editable
+- [ ] Item **08** — the task SOP goes out through `buildDocx` like every other SOP in the product
+- [ ] `task-mining` enforced server-side (deferred from 0.1 — see there)
+
+**Absorbs.** **Extensions 5 and 6**; **items 03, 07, 08**.
+
+**Reuses.** `detectReworkActivities(variants)` is **already label-agnostic** — it excludes navigation
+steps and counts within-variant repeats, which is exactly the "Credit check three times" figure.
+Widening that trigger genuinely is deleting a condition. `performance.resourceConcurrency` and
+`activityResource` for the workload view.
+
+**⚠ Two corrections to the review.**
+- **Extension 6 is half right.** `pingPongFromVariants` is **not** label-agnostic: `appOfActivity`
+  parses `"Switch to X"` / `"Open X"` / `"X:"`, so on a business log it returns **0** — a confident
+  wrong number, which is worse than an absent one. The business analogue is *team* ping-pong (A→B→A
+  over the resource sequence), a different function over Phase 1's `res` vectors. **Widening the
+  trigger without this replacement ships a bug.**
+- **Extension 5 is not quite "data already mined."** Resource is captured per event but survives only
+  as `dominantResource` per activity; the actual team-to-team flows are lost inside `computeAnalytics`.
+  A map built from edges × dominant team is buildable today and would **silently mis-state exactly the
+  multi-team activities item 03 flags amber.**
+
+**Honest floor.** On a run with `detail !== "full"`, the handover map falls back to the dominant-team
+approximation and is labelled **approximate**.
+
+---
+
+> ## — CUT LINE —
+>
+> After Phase 6 the Miner is a complete **analysis** tool: it slices, it attributes deviations to
+> cases, it shows where the delay actually is, and it shows who hands work to whom.
+>
+> Phases 7 and 8 are the **second visit** — the thing the review's whole judgement is about, and the
+> point at which the product stops being *a study you commission* and becomes *a monitor that tells
+> you when your process changed*. **This is where you would stop for cost, not where you would stop
+> for value.** Both halves of that are worth saying.
+
+---
+
+## Phase 7 — Nobody mines a process once
+
+**Status:** `Not started` · **The only phase that adds a real column.**
+
+- [ ] `ProcessMiningRun.parentRunId` — `schema/UPDATE_EVERYTHING.md` Steps 0–12, product version bump
+- [ ] `app/lib/mining/compareRuns.ts` (pure) + `console/ComparePanel.tsx`
+- [ ] A bounded auto-snapshot on refresh, so a live run keeps its own history
+- [ ] Item **11** — conformance history: the weekly fitness chart
+
+**Absorbs.** **Extension 3**, **items 11 and 06**.
+
+**Reuses.** `snapshot/route.ts` already freezes a run into a dated copy — it just records **no link**
+to the run it came from (only `"${run.name} — ${stamp}"`), so the history it creates cannot be
+assembled except by guessing at name prefixes. And the `accounts-payable-invoice-lifecycle` example
+already ships **three period logs designed to show compliance decay**: the comparison example needs
+no new data, only the view.
+
+**⚠ Item 06 is declined as written and re-specified.** "Append to a manual run" requires retained raw
+events, which do not exist and which are not worth introducing for this. What the item actually asks
+for is *continuity of trend*, and a **linked run series** delivers that without the storage fork.
+
+**Honest floor.** Two runs are comparable only when their activity vocabularies overlap sufficiently.
+Below a threshold the view refuses and says the two look like different processes, rather than diffing
+nonsense.
+
+---
+
+## Phase 8 — Watch it, rather than visit it
+
+**Status:** `Not started` · **Depends on Phase 7** and cannot precede it.
+
+- [ ] **The cheapest alarm first: the source stopped sending.** No thresholds, no history, no
+      statistics — only `lastIngestAt` staleness
+- [ ] Thresholds: fitness below X, a new undocumented transition, the late rate doubling
+- [ ] Notification wiring — a new `NotificationType`, the bell renderer, email
+- [ ] Item **10** — connectors beyond webhook / Blob / SharePoint
+
+**Absorbs.** **Extension 8**, **item 10**.
+
+You cannot alert on *"fitness fell from 94% to 71%"* when refresh overwrites the run and no prior
+value was ever kept — which is why item 11 is a prerequisite, not a smaller thing.
+
+**A detail worth knowing before starting.** The poll loop short-circuits on `if (hasNew)` and skips
+SharePoint sources entirely, so **silence is precisely the condition it currently cannot see**. That
+is a small change to the loop and the single highest-value line in the phase.
+
+**Why item 10 rides here.** "Watch it" needs something to watch, and most customers have a REST
+endpoint or a read-only database view, not a webhook they are willing to build first. `blobUrl.ts`'s
+SSRF guard is the template for any new connector. The optional tail of the tail.
+
+**Honest floor.** No alert fires on the first observation. A threshold with fewer than N prior points
+reports *not enough history yet* rather than firing on noise.
+
+---
+
+## Phase 9 — The examples programme
+
+**Status:** `Not started` · Its own final phase, deliberately.
+
+The lesson from the Simulator's programme, which is worth carrying over verbatim: *the code teaches
+nothing on its own — every capability is reachable only by someone who already knows it is there.*
+Building one worked example there found **five shipped defects** nothing else had caught.
+
+**Reuse before authoring.**
+
+| | Example | Slug | Teaches | Phase |
+|---|---|---|---|---|
+| [ ] | *(extend)* Accounts Payable | `accounts-payable-invoice-lifecycle` | Its three period logs already show compliance decay — that **is** the comparison example | 7 |
+| [ ] | *(extend)* Order-to-Cash | `order-to-cash-lifecycle` | Add `Region` / `Order value` / `Channel` columns — cheaper and truer than a sixth near-duplicate | 4 |
+| [ ] | Handover-heavy log | `three-team-handover` | Work crossing three teams with a genuine ping-pong pair | 6 |
+| [ ] | Business-process rework | `credit-check-rework` | "Credit check" three times, labels nothing like a UI step — **the example that proves the widened trigger** | 6 |
+| [ ] | Live source with an alarm | *(extend)* `live-order-processing` | An alert that actually fires during the batch demo — the best demo in the feature | 8 |
+
+**The cold start is a bug, not an example.** A user opening the Miner on their own project gets a bare
+file picker: *"Load built-in example data"* renders only when a catalog example was adopted, and no
+sample log is served from `public/`. **Serving one CSV is the cheapest onboarding fix in the
+programme** and should not wait for this phase.
+
+**No example carries a `twin` payload** despite the package format supporting one, and
+`live-order-processing` is the only example adopted as a **pre-created run** rather than a staged
+sample log — so it is the one whose baked `analytics` goes stale when Phase 1 changes the shape. The
+other four re-import at adopt time, which limits that risk considerably.
+
+Every new package must pass `validateMiningExamplePackage`; the 0.5 decision governs whether it is
+generated or authored.
+
+---
+
+## Verification
+
+- **`npm run build` — NOT OPTIONAL, and run it before pushing.** `refreshRun.ts` imports Prisma and
+  lives in `app/lib/mining/` beside pure modules that client components import; `filterAnalytics.ts`
+  lands in the same directory in Phase 4. `tsc` and the unit suite were both fully green while a
+  client component transitively imported Prisma, and it broke the production build, the deploy and
+  two CI jobs.
+- **Local:** `export PATH="$PATH:/c/Program Files/nodejs"; cd /c/Git/Diagramatix/diagramatix; npm run go`.
+- **Unit:** `npx vitest run tests/mining` after every phase; the full suite before any push.
+- **E2E:** `e2e/mining-examples.spec.ts` after 0.2 — it is the Miner's only route-level coverage.
+- **Adopt all five catalog examples** after 0.2 and after Phase 1, and confirm each still imports,
+  discovers, conforms and calibrates.
+- **Regression bar (Phase 1):** bit-identical `stats` / `variants` / `performance` / `governance` and
+  every pre-existing `analytics` field, with the new fields ignored. **The single most important
+  guard in this plan.**
+- **Docs:** `schema/UPDATE_EVERYTHING.md` Steps 0–12 on **Phase 7 only**.
+- **New tests** from **T3609**, appended to `tests/TESTS_SUMMARY.md`.
+
+---
+
+## Risks
+
+1. **Stale baked analytics in the catalog.** All five examples carry `analytics` inside a 2.9 MB
+   committed JSON, and Phase 1 changes its shape. Four re-import at adopt time and are fine;
+   **`live-order-processing` adopts a pre-created run** and would show old-shaped data on an example
+   meant to teach the new views. Mitigated by 0.5 and by regenerating after Phase 1. **Top risk.**
+2. **Payload growth.** `analytics` is uncompressed `jsonb` and the console fetches the whole run on
+   every Insights open. Phase 1 makes it materially bigger. Integer ms, a resource dictionary, the
+   `detail` budget guard, and a decision on moving the case index behind `GET runs/[runId]/cases`.
+3. **Analytics-shape drift.** Runs imported before Phase 1 can *never* gain its fields. Every reader
+   must tolerate absence and say so.
+4. **The 50k stride × the filter.** A rare slice of a capped run may resolve to almost nothing. The
+   most likely way this programme produces a number someone can disprove.
+5. **Privacy.** Phase 1 begins persisting columns previously discarded, in a product where case ids
+   are frequently customer identifiers. Masking ships in the same phase or not at all.
+6. **Client-bundle hygiene.** See Verification. Not hypothetical — it has happened once already.
+7. **Live-source write cost.** `MiningSource.buffer` is rewritten **in full** on every webhook append,
+   and Phase 8 adds threshold evaluation to the same loop (already capped at 200 sources per poll).
+8. **Canvas blast radius.** Phase 3(b) touches the renderer used by every diagram in the product.
+
+---
+
+## Corrections to the Capability Review
+
+Recorded here rather than silently working around them. The review was read from the shipped code and
+is right about the shape of the problem; these are the places the detail differs.
+
+| Item | The review says | The code says |
+|---|---|---|
+| Ext 1 | *render only / small* | No connector **colour field** exists; `weight` is honoured only for `uml-association`. The table is small; the coloured arrow is a shared-canvas change. |
+| Ext 5 | *data already mined* | Per-resource **counts are discarded**; only `dominantResource` survives. An exact handover map needs Phase 1's storage. |
+| Ext 6 | *widen the trigger* | True for `detectReworkActivities`; **false** for `pingPongFromVariants`, which parses UI-step labels and returns 0 on a business log. |
+| Ext 2, feasibility step 4 | *activity metrics … computed in the browser* | `CaseSummary` has **no durations**. The heat map is the one panel that could not be filtered. |
+| Ext 2, feasibility step 5 | *leave conformance and discovery alone* | Conformance filters **nearly free**. **Discovery** is the un-filterable one, because it emits a persisted diagram. |
+| Item 02 | a labelling nicety | A **correctness precondition** for ext 2 — the stride turns every filtered figure into an estimate. |
+| Item 05 | *a recompute action would fix it* | **Not implementable as written** for manual runs — raw events do not exist. Two honest answers, not one (0.3). |
+| Item 06 | *append to a manual run* | Needs retained raw events. **Re-specified** as a linked run series (Phase 7). |
+| Item 11 | a smaller thing | A **prerequisite** of ext 8. No history, no alarm. |
+| — | *(not mentioned)* | **The gating hole.** 3 routes of 26 enforced; three tier keys sold and enforced nowhere. Fixed in 0.1. |

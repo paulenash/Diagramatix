@@ -15,7 +15,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
-import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
+import { gateFeature, gateLimit, recordUsage } from "@/app/lib/subscription-route";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
 import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
@@ -46,6 +46,8 @@ export async function POST(req: Request, { params }: Params) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
+  const fg = await gateFeature(session?.user?.id ?? "", "processMining");
+  if (fg) return fg;
 
   const run = await prisma.processMiningRun.findFirst({ where: { id: runId, projectId: id } });
   if (!run) return NextResponse.json({ error: "Not found" }, { status: 404 });

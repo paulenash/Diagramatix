@@ -9,6 +9,7 @@ import { auth } from "@/auth";
 import { prisma, pgPool } from "@/app/lib/db";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
+import { gateFeature } from "@/app/lib/subscription-route";
 import { mintIngestKey } from "@/app/lib/mining/sourceAuth";
 import { validateBlobUrl } from "@/app/lib/mining/blobUrl";
 import { sourceHeaderFields, safeSource } from "@/app/lib/mining/sourceShape";
@@ -16,21 +17,28 @@ import type { LogMapping } from "@/app/lib/mining/types";
 
 type Params = { params: Promise<{ id: string; sourceId: string }> };
 
-async function gate(id: string) {
+/** Returns the response to send when the caller may NOT proceed, else null.
+ *  Returns the NextResponse directly (rather than a shape the callers rebuild)
+ *  so the subscription gate's own body — `metric: "feature"` plus the offending
+ *  key, which the UI reads to tell "not in your plan" from "over your cap" —
+ *  reaches the client intact. */
+async function gate(id: string): Promise<NextResponse | null> {
   const session = await auth();
-  if (isReadOnlyImpersonation(session, await cookies())) return { error: "Read-only: viewing another user", status: 403 as const };
+  if (isReadOnlyImpersonation(session, await cookies())) {
+    return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
+  }
   try {
     await requireProjectAccess(session, await cookies(), id, "edit");
   } catch (err) {
-    if (err instanceof OrgContextError) return { error: err.message, status: err.status };
+    if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
-  return null;
+  return gateFeature(session?.user?.id ?? "", "processMining");
 }
 
 export async function PATCH(req: Request, { params }: Params) {
   const { id, sourceId } = await params;
-  const g = await gate(id); if (g) return NextResponse.json({ error: g.error }, { status: g.status });
+  const g = await gate(id); if (g) return g;
 
   const source = await prisma.miningSource.findFirst({ where: { id: sourceId, projectId: id } });
   if (!source) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -67,7 +75,7 @@ export async function PATCH(req: Request, { params }: Params) {
 
 export async function DELETE(_req: Request, { params }: Params) {
   const { id, sourceId } = await params;
-  const g = await gate(id); if (g) return NextResponse.json({ error: g.error }, { status: g.status });
+  const g = await gate(id); if (g) return g;
   const source = await prisma.miningSource.findFirst({ where: { id: sourceId, projectId: id }, select: { id: true } });
   if (!source) return NextResponse.json({ error: "Not found" }, { status: 404 });
   await prisma.miningSource.delete({ where: { id: sourceId } });

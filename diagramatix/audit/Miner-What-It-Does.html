@@ -160,7 +160,7 @@
     <h2>From a spreadsheet to a process, in one sitting</h2>
 
     <div class="steps">
-      <div class="step"><span class="n">1</span><span class="t"><strong>Drop in the log.</strong> CSV or TSV from any system, or the two interchange standards &mdash; XES (IEEE 1849) and OCEL 2.0, object-centric logs included.</span></div>
+      <div class="step"><span class="n">1</span><span class="t"><strong>Drop in the log.</strong> CSV or TSV from any system, or the two interchange standards &mdash; XES (IEEE 1849) and OCEL 2.0, object-centric logs included. No log of your own yet? Start from a worked example instead &mdash; it arrives with a real sample log staged in the importer, so you see the same flow rather than a finished answer.</span></div>
       <div class="step"><span class="n">2</span><span class="t"><strong>Say which column is which.</strong> Case, activity and timestamp are all that is required. The columns are guessed for you; you confirm.</span></div>
       <div class="step"><span class="n">3</span><span class="t"><strong>Check before you commit.</strong> A panel shows how many rows are usable, how many would be dropped, how the dates parsed, and warns when a column looks wrong &mdash; before anything is imported.</span></div>
       <div class="step"><span class="n">4</span><span class="t"><strong>Import, and the analysis is already done.</strong> Cases, events, activities, states, distinct variants, the span of the data &mdash; and the whole Insights workbench underneath.</span></div>
@@ -284,7 +284,7 @@
         <ul>
           <li>For a task log &mdash; the UI steps inside one job &mdash; an <strong>automation score</strong> and a verdict</li>
           <li>App ping-pong, rework, and the hours it would save</li>
-          <li>The strongest candidate routine as a step-by-step <strong>RPA specification</strong> you can hand to a build team, plus an SOP</li>
+          <li>The strongest candidate routine as a step-by-step <strong>RPA specification</strong> you can hand to a build team, plus an as-actually-done SOP &mdash; both as Markdown files today, not as the styled Word document the rest of the product produces</li>
         </ul>
       </div>
       <div class="cap">
@@ -389,6 +389,7 @@
           <li>One button turns the mined run into a <strong>digital twin</strong>: fitted cycle-time distributions, the real arrival rate, gateway splits taken from observed frequencies, teams sized from how many cases each actually handled at once</li>
           <li>Even the <strong>working calendar</strong> is mined &mdash; from the hours the work really happened in</li>
           <li>So the <em>to-be</em> you test is a change to an <em>as-is</em> that was measured, not imagined</li>
+          <li>The twin can then be <strong>checked back against the log</strong> it came from. Today that check is <em>in-sample</em> &mdash; the model is compared with the very cases it was fitted on, which is a sanity check rather than a test, and it says so on its face rather than claiming more</li>
         </ul>
       </div>
       <div class="cap">
@@ -412,6 +413,21 @@
 
   <section>
     <span class="eyebrow">In short</span>
+    <div class="note" style="margin-bottom:26px">
+      <span class="eyebrow">What it does not do yet &middot; 9 September 2026</span>
+      <p>
+        Everything above is what ships. Three things it is worth knowing it does <em>not</em> do, so
+        nobody discovers them mid-demo: a run cannot be <strong>sliced</strong> &mdash; there is no
+        date, team or attribute filter, and columns you did not map are discarded at import; two runs
+        cannot be put <strong>side by side</strong>, even though the catalog deliberately ships several
+        periods of the same process; and a live source re-mines itself <strong>silently</strong>, with
+        no thresholds and no alert, so a fitness collapse waits until somebody opens the console.
+      </p>
+      <p>
+        All three are scheduled. See <strong>Miner-Extensions-Plan.md</strong>.
+      </p>
+    </div>
+
     <h2>The argument you cannot have without it</h2>
     <div class="col">
       <p>

@@ -12,6 +12,7 @@ import { auth } from "@/auth";
 import { prisma, pgPool } from "@/app/lib/db";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
+import { gateFeature } from "@/app/lib/subscription-route";
 import { discoverProcess } from "@/app/lib/mining/discoverProcess";
 import { calibrateSimulation } from "@/app/lib/mining/calibrateSimulation";
 import { layoutBpmnDiagram } from "@/app/lib/diagram/bpmnLayout";
@@ -36,6 +37,11 @@ export async function POST(_req: Request, { params }: Params) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
+  // Calibration crosses into the Simulator, so BOTH tiers have to pass — mining
+  // is what produces the twin, the simulator is what runs it.
+  const fg = await gateFeature(session?.user?.id ?? "", "processMining")
+    ?? await gateFeature(session?.user?.id ?? "", "simulator");
+  if (fg) return fg;
   const userId = session?.user?.id;
 
   const run = await prisma.processMiningRun.findFirst({ where: { id: runId, projectId: id } });

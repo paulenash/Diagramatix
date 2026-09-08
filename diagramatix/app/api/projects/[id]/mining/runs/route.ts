@@ -7,6 +7,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
+import { gateFeature } from "@/app/lib/subscription-route";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -19,6 +20,8 @@ export async function GET(_req: Request, { params }: Params) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
+  const fg = await gateFeature(session?.user?.id ?? "", "processMining");
+  if (fg) return fg;
   const runs = await prisma.processMiningRun.findMany({
     where: { projectId: id },
     orderBy: { createdAt: "desc" },
