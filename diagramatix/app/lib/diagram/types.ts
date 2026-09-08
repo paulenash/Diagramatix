@@ -1262,8 +1262,20 @@ export const SCHEMA_VERSION = "46";
  *   per hour. All optional: the case reports what it can and names what is
  *   missing rather than assuming a zero. Operational table, so ddlGenerate.ts
  *   is unaffected and the XSD export shape is unchanged.
+ * 2.8 (2026-09-08) — DB: SimulationTeam.members, SimulationTeam.skillsSource.
+ *   Skills — who can do what. A team may now name its people and what each
+ *   can do, and a task may require skills; only someone holding ALL of them
+ *   can take it. `capacity` still caps how many work at once, so calendars
+ *   and interventions are untouched; members only decide WHO. A team with no
+ *   members stays a counted pool and behaves exactly as before.
+ *   The matrix is read from an ArchiMate diagram (Actor -assignment-> Role
+ *   -assignment-> Process), read ONCE and editable after, with the source and
+ *   date recorded in skillsSource. Both are OPERATIONAL columns: the curated
+ *   diagram-model DDL in ddlGenerate.ts is unaffected, and the XSD shape is
+ *   unchanged — task requiredSkills ride in element sim params like every
+ *   other simulation field.
  */
-export const PRODUCT_VERSION = "2.7";
+export const PRODUCT_VERSION = "2.8";
 
 /**
  * The structural (XSD) schema version of an export, as a single integer, tolerant of BOTH the

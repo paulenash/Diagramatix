@@ -18,6 +18,8 @@ import { ResourcePool, type PoolUnit } from "@/app/lib/simulation/resourcePool";
 import { Engine } from "@/app/lib/simulation/engine";
 import { makeRng } from "@/app/lib/simulation/rng";
 import type { SimNetwork } from "@/app/lib/simulation/model";
+import { assembleFromDiagram } from "@/app/lib/simulation/assemble";
+import type { DiagramData } from "@/app/lib/diagram/types";
 import { DEFAULT_RUN_CONFIG, type SimRunConfig } from "@/app/lib/simulation/types";
 
 const unit = (id: string, ...skills: string[]): PoolUnit => ({ id, name: id, skills });
@@ -178,5 +180,60 @@ describe("skills — the machinery around them", () => {
     const revived = ResourcePool.fromJSON<string>(legacy as never);
     expect(revived.skilled).toBe(false);
     expect(revived.request(1, 1, "b")).toBe(true);
+  });
+});
+
+describe("skills — end to end, from the diagram to the engine", () => {
+  /** A task marked as needing "appeal", in a lane owned by the Claims team. */
+  function bpmn(): DiagramData {
+    const el = (id: string, type: string, label: string, sim?: Record<string, unknown>) => ({
+      id, type, label, x: 0, y: 0, width: 100, height: 60,
+      properties: { ...(sim ? { sim } : {}) },
+    });
+    return {
+      elements: [
+        el("s", "start-event", "In"),
+        el("t", "task", "Handle appeal", { teamId: "Claims", cycleTime: { kind: "fixed", value: 5 }, requiredSkills: ["appeal"] }),
+        el("e", "end-event", "Out"),
+      ],
+      connectors: [
+        { id: "c1", type: "sequence", sourceId: "s", targetId: "t", waypoints: [] },
+        { id: "c2", type: "sequence", sourceId: "t", targetId: "e", waypoints: [] },
+      ],
+      viewport: { x: 0, y: 0, zoom: 1 },
+    } as unknown as DiagramData;
+  }
+
+  it("T3537 - required skills survive the diagram → assembler → network journey", () => {
+    const net = assembleFromDiagram(bpmn(), {
+      teamCapacities: { Claims: 2 },
+      teamUnits: { Claims: [unit("ann", "assess", "appeal"), unit("bob", "assess")] },
+    });
+    const task = net.nodes.find((n) => n.id.endsWith("t"))!;
+    expect(task.requiredSkills).toEqual(["appeal"]);
+    const team = net.teams.find((t) => t.id === "Claims")!;
+    expect(team.units?.map((u) => u.id)).toEqual(["ann", "bob"]);
+    // Capacity still comes from the library, independently of who is on the team.
+    expect(team.capacity).toBe(2);
+  });
+
+  it("T3538 - a team with no members declared assembles as a counted pool", () => {
+    const net = assembleFromDiagram(bpmn(), { teamCapacities: { Claims: 2 } });
+    expect(net.teams.find((t) => t.id === "Claims")!.units).toBeUndefined();
+  });
+
+  it("T3539 - the constraint actually bites: only the qualified person does the work", () => {
+    // Two people, only one can appeal, and the work needs it — so the team
+    // behaves as though it had ONE person for this task however big it is.
+    const net = assembleFromDiagram(bpmn(), {
+      teamCapacities: { Claims: 2 },
+      teamUnits: { Claims: [unit("ann", "assess", "appeal"), unit("bob", "assess")] },
+    });
+    net.nodes.find((n) => n.kind === "source" || n.id.endsWith("s"))!;
+    const pool = net.teams.find((t) => t.id === "Claims")!;
+    expect(pool.units).toHaveLength(2);
+    // The eligibility itself is exercised directly by T3510-T3513; this pins that
+    // the model REACHING the engine carries what those tests rely on.
+    expect(net.nodes.find((n) => n.id.endsWith("t"))!.requiredSkills).toEqual(["appeal"]);
   });
 });

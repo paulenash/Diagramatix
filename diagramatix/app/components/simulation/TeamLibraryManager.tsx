@@ -7,6 +7,7 @@
  * defaulting everything to 1.
  */
 
+import { SkillsFillPanel } from "./SkillsFillPanel";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { MatrixButton } from "./matrix/MatrixChrome";
 import type { CalendarRow } from "./CalendarLibraryManager";
@@ -175,6 +176,14 @@ export function TeamLibraryManager({
 
   return (
     <div className="flex flex-col gap-2 text-[11px]">
+      {/* Skills: read from an ArchiMate diagram rather than typed a second time.
+          Only shown for a real project - there is nothing to read from otherwise. */}
+      {projectId && (
+        <div className="border border-green-500/20 rounded p-2">
+          <p className="text-green-400/70 uppercase tracking-widest text-[10px] mb-1">Skills</p>
+          <SkillsFillPanel baseUrl={`/api/projects/${projectId}/simulation-teams/fill-skills`} onFilled={load} />
+        </div>
+      )}
       <div className="flex flex-col gap-0.5">
         {teams.length === 0 && <p className="text-green-400/50">No teams yet — add one below.</p>}
         {teams.length > 0 && (

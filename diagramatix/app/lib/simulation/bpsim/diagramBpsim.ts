@@ -50,6 +50,7 @@ export function diagramToBpsimScenario(data: DiagramData, opts: DiagramBpsimOpts
       if (sim.waitTime) p.waitTime = sim.waitTime;
       if (sim.setupTime) p.setupTime = sim.setupTime;
       if (sim.teamId) p.selection = `getResource('${sim.teamId}'${sim.resourceUnits && sim.resourceUnits !== 1 ? `, ${sim.resourceUnits}` : ""})`;
+      if (sim.requiredSkills?.length) p.requiredSkills = [...sim.requiredSkills];
       if (sim.assign?.length) {
         p.assignments = sim.assign.map((a) => ({
           property: a.property,

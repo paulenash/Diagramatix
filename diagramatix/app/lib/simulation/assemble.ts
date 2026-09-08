@@ -24,6 +24,7 @@ import type { DiagramData, DiagramElement } from "@/app/lib/diagram/types";
 import { getSimParams, type LoopParams } from "@/app/lib/diagram/simParams";
 import type { SimNetwork, SimNode, SimEdge, SimTeam, NodeKind, Assignment, LoopSpec, EventSub, BoundaryEvent, EventChannel } from "./model";
 import type { SimDist, WorkCalendar } from "./types";
+import type { PoolUnit } from "./resourcePool";
 
 /** Resolvers for working calendars: team calendars keyed by team name (like
  *  teamCapacities), and a lookup from a source's calendarId → its WorkCalendar. */
@@ -45,6 +46,9 @@ function resourceIndex<T>(map: Record<string, T> | undefined): Map<string, { key
 }
 
 export interface AssembleOpts extends CalendarOpts {
+  /** Team name → its named people and their skills, from the team library.
+   *  Absent (or an empty list) leaves the pool counted, exactly as before. */
+  teamUnits?: Record<string, PoolUnit[]>;
   /** Resource name → capacity, from the project's Resources library. */
   teamCapacities?: Record<string, number>;
   /** Deny a pool to any resource the library does not declare, so only visible,
@@ -279,6 +283,9 @@ export function assembleFromDiagram(
       const teamId = sim.teamId ?? laneTeamOf(el); // inherit the lane's team if none set
       node.teamId = teamId;
       node.units = sim.resourceUnits ?? 1;
+      // Skills whoever takes this task must hold. Only carried when there ARE any:
+      // an empty array would look like a constraint while constraining nothing.
+      if (sim.requiredSkills?.length) node.requiredSkills = [...sim.requiredSkills];
       if (teamId) teamIds.add(teamId);
       // A repeat / multi-instance marker on a TASK means the work is performed
       // more than once. This used to be read only for sub-processes, so the
@@ -398,6 +405,7 @@ export function assembleFromDiagram(
   // pool entirely so it cannot influence the run at all.
   const capIndex = resourceIndex(opts?.teamCapacities);
   const calIndex = resourceIndex(opts?.teamCalendars);
+  const unitIndex = resourceIndex(opts?.teamUnits);
   // An EMPTY capacity map means the library isn't available — almost always
   // "not loaded yet" rather than "this project has no resources". Applying the
   // strict rule then would declare EVERY resource unknown and strip the lot,
@@ -423,13 +431,15 @@ export function assembleFromDiagram(
       }
       canonical.set(id, id);
       const cal = calIndex.get(id.trim().toLowerCase())?.value;
-      if (!teams.has(id)) teams.set(id, { id, capacity: 1, ...(cal ? { calendar: cal } : {}) });
+      const us = unitIndex.get(id.trim().toLowerCase())?.value;
+      if (!teams.has(id)) teams.set(id, { id, capacity: 1, ...(cal ? { calendar: cal } : {}), ...(us?.length ? { units: us } : {}) });
       continue;
     }
     canonical.set(id, hit.key);
     if (!teams.has(hit.key)) {
       const cal = calIndex.get(hit.key.trim().toLowerCase())?.value;
-      teams.set(hit.key, { id: hit.key, capacity: hit.value, ...(cal ? { calendar: cal } : {}) });
+      const us = unitIndex.get(hit.key.trim().toLowerCase())?.value;
+      teams.set(hit.key, { id: hit.key, capacity: hit.value, ...(cal ? { calendar: cal } : {}), ...(us?.length ? { units: us } : {}) });
     }
   }
   // Point every activity at the canonical resource — or at nothing when strict

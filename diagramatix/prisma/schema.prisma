@@ -1510,6 +1510,15 @@ model SimulationTeam {
   // Working hours: id of the SimulationCalendar this team follows (a plain id
   // reference, not an FK, so a deleted calendar just falls back to always-open).
   calendarId   String?
+  // Named people and what each can do: [{ name, skills[] }]. EMPTY = a counted
+  // pool of interchangeable units, exactly as before skills existed. `capacity`
+  // still caps how many may work at once (so calendars and interventions are
+  // unaffected); members only decide WHO may take WHICH task.
+  members      Json     @default("[]")
+  // Where the skills were last filled from: { diagramId, diagramName, at }.
+  // Recorded because the fill is READ-ONCE and editable afterwards - without
+  // provenance nobody can tell a hand-typed matrix from a stale imported one.
+  skillsSource Json     @default("{}")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

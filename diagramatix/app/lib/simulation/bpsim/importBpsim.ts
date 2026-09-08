@@ -145,6 +145,13 @@ function parseElementParams(inner: string, unit: ClockUnit): BpsimElementParams 
     if (qty) { const q = maxNumeric(qty); if (q !== undefined) p.quantity = q; }
     const sel = blocks(res, "Selection")[0]?.inner;
     if (sel) { const e = exprValue(sel); if (e) p.selection = e; }
+    // Our own extension: skills come back on a round trip through Diagramatix.
+    // A file from another tool simply has none, which reads as "no constraint".
+    const skillBlock = blocks(res, "RequiredSkills")[0]?.inner;
+    if (skillBlock) {
+      const names = [...skillBlock.matchAll(/name="([^"]*)"/g)].map((m) => m[1]).filter(Boolean);
+      if (names.length) p.requiredSkills = names;
+    }
   }
 
   const props = blocks(inner, "PropertyParameters")[0]?.inner;

@@ -41,6 +41,11 @@ export interface ElementSimParams {
   setupTime?: SimDist;
   waitTime?: SimDist;
   teamId?: string;
+  /** Skills whoever takes this task must hold - ALL of them (AND). ABSENT means
+   *  anyone on the team, which is what every model did before skills existed. The
+   *  default path is unchanged: the task names a team and the team IS the role;
+   *  these only refine it for genuinely specialist work. */
+  requiredSkills?: string[];
   resourceUnits?: number;
   // delay / timer
   delay?: SimDist;

@@ -15,6 +15,29 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.8.2500 — 2026-09-08 — Skills: who can do what
+
+- **Cross-skilling can finally be modelled.** Before this a team had two settings: separate
+  pools (nobody helps) or one merged pool (everybody does everything). Reality is in between,
+  and that middle was not awkward to express — it was impossible. Now a team can name its
+  people and what each can do, and a task can require skills; only someone holding ALL of them
+  can take it.
+- **Read from ArchiMate, not typed twice.** Business Architects already model this: an Actor
+  assigned to a Role holds that skill, a Role assigned to a Business Process means the work
+  requires it, and a Role that aggregates finer Roles is a bundle of skills. Point the team
+  library at an ArchiMate diagram and the matrix fills itself.
+- **Read once, then yours.** The source and date are shown so a re-pull is a decision — a run's
+  results never change because someone edited an architecture diagram last Tuesday. Everything
+  that did NOT match is reported in both directions, and a fill that matched nothing says so
+  rather than looking like it worked.
+- The generalist is kept free: among those who qualify, the work goes to the person holding
+  the FEWEST skills, so whoever can cover anything stays available for what only they can do.
+- Skills travel through BPSim in a Diagramatix namespace, so a round trip is lossless and
+  other tools ignore them rather than being confused by them.
+- A team that names no people behaves exactly as it always did — asserted directly, not
+  assumed.
+- Schema: product 2.7 → 2.8 (new columns `SimulationTeam.members`, `SimulationTeam.skillsSource`).
+  XSD unchanged (still 46).
 ## 2.7.2496 — 2026-09-08 — How do we know the model is right?
 
 - **Check the twin against reality.** The Miner can now compare the simulated flow-time

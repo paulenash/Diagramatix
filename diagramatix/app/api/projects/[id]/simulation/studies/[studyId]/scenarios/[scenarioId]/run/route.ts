@@ -9,6 +9,7 @@ import type { DiagramData } from "@/app/lib/diagram/types";
 import { assemblePortfolio, portfolioClosure } from "@/app/lib/simulation/network";
 import { spliceLinkedSubprocesses } from "@/app/lib/simulation/spliceLinks";
 import { applyOverrides, type OverrideSet } from "@/app/lib/simulation/overrides";
+import type { PoolUnit } from "@/app/lib/simulation/resourcePool";
 import { runMonteCarlo, clampRunConfig } from "@/app/lib/simulation/runner";
 import { checkSimReadiness } from "@/app/lib/simulation/readiness";
 import { runIdsToPrune } from "@/app/lib/simulation/runHistory";
@@ -97,8 +98,18 @@ export async function POST(req: Request, { params }: Params) {
 
   // Real pool capacities from the project's team library (keyed by name —
   // tasks reference a team by the name stored in sim.teamId).
-  const teams = await prisma.simulationTeam.findMany({ where: { projectId: id }, select: { name: true, capacity: true, costPerHour: true, calendarId: true } });
+  const teams = await prisma.simulationTeam.findMany({ where: { projectId: id }, select: { name: true, capacity: true, costPerHour: true, calendarId: true, members: true } });
   const teamCapacities = Object.fromEntries(teams.map((t) => [t.name, t.capacity]));
+  // Named people and their skills, when the team declares any. A team with no
+  // members stays a counted pool, exactly as before skills existed.
+  const teamUnits: Record<string, PoolUnit[]> = {};
+  for (const t of teams) {
+    const members = Array.isArray(t.members) ? (t.members as unknown as { name?: string; skills?: string[] }[]) : [];
+    const units = members
+      .filter((m) => typeof m?.name === "string" && m.name.trim())
+      .map((m) => ({ id: m.name!.trim(), name: m.name!.trim(), skills: Array.isArray(m.skills) ? m.skills.filter((x) => typeof x === "string") : [] }));
+    if (units.length) teamUnits[t.name] = units;
+  }
   // Cost per hour by team name → per-team + total cost in the results.
   const teamCosts = Object.fromEntries(teams.filter((t) => t.costPerHour != null).map((t) => [t.name, t.costPerHour as number]));
 
@@ -132,7 +143,7 @@ export async function POST(req: Request, { params }: Params) {
   }
 
   // ── Assemble + run ─────────────────────────────────────────────────────
-  const baseline = assemblePortfolio(rootDiagrams, { teamCapacities, strictTeams: true, teamCalendars, calendarsById });
+  const baseline = assemblePortfolio(rootDiagrams, { teamCapacities, strictTeams: true, teamCalendars, calendarsById, teamUnits });
   const net = applyOverrides(baseline, overrides);
 
   const run = await prisma.simulationRun.create({

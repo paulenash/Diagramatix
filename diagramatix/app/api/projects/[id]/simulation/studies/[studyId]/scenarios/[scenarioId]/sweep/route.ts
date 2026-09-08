@@ -21,6 +21,7 @@ import type { DiagramData } from "@/app/lib/diagram/types";
 import { assemblePortfolio, portfolioClosure } from "@/app/lib/simulation/network";
 import { spliceLinkedSubprocesses } from "@/app/lib/simulation/spliceLinks";
 import { applyOverrides, type OverrideSet } from "@/app/lib/simulation/overrides";
+import type { PoolUnit } from "@/app/lib/simulation/resourcePool";
 import { runMonteCarlo, clampSweep } from "@/app/lib/simulation/runner";
 import { buildSweep, analyseSweep, type SweepLever, type SweepObjective, type SweepPoint } from "@/app/lib/simulation/sweep";
 import { enumerateLevers } from "@/app/lib/simulation/nextSteps";
@@ -120,8 +121,18 @@ export async function POST(req: Request, { params }: Params) {
     .map((rid) => { const d = byId.get(rid); return d ? { id: rid, data: spliceLinkedSubprocesses(d, rid, byId) } : null; })
     .filter((x): x is { id: string; data: DiagramData } => x !== null);
 
-  const teams = await prisma.simulationTeam.findMany({ where: { projectId: id }, select: { name: true, capacity: true, costPerHour: true, calendarId: true } });
+  const teams = await prisma.simulationTeam.findMany({ where: { projectId: id }, select: { name: true, capacity: true, costPerHour: true, calendarId: true, members: true } });
   const teamCapacities = Object.fromEntries(teams.map((t) => [t.name, t.capacity]));
+  // Named people and their skills, when the team declares any. A team with no
+  // members stays a counted pool, exactly as before skills existed.
+  const teamUnits: Record<string, PoolUnit[]> = {};
+  for (const t of teams) {
+    const members = Array.isArray(t.members) ? (t.members as unknown as { name?: string; skills?: string[] }[]) : [];
+    const units = members
+      .filter((m) => typeof m?.name === "string" && m.name.trim())
+      .map((m) => ({ id: m.name!.trim(), name: m.name!.trim(), skills: Array.isArray(m.skills) ? m.skills.filter((x) => typeof x === "string") : [] }));
+    if (units.length) teamUnits[t.name] = units;
+  }
   const teamCosts = Object.fromEntries(teams.filter((t) => t.costPerHour != null).map((t) => [t.name, t.costPerHour as number]));
   const calendars = await prisma.simulationCalendar.findMany({ where: { projectId: id }, select: { id: true, pattern: true } });
   const calendarsById = Object.fromEntries(calendars.map((c) => [c.id, (c.pattern ?? { intervals: [] }) as unknown as WorkCalendar]));
@@ -134,7 +145,7 @@ export async function POST(req: Request, { params }: Params) {
   const cfg: ScenarioRunConfig = { ...rawCfg, ...sweepCfg };
 
   const baseOverrides = (scenario.overrides ?? {}) as unknown as OverrideSet;
-  const baseline = assemblePortfolio(rootDiagrams, { teamCapacities, strictTeams: true, teamCalendars, calendarsById });
+  const baseline = assemblePortfolio(rootDiagrams, { teamCapacities, strictTeams: true, teamCalendars, calendarsById, teamUnits });
   const stepsToRun = buildSweep(lever, from, to, steps);
 
   try {

@@ -15,6 +15,11 @@ import { serializeWorkCalendar } from "../calendar";
 import type { BpsimScenario, BpsimElementParams } from "./types";
 
 const NS = "bpsim";
+/** Diagramatix extension namespace. BPSim 1.0 has no skills concept, so the
+ *  skill requirements ride here: a round trip through us is lossless, and any
+ *  other tool ignores an element in a namespace it does not know. */
+const DGX = "dgx";
+const DGX_NS = "https://diagramatix.com/schemas/bpsim-extensions/1.0";
 
 function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
@@ -56,6 +61,11 @@ function elementXml(ref: string, p: BpsimElementParams, unit: ClockUnit, indent:
   const res: string[] = [];
   if (p.quantity !== undefined) res.push(`<${NS}:Quantity><${NS}:NumericParameter value="${p.quantity}"/></${NS}:Quantity>`);
   if (p.selection) res.push(`<${NS}:Selection><${NS}:ExpressionParameter value="${esc(p.selection)}"/></${NS}:Selection>`);
+  // Standard BPSim has nowhere to put this, so it goes in our own namespace —
+  // lossless for us, ignorable by everyone else. See BpsimElementParams.
+  if (p.requiredSkills?.length) {
+    res.push(`<${DGX}:RequiredSkills>${p.requiredSkills.map((sk) => `<${DGX}:Skill name="${esc(sk)}"/>`).join("")}</${DGX}:RequiredSkills>`);
+  }
   if (res.length) L.push(`<${NS}:ResourceParameters>${res.join("")}</${NS}:ResourceParameters>`);
 
   if (p.assignments?.length) {
@@ -75,7 +85,7 @@ function elementXml(ref: string, p: BpsimElementParams, unit: ClockUnit, indent:
 /** Serialise scenarios to a `<bpsim:BPSimData>` block. `unit` is the ClockUnit
  *  the numbers are in (drives ISO-8601 duration emission). */
 export function buildBpsimData(scenarios: BpsimScenario[], unit: ClockUnit = "minute"): string {
-  const out: string[] = [`<${NS}:BPSimData xmlns:${NS}="http://www.bpsim.org/schemas/1.0">`];
+  const out: string[] = [`<${NS}:BPSimData xmlns:${NS}="http://www.bpsim.org/schemas/1.0" xmlns:${DGX}="${DGX_NS}">`];
   for (const sc of scenarios) {
     const attrs = [
       sc.id ? ` id="${esc(sc.id)}"` : "",

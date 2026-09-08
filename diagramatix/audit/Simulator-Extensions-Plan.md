@@ -445,7 +445,7 @@ Three decisions worth recording:
 
 ## Phase 7 — Skills: who can do what
 
-**Status:** 🔶 `In progress` — slice 1 (engine) SHIPPED. **Re-planned 2026-09-08 with Paul.** The original plan modelled this as
+**Status:** ✅ `Shipped` — all four slices. Product version 2.7 → 2.8. **Re-planned 2026-09-08 with Paul.** The original plan modelled this as
 cross-skilling within a team and proposed a bespoke "team members + skills" library UI. Paul's
 input replaced both: this is a **competency model**, and the data already exists in the ArchiMate
 diagrams a Business Architect maintains. The engine change is smaller than planned and the
@@ -600,9 +600,10 @@ lesson as the calendar exceptions in Phase 5: the arithmetic was never the risk,
    `skillsFromArchimate()` reads actors, role bundles and required-skills-per-work;
    `matchSkills()` joins them onto team members and task labels by name. Everything that did not
    match is reported in BOTH directions, and a fill that matched nothing says so (T3534/T3535).
-3. **UI** — skills against each member in the team library; required skills in `SimDataPanel`;
-   the fill action with its provenance line.
-4. **BPSim** — see below.
+3. ✅ **UI + wiring (SHIPPED)** — `SimulationTeam.members` / `.skillsSource`; the assembler carries
+   `teamUnits` through; `requiredSkills` rides in element sim params; the fill action lives in the
+   team library with a preview, the provenance line and the unmatched report.
+4. ✅ **BPSim (SHIPPED)** — carried in a `dgx` extension namespace; round trip lossless (T3540).
 
 ### BPSim: the explicit decision
 
@@ -610,8 +611,10 @@ BPSim has no skills concept. **Decision: carry them in a Diagramatix extension n
 Diagramatix → BPSim → Diagramatix round trip is lossless, and WARN on export that other tools
 will ignore them.** Dropping silently would let a file produce different results elsewhere with
 no indication; an extension nobody reads is at least honest and lossless where it counts.
-*To confirm against the exporter when the slice is built — if it has no extension seam, the
-fallback is to drop with a visible warning, never a silent one.*
+**Confirmed on build:** the exporter emits XML directly, so a foreign namespace declared on the
+root was straightforward. `xmlns:dgx="https://diagramatix.com/schemas/bpsim-extensions/1.0"`, with
+`<dgx:RequiredSkills>` inside `ResourceParameters`. A file from another tool simply has none, which
+reads as no constraint (T3543).
 
 ### Version bump
 

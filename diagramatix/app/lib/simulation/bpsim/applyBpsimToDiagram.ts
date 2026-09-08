@@ -40,6 +40,9 @@ export function applyBpsimToDiagram(
         const m = p.selection.match(/getResource\(\s*'([^']+)'\s*(?:,\s*(\d+))?/);
         if (m) { patch.teamId = m[1]; if (m[2]) patch.resourceUnits = parseInt(m[2], 10); }
       }
+      if (p.requiredSkills?.length) {
+        patch.requiredSkills = [...p.requiredSkills];
+      }
       // Source operating-hours calendar (references a scenario <Calendar> by id).
       if (p.calendarRef) patch.calendarId = p.calendarRef;
       // PropertyParameters → token assignments (init distribution OR expression)

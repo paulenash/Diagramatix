@@ -23,7 +23,7 @@
 
 import type { DiagramData } from "@/app/lib/diagram/types";
 import { extractForwardLinks } from "@/app/lib/diagram/linkClosure";
-import { assembleFromDiagram, type CalendarOpts } from "./assemble";
+import { assembleFromDiagram, type CalendarOpts, type AssembleOpts } from "./assemble";
 import type { SimNetwork, SimNode, SimEdge, SimTeam } from "./model";
 
 export interface PortfolioDiagram {
@@ -74,7 +74,7 @@ function namespaceFragment(net: SimNetwork, diagramId: string): SimNetwork {
  */
 export function assemblePortfolio(
   diagrams: PortfolioDiagram[],
-  opts?: { teamCapacities?: Record<string, number>; strictTeams?: boolean } & CalendarOpts,
+  opts?: AssembleOpts,
 ): SimNetwork {
   const nodes: SimNode[] = [];
   const edges: SimEdge[] = [];

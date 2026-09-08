@@ -40,6 +40,17 @@ export interface BpsimElementParams {
   condition?: string;       // Condition / ExpressionParameter
   // ResourceParameters
   quantity?: number;        // Quantity / NumericParameter (staffed capacity)
+  /**
+   * Skills whoever takes this task must hold. BPSim has NO concept of this, so it
+   * travels in a Diagramatix extension namespace: a Diagramatix → BPSim →
+   * Diagramatix round trip keeps it, and other tools ignore it because they do
+   * not know the namespace.
+   *
+   * Dropping it silently was the alternative and is worse: the file would then
+   * produce DIFFERENT results elsewhere with nothing to say why. Carrying it and
+   * warning on export is honest about both halves.
+   */
+  requiredSkills?: string[];
   selection?: string;       // Selection / ExpressionParameter (getResource(...))
   // PropertyParameters
   assignments?: BpsimAssignment[];
