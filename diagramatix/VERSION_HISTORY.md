@@ -15,6 +15,47 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.8.2510 — 2026-09-08 — The Hire & Onboard example, asserted end to end
+
+The capstone example is now a **regression test for the whole simulator**. The
+calendar, the resource pool, the skills model, the significance test and the
+tornado are asserted TOGETHER on one realistic model — everything else in the
+suite exercises them one at a time on a fixture built to suit.
+
+Twenty tests in about ten seconds, in three tiers, because they fail for
+different reasons:
+
+- **Tier 0** reads the design out of the package with no run at all: exactly two
+  people accredited, every skill-requiring task on a team that names people,
+  every calendar anchored to a Monday with its holidays landing mid-run.
+- **Tier 1 is the argument.** The busiest team looks healthy at 60% and it is HR
+  Operations; there is still a real queue at the accredited step; MORE DESKS is
+  bit-identical to the baseline; hiring two more administrators moves the
+  accredited queue by 1.6%; training one person cuts it 9.4 h → 3.9 h while the
+  control step stays put. The significance test agrees on its own: hiring reads
+  as noise, training reads as real.
+- **Tier 2 pins the figures** at seed 20270705. These are a change detector, not
+  a correctness argument, and they are CAPTURED from a run rather than written by
+  hand — nobody can derive a discrete-event mean to three figures, and a
+  predicted number presented as an expectation would be a fabrication. If one
+  moves, the question is "was that intended?", never "adjust it until it passes".
+
+**Verified on the live path, not just in unit tests.** A real adopt into a
+throwaway project confirmed the four people, their two accreditations, the
+ArchiMate companion diagram, the business-case inputs and the cross-training
+override all survive the journey into a learner's project.
+
+**And that turned up a fifth bug from this example.** Companion diagrams were
+captured only when a team's skills had been FILLED from one — so a project whose
+matrix was typed in, or one that arrived with an adopted example, silently
+dropped its operating model on the way back out. Every ArchiMate diagram in the
+project is now carried: it is the type the fill reads, and its presence in a
+simulation project is not an accident.
+
+- Schema: unchanged. Product stays 2.8, XSD stays 46.
+
+---
+
 ## 2.8.2508 — 2026-09-08 — Hire & Onboard, and the four bugs it found
 
 The capstone worked example: a regulated employer hiring ~790 people a year, one

@@ -93,15 +93,22 @@ export async function captureProjectPackage(projectId: string, studyId: string):
   // Root diagrams + any scenario-pinned variant diagrams (id = package key).
   const rootIds = study.roots.map((r) => r.diagramId);
   const variantIds = study.scenarios.flatMap((s) => variantIdsOf(s.variantRootIds));
-  // Companions: the diagrams a team's skills were FILLED FROM. This is a real
-  // stored reference (skillsSource.diagramId), not a guess about what looks
-  // related, so the package carries exactly the ArchiMate model the matrix came
-  // from and nothing else.
-  const companionIds = Array.from(new Set(
-    (await prisma.simulationTeam.findMany({ where: { projectId }, select: { skillsSource: true } }))
+  // Companions — diagrams carried alongside the process but never run.
+  //
+  // TWO sources, deliberately. The obvious one is a real stored reference: the
+  // diagram a team's skills were FILLED FROM (skillsSource.diagramId). But a
+  // matrix that was typed in, or one that arrived with an adopted example, has
+  // no such reference — and capturing on that alone silently dropped the
+  // operating model from any project whose skills had not been filled, which is
+  // most of them. So every ArchiMate diagram in the project comes too: that is
+  // the type the fill reads, and its presence in a simulation project is not an
+  // accident.
+  const companionIds = Array.from(new Set([
+    ...(await prisma.simulationTeam.findMany({ where: { projectId }, select: { skillsSource: true } }))
       .map((t) => (t.skillsSource as { diagramId?: unknown } | null)?.diagramId)
       .filter((x): x is string => typeof x === "string" && !!x),
-  )).filter((id) => !rootIds.includes(id) && !variantIds.includes(id));
+    ...(await prisma.diagram.findMany({ where: { projectId, type: "archimate" }, select: { id: true } })).map((d) => d.id),
+  ])).filter((id) => !rootIds.includes(id) && !variantIds.includes(id));
   const captureIds = Array.from(new Set([...rootIds, ...variantIds, ...companionIds]));
   const diagramRows = await prisma.diagram.findMany({ where: { id: { in: captureIds } }, select: { id: true, name: true, type: true, data: true } });
   const capturedKeys = new Set(diagramRows.map((d) => d.id));

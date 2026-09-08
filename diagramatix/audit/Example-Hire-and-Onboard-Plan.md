@@ -4,7 +4,7 @@
 |---|---|
 | **Created** | 2026-09-08 |
 | **Revised** | 2026-09-08 — sizing arithmetic done; **the first draft's numbers did not work** (see §1.1) |
-| **Status** | `Slices 6–7 done 2026-09-08` — both diagrams authored, library and five scenarios configured, package merged into the catalog. Authoring found **four more shipped bugs** (§2b). Slices 8–11 (acceptance tests + goldens) still to do |
+| **Status** | ✅ `COMPLETE 2026-09-08` — authored, asserted (T3589–T3608), goldens pinned, seeded locally and adopt-verified. Authoring found **five more shipped bugs** (§2b). Only the prod seed is outstanding |
 | **Slug** | `hire-and-onboard` |
 | **Level** | `advanced` — the only one, after the 2026-09-08 re-levelling |
 | **Purpose** | The capstone example **and an end-to-end acceptance test**: one process that exercises calendars, holidays, named people, skills read from ArchiMate, priority queueing, the sweep, the tornado and the business case — with the figures each step must produce known in advance |
@@ -578,10 +578,10 @@ by Gap D, the other belongs to a different example.
 | ~~5b~~ | ✅ **Gap D** — `ElementSimParams.batch` + assemble mapping | **Done** — T3585–T3588 |
 | **6** | **Author both diagrams** through the editor, not by hand-writing JSON | Both render; the fill preview reports 18 / 5 with exactly the two intended non-matches |
 | **7** | **Configure** calendars, exceptions, teams, people, five scenarios, business-case inputs | Baseline runs; §4.3 utilisations within ±5pp of the analytic figures |
-| **8** | **Capture** via *Save as example*, merge by slug, add to **T3369** and the **T3561** level map | `exampleSeeds.test.ts` green |
-| **9** | **Tier 0 + Tier 1 acceptance tests**, numbered from **T3563** | Green |
-| **10** | **Capture Tier 2 goldens** from the first green run and commit them | Green, and re-running reproduces them exactly |
-| **11** | Seed locally, walk §7 end to end, then seed prod | The walkthrough works as written |
+| ~~8~~ | ✅ Merged by slug; registered in **T3369** and the **T3561** level map | **Done** |
+| ~~9~~ | ✅ **Tier 0 + Tier 1 acceptance tests** | **Done** — T3589–T3603, 20 tests in ~10s |
+| ~~10~~ | ✅ **Tier 2 goldens** captured by `scripts/capture-hire-onboard-goldens.ts` | **Done** — T3604–T3608 |
+| ~~11~~ | ✅ Seeded locally; **live adopt round-trip verified** (people, companion diagram, business case and the cross-training override all survive) | **Done.** ⏳ **Prod seed outstanding** |
 
 **Slices 1–5b are complete.** Authoring (slice 6 onward) is now unblocked — which was the point of
 doing them first: building the example and *then* discovering the package could not carry it was the
