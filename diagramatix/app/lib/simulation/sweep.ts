@@ -25,11 +25,11 @@ import type { RunMetrics } from "./results";
 import { compareSamples } from "./significance";
 
 /** What a sweep can vary. Mirrors the lever kinds the suggestions already use. */
-export type SweepLeverKind = "teamCapacity" | "taskCycleTime" | "sourceArrival";
+export type SweepLeverKind = "teamCapacity" | "taskCycleTime" | "sourceArrival" | "timerDelay";
 
 export interface SweepLever {
   kind: SweepLeverKind;
-  /** Team name (capacity) or engine node id (cycle time / arrival). */
+  /** Team name (capacity) or engine node id (cycle time / arrival / delay). */
   target: string;
   label: string;
 }
@@ -92,7 +92,8 @@ export function buildSweep(lever: SweepLever, from: number, to: number, steps: n
 export function overrideFor(lever: SweepLever, value: number): OverrideSet {
   if (lever.kind === "teamCapacity") return { teams: { [lever.target]: { capacity: Math.max(0, Math.round(value)) } } };
   const dist = { kind: "fixed" as const, value };
-  return { elements: { [lever.target]: lever.kind === "taskCycleTime" ? { cycleTime: dist } : { arrival: dist } } };
+  const key = lever.kind === "taskCycleTime" ? "cycleTime" : lever.kind === "timerDelay" ? "delay" : "arrival";
+  return { elements: { [lever.target]: { [key]: dist } } };
 }
 
 /** The objective's value for one run. Falls back to the run-average percentiles

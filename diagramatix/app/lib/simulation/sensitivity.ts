@@ -98,6 +98,15 @@ export function enumerateParameters(net: SimNetwork): SensitivityParam[] {
     } else if (n.kind === "source" && n.arrival) {
       const mean = distMean(n.arrival);
       if (mean !== null) out.push({ kind: "sourceArrival", target: n.id, label, baseline: r2(mean) });
+    } else if (n.kind === "delay" && n.delay) {
+      // Authored waits — "applications gather for 10 working days", "wait for
+      // the start date". These were invisible to the tornado, and in a process
+      // with any real waiting in it they are usually the LARGEST term in flow
+      // time: a model can spend twenty-five working days waiting and five hours
+      // working, and the chart would rank only the five hours. The lever already
+      // existed (`delay` is a NODE_KEY); only the enumeration was missing.
+      const mean = distMean(n.delay);
+      if (mean !== null) out.push({ kind: "timerDelay", target: n.id, label, baseline: r2(mean) });
     }
   }
   return out;

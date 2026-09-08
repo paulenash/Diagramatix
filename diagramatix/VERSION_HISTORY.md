@@ -15,6 +15,58 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.8.2508 — 2026-09-08 — Hire & Onboard, and the four bugs it found
+
+The capstone worked example: a regulated employer hiring ~790 people a year, one
+BPMN process and one ArchiMate operating model, five scenarios, holidays and a
+Christmas shutdown. It is the first example with a named person, a skill, a
+public holiday or a business case in it.
+
+**The argument.** Every team sits under 60% and nothing in the utilisation panel
+looks wrong — but only 2 of HR Operations' 4 people are accredited to sign off a
+compliance & vetting review. Giving them more desks changes NOTHING (bit-identical
+results — capacity cannot exceed the people who exist). Hiring two more
+administrators changes almost nothing. Training a third checker halves the queue
+at that step.
+
+**And a finding the example did not expect.** Its tornado says the two
+load-bearing assumptions are the two WAITING PERIODS — ten working days gathering
+applications and fifteen days' notice — at 19% and 13%, ten times anything else.
+HR Operations' headcount comes back "no difference" with a swing of exactly zero.
+So it teaches three things: headcount is not the lever, the accredited pair
+genuinely is a constraint, and the biggest lever of all is two waits nobody had
+questioned.
+
+**Building it found four bugs, three in shipped features, none of which any test
+caught:**
+
+- **The ArchiMate skills fill had never worked on a real diagram.** It matched on
+  the element type, but the editor stores every ArchiMate element under one type
+  with the concept in a shape key. A fill from a real operating model returned
+  zero actors and zero skills. Its tests used synthetic elements of a shape no
+  diagram in the product has.
+- **Skills never reached the engine on a study run.** The portfolio assembler
+  neither passed the teams' people down nor kept them when it rebuilt the pools,
+  so every run assembled counted pools and every skill requirement was silently
+  granted to anyone. The skills tests called the single-diagram assembler, which
+  was fine; the wrapper the app actually uses was not. Together with the fill bug,
+  the feature was inert end to end from the day it shipped.
+- **The tornado could not see authored waits.** It enumerated team capacities,
+  task times and arrival rates — not timers. In a process with real waiting in it
+  those are usually the largest term in flow time, and the chart could not rank
+  them.
+- **The example suite ran every example without its people**, so it could not have
+  noticed either of the first two. It now assembles examples the way the app does.
+
+Also recorded, because it cost an afternoon: an arrival mean is sampled in
+ELAPSED time and then pushed to the next open window, so a source with a working
+calendar is neither "per elapsed hour" nor "per open hour". Both obvious guesses
+were wrong by more than a factor of two. It has to be measured.
+
+- Schema: unchanged. Product stays 2.8, XSD stays 46.
+
+---
+
 ## 2.8.2506 — 2026-09-08 — Seven silent gaps in the simulator
 
 Every one of these ran, produced numbers, and quietly did something other than

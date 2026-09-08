@@ -24,6 +24,32 @@ function rootsFor(pkg: ExamplePackage, sc: ExampleScenario) {
 const maxUtil = (perTeam: Record<string, { utilization: { mean: number } }>) =>
   Math.max(0, ...Object.values(perTeam).map((t) => t.utilization.mean));
 
+/**
+ * Assemble options built from the package the way the RUN ROUTE builds them.
+ *
+ * The people were missing. Every assemble here passed capacities only, so an
+ * example with a skills matrix was run as a counted pool and every task's
+ * requiredSkills was ignored — the suite could not have noticed skills breaking,
+ * and a scenario that added a person to a team the test thought was unnamed
+ * behaved completely differently here than in the app.
+ */
+function assembleOpts(pkg: ExamplePackage) {
+  const teamUnits: Record<string, { id: string; name: string; skills: string[] }[]> = {};
+  for (const t of pkg.teams) {
+    if (!t.members?.length) continue;
+    teamUnits[t.name] = t.members.map((m) => ({ id: m.name, name: m.name, skills: m.skills ?? [] }));
+  }
+  const calendarsById = Object.fromEntries((pkg.calendars ?? []).map((c) => [c.name, c.pattern]));
+  const teamCalendars: Record<string, (typeof calendarsById)[string]> = {};
+  for (const t of pkg.teams) if (t.calendarName && calendarsById[t.calendarName]) teamCalendars[t.name] = calendarsById[t.calendarName];
+  return {
+    teamCapacities: Object.fromEntries(pkg.teams.map((t) => [t.name, t.capacity])),
+    teamUnits,
+    teamCalendars,
+    calendarsById,
+  };
+}
+
 describe("starter examples are operational", () => {
   it("there is a non-trivial starter set with unique slugs", () => {
     expect(STARTER_EXAMPLES.length).toBeGreaterThanOrEqual(2);
@@ -46,6 +72,7 @@ describe("starter examples are operational", () => {
       "car-repair-rework-loop",
       "aardwolf-loan-comparison",
       "sales-marketing-drill-through",
+      "hire-and-onboard",
     ];
     const present = new Set(STARTER_EXAMPLES.map((e) => e.slug));
     const missing = EXPECTED.filter((slug) => !present.has(slug));
@@ -65,6 +92,7 @@ describe("starter examples are operational", () => {
       "car-repair-rework-loop": "core",
       "aardwolf-loan-comparison": "core",
       "sales-marketing-drill-through": "core",
+      "hire-and-onboard": "advanced",
     };
     for (const ex of STARTER_EXAMPLES) {
       const want = LEVELS[ex.slug];
@@ -113,11 +141,10 @@ describe("starter examples are operational", () => {
       });
 
       it("assembles each scenario's roots, and every referenced team is in the library", () => {
-        const teamCaps = Object.fromEntries(pkg.teams.map((t) => [t.name, t.capacity]));
         const libNames = new Set(pkg.teams.map((t) => t.name));
         for (const sc of pkg.scenarios) {
           const roots = rootsFor(pkg, sc);
-          const net = assemblePortfolio(roots.map((d) => ({ id: d.key, data: d.data })), { teamCapacities: teamCaps });
+          const net = assemblePortfolio(roots.map((d) => ({ id: d.key, data: d.data })), assembleOpts(pkg));
           expect(net.nodes.length, `${ex.title} / ${sc.name}`).toBeGreaterThan(0);
           // Every team a task seizes must exist in the library (no dangling refs);
           // the library may also hold teams for lanes not yet parameterized.
@@ -126,11 +153,10 @@ describe("starter examples are operational", () => {
       });
 
       it("every scenario runs and completes work", () => {
-        const teamCaps = Object.fromEntries(pkg.teams.map((t) => [t.name, t.capacity]));
         for (const sc of pkg.scenarios) {
           // Run the scenario against ITS diagrams (variant roots if pinned).
           const roots = rootsFor(pkg, sc);
-          const base = assemblePortfolio(roots.map((d) => ({ id: d.key, data: d.data })), { teamCapacities: teamCaps });
+          const base = assemblePortfolio(roots.map((d) => ({ id: d.key, data: d.data })), assembleOpts(pkg));
           const net = applyOverrides(base, (sc.overrides ?? {}) as OverrideSet);
           const { stats } = runMonteCarlo(net, sc.runConfig, sc.runConfig.interventions);
           expect(stats.completed.mean, `${ex.title} / ${sc.name}`).toBeGreaterThan(0);
@@ -140,10 +166,9 @@ describe("starter examples are operational", () => {
   }
 
   it("T0542 — as-is/to-be comparison examples show the to-be relieving the busiest team", () => {
-    const teamCaps = (pkg: ExamplePackage) => Object.fromEntries(pkg.teams.map((t) => [t.name, t.capacity]));
     const runVariant = (pkg: ExamplePackage, sc: ExampleScenario) => {
       const roots = rootsFor(pkg, sc);
-      const net = assemblePortfolio(roots.map((d) => ({ id: d.key, data: d.data })), { teamCapacities: teamCaps(pkg) });
+      const net = assemblePortfolio(roots.map((d) => ({ id: d.key, data: d.data })), assembleOpts(pkg));
       return runMonteCarlo(applyOverrides(net, (sc.overrides ?? {}) as OverrideSet), sc.runConfig);
     };
     const comparisons = STARTER_EXAMPLES.filter((e) => e.package.scenarios.some((s) => s.variantRootKeys?.length));
@@ -196,9 +221,8 @@ describe("starter examples are operational", () => {
       // (e.g. a drill-through demo) have no add-staff variant to compare.
       if (ex.package.scenarios.some((s) => s.variantRootKeys?.length)) continue;
       if (ex.package.scenarios.length < 2) continue;
-      const teamCaps = Object.fromEntries(ex.package.teams.map((t) => [t.name, t.capacity]));
       const roots = ex.package.study.rootKeys.map((k) => ex.package.diagrams.find((d) => d.key === k)!);
-      const base = assemblePortfolio(roots.map((d) => ({ id: d.key, data: d.data })), { teamCapacities: teamCaps });
+      const base = assemblePortfolio(roots.map((d) => ({ id: d.key, data: d.data })), assembleOpts(ex.package));
       const [baseline, staffed] = ex.package.scenarios;
       const rBase = runMonteCarlo(applyOverrides(base, (baseline.overrides ?? {}) as OverrideSet), baseline.runConfig);
       const rStaff = runMonteCarlo(applyOverrides(base, (staffed.overrides ?? {}) as OverrideSet), staffed.runConfig);

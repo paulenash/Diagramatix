@@ -83,7 +83,7 @@ export function assemblePortfolio(
 
   for (const d of diagrams) {
     const frag = namespaceFragment(
-      assembleFromDiagram(d.data, { teamCapacities: opts?.teamCapacities, strictTeams: opts?.strictTeams, teamCalendars: opts?.teamCalendars, calendarsById: opts?.calendarsById }),
+      assembleFromDiagram(d.data, { teamCapacities: opts?.teamCapacities, strictTeams: opts?.strictTeams, teamCalendars: opts?.teamCalendars, calendarsById: opts?.calendarsById, teamUnits: opts?.teamUnits }),
       d.id,
     );
     for (const u of frag.unknownTeams ?? []) unknown.add(u);
@@ -98,12 +98,20 @@ export function assemblePortfolio(
     }
   }
 
-  // Re-attach each team's working calendar (by team name) — the per-team pools
-  // are rebuilt here, so the calendar resolved in the fragments would be lost.
+  // Re-attach each team's working calendar AND its named people (both by team
+  // name) — the per-team pools are rebuilt here, so anything resolved in the
+  // fragments would otherwise be lost.
+  //
+  // The people were being lost. `teamUnits` was neither passed down to the
+  // fragments nor re-attached here, so every portfolio run — which is EVERY
+  // study run — assembled counted pools, and every task's requiredSkills was
+  // silently granted to anyone. Skills worked in `assembleFromDiagram`, which is
+  // what the unit tests call, and died in the wrapper the app actually uses.
   const teams: SimTeam[] = [...teamCap].map(([id, capacity]) => ({
     id,
     capacity,
     ...(opts?.teamCalendars?.[id] ? { calendar: opts.teamCalendars[id] } : {}),
+    ...(opts?.teamUnits?.[id]?.length ? { units: opts.teamUnits[id] } : {}),
   }));
   // Carry every undeclared resource up from the fragments, so a portfolio run
   // can report them exactly as a single-diagram run does — a name that is not in

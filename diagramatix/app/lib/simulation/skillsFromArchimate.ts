@@ -30,7 +30,8 @@
  * Pure — no DB, no React, safe for a client component.
  */
 
-import type { DiagramData } from "@/app/lib/diagram/types";
+import type { DiagramData, DiagramElement } from "@/app/lib/diagram/types";
+import { ARCHI_SHAPE } from "@/app/lib/diagram/genericLayout";
 
 /** Business-layer behaviour a Role can be assigned to — i.e. "the work". */
 const WORK_TYPES = new Set([
@@ -41,6 +42,32 @@ const ACTOR_TYPES = new Set(["business-actor"]);
 const ROLE_TYPES = new Set(["business-role"]);
 /** Role → Role, meaning "this role is made up of those". */
 const BUNDLE_TYPES = new Set(["archi-aggregation", "archi-composition"]);
+
+/**
+ * The ArchiMate concept an element actually is.
+ *
+ * A diagram drawn in the editor stores EVERY ArchiMate element under the single
+ * type "archimate-shape", with the concept in `properties.shapeKey`
+ * ("business-business-actor-box"). Matching on `el.type` therefore matched
+ * nothing on a real diagram: this reader worked only against synthetic fixtures,
+ * and a fill from an actual operating model returned zero actors and zero skills
+ * while reporting — correctly, and uselessly — that nothing had matched.
+ *
+ * The map is inverted from ARCHI_SHAPE so the two cannot drift, and the
+ * -box/-icon suffix is dropped because one concept has both forms (a Business
+ * Role is drawn icon-first, an Actor box-first, and either can be switched). A
+ * bare concept type is still accepted, for models that carry one.
+ */
+const SHAPE_KEY_TO_TYPE: Map<string, string> = new Map(
+  Object.entries(ARCHI_SHAPE).map(([type, def]) => [def.key.replace(/-(box|icon)$/, ""), type]),
+);
+
+export function archimateTypeOf(el: Pick<DiagramElement, "type" | "properties">): string {
+  if (el.type !== "archimate-shape") return el.type;
+  const key = (el.properties as { shapeKey?: unknown } | undefined)?.shapeKey;
+  if (typeof key !== "string") return el.type;
+  return SHAPE_KEY_TO_TYPE.get(key.replace(/-(box|icon)$/, "")) ?? el.type;
+}
 
 /** Labels are matched the way every other cross-model link in the product
  *  matches them: trimmed, internal whitespace collapsed, case-insensitive. */
@@ -111,7 +138,7 @@ export function skillsFromArchimate(data: DiagramData): SkillsModel {
   const labelOf = new Map<string, string>();
   for (const el of elements) labelOf.set(el.id, (el.label ?? "").replace(/\s+/g, " ").trim());
 
-  const typeOf = new Map(elements.map((e) => [e.id, e.type as string]));
+  const typeOf = new Map(elements.map((e) => [e.id, archimateTypeOf(e)]));
   const isActor = (id: string) => ACTOR_TYPES.has(typeOf.get(id) ?? "");
   const isRole = (id: string) => ROLE_TYPES.has(typeOf.get(id) ?? "");
   const isWork = (id: string) => WORK_TYPES.has(typeOf.get(id) ?? "");
