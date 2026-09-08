@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-09-07  ·  **Document version:** 7.0  ·  **Suite:** 419 test files · 2,881 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T3562  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-09-07  ·  **Document version:** 7.0  ·  **Suite:** 420 test files · 2,907 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T3588  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
@@ -34,9 +34,9 @@ Each test file has its own section below, grouped into layers. Within each secti
 | **Protects you against** | In plain terms, the real-world problem that would occur if this behaviour regressed. |
 | **How it would break (go red)** | The kind of code or data change that would make this specific test fail — i.e. what the test is watching. |
 
-**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T3563**, the one after **T3564**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
+**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T3589**, the one after **T3590**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T3562`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
+> **Highest ref allocated: `T3588`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -2669,6 +2669,32 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 | T3560 | `tests/simulation/sensitivity.test.ts` | And the reachability check can fail - a path with no handler is reported missing. |
 | T3561 | `tests/simulation/exampleSeeds.test.ts` | Each catalog example carries its intended level (a teaching judgement nothing in the data can derive). |
 | T3562 | `tests/simulation/exampleSeeds.test.ts` | Every level is one the gallery and the admin routes accept - a typo writes straight through to the catalog. |
+| T3563 | `tests/simulation/gap-fixes.test.ts` | Training one person changes only that person - the rest of the team survives the merge. |
+| T3564 | `tests/simulation/gap-fixes.test.ts` | The baseline network is not touched, so sibling scenarios cannot corrupt each other. |
+| T3565 | `tests/simulation/gap-fixes.test.ts` | A name the team does not have is ADDED, which is how 'hire two more' is expressed. |
+| T3566 | `tests/simulation/gap-fixes.test.ts` | Member names match case- and whitespace-insensitively, so a typo retrains rather than clones. |
+| T3567 | `tests/simulation/gap-fixes.test.ts` | Capacity alone adds nobody: a desk is not a person. |
+| T3568 | `tests/simulation/gap-fixes.test.ts` | A task's requiredSkills is overridable, and an empty array means 'needs nothing'. |
+| T3569 | `tests/simulation/gap-fixes.test.ts` | REGRESSION: an override set declaring none of this changes nothing. |
+| T3570 | `tests/simulation/gap-fixes.test.ts` | A 20-parameter model gets all 41 of its tornado runs. |
+| T3571 | `tests/simulation/gap-fixes.test.ts` | Which the sweep cap would have cut to 24, dropping nine parameters. |
+| T3572 | `tests/simulation/gap-fixes.test.ts` | maxWork still binds, and replications give before parameters do. |
+| T3573 | `tests/simulation/gap-fixes.test.ts` | A pathological parameter count is still bounded. |
+| T3574 | `tests/simulation/gap-fixes.test.ts` | A package carrying named people and business-case inputs is valid. |
+| T3575 | `tests/simulation/gap-fixes.test.ts` | A team naming fewer people than its capacity is reported - the spare capacity is unreachable. |
+| T3576 | `tests/simulation/gap-fixes.test.ts` | A duplicated or nameless person in a package team is reported. |
+| T3577 | `tests/simulation/gap-fixes.test.ts` | REGRESSION: a package with no members and no inputs is still valid. |
+| T3578 | `tests/simulation/gap-fixes.test.ts` | An ArchiMate companion diagram alongside a BPMN root is valid. |
+| T3579 | `tests/simulation/gap-fixes.test.ts` | A companion key naming no diagram is reported. |
+| T3580 | `tests/simulation/gap-fixes.test.ts` | A diagram cannot be both a study root and a companion. |
+| T3581 | `tests/simulation/gap-fixes.test.ts` | A skill required from a team that names nobody is an error, not a silent no-op. |
+| T3582 | `tests/simulation/gap-fixes.test.ts` | A skill nobody on the team holds is reported as work that can never start. |
+| T3583 | `tests/simulation/gap-fixes.test.ts` | A requirement somebody actually holds is silent. |
+| T3584 | `tests/simulation/gap-fixes.test.ts` | REGRESSION: a task with no skill requirement is unaffected by a memberless team. |
+| T3585 | `tests/simulation/gap-fixes.test.ts` | A batch size and cut-off written on a task reach the engine's node. |
+| T3586 | `tests/simulation/gap-fixes.test.ts` | Either batching rule alone is enough. |
+| T3587 | `tests/simulation/gap-fixes.test.ts` | A batch of one, or a malformed cut-off, is not a batch. |
+| T3588 | `tests/simulation/gap-fixes.test.ts` | REGRESSION: a task that says nothing about batching gets no batch. |
 
 > **Keep this section in sync.** Whenever an e2e spec is added, removed, or changes what it asserts, update this section. It is hand-maintained, not generated.
 

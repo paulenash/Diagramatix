@@ -3,9 +3,14 @@
  * the answer moves.
  *
  * A tornado is N one-step sweeps, so this reuses Phase 4's machinery wholesale —
- * the same assembled baseline, the same overrides, the same work clamp. It runs
- * 2N+1 Monte-Carlos (a baseline plus a low and a high per parameter), which is
- * why the clamp counts them all rather than treating it as one run.
+ * the same assembled baseline, the same overrides, the same runner. It runs 2N+1
+ * Monte-Carlos (a baseline plus a low and a high per parameter), which is why the
+ * clamp counts them all rather than treating it as one run.
+ *
+ * The clamp is clampSensitivity, NOT clampSweep. A sweep's size is a user choice
+ * and 24 points is plenty; a tornado's is 2N+1, set by the model, and an ordinary
+ * 20-parameter process needs 41. Sharing the sweep cap silently dropped nine of
+ * them while using barely 70% of the real work budget.
  *
  * Parameters that make NO difference are returned with the rest, never filtered
  * away: that half of the chart is the answer to "but you guessed that number".
@@ -21,7 +26,7 @@ import type { DiagramData } from "@/app/lib/diagram/types";
 import { assemblePortfolio } from "@/app/lib/simulation/network";
 import { spliceLinkedSubprocesses } from "@/app/lib/simulation/spliceLinks";
 import { applyOverrides, type OverrideSet } from "@/app/lib/simulation/overrides";
-import { runMonteCarlo, clampSweep } from "@/app/lib/simulation/runner";
+import { runMonteCarlo, clampSensitivity } from "@/app/lib/simulation/runner";
 import {
   enumerateParameters, variationsFor, overrideForParam, buildTornado,
   DEFAULT_VARIATION, type SensitivityRun,
@@ -106,7 +111,7 @@ export async function POST(req: Request, { params }: Params) {
   const testable = parameters.map((p) => ({ p, v: variationsFor(p, variationPct) }));
   const points = 1 + testable.filter((t) => t.v).length * 2;
   const rawCfg: ScenarioRunConfig = { ...DEFAULT_RUN_CONFIG, ...((scenario.runConfig ?? {}) as unknown as ScenarioRunConfig) };
-  const { cfg: clampedCfg, steps: allowed, clamped } = clampSweep(rawCfg, points);
+  const { cfg: clampedCfg, steps: allowed, clamped } = clampSensitivity(rawCfg, points);
   const cfg: ScenarioRunConfig = { ...rawCfg, ...clampedCfg };
 
   // If the clamp cut the budget below what a full tornado needs, test the

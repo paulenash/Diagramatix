@@ -286,6 +286,19 @@ export function assembleFromDiagram(
       // Skills whoever takes this task must hold. Only carried when there ARE any:
       // an empty array would look like a constraint while constraining nothing.
       if (sim.requiredSkills?.length) node.requiredSkills = [...sim.requiredSkills];
+      // Batching. Carried only when a rule is actually set: an empty object
+      // would send every case down the batch path to be released alone, which
+      // is the same answer by a slower and much less obvious route. A size of 1
+      // is not a batch either, and a malformed cut-off is ignored rather than
+      // being passed to the engine to mean something unintended.
+      const batchSize = typeof sim.batch?.size === "number" && sim.batch.size > 1 ? Math.floor(sim.batch.size) : undefined;
+      const batchCutoff = typeof sim.batch?.cutoff === "string" && /^\d{1,2}:\d{2}$/.test(sim.batch.cutoff) ? sim.batch.cutoff : undefined;
+      if (batchSize !== undefined || batchCutoff !== undefined) {
+        node.batch = {
+          ...(batchSize !== undefined ? { size: batchSize } : {}),
+          ...(batchCutoff !== undefined ? { cutoff: batchCutoff } : {}),
+        };
+      }
       if (teamId) teamIds.add(teamId);
       // A repeat / multi-instance marker on a TASK means the work is performed
       // more than once. This used to be read only for sub-processes, so the

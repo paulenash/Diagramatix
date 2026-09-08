@@ -64,7 +64,7 @@ export async function adoptLibraryInto(
       where: { projectId, name: t.name }, select: { id: true },
     });
     if (existing) continue;
-    await tx.simulationTeam.create({
+    const createdTeam = await tx.simulationTeam.create({
       data: {
         name: t.name, projectId,
         capacity: Math.max(1, Math.round(t.capacity ?? 1)),
@@ -72,7 +72,18 @@ export async function adoptLibraryInto(
         efficiency: t.efficiency && t.efficiency > 0 ? t.efficiency : 1,
         calendarId: t.calendarName ? calendarNameToId.get(t.calendarName) ?? null : null,
       },
+      select: { id: true },
     });
+    // Named people + where the matrix came from. Prisma 7 omits JSON fields from
+    // model inputs, so these go in by raw SQL like every other JSON write.
+    if (t.members?.length || (t.skillsSource && Object.keys(t.skillsSource).length)) {
+      await tx.$executeRawUnsafe(
+        'UPDATE "SimulationTeam" SET members = $1::jsonb, "skillsSource" = $2::jsonb WHERE id = $3',
+        JSON.stringify(t.members ?? []),
+        JSON.stringify(t.skillsSource ?? {}),
+        createdTeam.id,
+      );
+    }
   }
   return { nameToId: calendarNameToId, resolve: calendarResolver(calendarNameToId, oldIdToNewId) };
 }
@@ -146,8 +157,31 @@ export async function adoptPackageInto(
 
   const { resolve } = await adoptLibraryInto(tx, pkg, projectId);
 
+  // A team's skillsSource names the diagram its matrix was filled from, as a
+  // package KEY. Left alone it would point at a diagram id in the project this
+  // package was captured FROM — a dangling reference that reads as provenance,
+  // which is worse than no provenance at all. Re-point it at the new copy.
+  for (const t of pkg.teams) {
+    const key = (t.skillsSource as { diagramId?: unknown } | undefined)?.diagramId;
+    const newId = typeof key === "string" ? keyToDiagramId.get(key) : undefined;
+    if (!newId) continue;
+    await tx.$executeRawUnsafe(
+      'UPDATE "SimulationTeam" SET "skillsSource" = jsonb_set("skillsSource", \'{diagramId}\', to_jsonb($1::text)) WHERE "projectId" = $2 AND name = $3',
+      newId, projectId, t.name,
+    );
+  }
+
   // Study + roots (remap package keys → new diagram ids).
   const study = await tx.simulationStudy.create({ data: { name: pkg.study.name, projectId, createdById: userId } });
+  // Business-case inputs live on the study, and are what turn a comparison into
+  // a payback month.
+  if (pkg.study.businessCase && Object.keys(pkg.study.businessCase).length) {
+    await tx.$executeRawUnsafe(
+      'UPDATE "SimulationStudy" SET "businessCase" = $1::jsonb WHERE id = $2',
+      JSON.stringify(pkg.study.businessCase),
+      study.id,
+    );
+  }
   for (const rk of pkg.study.rootKeys) {
     const diagramId = keyToDiagramId.get(rk);
     if (diagramId) await tx.simulationStudyRoot.create({ data: { studyId: study.id, diagramId } });

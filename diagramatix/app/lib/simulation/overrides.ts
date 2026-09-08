@@ -13,7 +13,7 @@
 
 import type { SimNetwork, SimNode, SimEdge, SimTeam } from "./model";
 import type { SimDist } from "./types";
-import type { QueueDiscipline } from "./resourcePool";
+import type { PoolUnit, QueueDiscipline } from "./resourcePool";
 
 /** The overridable subset of a node's simulation params. Every field optional
  *  + sparse: only defined keys replace the baseline value. */
@@ -26,12 +26,43 @@ export interface NodeOverride {
   arrival?: SimDist;
   maxArrivals?: number;
   delay?: SimDist;
+  /** "What if this step no longer needed the specialist?" — the other half of
+   *  the cross-training question. An EMPTY array means "requires nothing", which
+   *  is different from absent ("leave the baseline alone"), so both are usable. */
+  requiredSkills?: string[];
+}
+
+/** One person, as a scenario states them. */
+export interface TeamMemberOverride {
+  name: string;
+  /** What this person can do IN THIS SCENARIO. Replaces their library skills
+   *  outright — a scenario says what is true, it does not accumulate. */
+  skills: string[];
 }
 
 export interface TeamOverride {
   capacity?: number;
   /** "What if we triaged?" is a scenario, not a rebuild of the model. */
   discipline?: QueueDiscipline;
+  /**
+   * Cross-training and new starters — "what if we trained someone?", which is
+   * the only question anyone asks once they have a skills matrix, and which was
+   * unaskable before this existed.
+   *
+   * MERGED BY NAME, never a whole-list replacement: naming one person must not
+   * silently delete the rest of the team. A name the team already has has its
+   * skills replaced; a name it does not have is ADDED as a new person, which is
+   * how "hire two more administrators" is expressed.
+   *
+   * Names match the way every other cross-model link in the product matches
+   * them — trimmed, whitespace-collapsed, case-insensitive — so a stray capital
+   * retrains the person you meant rather than inventing a phantom twin. The
+   * SPELLING kept is the library's, so the roster does not change appearance.
+   *
+   * Note this can turn a counted pool into a skilled one. That is intended: it
+   * is the only way to ask the question of a team that has never named anybody.
+   */
+  members?: TeamMemberOverride[];
 }
 
 export interface EdgeOverride {
@@ -49,6 +80,9 @@ export interface OverrideSet {
 
 const NODE_KEYS: (keyof NodeOverride)[] = [
   "cycleTime", "setupTime", "waitTime", "teamId", "units", "arrival", "maxArrivals", "delay",
+  // Listed here and nowhere else: being a NODE_KEY is also what puts a lever in
+  // the sweep and the tornado, so a parameter added here is testable for free.
+  "requiredSkills",
 ];
 
 /** True if the override set carries no actual changes. */
@@ -73,6 +107,38 @@ function cloneNetwork(net: SimNetwork): SimNetwork {
     teams: net.teams.map((t) => ({ ...t })),
     properties: net.properties ? net.properties.map((p) => ({ ...p })) : undefined,
   };
+}
+
+/** The same normalisation every cross-model name match in the product uses. */
+const normaliseName = (s: string): string => s.replace(/\s+/g, " ").trim().toLowerCase();
+
+/**
+ * Merge a scenario's people over the library's, BY NAME.
+ *
+ * Builds an entirely new array of new objects rather than editing in place:
+ * `cloneNetwork` shallow-copies each team, so the baseline's `units` array and
+ * the unit objects inside it are SHARED with every scenario. Mutating one here
+ * would rewrite the baseline and every other scenario derived from it — a
+ * cross-scenario corruption that would look like a random engine bug.
+ */
+function mergeMembers(base: PoolUnit[] | undefined, patch: TeamMemberOverride[]): PoolUnit[] {
+  const out: PoolUnit[] = (base ?? []).map((u) => ({ ...u, skills: [...u.skills] }));
+  const byName = new Map(out.map((u, i) => [normaliseName(u.name ?? u.id), i]));
+  for (const m of patch) {
+    if (!m || typeof m.name !== "string" || !m.name.trim()) continue;
+    const skills = Array.isArray(m.skills) ? m.skills.filter((x) => typeof x === "string") : [];
+    const at = byName.get(normaliseName(m.name));
+    if (at !== undefined) {
+      // Keep the library's spelling of the name and its id; only what the
+      // person can do is what the scenario is changing.
+      out[at] = { ...out[at], skills };
+    } else {
+      const name = m.name.trim();
+      out.push({ id: name, name, skills });
+      byName.set(normaliseName(name), out.length - 1);
+    }
+  }
+  return out;
 }
 
 /** Apply a sparse override set over a baseline network, returning a new
@@ -114,8 +180,11 @@ export function applyOverrides(baseline: SimNetwork, ov?: OverrideSet): SimNetwo
       if (team) {
         if (patch.capacity !== undefined) team.capacity = patch.capacity;
         if (patch.discipline !== undefined) team.discipline = patch.discipline;
-      } else if (patch.capacity !== undefined) {
-        const created: SimTeam = { id, capacity: patch.capacity };
+        if (patch.members?.length) team.units = mergeMembers(team.units, patch.members);
+      } else if (patch.capacity !== undefined || patch.members?.length) {
+        const created: SimTeam = { id, capacity: patch.capacity ?? 1 };
+        if (patch.discipline !== undefined) created.discipline = patch.discipline;
+        if (patch.members?.length) created.units = mergeMembers(undefined, patch.members);
         net.teams.push(created);
         byId.set(id, created);
       }

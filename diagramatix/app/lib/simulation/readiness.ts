@@ -18,7 +18,12 @@ export interface ReadinessIssue {
   elementLabel?: string;
 }
 
-interface TeamLite { name: string; capacity: number }
+interface TeamLite {
+  name: string;
+  capacity: number;
+  /** Named people, when the team declares any. Absent/empty = a counted pool. */
+  members?: { name?: string; skills?: string[] }[];
+}
 
 const nameOf = (e?: DiagramElement) => (e?.label?.trim().replace(/\s+/g, " ")) || e?.id || "(unnamed)";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -103,6 +108,29 @@ export function checkSimReadiness(diagrams: DiagramData[], teams: TeamLite[]): R
       } else if (!teamByName.has(tid)) {
         issues.push({ severity: "error", elementId: el.id, elementLabel: nameOf(el),
           message: `Task "${nameOf(el)}" uses team "${tid}", which isn't in the team library — add it and set a capacity.` });
+      } else {
+        // A skill requirement on a team that names NOBODY is silently granted to
+        // anyone: ResourcePool short-circuits on `if (!this.skilled)`, which is
+        // the right call for backwards compatibility (a model that predates
+        // skills must run exactly as it did) and the wrong one for authoring —
+        // the restriction is in the diagram, the run ignores it, and nothing
+        // says so. Reported as an ERROR because the numbers are wrong in the
+        // flattering direction: no queue where there should be one.
+        const need = (sim(el).requiredSkills as string[] | undefined) ?? [];
+        const team = teamByName.get(tid)!;
+        const people = (team.members ?? []).filter((m) => m?.name?.trim());
+        if (need.length > 0 && people.length === 0) {
+          issues.push({ severity: "error", elementId: el.id, elementLabel: nameOf(el),
+            message: `Task "${nameOf(el)}" requires ${need.map((s) => `"${s}"`).join(" + ")}, but team "${tid}" names no people — the requirement is IGNORED and anyone on the team can take it. Name the team's members, or clear the requirement.` });
+        } else if (need.length > 0) {
+          // Named people, but nobody who qualifies: the opposite failure, and a
+          // deadlock rather than a silent no-op — the work waits forever.
+          const holders = people.filter((m) => need.every((sk) => (m.skills ?? []).includes(sk)));
+          if (holders.length === 0) {
+            issues.push({ severity: "error", elementId: el.id, elementLabel: nameOf(el),
+              message: `Task "${nameOf(el)}" requires ${need.map((s) => `"${s}"`).join(" + ")}, but nobody on team "${tid}" holds ${need.length > 1 ? "all of those" : "it"} — this work can never start.` });
+          }
+        }
       }
     }
 

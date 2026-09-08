@@ -62,7 +62,7 @@ describe("validateExamplePackage", () => {
   });
 
   it("emptyPackage is structurally sound except for the no-diagram rule", () => {
-    expect(summarizePackage(emptyPackage())).toEqual({ diagrams: 0, teams: 0, scenarios: 0, roots: 0 });
-    expect(summarizePackage({})).toEqual({ diagrams: 0, teams: 0, scenarios: 0, roots: 0 });
+    expect(summarizePackage(emptyPackage())).toEqual({ diagrams: 0, teams: 0, scenarios: 0, roots: 0, companions: 0 });
+    expect(summarizePackage({})).toEqual({ diagrams: 0, teams: 0, scenarios: 0, roots: 0, companions: 0 });
   });
 });

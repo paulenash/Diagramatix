@@ -15,6 +15,63 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.8.2506 — 2026-09-08 — Seven silent gaps in the simulator
+
+Every one of these ran, produced numbers, and quietly did something other than
+what the model said. None of them crashed; that is exactly why they lasted.
+
+- **"What if we trained someone?" is now askable.** Phase 7 shipped the skills
+  model but not the lever: a scenario could change a team's headcount and its
+  queue discipline, and nothing else. So the one question anybody asks once they
+  have a skills matrix — *should we cross-train a second person, or hire?* — could
+  not be put to the simulator at all. A scenario can now say who can do what, and
+  a task can have its skill requirement relaxed.
+- **Merged by name, never wholesale.** Naming one person must not silently delete
+  the rest of the team, so the merge replaces that person and leaves everyone
+  else alone. A name the team does not have is ADDED, which is how "hire two more
+  administrators" is expressed. Names match the way every other cross-model link
+  in the product matches them, so a stray capital retrains the person you meant
+  rather than inventing a phantom twin.
+- **A desk is still not a person.** Raising capacity without naming anyone adds
+  nobody — the model will not pretend otherwise.
+- **The tornado stopped throwing away parameters.** It was sharing the sweep's
+  24-point cap, which was sized for a curve, where more points buy nothing. A
+  tornado's size is set by the MODEL, not the user: an ordinary 20-parameter
+  process needs 41 runs, so nine of its parameters were being dropped while
+  barely 70% of the real work budget was in use. Sensitivity now has its own
+  limit, and gives up replications before it gives up parameters — a wider band
+  is reported honestly, a shorter chart is not.
+- **A skills matrix now survives being shared.** Team members were not captured
+  into an example package, so a cross-skilled example adopted as a plain counted
+  pool: every task's skill requirement still in the diagram, every one of them
+  ignored, and the example running perfectly while teaching the opposite of what
+  it claimed.
+- **So do business-case inputs, and the diagram the skills were read from.**
+  Implementation cost and volume live on the study and were dropped, taking the
+  payback month with them. And only diagrams the study RAN were captured, so the
+  ArchiMate operating model a matrix came from could never travel — the
+  provenance survived, pointing at a diagram that did not. Companions are now
+  found by following that stored reference, and re-pointed at the new copy on
+  adopt.
+- **A skill requirement that does nothing now says so.** Required skills on a
+  team that names nobody are granted to anyone — correct for compatibility, since
+  a model written before skills existed must run as it did, but silent. Two
+  errors now: the requirement is being ignored, or nobody holds it and the work
+  can never start. Both report numbers wrong in the flattering direction, which
+  is the worse kind.
+- **Batching became reachable.** The engine has honoured batch sizes and cut-off
+  times since Phase 5, with tests — but nothing could ever write one. There was
+  no parameter and no mapping, so "posted at 4pm" and "in batches of 50", which
+  is most of what back-office queueing actually is, could not be put on a diagram.
+  A batch of one is still not a batch.
+- Every fix is inert when unset, asserted directly rather than assumed: seven
+  regression tests prove a model that declares none of this behaves exactly as it
+  did.
+- Schema: unchanged. Product stays 2.8, XSD stays 46 — no new columns, and the
+  new parameters ride in element sim params like every other simulation field.
+
+---
+
 ## 2.8.2503 — 2026-09-08 — Which assumption is load-bearing?
 
 - **A model has thirty numbers in it and most of them do not matter.** The tornado pushes

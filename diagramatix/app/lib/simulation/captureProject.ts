@@ -15,6 +15,7 @@ import {
   type ExampleScenario,
 } from "./examplePackage";
 import type { ScenarioRunConfig, WorkCalendar } from "./types";
+import type { BusinessCaseInputs } from "./facts/businessCase";
 import type { OverrideSet } from "./overrides";
 import { calendarRefsToNames } from "./calendarRefs";
 
@@ -30,7 +31,7 @@ export interface CaptureResult { pkg: ExamplePackage; studyName: string }
 export async function captureProjectLibrary(projectId: string): Promise<ExampleLibrary> {
   const teamRows = await prisma.simulationTeam.findMany({
     where: { projectId },
-    select: { name: true, capacity: true, costPerHour: true, efficiency: true, calendarId: true },
+    select: { name: true, capacity: true, costPerHour: true, efficiency: true, calendarId: true, members: true, skillsSource: true },
   });
   const calendarRows = await prisma.simulationCalendar.findMany({
     where: { projectId },
@@ -42,10 +43,23 @@ export async function captureProjectLibrary(projectId: string): Promise<ExampleL
     pattern: (c.pattern ?? { intervals: [] }) as unknown as WorkCalendar,
     id: c.id,
   }));
-  const teams = teamRows.map((t) => ({
-    name: t.name, capacity: t.capacity, costPerHour: t.costPerHour, efficiency: t.efficiency,
-    ...(t.calendarId && calendarIdToName.has(t.calendarId) ? { calendarName: calendarIdToName.get(t.calendarId) } : {}),
-  }));
+  const teams = teamRows.map((t) => {
+    // Named people, when the team declares any. Omitted entirely when it does
+    // not, so a counted-pool team captures byte-for-byte as it always did.
+    const members = (Array.isArray(t.members) ? (t.members as unknown as { name?: string; skills?: unknown }[]) : [])
+      .filter((m) => typeof m?.name === "string" && m.name.trim())
+      .map((m) => ({
+        name: m.name!.trim(),
+        skills: Array.isArray(m.skills) ? (m.skills as unknown[]).filter((x): x is string => typeof x === "string") : [],
+      }));
+    const source = (t.skillsSource ?? {}) as Record<string, unknown>;
+    return {
+      name: t.name, capacity: t.capacity, costPerHour: t.costPerHour, efficiency: t.efficiency,
+      ...(t.calendarId && calendarIdToName.has(t.calendarId) ? { calendarName: calendarIdToName.get(t.calendarId) } : {}),
+      ...(members.length ? { members } : {}),
+      ...(Object.keys(source).length ? { skillsSource: source } : {}),
+    };
+  });
   return { teams, ...(calendars.length ? { calendars } : {}) };
 }
 
@@ -79,11 +93,24 @@ export async function captureProjectPackage(projectId: string, studyId: string):
   // Root diagrams + any scenario-pinned variant diagrams (id = package key).
   const rootIds = study.roots.map((r) => r.diagramId);
   const variantIds = study.scenarios.flatMap((s) => variantIdsOf(s.variantRootIds));
-  const captureIds = Array.from(new Set([...rootIds, ...variantIds]));
+  // Companions: the diagrams a team's skills were FILLED FROM. This is a real
+  // stored reference (skillsSource.diagramId), not a guess about what looks
+  // related, so the package carries exactly the ArchiMate model the matrix came
+  // from and nothing else.
+  const companionIds = Array.from(new Set(
+    (await prisma.simulationTeam.findMany({ where: { projectId }, select: { skillsSource: true } }))
+      .map((t) => (t.skillsSource as { diagramId?: unknown } | null)?.diagramId)
+      .filter((x): x is string => typeof x === "string" && !!x),
+  )).filter((id) => !rootIds.includes(id) && !variantIds.includes(id));
+  const captureIds = Array.from(new Set([...rootIds, ...variantIds, ...companionIds]));
   const diagramRows = await prisma.diagram.findMany({ where: { id: { in: captureIds } }, select: { id: true, name: true, type: true, data: true } });
   const capturedKeys = new Set(diagramRows.map((d) => d.id));
 
   const { teams, calendars } = await captureProjectLibrary(projectId);
+  // Business-case inputs live on the STUDY. Without them an adopted comparison
+  // example cannot produce a payback month, which is the one figure it exists
+  // to show.
+  const businessCase = (study.businessCase ?? {}) as unknown as BusinessCaseInputs;
 
   // A source's operating-hours calendar is stored as a bare project-scoped id,
   // which means nothing once this package lands somewhere else. Rewrite those
@@ -94,6 +121,10 @@ export async function captureProjectPackage(projectId: string, studyId: string):
     key: d.id, name: d.name, type: d.type || "bpmn",
     data: calendarRefsToNames((d.data ?? { elements: [], connectors: [] }) as unknown as DiagramData, idToName),
   }));
+
+  // A referenced companion whose diagram has since been deleted simply is not
+  // carried; the matrix it produced is still valid and still travels.
+  const presentCompanions = companionIds.filter((id) => capturedKeys.has(id));
 
   const scenarios: ExampleScenario[] = study.scenarios.map((s) => {
     const variantRootKeys = variantIdsOf(s.variantRootIds).filter((k) => capturedKeys.has(k));
@@ -111,7 +142,14 @@ export async function captureProjectPackage(projectId: string, studyId: string):
     teams,
     ...(calendars?.length ? { calendars } : {}),
     diagrams,
-    study: { name: study.name, rootKeys: rootIds },
+    ...(presentCompanions.length ? { companionKeys: presentCompanions } : {}),
+    study: {
+      name: study.name,
+      rootKeys: rootIds,
+      // Only when the study actually has inputs — an empty object would claim a
+      // business case had been configured when none had.
+      ...(Object.keys(businessCase).length ? { businessCase } : {}),
+    },
     scenarios,
   };
   const errs = validateExamplePackage(pkg);

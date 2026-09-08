@@ -4,7 +4,7 @@
 |---|---|
 | **Created** | 2026-09-08 |
 | **Revised** | 2026-09-08 — sizing arithmetic done; **the first draft's numbers did not work** (see §1.1) |
-| **Status** | `Planned` — nothing built yet |
+| **Status** | `Gaps closed 2026-09-08` — **all seven fixed and tested (T3563–T3588)**; the example itself is not built yet |
 | **Slug** | `hire-and-onboard` |
 | **Level** | `advanced` — the only one, after the 2026-09-08 re-levelling |
 | **Purpose** | The capstone example **and an end-to-end acceptance test**: one process that exercises calendars, holidays, named people, skills read from ArchiMate, priority queueing, the sweep, the tornado and the business case — with the figures each step must produce known in advance |
@@ -70,25 +70,27 @@ assert on queue wait and on the p95, never on the mean flow time.
 
 ---
 
-## 2. What must be built first — seven gaps
+## 2. What had to be built first — seven gaps, all now CLOSED
 
-None of these is a defect in this plan; all seven were found while checking whether the example
-could be authored and asserted at all. **Five block it.**
+None of these was a defect in this plan; all seven were found while checking whether the example
+could be authored and asserted at all, and five of them blocked it. **All seven are now fixed**
+(2026-09-08), each with a regression test proving the old behaviour is untouched when the new field
+is absent.
 
-| # | Gap | What actually happens today | Where | Blocks? |
+| # | Gap | What it used to do | Fix | Tests |
 |---|---|---|---|---|
-| **A** | Skills do not survive a package | `captureProjectLibrary` selects five columns; `members` is not one. Adopt recreates a plain counted pool — **silently** | `captureProject.ts:31`, `adoptPackage.ts:60` | **YES** |
-| **B** | Only study-root diagrams are captured | `captureIds = rootIds + variantIds`. An ArchiMate companion is neither | `captureProject.ts:87` | **YES** |
-| **C** | Business-case inputs do not travel | `ExamplePackage.study` is `{ name, rootKeys }`; the inputs live on `SimulationStudy.businessCase` | `examplePackage.ts:68` | **YES** |
-| **E** | **No scenario lever for cross-training** | `TeamOverride` is `{ capacity, discipline }`. "What if we trained someone?" is unaskable | `overrides.ts:31` | **YES** |
-| **G** | **`maxSweepSteps` is the wrong guard for a tornado** | A tornado is `2N+1` runs. This model has **20 parameters → 41 runs**, capped at **11 parameters**, so **9 are dropped**. `maxWork` is nowhere near binding (3.59M of 5M) | `runner.ts:33` | **YES** for the tornado step |
-| **D** | Batching is unreachable from a diagram | `SimNode.batch` is honoured and tested (T3486–T3488) but there is no `ElementSimParams.batch` and no `assemble.ts` mapping | `model.ts:107` | no — out of scope |
-| **F** | A skill required from a memberless team silently does nothing | `request()` short-circuits on `if (!this.skilled)` | `resourcePool.ts:182` | no — but see §4.4 |
+| **A** | Skills did not survive a package | Capture selected five columns; `members` was not one, so an adopted cross-skilled example became a plain counted pool — **silently** | `ExampleTeam.members` + `skillsSource`, carried through capture and adopt | T3574–T3577 |
+| **B** | Only study-root diagrams were captured | An ArchiMate companion was neither a root nor a variant, so it could never travel | `companionKeys`, captured by following the `skillsSource.diagramId` reference that already existed; adopt re-points it at the new copy | T3578–T3580 |
+| **C** | Business-case inputs did not travel | They live on the STUDY, and the package's study was `{ name, rootKeys }` | `study.businessCase` in the package | T3574, T3577 |
+| **E** | **No scenario lever for cross-training** | `TeamOverride` was `{ capacity, discipline }`, so "what if we trained someone?" — the only question anyone asks once they have a skills matrix — was unaskable | `TeamOverride.members` (merge BY NAME) + `NodeOverride.requiredSkills` + `NODE_KEYS` | T3563–T3569 |
+| **G** | **`maxSweepSteps` was the wrong guard for a tornado** | 20 parameters → 41 runs, capped at 11, so **9 were dropped** while using barely 70% of `maxWork` | `RUN_LIMITS.maxSensitivityRuns` (121) + `clampSensitivity`, which gives up replications before parameters | T3570–T3573 |
+| **D** | Batching was unreachable from a diagram | The engine honoured `SimNode.batch` and had tests for it, but nothing ever WROTE it — no parameter, no mapping | `ElementSimParams.batch` + the `assemble.ts` mapping. A size of 1 or a malformed cut-off is not a batch | T3585–T3588 |
+| **F** | A skill required from a memberless team silently did nothing | `request()` short-circuits on `if (!this.skilled)` — right for the engine, wrong for authoring | Two readiness ERRORS: the requirement is ignored, or nobody holds it and the work can never start | T3581–T3584 |
 
-### Gap E — the important one
+### Gap E — the important one *(shipped)*
 
 Phase 7 shipped the skills *model* but not the *lever*. A matrix that cannot be varied in a scenario
-is documentation, not a decision tool.
+is documentation, not a decision tool. As built:
 
 ```ts
 export interface TeamOverride {
@@ -107,7 +109,21 @@ export interface NodeOverride {
 }
 ```
 
-`requiredSkills` must go into `NODE_KEYS`, which puts it in the sweep and the tornado for free.
+`requiredSkills` goes into `NODE_KEYS`, which puts it in the sweep and the tornado for free.
+
+**Merge semantics, decided:** by name, normalised the way every cross-model link in the product
+normalises (trimmed, collapsed, case-insensitive), keeping the library's spelling. A name the team
+already has has its skills replaced; a name it does not have is **added**, which is how *"hire two
+more administrators"* is expressed. The earlier worry — "report, never invent a person" — is
+answered by the normalisation rather than by a rejection: a stray capital retrains the person you
+meant instead of creating a phantom twin, and a genuinely different name is a deliberate hire.
+`applyOverrides` is pure and has no channel to report anything, so rejecting would have meant
+silently dropping instead.
+
+The merge builds a **new** units array of new objects: `cloneNetwork` shallow-copies each team, so
+the baseline's people are shared with every scenario, and editing in place would rewrite the baseline
+and every sibling scenario — a cross-scenario corruption that would have looked like a random engine
+bug (T3564).
 
 ### Gap G — new, and only visible on a realistic model
 
@@ -115,15 +131,21 @@ export interface NodeOverride {
 size is `2N+1` and is set by the model, not by the user — any real model exceeds it. This one drops
 **9 of 20** parameters while using only 72% of `maxWork`.
 
-Recommendation: give sensitivity its own limit — `maxSensitivityRuns: 81` (40 parameters), still
-bounded by `maxWork`, which is the guard that actually protects the request. Phase 8 already reports
-what it dropped, so nothing is dishonest today; it is just needlessly crippled.
+**As built:** `maxSensitivityRuns: 121` (60 parameters), still bounded by `maxWork` — which is the
+guard that actually protects the request. `clampSensitivity` gives up **replications** before it
+gives up parameters: a wider band is reported honestly by `compareSamples` as "no difference shown",
+whereas a shorter chart silently omits levers.
 
 ### Gap F — the readiness warning
 
 `requiredSkills` on a task whose team names nobody is silently ignored. Right for the engine, wrong
-for authoring, and exactly how this example would rot if someone cleared the member list. One line
-in `readiness.ts`, in the same family as the `epochDate` warning and the unmatched-actor report.
+for authoring, and exactly how this example would rot if someone cleared the member list.
+
+**As built**, two readiness ERRORS rather than one warning — both report numbers that are wrong in
+the *flattering* direction, which is the worse kind:
+
+- the team names nobody, so the requirement is ignored and there is no queue where there should be one;
+- the team names people but nobody qualifies, so the work can never start at all.
 
 ---
 
@@ -464,7 +486,7 @@ Steps 6 → 9 are the spine.
 | Priority discipline | 5 | Scenario 5 | — |
 | Per-segment service level | 5 | Scenario 5 | — |
 | Holidays and shutdowns | 5 | §4.2, step 13 | T1.15 |
-| Batching and cut-offs | 5 | ❌ **Gap D** | — |
+| Batching and cut-offs | 5 | Now authorable (Gap D closed), but still not used by this example | T3585–T3588 |
 | Twin validation | 6 | ❌ belongs to `mined-twin-validated` | — |
 | Skills and named people | 7 | The spine | T0, **T1.3** |
 | Skills from ArchiMate | 7 | Step 3 | **T1.16** |
@@ -480,11 +502,12 @@ by Gap D, the other belongs to a different example.
 
 | Slice | Work | Done when |
 |---|---|---|
-| **1** | **Gap E** — `TeamOverride.members` (merge by name), `NodeOverride.requiredSkills`, `NODE_KEYS` | A scenario cross-trains one person; unset is bit-identical; an unknown name is reported |
-| **2** | **Gap G** — `maxSensitivityRuns`, separate from `maxSweepSteps` | A 20-parameter model tests all 20 and still respects `maxWork` |
-| **3** | **Gaps A + C** — `members`/`skillsSource` and `businessCase` in the package | Capture → adopt round-trip preserves both, proven by a test that fails without it |
-| **4** | **Gap B** — non-root diagrams in a package | An ArchiMate diagram survives capture → adopt and appears in the fill options |
-| **5** | **Gap F** — readiness warning | Clearing HR Operations' members makes it fire |
+| ~~1~~ | ✅ **Gap E** — `TeamOverride.members` (merge by name), `NodeOverride.requiredSkills`, `NODE_KEYS` | **Done** — T3563–T3569 |
+| ~~2~~ | ✅ **Gap G** — `maxSensitivityRuns`, separate from `maxSweepSteps` | **Done** — T3570–T3573 |
+| ~~3~~ | ✅ **Gaps A + C** — `members`/`skillsSource` and `businessCase` in the package | **Done** — T3574–T3577 |
+| ~~4~~ | ✅ **Gap B** — companion diagrams, found via `skillsSource.diagramId` | **Done** — T3578–T3580 |
+| ~~5~~ | ✅ **Gap F** — readiness errors | **Done** — T3581–T3584 |
+| ~~5b~~ | ✅ **Gap D** — `ElementSimParams.batch` + assemble mapping | **Done** — T3585–T3588 |
 | **6** | **Author both diagrams** through the editor, not by hand-writing JSON | Both render; the fill preview reports 18 / 5 with exactly the two intended non-matches |
 | **7** | **Configure** calendars, exceptions, teams, people, five scenarios, business-case inputs | Baseline runs; §4.3 utilisations within ±5pp of the analytic figures |
 | **8** | **Capture** via *Save as example*, merge by slug, add to **T3369** and the **T3561** level map | `exampleSeeds.test.ts` green |
@@ -492,16 +515,16 @@ by Gap D, the other belongs to a different example.
 | **10** | **Capture Tier 2 goldens** from the first green run and commit them | Green, and re-running reproduces them exactly |
 | **11** | Seed locally, walk §7 end to end, then seed prod | The walkthrough works as written |
 
-Slices 1–5 carry the judgement. **Do not start slice 6 before 1–4 are green** — authoring the example
-and *then* finding the package cannot carry it is the expensive failure here.
+**Slices 1–5b are complete.** Authoring (slice 6 onward) is now unblocked — which was the point of
+doing them first: building the example and *then* discovering the package could not carry it was the
+expensive failure here.
 
 ---
 
 ## 10. Risks and open decisions
 
-1. **Gap E's merge semantics.** Merge-by-name is specified; the open question is what happens to a
-   name not in the library. Recommendation: **report it, never invent a person** — matching how the
-   ArchiMate fill treats an unmatched actor.
+1. ~~**Gap E's merge semantics.**~~ **Resolved:** matched by normalised name, so a typo retrains the
+   person meant; a genuinely new name is a deliberate hire and is added. See §2.
 2. **The queue is 6% of the flow time.** 1.9 days of queue against ~32 days end to end. Mean flow
    time is the wrong headline; the assertions use queue wait and p95. If a future reviewer wants the
    flow time itself to move dramatically, the authored waits (10 + 15 working days) would have to
@@ -516,6 +539,7 @@ and *then* finding the package cannot carry it is the expensive failure here.
    description must say so in its own words.
 6. **Australian public holidays date this to 2027–28.** The `epochDate` pins it there anyway.
    **Recommendation: keep the real dates** — a holiday calendar that looks real is the point.
-7. **Gap D leaves batching untaught catalog-wide.** Separate small piece of work
-   (`ElementSimParams.batch` + `assemble.ts` + a panel field), after which the parent plan's
-   `batch-and-cutoff` example becomes buildable. Noted, not scheduled.
+7. ~~**Gap D leaves batching untaught catalog-wide.**~~ **Closed:** `ElementSimParams.batch` and the
+   assemble mapping are in, so the parent plan's `batch-and-cutoff` example is now buildable. Still
+   missing a Properties-panel field and a BPSim mapping (BPSim has no batching concept, so it would
+   need the same `dgx` extension namespace the skills use) — neither blocks anything.

@@ -31,6 +31,15 @@ export const RUN_LIMITS = {
    *  count — the one place the existing budget could be blown through without
    *  any single field looking unreasonable. */
   maxSweepSteps: 24,
+  /** Runs in one SENSITIVITY analysis (a tornado). Deliberately separate from
+   *  maxSweepSteps, and much larger, because the two are bounded by different
+   *  things. A sweep's size is a USER CHOICE and more than ~24 points on a curve
+   *  buys nothing, so a small cap costs nothing. A tornado's size is 2N+1, set by
+   *  THE MODEL — a perfectly ordinary 20-parameter process needs 41 runs, and
+   *  reusing the sweep cap silently dropped nine of its parameters while using
+   *  barely 70% of maxWork. maxWork is the guard that actually protects the
+   *  request; this one only stops a pathological model from queueing thousands. */
+  maxSensitivityRuns: 121,
 } as const;
 
 export interface ClampRunConfigResult {
@@ -80,6 +89,36 @@ export interface ClampSweepResult {
   /** True when steps or replications were reduced — the caller must SAY so
    *  rather than silently returning a coarser curve than was asked for. */
   clamped: boolean;
+}
+
+/**
+ * Clamp a SENSITIVITY analysis (a tornado) to {@link RUN_LIMITS}. The work is
+ * `runs × horizon × replications`, where `runs` is 2N+1 for N parameters.
+ *
+ * `steps` in the result is the number of RUNS the caller may afford; it keeps
+ * the ClampSweepResult shape so both callers read the same way.
+ */
+export function clampSensitivity(cfg: SimRunConfig, runs: number): ClampSweepResult {
+  const base = clampRunConfig(cfg);
+  let clamped = base.clamped;
+  let n = Math.max(1, Math.min(RUN_LIMITS.maxSensitivityRuns, Math.floor(runs)));
+  if (n !== runs) clamped = true;
+
+  const { horizon } = base.cfg;
+  let { replications } = base.cfg;
+  // Replications give first, exactly as in a sweep: fewer of them only widens
+  // the band, which compareSamples then reports honestly as "no difference
+  // shown". Dropping PARAMETERS instead would silently shorten the chart, and a
+  // tornado missing its biggest lever is worse than no tornado.
+  if (n * horizon * replications > RUN_LIMITS.maxWork) {
+    replications = Math.max(1, Math.floor(RUN_LIMITS.maxWork / (n * horizon)));
+    clamped = true;
+  }
+  if (n * horizon * replications > RUN_LIMITS.maxWork) {
+    n = Math.max(1, Math.floor(RUN_LIMITS.maxWork / (horizon * replications)));
+    clamped = true;
+  }
+  return { cfg: { ...base.cfg, replications }, steps: n, clamped };
 }
 
 /**

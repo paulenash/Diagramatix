@@ -47,6 +47,20 @@ export interface ElementSimParams {
    *  these only refine it for genuinely specialist work. */
   requiredSkills?: string[];
   resourceUnits?: number;
+  /**
+   * Batching and cut-off: cases WAIT here until `size` of them have gathered or
+   * the wall-clock `cutoff` ("16:00") arrives, whichever comes first, then the
+   * whole batch seizes the team once and moves on together.
+   *
+   * The engine has honoured `SimNode.batch` since Phase 5 and it is covered by
+   * tests, but nothing ever wrote it: there was no parameter here and no mapping
+   * in assemble, so "posted at 4pm" and "in batches of 50" — which is most of
+   * what back-office queueing actually is — could not be expressed on a diagram
+   * at all. This is that missing half.
+   *
+   * Absent, or with neither field set, = no batching, exactly as before.
+   */
+  batch?: { size?: number; cutoff?: string };
   // delay / timer
   delay?: SimDist;
   // How the delay magnitude is interpreted (default "elapsed" when absent):

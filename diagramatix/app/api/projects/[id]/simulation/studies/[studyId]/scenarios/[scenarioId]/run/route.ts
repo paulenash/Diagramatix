@@ -138,7 +138,16 @@ export async function POST(req: Request, { params }: Params) {
   // path from the dialog).
   const force = new URL(req.url).searchParams.get("force") === "true";
   if (!force) {
-    const issues = checkSimReadiness(rootDiagrams.map((r) => r.data), teams);
+    const issues = checkSimReadiness(
+      rootDiagrams.map((r) => r.data),
+      // members travel too: a skill requirement on a team that names nobody is
+      // silently ignored by the pool, and this is the only place that says so.
+      teams.map((t) => ({
+        name: t.name,
+        capacity: t.capacity,
+        members: Array.isArray(t.members) ? (t.members as unknown as { name?: string; skills?: string[] }[]) : [],
+      })),
+    );
     if (issues.length > 0) return NextResponse.json({ needsSetup: true, issues });
   }
 
