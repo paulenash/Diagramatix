@@ -52,6 +52,36 @@ describe("starter examples are operational", () => {
     expect(missing, `examples lost from exampleData.json: ${missing.join(", ")}`).toEqual([]);
   });
 
+  // The level a learner sees is a JUDGEMENT about teaching order, not a fact
+  // about the package, so nothing in the data can derive it and nothing else
+  // in this suite would notice it changing. Paul re-levelled these on
+  // 2026-09-08: loan-origination is an introduction, and the three that were
+  // 'advanced' are the core set - which leaves 'advanced' meaning the capstone
+  // example that exercises the whole feature set, not merely a longer diagram.
+  it("T3561 - each example carries its intended level", () => {
+    const LEVELS: Record<string, string> = {
+      "simple-process": "intro",
+      "loan-origination": "intro",
+      "car-repair-rework-loop": "core",
+      "aardwolf-loan-comparison": "core",
+      "sales-marketing-drill-through": "core",
+    };
+    for (const ex of STARTER_EXAMPLES) {
+      const want = LEVELS[ex.slug];
+      if (!want) continue; // a newly added example registers itself here when it ships
+      expect(ex.difficulty, `${ex.slug} should be levelled ${want}`).toBe(want);
+    }
+  });
+
+  // A typo here does not fail the seed - it writes straight through to the
+  // catalog row, where the gallery falls back to a neutral chip and the level
+  // silently stops meaning anything.
+  it("T3562 - every level is one the gallery and the admin routes accept", () => {
+    for (const ex of STARTER_EXAMPLES) {
+      expect(["intro", "core", "advanced"], `${ex.slug} has level "${ex.difficulty}"`).toContain(ex.difficulty);
+    }
+  });
+
   it("every diagram is EDITOR-valid (connectors fully formed, not just engine-valid)", () => {
     // A bare {id,source,target} connector runs in the engine but crashes the
     // editor, which maps over connector.waypoints + reads routing fields on

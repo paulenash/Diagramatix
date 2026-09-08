@@ -880,7 +880,7 @@
       "title": "Loan origination",
       "concept": "A multi-team loan process with real task timings — find the team that gates throughput.",
       "description": "A loan application flows across several teams with real per-task processing\ntimes and approval branches (imported from the BPSim example).\n\n**Demo:** Run the *Baseline* and open the results — one team sits near 100%\nutilisation while applications queue. Then *Add staff* and **⇄ compare** to\nsee the flow-time fall. Launch the **Replay** to watch tokens stack at the\nbusy step, or the **Heatmap** for the hotspot at a glance.",
-      "difficulty": "core",
+      "difficulty": "intro",
       "package": {
         "version": 1,
         "teams": [
@@ -2765,7 +2765,7 @@
       "title": "Car repair — rework loop",
       "concept": "A repair that loops until every issue is fixed — see how rework multiplies the load.",
       "description": "Each car arrives with a number of issues; the process works an issue, then\nloops back while issues remain (a BPSim property + condition-driven loop:\n`noOfIssues > 0`). Rework multiplies the demand on the workshop.\n\n**Demo:** Run the *Baseline* — the rework loop drives repeated visits to the\nrepair task and a growing queue. *Add a mechanic* and compare. Watch the\n**Replay** to see tokens loop back through the repair step.",
-      "difficulty": "advanced",
+      "difficulty": "core",
       "package": {
         "version": 1,
         "teams": [
@@ -4939,7 +4939,7 @@
       "title": "Aardwolf Loans — As-is vs To-be",
       "concept": "Process comparison: does automating loan assessment with an AI agent cut cycle time and cost?",
       "description": "A side-by-side comparison study for Aardwolf Loans' loan-application process. The As-is scenario runs the manual process where one Loan Assessment Team handles every intake, verification and eligibility step. The To-be scenario runs the redesigned process where a Loan Assessment AI Agent performs the routine assessment work and human specialists only handle exceptions. Run both and open the comparison to see the drop in cycle time, queueing and human cost.",
-      "difficulty": "advanced",
+      "difficulty": "core",
       "package": {
         "version": 1,
         "teams": [
@@ -9798,7 +9798,7 @@
       "title": "Sales & Marketing Enquiry — subprocess drill-through",
       "concept": "A parent process whose steps are collapsed subprocesses linked to their own diagrams — shows how the Simulator flattens, simulates and drills through nested subprocesses.",
       "description": "A three-diagram sample for exploring subprocess drill-through. The parent (P01 Sales Enquiry Process) has two collapsed subprocesses — Sales and Marketing — each linked to its own diagram (P01.1, P01.2). Run it and the engine flattens the linked children in, so a token flows through the parent AND the work inside each subprocess (with the child's own teams and times). In the replay, double-click a subprocess to drill into its child animation; in Simulation Data, a linked subprocess offers “⤢ edit child →” to edit the child's tasks.",
-      "difficulty": "advanced",
+      "difficulty": "core",
       "package": {
         "version": 1,
         "teams": [
