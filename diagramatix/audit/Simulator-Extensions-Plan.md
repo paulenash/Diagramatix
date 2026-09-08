@@ -596,8 +596,10 @@ lesson as the calendar exceptions in Phase 5: the arithmetic was never the risk,
    skipping. Regression bar held: a pool with no units declared is bit-identical, and required
    skills on a task cannot bite when nobody is declared (T3508/T3509). Capacity stayed a separate
    constraint, so the calendar can still close a skilled team to zero (T3519).
-2. **ArchiMate read** — `app/lib/simulation/skillsFromArchimate.ts` (pure): actors, skills,
-   required-skills-per-work-label, and the unmatched report.
+2. ✅ **ArchiMate read (SHIPPED)** — `app/lib/simulation/skillsFromArchimate.ts` (pure):
+   `skillsFromArchimate()` reads actors, role bundles and required-skills-per-work;
+   `matchSkills()` joins them onto team members and task labels by name. Everything that did not
+   match is reported in BOTH directions, and a fill that matched nothing says so (T3534/T3535).
 3. **UI** — skills against each member in the team library; required skills in `SimDataPanel`;
    the fill action with its provenance line.
 4. **BPSim** — see below.

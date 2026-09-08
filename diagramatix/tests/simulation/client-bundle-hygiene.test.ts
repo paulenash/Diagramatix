@@ -36,6 +36,7 @@ const CLIENT_REACHABLE = [
   { entry: path.join(LIB, "simulation", "warmup.ts"), importedBy: "the run dialog" },
   { entry: path.join(LIB, "simulation", "sweep.ts"), importedBy: "SweepPanel.tsx / StudyManager" },
   { entry: path.join(LIB, "simulation", "validate.ts"), importedBy: "ValidateTwinPanel.tsx" },
+  { entry: path.join(LIB, "simulation", "skillsFromArchimate.ts"), importedBy: "the skills fill UI (slice 3)" },
 ];
 
 /** Relative import specifiers in a source file. Deliberately string-based: this
