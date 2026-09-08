@@ -3,131 +3,127 @@
 | | |
 |---|---|
 | **Created** | 2026-09-08 |
+| **Revised** | 2026-09-08 — sizing arithmetic done; **the first draft's numbers did not work** (see §1.1) |
 | **Status** | `Planned` — nothing built yet |
 | **Slug** | `hire-and-onboard` |
 | **Level** | `advanced` — the only one, after the 2026-09-08 re-levelling |
-| **Purpose** | The capstone example: one process that exercises calendars, holidays, named people, skills, roles read from ArchiMate, priority queueing, the sweep, the tornado and the business case, in that order |
-| **Parent plan** | [`Simulator-Extensions-Plan.md`](./Simulator-Extensions-Plan.md) — the *Examples programme* section |
-| **Companion diagrams** | one **BPMN** (the process) + one **ArchiMate** (the operating model). First example to carry two diagram *types* |
+| **Purpose** | The capstone example **and an end-to-end acceptance test**: one process that exercises calendars, holidays, named people, skills read from ArchiMate, priority queueing, the sweep, the tornado and the business case — with the figures each step must produce known in advance |
+| **Parent plan** | [`Simulator-Extensions-Plan.md`](./Simulator-Extensions-Plan.md) — *Examples programme* |
+| **Working** | `scratchpad/hire-onboard-final.cjs` — every number below is reproduced by running it |
 
 ---
 
 ## 0. The re-levelling this sits inside
 
-Done on 2026-09-08 and guarded by **T3561** / **T3562** in `tests/simulation/exampleSeeds.test.ts`:
+Applied 2026-09-08, guarded by **T3561/T3562**, seeded locally, prod SQL in
+`scratchpad/prod-example-levels.sql`:
 
-| Example | Was | Now |
-|---|---|---|
-| `simple-process` | intro | **intro** |
-| `loan-origination` | core | **intro** |
-| `car-repair-rework-loop` | advanced | **core** |
-| `aardwolf-loan-comparison` | advanced | **core** |
-| `sales-marketing-drill-through` | advanced | **core** |
-| `hire-and-onboard` | — | **advanced** *(this plan)* |
+`simple-process` **intro** · `loan-origination` **intro** · `car-repair-rework-loop` **core** ·
+`aardwolf-loan-comparison` **core** · `sales-marketing-drill-through` **core**
 
-That leaves `advanced` meaning *"the example that exercises the whole feature set"* rather than
-merely *"a longer diagram"* — which is the point of adding this one.
-
-> ⚠ **Levels live in the DB too.** `scripts/seed-simulation-examples.ts` upserts by slug, so the new
-> levels reach a gallery only after that script is re-run — locally *and* on prod. Editing
-> `exampleData.json` alone changes nothing a user can see.
+`advanced` is deliberately empty until this example ships.
 
 ---
 
 ## 1. Why this example, and what it has to prove
 
-Every capability from Phase 2 onwards is currently reachable only by someone who already knows it is
-there. The five existing examples predate all of it: not one has a named person, a skill, a public
-holiday, a priority stream, a sweep worth running or a business case with a number in it.
+Every capability from Phase 2 onwards is reachable only by someone who already knows it is there.
+Not one existing example has a named person, a skill, a public holiday, a priority stream, a sweep
+worth running or a business case with a number in it.
 
-This example exists to make one argument, end to end, in a domain everybody understands:
+This example makes one argument, in a domain everybody understands:
 
 > **The constraint is not headcount. It is who is allowed to do the work.**
 >
-> Four people in HR Operations, but only two are trained to sign off a right-to-work check. Adding a
-> fifth and a sixth person does almost nothing. Training a third checker — for a fraction of the cost
-> — fixes it. Here is the curve, here is the evidence the difference is real, and here is the payback
-> month.
+> HR Operations runs at **56%** — a manager looking at team utilisation sees no problem. But only
+> **2 of its 4 people** are accredited to sign off a compliance & vetting review, and those two run
+> at **92%**, carrying **1.9 working days** of queue on every hire. Adding desks changes *nothing*.
+> Hiring two more administrators changes almost nothing. Training a third checker for £4,500 takes
+> the queue to **0.1 days** and buys **50% more hiring volume**.
 
-That argument is unavailable in every other example, it is the reason skills were built, and it is
-exactly the shape of question a Business Architect brings to a simulator. It also fails honestly: if
-the learner only ever adds headcount, the model tells them it did not work and the significance test
-backs that up.
+That argument is unavailable in every other example, and it is the reason skills were built.
 
-**Secondary argument, carried by the same model:** the skills matrix is not typed in. It is *read off
-the ArchiMate diagram the Business Architect already drew.*
+### 1.1 What the arithmetic changed — three corrections to the first draft
+
+The sizing was done before authoring anything, and it falsified three things:
+
+1. **The volume was far too low.** At 260 hires/year every team sat near **20%** and *nothing queued
+   anywhere*. The example would have taught nothing at all. The volume is now **~790 hires/year**
+   (`exponential(mean 2.35 open-hours)`) — a large employer with genuine turnover.
+2. **The specialist step was too small to be a constraint.** A 45-minute right-to-work check is a
+   thin slice of HR Operations' work; restricting it to half the team still left it at 26%. It is now
+   a **compliance & vetting review** — police check, working-with-children check, right-to-work,
+   reference and registration verification — `tri(1, 3, 9)` hours. Realistic for a regulated employer,
+   legally restricted to accredited staff, and *large enough to be the bottleneck*.
+   The wide spread matters as much as the mean: variability drives queues, and a tight
+   `tri(2.5, 3.5, 5)` produced only 1.37 days of queue against 1.89 for the same utilisation.
+3. **The epoch put the holidays where they would never be tested.** With `epochDate: 2027-01-04` the
+   Christmas shutdown fell at **97%** of the horizon, among the end-effects. It is now
+   **`2027-07-05`** (verified a Monday), which puts the shutdown at **47%** — mid-measurement — and
+   brings Labour Day, Australia Day, Easter, Anzac Day and the King's Birthday inside the run too.
+
+**A fourth finding shapes every assertion in §6:** the headline flow time is dominated by *authored*
+waits — 10 working days gathering applications, 15 days' notice, 5.3 days at the external provider —
+against only **1.9 days** of queue. So the mean flow time moves ~6% and **the queue-wait line is
+where the story is**. That is exactly the split Phase 2 built, and it means the acceptance tests
+assert on queue wait and on the p95, never on the mean flow time.
 
 ---
 
-## 2. What must be built first — six gaps
+## 2. What must be built first — seven gaps
 
-None of these is a defect in this plan; all six are real gaps found while checking whether the
-example could be authored at all. **Four of the six block it outright.**
+None of these is a defect in this plan; all seven were found while checking whether the example
+could be authored and asserted at all. **Five block it.**
 
 | # | Gap | What actually happens today | Where | Blocks? |
 |---|---|---|---|---|
-| **A** | Skills do not survive a package | `captureProjectLibrary` selects `name, capacity, costPerHour, efficiency, calendarId`. `adoptLibraryInto` creates teams without `members`. An adopted cross-skilled example becomes a plain counted pool — **silently** | `captureProject.ts:31`, `adoptPackage.ts:60` | **YES** |
-| **B** | Only study-root diagrams are captured | `captureIds = rootIds + variantIds`. An ArchiMate companion is neither, so it is never captured and never adopted | `captureProject.ts:87` | **YES** |
-| **C** | Business-case inputs do not travel | `ExamplePackage.study` is `{ name, rootKeys }`. The inputs live on `SimulationStudy.businessCase` and are dropped | `examplePackage.ts:68` | **YES** |
-| **E** | **You cannot ask "what if we cross-trained someone?"** | `TeamOverride` is `{ capacity, discipline }` only. There is no scenario lever for *who holds which skill*, and none for a task's `requiredSkills` | `overrides.ts:31` | **YES** |
-| **D** | Batching is unreachable from a diagram | `SimNode.batch` is honoured by the engine and tested (T3486–T3488), but there is no `ElementSimParams.batch` and no `assemble.ts` mapping. Phase 5's smaller item 03 landed in the engine only | `model.ts:107` vs `simParams.ts` | no — dropped from scope |
-| **F** | A skill requirement on a memberless team silently does nothing | `request()` short-circuits on `if (!this.skilled)` — correct for backwards compatibility, but nothing warns that the constraint was ignored | `resourcePool.ts:182` | no — but see §4.4 |
+| **A** | Skills do not survive a package | `captureProjectLibrary` selects five columns; `members` is not one. Adopt recreates a plain counted pool — **silently** | `captureProject.ts:31`, `adoptPackage.ts:60` | **YES** |
+| **B** | Only study-root diagrams are captured | `captureIds = rootIds + variantIds`. An ArchiMate companion is neither | `captureProject.ts:87` | **YES** |
+| **C** | Business-case inputs do not travel | `ExamplePackage.study` is `{ name, rootKeys }`; the inputs live on `SimulationStudy.businessCase` | `examplePackage.ts:68` | **YES** |
+| **E** | **No scenario lever for cross-training** | `TeamOverride` is `{ capacity, discipline }`. "What if we trained someone?" is unaskable | `overrides.ts:31` | **YES** |
+| **G** | **`maxSweepSteps` is the wrong guard for a tornado** | A tornado is `2N+1` runs. This model has **20 parameters → 41 runs**, capped at **11 parameters**, so **9 are dropped**. `maxWork` is nowhere near binding (3.59M of 5M) | `runner.ts:33` | **YES** for the tornado step |
+| **D** | Batching is unreachable from a diagram | `SimNode.batch` is honoured and tested (T3486–T3488) but there is no `ElementSimParams.batch` and no `assemble.ts` mapping | `model.ts:107` | no — out of scope |
+| **F** | A skill required from a memberless team silently does nothing | `request()` short-circuits on `if (!this.skilled)` | `resourcePool.ts:182` | no — but see §4.4 |
 
-### Gap E is the important one
+### Gap E — the important one
 
-Phase 7 shipped the skills *model* but not the *lever*. A skills matrix that cannot be varied in a
-scenario is documentation, not a decision tool — and "should we train a third person?" is the only
-question anybody asks once they have one. **This example cannot make its central argument without
-it.**
-
-Proposed minimum, additive and inert when unset:
+Phase 7 shipped the skills *model* but not the *lever*. A matrix that cannot be varied in a scenario
+is documentation, not a decision tool.
 
 ```ts
 export interface TeamOverride {
   capacity?: number;
   discipline?: QueueDiscipline;
-  /** Cross-training as a SCENARIO, not a rebuild of the library. Merged by
-   *  member name over the library's people; a name not in the library is
-   *  reported, never silently invented. */
+  /** Cross-training as a SCENARIO. Merged BY NAME over the library's people —
+   *  a whole-list replacement would mean "train Marta" silently deletes the
+   *  other three. A name not in the library is REPORTED, never invented. */
   members?: { name: string; skills: string[] }[];
 }
 
 export interface NodeOverride {
   /* …existing… */
-  /** "What if this step no longer needed the specialist?" — the other half of
-   *  the same question. Empty array = requires nothing. */
+  /** "What if this step no longer needed the specialist?" */
   requiredSkills?: string[];
 }
 ```
 
-`requiredSkills` must be added to `NODE_KEYS`, which is what makes it appear in the tornado and the
-sweep for free. `members` needs its own merge branch in `applyOverrides` (a replace-by-name merge,
-not a whole-list replacement — otherwise a scenario that trains one person deletes everybody else).
+`requiredSkills` must go into `NODE_KEYS`, which puts it in the sweep and the tornado for free.
+
+### Gap G — new, and only visible on a realistic model
+
+`maxSweepSteps: 24` was sized for a *curve*, where more than 24 points buys nothing. A tornado's
+size is `2N+1` and is set by the model, not by the user — any real model exceeds it. This one drops
+**9 of 20** parameters while using only 72% of `maxWork`.
+
+Recommendation: give sensitivity its own limit — `maxSensitivityRuns: 81` (40 parameters), still
+bounded by `maxWork`, which is the guard that actually protects the request. Phase 8 already reports
+what it dropped, so nothing is dishonest today; it is just needlessly crippled.
 
 ### Gap F — the readiness warning
 
-`requiredSkills` on a task whose team names nobody is silently ignored. That is the right *engine*
-behaviour and the wrong *authoring* behaviour: it is precisely how this example would rot if someone
-later cleared the HR Operations member list. One line in `readiness.ts`:
-
-> *"Right-to-work & background check requires Right to Work Compliance, but HR Operations names no
-> people — the requirement is ignored and anyone on the team can take it."*
-
-Cheap, and it belongs to the same family as the calendar `epochDate` warning and the unmatched-actor
-report: **the arithmetic was never the risk.**
-
-### Sizing
-
-| Gap | Work |
-|---|---|
-| A | `members`/`skillsSource` on `ExampleTeam`; carry in capture + adopt; one round-trip test |
-| B | `ExamplePackage.diagrams` already holds anything — add `extraKeys` (or simply capture every project diagram not already a root) + a validation rule that a non-root diagram is allowed |
-| C | `study.businessCase?: BusinessCaseInputs` in the package; write it on adopt |
-| E | `TeamOverride.members`, `NodeOverride.requiredSkills`, `NODE_KEYS`, merge logic, tornado/sweep pick it up free |
-| F | one readiness check |
-
-Roughly one focused session for A/B/C/F, one for E. **E should ship first** — it is the one with a
-design decision in it, and everything else is plumbing.
+`requiredSkills` on a task whose team names nobody is silently ignored. Right for the engine, wrong
+for authoring, and exactly how this example would rot if someone cleared the member list. One line
+in `readiness.ts`, in the same family as the `epochDate` warning and the unmatched-actor report.
 
 ---
 
@@ -135,348 +131,391 @@ design decision in it, and everything else is plumbing.
 
 ### 3.1 BPMN — *Hire & Onboard* (the study root)
 
-One pool, five lanes. Clock unit **hour** — a year is 8,760 hours, inside `maxHorizon` (100,000),
-whereas a year in minutes (525,600) is not. Every duration below is in hours unless stated.
+One pool, six lanes. **Clock unit `hour`** — a year is 8,760 hours (inside `maxHorizon` 100,000),
+whereas a year in minutes is 525,600 and is not.
 
-| # | Element | Lane / team | Sim parameters | Why it is there |
-|---|---|---|---|---|
-| 1 | ⭘ **Vacancy approved** (start) | — | `arrival: exponential(mean 7)`, `calendarId: "HR business hours"` | ~260 hires/yr. Gated so vacancies arrive in working time |
-| 2 | ▭ Draft role profile | Hiring Manager | `triangular(1, 1.5, 3)` | |
-| 3 | ▭ Approve requisition | Hiring Manager | `triangular(0.25, 0.5, 1.5)` | |
-| 4 | ▭ Advertise role | Talent Acquisition | `fixed(0.75)` | |
-| 5 | ⏱ **Applications gather** (timer) | — | `delay: 10`, `delayMode: "working-days"` | **Process wait**, not queue wait. Steps over the Christmas shutdown — visible proof the calendar is doing something |
-| 6 | ▭ Screen applications | Talent Acquisition | `triangular(2, 3, 5)` | |
-| 7 | ▭ Shortlist & schedule interviews | Talent Acquisition | `triangular(0.75, 1, 2)` | |
-| 8 | ▭ **Interview panel** | Talent Acquisition | `triangular(1.5, 2, 3)`, **`requiredSkills: ["Technical Interviewing"]`** | Only Priya holds it — a second, milder specialist pinch upstream of the main one |
-| 9 | ◇ Offer made? | — | 72% yes / 28% → back to (7) | Rework loop; the 28% is a named parameter for the tornado |
-| 10 | ▭ Prepare offer | HR Operations | `triangular(0.5, 0.75, 1.25)` | |
-| 11 | ▭ **Negotiate offer** | Talent Acquisition | `triangular(0.5, 1, 2.5)`, **`requiredSkills: ["Offer Negotiation"]`** | Priya + Aisha |
-| 12 | ◇ Offer accepted? | — | 86% yes / 14% → back to (7) | |
-| 13 | ▭ **Right-to-work & background check** | HR Operations | `cycleTime: triangular(0.5, 0.75, 1.5)`, `waitTime: fixed(40)`, **`requiredSkills: ["Right to Work Compliance"]`** | **The constraint.** 2 of 4 trained. `waitTime` is the external provider — process wait that headcount cannot touch, which the business case must not confuse with queueing |
-| 14 | ⬦ Parallel split | — | — | |
-| 15 | ▭ Create payroll record | Payroll | `fixed(0.4)`, `requiredSkills: ["Payroll Administration"]` | |
-| 16 | ▭ Provision laptop & accounts | IT Provisioning | `triangular(0.5, 0.75, 1.5)` | On the IT service-desk calendar — different hours from HR |
-| 17 | ▭ Prepare onboarding pack | HR Operations | `fixed(0.6)`, `requiredSkills: ["Onboarding Administration"]` | Held by all four — so it is *not* a constraint, which is the control case |
-| 18 | ⬦ Parallel join | — | — | |
-| 19 | ⏱ Wait for start date | — | `delay: 15`, `delayMode: "working-days"` | Notice period |
-| 20 | ▭ Day-one induction | HR Operations | `fixed(3)` | |
-| 21 | ⬤ **Onboarded** (end) | — | — | |
+| # | Element | Team | Sim parameters | Mean h | Runs/case |
+|---|---|---|---|---|---|
+| 1 | ⭘ Vacancy approved | — | `arrival: exponential(2.35)`, `calendarId: HR business hours`, `assign: priority` | — | 1 |
+| 2 | ▭ Draft role profile | Hiring Manager | `tri(1, 1.5, 3)` | 1.83 | 1 |
+| 3 | ▭ Approve requisition | Hiring Manager | `tri(0.25, 0.5, 1.5)` | 0.75 | 1 |
+| 4 | ▭ Advertise role | Talent Acquisition | `fixed(0.75)` | 0.75 | 1 |
+| 5 | ⏱ Applications gather | — | `delay: 10`, `delayMode: "working-days"` | — | 1 |
+| 6 | ▭ Screen applications | Talent Acquisition | `tri(2, 3, 5)` | 3.33 | 1 |
+| 7 | ▭ Shortlist & schedule interviews | Talent Acquisition | `tri(0.75, 1, 2)` | 1.25 | **1.615** |
+| 8 | ▭ Interview panel | Talent Acquisition | `tri(1.5, 2, 3)` | 2.17 | **1.615** |
+| 9 | ◇ Offer made? | — | 72% / **28% → (7)** | — | — |
+| 10 | ▭ Prepare offer | HR Operations | `tri(0.5, 0.75, 1.25)` | 0.83 | **1.163** |
+| 11 | ▭ Negotiate offer | Talent Acquisition | `tri(0.5, 1, 2.5)`, **`requiredSkills: ["Offer Negotiation"]`** | 1.33 | **1.163** |
+| 12 | ◇ Offer accepted? | — | 86% / **14% → (7)** | — | — |
+| 13 | ▭ **Compliance & vetting review** | HR Operations | **`tri(1, 3, 9)`**, `waitTime: fixed(40)`, **`requiredSkills: ["Compliance Accreditation"]`** | **4.33** | 1 |
+| 14 | ⬦ Parallel split | — | — | — | — |
+| 15 | ▭ Create payroll record | Payroll | `fixed(0.4)`, `requiredSkills: ["Payroll Administration"]` | 0.40 | 1 |
+| 16 | ▭ Provision laptop & accounts | IT Provisioning | `tri(0.5, 0.75, 1.5)`, `requiredSkills: ["Device Provisioning"]` (both hold it) | 0.92 | 1 |
+| 17 | ▭ Prepare onboarding pack | Onboarding Services | `fixed(0.6)`, `requiredSkills: ["Onboarding Administration"]` (all three hold it) | 0.60 | 1 |
+| 18 | ⬦ Parallel join | — | — | — | — |
+| 19 | ⏱ Wait for start date | — | `delay: 15`, `delayMode: "working-days"` | — | 1 |
+| 20 | ▭ Day-one induction | Onboarding Services | `fixed(3.0)` | 3.00 | 1 |
+| 21 | ⬤ Onboarded | — | — | — | — |
 
-**Token priority** is assigned on the start event (2 above) via `sim.assign`:
+**Rework**: `P(return to shortlist) = 0.28 + 0.72 × 0.14 = 0.3808`, so shortlist and interview run
+**1.615** times per case and the offer steps **1.163** times. Both loop-back probabilities are named
+parameters the tornado will test.
 
-```json
-{ "property": "priority",
-  "dist": { "kind": "fixed", "value": 1 } }
-```
-
-…with the *critical* stream carried by a second source, or (simpler, and the route actually taken)
-a single source whose assignment is an expression giving 10 to ~30% of cases. The `priority`
-property only bites when a team's discipline is `priority`, which is a scenario override — so the
-baseline model is unchanged and FIFO, exactly as it should be.
+**Why step 13 is the constraint and step 17 is not.** Both are HR-side admin. One is restricted to
+2 of 4 people and takes 4.33 h; the other is unrestricted and takes 0.6 h. Step 17 is the *control
+case* — a skill-adjacent task that is provably **not** a bottleneck, which is what stops the example
+proving its point by construction.
 
 ### 3.2 ArchiMate — *HR operating model — who can do what*
 
-Not a study root. Present purely so the learner can press **✨ Fill from ArchiMate** and watch the
-matrix populate. This is the diagram that makes Gap B a blocker.
+Not a study root. Present so the learner presses **✨ Fill from ArchiMate** and watches the matrix
+populate. This is what makes Gap B a blocker.
 
-**Business Actors** (must match team member names *exactly*, modulo case/whitespace):
+**Business Actors** — must match team member names exactly (modulo case/whitespace):
 
-| Actor | Team |
-|---|---|
-| Priya Raman | Talent Acquisition |
-| Tom Fletcher | Talent Acquisition |
-| Aisha Khan | Talent Acquisition |
-| Grace Oduya | HR Operations |
-| Ben Carter | HR Operations |
-| Marta Silva | HR Operations |
-| Ruth Ellis | HR Operations |
-| Sam Doyle | IT Provisioning |
-| Nina Petrov | IT Provisioning |
-| Jo Mensah | Payroll |
-| **Dev Nair (Contractor)** | *nobody* — deliberate, see §3.3 |
+Priya Raman · Tom Fletcher · Aisha Khan · Ravi Menon · Ellie Shaw · Jack Oduya · Nadia Rahman ·
+Chris Bell *(Talent Acquisition, 8)* — Grace Oduya · Ben Carter · **Marta Silva** · Ruth Ellis
+*(HR Operations, 4)* — Sam Doyle · Nina Petrov *(IT Provisioning, 2)* — Jo Mensah *(Payroll, 1)* —
+Leah Nowak · Femi Adeyemi · Dan Russo *(Onboarding Services, 3)* = **18 named people**, plus
+**Dev Nair (Contractor)**, on no team, deliberately (§3.3).
 
-**Business Roles.** Leaf roles are skills; a role that aggregates others is a bundle:
+**Every team member appears here with a role.** An actor drawn with no role holds nothing and lands
+in the warnings (T3530), and a member absent from the diagram lands in *"On a team, not in the
+diagram"* — either would add noise to the report that assertion 16 pins, and the two intended
+mismatches are the ones that should be visible.
 
-- Leaves: `Sourcing`, `Offer Negotiation`, `Technical Interviewing`, `Right to Work Compliance`,
-  `Payroll Administration`, `Onboarding Administration`
-- `Senior Recruiter` —aggregation→ { Sourcing, Offer Negotiation, Technical Interviewing }
-- `Onboarding Specialist` —aggregation→ { Onboarding Administration, Right to Work Compliance }
+**Business Roles.** Leaves are skills; a role that aggregates others is a bundle:
 
-**Assignments, Actor → Role** (`archi-assignment`) — *the person holds the skill*:
+- Leaves: `Sourcing`, `Offer Negotiation`, `Compliance Accreditation`, `Payroll Administration`,
+  `Onboarding Administration`, `Device Provisioning`
+- `Senior Recruiter` —aggregation→ { Sourcing, Offer Negotiation }
+- `Accredited Vetting Officer` —aggregation→ { Onboarding Administration, **Compliance Accreditation** }
 
-| Actor | Assigned to | Resolves to |
+**Actor → Role** (*the person holds the skill*):
+
+| Actor | Assigned to | Leaf skills |
 |---|---|---|
-| Priya Raman | Senior Recruiter | Sourcing, Offer Negotiation, Technical Interviewing |
-| Tom Fletcher | Sourcing | Sourcing |
-| Aisha Khan | Sourcing, Offer Negotiation | both |
-| Grace Oduya | Onboarding Specialist | Onboarding Administration, **Right to Work Compliance** |
-| Ruth Ellis | Onboarding Specialist | Onboarding Administration, **Right to Work Compliance** |
-| Ben Carter | Onboarding Administration | Onboarding Administration |
-| Marta Silva | Onboarding Administration | Onboarding Administration |
+| Priya Raman, Aisha Khan, Ravi Menon | Senior Recruiter | Sourcing, **Offer Negotiation** |
+| Tom Fletcher, Ellie Shaw, Jack Oduya, Nadia Rahman, Chris Bell | Sourcing | Sourcing |
+| **Grace Oduya, Ruth Ellis** | Accredited Vetting Officer | Onboarding Admin, **Compliance Accreditation** |
+| Ben Carter, **Marta Silva** | Onboarding Administration | Onboarding Administration |
+| Sam Doyle, Nina Petrov | Device Provisioning | Device Provisioning |
 | Jo Mensah | Payroll Administration | Payroll Administration |
-| Sam Doyle, Nina Petrov | *(none)* | — |
+| Leah Nowak, Femi Adeyemi, Dan Russo | Onboarding Administration | Onboarding Administration |
+| **Dev Nair (Contractor)** | Accredited Vetting Officer | Onboarding Admin, Compliance Accreditation |
 
-`Senior Recruiter` earns its keep here: it is defined once and assigned wholesale, and the fill
-expands it to three leaves. That is the feature, not decoration.
+→ **Compliance Accreditation is held by exactly 2 people. That is the whole example.**
 
-**Assignments, Role → Business Process** — *the work requires the skill*. The Business Process
-labels must match the BPMN task labels exactly:
+**Role → Business Process** (*the work requires the skill*) — labels must match the BPMN task labels:
 
-| Role | Business Process |
-|---|---|
-| Technical Interviewing | Interview panel |
-| Offer Negotiation | Negotiate offer |
-| Right to Work Compliance | Right-to-work & background check |
-| Payroll Administration | Create payroll record |
-| Onboarding Administration | Prepare onboarding pack |
-| Onboarding Administration | **Exit interview** — deliberate, see §3.3 |
+`Offer Negotiation → Negotiate offer` · `Compliance Accreditation → Compliance & vetting review` ·
+`Payroll Administration → Create payroll record` · `Device Provisioning → Provision laptop & accounts` ·
+`Onboarding Administration → Prepare onboarding pack` · `Onboarding Administration → Exit interview` ⟵ §3.3
+
+**Five of these six fill a real task.** Three are constraints-in-waiting held by 2, 3 and 1 people;
+two (`Device Provisioning`, `Onboarding Administration`) are held by **everyone on their team**, so
+they are control cases — a skill requirement that provably changes nothing, which is what stops the
+example proving its point by construction.
+
+`Accredited Vetting Officer` earns its keep: defined once, assigned wholesale, expanded to two leaves
+by the fill.
 
 ### 3.3 The two deliberate non-matches
 
-The unmatched report is the headline of the fill panel, and an example where it comes back empty
-teaches the learner to ignore it. So the diagram carries exactly two honest mismatches:
+An example whose unmatched report comes back empty teaches the learner to ignore it — and that report
+is the headline of the fill panel. So exactly two honest mismatches, both called out in the
+description so they read as intentional:
 
-1. **Dev Nair (Contractor)** — an actor in the architecture who is on no team. Reported under *"In
-   the diagram, not on any team"*.
-2. **Exit interview** — a business process with a role assigned but no matching BPMN task. Reported
-   under *"In the diagram, matching no task"*.
-
-Both are the kind of thing a real architecture diagram always has, both are harmless, and both are
-called out in the example's own description so they read as intentional rather than as a broken
-example.
+1. **Dev Nair (Contractor)** — fully modelled, and accredited, but on no team → *"In the diagram,
+   not on any team"*. He is given a role deliberately: an actor with NO role would also trip the
+   'holds nothing' warning (T3530), and one honest report is worth more than two. He also makes a
+   quiet point — the architecture says a third accredited person exists; the team library says he is
+   not available.
+2. **Exit interview** — a business process with a role assigned and no matching BPMN task → *"In the
+   diagram, matching no task"*.
 
 ---
 
 ## 4. The library
 
-### 4.1 Calendars
+### 4.1 Calendars and the epoch
 
 | Calendar | Pattern | Used by |
 |---|---|---|
-| **HR business hours** | Mon–Fri 09:00–12:30 and 13:30–17:00 (7.5 h/day) | Talent Acquisition, HR Operations, Payroll, and the arrival source |
+| **HR business hours** | Mon–Fri 09:00–12:30, 13:30–17:00 (7.5 h/day) | Hiring Manager, Talent Acquisition, HR Operations, Onboarding Services, Payroll, and the arrival source |
 | **IT service desk** | Mon–Fri 08:00–18:00 | IT Provisioning |
 
-`epochDate: "2027-01-04"` on both — **verified a Monday**, which the weekly pattern anchors t=0 to.
+**`epochDate: "2027-07-05"`** — verified a Monday, which is what the weekly pattern anchors t=0 to.
 Without it, `exceptions` are ignored entirely and `calendarWarnings` says so.
 
-### 4.2 Exceptions — the holidays
+### 4.2 Exceptions — and where they land in the run
 
-Dated closures on both calendars (`intervals: []` = closed all day):
+`horizon: 8760` from 2027-07-05 runs to **2028-07-04**:
 
-`2027-01-01` New Year's Day · `2027-01-26` Australia Day · `2027-03-26` Good Friday ·
-`2027-03-29` Easter Monday · `2027-04-25` Anzac Day · `2027-06-14` King's Birthday ·
-`2027-12-24` → `2028-01-03` **Christmas shutdown** (a run of dated closures)
+| Date | | Exception | Position in the run |
+|---|---|---|---|
+| 2027-10-04 | Mon | Labour Day | 25% |
+| 2027-12-23 | Thu | Half day, 09:00–12:30 only | 47% |
+| 2027-12-24 → 2028-01-03 | | **Christmas shutdown** (closed) | **47% → 50%** |
+| 2028-01-26 | Wed | Australia Day | 56% |
+| 2028-04-14 | Fri | Good Friday | 78% |
+| 2028-04-17 | Mon | Easter Monday | 79% |
+| 2028-04-25 | Tue | Anzac Day | 81% |
+| 2028-06-12 | Mon | King's Birthday | 94% |
 
-Plus one half-day, because a non-empty exception is the interesting case and the common case is
-already covered: `2027-12-23`, `09:00–12:30` only.
-
-> The Christmas shutdown is what makes step 5's *"10 working days"* visibly different from *"14
-> days"*. A learner who runs the model across December sees the timer step over the closure. That is
-> the whole argument for `delayMode: "working-days"` in one screenshot.
+Eight exceptions spread across the measurement window, with the shutdown squarely in the middle. The
+half-day is there because empty `intervals` (closed) is the easy case and a non-empty one is the
+interesting one.
 
 ### 4.3 Teams and people
 
-| Team | Capacity | £/hr | Calendar | Named people |
-|---|---|---|---|---|
-| Hiring Manager | 6 | 95 | HR business hours | *(none — a counted pool)* |
-| Talent Acquisition | 3 | 65 | HR business hours | Priya Raman, Tom Fletcher, Aisha Khan |
-| HR Operations | 4 | 45 | HR business hours | Grace Oduya, Ben Carter, Marta Silva, Ruth Ellis |
-| IT Provisioning | 2 | 55 | IT service desk | Sam Doyle, Nina Petrov |
-| Payroll | 1 | 50 | HR business hours | Jo Mensah |
+| Team | Capacity | £/h | Calendar | Utilisation | Named people |
+|---|---|---|---|---|---|
+| Hiring Manager | 6 | 95 | HR business hours | **18%** | *(none — a counted pool)* |
+| Talent Acquisition | 8 | 65 | HR business hours | **59%** | Priya, Tom, Aisha, Ravi, Ellie, Jack, Nadia, Chris |
+| **HR Operations** | 4 | 45 | HR business hours | **56%** | Grace, Ben, **Marta**, Ruth |
+| Onboarding Services | 3 | 42 | HR business hours | **51%** | Leah, Femi, Dan |
+| IT Provisioning | 2 | 55 | IT service desk | **20%** | Sam, Nina |
+| Payroll | 1 | 50 | HR business hours | **17%** | Jo |
 
-Mixing a counted pool (Hiring Manager) with named teams is deliberate: it shows both models coexisting,
-and it keeps the example honest about the fact that you only name people where the naming *does*
-something.
+**No team is above 59%.** That is the point: nothing in the utilisation panel looks like a problem.
+Mixing one counted pool (Hiring Manager) with five named teams is deliberate — you only name people
+where naming *does* something.
 
 ### 4.4 ⚠ The authoring trap (Gap F)
 
 **Every task carrying `requiredSkills` must sit on a team that names its people.** A skill required
-from a memberless pool is granted to anyone, silently — `resourcePool.ts:182`. In the design above
-that is satisfied (all five skilled tasks are on Talent Acquisition, HR Operations or Payroll, never
-on Hiring Manager), but it is one careless edit away from being untrue, which is why Gap F's
-readiness warning is worth shipping alongside.
+from a memberless pool is granted to anyone, silently. The design satisfies this — all four skilled
+tasks are on Talent Acquisition, HR Operations or Payroll, never on Hiring Manager — but it is one
+careless edit from being untrue.
 
 ### 4.5 Business-case inputs (on the study)
 
 ```json
-{ "implementationCost": 4500,
-  "annualVolume": 260,
-  "costOfDelayPerHour": 120 }
+{ "implementationCost": 4500, "annualVolume": 790, "costOfDelayPerHour": 120 }
 ```
 
-- **£4,500** — accredited right-to-work compliance training for one person, plus their time.
-- **260** — hires per year, consistent with the arrival rate.
-- **£120/h** — the business cost of a role standing empty. *Not* staff cost; the doing line already
-  carries that. This is the number that makes the payback month non-trivial, and the example's
-  description must say plainly that it is an assumption the reader should replace.
+- **£4,500** — accredited vetting-officer training for one person, plus their time.
+- **790** — hires/year, consistent with `exponential(2.35)` over ~1,850 open hours.
+- **£120/h** — the business cost of a role standing empty. **Not** staff cost; the doing line carries
+  that. This is an assumption the example's own description must flag, because the payback month is
+  directly proportional to it.
 
-The alternative being costed — **hiring a fifth HR Operations person** at ~£88,000 loaded plus
-£12,000 recruitment — is the comparison scenario, and is ~22× the training cost. The model's job is
-to show it also performs *worse*.
+The alternative being costed — **two more HR administrators** at ~£88,000 loaded each — is scenario 3,
+and is **~39× the training cost** for a worse answer.
 
 ---
 
-## 5. Scenarios and planned runs
+## 5. Scenarios
 
-Run config for all: `clockUnit: "hour"`, `horizon: 8760`, `warmUp: 336` (two weeks), `replications: 10`,
-`seed: 20260908`, `collectQueues: true`.
+Run config for all: `clockUnit: "hour"`, `horizon: 8760`, `warmUp: 2160` (90 days ≈ 2 flow times),
+`replications: 10`, `seed: 20270705`, `collectQueues: true`. Measurement window ≈ 275 days ≈ **590
+completed cases per replication**.
 
-Cost check: 8,760 × 10 = 87,600 per run, well inside `maxWork` (5,000,000). A 12-point sweep is
-1,051,200 — also fine. A tornado over ~11 parameters is 23 runs; `maxSweepSteps` is 24, so it just
-fits. **Twelve parameters would not**, and the tornado would name what it dropped.
-
-| # | Scenario | Overrides | Teaches |
+| # | Scenario | Overrides | Expected outcome |
 |---|---|---|---|
-| 1 | **As-is — today's team** *(baseline)* | *(none)* | The starting picture. Right-to-work is top of `bottlenecks` |
-| 2 | **Hire two more HR administrators** | `teams["HR Operations"].capacity = 6` | **The trap.** Costs £200k/yr and barely moves the answer, because the queue is for a *skill*, not a *desk* |
-| 3 | **Train a third checker** | `teams["HR Operations"].members = [{ name: "Marta Silva", skills: [ …+"Right to Work Compliance" ] }]` | **The answer.** £4,500, capacity unchanged, and the constraint lifts. *Needs Gap E* |
-| 4 | **Train a third checker + triage critical roles** | scenario 3 plus `teams["HR Operations"].discipline = "priority"` | Priority queueing; the pooled p95 barely moves while the critical segment improves sharply |
+| 1 | **As-is — today's team** *(baseline)* | *(none)* | HR Operations 56%, the two accredited officers **92%**, ~**1.9 working days** of queue on every hire |
+| 2 | **More desks, no more people** | `teams["HR Operations"].capacity = 6` | **Bit-identical to the baseline.** Capacity cannot exceed the 4 named members, so nothing changes at all |
+| 3 | **Hire two more administrators** | `capacity = 6` **+** two new members with `skills: []` | Helps *Prepare offer* only. **Inside the noise.** ~£176k/yr for no measurable difference |
+| 4 | **Train a third checker** | `members: [{ name: "Marta Silva", skills: [ …, "Compliance Accreditation" ] }]`, capacity unchanged | Accredited pool 2→3: **92% → 61%**, queue **1.9 → 0.1 days**. **Real.** £4,500 |
+| 5 | **Train a third checker + triage critical roles** | scenario 4 **+** `discipline: "priority"` | Pooled p95 barely moves; the *critical* segment improves sharply |
 
-**Then, from the panels rather than as stored scenarios:**
-
-- **Sweep** — `HR Operations` capacity, 1 → 10, 10 points, measuring near-worst flow time. Run it on
-  scenario 2 and the curve is nearly **flat above 4**: there is no knee, because more desks buy
-  nothing. Run the same sweep on scenario 3 and the curve has a real knee. *Two sweeps, one lesson* —
-  and it is the clearest demonstration of the knee detector refusing to invent an elbow that this
-  product will ever have.
-- **Tornado** — on the baseline. Expected ranking: the right-to-work cycle time and the arrival rate
-  move the answer; `Prepare onboarding pack` and the IT provisioning time do not; the **Payroll**
-  headcount (capacity 1) comes back **not-testable**, which is the untested-vs-unimportant
-  distinction landing in a real model rather than a unit test.
-- **Business case** — scenarios 1 → 3, then 1 → 2 for contrast. Only one of them has a payback month.
-- **Significance** — 1 vs 2 should read *inside the noise*; 1 vs 3 should read *real*. If 1 vs 2 came
-  back "real" the example would be teaching the opposite of what it claims, so this is a build-time
-  acceptance check, not just a walkthrough step (see §8).
+Scenarios 2, 3 and 4 all need **Gap E**.
 
 ---
 
-## 6. The learner's walkthrough
+## 6. Acceptance — the example as an end-to-end test
 
-Ten steps, each one landing a feature. This becomes the example's `description` and the ordering of
-its scenarios.
+The point of designing the figures in advance is that the example becomes a **regression test for the
+whole simulator**: the calendar, the pool, the skills model, the significance test, the knee
+detector, the tornado and the business case, all asserted together on one realistic model. Nothing
+else in the suite exercises them in combination.
 
-1. **Adopt** *Hire & Onboard* from the Simulator Examples gallery. Two diagrams arrive: the process,
-   and the HR operating model.
-2. **Open the ArchiMate diagram.** Nobody has typed a skills matrix. This is the picture the Business
-   Architect already had.
-3. **Team library → ✨ Fill from ArchiMate.** The preview says what it *would* fill before anything
-   happens. Fill it. Ten members get skills, five tasks get requirements — and two things do not
-   match, both named. Read the unmatched report: that is the feature.
-4. **Run the baseline.** HR Operations is top of the bottleneck list, and the flow-time p95 is far
-   worse than the p50 — the long tail is the cases that arrive when neither Grace nor Ruth is free.
-5. **Look at the calendar.** Run the replay across late December and watch the process stop. The
-   *"10 working days"* timer steps over the shutdown; an elapsed-days timer would not have.
-6. **Ask the obvious question: hire more people.** Run scenario 2. Compare with the baseline —
-   the verdict says **inside the noise**. Two extra salaries, no measurable difference.
-7. **Sweep the headcount, 1 → 10.** The curve is flat above 4 and reports **no knee**. The model is
-   telling you that you are pulling the wrong lever.
-8. **Train one person instead.** Run scenario 3. Compare: this time the difference is **real**, and
-   the same sweep now shows a genuine knee.
-9. **Tornado.** Which of the model's thirty numbers were load-bearing? Two were. Several made no
-   measurable difference — a rough guess is safe for those. And one could not be tested at all, and
-   says so.
-10. **Business case.** £4,500 against £200,000, with a payback month on the cheap one and none on the
-    expensive one. Export to `.docx` and it is a paper you could hand to a finance director.
+Three tiers, because they fail for different reasons and want different responses.
 
-Step 6 → 8 is the spine. Everything else is scenery hung on it.
+### Tier 0 — design invariants, checkable from the package alone (no run)
 
----
+Cheap, fast, and they catch an edit to the example that quietly destroys its argument.
 
-## 7. Feature coverage
+| Assertion | Expected |
+|---|---|
+| Exactly **2** members hold `Compliance Accreditation` | `=== 2` |
+| `Compliance & vetting review` carries `requiredSkills: ["Compliance Accreditation"]` | present |
+| Every task with `requiredSkills` sits on a team with ≥1 named member | all |
+| Analytic team utilisation, every team | **< 65%** |
+| Analytic utilisation of the accredited pair | **> 88%** |
+| `epochDate` is a Monday on every calendar | all |
+| ≥ 6 calendar exceptions fall between 20% and 95% of the horizon | yes |
 
-| Feature | Phase | Where in this example |
+The utilisation ones are the arithmetic of §4.3 recomputed from the package — *not* a run. If someone
+raises a cycle time and quietly makes a second team the bottleneck, this fails immediately and says so.
+
+### Tier 1 — the argument (relational, must never break)
+
+These are what the example *claims*. If one fails, either the engine regressed or the example has
+stopped teaching what it says on the tin. **This is the most important guard in the plan.**
+
+| # | Assertion | Why it matters |
 |---|---|---|
-| Named baseline + run trend | 1 | Scenario 1, kept as the baseline across runs |
-| Suggested next steps | 1 | Available after step 8 (four runs ≥ the three-run floor) |
-| Business case + payback month | 2 | Step 10 |
-| Queue wait vs process wait, kept apart | 2 | Right-to-work: 40 h of provider `waitTime` that headcount cannot touch |
-| Rework / first-pass yield | 2 | The 28% and 14% loop-backs |
-| Significance verdict | 3 | Steps 6 and 8 — and the example is *wrong* if step 6 reads "real" |
-| Warm-up suggestion | 3 | 336 h is set; the pilot should agree |
-| **Sweep + knee** | 4 | Steps 7 and 8 — run twice, deliberately |
-| Priority queue discipline | 5 | Scenario 4 |
-| Per-segment service level | 5 | Scenario 4 — pooled p95 vs the critical segment |
-| **Holidays and shutdowns** | 5 | §4.2, visible at step 5 |
-| Batching and cut-offs | 5 | ❌ **omitted — Gap D**, unreachable from a diagram |
-| Twin validation vs a mining log | 6 | ❌ out of scope — belongs to `mined-twin-validated` |
-| **Skills and named people** | 7 | The spine |
-| **Skills read from ArchiMate** | 7 | Step 3 |
-| Least-flexible-first assignment | 7 | Priya holds three skills and is kept free for the ones only she has |
-| BPSim round-trip with skills | 7 | Export/import as an optional last step |
-| **Tornado** | 8 | Step 9, including a not-testable bar |
+| 1 | Baseline: the busiest **team** is < 65%, yet mean queue wait per case > 1 working day | The whole premise — a healthy-looking team with a real queue |
+| 2 | Baseline `bottlenecks[0]` is **HR Operations** | The bottleneck report finds it despite the low utilisation |
+| 3 | Scenario 2 is **bit-identical** to the baseline — same completed count, same p50, same p95 | Capacity is not people. An exact assertion, and the cleanest possible statement of the mechanic |
+| 4 | Scenario 3 vs baseline: `compareSamples` → **does not clear the band** | Hiring two administrators is not the answer |
+| 5 | Scenario 4 vs baseline: `compareSamples` → **clears the band** | Training one person is |
+| 6 | Scenario 4's **queue wait per case** < 25% of the baseline's | The improvement is in the queue, not a flow-time artefact |
+| 7 | Scenario 4 costs less than scenario 3 **and** performs better | The business case's conclusion, asserted directly |
+| 8 | Sweeping `HR Operations` capacity **4 → 10** on the baseline: every point identical, `findKnee` → **null** | The knee detector refuses to invent an elbow. Also proves 3 across a range |
+| 9 | Sweeping **arrival** 3.2 → 1.6 on the baseline: knee in **2.1 – 2.7** open-hours | Saturation is at 2.17 (100%) / 2.55 (85%) — the knee sits between |
+| 10 | Same sweep on scenario 4: knee in **1.3 – 1.8** open-hours | Saturation moves to 1.44 / 1.70 — **+50% volume for £4,500** |
+| 11 | Tornado: `HR Operations` capacity → **`no-difference`** | The headline. A capacity bar sitting flat next to a moving arrival bar *is* the example |
+| 12 | Tornado: `Payroll` capacity → **`not-testable`** | Capacity 1 cannot go ±20%. Untested-vs-unimportant, landing on a real model |
+| 13 | Tornado: the top mover is the **arrival rate** or the **compliance cycle time** | Ranking sanity |
+| 14 | Tornado returns **≥ 1** of each of the three verdicts | Both halves of the chart non-empty by construction |
+| 15 | A case spanning the Christmas shutdown takes measurably longer than one that does not | The calendar exceptions are actually applied |
+| 16 | ArchiMate fill: **18 members**, **5 tasks**, exactly **1** unmatched actor, exactly **1** unmatched work item | Silent non-matching is this feature's failure mode |
 
-Fifteen of seventeen. The two omissions are honest: one is blocked by Gap D, the other belongs to a
-different example.
+Assertions 9 and 10 use **ranges derived from queueing theory**, not observed values — they are a
+genuine prediction the model must meet, which is what makes them a test rather than a snapshot.
+
+### Tier 2 — golden figures (exact, seed-pinned)
+
+A change-detector, not a correctness argument. **Captured from the first green run and committed —
+never hand-written**, because a predicted figure presented as an expectation is a fabrication, and
+the discrete-event mean is not something anyone can derive to three significant figures.
+
+Pinned per scenario at `seed: 20270705`: `completed.mean`, `flowTime.p50/p95`, `queueWait.mean`,
+`costPerCase.mean`, and `perTeam[*].utilization.mean`.
+
+Any change to any of them is a **real behavioural change in the engine**, and the review question is
+"was that intended?" — not "adjust the number until it passes". The commit that moves a golden must
+say why in its message.
+
+> **Why goldens and Tier 1 both.** Tier 1 survives an intentional engine change and would keep
+> passing through a slow drift; Tier 2 catches the drift but goes red on every intentional change.
+> Neither alone is enough. This is the same two-tier shape as the existing regression bar for the
+> engine phases.
+
+### What to sweep, precisely
+
+| Sweep | Lever | Range | Steps | Objective | Expected |
+|---|---|---|---|---|---|
+| **A** | `teamCapacity: HR Operations` | 4 → 10 | 7 | near-worst flow | **Perfectly flat, no knee** |
+| **B** | `sourceArrival: Vacancy approved` | 3.2 → 1.6 | 9 | near-worst flow | Knee at **2.1 – 2.7** |
+| **C** | Sweep B on scenario 4 | 3.2 → 1.6 | 9 | near-worst flow | Knee at **1.3 – 1.8** |
+| **D** | `taskCycleTime: Compliance & vetting review` | 1 → 8 | 8 | near-worst flow | Knee where the pair passes ~85%, ≈ **4.4 h** |
+
+Sweep A is run **from 4, not from 1** — below 4 the capacity genuinely binds and the curve would bend
+for the wrong reason. Sweep B is the one that answers the question a business actually asks: *at what
+hiring volume does our current accreditation cover fall over?*
+
+Cost check: 9 points × 8,760 h × 10 reps = **788k** of the 5M `maxWork` budget. Comfortable.
+
+### The tornado, precisely
+
+20 parameters (6 teams + 1 source + 13 tasks) → **41 runs**, 3.59M of the 5M `maxWork` budget — but
+`maxSweepSteps: 24` caps it at 11 parameters and **drops 9** (Gap G). The example therefore needs
+Gap G fixed, or assertion 11 is a coin toss depending on enumeration order.
 
 ---
 
-## 8. Build order
+## 7. The learner's walkthrough
+
+1. **Adopt** from the gallery. Two diagrams arrive: the process, and the HR operating model.
+2. **Open the ArchiMate diagram.** Nobody typed a skills matrix — this is what the Business Architect
+   already had.
+3. **Team library → ✨ Fill from ArchiMate.** The preview says what it *would* fill first. Fill it:
+   18 members, 5 tasks, and two things that did not match, both named. Read the unmatched report.
+4. **Run the baseline.** Every team under 60%. Nothing looks wrong. And yet the p95 flow time is far
+   worse than the p50.
+5. **Look at the queue-wait line.** 1.9 working days per hire, all of it at one step.
+6. **"Give them more desks."** Run scenario 2. The result is *identical to the baseline* — the model
+   will not pretend a desk is a person.
+7. **"Then hire two more."** Run scenario 3. £176k/year, and the verdict is **inside the noise**.
+8. **Sweep the headcount, 4 → 10.** Flat. **No knee.** The model is telling you it is the wrong lever.
+9. **Train one person instead.** Scenario 4: the verdict is **real**, and the queue collapses to
+   0.1 days.
+10. **Sweep the arrival rate on both.** The knee moves from ~2.4 to ~1.5 open-hours: the same team can
+    now absorb **50% more hiring** — for £4,500.
+11. **Tornado.** The arrival rate and the vetting time are load-bearing. HR Operations' *headcount*
+    makes **no measurable difference** — the bar the whole example has been arguing towards. Payroll
+    cannot be tested at all, and says so.
+12. **Business case.** £4,500 against £176,000, with a payback month on one and none on the other.
+    Export to `.docx`.
+13. **Watch the calendar.** Replay across late December: the process stops for the shutdown, and the
+    "10 working days" timer steps over it.
+
+Steps 6 → 9 are the spine.
+
+---
+
+## 8. Feature coverage
+
+| Feature | Phase | Where | Asserted by |
+|---|---|---|---|
+| Named baseline + run trend | 1 | Scenario 1 held across runs | — |
+| Suggested next steps | 1 | After step 9 (≥ 3 runs) | — |
+| Business case + payback | 2 | Step 12 | T1.7 |
+| Queue wait vs process wait | 2 | 1.9 d queue against 30 d of authored waits | T1.1, T1.6 |
+| Rework / first-pass yield | 2 | 28% and 14% loop-backs, 1.615 passes | T0 |
+| Significance verdict | 3 | Steps 7 and 9 | **T1.4, T1.5** |
+| Warm-up | 3 | 2,160 h; Welch should agree | — |
+| Sweep + knee | 4 | Steps 8 and 10 | **T1.8, T1.9, T1.10** |
+| Priority discipline | 5 | Scenario 5 | — |
+| Per-segment service level | 5 | Scenario 5 | — |
+| Holidays and shutdowns | 5 | §4.2, step 13 | T1.15 |
+| Batching and cut-offs | 5 | ❌ **Gap D** | — |
+| Twin validation | 6 | ❌ belongs to `mined-twin-validated` | — |
+| Skills and named people | 7 | The spine | T0, **T1.3** |
+| Skills from ArchiMate | 7 | Step 3 | **T1.16** |
+| Least-flexible-first | 7 | Grace and Ruth kept for what only they can do | — |
+| Tornado, all three verdicts | 8 | Step 11 | **T1.11–T1.14** |
+
+**Fifteen of seventeen**, with eleven under assertion. The two omissions are honest: one is blocked
+by Gap D, the other belongs to a different example.
+
+---
+
+## 9. Build order
 
 | Slice | Work | Done when |
 |---|---|---|
-| **1** | **Gap E** — `TeamOverride.members`, `NodeOverride.requiredSkills`, `NODE_KEYS`, merge-by-name in `applyOverrides` | A scenario can cross-train one person; unset behaves bit-identically; a name not in the library is reported, not invented |
-| **2** | **Gaps A + C** — `members`/`skillsSource` on `ExampleTeam`, `businessCase` on the package study; carry both through capture and adopt | Capture → adopt round-trip preserves a skills matrix and the inputs, proven by a test that fails without the change |
-| **3** | **Gap B** — non-root diagrams in a package | An ArchiMate diagram survives capture → adopt and shows up in the fill panel's options |
-| **4** | **Gap F** — readiness warning for a skill required from a memberless team | The warning fires; clearing HR Operations' members makes it fire |
-| **5** | **Author the two diagrams** in a real project through the editor — *not* by hand-writing JSON | Both render; the ArchiMate fill preview reports 10 members and 5 tasks, with exactly the two intended non-matches |
-| **6** | **Configure** calendars, exceptions, teams, people, the four scenarios and the business-case inputs, in that project | Baseline runs; right-to-work is top of `bottlenecks` |
-| **7** | **Capture** via the admin *Save as example* path, merge into `exampleData.json` by slug, add to the **T3369** list and the **T3561** level map | `exampleSeeds.test.ts` green |
-| **8** | **Acceptance tests** — §9 | Green |
-| **9** | Seed locally, walk §6 end to end, then seed prod | The walkthrough works as written |
+| **1** | **Gap E** — `TeamOverride.members` (merge by name), `NodeOverride.requiredSkills`, `NODE_KEYS` | A scenario cross-trains one person; unset is bit-identical; an unknown name is reported |
+| **2** | **Gap G** — `maxSensitivityRuns`, separate from `maxSweepSteps` | A 20-parameter model tests all 20 and still respects `maxWork` |
+| **3** | **Gaps A + C** — `members`/`skillsSource` and `businessCase` in the package | Capture → adopt round-trip preserves both, proven by a test that fails without it |
+| **4** | **Gap B** — non-root diagrams in a package | An ArchiMate diagram survives capture → adopt and appears in the fill options |
+| **5** | **Gap F** — readiness warning | Clearing HR Operations' members makes it fire |
+| **6** | **Author both diagrams** through the editor, not by hand-writing JSON | Both render; the fill preview reports 18 / 5 with exactly the two intended non-matches |
+| **7** | **Configure** calendars, exceptions, teams, people, five scenarios, business-case inputs | Baseline runs; §4.3 utilisations within ±5pp of the analytic figures |
+| **8** | **Capture** via *Save as example*, merge by slug, add to **T3369** and the **T3561** level map | `exampleSeeds.test.ts` green |
+| **9** | **Tier 0 + Tier 1 acceptance tests**, numbered from **T3563** | Green |
+| **10** | **Capture Tier 2 goldens** from the first green run and commit them | Green, and re-running reproduces them exactly |
+| **11** | Seed locally, walk §7 end to end, then seed prod | The walkthrough works as written |
 
-Slices 1–4 are the ones with judgement in them. 5–7 are careful data entry. **Do not start slice 5
-before slices 1–3 are green** — authoring the example first and discovering the package cannot carry
-it is the expensive failure mode here.
-
----
-
-## 9. Verification
-
-Beyond the existing example suite (`validateExamplePackage`, every scenario runs, **T0571**
-calendars, **T3369** no slug lost, **T3561/T3562** levels):
-
-- **The example's argument must actually hold.** A test that runs scenarios 1, 2 and 3 and asserts:
-  1 vs 2 does **not** clear the significance band; 1 vs 3 **does**; and scenario 3's busiest-team
-  utilisation is lower than scenario 2's *at lower cost*. If a future engine change quietly inverts
-  that, the example starts teaching the opposite of what it says, and nothing else in the suite would
-  notice. **This is the single most important guard in this plan.**
-- **The sweep on scenario 2 finds no knee, the sweep on scenario 3 does.** Same assertion style.
-- **The tornado returns at least one `not-testable` bar** (Payroll, capacity 1) and at least one
-  `no-difference` bar — the example is chosen precisely so both halves are non-empty.
-- **The ArchiMate fill matches what §3.2 promises**: 10 members, 5 tasks, exactly 1 unmatched actor
-  and exactly 1 unmatched work item. Pin the counts; a silent drift to zero matches is this feature's
-  failure mode.
-- **Calendar exceptions are actually applied** — `calendarWarnings` empty, `epochDate` a Monday, and
-  a case spanning the shutdown takes measurably longer than one that does not.
-- **Round-trip**: capture → adopt → capture yields the same skills matrix and business-case inputs.
-- **`npm run build`** before pushing, per the parent plan's first verification note.
-- New tests numbered from **T3563** (T3562 is the current highest), appended to `TESTS_SUMMARY.md`.
+Slices 1–5 carry the judgement. **Do not start slice 6 before 1–4 are green** — authoring the example
+and *then* finding the package cannot carry it is the expensive failure here.
 
 ---
 
 ## 10. Risks and open decisions
 
-1. **Gap E's merge semantics.** `members` as a whole-list replacement is simpler but means a scenario
-   that trains one person silently deletes the other three. Merge-by-name is the right answer and the
-   one specified above; it needs a decision on what happens to a name that is *not* in the library —
-   the recommendation is **report it, do not invent a person**, matching how the ArchiMate fill treats
-   an unmatched actor.
-2. **Model size vs legibility.** Twenty-one elements is the largest example in the catalog. It is
-   justified — the argument needs a specialist step, a control step that is *not* a constraint, a
-   process wait and a rework loop — but the diagram must still be readable in one screenshot or the
-   walkthrough falls apart. If it will not fit, the parallel branch (14–18) is the part to simplify,
-   not the spine.
-3. **The tornado just fits.** Eleven parameters is 23 runs against a cap of 24. Adding one more team
-   or task pushes it over and the tornado starts dropping parameters. Acceptable — it *reports* what
-   it dropped — but it means this example is also, incidentally, the argument for the queued-job
-   migration the parent plan has been deferring since Phase 4.
-4. **The £120/h cost of delay is an assumption**, and the payback month is proportional to it. The
-   description must say so in the example's own words, not in a footnote. An example that presents a
-   made-up number as a finding is the exact failure the business-case work was built to avoid.
-5. **Australian public holidays date this example.** They are correct for 2027 and wrong for every
-   other year. Either accept that (the `epochDate` pins it to 2027 anyway) or drop to a generic
-   "Christmas shutdown + four public holidays" set. **Recommendation: keep the real dates** — a
-   holiday calendar that looks real is the point, and a learner replaces it with their own.
-6. **Gap D leaves batching untaught** across the whole catalog. Worth a separate, small piece of work
-   — `ElementSimParams.batch` plus an `assemble.ts` mapping plus a Properties-panel field — after
-   which the parent plan's `batch-and-cutoff` example becomes buildable. Noted, not scheduled.
+1. **Gap E's merge semantics.** Merge-by-name is specified; the open question is what happens to a
+   name not in the library. Recommendation: **report it, never invent a person** — matching how the
+   ArchiMate fill treats an unmatched actor.
+2. **The queue is 6% of the flow time.** 1.9 days of queue against ~32 days end to end. Mean flow
+   time is the wrong headline; the assertions use queue wait and p95. If a future reviewer wants the
+   flow time itself to move dramatically, the authored waits (10 + 15 working days) would have to
+   shrink — at the cost of realism. **Recommendation: keep them, and let the business case do its
+   job.** This is the situation Phase 2's wait split was built for.
+3. **Tier 2 goldens will go red on any intentional engine change.** That is the design. The risk is
+   somebody "fixing" them without reading why. The commit message discipline in §6 is the mitigation.
+4. **Model size.** 21 elements, six lanes — the largest example in the catalog. Justified, but it
+   must still be readable in one screenshot. If it will not fit, simplify the parallel branch
+   (14–18), never the spine.
+5. **£120/h cost of delay is an assumption** and the payback month is proportional to it. The
+   description must say so in its own words.
+6. **Australian public holidays date this to 2027–28.** The `epochDate` pins it there anyway.
+   **Recommendation: keep the real dates** — a holiday calendar that looks real is the point.
+7. **Gap D leaves batching untaught catalog-wide.** Separate small piece of work
+   (`ElementSimParams.batch` + `assemble.ts` + a panel field), after which the parent plan's
+   `batch-and-cutoff` example becomes buildable. Noted, not scheduled.
