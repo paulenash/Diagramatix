@@ -8,7 +8,7 @@
  */
 
 import type { SimDist, WorkCalendar } from "./types";
-import type { QueueDiscipline } from "./resourcePool";
+import type { QueueDiscipline, PoolUnit } from "./resourcePool";
 
 export type NodeKind = "source" | "task" | "gateway" | "delay" | "sink" | "subprocess";
 
@@ -105,6 +105,11 @@ export interface SimNode {
    * Absent (or with neither field set) = no batching, exactly as before.
    */
   batch?: { size?: number; cutoff?: string };
+  /** Skills this task needs. ALL must be held by whoever takes it (AND).
+   *  ABSENT = anyone on the team, which is what every model did before skills
+   *  existed. The DEFAULT path is unchanged: the task names a team, and the team
+   *  is the role; these only refine it for genuinely specialist work. */
+  requiredSkills?: string[];
   cycleTime?: SimDist;
   setupTime?: SimDist;   // BPSim SetupTime, added before processing
   waitTime?: SimDist;    // BPSim WaitTime — non-seizing delay after service
@@ -173,6 +178,11 @@ export interface SimTeam {
    *  did before disciplines existed. See ResourcePool for why head-of-line
    *  blocking is kept in every discipline. */
   discipline?: QueueDiscipline;
+  /** Named people and what each can do. ABSENT = a counted pool of
+   *  interchangeable units, exactly as before skills existed. `capacity` still
+   *  caps how many may work at once, so the calendar and interventions are
+   *  unaffected; units only decide WHO may take WHICH task. */
+  units?: PoolUnit[];
   /** Working hours: the team is staffed at `capacity` during open windows and
    *  0 when closed (in-service tasks finish; new seizes wait). Absent → 24/7. */
   calendar?: WorkCalendar;

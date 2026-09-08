@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-09-07  ·  **Document version:** 7.0  ·  **Suite:** 415 test files · 2,824 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T3507  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-09-07  ·  **Document version:** 7.0  ·  **Suite:** 416 test files · 2,839 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T3522  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
@@ -34,9 +34,9 @@ Each test file has its own section below, grouped into layers. Within each secti
 | **Protects you against** | In plain terms, the real-world problem that would occur if this behaviour regressed. |
 | **How it would break (go red)** | The kind of code or data change that would make this specific test fail — i.e. what the test is watching. |
 
-**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T3508**, the one after **T3509**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
+**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T3523**, the one after **T3524**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T3507`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
+> **Highest ref allocated: `T3522`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -2614,6 +2614,21 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 | T3505 | `tests/simulation/validate.test.ts` | The holdout is capped, so a model can never be fitted on nothing. |
 | T3506 | `tests/simulation/validate.test.ts` | Cases arriving out of order are sorted before splitting. |
 | T3507 | `tests/simulation/validate.test.ts` | The path the validate panel posts to resolves to a route file. |
+| T3508 | `tests/simulation/skills.test.ts` | A pool with no people declared is a counted pool, exactly as before. |
+| T3509 | `tests/simulation/skills.test.ts` | Required skills change nothing when the team declares no people. |
+| T3510 | `tests/simulation/skills.test.ts` | Only someone holding every required skill can take the work (AND). |
+| T3511 | `tests/simulation/skills.test.ts` | Work requiring no skills can be taken by anyone on the team. |
+| T3512 | `tests/simulation/skills.test.ts` | A skill nobody holds makes the work wait rather than going to anyone. |
+| T3513 | `tests/simulation/skills.test.ts` | Releasing frees the right person: only the qualified one unblocks the work. |
+| T3514 | `tests/simulation/skills.test.ts` | The generalist is kept free for the work only they can do. |
+| T3515 | `tests/simulation/skills.test.ts` | Ties break on unit id, so the choice of person is reproducible. |
+| T3516 | `tests/simulation/skills.test.ts` | A skilled pool serves work someone can do rather than leaving them idle. |
+| T3517 | `tests/simulation/skills.test.ts` | Queue order is still respected among the requests that can be served. |
+| T3518 | `tests/simulation/skills.test.ts` | A counted pool keeps strict head-of-line blocking, unchanged. |
+| T3519 | `tests/simulation/skills.test.ts` | A skilled team closed by the calendar stops, however many qualify. |
+| T3520 | `tests/simulation/skills.test.ts` | Capacity can cap a skilled team below its headcount. |
+| T3521 | `tests/simulation/skills.test.ts` | People and their assignments survive a snapshot. |
+| T3522 | `tests/simulation/skills.test.ts` | An older snapshot with no people resumes as a counted pool. |
 
 > **Keep this section in sync.** Whenever an e2e spec is added, removed, or changes what it asserts, update this section. It is hand-maintained, not generated.
 

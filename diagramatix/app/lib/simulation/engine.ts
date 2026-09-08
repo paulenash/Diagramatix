@@ -278,7 +278,7 @@ export class Engine {
       }
       for (const es of n.eventSubs ?? []) this.esubById.set(es.id, es);
     }
-    for (const t of network.teams) this.pools.set(t.id, new ResourcePool<Pending>(t.capacity, 0, t.discipline ?? "fifo"));
+    for (const t of network.teams) this.pools.set(t.id, new ResourcePool<Pending>(t.capacity, 0, t.discipline ?? "fifo", t.units ?? []));
   }
 
   /** Seed sources with their first arrival, and schedule any planned
@@ -918,6 +918,10 @@ export class Engine {
         const granted = pool.request(this.clock, plan.units, pending, {
           priority: numProp(token, PRIORITY_PROP),
           serviceEstimate: node.cycleTime ? distMeanOf(node.cycleTime) : undefined,
+          // ALL required skills must be held (AND). Absent = anyone on the team.
+          requiredSkills: node.requiredSkills,
+          // The token is the holder: releasing it frees exactly those people.
+          key: token.id,
         });
         if (granted) this.startService(token, node, 0, plan);
         else this.emit("queue", token.id, node.id); // queued — service starts on a future release
@@ -965,7 +969,7 @@ export class Engine {
         // leaked the difference on every execution: the pool drained to zero,
         // every token queued forever, and the run reported "Running" while
         // nothing moved.
-        const granted = pool.release(this.clock, held?.units ?? node.units ?? 1);
+        const granted = pool.release(this.clock, held?.units ?? node.units ?? 1, token.id);
         for (const p of granted) {
           const gToken = this.tokens.get(p.tokenId);
           const gNode = this.nodeById.get(p.nodeId);

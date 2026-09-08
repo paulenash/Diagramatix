@@ -445,12 +445,60 @@ Three decisions worth recording:
 
 ## Phase 7 — Skills: who can do what
 
-**Status:** `Not started` · **Re-planned 2026-09-08 with Paul.** The original plan modelled this as
+**Status:** 🔶 `In progress` — slice 1 (engine) SHIPPED. **Re-planned 2026-09-08 with Paul.** The original plan modelled this as
 cross-skilling within a team and proposed a bespoke "team members + skills" library UI. Paul's
 input replaced both: this is a **competency model**, and the data already exists in the ArchiMate
 diagrams a Business Architect maintains. The engine change is smaller than planned and the
 feature is considerably more useful.
 
+### Why bother — what skills buy that roles alone cannot
+
+Today there are exactly two settings: **separate pools** (no sharing) or **one merged pool**
+(total sharing). Reality lives between them, and that middle is not awkward to express — it is
+**unrepresentable**. You can model "Assessment has 3, Appeals has 1". You cannot model "one of
+the Assessment three can also do Appeals". Merging overstates flexibility; separating
+understates it. The entire value of cross-skilling sits in the gap between those two wrong
+answers.
+
+Four questions become askable, none of which can be asked at all today:
+
+1. **Who should we train, and in what?** A Phase 4 sweep over a skills dimension — give one more
+   person skill X, re-run, read the curve. Cross-skilling is the cheapest improvement most
+   departments have and is currently an assertion rather than a number.
+2. **Who is the bottleneck — not which team, which PERSON?** A task needing a rare skill held by
+   one individual is a single point of failure no utilisation chart shows: the team reads a
+   comfortable 60% while one named person is the constraint. Without individuals that is
+   invisible by construction.
+3. **What happens when Ann is on leave?** Phase 5 gave calendars dated absence, but with counted
+   pools that is only capacity 3→2 and it does not matter who. With skills it matters
+   enormously: if Ann is the only one qualified for appeals, her fortnight off stops appeals dead.
+4. **Can we keep the urgent promise?** Priority and per-segment service levels already exist.
+   Skills add the real constraint: the urgent queue can only be served by those qualified for it.
+
+**What it does NOT buy**, so this is not oversold: in a model where every task is done by a
+distinct team with no overlap, skills add nothing — they would re-encode the team assignment in
+a second place. Which is exactly why the whole thing is optional.
+
+### Roles are bundles; skills are the optional refinement
+
+Paul, 2026-09-08. A Role IMPLIES a set of skills, and the process already says which Role does
+which task — so the role path is the default and skills only refine it:
+
+```
+Role    →  { skill, skill, … }      a named bundle, defined once
+Person  →  holds Role(s)            ⇒ holds the union of those skills
+Task    →  requires a Role          the DEFAULT, straight from the process/lane
+        →  or specific skills       OPTIONAL, for specialist tasks only
+```
+
+So the default path is exactly today's: task ← lane ← role ← team. Skills bite only when a task
+declares specialist requirements or a person holds a partial set. **A model that says nothing
+about skills behaves identically** — the same regression bar as every other phase.
+
+**ArchiMate expresses the bundle without inventing anything.** A Role that AGGREGATES finer
+Roles is a bundle of skills (`archi-aggregation` / `archi-composition`, both already in the app).
+A Role that aggregates nothing simply IS a single skill — the degenerate case, and the correct
+one.
 ### The model
 
 ```
@@ -473,6 +521,10 @@ design it replaces:
   interchangeable units, exactly as today.**
 - **No proficiency levels** (Paul, 2026-09-08). A level implies *speed* as well as eligibility,
   which reaches into cycle time — a much larger change, and a later slice if it is wanted at all.
+- **Capacity and skills are separate constraints, and both apply.** `capacity` stays what it is
+  today — how many may work at once — so the calendar can still close a team to 0 and interventions
+  still work unchanged. Units add WHO may take WHICH task on top of that. Conflating the two would
+  have broken the calendar cap for any skilled team, silently.
 
 ### Allocation: prefer the least flexible person who qualifies
 
@@ -540,8 +592,10 @@ lesson as the calendar exceptions in Phase 5: the arithmetic was never the risk,
 
 ### Slices
 
-1. **Engine** — `PoolUnit`, skill-aware granting, least-flexible-first, skill-aware skipping.
-   Regression bar: a pool with no units declared produces bit-identical results.
+1. ✅ **Engine (SHIPPED)** — `PoolUnit`, skill-aware granting, least-flexible-first, skill-aware
+   skipping. Regression bar held: a pool with no units declared is bit-identical, and required
+   skills on a task cannot bite when nobody is declared (T3508/T3509). Capacity stayed a separate
+   constraint, so the calendar can still close a skilled team to zero (T3519).
 2. **ArchiMate read** — `app/lib/simulation/skillsFromArchimate.ts` (pure): actors, skills,
    required-skills-per-work-label, and the unmatched report.
 3. **UI** — skills against each member in the team library; required skills in `SimDataPanel`;
