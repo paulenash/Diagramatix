@@ -28,6 +28,25 @@ export interface LogMapping {
   /** When no `resource` column is mapped, this activity→team table supplies the
    *  team for each activity (e.g. enriched from the Process Diagram's lanes). */
   activityResource?: Record<string, string>;
+  /**
+   * What to do with each column, by header name.
+   *
+   * Every column the nine roles above do not claim used to be discarded at parse
+   * time, which is why "did invoices over $10,000 take longer?" was unanswerable
+   * from the very spreadsheet that had just been uploaded. Kept columns become
+   * per-case attributes on the analytics index and are what a filter slices on.
+   *
+   * DEFAULTS ARE DELIBERATE. An unmapped column defaults to `"drop"`, not
+   * `"keep"`: this is a product where a spare column is as likely to hold a
+   * customer name as a region, and opting IN to retention is the only safe way
+   * round. A mapped column defaults to `"keep"` — it is already in use — but may
+   * be set to `"hash"`, which is the honest answer for a case id that is really
+   * a customer number.
+   *
+   * `"hash"` is a stable one-way digest: the same input always gives the same
+   * token, so cases still group and join correctly, and nothing reads back.
+   */
+  attributeMode?: Record<string, "keep" | "hash" | "drop">;
 }
 
 /** One normalised event row. `timestamp` is epoch milliseconds. */
@@ -40,6 +59,11 @@ export interface LogEvent {
   controlId?: string;
   riskId?: string;
   policyId?: string;
+  /** Columns kept by `LogMapping.attributeMode`. Carried on the event because
+   *  that is where the row is; the analytics index takes them from the case's
+   *  FIRST event, which is the one that describes the case rather than a later
+   *  state of it. Absent when nothing was kept. */
+  attrs?: Record<string, string>;
 }
 
 /** All events of one entity instance, ordered by timestamp. */

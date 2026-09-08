@@ -28,8 +28,8 @@ export interface LogValidation {
   warnings: { level: "warn" | "info"; message: string }[];
 }
 
-// Column-valued roles only (excludes activityState, which is a config map).
-type ColKey = Exclude<keyof LogMapping, "activityState" | "activityResource">;
+// Column-valued roles only (excludes the config maps, which are not columns).
+type ColKey = Exclude<keyof LogMapping, "activityState" | "activityResource" | "attributeMode">;
 const ROLE_KEYS: ColKey[] = ["caseId", "activity", "timestamp", "state", "resource", "entityType", "controlId", "riskId", "policyId"];
 
 function classifyTs(raw: string): TimestampFormat {

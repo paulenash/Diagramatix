@@ -157,17 +157,50 @@ column name inside a string literal. Phases 1, 5 and 7 each add a seventh.
 
 ## Phase 1 — Keep what we are about to need; the importer only runs once
 
-**Status:** `Not started` · No UI but the mapping step. **This is the phase the ordering exists for.**
+**Status:** ✅ `Shipped` · No UI but the mapping step. **This is the phase the ordering exists for.**
 
-- [ ] `CaseSummary.attrs` — unmapped columns as case attributes, from the case's first event
-- [ ] `CaseSummary.durs` — per-event sojourn, integer ms, aligned to the variant's event sequence
-- [ ] `CaseSummary.res` — indices into a new `RunAnalytics.resourceDict`
-- [ ] `RunAnalytics.attributes` (dictionary + cardinality + a reason string for columns too
+- [x] `CaseSummary.attrs` — unmapped columns as case attributes, from the case's first event
+- [x] `CaseSummary.durs` — per-event sojourn, integer ms, aligned to the variant's event sequence
+- [x] `CaseSummary.res` — indices into a new `RunAnalytics.resourceDict`
+- [x] `RunAnalytics.attributes` (values + cardinality + a reason string for columns too
       high-cardinality to filter on) and `RunAnalytics.detail`
-- [ ] `ActivityMetric.resourceCounts` — already computed in `resByActivity` and thrown away
-- [ ] The **`useRunView()` seam** in `MiningInsightsPanel`, with an identity filter
-- [ ] Per-column **keep / hash / drop** on the mapping screen, defaulting to drop
-- [ ] Optional: the missing `.xlsx` importer
+- [x] `ActivityMetric.resourceCounts` — already computed in `resByActivity` and thrown away
+- [x] The **`useRunView()` seam** in `MiningInsightsPanel`, with an identity filter
+- [x] Per-column **keep / hash / drop** on the mapping screen, defaulting to drop
+- [x] **Unplanned, and the important one:** `numeric.ts` — `minOf`/`maxOf` (see *As built*)
+- [ ] Deferred: the missing `.xlsx` importer
+
+**As built.**
+
+**A crash, not a limitation.** The test that builds a deliberately large log to
+exercise the detail budget did not fail its assertion — it threw
+`RangeError: Maximum call stack size exceeded` inside `buildEventLog`.
+`Math.min(...times)` passes every element as an argument, and V8 gives up past
+roughly 125,000 of them. The pipeline spread per-EVENT and per-CASE arrays in
+three places (`parseEventLog`, `analytics`, `calibrateSimulation`), so **any log
+beyond about 125k events could not be imported at all** — it did not degrade, it
+crashed, and that is well inside what this feature invites people to upload: the
+live-source buffer alone caps at 100,000 rows. Fixed with `numeric.ts`; T3629
+pins it by asserting the spread form still throws.
+
+**Masking shipped in this phase, as the plan required.** The mapping screen now
+offers keep / hash / drop per spare column, defaulting to **drop**, plus a
+separate tick to mask the case id — for when it is really a customer number. The
+digest is a dependency-free FNV-1a pair rather than `crypto`, because this module
+is imported by client code for the pre-import preview and pulling `node:crypto`
+into that graph is the shape that has broken this product's build before.
+
+**The seam ships with no filter behind it, on purpose.** `useRunView` is an
+identity view today and owns the exactness vocabulary — *whole / filtered /
+estimated / unfiltered*. The rule it exists to enforce is written at the top of
+the file: no panel reads the fetched analytics directly. That is what turns Phase
+4 from a six-panel retrofit into one change.
+
+**Two things deliberately NOT done.** The `.xlsx` importer was listed as optional
+and is deferred — it is unrelated to the storage argument and would have widened
+the diff for no gain here. And Phase 0.2 (splitting the 1,027-line console) is
+still outstanding, so the mapping UI added to it makes that file longer, not
+shorter. Both are debts, and both are named rather than quietly carried.
 
 **Absorbs.** The storage half of **extension 2**; **items 02, 03, 09**.
 

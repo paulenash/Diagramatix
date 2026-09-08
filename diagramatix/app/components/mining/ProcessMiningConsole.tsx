@@ -275,6 +275,17 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
 
   const setRole = (key: keyof LogMapping, col: string) => setMapping((m) => ({ ...m, [key]: col || undefined }));
   const canImport = mapping.caseId && mapping.activity && mapping.timestamp && rows.length > 0;
+
+  // Columns none of the nine roles claims. These are the candidates for slicing
+  // later — and the ones that were silently discarded at parse time until now.
+  const spareColumns = useMemo(() => {
+    const claimed = new Set(
+      ROLES.map((r) => mapping[r.key]).filter((c): c is string => typeof c === "string" && !!c),
+    );
+    return headers.filter((h) => !claimed.has(h));
+  }, [headers, mapping]);
+  const setAttributeMode = (col: string, mode: "keep" | "hash" | "drop") =>
+    setMapping((m) => ({ ...m, attributeMode: { ...(m.attributeMode ?? {}), [col]: mode } }));
   // When no State column is mapped, offer an Activity→State table (seeded with a
   // same-named state per activity) that completes the lifecycle the miner + the
   // State Machine need. The table lives in mapping.activityState so it's imported.
@@ -539,6 +550,53 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
                   </label>
                 ))}
               </div>
+
+              {/* The columns the nine roles above do not claim. Every one of them
+                  used to be discarded at parse time, which is why "did invoices
+                  over $10,000 take longer?" was unanswerable from the very file
+                  that had just been uploaded. Keeping one makes it a dimension
+                  you can slice by.
+
+                  DROP IS THE DEFAULT, deliberately: a spare column is as likely
+                  to hold a customer name as a region, and this is not a decision
+                  to make on the user's behalf. */}
+              {spareColumns.length > 0 && (
+                <div className="rounded border border-stone-600 bg-stone-900/40 p-2.5 flex flex-col gap-1.5">
+                  <div className="text-[11px] text-stone-300">
+                    <span className="font-semibold">{spareColumns.length} other column{spareColumns.length === 1 ? "" : "s"}</span> in this file.
+                    Keep one to slice by it later; hash it if it identifies a person.
+                    Anything left as <em>drop</em> is not stored at all.
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                    {spareColumns.map((h) => (
+                      <label key={h} className="flex items-center gap-2 text-[11px]">
+                        <span className="flex-1 min-w-0 truncate text-stone-400" title={h}>{h}</span>
+                        <select
+                          value={mapping.attributeMode?.[h] ?? "drop"}
+                          onChange={(e) => setAttributeMode(h, e.target.value as "keep" | "hash" | "drop")}
+                          className={inp + " w-24"}
+                        >
+                          <option value="drop">drop</option>
+                          <option value="keep">keep</option>
+                          <option value="hash">hash</option>
+                        </select>
+                      </label>
+                    ))}
+                  </div>
+                  <label className="flex items-center gap-2 text-[11px] pt-1 border-t border-stone-700">
+                    <input
+                      type="checkbox"
+                      checked={!!mapping.caseId && mapping.attributeMode?.[mapping.caseId] === "hash"}
+                      onChange={(e) => { if (mapping.caseId) setAttributeMode(mapping.caseId, e.target.checked ? "hash" : "keep"); }}
+                      disabled={!mapping.caseId}
+                    />
+                    <span className="text-stone-400">
+                      Mask the case id &mdash; for when it is really a customer number. Cases still group
+                      and join; the original never reaches the database.
+                    </span>
+                  </label>
+                </div>
+              )}
 
               {/* Activity → Team table — shown when no Resource column is mapped.
                   Fill from the Process Diagram's lanes, or set per activity. */}

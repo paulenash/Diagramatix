@@ -152,6 +152,12 @@ describe("starter examples are operational", () => {
         }
       });
 
+      // Timeout raised from the 15s default ON PURPOSE, not to paper over a slow
+      // test. `hire-and-onboard` runs five scenarios of a full simulated year at
+      // ten replications each — fifty replication-years of discrete-event
+      // simulation — which takes ~12s alone and tips past 15s under the parallel
+      // load of a full-suite run. It failed intermittently, which is worse than
+      // failing: a flaky guard teaches people to re-run rather than to look.
       it("every scenario runs and completes work", () => {
         for (const sc of pkg.scenarios) {
           // Run the scenario against ITS diagrams (variant roots if pinned).
@@ -161,7 +167,7 @@ describe("starter examples are operational", () => {
           const { stats } = runMonteCarlo(net, sc.runConfig, sc.runConfig.interventions);
           expect(stats.completed.mean, `${ex.title} / ${sc.name}`).toBeGreaterThan(0);
         }
-      });
+      }, 90_000);
     });
   }
 

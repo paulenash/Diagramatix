@@ -6,6 +6,11 @@
  * (Pareto + path isolation + compare). Later slices add Cases, Outcomes, Export.
  * Self-fetches the run's full detail (analytics + variants + kpiConfig) and the
  * discovered diagram data once, shared across tabs.
+ *
+ * Every tab reads its numbers through `useRunView` rather than from the fetched
+ * analytics directly. That seam is what a filter will one day change in ONE
+ * place instead of six — and what stops a filtered figure ever sitting beside an
+ * unfiltered one without saying so.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DiagramData } from "@/app/lib/diagram/types";
@@ -20,6 +25,7 @@ import { automationOpportunities, taskAutomationScore, buildAutomationSpec, auto
 import { isTaskRun, detectReworkActivities, pingPongFromVariants } from "@/app/lib/mining/taskMining/insights";
 import { buildTaskProcedure } from "@/app/lib/mining/taskMining/procedure";
 import { ReplayDiagramBackdrop } from "@/app/components/simulation/replay/ReplayDiagramBackdrop";
+import { useRunView } from "./useRunView";
 import { ExpandedView } from "./ExpandedView";
 import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
 
@@ -81,6 +87,11 @@ export function MiningInsightsPanel({ projectId, run }: { projectId: string; run
   useEffect(() => { if (isTask && !autoSwitched.current) { autoSwitched.current = true; setTab("tasks"); } }, [isTask]);
   const visibleTabs = isTask ? [TASK_TAB, ...TABS] : TABS;
 
+  // THE SEAM. Every panel below reads its numbers through this, never from
+  // `analytics` directly — see useRunView for why. It is an identity view today;
+  // when the filter lands, only useRunView changes and every panel follows.
+  const view = useRunView(analytics, variants);
+
   return (
     <div className="mt-4 pt-3 border-t border-stone-700">
       <div className="flex items-center gap-2 mb-2 flex-wrap">
@@ -92,12 +103,13 @@ export function MiningInsightsPanel({ projectId, run }: { projectId: string; run
         ))}
         {loading && <DiagramatixThrobber size={16} tone="amber" />}
       </div>
-      {tab === "tasks" && <TasksTab variants={variants} loading={loading} />}
-      {tab === "activities" && <ActivitiesTab analytics={analytics} loading={loading} />}
-      {tab === "heat" && <HeatTab analytics={analytics} bpmn={bpmn} hasBpmn={!!run.discoveredBpmnId} loading={loading} />}
-      {tab === "variants" && <VariantsTab variants={variants} bpmn={bpmn} hasBpmn={!!run.discoveredBpmnId} />}
-      {tab === "cases" && <CasesTab analytics={analytics} variants={variants} bpmn={bpmn} hasBpmn={!!run.discoveredBpmnId} />}
-      {tab === "outcomes" && <OutcomesTab analytics={analytics} variants={variants} kpiConfig={kpiConfig} onSave={saveKpi} />}
+      {view.note && <p className="text-[11px] text-amber-300/80 mb-2">{view.note}</p>}
+      {tab === "tasks" && <TasksTab variants={view.variants} loading={loading} />}
+      {tab === "activities" && <ActivitiesTab analytics={view.analytics} loading={loading} />}
+      {tab === "heat" && <HeatTab analytics={view.analytics} bpmn={bpmn} hasBpmn={!!run.discoveredBpmnId} loading={loading} />}
+      {tab === "variants" && <VariantsTab variants={view.variants} bpmn={bpmn} hasBpmn={!!run.discoveredBpmnId} />}
+      {tab === "cases" && <CasesTab analytics={view.analytics} variants={view.variants} bpmn={bpmn} hasBpmn={!!run.discoveredBpmnId} />}
+      {tab === "outcomes" && <OutcomesTab analytics={view.analytics} variants={view.variants} kpiConfig={kpiConfig} onSave={saveKpi} />}
       {tab === "export" && <ExportTab projectId={projectId} runId={run.id} hasAnalytics={!!analytics && analytics.activities.length > 0} />}
     </div>
   );

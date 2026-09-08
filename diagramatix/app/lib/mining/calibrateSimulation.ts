@@ -10,6 +10,7 @@ import type { DiagramData, DiagramElement } from "@/app/lib/diagram/types";
 import { getSimParams, simPatch } from "@/app/lib/diagram/simParams";
 import type { SimDist, ClockUnit, WorkCalendar, CalendarInterval } from "@/app/lib/simulation/types";
 import type { Performance } from "./types";
+import { minOf, maxOf } from "./numeric";
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 const median = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
@@ -18,7 +19,8 @@ const median = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b); cons
  *  else a triangular(min, median, max). */
 export function fitDuration(samples: number[]): SimDist {
   if (samples.length === 0) return { kind: "fixed", value: 1 };
-  const min = Math.max(0, Math.min(...samples)), max = Math.max(...samples);
+  // Spreading a per-event sample array throws past ~125k — see numeric.ts.
+  const min = Math.max(0, minOf(samples) ?? 0), max = maxOf(samples) ?? 0;
   const mean = samples.reduce((a, b) => a + b, 0) / samples.length;
   if (samples.length < 3 || min === max) return { kind: "fixed", value: Math.max(0, r2(mean)) };
   return { kind: "triangular", min: r2(min), mode: r2(Math.max(min, median(samples))), max: r2(max) };

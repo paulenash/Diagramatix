@@ -5,6 +5,7 @@
  */
 import type { LogMapping, LogEvent, CaseTrace, Variant, MiningStats, EventLog } from "./types";
 import { activityToState } from "./stateNaming";
+import { minOf, maxOf } from "./numeric";
 
 // ── CSV ────────────────────────────────────────────────────────────────────
 
@@ -122,12 +123,55 @@ export function parseTimestamp(v: string): number | null {
 
 // ── Normalise → traces → variants ────────────────────────────────────────────
 
+/**
+ * A stable, dependency-free one-way digest (FNV-1a, 64-bit, base36).
+ *
+ * Deliberately not `crypto`: this module is imported by client code for the
+ * pre-import preview, and pulling `node:crypto` into that graph is the exact
+ * shape that has broken this product's build before. A cryptographic hash is
+ * not what this is for anyway — the requirement is that the same customer
+ * number always yields the same token, so cases still group and join, and that
+ * the original does not travel to the database.
+ */
+export function maskValue(raw: string): string {
+  // Two independently-seeded 32-bit FNV-1a passes, concatenated. Not BigInt:
+  // the build targets below ES2020, where BigInt literals do not compile.
+  const pass = (seed: number): number => {
+    let h = seed;
+    for (let i = 0; i < raw.length; i++) {
+      h ^= raw.charCodeAt(i);
+      h = Math.imul(h, 0x01000193);
+    }
+    return h >>> 0;
+  };
+  return "•" + pass(0x811c9dc5).toString(36) + pass(0x7fffffff).toString(36);
+}
+
 /** Build the normalised + compressed event log from parsed rows + a mapping.
  *  Rows missing a case id or a valid timestamp are dropped (counted in stats). */
 export function buildEventLog(headers: string[], rows: string[][], mapping: LogMapping): EventLog {
   const idx = (col: string | undefined) => (col ? headers.indexOf(col) : -1);
   const ci = idx(mapping.caseId), ai = idx(mapping.activity), ti = idx(mapping.timestamp), si = idx(mapping.state), ri = idx(mapping.resource);
   const cti = idx(mapping.controlId), rki = idx(mapping.riskId), pli = idx(mapping.policyId);
+
+  // ── Columns to keep as case attributes, and columns to mask ──────────────
+  // An unmapped column defaults to "drop": a spare column is as likely to hold a
+  // customer name as a region, so retention is opt-in. Nothing here changes
+  // traces or variants — attributes ride alongside and never affect the
+  // compression, so a log imported with none behaves exactly as it always did.
+  const modes = mapping.attributeMode ?? {};
+  const claimed = new Set(
+    [mapping.caseId, mapping.activity, mapping.timestamp, mapping.state, mapping.resource,
+     mapping.entityType, mapping.controlId, mapping.riskId, mapping.policyId]
+      .filter((c): c is string => !!c),
+  );
+  const keepCols: { name: string; at: number; hash: boolean }[] = [];
+  headers.forEach((h, at) => {
+    const mode = modes[h] ?? (claimed.has(h) ? "keep" : "drop");
+    if (claimed.has(h) || mode === "drop") return;
+    keepCols.push({ name: h, at, hash: mode === "hash" });
+  });
+  const maskCase = modes[mapping.caseId] === "hash";
   // No state column? Derive each event's state from the Activity→State table,
   // else from the activity's PAST PARTICIPLE ("Ship" → "Shipped") so an inferred
   // state reads as a condition, not a command. State names are Capitalised
@@ -146,9 +190,12 @@ export function buildEventLog(headers: string[], rows: string[][], mapping: LogM
   const events: LogEvent[] = [];
   let unmapped = 0;
   for (const r of rows) {
-    const caseId = (r[ci] ?? "").trim();
+    const rawCaseId = (r[ci] ?? "").trim();
     const timestamp = parseTimestamp(r[ti] ?? "");
-    if (!caseId || timestamp === null) { unmapped++; continue; }
+    // Masked AFTER the empty check, so a blank case id is still counted as an
+    // unusable row rather than becoming the digest of an empty string.
+    if (!rawCaseId || timestamp === null) { unmapped++; continue; }
+    const caseId = maskCase ? maskValue(rawCaseId) : rawCaseId;
     const activity = clean(r[ai] ?? "");
     // No resource column? Fall back to the activity→team table (e.g. enriched from
     // the Process Diagram's lanes) — mirrors the activityState fallback above.
@@ -156,6 +203,12 @@ export function buildEventLog(headers: string[], rows: string[][], mapping: LogM
     const controlId = cti >= 0 ? (r[cti] ?? "").trim() : "";
     const riskId = rki >= 0 ? (r[rki] ?? "").trim() : "";
     const policyId = pli >= 0 ? (r[pli] ?? "").trim() : "";
+    let attrs: Record<string, string> | undefined;
+    for (const k of keepCols) {
+      const v = (r[k.at] ?? "").trim();
+      if (!v) continue;
+      (attrs ??= {})[k.name] = k.hash ? maskValue(v) : v;
+    }
     events.push({
       caseId,
       activity,
@@ -165,6 +218,7 @@ export function buildEventLog(headers: string[], rows: string[][], mapping: LogM
       ...(controlId ? { controlId } : {}),
       ...(riskId ? { riskId } : {}),
       ...(policyId ? { policyId } : {}),
+      ...(attrs ? { attrs } : {}),
     });
   }
 
@@ -193,8 +247,10 @@ export function buildEventLog(headers: string[], rows: string[][], mapping: LogM
     activities: [...new Set(events.map((e) => e.activity).filter(Boolean))].sort(),
     states: [...new Set(events.map((e) => e.state).filter(Boolean))].sort(),
     variants: variants.length,
-    from: times.length ? Math.min(...times) : undefined,
-    to: times.length ? Math.max(...times) : undefined,
+    // minOf/maxOf, not Math.min(...times): spreading a per-event array throws
+    // RangeError past ~125k elements, so a large log could not be imported at all.
+    from: minOf(times),
+    to: maxOf(times),
     ...(unmapped ? { unmappedRows: unmapped } : {}),
   };
 
