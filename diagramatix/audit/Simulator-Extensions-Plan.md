@@ -7,7 +7,7 @@
 | **This document** | The **live worklist** for building them. Phases follow the review's own stated build order (value first). Every phase names the files it touches and the existing functions it reuses. |
 | **Scope** | All 8 extensions + all 6 smaller items. New worked examples are planned alongside, one per new capability. |
 | **How to use** | Work an item, tick its box and set **Status** → `In progress` / `Shipped (<commit>)` / `Won't do (<reason>)`. Keep the review as the historical argument; keep this as the burn-down. |
-| **Progress log** | **2026-09-07** — **Phase 0 COMPLETE.** 0.1/0.2/0.3 `e290a9b4`; TESTS_SUMMARY header repaired `11eed0f1`; **0.4 closed by Paul’s decision — generator retired, committed examples are the source of truth** (this also supersedes the original "extend the generator" plan for new examples). 0.1 generator merges by slug (guarded by T3369, proven to fail on a simulated overwrite); 0.2 `studyRuns.ts` + `latestRunPerScenario` (T3370/T3371); 0.3 `facts/` established, `assessFacts.ts` moved, both importers repointed (no compat shim — there were only two). **New finding: 0.4** — the generator is stale relative to its own committed output; see below. 382 simulation tests green, typecheck unchanged. |
+| **Progress log** | **2026-09-07** — **Phase 0 COMPLETE.** 0.1/0.2/0.3 `e290a9b4`; TESTS_SUMMARY header repaired `11eed0f1`; **0.4 closed by Paul’s decision — generator retired, committed examples are the source of truth** (this also supersedes the original "extend the generator" plan for new examples). 0.1 generator merges by slug (guarded by T3369, proven to fail on a simulated overwrite); 0.2 `studyRuns.ts` + `latestRunPerScenario` (T3370/T3371); 0.3 `facts/` established, `assessFacts.ts` moved, both importers repointed (no compat shim — there were only two). **New finding: 0.4** — the generator is stale relative to its own committed output; see below. 382 simulation tests green, typecheck unchanged. **2026-09-08 — ALL EIGHT PHASES SHIPPED.** Phase 8 (the tornado) closes the programme's code: `sensitivity.ts` + `POST .../sensitivity` + `TornadoPanel`, T3545–T3560, feature-only (product stays 2.8, XSD stays 46). **What remains is the examples programme below — 7 worked examples and the `aardwolf-loan-comparison` business-case inputs, none of them started.** The code teaches nothing on its own: every capability from Phase 2 onwards is currently reachable only by someone who already knows it is there. |
 
 **Status values:** `Not started` · `In progress` · `Shipped (<commit>)` · `Blocked (<on what>)` · `Won't do (<reason>)`
 
@@ -625,10 +625,13 @@ the likely shape). That IS a physical DB change → **Q1 yes → PRODUCT_VERSION
 ---
 ## Phase 8 — Which assumption is load-bearing?
 
-**Status:** `Not started` · Cheap **because** Phase 4 landed first — a tornado is N one-step sweeps.
+**Status:** ✅ `Shipped` — no engine change, no version bump (feature-only). Cheap **because**
+Phase 4 landed first: a tornado is N one-step sweeps over the same machinery.
 
-- [ ] `app/lib/simulation/sensitivity.ts`
-- [ ] Sorted tornado chart
+- [x] `app/lib/simulation/sensitivity.ts` — `enumerateParameters` / `variationsFor` / `buildTornado`
+- [x] `POST .../scenarios/[scenarioId]/sensitivity` — 2N+1 runs behind `clampSweep`
+- [x] Sorted tornado chart (`TornadoPanel.tsx`), wired into `StudyManager`
+- [x] T3545–T3560, and `sensitivity.ts` added to the client-bundle guard
 
 Enumerate every overridable parameter in the assembled network — the `NODE_KEYS` list in
 `overrides.ts` is already exactly that list — vary each ±X% in turn, run, and rank by |Δ| in the
@@ -636,6 +639,31 @@ chosen metric. Reuse the Phase 4 sweep runner and its `maxWork` clamp wholesale.
 
 Show the parameters that make **no** difference as prominently as the ones that do: that half is what
 disarms *"but you guessed that number"* — yes, and here is the evidence that it makes no difference.
+
+**As built.** Four decisions worth recording:
+
+- **Three outcomes, not two.** `moves` / `no-difference` / **`not-testable`**. A team of one cannot
+  go down 20%, and an integer headcount rounds straight back onto itself — nothing was actually
+  tried. Reporting that as "made no difference" would be a lie of exactly the kind this feature
+  exists to disprove, so it is a third verdict with its own style in the chart.
+- **Every bar is the SAME relative change.** It is tempting to widen an unvariable headcount to
+  1-vs-2 and call that an answer, but that is a +100% perturbation sitting in a chart of ±20% ones:
+  the bar would top the ranking purely because it was pushed hardest. Untestable is the honest
+  answer, and untestable bars sort **after** the ranked ones rather than being interleaved among
+  them — they are a different kind of answer, and mixing them would imply a ranking that does not
+  exist.
+- **"No difference" is a significance question, not a smallness one.** Each pair goes through the
+  Phase 3 `compareSamples`, so a tiny swing on noisy runs is never dressed up as proof of
+  insensitivity. When nothing clears the band the statement says so and suggests more replications,
+  rather than crowning whichever bar happened to be widest.
+- **A budget cut names what it dropped.** `clampSweep` caps a tornado at 24 runs, so a model with
+  more than eleven parameters cannot test them all. The ones left out are returned and shown by
+  name: a chart silently missing its biggest lever is worse than no chart.
+
+Parameters are enumerated from the network the scenario **actually runs** — overrides applied —
+so the baselines shown are the ones being perturbed. Unlike a sweep, the points are not persisted
+as runs: a tornado is a diagnostic read once, and 2N+1 pinned rows would bury the run history it
+shares with the curve.
 
 ---
 

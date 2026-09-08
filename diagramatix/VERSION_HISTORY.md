@@ -15,6 +15,35 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.8.2503 — 2026-09-08 — Which assumption is load-bearing?
+
+- **A model has thirty numbers in it and most of them do not matter.** The tornado pushes
+  every one of them — each team's headcount, each task's time, each arrival rate — plus and
+  minus 20% in turn, and ranks them by how far the answer actually moves. It says where to
+  spend effort on better data, and where a rough guess is perfectly safe.
+- **The bottom half of the chart is the point.** "But you guessed that number" is the
+  commonest objection a simulation meets in a meeting room. The answer is: yes, and here is
+  the evidence it makes no difference. So the flat bars are drawn, labelled and counted
+  rather than filtered away as boring.
+- **Three outcomes, not two.** A parameter can move the answer, fail to move it, or be one
+  the model CANNOT vary — a team of one cannot go down 20%, and an integer headcount rounds
+  straight back onto itself. Those come back as UNTESTED in their own style, because
+  "could not be tested" shown as "made no difference" would be exactly the false
+  reassurance this feature exists to disprove.
+- **"No difference" is a significance question, not a smallness one.** A tiny swing on noisy
+  runs has not been shown to be nothing, so each pair is compared with the same test the
+  As-is/To-be verdict uses — and when nothing moves at all, it says so and suggests more
+  replications rather than crowning a random winner.
+- Every bar is the same relative change, or the ranking would mean nothing: a headcount
+  widened to 1-vs-2 just to have something to show would be a +100% push sitting in a chart
+  of ±20% ones, and would top the chart purely because it was pushed hardest.
+- Cheap because the sweep landed first — a tornado is N one-step sweeps, so it reuses that
+  runner, its objective functions and its work budget. When the budget cannot cover every
+  parameter, the ones left out are **named**: a chart missing its biggest lever is worse
+  than no chart.
+- Schema: unchanged. Product stays 2.8, XSD stays 46 — no stored shape moved.
+
+---
 ## 2.8.2500 — 2026-09-08 — Skills: who can do what
 
 - **Cross-skilling can finally be modelled.** Before this a team had two settings: separate
