@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-09-07  ·  **Document version:** 7.0  ·  **Suite:** 436 test files · 3,112 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T3790  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-09-07  ·  **Document version:** 7.0  ·  **Suite:** 439 test files · 3,143 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T3821  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
@@ -34,9 +34,9 @@ Each test file has its own section below, grouped into layers. Within each secti
 | **Protects you against** | In plain terms, the real-world problem that would occur if this behaviour regressed. |
 | **How it would break (go red)** | The kind of code or data change that would make this specific test fail — i.e. what the test is watching. |
 
-**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T3791**, the one after **T3792**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
+**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T3822**, the one after **T3823**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T3790`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
+> **Highest ref allocated: `T3821`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -2897,6 +2897,37 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 | T3788 | `tests/mining/handover.test.ts` | The input diagram is not mutated. |
 | T3789 | `tests/mining/handover.test.ts` | No analytics returns the diagram exactly as it came in. |
 | T3790 | `tests/mining/handover.test.ts` | Only the known producers assign a connector weight - the canvas regression bar. |
+| T3791 | `tests/mining/filter-analytics.test.ts` | An inactive filter changes nothing and returns the very same objects. |
+| T3792 | `tests/mining/filter-analytics.test.ts` | What counts as an active filter. |
+| T3793 | `tests/mining/filter-analytics.test.ts` | No analytics filters to nothing rather than throwing. |
+| T3794 | `tests/mining/filter-analytics.test.ts` | Only the matching cases survive a slice. |
+| T3795 | `tests/mining/filter-analytics.test.ts` | The cycle distribution is the SLICE's, not the run's. |
+| T3796 | `tests/mining/filter-analytics.test.ts` | Variant counts become a histogram of the slice, KEEPING their indices. |
+| T3797 | `tests/mining/filter-analytics.test.ts` | Throughput is rebuilt on the same buckets, so the axis cannot move under a drag. |
+| T3798 | `tests/mining/filter-analytics.test.ts` | A date range selects on the case's START. |
+| T3799 | `tests/mining/filter-analytics.test.ts` | Activity durations are recomputed from the slice; an absent step is absent, not zero. |
+| T3800 | `tests/mining/filter-analytics.test.ts` | A filtered rebuild equals recomputing that slice from scratch - the exactness proof. |
+| T3801 | `tests/mining/filter-analytics.test.ts` | Edges are recomputed too, so the transitions table filters. |
+| T3802 | `tests/mining/filter-analytics.test.ts` | Filtering by team keeps the cases that team touched. |
+| T3803 | `tests/mining/filter-analytics.test.ts` | A team that does not exist matches nothing, rather than everything. |
+| T3804 | `tests/mining/filter-analytics.test.ts` | A run with no per-event detail hands back WHOLE-RUN timings, flagged - never averaged. |
+| T3805 | `tests/mining/filter-analytics.test.ts` | A run imported before per-event vectors behaves the same way. |
+| T3806 | `tests/mining/filter-analytics.test.ts` | A slice below the case floor is flagged; counts still reported. |
+| T3807 | `tests/mining/filter-analytics.test.ts` | A slice at the floor is not flagged. |
+| T3808 | `tests/mining/filter-analytics.test.ts` | On a strided run the matching count is SCALED and the raw count kept. |
+| T3809 | `tests/mining/filter-analytics.test.ts` | The filter describes itself for the chip and the report header. |
+| T3810 | `tests/mining/filter-analytics.test.ts` | An open-ended range reads as open-ended. |
+| T3811 | `tests/mining/filtered-report.test.ts` | The Word report states its filter BEFORE any figure. |
+| T3812 | `tests/mining/filtered-report.test.ts` | The spreadsheet says so too, in the Summary sheet. |
+| T3813 | `tests/mining/filtered-report.test.ts` | An unfiltered report says nothing, rather than 'no filter'. |
+| T3814 | `tests/mining/filtered-report.test.ts` | The Summary counts describe the SLICE, not the whole run. |
+| T3815 | `tests/mining/filtered-report.test.ts` | The activity list is the slice's, so a step the slice never does is gone. |
+| T3816 | `tests/mining/filtered-report.test.ts` | The variant count is how many variants the slice actually followed. |
+| T3817 | `tests/mining/filtered-report.test.ts` | The bottleneck table carries the slice's timings. |
+| T3818 | `tests/mining/insights-seam.test.ts` | No tab is handed the raw, unfiltered analytics (only the filter bar). |
+| T3819 | `tests/mining/insights-seam.test.ts` | No tab is handed the raw, unfiltered variants. |
+| T3820 | `tests/mining/insights-seam.test.ts` | Every tab taking analytics or variants takes the VIEW's. |
+| T3821 | `tests/mining/insights-seam.test.ts` | The seam is actually given the filter. |
 
 > **Keep this section in sync.** Whenever an e2e spec is added, removed, or changes what it asserts, update this section. It is hand-maintained, not generated.
 

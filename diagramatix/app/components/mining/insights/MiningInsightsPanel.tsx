@@ -26,7 +26,9 @@ import { isTaskRun, detectReworkActivities, pingPongFromVariants } from "@/app/l
 import { buildTaskProcedure } from "@/app/lib/mining/taskMining/procedure";
 import { ReplayDiagramBackdrop } from "@/app/components/simulation/replay/ReplayDiagramBackdrop";
 import { transitionRows, MIN_EDGE_OBS } from "@/app/lib/mining/handover";
-import { useRunView } from "./useRunView";
+import { useRunView, exactnessLabel, exactnessTone } from "./useRunView";
+import { FilterBar } from "./FilterBar";
+import { EMPTY_FILTER, type MiningFilter } from "@/app/lib/mining/filterAnalytics";
 import { ExpandedView } from "./ExpandedView";
 import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
 
@@ -46,8 +48,17 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: "export", label: "⬇ Export" },
 ];
 
+/** What each tab's figures are made of, and therefore what they may claim
+ *  under a filter. Counts filter from the case index alone; timings need the
+ *  per-event vectors, which not every run carries. */
+const TAB_SHAPE: Record<TabKey, "count" | "time"> = {
+  tasks: "time", activities: "time", between: "time", heat: "time",
+  variants: "count", cases: "count", outcomes: "count", export: "count",
+};
+
 export function MiningInsightsPanel({ projectId, run }: { projectId: string; run: RunLite }) {
   const [tab, setTab] = useState<TabKey>("activities");
+  const [filter, setFilter] = useState<MiningFilter>(EMPTY_FILTER);
   const [analytics, setAnalytics] = useState<RunAnalytics | null>(null);
   const [variants, setVariants] = useState<Variant[]>([]);
   const [kpiConfig, setKpiConfig] = useState<KpiConfig | null>(null);
@@ -90,9 +101,12 @@ export function MiningInsightsPanel({ projectId, run }: { projectId: string; run
   const visibleTabs = isTask ? [TASK_TAB, ...TABS] : TABS;
 
   // THE SEAM. Every panel below reads its numbers through this, never from
-  // `analytics` directly — see useRunView for why. It is an identity view today;
-  // when the filter lands, only useRunView changes and every panel follows.
-  const view = useRunView(analytics, variants);
+  // `analytics` directly — see useRunView for why. The filter arrived in
+  // Phase 5 and this line is the only place any panel had to learn about it.
+  const view = useRunView(analytics, variants, filter);
+  // The chip beside the active tab: what THESE figures are entitled to claim.
+  const exactness = TAB_SHAPE[tab] === "time" ? view.timeExactness : view.countExactness;
+  const chip = exactnessLabel(exactness);
 
   return (
     <div className="mt-4 pt-3 border-t border-stone-700">
@@ -104,8 +118,18 @@ export function MiningInsightsPanel({ projectId, run }: { projectId: string; run
           </button>
         ))}
         {loading && <DiagramatixThrobber size={16} tone="amber" />}
+        {chip && (
+          <span className={`text-[10px] rounded px-1.5 py-0.5 border ${exactnessTone(exactness)}`}
+            title={exactness === "unfiltered"
+              ? "This run cannot narrow timings, so the whole-run figures are shown"
+              : exactness === "estimated"
+                ? "Scaled from the stored sample of cases"
+                : "These figures describe only the filtered cases"}>
+            {chip}
+          </span>
+        )}
       </div>
-      {view.note && <p className="text-[11px] text-amber-300/80 mb-2">{view.note}</p>}
+      <FilterBar analytics={analytics} filter={filter} onChange={setFilter} view={view} />
       {tab === "tasks" && <TasksTab variants={view.variants} loading={loading} />}
       {tab === "activities" && <ActivitiesTab analytics={view.analytics} loading={loading} />}
       {tab === "between" && <BetweenStepsTab analytics={view.analytics} loading={loading} />}
@@ -113,7 +137,7 @@ export function MiningInsightsPanel({ projectId, run }: { projectId: string; run
       {tab === "variants" && <VariantsTab variants={view.variants} bpmn={bpmn} hasBpmn={!!run.discoveredBpmnId} />}
       {tab === "cases" && <CasesTab analytics={view.analytics} variants={view.variants} bpmn={bpmn} hasBpmn={!!run.discoveredBpmnId} />}
       {tab === "outcomes" && <OutcomesTab analytics={view.analytics} variants={view.variants} kpiConfig={kpiConfig} onSave={saveKpi} />}
-      {tab === "export" && <ExportTab projectId={projectId} runId={run.id} hasAnalytics={!!analytics && analytics.activities.length > 0} />}
+      {tab === "export" && <ExportTab projectId={projectId} runId={run.id} filter={filter} filterNote={view.description} hasAnalytics={!!analytics && analytics.activities.length > 0} />}
     </div>
   );
 }
@@ -209,17 +233,33 @@ function TasksTab({ variants, loading }: { variants: Variant[]; loading: boolean
 
 // ── Export tab (Word / Excel / PDF) ──────────────────────────────────────────
 
-function ExportTab({ projectId, runId, hasAnalytics }: { projectId: string; runId: string; hasAnalytics: boolean }) {
+function ExportTab({ projectId, runId, filter, filterNote, hasAnalytics }: { projectId: string; runId: string; filter: MiningFilter; filterNote: string | null; hasAnalytics: boolean }) {
   if (!hasAnalytics) return <NoAnalytics />;
+  // The report is built server-side, so the slice has to travel with the
+  // request. A report that silently described the whole run while the screen
+  // showed a slice would be the same defect as a mixed page, except in a file
+  // that gets forwarded to people who never saw the screen.
+  const q = new URLSearchParams();
+  if (filter.from != null) q.set("from", String(filter.from));
+  if (filter.to != null) q.set("to", String(filter.to));
+  if (filter.resource) q.set("resource", filter.resource);
+  for (const [k, v] of Object.entries(filter.attrs ?? {})) q.set(`attr.${k}`, v);
+  const qs = q.toString();
   const base = `/api/projects/${projectId}/mining/runs/${runId}/analysis-export`;
+  const href = (format: string) => `${base}?format=${format}${qs ? `&${qs}` : ""}`;
   const btn = "text-xs rounded px-3 py-1.5 bg-amber-700 hover:bg-amber-600 text-white";
   return (
     <div>
       <p className="text-[11px] text-stone-400 mb-2">Download the full analysis — summary, bottleneck table, variant Pareto and the on-time/late outcomes — as a report.</p>
+      {filterNote && (
+        <p className="text-[11px] text-amber-200 mb-2">
+          The report will cover <span className="text-amber-100">{filterNote}</span> only, and will say so on its first page.
+        </p>
+      )}
       <div className="flex items-center gap-2">
-        <a className={btn} href={`${base}?format=docx`}>Word (.docx)</a>
-        <a className={btn} href={`${base}?format=xlsx`}>Excel (.xlsx)</a>
-        <a className={btn} href={`${base}?format=pdf`} target="_blank" rel="noopener">PDF</a>
+        <a className={btn} href={href("docx")}>Word (.docx)</a>
+        <a className={btn} href={href("xlsx")}>Excel (.xlsx)</a>
+        <a className={btn} href={href("pdf")} target="_blank" rel="noopener">PDF</a>
       </div>
       <p className="text-[10px] text-stone-500 mt-2">PDF is rendered server-side (needs LibreOffice on the host); Word/Excel download directly.</p>
     </div>

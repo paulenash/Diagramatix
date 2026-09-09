@@ -19,17 +19,25 @@ export interface AnalysisInput {
   analytics: RunAnalytics;
   variants: Variant[];
   kpiConfig: KpiConfig | null;
+  /** What the run was narrowed to, when it was. Stated at the top of the
+   *  report and in the spreadsheet's Summary, because a filtered report that
+   *  does not say so is indistinguishable from a whole-run one once it has
+   *  been emailed to somebody. */
+  filterNote?: string | null;
 }
 
 const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
 
 /** Word report → one chapter with markdown sections (tables supported by buildDocx). */
 export function buildAnalysisChapters(input: AnalysisInput): DocxChapter[] {
-  const { name, stats, analytics, variants, kpiConfig } = input;
+  const { name, stats, analytics, variants, kpiConfig, filterNote } = input;
   const unit = analytics.clockUnit;
   const fmt = (ms: number) => formatDuration(ms, unit);
   const md: string[] = [];
 
+  if (filterNote) {
+    md.push(`**Filtered to: ${filterNote}.** Every figure below describes only these cases.`, "");
+  }
   md.push("## Summary", "");
   md.push("| Metric | Value |", "|---|---|");
   md.push(`| Cases | ${stats.cases} |`);
@@ -83,6 +91,7 @@ export function buildAnalysisSheets(input: AnalysisInput): Sheet[] {
 
   const summary: Cell[][] = [
     ["Process Insights", name],
+    ...(input.filterNote ? [["Filtered to", input.filterNote] as Cell[], [] as Cell[]] : []),
     ["Metric", "Value"],
     ["Cases", stats.cases], ["Events", stats.events], ["Activities", stats.activities.length],
     ["Variants", stats.variants],

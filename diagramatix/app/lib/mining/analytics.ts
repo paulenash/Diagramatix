@@ -24,8 +24,10 @@ function pickUnit(medianMs: number): ClockUnit {
   if (medianMs < 86_400_000) return "hour";
   return "day";
 }
-function sortedNums(xs: number[]): number[] { return [...xs].sort((a, b) => a - b); }
-function quantile(sorted: number[], q: number): number {
+export function sortedNums(xs: number[]): number[] { return [...xs].sort((a, b) => a - b); }
+/** Exported so a filtered rebuild quotes its percentiles the SAME way the
+ *  import did — two implementations of a median is two different medians. */
+export function quantile(sorted: number[], q: number): number {
   if (sorted.length === 0) return 0;
   const i = (sorted.length - 1) * q;
   const lo = Math.floor(i), hi = Math.ceil(i);

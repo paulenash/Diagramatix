@@ -14,6 +14,7 @@ import { buildDocx } from "@/app/lib/documents/exportDocx";
 import { docxToPdf } from "@/app/lib/documents/docxToPdf";
 import { buildXlsx } from "@/app/lib/riskControls/xlsx";
 import { buildAnalysisChapters, buildAnalysisSheets, type AnalysisInput } from "@/app/lib/mining/exportAnalysis";
+import { filterAnalytics, filteredStats, describeFilter, type MiningFilter } from "@/app/lib/mining/filterAnalytics";
 import type { RunAnalytics } from "@/app/lib/mining/analytics";
 import type { MiningStats, Variant } from "@/app/lib/mining/types";
 import type { KpiConfig } from "@/app/lib/mining/outcomes";
@@ -40,12 +41,26 @@ export async function GET(req: Request, { params }: Params) {
     return NextResponse.json({ error: "No analytics for this run — re-import the log to compute the Insights." }, { status: 400 });
   }
 
+  // The slice the screen was showing, carried on the query string. The same
+  // pure function the console uses, so the report cannot disagree with it.
+  const sp = new URL(req.url).searchParams;
+  const num = (k: string) => { const v = sp.get(k); const n = v == null ? NaN : Number(v); return Number.isFinite(n) ? n : null; };
+  const attrs: Record<string, string> = {};
+  for (const [k, v] of sp.entries()) if (k.startsWith("attr.") && v) attrs[k.slice(5)] = v;
+  const filter: MiningFilter = { from: num("from"), to: num("to"), resource: sp.get("resource"), attrs };
+
+  const baseStats = run.stats as unknown as MiningStats;
+  const baseVariants = (run.variants as unknown as Variant[]) ?? [];
+  const sliced = filterAnalytics(analytics, baseVariants, filter);
+  const filterNote = describeFilter(filter);
+
   const input: AnalysisInput = {
     name: run.name,
-    stats: run.stats as unknown as MiningStats,
-    analytics,
-    variants: (run.variants as unknown as Variant[]) ?? [],
+    stats: sliced && filterNote ? filteredStats(baseStats, sliced) : baseStats,
+    analytics: sliced?.analytics ?? analytics,
+    variants: sliced?.variants ?? baseVariants,
     kpiConfig: (run.kpiConfig as unknown as KpiConfig | null) ?? null,
+    filterNote,
   };
   const safe = run.name.replace(/[^a-z0-9\-_. ]/gi, "_").slice(0, 80) || "insights";
 

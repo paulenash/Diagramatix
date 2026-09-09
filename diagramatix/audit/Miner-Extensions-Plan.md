@@ -7,7 +7,7 @@
 | **This document** | The **live worklist** for building them. Every phase names the files it touches and the existing functions it reuses. The review is the historical argument; this is the burn-down. |
 | **Scope** | All 8 extensions + all 11 smaller items. Nothing dropped — two are **re-specified** rather than built as written, and each says why on its face. |
 | **How to use** | Work an item, tick its box, set **Status** → `In progress` / `Shipped (<commit>)` / `Won't do (<reason>)`. Record what actually happened — including deviations — in the phase's own **As built** paragraph, so this doubles as a decision log. |
-| **Progress log** | **2026-09-09** — **PHASE 4 SHIPPED** (T3773–T3790): `analytics.edges` reaches a screen at last as a ranked "Between steps" table, the discovered model's arrows carry the median gap and a thickness, and the detail slider the User Guide already described now exists. **The in-step vs between-step split was REFUSED**: one timestamp per event means the same milliseconds are already counted under the from-activity, so the split would have been fabricated and summing the two tables would have doubled the process. Slice (b) turned out to be one conditional, safe because almost nothing in the tree sets `weight` — now a test. **PHASE 3 SHIPPED** (T3763–T3772): the hold-back reaches a screen for the first time, the calibrate hand-off stops discarding its study, and a refreshed run marks its twin stale rather than silently re-calibrating. A FOURTH defect surfaced while building: a live refresh was silently DROPPING the hold-back, so an out-of-sample validation quietly became in-sample and the panel said otherwise. **PHASE 0 COMPLETE** (0.3–0.6, T3681–T3762): the recompute contract refuses the four per-event fields by name rather than approximating them from variants; a test floor under the five untested modules; eleven hand-written run-JSON statements (not six) became one patch helper with a guard that was proved to fire; and **0.5 answered on evidence — the generator is deterministic, the baked catalog was merely STALE, and all five examples had been teaching pre-Phase-1 analytics since Phase 1 shipped ahead of its own gate.** **2.3 SHIPPED** (T3657–T3680): several systems merge into one lifecycle, ids unified by shared key or crosswalk (union-find, so chains resolve), a refusal when nothing overlaps, and CROSS-SYSTEM HANDOVER measured at the join — the days nobody owns, which neither export contains. **0.2 SHIPPED**: the console went 1,183 → 153 lines (44 `useState` → 5) into `console/ImportPanel`, `console/RunList`, `console/RunDetail`. **No tab shell** — this plan's own text contradicted itself and the e2e settled it. Which turned up the next thing: that e2e looked for a button renamed months ago, so the Miner's only route-level coverage was failing before it reached what it covered. **2.1 SHIPPED** (T3647–T3656): `.xlsx` read directly, no new dependency. **2.2 SHIPPED** (T3631–T3646): wide exports expand to one row per event. — Plan written. Reconnaissance found **four things the review got wrong** and **one it does not mention at all** (the gating hole), all recorded below against the item they affect. **Step 1 SHIPPED**: 20 of 26 mining routes now carry a subscription gate (was 3), the three dormant tier keys are enforced, and `tests/mining/route-gating.test.ts` (T3609–T3613) enumerates the route tree so the twenty-seventh route cannot be added ungated. **Phase 1 SHIPPED** (T3614–T3630) — and its budget test found a CRASH: `Math.min(...xs)` threw past ~125k elements in three places, so any log beyond ~125,000 events could not be imported at all. **Phase 8 ADDED** after Paul asked whether the plan gave the user a course of action; it did not, and neither does the review. The cut line moved to after it. **Phase 2 ADDED** — three input questions the plan could not answer: no `.xlsx`, wide-format exports silently read as one event, and no way to merge several systems' exports of the same cases. Placed second, because a user who cannot load their export is not reached by anything else. Phases 2–10 renumbered to 3–11. |
+| **Progress log** | **2026-09-09** — **PHASE 5 SHIPPED** (T3791–T3821): the run slices by date, team and any kept column; the throughput chart is the date brush; the filtered rebuild is EXACT (T3800 proves it equals recomputing that slice from scratch); the report filters server-side and restates its own Summary. Phase 1's seam paid off exactly as designed — the filter reached eight panels by changing ONE line. The seam's rule is now a test, proved by reverting a tab to the raw data. **PHASE 4 SHIPPED** (T3773–T3790): `analytics.edges` reaches a screen at last as a ranked "Between steps" table, the discovered model's arrows carry the median gap and a thickness, and the detail slider the User Guide already described now exists. **The in-step vs between-step split was REFUSED**: one timestamp per event means the same milliseconds are already counted under the from-activity, so the split would have been fabricated and summing the two tables would have doubled the process. Slice (b) turned out to be one conditional, safe because almost nothing in the tree sets `weight` — now a test. **PHASE 3 SHIPPED** (T3763–T3772): the hold-back reaches a screen for the first time, the calibrate hand-off stops discarding its study, and a refreshed run marks its twin stale rather than silently re-calibrating. A FOURTH defect surfaced while building: a live refresh was silently DROPPING the hold-back, so an out-of-sample validation quietly became in-sample and the panel said otherwise. **PHASE 0 COMPLETE** (0.3–0.6, T3681–T3762): the recompute contract refuses the four per-event fields by name rather than approximating them from variants; a test floor under the five untested modules; eleven hand-written run-JSON statements (not six) became one patch helper with a guard that was proved to fire; and **0.5 answered on evidence — the generator is deterministic, the baked catalog was merely STALE, and all five examples had been teaching pre-Phase-1 analytics since Phase 1 shipped ahead of its own gate.** **2.3 SHIPPED** (T3657–T3680): several systems merge into one lifecycle, ids unified by shared key or crosswalk (union-find, so chains resolve), a refusal when nothing overlaps, and CROSS-SYSTEM HANDOVER measured at the join — the days nobody owns, which neither export contains. **0.2 SHIPPED**: the console went 1,183 → 153 lines (44 `useState` → 5) into `console/ImportPanel`, `console/RunList`, `console/RunDetail`. **No tab shell** — this plan's own text contradicted itself and the e2e settled it. Which turned up the next thing: that e2e looked for a button renamed months ago, so the Miner's only route-level coverage was failing before it reached what it covered. **2.1 SHIPPED** (T3647–T3656): `.xlsx` read directly, no new dependency. **2.2 SHIPPED** (T3631–T3646): wide exports expand to one row per event. — Plan written. Reconnaissance found **four things the review got wrong** and **one it does not mention at all** (the gating hole), all recorded below against the item they affect. **Step 1 SHIPPED**: 20 of 26 mining routes now carry a subscription gate (was 3), the three dormant tier keys are enforced, and `tests/mining/route-gating.test.ts` (T3609–T3613) enumerates the route tree so the twenty-seventh route cannot be added ungated. **Phase 1 SHIPPED** (T3614–T3630) — and its budget test found a CRASH: `Math.min(...xs)` threw past ~125k elements in three places, so any log beyond ~125,000 events could not be imported at all. **Phase 8 ADDED** after Paul asked whether the plan gave the user a course of action; it did not, and neither does the review. The cut line moved to after it. **Phase 2 ADDED** — three input questions the plan could not answer: no `.xlsx`, wide-format exports silently read as one event, and no way to merge several systems' exports of the same cases. Placed second, because a user who cannot load their export is not reached by anything else. Phases 2–10 renumbered to 3–11. |
 
 **Status values:** `Not started` · `In progress` · `Shipped (<commit>)` · `Blocked (<on what>)` · `Won't do (<reason>)`
 
@@ -738,13 +738,13 @@ a linking job, not an analysis one, and it belongs with Phase 5's filtering seam
 
 ## Phase 5 — Slicing is what turns a finding into a cause
 
-**Status:** `Not started` · The big one, and the one that pays back everything Phase 1 stored.
+**Status:** ✅ `Shipped` — T3791–T3821. The big one, and it paid back everything Phase 1 stored.
 
-- [ ] One filter bar above the tabs — date range plus any captured attribute or team
-- [ ] New pure `app/lib/mining/filterAnalytics.ts` — `filterAnalytics`, `filterVariants`
-- [ ] `insights/ThroughputChart.tsx` — arrivals and completions, brushable
-- [ ] Per-panel exactness chips using Phase 1's vocabulary
-- [ ] The exported report states the filter it was run under
+- [x] One filter bar above the tabs — date range plus any captured attribute or team
+- [x] New pure `app/lib/mining/filterAnalytics.ts`
+- [x] `insights/ThroughputChart.tsx` — arrivals and completions, brushable
+- [x] Per-panel exactness chips using Phase 1's vocabulary
+- [x] The exported report states the filter it was run under — **and its Summary counts agree**
 
 **Absorbs.** **Extension 2** (the UI half) and **extension 7**, paired deliberately: **the throughput
 chart *is* the date filter.** Volume over time is already computed (`analytics.throughput`, 30 buckets
@@ -772,6 +772,72 @@ feeds them. The Word and Excel reports filter for free.
 2. When `analytics.capped`, every filtered figure is an estimate from a 1-in-N stride and says so.
 3. Time-shaped figures are exact only when `detail === "full"`; otherwise the chip reads *not
    filtered* and the number shown is the whole-run number, visibly marked. **Never averaged.**
+
+---
+
+### As built
+
+**Phase 1's bet came off exactly as designed.** `useRunView` was introduced as an identity view
+before any filter existed, on the argument that it would convert this phase from a retrofit of
+eight panels into a change in one place. It did: every panel already read `view.analytics` and
+`view.variants`, so the filter reached all of them by changing **one line** — the call that passes
+the filter into the seam. Nothing else in the panel body moved.
+
+**The reconstruction is exact, and that is checkable rather than asserted.** A filtered activity
+table, heat map and transitions table are all rebuilt from the stored case index — each case's
+variant supplies the activity sequence its `durs` and `res` vectors line up with. T3800 is the
+proof: the filtered figures equal what `computeAnalytics` produces when *only those cases were ever
+in the log*. Not approximately; equal.
+
+**Conformance filtering came free, as predicted.** Variant counts become a histogram over the
+filtered cases while the array KEEPS its length and order, so `variantIdx` stays a valid index
+everywhere and `checkTransitionConformance` — which weights by count — narrows without knowing a
+filter exists. A variant nobody in the slice followed simply has a count of zero (T3796).
+
+**The chart is the date control, and the bars never move.** `analytics.throughput` was computed on
+every run since import and drawn nowhere. It is now the brush. The bars are always the WHOLE run,
+deliberately — a chart that redrew itself from its own selection would move the ground under the
+hand dragging it, and a user could brush a range only to find the range had gone. A filtered
+rebuild reuses the same bucket boundaries for the same reason (T3797).
+
+**The three honest floors, as built:**
+
+1. **Below the case floor**, the slice reports its counts and refuses distributions (T3806) — and
+   says which, because with four matching cases the COUNT is the finding and the median is noise.
+2. **On a strided run**, both numbers are returned: the raw matched count and the scaled estimate,
+   from ONE stride so no two figures on the page can disagree (T3808).
+3. **A run without per-event detail** hands back the whole-run timings untouched, flagged `not
+   filtered` in rose (T3804, T3805). Never averaged, never scaled, never quietly narrowed — while
+   its COUNTS still filter, because the case index alone supports them. That split is the phase.
+
+**An unsatisfiable clause matches nothing rather than being dropped** (T3803). Silently ignoring a
+team that is not in the dictionary would show the whole run beneath a chip claiming otherwise,
+which is the exact failure the seam exists to prevent.
+
+**The report filters server-side, using the same pure function.** The slice travels on the query
+string and `filterAnalytics` runs in the route, so the document cannot disagree with the screen it
+was requested from. Its Summary counts are restated for the slice too (`filteredStats`): a Summary
+saying 12 cases above a bottleneck table built from 6 is the same mixed-provenance defect as a
+mixed screen, except in a file that gets forwarded to people who never saw the console (T3814).
+An UNfiltered report says nothing at all rather than "no filter" — a caveat on every report trains
+people to ignore caveats (T3813).
+
+**The seam's rule is now enforced, not just documented.** T3818–T3821 read the panel's own render
+and fail if any tab is handed the unfiltered `analytics` or `variants`. This is the one defect in
+the phase that no unit test could catch — every panel would be individually correct, both figures
+would render, both would be plausible, and only someone who already knew the answer would notice.
+Proved by reverting one tab to the raw data: the guard names it.
+
+**Found while writing that guard:** the first version scanned to the end of the file and flagged
+`CaseReplay`, which takes `variants` from inside `CasesTab` where the name is already the view's.
+The rule is about what the PANEL hands out; once data is inside a tab it has been through the seam
+by definition. Bounded to the panel's own function, with the reason recorded in the test.
+
+**Not done, and named:** *discovery* from a slice. The plan is right that it must be an explicit
+"discover from this slice" action creating a NEW diagram rather than a live overlay, because
+discovery emits a persisted artefact. Nothing about that is blocked — it is a button and a route
+parameter — but it belongs with the arrow-to-table linking deferred from Phase 4, and both are
+better done together.
 
 ---
 
