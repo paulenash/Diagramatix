@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-09-07  ·  **Document version:** 7.0  ·  **Suite:** 423 test files · 2,952 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T3630  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-09-07  ·  **Document version:** 7.0  ·  **Suite:** 424 test files · 2,968 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T3646  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
@@ -34,9 +34,9 @@ Each test file has its own section below, grouped into layers. Within each secti
 | **Protects you against** | In plain terms, the real-world problem that would occur if this behaviour regressed. |
 | **How it would break (go red)** | The kind of code or data change that would make this specific test fail — i.e. what the test is watching. |
 
-**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T3631**, the one after **T3632**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
+**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T3647**, the one after **T3648**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T3630`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
+> **Highest ref allocated: `T3646`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -2737,6 +2737,22 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 | T3629 | `tests/mining/case-attributes.test.ts` | min/max over a log-sized array does not blow the stack - Math.min(...xs) throws past ~125k. |
 | T3630 | `tests/mining/case-attributes.test.ts` | ...and they report an empty array as unknown, not as zero. |
 | T3628 | `tests/mining/case-attributes.test.ts` | A run imported before any of this reads as 'none', not as zero. |
+| T3631 | `tests/mining/wide-format.test.ts` | A state/date paired export is recognised, and keyed on the case id (not the row id or the case name). |
+| T3632 | `tests/mining/wide-format.test.ts` | Milestone columns are recognised, and the header becomes the step. |
+| T3633 | `tests/mining/wide-format.test.ts` | An ordinary LONG log is not mistaken for a wide one. |
+| T3634 | `tests/mining/wide-format.test.ts` | Detection reads the DATA, not the header names. |
+| T3635 | `tests/mining/wide-format.test.ts` | Every state on the row becomes its own event - the row used to yield one. |
+| T3636 | `tests/mining/wide-format.test.ts` | A step the case never reached is simply absent, not an empty event. |
+| T3637 | `tests/mining/wide-format.test.ts` | Events are ordered by TIME, not by column order. |
+| T3638 | `tests/mining/wide-format.test.ts` | Carried columns ride on every event of the case. |
+| T3639 | `tests/mining/wide-format.test.ts` | Milestone headers lose their date suffix, so the step reads as a step. |
+| T3640 | `tests/mining/wide-format.test.ts` | A state with no date is reported, not placed at the epoch. |
+| T3641 | `tests/mining/wide-format.test.ts` | A date with no state names nothing, and says so. |
+| T3642 | `tests/mining/wide-format.test.ts` | An unreadable date is skipped and counted. |
+| T3643 | `tests/mining/wide-format.test.ts` | A row with no case id cannot be attributed, and is counted. |
+| T3644 | `tests/mining/wide-format.test.ts` | guessMapping finds the expanded columns without the user intervening. |
+| T3645 | `tests/mining/wide-format.test.ts` | buildEventLog mines the expansion into the lifecycle the row described. |
+| T3646 | `tests/mining/wide-format.test.ts` | The description says what will happen before it happens. |
 
 > **Keep this section in sync.** Whenever an e2e spec is added, removed, or changes what it asserts, update this section. It is hand-maintained, not generated.
 

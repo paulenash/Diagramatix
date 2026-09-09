@@ -156,7 +156,11 @@ describe("Phase 1 — the per-event vectors a filter will need", () => {
     // The counts themselves are untouched — this is a detail budget, not a cap.
     expect(a.totalCases).toBe(n);
     expect(a.cases[0].cycleMs).toBeGreaterThan(0);
-  });
+    // Timeout raised deliberately: building and mining ~1.5M events is the point
+    // of this test, not an accident of it, and 15s is tight for that under the
+    // parallel load of a full-suite run. It is also the test that found the
+    // Math.min(...) crash, so it is not one to make cheaper.
+  }, 90_000);
 });
 
 describe("Phase 1 — REGRESSION: a log that asks for none of this is unchanged", () => {

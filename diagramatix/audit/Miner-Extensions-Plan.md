@@ -7,7 +7,7 @@
 | **This document** | The **live worklist** for building them. Every phase names the files it touches and the existing functions it reuses. The review is the historical argument; this is the burn-down. |
 | **Scope** | All 8 extensions + all 11 smaller items. Nothing dropped — two are **re-specified** rather than built as written, and each says why on its face. |
 | **How to use** | Work an item, tick its box, set **Status** → `In progress` / `Shipped (<commit>)` / `Won't do (<reason>)`. Record what actually happened — including deviations — in the phase's own **As built** paragraph, so this doubles as a decision log. |
-| **Progress log** | **2026-09-09** — Plan written. Reconnaissance found **four things the review got wrong** and **one it does not mention at all** (the gating hole), all recorded below against the item they affect. **Step 1 SHIPPED**: 20 of 26 mining routes now carry a subscription gate (was 3), the three dormant tier keys are enforced, and `tests/mining/route-gating.test.ts` (T3609–T3613) enumerates the route tree so the twenty-seventh route cannot be added ungated. **Phase 1 SHIPPED** (T3614–T3630) — and its budget test found a CRASH: `Math.min(...xs)` threw past ~125k elements in three places, so any log beyond ~125,000 events could not be imported at all. **Phase 8 ADDED** after Paul asked whether the plan gave the user a course of action; it did not, and neither does the review. The cut line moved to after it. **Phase 2 ADDED** — three input questions the plan could not answer: no `.xlsx`, wide-format exports silently read as one event, and no way to merge several systems' exports of the same cases. Placed second, because a user who cannot load their export is not reached by anything else. Phases 2–10 renumbered to 3–11. |
+| **Progress log** | **2026-09-09** — **2.2 SHIPPED** (T3631–T3646): wide exports expand to one row per event. — Plan written. Reconnaissance found **four things the review got wrong** and **one it does not mention at all** (the gating hole), all recorded below against the item they affect. **Step 1 SHIPPED**: 20 of 26 mining routes now carry a subscription gate (was 3), the three dormant tier keys are enforced, and `tests/mining/route-gating.test.ts` (T3609–T3613) enumerates the route tree so the twenty-seventh route cannot be added ungated. **Phase 1 SHIPPED** (T3614–T3630) — and its budget test found a CRASH: `Math.min(...xs)` threw past ~125k elements in three places, so any log beyond ~125,000 events could not be imported at all. **Phase 8 ADDED** after Paul asked whether the plan gave the user a course of action; it did not, and neither does the review. The cut line moved to after it. **Phase 2 ADDED** — three input questions the plan could not answer: no `.xlsx`, wide-format exports silently read as one event, and no way to merge several systems' exports of the same cases. Placed second, because a user who cannot load their export is not reached by anything else. Phases 2–10 renumbered to 3–11. |
 
 **Status values:** `Not started` · `In progress` · `Shipped (<commit>)` · `Blocked (<on what>)` · `Won't do (<reason>)`
 
@@ -238,7 +238,7 @@ this plan — and the review — had no answer to. **Placed second on purpose: i
 their export, no later phase matters to them.**
 
 - [ ] `.xlsx` import — the format people actually have
-- [ ] **Wide-format unpivot** — one row per case, `state1, ts1, state2, ts2, …`
+- [x] **Wide-format unpivot** — one row per case, `state1, ts1, state2, ts2, …`
 - [ ] **Multi-file merge** — several systems' exports assembled into one run, with source provenance
 - [ ] An id **crosswalk** for merging, when the systems do not agree on the case id
 
@@ -277,6 +277,34 @@ detected from header patterns and confirmed by the user, in the same idiom as th
 **Honest floor:** a row whose pairs are ragged (a state with no timestamp, or the reverse) is
 reported, not guessed at — and a file that looks wide but cannot be paired should say so rather than
 importing one event per case.
+
+**As built (2.2 shipped).** `app/lib/mining/wideFormat.ts` — `detectWideSpec` / `unpivotWide`, pure,
+client-side, before the file is ever sent. Both shapes are handled: **paired** (`Status 1` +
+`Status 1 Date`, where the cell names the state) and **milestone** (`Approved On`, where the header
+names the step and the cell is only a date) — the second is at least as common as the first and cost
+almost nothing once the machinery existed. Output is ordinary long format, so `guessMapping`,
+validation and `buildEventLog` are untouched (T3644, T3645).
+
+**Detected, never applied.** Expanding a log silently would be the same class of mistake as the bug
+it fixes, so the console states what it found — *"3 state/date pairs, keyed on Case ID"* — and what
+would otherwise happen — *"each case would show a single step and the rest of its row would be
+ignored"* — and waits for the button.
+
+**Two false positives it took real care to avoid**, both found by tests rather than by reasoning:
+
+- **`Date.parse` cannot be used for detection.** V8's legacy fallback reads `"C-1"` as a date in 2001,
+  and `"1"` as one too. The first detector duly decided a column of case ids was a lifecycle, and the
+  second decided the same about `Row ID`. Detection now matches explicit date SHAPES and only then
+  confirms with `parseTimestamp`. `parseTimestamp` itself is left generous on purpose: by the time it
+  runs the user has said "this column is the timestamp", so its willingness is a kindness rather than
+  a hazard.
+- **Sparse late columns.** Requiring several samples before believing a column holds dates misses
+  precisely the columns furthest along the process, because the last state is reached by a minority
+  of cases. A header that says "date" now lowers the evidence needed; a header that says nothing still
+  has to prove it.
+
+Events are sorted **by time, not by column order** (T3637): a spreadsheet's layout is not a claim
+about sequence.
 
 ### 2.3 Several systems, one lifecycle
 

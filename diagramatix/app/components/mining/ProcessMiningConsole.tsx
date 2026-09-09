@@ -9,6 +9,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { parseCsv, guessMapping, distinctActivities } from "@/app/lib/mining/parseEventLog";
+import { detectWideSpec, unpivotWide, describeWideSpec, type WideSpec, type UnpivotResult } from "@/app/lib/mining/wideFormat";
 import { enrichResources, enrichStates } from "@/app/lib/mining/enrich";
 import type { DiagramData } from "@/app/lib/diagram/types";
 import { activityToState } from "@/app/lib/mining/stateNaming";
@@ -61,6 +62,10 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
 
   // Import staging
   const [fileName, setFileName] = useState<string | null>(null);
+  // A wide file, once detected, and the result once expanded. Both null for an
+  // ordinary long-format log, which is the overwhelming majority.
+  const [wide, setWide] = useState<WideSpec | null>(null);
+  const [wideResult, setWideResult] = useState<UnpivotResult | null>(null);
   const [headers, setHeaders] = useState<string[]>([]);
   const [rows, setRows] = useState<string[][]>([]);
   const [mapping, setMapping] = useState<Partial<LogMapping>>({});
@@ -254,6 +259,11 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
       const csv = parseCsv(text); h = csv.headers; r = csv.rows; map = guessMapping(h);
     }
     if (h.length === 0 || r.length === 0) { setErr("Couldn't read any rows from that file."); return; }
+    // Is the whole lifecycle laid out ACROSS the row rather than down the rows?
+    // Detected, never applied: expanding a log silently would be its own version
+    // of the bug this fixes, so the user is shown what it would do and presses
+    // the button. Long-format files detect as null and see nothing.
+    setWide(detectWideSpec(h, r));
     setFileName(file.name); setHeaders(h); setRows(r);
     setMapping(map); setEnrichMsg(null);
     setRunName(file.name.replace(/\.[^.]+$/, ""));
@@ -266,7 +276,7 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
   function loadStaging(s: SampleScenario) {
     if (!Array.isArray(s?.headers) || !Array.isArray(s?.rows) || !s.headers.length || !s.rows.length) return;
     setErr(null); setOcelText(null); setOcelTypes([]); setEnrichMsg(null);
-    setHeaders(s.headers); setRows(s.rows);
+    setHeaders(s.headers); setRows(s.rows); setWide(null); setWideResult(null);
     setMapping(s.mapping ?? guessMapping(s.headers));
     setFileName(s.fileName ?? "sample.csv");
     setRunName(s.runName ?? (s.fileName ?? "").replace(/\.[^.]+$/, ""));
@@ -286,6 +296,16 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
   }, [headers, mapping]);
   const setAttributeMode = (col: string, mode: "keep" | "hash" | "drop") =>
     setMapping((m) => ({ ...m, attributeMode: { ...(m.attributeMode ?? {}), [col]: mode } }));
+
+  /** Expand a wide file in place, then re-guess the mapping over the new shape. */
+  const expandWide = () => {
+    if (!wide) return;
+    const out = unpivotWide(headers, rows, wide);
+    if (out.rows.length === 0) { setErr("Nothing could be expanded from that file — check the state and date columns."); return; }
+    setHeaders(out.headers); setRows(out.rows);
+    setMapping(guessMapping(out.headers));
+    setWideResult(out); setWide(null); setErr(null);
+  };
   // When no State column is mapped, offer an Activity→State table (seeded with a
   // same-named state per activity) that completes the lifecycle the miner + the
   // State Machine need. The table lives in mapping.activityState so it's imported.
@@ -344,7 +364,7 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
       const json = await res.json().catch(() => ({}));
       if (!res.ok) { setErr(json.error ?? "Import failed"); return; }
       pendingKpi.current = null;
-      setFileName(null); setHeaders([]); setRows([]); setMapping({}); setRunName("");
+      setFileName(null); setHeaders([]); setRows([]); setWide(null); setWideResult(null); setMapping({}); setRunName("");
       await load();
       setSelectedId(json.run?.id ?? null);
     } finally { setBusy(false); }
@@ -364,7 +384,7 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) { setErr(json.error ?? "OCEL study import failed"); return; }
-      setOcelText(null); setOcelTypes([]); setFileName(null); setHeaders([]); setRows([]); setMapping({}); setRunName("");
+      setOcelText(null); setOcelTypes([]); setFileName(null); setHeaders([]); setRows([]); setWide(null); setWideResult(null); setMapping({}); setRunName("");
       setOcelDomainId(json.domainDiagramId ?? null);
       await loadReferenceSms();
       await load();
@@ -534,6 +554,41 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
           {ocelDomainId && (
             <div className="mt-2 text-[11px] text-emerald-300">
               ✓ OCEL study created. <a href={openDiagram(ocelDomainId)} onClick={stashReturn} className="underline hover:text-emerald-200">Open the object model (Domain Diagram) →</a>
+            </div>
+          )}
+
+          {/* One row per case? Offer to expand it — and say exactly what that
+              would do first. Reading such a file as long format yields ONE event
+              per case and drops the rest of the row without a word, which is why
+              this is offered rather than left to the user to notice. */}
+          {wide && (
+            <div className="mt-3 rounded border border-amber-500/50 bg-amber-950/20 p-2.5 flex flex-col gap-1.5">
+              <div className="text-[11px] text-amber-200">
+                This file looks like <span className="font-semibold">one row per case</span> — the whole
+                lifecycle across the row, not one row per event.
+              </div>
+              <div className="text-[11px] text-stone-300">
+                Found {describeWideSpec(wide)}. Read as-is, each case would show
+                <span className="font-semibold"> a single step</span> and the rest of its row would be ignored.
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button onClick={expandWide} className="text-xs bg-amber-700 hover:bg-amber-600 text-white rounded px-3 py-1.5">⤢ Expand to one row per event</button>
+                <button onClick={() => setWide(null)} className="text-xs rounded px-3 py-1.5 border border-stone-600 text-stone-300 hover:bg-stone-800">No, it is already one row per event</button>
+              </div>
+            </div>
+          )}
+          {wideResult && (
+            <div className="mt-3 rounded border border-emerald-500/40 bg-emerald-950/20 p-2.5 flex flex-col gap-1">
+              <div className="text-[11px] text-emerald-200">
+                ✓ Expanded to <span className="font-semibold">{wideResult.events}</span> event
+                {wideResult.events === 1 ? "" : "s"} across <span className="font-semibold">{wideResult.cases}</span> case
+                {wideResult.cases === 1 ? "" : "s"}.
+              </div>
+              {/* Never silently dropped: a state with no date, or a date naming
+                  no state, is counted and said out loud. */}
+              {wideResult.warnings.map((w, i) => (
+                <div key={i} className="text-[11px] text-amber-300/90">⚠ {w}</div>
+              ))}
             </div>
           )}
 
