@@ -1811,7 +1811,7 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 **`e2e/mining-examples.spec.ts` — Process Mining sample-catalog journeys**
 - *gallery renders + Load & open pre-loads the sample CSV; import creates the run* — the gallery card → Load & open → the console opens with the Import panel pre-filled, offering the **three choosable period scenarios** (current month = default); switching to *January 2025* re-stages that log → Import log creates the run.
 - *every mining route works over an authenticated session (import → calibrate)* — adopt → import the sample → discover → discover-SM → conformance (181/200) → calibrate, all over authenticated HTTP.
-- *＋ Create draft reference scaffolds a reference for a run that has none* — the empty-state button scaffolds an (AI) reference and selects it. **Skips without `ANTHROPIC_API_KEY`.**
+- *Create reference scaffolds a reference for a run that has none* — the empty-state `＋ Create reference` button scaffolds a **deterministic** reference (a copy of the mined lifecycle) and selects it. No AI, no key: the skip guard and the old `/Create AI reference/` selector were both left over from when this button called Claude, and between them the test had never run.
 - *admin catalog routes are refused for a non-superuser (403)* — the admin API rejects a normal user.
 - *(admin) catalog manager loads for a superuser and CRUD works* — the manager page + create / publish / duplicate / delete.
 - *(admin) Save run as example: capture route works + the button renders in the console* — capture a run into a draft example; the admin capture button renders.

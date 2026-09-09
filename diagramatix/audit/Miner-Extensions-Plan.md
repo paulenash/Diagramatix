@@ -7,7 +7,7 @@
 | **This document** | The **live worklist** for building them. Every phase names the files it touches and the existing functions it reuses. The review is the historical argument; this is the burn-down. |
 | **Scope** | All 8 extensions + all 11 smaller items. Nothing dropped — two are **re-specified** rather than built as written, and each says why on its face. |
 | **How to use** | Work an item, tick its box, set **Status** → `In progress` / `Shipped (<commit>)` / `Won't do (<reason>)`. Record what actually happened — including deviations — in the phase's own **As built** paragraph, so this doubles as a decision log. |
-| **Progress log** | **2026-09-09** — **2.1 SHIPPED** (T3647–T3656): `.xlsx` read directly, no new dependency. **2.2 SHIPPED** (T3631–T3646): wide exports expand to one row per event. — Plan written. Reconnaissance found **four things the review got wrong** and **one it does not mention at all** (the gating hole), all recorded below against the item they affect. **Step 1 SHIPPED**: 20 of 26 mining routes now carry a subscription gate (was 3), the three dormant tier keys are enforced, and `tests/mining/route-gating.test.ts` (T3609–T3613) enumerates the route tree so the twenty-seventh route cannot be added ungated. **Phase 1 SHIPPED** (T3614–T3630) — and its budget test found a CRASH: `Math.min(...xs)` threw past ~125k elements in three places, so any log beyond ~125,000 events could not be imported at all. **Phase 8 ADDED** after Paul asked whether the plan gave the user a course of action; it did not, and neither does the review. The cut line moved to after it. **Phase 2 ADDED** — three input questions the plan could not answer: no `.xlsx`, wide-format exports silently read as one event, and no way to merge several systems' exports of the same cases. Placed second, because a user who cannot load their export is not reached by anything else. Phases 2–10 renumbered to 3–11. |
+| **Progress log** | **2026-09-09** — **0.2 SHIPPED**: the console went 1,183 → 153 lines (44 `useState` → 5) into `console/ImportPanel`, `console/RunList`, `console/RunDetail`. **No tab shell** — this plan's own text contradicted itself and the e2e settled it. Which turned up the next thing: that e2e looked for a button renamed months ago, so the Miner's only route-level coverage was failing before it reached what it covered. **2.1 SHIPPED** (T3647–T3656): `.xlsx` read directly, no new dependency. **2.2 SHIPPED** (T3631–T3646): wide exports expand to one row per event. — Plan written. Reconnaissance found **four things the review got wrong** and **one it does not mention at all** (the gating hole), all recorded below against the item they affect. **Step 1 SHIPPED**: 20 of 26 mining routes now carry a subscription gate (was 3), the three dormant tier keys are enforced, and `tests/mining/route-gating.test.ts` (T3609–T3613) enumerates the route tree so the twenty-seventh route cannot be added ungated. **Phase 1 SHIPPED** (T3614–T3630) — and its budget test found a CRASH: `Math.min(...xs)` threw past ~125k elements in three places, so any log beyond ~125,000 events could not be imported at all. **Phase 8 ADDED** after Paul asked whether the plan gave the user a course of action; it did not, and neither does the review. The cut line moved to after it. **Phase 2 ADDED** — three input questions the plan could not answer: no `.xlsx`, wide-format exports silently read as one event, and no way to merge several systems' exports of the same cases. Placed second, because a user who cannot load their export is not reached by anything else. Phases 2–10 renumbered to 3–11. |
 
 **Status values:** `Not started` · `In progress` · `Shipped (<commit>)` · `Blocked (<on what>)` · `Won't do (<reason>)`
 
@@ -68,7 +68,7 @@ cannot. Phase 0.3 makes that distinction explicit rather than letting it be disc
 
 ## Phase 0 — Foundations (blocking)
 
-**Status:** `In progress` — 0.1 shipped; 0.2–0.6 not started.
+**Status:** `In progress` — 0.1 + 0.2 shipped; 0.3–0.6 not started.
 
 Nothing here is a feature. All of it is a prerequisite, and each item costs an hour now and a week
 later.
@@ -105,17 +105,54 @@ computation. Phase 7 touches those files and is where it belongs.
 restricts once a row explicitly says otherwise, so gating a key that has not been seeded is a no-op
 today and correct the moment it is seeded.
 
-### 0.2 Break up the console
+### 0.2 Break up the console ✅
 
-- [ ] Extract `ProcessMiningConsole.tsx` (**1,027 lines, one scroll, no tabs**) into
-      `app/components/mining/console/` — `RunList`, `ImportPanel`, `MappingPanel`, `DiscoverPanel`,
-      `ConformancePanel`, `TwinPanel` — behind a top-level tab shell
+**Status:** ✅ `Shipped`
 
-`MiningSourcesPanel`, `LiveDemoPanel`, `MiningLogViewer` and `ValidateTwinPanel` already stand alone
-and simply move. **Behaviour-preserving, zero new features.** Five of the eight extensions add a
-panel to this file; doing it later means every phase's diff fights it.
+- [x] `ProcessMiningConsole.tsx` — **1,183 lines, 44 `useState`** — split into
+      `app/components/mining/console/`: `ImportPanel`, `RunList`, `RunDetail`,
+      `SaveRunAsExample`, `shared.ts`
+- [x] The shell keeps only what genuinely spans the screen: the run list, the selection, deletion
 
-Verified by `e2e/mining-examples.spec.ts` plus adopting all five catalog examples.
+`MiningSourcesPanel`, `LiveDemoPanel`, `MiningLogViewer` and `ValidateTwinPanel` already stood alone
+and simply moved. Five of the eight extensions add a panel to this file; doing it later means every
+phase's diff fights it.
+
+**As built — 1,183 → 153 lines in the shell**, and the state went with the panels rather than being
+lifted: 44 `useState` calls became 5 in the console, 22 in `ImportPanel` and 14 in `RunDetail`.
+Nothing about the staged rows, the column mapping, the wide-format detection or the OCEL type picker
+is of any interest to the run list, and none of it is visible to it any more. The console learns one
+thing from the importer — that an import landed.
+
+**Three deviations from this plan's own text, each deliberate:**
+
+1. **No tab shell.** The line above said "behind a top-level tab shell" and, two sentences later,
+   "behaviour-preserving, zero new features" — those contradict each other, and
+   `e2e/mining-examples.spec.ts` settles it: it selects a run and expects the conformance controls
+   visible immediately. Tabs would have broken the Miner's only route-level coverage. **A refactor
+   phase is the wrong place to change what a user sees.** Panels, not tabs; the single scroll stands.
+2. **Errors now appear where they happened.** One `err` state was shared by the whole file, and it
+   was rendered inside the *Import* section — so a conformance or calibration failure printed its
+   message at the top of the page, far from the button that failed. Splitting the state made keeping
+   that behaviour more work than fixing it.
+3. **A stale file no longer leaves a stale banner.** Loading a second file after expanding a wide one
+   kept the "✓ Expanded to N events" banner from the first (`onFile` never cleared `wideResult`;
+   `loadSheet` did). Both paths now go through one `stage()`.
+
+Also corrected in passing: the panel's own description still said "CSV/TSV, XES or OCEL" after 2.1
+shipped `.xlsx`, while the file picker had accepted workbooks all along.
+
+**The e2e this phase leans on was not protecting anything — for two independent reasons.** It
+opened with `test.skip(!process.env.ANTHROPIC_API_KEY, …)`, so it skipped in every environment
+without a key, including this one; and it looked for a button named `/Create AI reference/` when the
+button has been `＋ Create reference` since reference creation became deterministic-by-default — an
+assertion that could not have matched had it ever run. Both are the same stale assumption: that
+scaffolding a reference calls Claude. It does not (`ai:false` is a straight copy of the mined
+lifecycle), so the skip is gone, the selector is fixed, and **the test now runs and passes for real**.
+That is the first time this phase's stated verification has meant anything.
+
+Verified: `tsc` clean, `npx vitest run tests/mining` 187 green, `npm run build` green,
+`e2e/mining-examples.spec.ts` 6 passed.
 
 ### 0.3 State the recompute contract, and build the honest half
 
@@ -198,7 +235,7 @@ the file: no panel reads the fetched analytics directly. That is what turns Phas
 
 **Two things deliberately NOT done.** The `.xlsx` importer was listed as optional
 and is deferred — it is unrelated to the storage argument and would have widened
-the diff for no gain here. And Phase 0.2 (splitting the 1,027-line console) is
+the diff for no gain here. And Phase 0.2 (splitting the console) is
 still outstanding, so the mapping UI added to it makes that file longer, not
 shorter. Both are debts, and both are named rather than quietly carried.
 

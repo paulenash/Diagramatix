@@ -7,7 +7,7 @@ import { E2E_ADMIN } from "./_user";
  *
  *  • As a normal user: gallery → Load & open (adopt over HTTP + ?mining deep-link
  *    opens the console), the full route chain (adopt → discover → conformance →
- *    calibrate), the "Create AI reference" button, and that the admin
+ *    calibrate), the "Create reference" button, and that the admin
  *    routes are refused (403).
  *  • As a SuperAdmin: the catalog manager loads, CRUD works (create / publish /
  *    duplicate / delete), and "Save run as example" (capture) works + its button
@@ -89,10 +89,7 @@ test.describe("DiagramatixMINER Examples — user", () => {
     expect(cal.studyId && cal.diagramId).toBeTruthy();
   });
 
-  test("Create AI reference scaffolds a reference for a run that has none", async ({ page }) => {
-    // Discovery is AI-only now — this button calls Claude, so it needs a key.
-    // Skip in environments without one (e.g. CI e2e) rather than 503.
-    test.skip(!process.env.ANTHROPIC_API_KEY, "Create draft reference uses AI — needs ANTHROPIC_API_KEY");
+  test("Create reference scaffolds a reference for a run that has none", async ({ page }) => {
     // A project + a small imported log → a run with NO reference state machine.
     const projectId = (await (await page.request.post("/api/projects", { data: { name: `Draft Ref ${Date.now()}` } })).json()).id;
     const imp = await page.request.post(`/api/projects/${projectId}/mining/import`, {
@@ -111,7 +108,9 @@ test.describe("DiagramatixMINER Examples — user", () => {
     await page.keyboard.press("Enter").catch(() => {});
     await page.getByText("tiny log").click({ timeout: 25_000 });          // select the run
 
-    const btn = page.getByRole("button", { name: /Create AI reference/ });
+    // The button is "＋ Create reference" — deterministic by default; AI-curation is
+    // a separate button beside it, so this path spends no credits.
+    const btn = page.getByRole("button", { name: /Create reference/ });
     await expect(btn).toBeVisible();
     await btn.click();
 

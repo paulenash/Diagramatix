@@ -2,58 +2,31 @@
 
 /**
  * DiagramatixMINER console — ingest an event log, discover the implied BPMN + a
- * candidate state machine, and check conformance against a reference state
- * machine. Amber/brown "mining" skin, styled like the Simulator console. The
- * digital-twin simulator calibration lands in the final slice.
+ * candidate state machine, check conformance against a reference state machine,
+ * and calibrate a digital twin. Amber/brown "mining" skin, styled like the
+ * Simulator console.
+ *
+ * Phase 0.2 reduced this file from 1,183 lines to a shell. It now owns only what
+ * genuinely spans the screen — the run list, which run is selected, and deletion
+ * — and composes `console/ImportPanel`, `console/RunList` and `console/RunDetail`.
+ * Each of those keeps its own state; nothing is lifted here that only one of them
+ * needs.
+ *
+ * The single-scroll layout is deliberately UNCHANGED. An earlier draft of the
+ * plan said "behind a tab shell", but `e2e/mining-examples.spec.ts` — the Miner's
+ * only route-level coverage — selects a run and expects the conformance controls
+ * to be visible immediately. Tabs would have broken it, and a refactor phase is
+ * the wrong place to change what a user sees.
  */
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { parseCsv, guessMapping, distinctActivities } from "@/app/lib/mining/parseEventLog";
-import { detectWideSpec, unpivotWide, describeWideSpec, type WideSpec, type UnpivotResult } from "@/app/lib/mining/wideFormat";
-import { parseXlsx, type XlsxSheet } from "@/app/lib/mining/formats/xlsx";
-import { enrichResources, enrichStates } from "@/app/lib/mining/enrich";
-import type { DiagramData } from "@/app/lib/diagram/types";
-import { activityToState } from "@/app/lib/mining/stateNaming";
-import { parseXes } from "@/app/lib/mining/formats/xes";
-import { parseOcel } from "@/app/lib/mining/formats/ocel";
-import { validateEventLogMapping } from "@/app/lib/mining/validateLog";
+import { useCallback, useEffect, useState } from "react";
 import { MiningSourcesPanel } from "./MiningSourcesPanel";
 import { LiveDemoPanel } from "./LiveDemoPanel";
-import { MiningInsightsPanel } from "./insights/MiningInsightsPanel";
-import { MiningLogViewer } from "./MiningLogViewer";
-import { ValidateTwinPanel } from "./ValidateTwinPanel";
-import type { LogMapping, MiningStats } from "@/app/lib/mining/types";
-import type { ConformanceResult } from "@/app/lib/mining/transitionConformance";
+import { ImportPanel } from "./console/ImportPanel";
+import { RunList } from "./console/RunList";
+import { RunDetail } from "./console/RunDetail";
+import type { RunRow } from "./console/shared";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
-import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
-import { useAiAllowed } from "@/app/lib/auth/useAiAllowed";
-
-interface RunRow {
-  id: string; name: string; stats: MiningStats; mapping: Partial<LogMapping>;
-  discoveredBpmnId: string | null; discoveredSmId: string | null; referenceSmId: string | null;
-  conformance: ConformanceResult | null;
-  studyId: string | null; createdAt: string; excludeFromCompliance?: boolean;
-  ocelGroupId?: string | null; objectType?: string | null; domainDiagramId?: string | null;
-}
-
-/** A choosable raw sample log handed over from an adopted example. */
-interface SampleScenario {
-  scenario?: string; note?: string;
-  fileName?: string; runName?: string;
-  headers: string[]; rows: string[][]; mapping?: Partial<LogMapping>;
-}
-
-const ROLES: { key: keyof LogMapping; label: string; required: boolean; hint: string }[] = [
-  { key: "caseId", label: "Case / entity id", required: true, hint: "The entity instance (e.g. Invoice #123) — the process case" },
-  { key: "activity", label: "Activity / event", required: true, hint: "The business event that occurred" },
-  { key: "timestamp", label: "Timestamp", required: true, hint: "When it happened (ISO or epoch)" },
-  { key: "state", label: "State (optional)", required: false, hint: "The entity's resulting state after the event. Leave blank to map activities → states below." },
-  { key: "resource", label: "Resource (optional)", required: false, hint: "Who/what performed it → simulation team" },
-  { key: "entityType", label: "Entity type (optional)", required: false, hint: "The entity kind (Invoice, Employee…)" },
-  { key: "controlId", label: "Control ID (optional)", required: false, hint: "The Control (RCM) id exercised — mines control operating-effectiveness" },
-  { key: "riskId", label: "Risk ID (optional)", required: false, hint: "The Risk id the event relates to — GRC traceability" },
-  { key: "policyId", label: "Policy ID (optional)", required: false, hint: "The Policy id the event relates to — GRC traceability" },
-];
 
 export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose, onOpenSimulator }: { projectId: string; projectName?: string; isAdmin?: boolean; onClose: () => void; onOpenSimulator?: () => void }) {
   const [runs, setRuns] = useState<RunRow[]>([]);
@@ -61,84 +34,21 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
   const [deleting, setDeleting] = useState<RunRow | null>(null);
   const [deletingStudy, setDeletingStudy] = useState<{ groupId: string; name: string; count: number } | null>(null);
 
-  // Import staging
-  const [fileName, setFileName] = useState<string | null>(null);
-  // A wide file, once detected, and the result once expanded. Both null for an
-  // ordinary long-format log, which is the overwhelming majority.
-  const [wide, setWide] = useState<WideSpec | null>(null);
-  const [wideResult, setWideResult] = useState<UnpivotResult | null>(null);
-  // Sheets from a workbook, so a multi-sheet file does not silently lose the
-  // ones that were not first.
-  const [xlsxSheets, setXlsxSheets] = useState<XlsxSheet[]>([]);
-  const [headers, setHeaders] = useState<string[]>([]);
-  const [rows, setRows] = useState<string[][]>([]);
-  const [mapping, setMapping] = useState<Partial<LogMapping>>({});
-  const [runName, setRunName] = useState("");
-  // Choosable scenarios (an example may ship several period logs to pick between).
-  const [scenarios, setScenarios] = useState<SampleScenario[] | null>(null);
-  const [scenarioIdx, setScenarioIdx] = useState(-1);
-  // The adopted example's built-in log — RETAINED so it can always be re-loaded
-  // (alongside "Choose file…"), even after picking a different file. For a single
-  // sample this backs a "Load built-in example data" button; multi-scenario
-  // examples use the scenario picker instead.
-  const [builtInSample, setBuiltInSample] = useState<SampleScenario | null>(null);
-  // OCEL 2.0 object-centric study: the raw log + the object types the user picks
-  // to mine (one state machine + run each) tied together by a Domain Diagram.
-  const [ocelText, setOcelText] = useState<string | null>(null);
-  const [ocelTypes, setOcelTypes] = useState<string[]>([]);
-  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
-  const [ocelDomainId, setOcelDomainId] = useState<string | null>(null);
-  const [showJson, setShowJson] = useState(false);
-  // Pretty-printed OCEL for the inline "View JSON" panel (capped so a huge log
-  // can't freeze the render; the raw file is unchanged on import).
-  const ocelPretty = useMemo(() => {
-    if (!ocelText) return "";
-    let s: string;
-    try { s = JSON.stringify(JSON.parse(ocelText), null, 2); } catch { s = ocelText; }
-    return s.length > 200_000 ? s.slice(0, 200_000) + "\n… (truncated for display)" : s;
-  }, [ocelText]);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  const [discovering, setDiscovering] = useState(false); // any discovery in flight (disables all buttons)
-  const [aiSm, setAiSm] = useState(false);   // AI reference-SM generation in flight (its own spinner)
-  const [smBusy, setSmBusy] = useState(false); // deterministic state-machine discovery in flight
-  const [aiBpmn, setAiBpmn] = useState(false);   // AI process curation in flight (its own spinner)
-  const [bpmnBusy, setBpmnBusy] = useState(false); // deterministic process discovery in flight
-  // Conformance
-  const [referenceSms, setReferenceSms] = useState<{ id: string; name: string }[]>([]);
-  const [refSmId, setRefSmId] = useState("");
-  const [runningConf, setRunningConf] = useState(false);
-  const [conformance, setConformance] = useState<ConformanceResult | null>(null);
-  // AI "Explain results"
-  const [explanation, setExplanation] = useState<string | null>(null);
-  const [explaining, setExplaining] = useState(false);
-  // Hide the AI-curate / Explain actions when the org disables AI (server enforces regardless).
-  const aiAllowed = useAiAllowed();
-
   const load = useCallback(async () => {
     const res = await fetch(`/api/projects/${projectId}/mining/runs`);
     if (res.ok) setRuns((await res.json()).runs ?? []);
   }, [projectId]);
   useEffect(() => { load(); }, [load]);
-  // Include/exclude this run from org Compliance Monitoring (test runs shouldn't
-  // pollute the trend). Optimistic; PATCH persists on the run.
-  const toggleRunCompliance = useCallback(async (runId: string, exclude: boolean) => {
-    setRuns((rs) => rs.map((r) => (r.id === runId ? { ...r, excludeFromCompliance: exclude } : r)));
-    try {
-      await fetch(`/api/projects/${projectId}/mining/runs/${runId}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ excludeFromCompliance: exclude }),
-      });
-    } catch { load(); }
+
+  // Persist a field on a run. Optimistic — the panel that asked has already moved
+  // its own UI on, and a failed PATCH re-reads the truth.
+  const patchRun = useCallback((runId: string, patch: { excludeFromCompliance?: boolean; referenceSmId?: string | null }) => {
+    setRuns((rs) => rs.map((r) => (r.id === runId ? { ...r, ...patch } : r)));
+    void fetch(`/api/projects/${projectId}/mining/runs/${runId}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch),
+    }).catch(() => { void load(); });
   }, [projectId, load]);
-  // The reference picker is SCOPED to the selected run (its entity's lifecycle),
-  // so cross-entity state machines + the run's own discovered mirror are excluded.
-  const loadReferenceSms = useCallback(async (runId?: string | null) => {
-    try {
-      const q = runId ? `?runId=${encodeURIComponent(runId)}` : "";
-      const r = await fetch(`/api/projects/${projectId}/mining/reference-sms${q}`);
-      if (r.ok) { const j = await r.json(); if (j?.diagrams) setReferenceSms(j.diagrams); }
-    } catch { /* ignore */ }
-  }, [projectId]);
+
   // Restore the run that was open before viewing a diagram (return-to-exact-screen).
   useEffect(() => {
     try {
@@ -147,281 +57,6 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
     } catch { /* ignore */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
-  // Holds an adopted example's SLA between the pre-load and the import POST.
-  const pendingKpi = useRef<unknown>(null);
-
-  // Adopted-example hand-off: if the gallery stashed a raw sample log for this
-  // project, pre-load the Import panel with it (confirm the analysis, then import).
-  // Several scenarios → keep the set for the picker + pre-load the default (last).
-  useEffect(() => {
-    try {
-      const key = `mining-sample:${projectId}`;
-      const raw = sessionStorage.getItem(key);
-      if (!raw) return;
-      sessionStorage.removeItem(key);
-      // Adopted example's SLA — apply it to the run created by this re-import.
-      try { const kraw = sessionStorage.getItem(`mining-kpi:${projectId}`); if (kraw) { sessionStorage.removeItem(`mining-kpi:${projectId}`); pendingKpi.current = JSON.parse(kraw); } } catch { /* ignore */ }
-      const parsed = JSON.parse(raw) as SampleScenario | { scenarios: SampleScenario[] };
-      const set = "scenarios" in parsed ? parsed.scenarios : null;
-      if (set && Array.isArray(set) && set.length) {
-        setScenarios(set);
-        const def = set.length - 1;             // last = recommended/current
-        setScenarioIdx(def);
-        setBuiltInSample(set[def]);
-        loadStaging(set[def]);
-      } else {
-        setBuiltInSample(parsed as SampleScenario);
-        loadStaging(parsed as SampleScenario);
-      }
-    } catch { /* ignore */ }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId]);
-  // Sync the reference picker + last result to whichever run is selected.
-  useEffect(() => {
-    const s = runs.find((r) => r.id === selectedId);
-    // Default to the run's REFERENCE only — never the discovered mirror, so the
-    // two are never conflated (editing a reference must not touch the discovered).
-    setRefSmId(s?.referenceSmId ?? "");
-    setConformance(s?.conformance ?? null);
-    setExplanation(null);
-    loadReferenceSms(selectedId);   // scope the picker to this run's entity
-  }, [selectedId, runs, loadReferenceSms]);
-
-  // Choose a run's conformance reference — persisted immediately so the choice
-  // survives navigating away to edit the reference and back (not just after a run).
-  async function selectReference(runId: string, refId: string) {
-    setRefSmId(refId);
-    setRuns((rs) => rs.map((r) => (r.id === runId ? { ...r, referenceSmId: refId || null } : r)));
-    try {
-      await fetch(`/api/projects/${projectId}/mining/runs/${runId}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ referenceSmId: refId || null }),
-      });
-    } catch { /* best-effort */ }
-  }
-
-  const [calibrating, setCalibrating] = useState(false);
-  async function calibrate(runId: string) {
-    setCalibrating(true); setErr(null);
-    try {
-      const res = await fetch(`/api/projects/${projectId}/mining/runs/${runId}/calibrate`, { method: "POST" });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) { setErr(json.error ?? "Calibration failed"); return; }
-      await load();
-      // Remember the open run so exiting the Simulator returns to this exact screen.
-      try { if (selectedId) sessionStorage.setItem(`mining-return:${projectId}`, selectedId); } catch { /* ignore */ }
-      onOpenSimulator?.(); // hand off to the Simulator on the calibrated twin study
-    } finally { setCalibrating(false); }
-  }
-
-  async function runConformance(runId: string) {
-    if (!refSmId) return;
-    setRunningConf(true); setErr(null);
-    try {
-      const res = await fetch(`/api/projects/${projectId}/mining/runs/${runId}/conformance`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ referenceSmId: refSmId }),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) { setErr(json.error ?? "Conformance failed"); return; }
-      setConformance(json.conformance ?? null);
-      await load();
-    } finally { setRunningConf(false); }
-  }
-
-  async function explain(runId: string) {
-    setExplaining(true); setErr(null);
-    try {
-      const res = await fetch(`/api/projects/${projectId}/mining/runs/${runId}/explain`, { method: "POST" });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) { setErr(json.error ?? "Explain failed"); return; }
-      setExplanation(json.explanation ?? "");
-    } finally { setExplaining(false); }
-  }
-
-  /** Stage one worksheet, exactly as a parsed CSV would be staged. */
-  function loadSheet(sheet: XlsxSheet, fileName: string) {
-    setWide(detectWideSpec(sheet.headers, sheet.rows));
-    setWideResult(null);
-    setOcelText(null); setOcelTypes([]);
-    setFileName(fileName);
-    setHeaders(sheet.headers); setRows(sheet.rows);
-    setMapping(guessMapping(sheet.headers)); setEnrichMsg(null);
-    setRunName(fileName.replace(/\.[^.]+$/, "") + (sheet.name ? ` — ${sheet.name}` : ""));
-    setScenarioIdx(-1);
-  }
-
-  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    setErr(null);
-    const ext = file.name.toLowerCase().split(".").pop() ?? "";
-
-    // A workbook is a ZIP, so it must be read as bytes — `file.text()` would
-    // mangle it before anything got the chance to look.
-    if (ext === "xlsx" || ext === "xlsm") {
-      try {
-        const sheets = (await parseXlsx(await file.arrayBuffer())).filter((s) => s.rows.length > 0);
-        if (sheets.length === 0) { setErr("That workbook has no rows in any sheet."); return; }
-        setXlsxSheets(sheets);
-        loadSheet(sheets[0], file.name);
-      } catch (ex) {
-        setErr(`Couldn't read that workbook: ${ex instanceof Error ? ex.message : String(ex)}`);
-      }
-      return;
-    }
-    setXlsxSheets([]);
-    const text = await file.text();
-    // XES (IEEE 1849) and OCEL are parsed to the same { headers, rows, mapping }
-    // table CSV produces, then flow through the identical import pipeline.
-    setOcelText(null); setOcelTypes([]);
-    let h: string[], r: string[][], map: Partial<LogMapping>;
-    // OCEL 2.0 XML and XES both start with <?xml/<log — tell them apart by the
-    // OCEL object-model markers so an OCEL .xml isn't mistaken for XES.
-    const isXml = /^<\?xml|^<log[\s>]/.test(text.trimStart());
-    const isOcelXml = isXml && /<object-types|<objects>/.test(text.slice(0, 30_000));
-    if (!isOcelXml && (ext === "xes" || isXml)) {
-      const parsed = parseXes(text); h = parsed.headers; r = parsed.rows; map = parsed.mapping;
-    } else if (ext === "json" || ext === "ocel" || ext === "jsonocel" || ext === "xml" || isOcelXml || /^\s*\{/.test(text)) {
-      const parsed = parseOcel(text); h = parsed.headers; r = parsed.rows; map = parsed.mapping;
-      // Object-centric: offer an OCEL 2.0 STUDY (one lifecycle per object type +
-      // a Domain Diagram). The single-object flatten stays as an advanced fallback.
-      if (parsed.objectTypes.length > 0) { setOcelText(text); setOcelTypes(parsed.objectTypes); setSelectedTypes(parsed.objectTypes); }
-    } else {
-      const csv = parseCsv(text); h = csv.headers; r = csv.rows; map = guessMapping(h);
-    }
-    if (h.length === 0 || r.length === 0) { setErr("Couldn't read any rows from that file."); return; }
-    // Is the whole lifecycle laid out ACROSS the row rather than down the rows?
-    // Detected, never applied: expanding a log silently would be its own version
-    // of the bug this fixes, so the user is shown what it would do and presses
-    // the button. Long-format files detect as null and see nothing.
-    setWide(detectWideSpec(h, r));
-    setFileName(file.name); setHeaders(h); setRows(r);
-    setMapping(map); setEnrichMsg(null);
-    setRunName(file.name.replace(/\.[^.]+$/, ""));
-    // A hand-picked file deselects the scenario/built-in choice, but we KEEP the
-    // scenario picker + built-in sample available so the user can switch back.
-    setScenarioIdx(-1);
-  }
-
-  // Load a scenario/sample log into the Import staging (confirm-the-analysis flow).
-  function loadStaging(s: SampleScenario) {
-    if (!Array.isArray(s?.headers) || !Array.isArray(s?.rows) || !s.headers.length || !s.rows.length) return;
-    setErr(null); setOcelText(null); setOcelTypes([]); setEnrichMsg(null);
-    setHeaders(s.headers); setRows(s.rows); setWide(null); setWideResult(null);
-    setMapping(s.mapping ?? guessMapping(s.headers));
-    setFileName(s.fileName ?? "sample.csv");
-    setRunName(s.runName ?? (s.fileName ?? "").replace(/\.[^.]+$/, ""));
-  }
-  const chooseScenario = (i: number) => { if (!scenarios?.[i]) return; setScenarioIdx(i); loadStaging(scenarios[i]); };
-
-  const setRole = (key: keyof LogMapping, col: string) => setMapping((m) => ({ ...m, [key]: col || undefined }));
-  const canImport = mapping.caseId && mapping.activity && mapping.timestamp && rows.length > 0;
-
-  // Columns none of the nine roles claims. These are the candidates for slicing
-  // later — and the ones that were silently discarded at parse time until now.
-  const spareColumns = useMemo(() => {
-    const claimed = new Set(
-      ROLES.map((r) => mapping[r.key]).filter((c): c is string => typeof c === "string" && !!c),
-    );
-    return headers.filter((h) => !claimed.has(h));
-  }, [headers, mapping]);
-  const setAttributeMode = (col: string, mode: "keep" | "hash" | "drop") =>
-    setMapping((m) => ({ ...m, attributeMode: { ...(m.attributeMode ?? {}), [col]: mode } }));
-
-  /** Expand a wide file in place, then re-guess the mapping over the new shape. */
-  const expandWide = () => {
-    if (!wide) return;
-    const out = unpivotWide(headers, rows, wide);
-    if (out.rows.length === 0) { setErr("Nothing could be expanded from that file — check the state and date columns."); return; }
-    setHeaders(out.headers); setRows(out.rows);
-    setMapping(guessMapping(out.headers));
-    setWideResult(out); setWide(null); setErr(null);
-  };
-  // When no State column is mapped, offer an Activity→State table (seeded with a
-  // same-named state per activity) that completes the lifecycle the miner + the
-  // State Machine need. The table lives in mapping.activityState so it's imported.
-  const activities = useMemo(
-    () => (mapping.activity ? distinctActivities(headers, rows, mapping.activity) : []),
-    [headers, rows, mapping.activity],
-  );
-  const needsStateTable = !mapping.state && activities.length > 0;
-  const stateFor = (a: string) => mapping.activityState?.[a] ?? activityToState(a);
-  const setActivityState = (a: string, s: string) =>
-    setMapping((m) => ({ ...m, activityState: { ...(m.activityState ?? {}), [a]: s } }));
-
-  // Enrichment — when no resource/state column, fill the activity→team / activity→
-  // state tables from the project's own models (Process Diagram lanes / State
-  // Machine transitions). Editable after (it just seeds mapping.activity*).
-  const needsTeamTable = !mapping.resource && activities.length > 0;
-  const teamFor = (a: string) => mapping.activityResource?.[a] ?? "";
-  const setActivityResource = (a: string, r: string) =>
-    setMapping((m) => ({ ...m, activityResource: { ...(m.activityResource ?? {}), [a]: r || undefined } as Record<string, string> }));
-  const [enrichDiagrams, setEnrichDiagrams] = useState<{ id: string; name: string; type: string }[]>([]);
-  const [enrichMsg, setEnrichMsg] = useState<string | null>(null);
-  const [showLog, setShowLog] = useState(false);
-  useEffect(() => {
-    fetch(`/api/projects/${projectId}/mining/diagrams`, { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : { diagrams: [] })).then((j) => setEnrichDiagrams(j.diagrams ?? [])).catch(() => {});
-  }, [projectId]);
-  async function fillFrom(diagramId: string, kind: "resource" | "state") {
-    if (!diagramId) return;
-    try {
-      const res = await fetch(`/api/diagrams/${diagramId}`, { cache: "no-store" });
-      if (!res.ok) return;
-      const data = ((await res.json())?.data ?? null) as DiagramData | null;
-      if (!data) return;
-      const e = kind === "resource" ? enrichResources(activities, data) : enrichStates(activities, data);
-      setMapping((m) => kind === "resource"
-        ? { ...m, activityResource: { ...(m.activityResource ?? {}), ...e.map } }
-        : { ...m, activityState: { ...(m.activityState ?? {}), ...e.map } });
-      setEnrichMsg(`Filled ${e.rows.length} of ${activities.length} ${kind === "resource" ? "teams" : "states"}${e.unmatched.length ? ` — ${e.unmatched.length} unmatched (edit below)` : ""}.`);
-    } catch { /* best-effort */ }
-  }
-  // Advisory pre-import validation off the already-parsed rows — confirm the
-  // mapping is right + see what would be discarded, before ingesting.
-  const validation = useMemo(
-    () => (headers.length > 0 && rows.length > 0 ? validateEventLogMapping(headers, rows, mapping) : null),
-    [headers, rows, mapping],
-  );
-
-  async function doImport() {
-    if (!canImport) return;
-    setBusy(true); setErr(null);
-    try {
-      const res = await fetch(`/api/projects/${projectId}/mining/import`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: runName.trim() || "Event log", mapping, headers, rows, kpiConfig: pendingKpi.current ?? undefined }),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) { setErr(json.error ?? "Import failed"); return; }
-      pendingKpi.current = null;
-      setFileName(null); setHeaders([]); setRows([]); setWide(null); setWideResult(null); setMapping({}); setRunName("");
-      await load();
-      setSelectedId(json.run?.id ?? null);
-    } finally { setBusy(false); }
-  }
-
-  const toggleType = (t: string) => setSelectedTypes((ts) => (ts.includes(t) ? ts.filter((x) => x !== t) : [...ts, t]));
-
-  // OCEL 2.0 object-centric import: one discovered state machine + run per chosen
-  // object type, plus the shared Domain Diagram that links them.
-  async function importOcelStudy() {
-    if (!ocelText || selectedTypes.length === 0) return;
-    setBusy(true); setErr(null);
-    try {
-      const res = await fetch(`/api/projects/${projectId}/mining/import-ocel`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: runName.trim() || "OCEL log", ocelText, selectedTypes }),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) { setErr(json.error ?? "OCEL study import failed"); return; }
-      setOcelText(null); setOcelTypes([]); setFileName(null); setHeaders([]); setRows([]); setWide(null); setWideResult(null); setMapping({}); setRunName("");
-      setOcelDomainId(json.domainDiagramId ?? null);
-      await loadReferenceSms();
-      await load();
-      setSelectedId(json.runs?.[0]?.id ?? null);
-    } finally { setBusy(false); }
-  }
 
   async function remove(id: string) {
     setDeleting(null);
@@ -439,56 +74,17 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
     await load();
   }
 
-  async function discover(runId: string, ai = false) {
-    setDiscovering(true); if (ai) setAiBpmn(true); else setBpmnBusy(true); setErr(null);
-    try {
-      const res = await fetch(`/api/projects/${projectId}/mining/runs/${runId}/discover`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ai }),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) { setErr(json.error ?? "Discovery failed"); return; }
-      await load();
-    } finally { setDiscovering(false); setAiBpmn(false); setBpmnBusy(false); }
-  }
-
-  async function discoverSm(runId: string, opts: { ai?: boolean; as?: "discovered" | "reference" } = {}): Promise<string | null> {
-    const { ai = false, as = "discovered" } = opts;
-    // Isolate the spinners: a reference build spins its own button (aiSm); the
-    // deterministic discovered SM spins its button (smBusy). `discovering`
-    // disables every discovery button while any one runs.
-    setDiscovering(true); if (as === "reference") setAiSm(true); else setSmBusy(true); setErr(null);
-    try {
-      const res = await fetch(`/api/projects/${projectId}/mining/runs/${runId}/discover-sm`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ai, as }),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) { setErr(json.error ?? "State-machine discovery failed"); return null; }
-      await load();
-      await loadReferenceSms(runId);   // refresh the (scoped) conformance picker
-      return (json.diagramId as string) ?? null;
-    } finally { setDiscovering(false); setAiSm(false); setSmBusy(false); }
-  }
-
-  // Create the governed REFERENCE — a SEPARATE state machine (its own diagram,
-  // stored in referenceSmId) that discovery + refresh never overwrite, so editing
-  // it never touches the discovered mirror. Deterministic by default (a copy of
-  // the mined lifecycle, no AI credits); `ai:true` AI-curates a cleaner one.
-  async function createReference(runId: string, ai = false) {
-    const id = await discoverSm(runId, { ai, as: "reference" });
-    if (id) await selectReference(runId, id);
-  }
-
   const selected = runs.find((r) => r.id === selectedId) ?? null;
-  // "Explain results" lights up once the run is fully mined (process + lifecycle + conformance).
-  const allStepsDone = !!(selected?.discoveredBpmnId && selected?.discoveredSmId && selected?.conformance);
-  const inp = "bg-stone-800 border border-stone-600 rounded px-2 py-1 text-stone-100 text-xs";
   // Open a discovered diagram with a back-link that returns to the MINER console
   // (via the ?mining deep-link) instead of the owning project.
-  const openDiagram = (id: string) =>
-    `/diagram/${id}?from=${encodeURIComponent(`/dashboard?mining=${projectId}&mp=${encodeURIComponent(projectName ?? "")}&pmnoi=1`)}`;
+  const openDiagram = useCallback((id: string) =>
+    `/diagram/${id}?from=${encodeURIComponent(`/dashboard?mining=${projectId}&mp=${encodeURIComponent(projectName ?? "")}&pmnoi=1`)}`,
+    [projectId, projectName]);
   // Remember which run was open so returning from a diagram restores the exact
   // screen (the selected-run panel) instead of the top of the console.
-  const stashReturn = () => { try { if (selectedId) sessionStorage.setItem(`mining-return:${projectId}`, selectedId); } catch { /* ignore */ } };
+  const stashReturn = useCallback(() => {
+    try { if (selectedId) sessionStorage.setItem(`mining-return:${projectId}`, selectedId); } catch { /* ignore */ }
+  }, [projectId, selectedId]);
 
   return (
     <div className="fixed inset-0 z-[60] bg-stone-950 text-stone-200 overflow-auto font-mono">
@@ -506,303 +102,12 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
       </header>
 
       <main className="max-w-5xl mx-auto p-4 grid gap-4 md:grid-cols-3">
-        {/* Import */}
-        <section className="md:col-span-2 bg-stone-900 border border-stone-700 rounded-lg p-4">
-          <h2 className="text-sm font-semibold text-amber-200 mb-1">Import an event log</h2>
-          <p className="text-xs text-stone-400 mb-3">Upload an event log — <span className="text-stone-300">CSV/TSV</span>, <span className="text-stone-300">XES</span> (IEEE 1849) or <span className="text-stone-300">OCEL</span> JSON — from your source system(s). Map its columns to roles, then import — the process is inferred from the logs.</p>
-
-          {/* Choosable scenarios (adopted example) — pick a period, confirm, import. */}
-          {scenarios && scenarios.length > 0 && (
-            <div className="mb-3 rounded-md border border-amber-800/60 bg-amber-950/30 p-3 flex flex-col gap-2">
-              <p className="text-[11px] text-amber-200 font-medium">Choose a scenario to explore</p>
-              <div className="flex flex-wrap gap-1.5">
-                {scenarios.map((s, i) => (
-                  <button
-                    key={i}
-                    onClick={() => chooseScenario(i)}
-                    className={`text-[11px] rounded px-2.5 py-1 border transition ${
-                      i === scenarioIdx
-                        ? "bg-amber-700 border-amber-500 text-white shadow-[0_0_10px_rgba(217,119,6,0.45)]"
-                        : "bg-stone-800 border-stone-600 text-stone-300 hover:border-amber-600 hover:text-amber-200"
-                    }`}
-                  >
-                    {s.scenario ?? s.runName ?? `Scenario ${i + 1}`}
-                  </button>
-                ))}
-              </div>
-              {scenarios[scenarioIdx]?.note && (
-                <p className="text-[10px] text-amber-100/70 leading-snug">{scenarios[scenarioIdx].note}</p>
-              )}
-              <p className="text-[10px] text-stone-400 leading-snug">Same process across different past periods — compliance declines the further back you go. Confirm the analysis below, then import.</p>
-            </div>
-          )}
-
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Always offer the built-in example data (when there's no multi-scenario
-                picker) — so you can re-load it and Import even after browsing a file. */}
-            {builtInSample && (!scenarios || scenarios.length === 0) && (
-              <button onClick={() => loadStaging(builtInSample)}
-                className="text-xs rounded px-3 py-1.5 border border-amber-700 text-amber-200 hover:bg-amber-950/40">
-                📋 Load built-in example data
-              </button>
-            )}
-            <label className="inline-block cursor-pointer text-xs bg-amber-700 hover:bg-amber-600 text-white rounded px-3 py-1.5">
-              ⭱ Choose file…
-              <input type="file" accept=".csv,.tsv,.txt,text/csv,.xlsx,.xlsm,.xes,.json,.ocel,.jsonocel,.xml,application/xml,application/json" onChange={onFile} className="hidden" />
-            </label>
-            {fileName && <span className="text-[11px] text-stone-400 truncate max-w-[18rem]" title={fileName}>loaded: <span className="text-stone-300">{fileName}</span></span>}
-          </div>
-
-          {/* OCEL 2.0 object-centric study — one lifecycle per object type + a Domain Diagram. */}
-          {ocelText && ocelTypes.length > 0 && (
-            <div className="mt-4 rounded border border-emerald-500/40 bg-emerald-950/20 p-3 flex flex-col gap-2">
-              <div className="text-[11px] text-emerald-200">
-                <span className="font-semibold">OCEL 2.0 object-centric log</span> — {ocelTypes.length} object type{ocelTypes.length === 1 ? "" : "s"}. Import as a study: one discovered state machine + run per selected type, tied together by a <span className="text-emerald-100">Domain Diagram</span> (object model).
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {ocelTypes.map((t) => (
-                  <label key={t} className={`flex items-center gap-1 text-[11px] px-2 py-0.5 rounded cursor-pointer border ${selectedTypes.includes(t) ? "bg-emerald-800/50 border-emerald-500 text-emerald-100" : "border-stone-600 text-stone-400"}`}>
-                    <input type="checkbox" className="accent-emerald-500" checked={selectedTypes.includes(t)} onChange={() => toggleType(t)} />
-                    {t}
-                  </label>
-                ))}
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <input value={runName} onChange={(e) => setRunName(e.target.value)} placeholder="Study name" className={`${inp} min-w-[10rem]`} />
-                <button onClick={importOcelStudy} disabled={busy || selectedTypes.length === 0} className="text-xs bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 text-white rounded px-3 py-1.5">
-                  {busy ? "Importing…" : `Import OCEL study (${selectedTypes.length})`}
-                </button>
-                <button onClick={() => setShowJson((v) => !v)} className="text-[11px] text-emerald-300 hover:text-emerald-200 underline">
-                  {showJson ? "Hide JSON ▾" : "View JSON ▸"}
-                </button>
-                <span className="text-[10px] text-stone-500">or map columns below to flatten onto a single object (advanced).</span>
-              </div>
-              {showJson && (
-                <pre className="mt-1 max-h-72 overflow-auto rounded bg-stone-950/70 border border-stone-700 p-2 text-[10px] leading-snug text-stone-300 font-mono whitespace-pre">{ocelPretty}</pre>
-              )}
-            </div>
-          )}
-          {ocelDomainId && (
-            <div className="mt-2 text-[11px] text-emerald-300">
-              ✓ OCEL study created. <a href={openDiagram(ocelDomainId)} onClick={stashReturn} className="underline hover:text-emerald-200">Open the object model (Domain Diagram) →</a>
-            </div>
-          )}
-
-          {/* A workbook with more than one sheet of data: say so and let the
-              user choose, rather than importing the first and discarding the
-              rest without a word. */}
-          {xlsxSheets.length > 1 && (
-            <div className="mt-3 flex items-center gap-2 flex-wrap text-[11px]">
-              <span className="text-stone-400">This workbook has {xlsxSheets.length} sheets with data. Import:</span>
-              <select defaultValue="0" className={inp}
-                onChange={(e) => { const sh = xlsxSheets[Number(e.target.value)]; if (sh) loadSheet(sh, fileName ?? "workbook"); }}>
-                {xlsxSheets.map((sh, i) => <option key={sh.name + i} value={i}>{sh.name} ({sh.rows.length} rows)</option>)}
-              </select>
-            </div>
-          )}
-          {/* One row per case? Offer to expand it — and say exactly what that
-              would do first. Reading such a file as long format yields ONE event
-              per case and drops the rest of the row without a word, which is why
-              this is offered rather than left to the user to notice. */}
-          {wide && (
-            <div className="mt-3 rounded border border-amber-500/50 bg-amber-950/20 p-2.5 flex flex-col gap-1.5">
-              <div className="text-[11px] text-amber-200">
-                This file looks like <span className="font-semibold">one row per case</span> — the whole
-                lifecycle across the row, not one row per event.
-              </div>
-              <div className="text-[11px] text-stone-300">
-                Found {describeWideSpec(wide)}. Read as-is, each case would show
-                <span className="font-semibold"> a single step</span> and the rest of its row would be ignored.
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <button onClick={expandWide} className="text-xs bg-amber-700 hover:bg-amber-600 text-white rounded px-3 py-1.5">⤢ Expand to one row per event</button>
-                <button onClick={() => setWide(null)} className="text-xs rounded px-3 py-1.5 border border-stone-600 text-stone-300 hover:bg-stone-800">No, it is already one row per event</button>
-              </div>
-            </div>
-          )}
-          {wideResult && (
-            <div className="mt-3 rounded border border-emerald-500/40 bg-emerald-950/20 p-2.5 flex flex-col gap-1">
-              <div className="text-[11px] text-emerald-200">
-                ✓ Expanded to <span className="font-semibold">{wideResult.events}</span> event
-                {wideResult.events === 1 ? "" : "s"} across <span className="font-semibold">{wideResult.cases}</span> case
-                {wideResult.cases === 1 ? "" : "s"}.
-              </div>
-              {/* Never silently dropped: a state with no date, or a date naming
-                  no state, is counted and said out loud. */}
-              {wideResult.warnings.map((w, i) => (
-                <div key={i} className="text-[11px] text-amber-300/90">⚠ {w}</div>
-              ))}
-            </div>
-          )}
-
-          {headers.length > 0 && (
-            <div className="mt-4 flex flex-col gap-3">
-              <div className="grid grid-cols-2 gap-2">
-                {ROLES.map((role) => (
-                  <label key={role.key} className="flex flex-col gap-0.5" title={role.hint}>
-                    <span className="text-[10px] uppercase tracking-wide text-stone-400">{role.label}{role.required && <span className="text-rose-400"> *</span>}</span>
-                    <select value={(mapping[role.key] as string) ?? ""} onChange={(e) => setRole(role.key, e.target.value)} className={inp}>
-                      <option value="">—</option>
-                      {headers.map((h) => <option key={h} value={h}>{h}</option>)}
-                    </select>
-                  </label>
-                ))}
-              </div>
-
-              {/* The columns the nine roles above do not claim. Every one of them
-                  used to be discarded at parse time, which is why "did invoices
-                  over $10,000 take longer?" was unanswerable from the very file
-                  that had just been uploaded. Keeping one makes it a dimension
-                  you can slice by.
-
-                  DROP IS THE DEFAULT, deliberately: a spare column is as likely
-                  to hold a customer name as a region, and this is not a decision
-                  to make on the user's behalf. */}
-              {spareColumns.length > 0 && (
-                <div className="rounded border border-stone-600 bg-stone-900/40 p-2.5 flex flex-col gap-1.5">
-                  <div className="text-[11px] text-stone-300">
-                    <span className="font-semibold">{spareColumns.length} other column{spareColumns.length === 1 ? "" : "s"}</span> in this file.
-                    Keep one to slice by it later; hash it if it identifies a person.
-                    Anything left as <em>drop</em> is not stored at all.
-                  </div>
-                  <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-                    {spareColumns.map((h) => (
-                      <label key={h} className="flex items-center gap-2 text-[11px]">
-                        <span className="flex-1 min-w-0 truncate text-stone-400" title={h}>{h}</span>
-                        <select
-                          value={mapping.attributeMode?.[h] ?? "drop"}
-                          onChange={(e) => setAttributeMode(h, e.target.value as "keep" | "hash" | "drop")}
-                          className={inp + " w-24"}
-                        >
-                          <option value="drop">drop</option>
-                          <option value="keep">keep</option>
-                          <option value="hash">hash</option>
-                        </select>
-                      </label>
-                    ))}
-                  </div>
-                  <label className="flex items-center gap-2 text-[11px] pt-1 border-t border-stone-700">
-                    <input
-                      type="checkbox"
-                      checked={!!mapping.caseId && mapping.attributeMode?.[mapping.caseId] === "hash"}
-                      onChange={(e) => { if (mapping.caseId) setAttributeMode(mapping.caseId, e.target.checked ? "hash" : "keep"); }}
-                      disabled={!mapping.caseId}
-                    />
-                    <span className="text-stone-400">
-                      Mask the case id &mdash; for when it is really a customer number. Cases still group
-                      and join; the original never reaches the database.
-                    </span>
-                  </label>
-                </div>
-              )}
-
-              {/* Activity → Team table — shown when no Resource column is mapped.
-                  Fill from the Process Diagram's lanes, or set per activity. */}
-              {needsTeamTable && (
-                <div className="rounded border border-blue-500/40 bg-blue-950/20 p-2.5 flex flex-col gap-1.5">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <div className="text-[11px] text-blue-200 flex-1 min-w-[12rem]">No <span className="font-semibold">Resource</span> column — set the team per activity, or fill from a Process Diagram&apos;s lanes.</div>
-                    <select defaultValue="" onChange={(e) => { void fillFrom(e.target.value, "resource"); e.currentTarget.value = ""; }} className={`${inp} py-0.5 text-[10px]`}>
-                      <option value="">✨ Fill from Process Diagram…</option>
-                      {enrichDiagrams.filter((d) => d.type === "bpmn").map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-                    </select>
-                  </div>
-                  <div className="max-h-48 overflow-y-auto grid grid-cols-[1fr_auto_1fr] gap-x-2 gap-y-1 items-center">
-                    {activities.map((a) => (
-                      <Fragment key={a}>
-                        <span className="text-[10px] text-stone-300 truncate" title={a}>{a}</span>
-                        <span className="text-stone-500 text-[10px]">→</span>
-                        <input value={teamFor(a)} placeholder="(team)" onChange={(e) => setActivityResource(a, e.target.value)} className={`${inp} py-0.5 text-[10px]`} />
-                      </Fragment>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Activity → State table — shown when no State column is mapped.
-                  Fill from a State Machine's transitions, or set per activity. */}
-              {needsStateTable && (
-                <div className="rounded border border-amber-500/40 bg-amber-950/20 p-2.5 flex flex-col gap-1.5">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <div className="text-[11px] text-amber-200 flex-1 min-w-[12rem]">No <span className="font-semibold">State</span> column mapped — set the state each activity produces, or fill from a State Machine. Defaults to the activity name.</div>
-                    <select defaultValue="" onChange={(e) => { void fillFrom(e.target.value, "state"); e.currentTarget.value = ""; }} className={`${inp} py-0.5 text-[10px]`}>
-                      <option value="">✨ Fill from State Machine…</option>
-                      {enrichDiagrams.filter((d) => d.type === "state-machine").map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-                    </select>
-                  </div>
-                  <div className="max-h-48 overflow-y-auto grid grid-cols-[1fr_auto_1fr] gap-x-2 gap-y-1 items-center">
-                    {activities.map((a) => (
-                      <Fragment key={a}>
-                        <span className="text-[10px] text-stone-300 truncate" title={a}>{a}</span>
-                        <span className="text-stone-500 text-[10px]">→</span>
-                        <input value={stateFor(a)} onChange={(e) => setActivityState(a, e.target.value)} className={`${inp} py-0.5 text-[10px]`} />
-                      </Fragment>
-                    ))}
-                  </div>
-                  <p className="text-[10px] text-stone-400">{activities.length.toLocaleString()} distinct activities</p>
-                </div>
-              )}
-              {(needsTeamTable || needsStateTable) && enrichMsg && <p className="text-[10px] text-emerald-300">✨ {enrichMsg}</p>}
-
-              {/* Preview */}
-              <div className="overflow-x-auto border border-stone-700 rounded">
-                <table className="text-[10px] min-w-full">
-                  <thead className="bg-stone-800 text-stone-400">
-                    <tr>{headers.map((h) => <th key={h} className="px-2 py-1 text-left font-medium whitespace-nowrap">{h}</th>)}</tr>
-                  </thead>
-                  <tbody>
-                    {rows.slice(0, 5).map((r, i) => (
-                      <tr key={i} className="border-t border-stone-800">{headers.map((_, c) => <td key={c} className="px-2 py-1 whitespace-nowrap text-stone-300">{r[c]}</td>)}</tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <p className="text-[10px] text-stone-400">{rows.length.toLocaleString()} rows · previewing first 5</p>
-
-              {/* Advisory mapping verification — confirm the mapping + see what would be dropped */}
-              {validation && (
-                <div className="rounded border border-stone-700 bg-stone-900/60 p-2.5 flex flex-col gap-1.5 text-[10px]">
-                  <div className="text-stone-300">
-                    <span className="text-amber-200">{validation.usable.toLocaleString()}</span> usable
-                    {" · "}
-                    {validation.dropped > 0
-                      ? <span className="text-rose-300">{validation.dropped.toLocaleString()} dropped</span>
-                      : <span className="text-emerald-300">0 dropped</span>}
-                    {" · "}<span className="text-stone-200">{validation.distinctCases.toLocaleString()}</span> cases
-                    {mapping.activity ? <>{" · "}{validation.distinctActivities.toLocaleString()} activities</> : null}
-                    {mapping.state ? <>{" · "}{validation.distinctStates.toLocaleString()} states</> : null}
-                  </div>
-                  <div className="text-stone-400">
-                    timestamp: <span className={validation.timestampFormat === "unrecognised" ? "text-rose-300" : "text-stone-300"}>{validation.timestampFormat}</span>
-                    {validation.from && validation.to ? ` · ${new Date(validation.from).toISOString().slice(0, 10)} → ${new Date(validation.to).toISOString().slice(0, 10)}` : ""}
-                  </div>
-                  <div className="flex flex-col gap-0.5">
-                    {ROLES.map((r) => (validation.samples[r.key]?.length ? (
-                      <div key={r.key} className="text-stone-400 truncate"><span className="text-stone-500">{r.label.replace(/ \(optional\)$/, "")}:</span> {validation.samples[r.key]!.join("  ·  ")}</div>
-                    ) : null))}
-                  </div>
-                  {validation.warnings.map((w, i) => (
-                    <div key={i} className="text-amber-300 leading-snug">⚠ {w.message}</div>
-                  ))}
-                </div>
-              )}
-
-              <div className="flex items-center gap-2">
-                <input value={runName} onChange={(e) => setRunName(e.target.value)} placeholder="run name" className={`${inp} flex-1`} />
-                {rows.length > 0 && (
-                  <button onClick={() => setShowLog(true)} className="text-xs bg-stone-700 hover:bg-stone-600 text-stone-100 rounded px-3 py-1.5 whitespace-nowrap">
-                    🔍 View / filter log
-                  </button>
-                )}
-                <button onClick={doImport} disabled={!canImport || busy} className="text-xs bg-amber-700 hover:bg-amber-600 disabled:opacity-40 text-white rounded px-3 py-1.5">
-                  {busy ? "Importing…" : "Import log"}
-                </button>
-              </div>
-              {!canImport && <p className="text-[10px] text-amber-400">Map case id, activity and timestamp to continue.</p>}
-            </div>
-          )}
-          {err && <p className="text-rose-400 text-xs mt-2">{err}</p>}
-        </section>
+        <ImportPanel
+          projectId={projectId}
+          openDiagram={openDiagram}
+          stashReturn={stashReturn}
+          onImported={async (runId) => { await load(); setSelectedId(runId); }}
+        />
 
         {/* Live-source polling DEMO — appears after adopting the "Order Processing —
             live" example; ingests poll batches into a real webhook source. */}
@@ -811,300 +116,27 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
         {/* Live sources — push (webhook) / pull (watched folder) auto-refresh */}
         <MiningSourcesPanel projectId={projectId} />
 
-        {/* Runs */}
-        <section className="bg-stone-900 border border-stone-700 rounded-lg p-4">
-          <h2 className="text-sm font-semibold text-amber-200 mb-2">Imports</h2>
-          <p className="text-[10px] text-stone-500 mb-2">Every import you run is kept here. An OCEL import is grouped as one study with a run per object type.</p>
-          {runs.length === 0 && <p className="text-xs text-stone-400">No imports yet — import a log.</p>}
-          {(() => {
-            // Group OCEL studies (by ocelGroupId); other imports are single runs.
-            const byGroup = new Map<string, RunRow[]>();
-            const standalone: RunRow[] = [];
-            for (const r of runs) { if (r.ocelGroupId) { const g = byGroup.get(r.ocelGroupId) ?? []; g.push(r); byGroup.set(r.ocelGroupId, g); } else standalone.push(r); }
-            const studyName = (rs: RunRow[]) => { const n = rs[0]?.name ?? ""; const i = n.lastIndexOf(" — "); return i >= 0 ? n.slice(0, i) : n; };
-            return (
-              <div className="flex flex-col gap-2">
-                {[...byGroup.entries()].map(([gid, rs]) => (
-                  <div key={gid} className="rounded border border-emerald-500/25 overflow-hidden">
-                    <div className="flex items-center gap-2 px-2 py-1 bg-emerald-950/25">
-                      <span className="flex-1 truncate text-[11px] font-semibold text-emerald-200" title={studyName(rs)}>{studyName(rs)}</span>
-                      <span className="text-[10px] text-stone-400">{rs.length} entit{rs.length === 1 ? "y" : "ies"}</span>
-                      <button onClick={() => setDeletingStudy({ groupId: gid, name: studyName(rs), count: rs.length })} className="text-rose-400/70 hover:text-rose-300 px-1" title="Delete this whole import (all its entity runs)">✕</button>
-                    </div>
-                    {rs.map((r) => (
-                      <div key={r.id} className={`flex items-center gap-2 px-2 py-1 text-xs ${selectedId === r.id ? "bg-amber-600/15" : "hover:bg-stone-800"}`}>
-                        <button onClick={() => setSelectedId(selectedId === r.id ? null : r.id)} className="flex-1 text-left truncate capitalize text-stone-200" title={r.name}>{r.objectType ?? r.name}</button>
-                        <span className="text-stone-400">{r.stats?.cases ?? 0}c</span>
-                        <button onClick={() => setDeleting(r)} className="text-rose-400/70 hover:text-rose-300 px-1" title="Delete this entity's run">✕</button>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-                {standalone.map((r) => (
-                  <div key={r.id} className={`flex items-center gap-2 px-2 py-1 rounded text-xs ${selectedId === r.id ? "bg-amber-600/15" : "hover:bg-stone-800"}`}>
-                    <button onClick={() => setSelectedId(selectedId === r.id ? null : r.id)} className="flex-1 text-left truncate text-stone-200" title={r.name}>{r.name}</button>
-                    <span className="text-stone-400">{r.stats?.cases ?? 0}c</span>
-                    <button onClick={() => setDeleting(r)} className="text-rose-400/70 hover:text-rose-300 px-1" title="Delete run">✕</button>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
-        </section>
+        <RunList
+          runs={runs}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          onDeleteRun={setDeleting}
+          onDeleteStudy={setDeletingStudy}
+        />
 
-        {/* Selected run summary */}
         {selected && (
-          <section className="md:col-span-3 bg-stone-900 border border-stone-700 rounded-lg p-4">
-            {selected.objectType ? (
-              <h2 className="mb-2 flex items-baseline gap-1.5 flex-wrap">
-                <span className="text-[11px] text-amber-200/60">
-                  {(() => { const i = selected.name.lastIndexOf(" — "); return i >= 0 ? selected.name.slice(0, i) : selected.name; })()} —
-                </span>
-                <span className="text-xl font-bold text-amber-100 capitalize leading-none" title={`OCEL object type: ${selected.objectType}`}>{selected.objectType}</span>
-              </h2>
-            ) : (
-              <h2 className="text-sm font-semibold text-amber-200 mb-2">{selected.name}</h2>
-            )}
-            {selected.domainDiagramId && (
-              <a href={openDiagram(selected.domainDiagramId)} onClick={stashReturn} className="inline-block mb-2 text-[11px] text-emerald-300 hover:text-emerald-200 underline" title="The OCEL object model — object types, relationships, and links to each type's state machine">
-                Open the object model (Domain Diagram) →
-              </a>
-            )}
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 text-xs">
-              <Stat label="Cases" value={selected.stats?.cases} />
-              <Stat label="Events" value={selected.stats?.events} />
-              <Stat label="Activities" value={selected.stats?.activities?.length} />
-              <Stat label="States" value={selected.stats?.states?.length} />
-              <Stat label="Variants" value={selected.stats?.variants} />
-              <Stat label="Span" value={selected.stats?.from && selected.stats?.to ? `${Math.round((selected.stats.to - selected.stats.from) / 86400000)}d` : "—"} />
-              {typeof selected.stats?.unmappedRows === "number" && selected.stats.unmappedRows > 0 && (
-                <Stat label="Dropped rows" value={selected.stats.unmappedRows} />
-              )}
-            </div>
-
-            {/* OCEL study overview — every object type's progress at a glance. */}
-            {selected.ocelGroupId && (() => {
-              const siblings = runs.filter((r) => r.ocelGroupId === selected.ocelGroupId);
-              const cell = "px-1.5 py-0.5";
-              return (
-                <div className="mt-3 rounded border border-emerald-500/30 bg-emerald-950/20 p-2.5">
-                  <div className="flex items-center justify-between mb-1 flex-wrap gap-1">
-                    <span className="text-[11px] font-semibold text-emerald-200">OCEL study — {siblings.length} object type{siblings.length === 1 ? "" : "s"}</span>
-                    {selected.domainDiagramId && <a href={openDiagram(selected.domainDiagramId)} onClick={stashReturn} className="text-[11px] text-emerald-300 hover:text-emerald-200 underline">Open object model →</a>}
-                  </div>
-                  <p className="text-[10px] text-stone-400 mb-1.5">Each object type is analysed on its own — its <span className="text-stone-300">state machine is already discovered</span>. The BPMN process + conformance are optional per type; you don&rsquo;t need them all before analysing any one.</p>
-                  <div className="overflow-x-auto">
-                    <table className="text-[10px] w-full">
-                      <thead className="text-stone-500 uppercase tracking-wide">
-                        <tr>
-                          <th className={`${cell} text-left`}>Object type</th>
-                          <th className={`${cell} text-left`}>State machine</th>
-                          <th className={`${cell} text-left`}>Process</th>
-                          <th className={`${cell} text-left`}>Conformance</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {siblings.map((r) => {
-                          const sel = r.id === selected.id;
-                          return (
-                            <tr key={r.id} className={sel ? "bg-emerald-800/30" : ""}>
-                              <td className={cell}>
-                                <button onClick={() => setSelectedId(r.id)} className={`text-left capitalize ${sel ? "text-emerald-200 font-semibold" : "text-stone-300 hover:text-stone-100"}`} title="Select this object type">
-                                  {sel ? "▸ " : ""}{r.objectType ?? r.name}
-                                </button>
-                              </td>
-                              <td className={cell}>{r.discoveredSmId ? <a href={openDiagram(r.discoveredSmId)} onClick={stashReturn} className="text-emerald-300 hover:text-emerald-200 underline">✓ open</a> : <span className="text-stone-600">—</span>}</td>
-                              <td className={cell}>{r.discoveredBpmnId ? <a href={openDiagram(r.discoveredBpmnId)} onClick={stashReturn} className="text-emerald-300 hover:text-emerald-200 underline">✓ open</a> : <span className="text-stone-500">not yet</span>}</td>
-                              <td className={cell}>{r.conformance ? <span className="text-emerald-300">{Math.round((r.conformance.fitness ?? 0) * 100)}%</span> : <span className="text-stone-600">—</span>}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* Interchange export — round-trip with other process-mining tools. */}
-            <div className="mt-3 flex items-center gap-2 text-[11px] text-stone-400">
-              <span>Export log:</span>
-              <a href={`/api/projects/${projectId}/mining/runs/${selected.id}/export?format=xes`} className="text-amber-300 hover:text-amber-200 underline" title="IEEE 1849 XES — ProM, Celonis, Disco, Apromore, Signavio PI">XES</a>
-              <span className="text-stone-600">·</span>
-              <a href={`/api/projects/${projectId}/mining/runs/${selected.id}/export?format=ocel`} className="text-amber-300 hover:text-amber-200 underline" title="OCEL 2.0 JSON (single-object)">OCEL</a>
-              <span className="text-stone-600">— variant-level fidelity</span>
-            </div>
-            {/* Include/exclude from org Compliance Monitoring — keep test runs out of the trend. */}
-            <label className="mt-2 flex items-center gap-2 text-[11px] text-stone-400 cursor-pointer select-none">
-              <input type="checkbox" checked={!selected.excludeFromCompliance} onChange={(e) => toggleRunCompliance(selected.id, !e.target.checked)} className="accent-amber-500" />
-              <span>Include in <span className="text-stone-200">Compliance Monitoring</span></span>
-              {selected.excludeFromCompliance && <span className="text-amber-300/80">— excluded (a test/throwaway run)</span>}
-            </label>
-            {/* Discover the BPMN process */}
-            <div className="mt-4 pt-3 border-t border-stone-700">
-              <h3 className="text-xs font-semibold text-amber-200 mb-1">Discover the process</h3>
-              <p className="text-[11px] text-stone-400 mb-2">Turn the mined paths into a BPMN process — a faithful directly-follows model of the log (no AI needed). Optionally <span className="text-stone-300">AI-curate</span> a cleaner version (gateways at real branches, tidy labels, noise dropped) — needs API credits.</p>
-              <div className="flex items-center gap-3 flex-wrap">
-                <button onClick={() => discover(selected.id, false)} disabled={discovering} className="text-xs bg-amber-700 hover:bg-amber-600 disabled:opacity-40 text-white rounded px-3 py-1.5" title="Build the BPMN directly from the mined paths (a faithful mirror of the log)">
-                  {bpmnBusy ? "Discovering…" : "Discover process"}
-                </button>
-                {bpmnBusy && <DiagramatixThrobber size={20} tone="amber" />}
-                {aiAllowed && (
-                <button onClick={() => discover(selected.id, true)} disabled={discovering} className="text-xs bg-amber-900/60 hover:bg-amber-800 disabled:opacity-40 text-amber-100 rounded px-2.5 py-1.5" title="Use AI (rules + template + your configured model) to curate a cleaner process — needs ANTHROPIC_API_KEY + credits">
-                  {aiBpmn ? "✨ Curating…" : "✨ AI-curate"}
-                </button>
-                )}
-                {aiBpmn && <DiagramatixThrobber size={20} tone="amber" />}
-                {selected.discoveredBpmnId && (
-                  <a href={openDiagram(selected.discoveredBpmnId)} onClick={stashReturn} className="text-xs text-amber-300 hover:text-amber-200 underline">Open discovered diagram →</a>
-                )}
-              </div>
-            </div>
-
-            {/* Discover the entity state machine (deterministic mirror of the log) */}
-            <div className="mt-4 pt-3 border-t border-stone-700">
-              <h3 className="text-xs font-semibold text-amber-200 mb-1">Discover the state machine</h3>
-              <p className="text-[11px] text-stone-400 mb-2">Infer the entity&rsquo;s lifecycle — the states and the events that move between them — a faithful mirror of the event log. It refreshes with the data; your governed <span className="text-stone-300">reference</span> below is a separate diagram you edit.</p>
-              <div className="flex items-center gap-3 flex-wrap">
-                <button onClick={() => discoverSm(selected.id, { ai: false, as: "discovered" })} disabled={discovering} className="text-xs bg-amber-700 hover:bg-amber-600 disabled:opacity-40 text-white rounded px-3 py-1.5" title="Build the discovered state machine directly from the mined state sequences (a faithful mirror of the log)">
-                  {smBusy ? "Discovering…" : "Discover state machine"}
-                </button>
-                {smBusy && <DiagramatixThrobber size={20} tone="amber" />}
-                {selected.discoveredSmId && (
-                  <a href={openDiagram(selected.discoveredSmId)} onClick={stashReturn} className="text-xs text-amber-300 hover:text-amber-200 underline">Open state machine →</a>
-                )}
-              </div>
-            </div>
-
-            {/* Conformance vs a reference state machine */}
-            <div className="mt-4 pt-3 border-t border-stone-700">
-              <h3 className="text-xs font-semibold text-amber-200 mb-1">Conformance vs the reference</h3>
-              <p className="text-[11px] text-stone-400 mb-2">Replay the real state changes against your single source of truth and see where reality deviates.</p>
-              <div className="flex items-center gap-2 flex-wrap">
-                <select value={refSmId} onChange={(e) => selectReference(selected.id, e.target.value)} className={`${inp} min-w-[12rem]`} title="The reference State-Machine diagram (this entity's lifecycle)">
-                  <option value="">— pick a reference state machine —</option>
-                  {referenceSms.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-                </select>
-                <button onClick={() => runConformance(selected.id)} disabled={!refSmId || runningConf} className="text-xs bg-amber-700 hover:bg-amber-600 disabled:opacity-40 text-white rounded px-3 py-1.5">
-                  {runningConf ? "Checking…" : "✓ Check conformance"}
-                </button>
-                {refSmId && <a href={openDiagram(refSmId)} onClick={stashReturn} className="text-[11px] text-amber-300 hover:text-amber-200 underline">edit reference →</a>}
-              </div>
-              {!selected.referenceSmId && (
-                <div className="mt-2 flex items-center gap-2 flex-wrap">
-                  <button onClick={() => createReference(selected.id, false)} disabled={discovering} className="text-xs bg-amber-800 hover:bg-amber-700 disabled:opacity-40 text-white rounded px-3 py-1.5" title="Create a SEPARATE reference (a copy of the mined lifecycle) that discovery + refresh never overwrite — no AI needed. Then edit it into your rulebook.">
-                    {smBusy ? "Creating…" : "＋ Create reference"}
-                  </button>
-                  {aiAllowed && (
-                  <button onClick={() => createReference(selected.id, true)} disabled={discovering} className="text-xs bg-amber-900/60 hover:bg-amber-800 disabled:opacity-40 text-amber-100 rounded px-2.5 py-1.5" title="AI-curate a cleaner reference (tidy labels, merged states, noise dropped) — needs API credits">
-                    {aiSm ? "✨ Curating…" : "✨ AI-curate"}
-                  </button>
-                  )}
-                  {(smBusy || aiSm) && <DiagramatixThrobber size={18} tone="amber" />}
-                  <span className="text-[10px] text-stone-400">No reference yet — create a <span className="text-stone-300">separate</span> governed state machine, then <span className="text-stone-300">edit it into your rulebook</span> (prune the moves that shouldn&rsquo;t be allowed). It stays independent of the discovered mirror above, so editing it turns the discovered transitions <span className="text-rose-300">red</span> where they deviate.</span>
-                </div>
-              )}
-
-              {conformance && (
-                <div className="mt-3">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="text-2xl tabular-nums" style={{ color: conformance.fitness >= 0.9 ? "#86efac" : conformance.fitness >= 0.6 ? "#fcd34d" : "#fca5a5" }}>
-                      {(conformance.fitness * 100).toFixed(0)}%
-                    </div>
-                    <div className="text-[11px] text-stone-400">
-                      fitness — <span className="text-stone-200">{conformance.conformingCases.toLocaleString()}</span> of <span className="text-stone-200">{conformance.totalCases.toLocaleString()}</span> cases replay cleanly
-                    </div>
-                  </div>
-                  {conformance.violations.length === 0 ? (
-                    <p className="text-xs text-emerald-300">✓ Fully conformant — no deviations.</p>
-                  ) : (
-                    <div className="overflow-x-auto border border-stone-700 rounded">
-                      <table className="text-[11px] min-w-full">
-                        <thead className="bg-stone-800 text-stone-400">
-                          <tr><th className="px-2 py-1 text-left">Deviation</th><th className="px-2 py-1 text-left">Detail</th><th className="px-2 py-1 text-right">Cases</th></tr>
-                        </thead>
-                        <tbody>
-                          {conformance.violations.map((v, i) => (
-                            <tr key={i} className="border-t border-stone-800">
-                              <td className="px-2 py-1 whitespace-nowrap"><span className={v.severity === "error" ? "text-rose-300" : "text-amber-300"}>{v.severity === "error" ? "✕" : "!"} {v.rule.replace(/-/g, " ")}</span></td>
-                              <td className="px-2 py-1 text-stone-300">{v.message}</td>
-                              <td className="px-2 py-1 text-right text-stone-300 tabular-nums">{v.cases || "—"}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Calibrate a simulation digital twin */}
-            <div className="mt-4 pt-3 border-t border-stone-700">
-              <h3 className="text-xs font-semibold text-amber-200 mb-1">Simulate a digital twin</h3>
-              <p className="text-[11px] text-stone-400 mb-2">Calibrate a simulation from the mined data — cycle times, arrivals, branch splits, teams + working hours — then explore <em>to-be</em> improvements in the Simulator.</p>
-              <div className="flex items-center gap-3 flex-wrap">
-                <button onClick={() => calibrate(selected.id)} disabled={calibrating} className="text-xs bg-amber-700 hover:bg-amber-600 disabled:opacity-40 text-white rounded px-3 py-1.5">
-                  {calibrating ? "Calibrating…" : "▶ Calibrate & simulate"}
-                </button>
-                {selected.studyId && <span className="text-[10px] text-emerald-300">✓ twin study ready — opens in the Simulator</span>}
-              </div>
-            </div>
-
-            {/* The twin, checked against the log it came from. Only once there IS
-                a twin — the question has no meaning before that. */}
-            {selected.studyId && (
-              <ValidateTwinPanel validateUrl={`/api/projects/${projectId}/mining/runs/${selected.id}/validate`} />
-            )}
-
-            {/* Explain results — lights up once fully mined. When the org allows AI it
-                narrates; when AI is off it falls back to a deterministic templated summary
-                (server picks the branch), so the card stays available either way. */}
-            <div className={`mt-4 pt-3 border-t transition-colors ${allStepsDone ? "border-amber-500/60" : "border-stone-700"}`}>
-              <h3 className={`text-xs font-semibold mb-1 ${allStepsDone ? "text-amber-200" : "text-stone-500"}`}>{aiAllowed ? "Explain results" : "Results summary"}</h3>
-              <p className="text-[11px] text-stone-400 mb-2">
-                {aiAllowed
-                  ? "An AI summary of what the mining revealed — the real process, the conformance findings, timing, and the twin."
-                  : "A structured summary of what the mining revealed — the real process, the conformance findings and timing — computed deterministically (no AI)."}
-              </p>
-              {/* Prerequisites — the button lights up when every step is done. */}
-              <ul className="text-[11px] mb-2.5 flex flex-col gap-0.5">
-                {[
-                  { done: !!selected.discoveredBpmnId, label: "Discover the process", hint: "the Discover process step" },
-                  { done: !!selected.discoveredSmId, label: "Discover the state machine", hint: "the Discover state machine step" },
-                  { done: !!selected.conformance, label: "Check conformance against a reference", hint: "pick a reference state machine + run conformance" },
-                ].map((s, i) => (
-                  <li key={i} className="flex items-baseline gap-1.5">
-                    <span className={s.done ? "text-emerald-400" : "text-stone-500"}>{s.done ? "✓" : "○"}</span>
-                    <span className={s.done ? "text-stone-300" : "text-stone-400"}>
-                      {s.label}
-                      {!s.done && <span className="text-stone-500"> — {s.hint}</span>}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              {allStepsDone
-                ? <p className="text-[11px] text-amber-300/80 mb-2">All steps complete — ready to summarise.</p>
-                : <p className="text-[11px] text-stone-500 mb-2">Complete the steps above to enable the summary.</p>}
-              <div className="flex items-center gap-3 flex-wrap">
-                <button onClick={() => explain(selected.id)} disabled={!allStepsDone || explaining}
-                  className={`text-xs rounded px-3 py-1.5 text-white disabled:cursor-not-allowed ${allStepsDone ? "bg-amber-600 hover:bg-amber-500 shadow-[0_0_16px_rgba(217,119,6,0.5)]" : "bg-stone-700/60 !text-stone-400"}`}
-                  title={allStepsDone ? "Summarise what the mining discovered" : "Complete discovery + conformance first"}>
-                  {explaining ? "Analysing…" : aiAllowed ? "✨ Explain results" : "Summarise results"}
-                </button>
-                {explaining && <DiagramatixThrobber size={20} tone="amber" />}
-              </div>
-              {explanation && (
-                <div className="mt-3 rounded border border-amber-500/40 bg-stone-900/70 p-3 text-[11px] text-stone-200 leading-relaxed whitespace-pre-wrap">{explanation}</div>
-              )}
-            </div>
-
-            {/* Insights — bottleneck/frequency heat over the discovered model (+ Variants/Cases/Outcomes/Export). */}
-            <MiningInsightsPanel projectId={projectId} run={selected} />
-
-            {/* Admin: capture this run into the Mining-Example catalog */}
-            {isAdmin && <SaveRunAsExample projectId={projectId} runId={selected.id} defaultTitle={selected.name} />}
-          </section>
+          <RunDetail
+            projectId={projectId}
+            run={selected}
+            runs={runs}
+            isAdmin={isAdmin}
+            onSelect={setSelectedId}
+            reload={load}
+            patchRun={patchRun}
+            openDiagram={openDiagram}
+            stashReturn={stashReturn}
+            onOpenSimulator={onOpenSimulator}
+          />
         )}
       </main>
 
@@ -1116,68 +148,6 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
         <ConfirmDialog title="Delete import" message={`Delete the whole "${deletingStudy.name}" import — all ${deletingStudy.count} object-type run${deletingStudy.count === 1 ? "" : "s"}? (Discovered diagrams are kept.)`} destructive
           onConfirm={() => removeStudy(deletingStudy.groupId)} onCancel={() => setDeletingStudy(null)} />
       )}
-      {showLog && (
-        <MiningLogViewer headers={headers} rows={rows} title={fileName ?? "Event log"} onClose={() => setShowLog(false)} />
-      )}
-    </div>
-  );
-}
-
-/** Admin-only: capture this run (log + reference SM) into a NEW draft
- *  Mining-Example catalog entry. Mirrors the Simulator's "Save as example". */
-function SaveRunAsExample({ projectId, runId, defaultTitle }: { projectId: string; runId: string; defaultTitle: string }) {
-  const [open, setOpen] = useState(false);
-  const [title, setTitle] = useState(defaultTitle);
-  const [concept, setConcept] = useState("");
-  const [difficulty, setDifficulty] = useState("core");
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-
-  async function capture() {
-    if (!title.trim()) return;
-    setBusy(true); setMsg(null);
-    try {
-      const res = await fetch(`/api/admin/mining-examples/capture`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId, runId, title: title.trim(), concept: concept.trim(), difficulty }),
-      });
-      const json = await res.json().catch(() => ({}));
-      setMsg(res.ok ? "Saved as a draft example ✓ — publish it in the Catalog manager." : (json.error ?? "Capture failed"));
-    } finally { setBusy(false); }
-  }
-
-  return (
-    <div className="mt-4 pt-3 border-t border-stone-700">
-      {!open ? (
-        <button onClick={() => setOpen(true)} className="text-amber-300/70 hover:text-amber-200 text-[10px] uppercase tracking-widest">
-          ⎘ Save run as example
-        </button>
-      ) : (
-        <div className="flex flex-col gap-1.5 text-[11px] max-w-md">
-          <span className="text-amber-300/70 uppercase tracking-widest text-[10px]">Save as example (admin)</span>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="title"
-            className="bg-stone-900 border border-amber-500/40 rounded px-1.5 py-0.5 text-amber-100 [color-scheme:dark]" />
-          <input value={concept} onChange={(e) => setConcept(e.target.value)} placeholder="one-line concept"
-            className="bg-stone-900 border border-amber-500/40 rounded px-1.5 py-0.5 text-amber-100 [color-scheme:dark]" />
-          <div className="flex items-center gap-2">
-            <select value={difficulty} onChange={(e) => setDifficulty(e.target.value)} className="bg-stone-900 border border-amber-500/40 rounded px-1 py-0.5 text-amber-100 [color-scheme:dark]">
-              <option value="intro">intro</option><option value="core">core</option><option value="advanced">advanced</option>
-            </select>
-            <button onClick={capture} disabled={busy} className="text-xs bg-amber-700 hover:bg-amber-600 disabled:opacity-40 text-white rounded px-3 py-1">{busy ? "…" : "Capture"}</button>
-            <button onClick={() => setOpen(false)} className="text-amber-300/50 hover:text-amber-200 text-[10px]">cancel</button>
-          </div>
-          {msg && <span className="text-amber-200 text-[10px]">{msg}</span>}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: number | string | undefined }) {
-  return (
-    <div className="bg-stone-800/60 rounded p-2">
-      <div className="text-[10px] uppercase tracking-wide text-stone-400">{label}</div>
-      <div className="text-lg text-stone-100 tabular-nums">{value ?? "—"}</div>
     </div>
   );
 }
