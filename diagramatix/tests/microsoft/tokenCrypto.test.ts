@@ -25,9 +25,28 @@ describe("tokenCrypto", () => {
 
   it("T2253 — a tampered ciphertext fails to decrypt (GCM auth tag)", () => {
     const blob = encryptSecret("do-not-tamper");
-    const parts = blob.split(".");
-    parts[3] = parts[3].slice(0, -2) + (parts[3].endsWith("A") ? "BB" : "AA"); // corrupt the ct
-    expect(() => decryptSecret(parts.join("."))).toThrow();
+
+    // Tamper the DECODED BYTES, not the base64url text. The final base64url
+    // character of a short ciphertext carries only 4 significant bits, so
+    // rewriting the last two characters can change the text while decoding to
+    // exactly the same bytes — leaving nothing tampered, GCM correctly not
+    // throwing, and this guard failing at random roughly once in a thousand runs.
+    const flip = (part: number) => {
+      const parts = blob.split(".");
+      const bytes = Buffer.from(parts[part], "base64url");
+      bytes[0] ^= 0xff;
+      parts[part] = bytes.toString("base64url");
+      expect(parts[part]).not.toBe(blob.split(".")[part]);   // it really did change
+      return parts.join(".");
+    };
+
+    // Tampered EAGERLY, outside the toThrow callbacks. Called inside one, a
+    // failure of the "it really did change" assertion above is itself a throw,
+    // so toThrow() would pass on it and the guard would guard nothing.
+    const badIv = flip(1), badTag = flip(2), badCt = flip(3);
+    expect(() => decryptSecret(badIv)).toThrow();
+    expect(() => decryptSecret(badTag)).toThrow();
+    expect(() => decryptSecret(badCt)).toThrow();
     expect(() => decryptSecret("garbage")).toThrow();
   });
 });
