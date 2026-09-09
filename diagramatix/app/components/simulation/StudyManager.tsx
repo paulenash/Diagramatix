@@ -46,10 +46,13 @@ const KIND_HINT: Record<PlannedInterventionKind, string> = {
   outage: "team → capacity during outage",
 };
 
-export function StudyManager({ projectId, isAdmin, onRan }: { projectId: string | null; isAdmin?: boolean; onRan?: (cfg: ScenarioRunConfig) => void }) {
+export function StudyManager({ projectId, isAdmin, onRan, initialStudyId }: { projectId: string | null; isAdmin?: boolean; onRan?: (cfg: ScenarioRunConfig) => void; initialStudyId?: string | null }) {
   const [studies, setStudies] = useState<StudyRow[]>([]);
   const [diagrams, setDiagrams] = useState<DiagramLite[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Opened ON a study when one was named — the Miner hands over the twin it just
+  // calibrated, rather than leaving it to be found among the project's studies.
+  const [selectedId, setSelectedId] = useState<string | null>(initialStudyId ?? null);
+  const focusRef = useRef<HTMLDivElement | null>(null);
   const [detail, setDetail] = useState<StudyDetail | null>(null);
   const [newStudy, setNewStudy] = useState("");
   const [err, setErr] = useState<string | null>(null);
@@ -111,6 +114,11 @@ export function StudyManager({ projectId, isAdmin, onRan }: { projectId: string 
 
   useEffect(() => { loadStudies(); }, [loadStudies]);
   useEffect(() => { if (selectedId) loadDetail(selectedId); else setDetail(null); }, [selectedId, loadDetail]);
+  // Studies sit well down a long single-scroll page, so an expanded study nobody
+  // can see is barely better than one nobody selected.
+  useEffect(() => {
+    if (initialStudyId && focusRef.current) focusRef.current.scrollIntoView({ block: "center" });
+  }, [initialStudyId, studies.length]);
 
   async function createStudy() {
     if (!projectId || !newStudy.trim()) return;
@@ -150,7 +158,8 @@ export function StudyManager({ projectId, isAdmin, onRan }: { projectId: string 
       <div className="flex flex-col gap-1">
         {studies.length === 0 && <p className="text-green-400/50">No studies yet — create one below.</p>}
         {studies.map((s) => (
-          <div key={s.id} className={`flex items-center gap-2 px-1 rounded ${selectedId === s.id ? "bg-green-400/10" : ""}`}>
+          <div key={s.id} ref={s.id === initialStudyId ? focusRef : undefined}
+            className={`flex items-center gap-2 px-1 rounded ${selectedId === s.id ? "bg-green-400/10" : ""}`}>
             <button onClick={() => setSelectedId(selectedId === s.id ? null : s.id)} className="flex-1 text-left text-green-300 hover:text-green-200 truncate">
               {selectedId === s.id ? "▾" : "▸"} {s.name}
             </button>

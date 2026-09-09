@@ -72,6 +72,13 @@ export function ImportPanel({ projectId, onImported, openDiagram, stashReturn }:
   const [crosswalk, setCrosswalk] = useState<Crosswalk | null>(null);
   const [crosswalkName, setCrosswalkName] = useState<string | null>(null);
 
+  // Hold back the most recent share of cases so a twin can later be tested on
+  // data it was not fitted to. The import route has accepted this since the
+  // validation work shipped and NOTHING has ever sent it — while the validate
+  // panel told the user to "re-import the log with a hold-back", which no screen
+  // could do. Off by default: it is a deliberate choice, not a default posture.
+  const [holdoutPct, setHoldoutPct] = useState(0);
+
   // Choosable scenarios (an example may ship several period logs to pick between).
   const [scenarios, setScenarios] = useState<SampleScenario[] | null>(null);
   const [scenarioIdx, setScenarioIdx] = useState(-1);
@@ -341,7 +348,7 @@ export function ImportPanel({ projectId, onImported, openDiagram, stashReturn }:
     try {
       const res = await fetch(`/api/projects/${projectId}/mining/import`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: runName.trim() || "Event log", ...payload, kpiConfig: pendingKpi.current ?? undefined }),
+        body: JSON.stringify({ name: runName.trim() || "Event log", ...payload, holdoutPct, kpiConfig: pendingKpi.current ?? undefined }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) { setErr(json.error ?? "Import failed"); return; }
@@ -682,6 +689,27 @@ export function ImportPanel({ projectId, onImported, openDiagram, stashReturn }:
                 </button>
               </div>
             )}
+
+            {/* The hold-back. Only offered where it can be honoured — at import,
+                because the split has to happen before performance is fitted and
+                the raw events are gone immediately afterwards. */}
+            <div className="rounded border border-stone-600 bg-stone-900/40 p-2.5 flex flex-col gap-1.5">
+              <label className="flex items-center gap-2 text-[11px] flex-wrap">
+                <span className="text-stone-300">Hold back the most recent</span>
+                <select value={holdoutPct} onChange={(e) => setHoldoutPct(Number(e.target.value))} className={`${inp} py-0.5`}>
+                  <option value={0}>nothing</option>
+                  <option value={0.1}>10% of cases</option>
+                  <option value={0.2}>20% of cases</option>
+                  <option value={0.3}>30% of cases</option>
+                </select>
+                <span className="text-stone-300">to test the digital twin against</span>
+              </label>
+              <p className="text-[10px] text-stone-400 leading-snug">
+                {holdoutPct > 0
+                  ? <>The twin will be fitted on the earlier <span className="text-stone-300">{Math.round((1 - holdoutPct) * 100)}%</span> of cases and can then be checked against the {Math.round(holdoutPct * 100)}% it never saw. Split by <span className="text-stone-300">date</span>, not at random — a random split leaks the future into the fit. The Insights views still cover every case.</>
+                  : <>Without a hold-back, a twin is fitted on every case and then checked against those same cases &mdash; marking its own homework. It is still a useful sanity check, and the validation says so.</>}
+              </p>
+            </div>
 
             <div className="flex items-center gap-2">
               <input value={runName} onChange={(e) => setRunName(e.target.value)} placeholder="run name" className={`${inp} flex-1`} />

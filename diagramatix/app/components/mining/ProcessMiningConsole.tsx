@@ -28,7 +28,7 @@ import { RunDetail } from "./console/RunDetail";
 import type { RunRow } from "./console/shared";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 
-export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose, onOpenSimulator }: { projectId: string; projectName?: string; isAdmin?: boolean; onClose: () => void; onOpenSimulator?: () => void }) {
+export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose, onOpenSimulator }: { projectId: string; projectName?: string; isAdmin?: boolean; onClose: () => void; onOpenSimulator?: (studyId?: string | null) => void }) {
   const [runs, setRuns] = useState<RunRow[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<RunRow | null>(null);

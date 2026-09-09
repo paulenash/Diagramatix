@@ -29,8 +29,10 @@ import type { ScenarioRunConfig, WorkCalendar } from "@/app/lib/simulation/types
 
 const EMPTY_DIAGRAM: DiagramData = { elements: [], connectors: [], viewport: { x: 0, y: 0, zoom: 1 } };
 
-export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId, projectId, isAdmin, diagramName, projectName, onClose, onFillTestData, onApplyData }: {
+export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId, projectId, isAdmin, diagramName, projectName, onClose, onFillTestData, onApplyData, initialStudyId }: {
   data?: DiagramData; colorConfig?: SymbolColorConfig; diagramId?: string; projectId: string | null; isAdmin?: boolean; diagramName?: string; projectName?: string; onClose: () => void; onFillTestData?: () => number; onApplyData?: (next: DiagramData) => void;
+  /** Open with this study already expanded — the Miner's calibrated twin. */
+  initialStudyId?: string | null;
 }) {
   // Project mode = entered from a Project (no single open diagram): show the
   // project name + a variant selector across all its processes for comparison.
@@ -397,7 +399,7 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId,
                 <CalendarLibraryManager key={`cals-${seedKey}`} projectId={projectId} onCalendars={setCalendars} />
               </MatrixPanel>
               <MatrixPanel title="Studies & Scenarios" className="md:col-span-3">
-                <StudyManager key={`studies-${seedKey}`} projectId={projectId} isAdmin={isAdmin} onRan={(cfg) => { setLastRunCfg(cfg); setMode("replay"); }} />
+                <StudyManager key={`studies-${seedKey}`} projectId={projectId} isAdmin={isAdmin} initialStudyId={initialStudyId} onRan={(cfg) => { setLastRunCfg(cfg); setMode("replay"); }} />
               </MatrixPanel>
               <MatrixPanel title={`Simulation Data — see, edit, fill & clear${!isOpen ? ` · ${diagramList.find((d) => d.id === activeId)?.name ?? "variant"}` : ""}`} className="md:col-span-3">
                 {!isOpen && (

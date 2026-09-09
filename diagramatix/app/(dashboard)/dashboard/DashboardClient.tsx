@@ -368,6 +368,8 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const [skipMiningIntro, setSkipMiningIntro] = useState(false);
   // When the Simulator was opened FROM the MINER, exiting it returns here.
   const [simFromMining, setSimFromMining] = useState<{ id: string; name: string } | null>(null);
+  /** The twin the Miner just calibrated — the Simulator opens ON it. */
+  const [simStudyId, setSimStudyId] = useState<string | null>(null);
   // Deep-link: ?mining=<projectId>&mp=<name> auto-opens Process Mining on a
   // freshly-adopted example project, or on return from a discovered diagram.
   useEffect(() => {
@@ -3339,6 +3341,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
 
       {simProject && (
         <SimulatorOverlay
+          initialStudyId={simStudyId}
           projectId={simProject.id}
           projectName={simProject.name}
           isAdmin={!!isSu}
@@ -3346,6 +3349,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
             setSimProject(null);
             // Invoked from the MINER → exiting the Simulator returns to the MINER
             // console it came from (skip the intro; the console restores its screen).
+            setSimStudyId(null);
             if (simFromMining) { const p = simFromMining; setSimFromMining(null); setSkipMiningIntro(true); setMiningProject(p); }
           }}
         />
@@ -3358,7 +3362,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           isAdmin={!!isSu}
           skipIntro={skipMiningIntro}
           onClose={() => setMiningProject(null)}
-          onOpenSimulator={() => { const p = miningProject; setMiningProject(null); setSimFromMining(p); setSimProject(p); }}
+          onOpenSimulator={(studyId) => { const p = miningProject; setMiningProject(null); setSimFromMining(p); setSimStudyId(studyId ?? null); setSimProject(p); }}
         />
       )}
 

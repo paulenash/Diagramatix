@@ -14,13 +14,14 @@ import { buildEventLog } from "./parseEventLog";
 import { computePerformance } from "./performance";
 import { computeAnalytics } from "./analytics";
 import { computeGovernance, hasGovernance } from "./governance";
+import { splitByTime } from "@/app/lib/simulation/validate";
 import { discoverProcess } from "./discoverProcess";
 import { badgeEdgeCounts } from "./edgeBadges";
 import { discoverStateMachine } from "./discoverStateMachine";
 import { layoutBpmnDiagram } from "@/app/lib/diagram/bpmnLayout";
 import { checkTransitionConformance, type ReferenceSm } from "./transitionConformance";
 import { flagIllegalTransitions } from "./flagIllegalTransitions";
-import type { LogMapping } from "./types";
+import type { LogMapping, Performance } from "./types";
 import type { DiagramData } from "@/app/lib/diagram/types";
 
 export interface RefreshableSource {
@@ -43,7 +44,37 @@ export async function refreshRunFromSource(source: RefreshableSource): Promise<R
   if (!mapping?.caseId || !mapping?.activity || !mapping?.timestamp) return null;
 
   const log = buildEventLog(headers, rows, mapping);
-  const performance = computePerformance(log.traces);
+
+  // What the run knew before this refresh. Two things have to survive it, and
+  // neither did.
+  const prior = await prisma.processMiningRun.findUnique({
+    where: { id: source.runId },
+    select: { performance: true, studyId: true },
+  });
+  const priorPerf = (prior?.performance ?? {}) as Partial<Performance>;
+
+  // THE HOLD-BACK IS RE-APPLIED, not inherited. Recomputing performance over
+  // every trace silently turned an out-of-sample validation into an in-sample
+  // one: the twin quietly began marking its own homework, while the panel went
+  // on reporting whichever answer a field that had just been dropped implied.
+  // Re-splitting at the same percentage keeps the arrangement the user asked
+  // for as the log grows.
+  const pct = priorPerf.holdout?.pct ?? 0;
+  const traceStart = (t: { events: { timestamp: number }[] }) => t.events[0]?.timestamp ?? 0;
+  const split = pct > 0
+    ? splitByTime(log.traces.map((t) => ({ startMs: traceStart(t), t })), pct)
+    : null;
+  const performance = computePerformance(split ? split.fit.map((x) => x.t) : log.traces);
+  if (split && split.holdout.length > 0) {
+    performance.holdout = { pct, splitMs: split.splitMs, cases: split.holdout.length };
+  }
+
+  // A twin calibrated before this refresh no longer describes the log. MARKED,
+  // not re-calibrated — a study the user has edited must not be rewritten under
+  // them. The FIRST divergence date is kept, because what a reader needs is when
+  // the twin stopped being true, not when it was last looked at.
+  if (prior?.studyId) performance.twinStaleAt = priorPerf.twinStaleAt ?? new Date().toISOString();
+
   const analytics = computeAnalytics(log);
   const governance = computeGovernance(log.traces);
 

@@ -11,6 +11,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma, pgPool } from "@/app/lib/db";
 import { writeDiagramData } from "@/app/lib/mining/diagramStore";
+import { updateRunJson } from "@/app/lib/mining/runStore";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 import { gateFeature } from "@/app/lib/subscription-route";
@@ -109,5 +110,12 @@ export async function POST(_req: Request, { params }: Params) {
   }
 
   await prisma.processMiningRun.update({ where: { id: runId }, data: { discoveredBpmnId: bpmnId, studyId } });
+  // The twin describes the log again, so the staleness a refresh may have marked
+  // is gone. Written back only when there was one, so a calibrate never touches
+  // `performance` it has no reason to.
+  if (perf.twinStaleAt) {
+    const { twinStaleAt: _cleared, ...fresh } = perf;
+    await updateRunJson(runId, { performance: fresh });
+  }
   return NextResponse.json({ studyId, diagramId: bpmnId, teams: cal.teams.length }, { status: 200 });
 }

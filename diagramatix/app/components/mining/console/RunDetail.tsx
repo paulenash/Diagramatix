@@ -37,8 +37,8 @@ export interface RunDetailProps {
   stashReturn: () => void;
   /** Persist a field on the run — applied optimistically by the console, then PATCHed. */
   patchRun: (runId: string, patch: { excludeFromCompliance?: boolean; referenceSmId?: string | null }) => void;
-  /** A twin has been calibrated — hand off to the Simulator. */
-  onOpenSimulator?: () => void;
+  /** A twin has been calibrated — hand off to the Simulator, ON that study. */
+  onOpenSimulator?: (studyId?: string | null) => void;
 }
 
 export function RunDetail({
@@ -98,8 +98,11 @@ export function RunDetail({
       const json = await res.json().catch(() => ({}));
       if (!res.ok) { setErr(json.error ?? "Calibration failed"); return; }
       await reload();
-      stashReturn();       // exiting the Simulator returns to this exact screen
-      onOpenSimulator?.(); // hand off to the Simulator on the calibrated twin study
+      stashReturn();                       // exiting the Simulator returns here
+      // The route has always returned { studyId, diagramId } and the caller has
+      // always thrown both away, dropping the user into the Simulator in project
+      // mode to hunt for the mined twin among auto-seeded default studies.
+      onOpenSimulator?.(json.studyId ?? null);
     } finally { setCalibrating(false); }
   }
 

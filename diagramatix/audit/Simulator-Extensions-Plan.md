@@ -684,7 +684,7 @@ the **T3369** slug list.
 | [ ] | Priority triage | `priority-triage` | Urgent vs standard: the pooled p95 looks fine while the urgent segment misses. FIFO vs priority scenarios | 5 | core |
 | [ ] | Batch and cut-off | `batch-and-cutoff` | A 4pm posting cut-off and batches of 50 — same work, very different queue | 5 | core |
 | [ ] | Holiday shutdown | `holiday-shutdown` | A Christmas shutdown and a summer of absence against steady arrivals | 5 | core |
-| [ ] | Validated twin | `mined-twin-validated` | Mining run → twin → held-back validation, agreement figure end to end. Pairs with the existing `accounts-payable-invoice-lifecycle` mining example rather than authoring a new log | 6 | advanced |
+| [ ] | Validated twin | `mined-twin-validated` | Mining run → twin → held-back validation, agreement figure end to end. Pairs with the existing `accounts-payable-invoice-lifecycle` mining example rather than authoring a new log. **UNBLOCKED 2026-09-09** — the hold-back it needs was accepted by the import route but reachable from no screen; Miner Phase 3 (T3763–T3772) put a control on the import panel, so this example can now be built | 6 | advanced |
 | [ ] | Cross-skilled team | `cross-skilled-team` | Assessments + appeals sharing one person; siloed vs cross-skilled | 7 | advanced |
 | [ ] | **Hire & Onboard** | `hire-and-onboard` | **The capstone.** Calendars + holidays + named people + skills read from ArchiMate + priority + sweep + tornado + business case, in one process. Plan: [`Example-Hire-and-Onboard-Plan.md`](./Example-Hire-and-Onboard-Plan.md) | 2-8 | advanced |
 

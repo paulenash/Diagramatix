@@ -86,6 +86,11 @@ export async function POST(_req: Request, { params }: Params) {
     unit,
     outOfSample: !!holdout,
     holdout,
+    // The log moved on after this twin was calibrated. Reported rather than
+    // silently corrected: re-calibrating would rewrite a study the user may
+    // have edited, and a validation against a twin that no longer describes
+    // the log is a number worth distrusting.
+    twinStaleAt: perf.twinStaleAt ?? null,
     observedCases: observed.length,
     simulatedAt: simRun?.startedAt ?? null,
     // Said plainly rather than left for the reader to work out: an in-sample

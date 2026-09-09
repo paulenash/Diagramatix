@@ -21,6 +21,8 @@ interface Payload {
   outOfSample: boolean;
   observedCases: number;
   caveat: string;
+  /** The log moved on after this twin was calibrated — an ISO date, or null. */
+  twinStaleAt: string | null;
 }
 
 const W = 320, H = 96, PAD_L = 6, PAD_R = 6, PAD_T = 8, PAD_B = 16;
@@ -61,6 +63,20 @@ export function ValidateTwinPanel({ validateUrl }: { validateUrl: string }) {
       </div>
 
       {err && <p className="text-rose-400 text-[11px] mt-2">{err}</p>}
+
+      {/* The twin was fitted, then the log moved on. Said BEFORE the number, not
+          after it: a reader who has already taken in a green agreement figure
+          has formed the view this warning exists to prevent. */}
+      {data?.twinStaleAt && (
+        <div className="mt-3 rounded border border-amber-500/50 bg-amber-950/25 p-2.5 text-[11px] text-amber-200 leading-relaxed">
+          ⚠ New events have arrived since this twin was calibrated
+          {" "}(<span className="text-amber-100">{new Date(data.twinStaleAt).toLocaleDateString()}</span>).
+          It is being checked against a log it was not fitted to, which is not the same thing as being
+          checked out-of-sample &mdash; recalibrate before trusting the figure below.
+          <span className="text-amber-200/70"> Nothing was recalibrated for you, because that would
+          rewrite a study you may have edited.</span>
+        </div>
+      )}
 
       {c && (
         <div className="mt-3 flex flex-col gap-2">

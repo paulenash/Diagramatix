@@ -7,7 +7,7 @@
 | **This document** | The **live worklist** for building them. Every phase names the files it touches and the existing functions it reuses. The review is the historical argument; this is the burn-down. |
 | **Scope** | All 8 extensions + all 11 smaller items. Nothing dropped — two are **re-specified** rather than built as written, and each says why on its face. |
 | **How to use** | Work an item, tick its box, set **Status** → `In progress` / `Shipped (<commit>)` / `Won't do (<reason>)`. Record what actually happened — including deviations — in the phase's own **As built** paragraph, so this doubles as a decision log. |
-| **Progress log** | **2026-09-09** — **PHASE 0 COMPLETE** (0.3–0.6, T3681–T3762): the recompute contract refuses the four per-event fields by name rather than approximating them from variants; a test floor under the five untested modules; eleven hand-written run-JSON statements (not six) became one patch helper with a guard that was proved to fire; and **0.5 answered on evidence — the generator is deterministic, the baked catalog was merely STALE, and all five examples had been teaching pre-Phase-1 analytics since Phase 1 shipped ahead of its own gate.** **2.3 SHIPPED** (T3657–T3680): several systems merge into one lifecycle, ids unified by shared key or crosswalk (union-find, so chains resolve), a refusal when nothing overlaps, and CROSS-SYSTEM HANDOVER measured at the join — the days nobody owns, which neither export contains. **0.2 SHIPPED**: the console went 1,183 → 153 lines (44 `useState` → 5) into `console/ImportPanel`, `console/RunList`, `console/RunDetail`. **No tab shell** — this plan's own text contradicted itself and the e2e settled it. Which turned up the next thing: that e2e looked for a button renamed months ago, so the Miner's only route-level coverage was failing before it reached what it covered. **2.1 SHIPPED** (T3647–T3656): `.xlsx` read directly, no new dependency. **2.2 SHIPPED** (T3631–T3646): wide exports expand to one row per event. — Plan written. Reconnaissance found **four things the review got wrong** and **one it does not mention at all** (the gating hole), all recorded below against the item they affect. **Step 1 SHIPPED**: 20 of 26 mining routes now carry a subscription gate (was 3), the three dormant tier keys are enforced, and `tests/mining/route-gating.test.ts` (T3609–T3613) enumerates the route tree so the twenty-seventh route cannot be added ungated. **Phase 1 SHIPPED** (T3614–T3630) — and its budget test found a CRASH: `Math.min(...xs)` threw past ~125k elements in three places, so any log beyond ~125,000 events could not be imported at all. **Phase 8 ADDED** after Paul asked whether the plan gave the user a course of action; it did not, and neither does the review. The cut line moved to after it. **Phase 2 ADDED** — three input questions the plan could not answer: no `.xlsx`, wide-format exports silently read as one event, and no way to merge several systems' exports of the same cases. Placed second, because a user who cannot load their export is not reached by anything else. Phases 2–10 renumbered to 3–11. |
+| **Progress log** | **2026-09-09** — **PHASE 3 SHIPPED** (T3763–T3772): the hold-back reaches a screen for the first time, the calibrate hand-off stops discarding its study, and a refreshed run marks its twin stale rather than silently re-calibrating. A FOURTH defect surfaced while building: a live refresh was silently DROPPING the hold-back, so an out-of-sample validation quietly became in-sample and the panel said otherwise. **PHASE 0 COMPLETE** (0.3–0.6, T3681–T3762): the recompute contract refuses the four per-event fields by name rather than approximating them from variants; a test floor under the five untested modules; eleven hand-written run-JSON statements (not six) became one patch helper with a guard that was proved to fire; and **0.5 answered on evidence — the generator is deterministic, the baked catalog was merely STALE, and all five examples had been teaching pre-Phase-1 analytics since Phase 1 shipped ahead of its own gate.** **2.3 SHIPPED** (T3657–T3680): several systems merge into one lifecycle, ids unified by shared key or crosswalk (union-find, so chains resolve), a refusal when nothing overlaps, and CROSS-SYSTEM HANDOVER measured at the join — the days nobody owns, which neither export contains. **0.2 SHIPPED**: the console went 1,183 → 153 lines (44 `useState` → 5) into `console/ImportPanel`, `console/RunList`, `console/RunDetail`. **No tab shell** — this plan's own text contradicted itself and the e2e settled it. Which turned up the next thing: that e2e looked for a button renamed months ago, so the Miner's only route-level coverage was failing before it reached what it covered. **2.1 SHIPPED** (T3647–T3656): `.xlsx` read directly, no new dependency. **2.2 SHIPPED** (T3631–T3646): wide exports expand to one row per event. — Plan written. Reconnaissance found **four things the review got wrong** and **one it does not mention at all** (the gating hole), all recorded below against the item they affect. **Step 1 SHIPPED**: 20 of 26 mining routes now carry a subscription gate (was 3), the three dormant tier keys are enforced, and `tests/mining/route-gating.test.ts` (T3609–T3613) enumerates the route tree so the twenty-seventh route cannot be added ungated. **Phase 1 SHIPPED** (T3614–T3630) — and its budget test found a CRASH: `Math.min(...xs)` threw past ~125k elements in three places, so any log beyond ~125,000 events could not be imported at all. **Phase 8 ADDED** after Paul asked whether the plan gave the user a course of action; it did not, and neither does the review. The cut line moved to after it. **Phase 2 ADDED** — three input questions the plan could not answer: no `.xlsx`, wide-format exports silently read as one event, and no way to merge several systems' exports of the same cases. Placed second, because a user who cannot load their export is not reached by anything else. Phases 2–10 renumbered to 3–11. |
 
 **Status values:** `Not started` · `In progress` · `Shipped (<commit>)` · `Blocked (<on what>)` · `Won't do (<reason>)`
 
@@ -575,11 +575,13 @@ is true is narrower: the *console's* `onFile` is a near-duplicate of it that add
 
 ## Phase 3 — The twin is a claim; make it checkable, and make it reachable
 
-**Status:** `Not started` · The smallest phase, and the cheapest credibility in the programme.
+**Status:** ✅ `Shipped` — T3763–T3772. The smallest phase, and the cheapest credibility in the
+programme.
 
-- [ ] `holdoutPct` reaches the UI — one control on the mapping screen
-- [ ] `studyId` / `diagramId` stop being discarded by the calibrate hand-off
-- [ ] A refreshed live run **marks its twin stale**, with the date it diverged
+- [x] `holdoutPct` reaches the UI — one control on the import screen
+- [x] `studyId` stops being discarded by the calibrate hand-off
+- [x] A refreshed live run **marks its twin stale**, with the date it diverged
+- [x] **(found while building)** A refreshed live run no longer silently **loses** its hold-back
 
 No review extension — three verified defects that share one story: **the Miner → Simulator seam is
 unfinished.**
@@ -596,6 +598,52 @@ unfinished.**
 **Why here.** The Simulator's own examples programme lists `mined-twin-validated` as unstarted, and
 it is currently **unbuildable** because the hold-back it needs is unreachable. This phase unblocks a
 plan whose code already shipped.
+
+**Reuses.** `splitByTime`, `compareDistributions`, `Performance.holdout`, `ValidateTwinPanel` — all
+shipped and tested.
+
+**As built.**
+
+**The hold-back is offered at import, because that is the only place it can be honoured** — the split
+has to happen before performance is fitted, and the raw events are gone immediately afterwards. Off
+by default: holding data back is a deliberate choice, not a default posture. The control states which
+way it is set means, rather than leaving the reader to infer it — with a hold-back, the twin is
+fitted on the earlier share and tested on what it never saw; without one, it is marking its own
+homework and the validation says so.
+
+**A fourth defect surfaced while wiring the third, and it was the worst of them.**
+`refreshRunFromSource` recomputed `performance` over every trace, so a live refresh **silently
+dropped the hold-back**: an out-of-sample validation quietly became in-sample, the twin went back to
+marking its own homework, and the panel went on reporting whatever a field that had just been deleted
+implied. Nothing broke. The run kept working; only the claim it supports stopped being true. The
+hold-back is now **re-applied** at the same percentage to the grown log rather than inherited —
+inheriting the old `cases` count would describe a log that no longer exists (T3763, T3764). Verified
+by reverting the fix: both tests fail on the previous code.
+
+**Marking, not re-calibrating** — as recommended, and for a reason worth stating plainly: a study the
+user has edited must not be rewritten under them. So a refresh records `twinStaleAt` and touches
+nothing else; T3769 asserts the refresh never writes `studyId` and never touches a
+`SimulationStudy`. The **first** divergence date is kept, not the latest refresh (T3768) — a date
+that advances on every poll says "just now" forever and tells a reader nothing. Cleared by a
+calibrate, because the twin then describes the log again.
+
+**The warning is shown BEFORE the number, not after it.** A reader who has already taken in a green
+agreement figure has formed exactly the view the warning exists to prevent.
+
+**No schema change.** `twinStaleAt` is a new key in the existing `performance` JSON column — data,
+not structure, per this plan's ground rule 3 — alongside `holdout`, which is the same kind of fact
+about the fit. Phase 9's `parentRunId` remains the only phase needing a real column.
+
+**The hand-off carries the study all the way down.** `calibrate` has always returned
+`{ studyId, diagramId }`; six files sat between that and the study a user ends up looking at, and the
+first of them threw it away. The Simulator now opens with the mined twin expanded and scrolled into
+view, rather than in project mode among auto-seeded default studies.
+
+**A guard for the failure mode this phase is about.** Three verified defects here shared one shape:
+implemented, tested, reachable by nothing. A unit test cannot notice that — `splitByTime` was fully
+covered by T3503–T3506 the whole time it had zero callers. T3770–T3772 ask the other question:
+does anything *call* it? Source-text tripwires in the idiom of `route-gating` and
+`generate-diagnostics-wired`, and **all three were proved to fail** by re-orphaning each end.
 
 **Reuses.** `splitByTime`, `compareDistributions`, `Performance.holdout`, `ValidateTwinPanel` — all
 shipped and tested.

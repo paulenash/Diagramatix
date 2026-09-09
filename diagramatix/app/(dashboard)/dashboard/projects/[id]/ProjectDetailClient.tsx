@@ -585,6 +585,8 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
   // When the Simulator was launched from the MINER, exiting it returns to the
   // MINER (skipping its intro) rather than falling back to the project screen.
   const [simFromMining, setSimFromMining] = useState(false);
+  /** The twin the Miner just calibrated — the Simulator opens ON it. */
+  const [simStudyId, setSimStudyId] = useState<string | null>(null);
   const [miningSkipIntro, setMiningSkipIntro] = useState(false);
   // Renamed: this menu now also handles imports, so it's a generic File menu.
   const [showFileMenu, setShowFileMenu] = useState(false);
@@ -3656,11 +3658,13 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
       )}
       {showSim && (
         <SimulatorOverlay
+          initialStudyId={simStudyId}
           projectId={project.id}
           projectName={project.name}
           isAdmin={!!isAdmin}
           onClose={() => {
             setShowSim(false);
+            setSimStudyId(null);
             // Came from the MINER? Return to it (skip the intro) instead of the project screen.
             if (simFromMining) { setSimFromMining(false); setMiningSkipIntro(true); setShowMining(true); }
           }}
@@ -3673,7 +3677,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
           isAdmin={!!isAdmin}
           skipIntro={miningSkipIntro}
           onClose={() => { setShowMining(false); setMiningSkipIntro(false); }}
-          onOpenSimulator={() => { setShowMining(false); setSimFromMining(true); setShowSim(true); }}
+          onOpenSimulator={(studyId) => { setShowMining(false); setSimFromMining(true); setSimStudyId(studyId ?? null); setShowSim(true); }}
         />
       )}
       {showRcm && (

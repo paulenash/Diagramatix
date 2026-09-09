@@ -136,4 +136,12 @@ export interface Performance {
    *  kept aside so the model can later be tested on data it never saw. Absent =
    *  fitted on everything, and any validation is in-sample and must say so. */
   holdout?: { pct: number; splitMs: number | null; cases: number };
+  /** When the log moved on after the twin was calibrated — an ISO date, set by
+   *  the FIRST refresh that diverges and left alone by later ones, because what
+   *  a reader needs is when the twin stopped describing the log, not when it was
+   *  last looked at.
+   *
+   *  Marking, deliberately, rather than re-calibrating: a study the user has
+   *  edited must not be silently rewritten under them. Cleared by a calibrate. */
+  twinStaleAt?: string;
 }
