@@ -60,7 +60,7 @@ export default function PrivacyPage() {
 
         <h2 className="text-lg font-semibold text-gray-900 mt-6">7. Contact</h2>
         <p className="mt-2 text-sm leading-relaxed text-gray-700">
-          Privacy questions: <a href="mailto:privacy@diagramatix.com.au" className="text-blue-600 hover:underline">privacy@diagramatix.com.au</a>.
+          Privacy questions: <a href="mailto:info@diagramatix.com.au" className="text-blue-600 hover:underline">info@diagramatix.com.au</a>.
         </p>
 
         <div className="mt-12">

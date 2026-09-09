@@ -20,8 +20,10 @@ export default function TermsPage() {
 
         <h2 className="text-lg font-semibold text-gray-900 mt-8">1. Agreement</h2>
         <p className="mt-2 text-sm leading-relaxed text-gray-700">
-          By creating a Diagramatix account or using the Diagramatix service
-          (the &ldquo;Service&rdquo;), you agree to these Terms of Service. If you do
+          The Diagramatix service (the &ldquo;Service&rdquo;) is provided by Nash
+          Computer Consultants Pty Ltd (ABN 85 084 745 657) of Thornbury,
+          Victoria, Australia (&ldquo;Diagramatix&rdquo;). By creating a Diagramatix
+          account or using the Service, you agree to these Terms of Service. If you do
           not agree, do not use the Service.
         </p>
 
@@ -62,12 +64,12 @@ export default function TermsPage() {
         <h2 className="text-lg font-semibold text-gray-900 mt-6">7. Governing law</h2>
         <p className="mt-2 text-sm leading-relaxed text-gray-700">
           These terms are governed by the laws of Australia. Any dispute will be
-          resolved in the courts of New South Wales.
+          resolved in the courts of Victoria, Australia.
         </p>
 
         <h2 className="text-lg font-semibold text-gray-900 mt-6">8. Contact</h2>
         <p className="mt-2 text-sm leading-relaxed text-gray-700">
-          Questions: <a href="mailto:legal@diagramatix.com.au" className="text-blue-600 hover:underline">legal@diagramatix.com.au</a>.
+          Questions: <a href="mailto:info@diagramatix.com.au" className="text-blue-600 hover:underline">info@diagramatix.com.au</a>.
         </p>
 
         <div className="mt-12">

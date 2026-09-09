@@ -9,7 +9,7 @@ export const metadata: Metadata = {
     "Diagramatix pricing in Australian dollars. 30-day free trial, then paid plans for BPMN diagramming with Visio import/export and AI generation. Built in Australia.",
 };
 
-const CONTACT_EMAIL = "sales@diagramatix.com.au";
+const CONTACT_EMAIL = "info@diagramatix.com.au";
 
 /**
  * Marketing pricing page.
