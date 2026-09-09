@@ -10,6 +10,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { parseCsv, guessMapping, distinctActivities } from "@/app/lib/mining/parseEventLog";
 import { detectWideSpec, unpivotWide, describeWideSpec, type WideSpec, type UnpivotResult } from "@/app/lib/mining/wideFormat";
+import { parseXlsx, type XlsxSheet } from "@/app/lib/mining/formats/xlsx";
 import { enrichResources, enrichStates } from "@/app/lib/mining/enrich";
 import type { DiagramData } from "@/app/lib/diagram/types";
 import { activityToState } from "@/app/lib/mining/stateNaming";
@@ -66,6 +67,9 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
   // ordinary long-format log, which is the overwhelming majority.
   const [wide, setWide] = useState<WideSpec | null>(null);
   const [wideResult, setWideResult] = useState<UnpivotResult | null>(null);
+  // Sheets from a workbook, so a multi-sheet file does not silently lose the
+  // ones that were not first.
+  const [xlsxSheets, setXlsxSheets] = useState<XlsxSheet[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
   const [rows, setRows] = useState<string[][]>([]);
   const [mapping, setMapping] = useState<Partial<LogMapping>>({});
@@ -233,13 +237,40 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
     } finally { setExplaining(false); }
   }
 
+  /** Stage one worksheet, exactly as a parsed CSV would be staged. */
+  function loadSheet(sheet: XlsxSheet, fileName: string) {
+    setWide(detectWideSpec(sheet.headers, sheet.rows));
+    setWideResult(null);
+    setOcelText(null); setOcelTypes([]);
+    setFileName(fileName);
+    setHeaders(sheet.headers); setRows(sheet.rows);
+    setMapping(guessMapping(sheet.headers)); setEnrichMsg(null);
+    setRunName(fileName.replace(/\.[^.]+$/, "") + (sheet.name ? ` — ${sheet.name}` : ""));
+    setScenarioIdx(-1);
+  }
+
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
     setErr(null);
-    const text = await file.text();
     const ext = file.name.toLowerCase().split(".").pop() ?? "";
+
+    // A workbook is a ZIP, so it must be read as bytes — `file.text()` would
+    // mangle it before anything got the chance to look.
+    if (ext === "xlsx" || ext === "xlsm") {
+      try {
+        const sheets = (await parseXlsx(await file.arrayBuffer())).filter((s) => s.rows.length > 0);
+        if (sheets.length === 0) { setErr("That workbook has no rows in any sheet."); return; }
+        setXlsxSheets(sheets);
+        loadSheet(sheets[0], file.name);
+      } catch (ex) {
+        setErr(`Couldn't read that workbook: ${ex instanceof Error ? ex.message : String(ex)}`);
+      }
+      return;
+    }
+    setXlsxSheets([]);
+    const text = await file.text();
     // XES (IEEE 1849) and OCEL are parsed to the same { headers, rows, mapping }
     // table CSV produces, then flow through the identical import pipeline.
     setOcelText(null); setOcelTypes([]);
@@ -517,7 +548,7 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
             )}
             <label className="inline-block cursor-pointer text-xs bg-amber-700 hover:bg-amber-600 text-white rounded px-3 py-1.5">
               ⭱ Choose file…
-              <input type="file" accept=".csv,.tsv,.txt,text/csv,.xes,.json,.ocel,.jsonocel,.xml,application/xml,application/json" onChange={onFile} className="hidden" />
+              <input type="file" accept=".csv,.tsv,.txt,text/csv,.xlsx,.xlsm,.xes,.json,.ocel,.jsonocel,.xml,application/xml,application/json" onChange={onFile} className="hidden" />
             </label>
             {fileName && <span className="text-[11px] text-stone-400 truncate max-w-[18rem]" title={fileName}>loaded: <span className="text-stone-300">{fileName}</span></span>}
           </div>
@@ -557,6 +588,18 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
             </div>
           )}
 
+          {/* A workbook with more than one sheet of data: say so and let the
+              user choose, rather than importing the first and discarding the
+              rest without a word. */}
+          {xlsxSheets.length > 1 && (
+            <div className="mt-3 flex items-center gap-2 flex-wrap text-[11px]">
+              <span className="text-stone-400">This workbook has {xlsxSheets.length} sheets with data. Import:</span>
+              <select defaultValue="0" className={inp}
+                onChange={(e) => { const sh = xlsxSheets[Number(e.target.value)]; if (sh) loadSheet(sh, fileName ?? "workbook"); }}>
+                {xlsxSheets.map((sh, i) => <option key={sh.name + i} value={i}>{sh.name} ({sh.rows.length} rows)</option>)}
+              </select>
+            </div>
+          )}
           {/* One row per case? Offer to expand it — and say exactly what that
               would do first. Reading such a file as long format yields ONE event
               per case and drops the rest of the row without a word, which is why

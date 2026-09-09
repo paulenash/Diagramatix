@@ -7,7 +7,7 @@
 | **This document** | The **live worklist** for building them. Every phase names the files it touches and the existing functions it reuses. The review is the historical argument; this is the burn-down. |
 | **Scope** | All 8 extensions + all 11 smaller items. Nothing dropped — two are **re-specified** rather than built as written, and each says why on its face. |
 | **How to use** | Work an item, tick its box, set **Status** → `In progress` / `Shipped (<commit>)` / `Won't do (<reason>)`. Record what actually happened — including deviations — in the phase's own **As built** paragraph, so this doubles as a decision log. |
-| **Progress log** | **2026-09-09** — **2.2 SHIPPED** (T3631–T3646): wide exports expand to one row per event. — Plan written. Reconnaissance found **four things the review got wrong** and **one it does not mention at all** (the gating hole), all recorded below against the item they affect. **Step 1 SHIPPED**: 20 of 26 mining routes now carry a subscription gate (was 3), the three dormant tier keys are enforced, and `tests/mining/route-gating.test.ts` (T3609–T3613) enumerates the route tree so the twenty-seventh route cannot be added ungated. **Phase 1 SHIPPED** (T3614–T3630) — and its budget test found a CRASH: `Math.min(...xs)` threw past ~125k elements in three places, so any log beyond ~125,000 events could not be imported at all. **Phase 8 ADDED** after Paul asked whether the plan gave the user a course of action; it did not, and neither does the review. The cut line moved to after it. **Phase 2 ADDED** — three input questions the plan could not answer: no `.xlsx`, wide-format exports silently read as one event, and no way to merge several systems' exports of the same cases. Placed second, because a user who cannot load their export is not reached by anything else. Phases 2–10 renumbered to 3–11. |
+| **Progress log** | **2026-09-09** — **2.1 SHIPPED** (T3647–T3656): `.xlsx` read directly, no new dependency. **2.2 SHIPPED** (T3631–T3646): wide exports expand to one row per event. — Plan written. Reconnaissance found **four things the review got wrong** and **one it does not mention at all** (the gating hole), all recorded below against the item they affect. **Step 1 SHIPPED**: 20 of 26 mining routes now carry a subscription gate (was 3), the three dormant tier keys are enforced, and `tests/mining/route-gating.test.ts` (T3609–T3613) enumerates the route tree so the twenty-seventh route cannot be added ungated. **Phase 1 SHIPPED** (T3614–T3630) — and its budget test found a CRASH: `Math.min(...xs)` threw past ~125k elements in three places, so any log beyond ~125,000 events could not be imported at all. **Phase 8 ADDED** after Paul asked whether the plan gave the user a course of action; it did not, and neither does the review. The cut line moved to after it. **Phase 2 ADDED** — three input questions the plan could not answer: no `.xlsx`, wide-format exports silently read as one event, and no way to merge several systems' exports of the same cases. Placed second, because a user who cannot load their export is not reached by anything else. Phases 2–10 renumbered to 3–11. |
 
 **Status values:** `Not started` · `In progress` · `Shipped (<commit>)` · `Blocked (<on what>)` · `Won't do (<reason>)`
 
@@ -237,7 +237,7 @@ pre-existing `analytics` field, for all five catalog examples, with the new fiel
 this plan — and the review — had no answer to. **Placed second on purpose: if someone cannot load
 their export, no later phase matters to them.**
 
-- [ ] `.xlsx` import — the format people actually have
+- [x] `.xlsx` import — the format people actually have
 - [x] **Wide-format unpivot** — one row per case, `state1, ts1, state2, ts2, …`
 - [ ] **Multi-file merge** — several systems' exports assembled into one run, with source provenance
 - [ ] An id **crosswalk** for merging, when the systems do not agree on the case id
@@ -258,6 +258,28 @@ Excel's serial dates arriving inside a CSV, so the shape was half-anticipated an
 
 Listed as optional in Phase 1 and deferred there. **That was the wrong call** — the phase was about
 storage and this is about reach, so it belongs here, not as a rider on something unrelated.
+
+**As built (2.1 shipped).** `app/lib/mining/formats/xlsx.ts`. **No new dependency**: `jszip` was
+already in the tree for the guide exporter and the diagram diff, and an `.xlsx` is a zip of XML.
+
+**Dates are deliberately not interpreted.** A styled date cell is a number plus a format id, and
+chasing `numFmt` through the style table to decide what a cell *means* is where this kind of reader
+usually goes wrong. `parseTimestamp` → `excelSerialToMs` has understood Excel serials since long
+before this module existed, so a serial handed straight through is read correctly by the code that
+has always read them (T3653). One fewer thing to get wrong.
+
+**Three alignment traps, each pinned by a test**, because all three corrupt data silently rather than
+failing:
+- Excel **omits empty cells entirely**, so counting `<c>` elements shifts every later value one
+  column left — putting activities in the timestamp column. Cells are placed by their `r="B3"`
+  reference (T3648), and rows by their own `r=` (T3649).
+- Column references pass Z: `AA`, `BC`. A wide export really does reach them (T3656).
+- The header row is the first row with **anything** in it, because exported sheets routinely carry a
+  blank line or a title above the table (T3650).
+
+**Multi-sheet workbooks are offered, not silently narrowed.** Every sheet with rows is read; the first
+is staged and a picker appears when there is more than one, rather than importing sheet 1 and
+discarding the rest without a word.
 
 ### 2.2 Wide format — the shape most status reports actually come in
 
