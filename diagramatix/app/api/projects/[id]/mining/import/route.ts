@@ -7,7 +7,8 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
-import { prisma, pgPool } from "@/app/lib/db";
+import { prisma } from "@/app/lib/db";
+import { updateRunJson } from "@/app/lib/mining/runStore";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 import { gateFeature } from "@/app/lib/subscription-route";
@@ -87,10 +88,10 @@ export async function POST(req: Request, { params }: Params) {
   const run = await prisma.processMiningRun.create({
     data: { name, projectId: id, orgId, createdById: session?.user?.id ?? null },
   });
-  await pgPool.query(
-    'UPDATE "ProcessMiningRun" SET mapping = $1::jsonb, stats = $2::jsonb, variants = $3::jsonb, performance = $4::jsonb, analytics = $5::jsonb, "kpiConfig" = $6::jsonb, governance = $7::jsonb, "updatedAt" = NOW() WHERE id = $8',
-    [JSON.stringify(mapping), JSON.stringify(log.stats), JSON.stringify(log.variants), JSON.stringify(performance), JSON.stringify(analytics), JSON.stringify(kpiConfig), JSON.stringify(hasGovernance(governance) ? governance : null), run.id],
-  );
+  await updateRunJson(run.id, {
+    mapping, stats: log.stats, variants: log.variants, performance, analytics,
+    kpiConfig, governance: hasGovernance(governance) ? governance : null,
+  });
 
   return NextResponse.json({ run: { id: run.id, name, stats: log.stats } }, { status: 201 });
 }

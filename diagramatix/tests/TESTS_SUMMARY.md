@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-09-07  ·  **Document version:** 7.0  ·  **Suite:** 426 test files · 3,002 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T3680  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-09-07  ·  **Document version:** 7.0  ·  **Suite:** 434 test files · 3,084 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T3762  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
@@ -34,9 +34,9 @@ Each test file has its own section below, grouped into layers. Within each secti
 | **Protects you against** | In plain terms, the real-world problem that would occur if this behaviour regressed. |
 | **How it would break (go red)** | The kind of code or data change that would make this specific test fail — i.e. what the test is watching. |
 
-**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T3681**, the one after **T3682**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
+**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T3763**, the one after **T3764**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T3680`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
+> **Highest ref allocated: `T3762`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -2787,6 +2787,88 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 | T3678 | `tests/mining/merge-sources.test.ts` | An unparseable timestamp is kept and sorts last, so ONE place counts dropped rows. |
 | T3679 | `tests/mining/merge-sources.test.ts` | A two-column crosswalk becomes pairs; a row missing either id is not a pair. |
 | T3680 | `tests/mining/merge-sources.test.ts` | A crosswalk file of the wrong shape yields no pairs rather than nonsense. |
+| T3681 | `tests/mining/run-store.test.ts` | Only the columns in the patch are written. |
+| T3682 | `tests/mining/run-store.test.ts` | An ABSENT column is left alone; an explicit null writes NULL. |
+| T3683 | `tests/mining/run-store.test.ts` | Every value binds to its own placeholder, and the run id binds last. |
+| T3684 | `tests/mining/run-store.test.ts` | JSON columns are stringified and cast; the scalar reference id is neither. |
+| T3685 | `tests/mining/run-store.test.ts` | Conformance and its reference are written in ONE statement. |
+| T3686 | `tests/mining/run-store.test.ts` | Clearing a reference writes a real NULL, not a JSON null string. |
+| T3687 | `tests/mining/run-store.test.ts` | camelCase columns are quoted, or Postgres folds them to lower case. |
+| T3688 | `tests/mining/run-store.test.ts` | updatedAt moves on every patch. |
+| T3689 | `tests/mining/run-store.test.ts` | An empty patch produces NO statement rather than a broken one. |
+| T3690 | `tests/mining/run-store.test.ts` | The run id is bound, never interpolated. |
+| T3691 | `tests/mining/run-store.test.ts` | The only UPDATE of ProcessMiningRun in the tree is the one runStore builds. |
+| T3692 | `tests/mining/performance.test.ts` | A step lasts until the NEXT event; the last event of a case has no duration. |
+| T3693 | `tests/mining/performance.test.ts` | An out-of-order pair is discarded, not counted as negative time. |
+| T3694 | `tests/mining/performance.test.ts` | The clock unit follows the data, so durations stay human-scaled. |
+| T3695 | `tests/mining/performance.test.ts` | An empty log produces a usable shape, not a crash. |
+| T3696 | `tests/mining/performance.test.ts` | Inter-arrival is between case STARTS, in arrival order not log order. |
+| T3697 | `tests/mining/performance.test.ts` | One case has no inter-arrival, rather than a zero. |
+| T3698 | `tests/mining/performance.test.ts` | Team capacity is the MAXIMUM simultaneous cases, not the count. |
+| T3699 | `tests/mining/performance.test.ts` | Back-to-back work needs one person, not two. |
+| T3700 | `tests/mining/performance.test.ts` | Capacity is never zero, even for a single instant of work. |
+| T3701 | `tests/mining/performance.test.ts` | An activity is attributed to the team that does it most. |
+| T3702 | `tests/mining/performance.test.ts` | An unattributed event contributes no team - none is invented. |
+| T3703 | `tests/mining/performance.test.ts` | The hour histogram is Monday-first and counts every event. |
+| T3704 | `tests/mining/performance.test.ts` | A Sunday event lands in the last day of the week, not the first. |
+| T3705 | `tests/mining/heat.test.ts` | Heat is applied to a COPY - the saved discovered diagram is never repainted. |
+| T3706 | `tests/mining/heat.test.ts` | Existing element properties survive the repaint. |
+| T3707 | `tests/mining/heat.test.ts` | An element whose label is not an activity is left uncoloured. |
+| T3708 | `tests/mining/heat.test.ts` | The slowest step is hotter than the quickest (probed on blue, not red). |
+| T3709 | `tests/mining/heat.test.ts` | Every offered metric colours something. |
+| T3710 | `tests/mining/heat.test.ts` | The gradient is clamped, hits its three stops, and cools monotonically. |
+| T3711 | `tests/mining/heat.test.ts` | An unknown metric falls back rather than colouring everything the same. |
+| T3712 | `tests/mining/export-analysis.test.ts` | One chapter, titled with the run's own name. |
+| T3713 | `tests/mining/export-analysis.test.ts` | The summary reports the run's real counts. |
+| T3714 | `tests/mining/export-analysis.test.ts` | Every section a reader expects is present. |
+| T3715 | `tests/mining/export-analysis.test.ts` | Bottlenecks are listed worst-first, because that is the point. |
+| T3716 | `tests/mining/export-analysis.test.ts` | With NO SLA there is no outcome section at all. |
+| T3717 | `tests/mining/export-analysis.test.ts` | With an SLA the on-time/late split is reported, and it is the real split. |
+| T3718 | `tests/mining/export-analysis.test.ts` | A variant path renders as a path, not as a raw array. |
+| T3719 | `tests/mining/export-analysis.test.ts` | The four standard spreadsheet sheets are always produced. |
+| T3720 | `tests/mining/export-analysis.test.ts` | The Outcomes sheet appears only when an SLA is set. |
+| T3721 | `tests/mining/export-analysis.test.ts` | Durations are NUMBERS in the run's clock unit, not formatted text. |
+| T3722 | `tests/mining/export-analysis.test.ts` | Every case is listed with its variant and cycle time. |
+| T3723 | `tests/mining/export-analysis.test.ts` | The Late? column is blank without an SLA and decided with one. |
+| T3724 | `tests/mining/export-analysis.test.ts` | A one-case run with no timing still exports rather than throwing. |
+| T3725 | `tests/mining/pull-buffer.test.ts` | A file whose columns are in a different order is realigned, not appended raw. |
+| T3726 | `tests/mining/pull-buffer.test.ts` | A column the source does not know about is dropped. |
+| T3727 | `tests/mining/pull-buffer.test.ts` | A column the file is missing becomes empty, not undefined. |
+| T3728 | `tests/mining/pull-buffer.test.ts` | Values are stringified, so a numeric cell does not arrive as a number. |
+| T3729 | `tests/mining/pull-buffer.test.ts` | The buffer accumulates onto what is already there. |
+| T3730 | `tests/mining/pull-buffer.test.ts` | Over the cap it drops the OLDEST, keeping the most recent window. |
+| T3731 | `tests/mining/pull-buffer.test.ts` | A source with no cap set gets the default, not a cap of zero. |
+| T3732 | `tests/mining/pull-buffer.test.ts` | The counter records what the buffer HOLDS; the return value is what ARRIVED. |
+| T3733 | `tests/mining/pull-buffer.test.ts` | An empty delivery writes nothing - lastIngestAt stays put for staleness alarms. |
+| T3734 | `tests/mining/pull-buffer.test.ts` | A source with no headerFields yet produces empty rows rather than throwing. |
+| T3735 | `tests/mining/refresh-run.test.ts` | A source with no run does nothing at all. |
+| T3736 | `tests/mining/refresh-run.test.ts` | A mapping missing a required role refuses rather than rebuilding from nothing. |
+| T3737 | `tests/mining/refresh-run.test.ts` | An empty buffer refuses to touch the discovered diagrams. |
+| T3738 | `tests/mining/refresh-run.test.ts` | The aggregates are recomputed from the buffer. |
+| T3739 | `tests/mining/refresh-run.test.ts` | kpiConfig is NOT written, so a live refresh cannot clear the SLA. |
+| T3740 | `tests/mining/refresh-run.test.ts` | governance is written as NULL when the log has no GRC columns. |
+| T3741 | `tests/mining/refresh-run.test.ts` | The source is stamped as refreshed. |
+| T3742 | `tests/mining/refresh-run.test.ts` | No discovered diagrams means no diagram writes. |
+| T3743 | `tests/mining/refresh-run.test.ts` | An existing discovered BPMN is rebuilt in place. |
+| T3744 | `tests/mining/refresh-run.test.ts` | An existing discovered state machine is rebuilt in place. |
+| T3745 | `tests/mining/refresh-run.test.ts` | Conformance re-runs against the chosen reference and is persisted. |
+| T3746 | `tests/mining/refresh-run.test.ts` | With no reference chosen, conformance is left alone rather than cleared. |
+| T3747 | `tests/mining/recompute.test.ts` | A source buffer means everything can be recomputed for real. |
+| T3748 | `tests/mining/recompute.test.ts` | An EMPTY buffer is not a live run. |
+| T3749 | `tests/mining/recompute.test.ts` | The four per-event fields are refused BY NAME, with a reason. |
+| T3750 | `tests/mining/recompute.test.ts` | Each existing artefact is rebuilt, and only the ones that exist. |
+| T3751 | `tests/mining/recompute.test.ts` | A run with nothing to rebuild says so rather than reporting success. |
+| T3752 | `tests/mining/recompute.test.ts` | The message never claims the imported figures changed. |
+| T3753 | `tests/mining/recompute.test.ts` | A run with no stored variants is impossible to rebuild, and says re-import. |
+| T3754 | `tests/mining/recompute.test.ts` | ...unless it is live, in which case the buffer wins. |
+| T3755 | `tests/mining/run-store.test.ts` | Mining never writes a diagram's data by hand either. |
+| T3756 | `tests/mining/example-data-shape.test.ts` | Every baked example package validates, by the capture tool's own check. |
+| T3757 | `tests/mining/example-data-shape.test.ts` | Every example has a run with a log in it. |
+| T3758 | `tests/mining/example-data-shape.test.ts` | Every run carries the CURRENT analytics shape - a stale bake fails here. |
+| T3759 | `tests/mining/example-data-shape.test.ts` | The per-event vectors line up with the events they describe. |
+| T3760 | `tests/mining/example-data-shape.test.ts` | Every resource index points at a real name, or at nothing. |
+| T3761 | `tests/mining/example-data-shape.test.ts` | The case index and the stats agree about how many cases there are. |
+| T3762 | `tests/mining/example-data-shape.test.ts` | Variant frequencies add up to the case count. |
 
 > **Keep this section in sync.** Whenever an e2e spec is added, removed, or changes what it asserts, update this section. It is hand-maintained, not generated.
 

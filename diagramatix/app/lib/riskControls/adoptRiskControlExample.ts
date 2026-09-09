@@ -7,7 +7,8 @@
  *
  * Extracted from the route so it can be unit-tested + reused by the demo seed.
  */
-import { prisma, pgPool } from "@/app/lib/db";
+import { prisma } from "@/app/lib/db";
+import { updateRunJson } from "@/app/lib/mining/runStore";
 import { createLibraryFrom } from "./seedO2c";
 import { checkTransitionConformance, type ReferenceSm } from "@/app/lib/mining/transitionConformance";
 import type { RiskControlExamplePackage } from "./examplePackage";
@@ -74,10 +75,10 @@ export async function adoptRiskControlExample(pkg: RiskControlExamplePackage, ct
     if (refPkgDiag && refSmId) {
       const conf = checkTransitionConformance(m.run.variants, { elements: refPkgDiag.data.elements, connectors: refPkgDiag.data.connectors } as ReferenceSm);
       const run = await prisma.processMiningRun.create({ data: { name: m.run.name, projectId: project.id, orgId: ctx.orgId, createdById: ctx.userId, referenceSmId: refSmId } });
-      await pgPool.query(
-        'UPDATE "ProcessMiningRun" SET mapping=$1::jsonb, stats=$2::jsonb, variants=$3::jsonb, performance=$4::jsonb, conformance=$5::jsonb, governance=$6::jsonb, "updatedAt"=NOW() WHERE id=$7',
-        [JSON.stringify(m.run.mapping), JSON.stringify(m.run.stats), JSON.stringify(m.run.variants), JSON.stringify(m.run.performance), JSON.stringify(conf), m.run.governance ? JSON.stringify(m.run.governance) : null, run.id],
-      );
+      await updateRunJson(run.id, {
+        mapping: m.run.mapping, stats: m.run.stats, variants: m.run.variants,
+        performance: m.run.performance, conformance: conf, governance: m.run.governance ?? null,
+      });
     }
   }
 

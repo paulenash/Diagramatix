@@ -7,7 +7,7 @@
 | **This document** | The **live worklist** for building them. Every phase names the files it touches and the existing functions it reuses. The review is the historical argument; this is the burn-down. |
 | **Scope** | All 8 extensions + all 11 smaller items. Nothing dropped — two are **re-specified** rather than built as written, and each says why on its face. |
 | **How to use** | Work an item, tick its box, set **Status** → `In progress` / `Shipped (<commit>)` / `Won't do (<reason>)`. Record what actually happened — including deviations — in the phase's own **As built** paragraph, so this doubles as a decision log. |
-| **Progress log** | **2026-09-09** — **2.3 SHIPPED** (T3657–T3680): several systems merge into one lifecycle, ids unified by shared key or crosswalk (union-find, so chains resolve), a refusal when nothing overlaps, and CROSS-SYSTEM HANDOVER measured at the join — the days nobody owns, which neither export contains. **0.2 SHIPPED**: the console went 1,183 → 153 lines (44 `useState` → 5) into `console/ImportPanel`, `console/RunList`, `console/RunDetail`. **No tab shell** — this plan's own text contradicted itself and the e2e settled it. Which turned up the next thing: that e2e looked for a button renamed months ago, so the Miner's only route-level coverage was failing before it reached what it covered. **2.1 SHIPPED** (T3647–T3656): `.xlsx` read directly, no new dependency. **2.2 SHIPPED** (T3631–T3646): wide exports expand to one row per event. — Plan written. Reconnaissance found **four things the review got wrong** and **one it does not mention at all** (the gating hole), all recorded below against the item they affect. **Step 1 SHIPPED**: 20 of 26 mining routes now carry a subscription gate (was 3), the three dormant tier keys are enforced, and `tests/mining/route-gating.test.ts` (T3609–T3613) enumerates the route tree so the twenty-seventh route cannot be added ungated. **Phase 1 SHIPPED** (T3614–T3630) — and its budget test found a CRASH: `Math.min(...xs)` threw past ~125k elements in three places, so any log beyond ~125,000 events could not be imported at all. **Phase 8 ADDED** after Paul asked whether the plan gave the user a course of action; it did not, and neither does the review. The cut line moved to after it. **Phase 2 ADDED** — three input questions the plan could not answer: no `.xlsx`, wide-format exports silently read as one event, and no way to merge several systems' exports of the same cases. Placed second, because a user who cannot load their export is not reached by anything else. Phases 2–10 renumbered to 3–11. |
+| **Progress log** | **2026-09-09** — **PHASE 0 COMPLETE** (0.3–0.6, T3681–T3762): the recompute contract refuses the four per-event fields by name rather than approximating them from variants; a test floor under the five untested modules; eleven hand-written run-JSON statements (not six) became one patch helper with a guard that was proved to fire; and **0.5 answered on evidence — the generator is deterministic, the baked catalog was merely STALE, and all five examples had been teaching pre-Phase-1 analytics since Phase 1 shipped ahead of its own gate.** **2.3 SHIPPED** (T3657–T3680): several systems merge into one lifecycle, ids unified by shared key or crosswalk (union-find, so chains resolve), a refusal when nothing overlaps, and CROSS-SYSTEM HANDOVER measured at the join — the days nobody owns, which neither export contains. **0.2 SHIPPED**: the console went 1,183 → 153 lines (44 `useState` → 5) into `console/ImportPanel`, `console/RunList`, `console/RunDetail`. **No tab shell** — this plan's own text contradicted itself and the e2e settled it. Which turned up the next thing: that e2e looked for a button renamed months ago, so the Miner's only route-level coverage was failing before it reached what it covered. **2.1 SHIPPED** (T3647–T3656): `.xlsx` read directly, no new dependency. **2.2 SHIPPED** (T3631–T3646): wide exports expand to one row per event. — Plan written. Reconnaissance found **four things the review got wrong** and **one it does not mention at all** (the gating hole), all recorded below against the item they affect. **Step 1 SHIPPED**: 20 of 26 mining routes now carry a subscription gate (was 3), the three dormant tier keys are enforced, and `tests/mining/route-gating.test.ts` (T3609–T3613) enumerates the route tree so the twenty-seventh route cannot be added ungated. **Phase 1 SHIPPED** (T3614–T3630) — and its budget test found a CRASH: `Math.min(...xs)` threw past ~125k elements in three places, so any log beyond ~125,000 events could not be imported at all. **Phase 8 ADDED** after Paul asked whether the plan gave the user a course of action; it did not, and neither does the review. The cut line moved to after it. **Phase 2 ADDED** — three input questions the plan could not answer: no `.xlsx`, wide-format exports silently read as one event, and no way to merge several systems' exports of the same cases. Placed second, because a user who cannot load their export is not reached by anything else. Phases 2–10 renumbered to 3–11. |
 
 **Status values:** `Not started` · `In progress` · `Shipped (<commit>)` · `Blocked (<on what>)` · `Won't do (<reason>)`
 
@@ -68,7 +68,7 @@ cannot. Phase 0.3 makes that distinction explicit rather than letting it be disc
 
 ## Phase 0 — Foundations (blocking)
 
-**Status:** `In progress` — 0.1 + 0.2 shipped; 0.3–0.6 not started.
+**Status:** ✅ `Shipped` — 0.1 to 0.6 all done.
 
 Nothing here is a feature. All of it is a prerequisite, and each item costs an hour now and a week
 later.
@@ -154,39 +154,164 @@ That is the first time this phase's stated verification has meant anything.
 Verified: `tsc` clean, `npx vitest run tests/mining` 187 green, `npm run build` green,
 `e2e/mining-examples.spec.ts` 6 passed.
 
-### 0.3 State the recompute contract, and build the honest half
+### 0.3 State the recompute contract, and build the honest half ✅
 
-- [ ] `POST runs/[runId]/recompute`
+**Status:** ✅ `Shipped` — T3747–T3754.
 
-The contract: a run recomputes **from what is stored** — `variants`, `analytics`, `performance` —
-never from raw events, which do not exist. Conformance, variant analyses, outcome splits and report
-content recompute. Anything needing per-event data is **refused by name** with "re-import the log",
-never silently approximated. Live runs get the real thing by reusing `refreshRunFromSource` against
-`MiningSource.buffer`.
+- [x] `POST runs/[runId]/recompute`
+- [x] `app/lib/mining/recompute.ts` — the contract as a pure, testable plan
+
+The contract: a run recomputes **from what is stored** — never from raw events, which do not exist.
+Live runs get the real thing by reusing `refreshRunFromSource` against `MiningSource.buffer`.
 
 Absorbs **smaller item 05** — correctly, rather than as advertised. See *Corrections*, below.
 
-### 0.4 A test floor under the modules about to change
+**As built.** "Recompute" sounds like one operation and is two, so `planRecompute()` decides which
+before anything runs:
 
-- [ ] Unit coverage for `exportAnalysis.ts`, `heat.ts`, `performance.ts`, `refreshRun.ts`, `pull.ts`
+- **`source`** — a live source with a non-empty buffer. Raw events still exist; rebuild everything.
+- **`stored`** — a manual import. Only what derives from `variants` is redone: the discovered
+  process, the discovered lifecycle, the conformance replay. All three are already pure over
+  `variants`, which is why this is possible at all.
+- **`impossible`** — no variants and no buffer. Says re-import, and does nothing.
 
-None has any today, and phases 1–4 change all of them. Route coverage is Playwright-only.
+**The refusing is the feature.** It would have been easy to recompute `performance` from
+`variants` — a variant knows its activity sequence and its frequency — and every duration would have
+looked plausible and been invented, because a variant has no timestamps, no resources and no
+attributes. So `stats`, `performance`, `analytics` and `governance` are each **refused by name with
+the reason**, carried as data rather than as prose in a route so the answer survives the next phase
+that adds a field (T3749). The response also never claims the imported figures changed (T3752), and a
+run with nothing to rebuild says so instead of reporting success (T3751).
 
-### 0.5 Decide the example-generator question
+**An empty buffer is not a live run** (T3748) — treating it as one would replace a real import with
+nothing. And source mode is checked *first*, so a live run whose variants were never written can
+still be rebuilt (T3754).
 
-- [ ] Regenerate-and-verify, or retire `scripts/gen-mining-examples.ts` and hand-maintain
+**An existing guard caught this route before it shipped.** T2941 — "every route that lays out a BPMN
+diagram passes `onDiagnostic`", written after Paul reported the editor showing no diagnostics —
+failed on the new route, which re-lays out a discovered process and discarded what the layout could
+not take at face value. A re-layout can dangle a reference exactly as an original can, and a diagram
+that *looks* fine is how those survive. Fixed before commit. Worth recording as evidence that the
+tripwire idiom this plan keeps reaching for actually earns its keep on code it never anticipated.
+
+**Named debt: the route has no caller yet.** Phase 0's regression bar is "no user-visible change",
+which means no button — and a tested route with no caller is precisely the `holdoutPct` pattern this
+plan opens by complaining about. So its consumer is stated rather than assumed: **Phase 5**, whose
+whole claim is that violation case lists are "pure over stored data, so every existing run gains this
+without re-import". That is this route. If Phase 5 is cut, this should be cut with it rather than
+left to accumulate.
+
+### 0.4 A test floor under the modules about to change ✅
+
+**Status:** ✅ `Shipped` — T3692–T3746 (55 tests across five files).
+
+- [x] `performance.ts` — T3692–T3704 · `heat.ts` — T3705–T3711 · `exportAnalysis.ts` — T3712–T3724
+- [x] `pull.ts` — T3725–T3734 · `refreshRun.ts` — T3735–T3746
+
+None had any coverage, and phases 1–4 change all of them.
+
+**Where the value is, module by module** — these were not written to a uniform template, because the
+five modules fail in quite different ways:
+
+- **`performance.ts`** is the one that turns a log into the simulation twin, so every number a mined
+  business case shows starts here. Pinned: a step lasts until the *next* event and the last event of
+  a case has none (T3692); team capacity is maximum *concurrency*, not a count (T3698); back-to-back
+  work needs one person, not two (T3699); an unattributed event invents no team (T3702); the
+  hour-of-week histogram is Monday-first, or the twin works weekends (T3703).
+- **`heat.ts`** returns a *copy* — mutating in place would repaint the user's saved discovered
+  diagram, silently (T3705).
+- **`exportAnalysis.ts`** is what leaves the building. A report is the worst place for a silent
+  defect, because a wrong duration reads as a fact. Pinned: durations are numbers in a spreadsheet,
+  not formatted text (T3721), and with no SLA there is no outcome section rather than a 100%
+  on-time claim against an SLA nobody set (T3716).
+- **`pull.ts`**'s buffer maths is the only place a live source's history is kept, and every way it
+  can go wrong is silent: a file whose columns arrive in a different order than last time is
+  realigned rather than appended raw (T3725), and the cap drops the *oldest* — slicing the other end
+  would freeze a run at its first N events and quietly stop it being live (T3730).
+- **`refreshRun.ts`** runs unattended, so its refusals matter more than its work: a source with no
+  run, or a mapping that lost its timestamp column, must stop rather than rebuild from nothing
+  (T3735, T3736).
+
+**Two of these encode rules that were previously kept only by omission** and are now kept explicitly:
+a live refresh must not clear the SLA (T3739), and must not clear a conformance result the user set
+by hand (T3746).
+
+**One test was wrong before the code was.** The first draft of T3708 probed the heat gradient on the
+red channel; the ramp runs pale blue → amber → red, so red *peaks* at the amber midpoint (251) and
+falls again at the hot end (220). Blue is the honest temperature channel. Worth recording because the
+assertion looked obviously right.
+
+### 0.5 Decide the example-generator question ✅
+
+**Status:** ✅ `Shipped` — **decision: regenerate and KEEP.** T3756–T3762.
+
+- [x] Regenerated, diffed, and pinned
 
 Line 486 writes `{ examples: [...] }` over `miningExampleData.json` **wholesale** — the same hazard
 that cost the Simulator three examples, where regenerating produced materially *worse* packages and
-the generator was retired. Phase 1 changes the shape baked into that 2.9 MB file. **Hard gate on
-Phase 1's exit criteria, not a nicety.**
+the generator was retired.
 
-### 0.6 One JSON-write helper
+**The decision was made on evidence, not on the analogy.** The generator was run and the output
+diffed against what was committed:
 
-- [ ] `updateRunJson(runId, patch)`
+- Every sample log reproduced **byte-for-byte** — the `mining/*.csv` files did not change at all.
+- Every case count, variant count, diagram and reference was identical across all five examples.
+- The **only** change was that all five packages gained the analytics fields Phase 1 added:
+  `detail: "full"`, a `resourceDict`, and per-case `durs`/`res` vectors. 12,107 inserted lines,
+  all of them that.
 
-All JSON persistence bypasses Prisma via raw `pgPool` SQL across six call sites, each an untyped
-column name inside a string literal. Phases 1, 6 and 9 each add a seventh.
+So this generator is deterministic and faithful, and the baked file was not at risk of being made
+worse — it was simply **stale**. The opposite of the Simulator's problem, and the fix was to run it.
+
+**This closes Risk 1, and it was a live defect rather than a hypothetical one.** Phase 1 shipped
+ahead of this gate, so since then all five catalog examples had been carrying pre-Phase-1 analytics —
+including `live-order-processing`, which adopts a pre-created run and would have taught the previous
+version of the views it exists to demonstrate.
+
+**Pinned so it cannot recur** (`tests/mining/example-data-shape.test.ts`). The generator is *not* run
+in the test — it writes files and takes seconds — but the properties of its output are asserted, so a
+bake left behind by a later phase fails in CI: the current analytics shape is present (T3758), the
+per-event vectors line up with the events they describe (T3759), resource indices point at real names
+(T3760), and the case index agrees with the stats (T3761). **Verified by running them against the
+pre-regeneration file: T3758 and T3759 fail on it and pass on the new one.**
+
+### 0.6 One JSON-write helper ✅
+
+**Status:** ✅ `Shipped` — T3681–T3691, T3755.
+
+- [x] `app/lib/mining/runStore.ts` — `updateRunJson(runId, patch)` + `runPatchSql`
+- [x] `app/lib/mining/diagramStore.ts` — `writeDiagramData(id, data)`
+- [x] Tree-scanning guards so a later phase cannot add another by hand
+
+All JSON persistence bypasses Prisma via raw `pgPool` SQL, each an untyped column name inside a
+string literal. Phases 1, 6 and 9 each add another.
+
+**As built — there were eleven, not six.** `import`, `import-ocel`, `conformance`, `runs/[runId]`,
+`snapshot`, `sources`, `refreshRun` (×2), `adoptMiningPackage` (×2, inside a Prisma transaction) and
+`adoptRiskControlExample`. Two of them are transactional, so the helper exposes `runPatchSql`
+separately and those run it on the transaction client — an adopt that half-committed would leave a
+run with scalars but no log.
+
+**The patch object is the point, not the tidiness.** A patch cannot get wrong the three things eleven
+hand-written statements each could: which columns are touched, which `$n` each value binds to, and
+the difference between "leave this column alone" (`undefined`) and "write NULL" (`null`). That last
+one is not pedantry — `kpiConfig` must survive a live refresh and `governance` must be *clearable*
+when a re-import finds no GRC columns, and both were previously kept only by remembering to omit or
+include the right column in the right literal (T3682, and T3739/T3740 in 0.4).
+
+**`referenceSmId` is allowed through despite not being JSON**, because the conformance write must be
+atomic with it: a run whose result and reference disagree is worse than either being stale (T3685).
+It is passed as text, not stringified — quoting it would store `"diag-7"` *with* the quotes and
+quietly break every reference lookup (T3684).
+
+**Same hazard, one table over.** The five hand-written `UPDATE "Diagram" SET data` statements in the
+mining paths became `writeDiagramData`. Deliberately tiny and mining-scoped — the editor has its own
+much larger save path with autosave and versioning, and nothing here should look like an invitation
+to bypass it.
+
+**Both guards were proved to fail** by planting an offending statement: T3691 (runs) and T3755
+(diagrams) each caught it, then went green again on removal. A guard that scans a file tree is worth
+exactly nothing until it has been seen to fire.
 
 **Regression bar for the whole phase:** no user-visible change whatsoever.
 
@@ -438,9 +563,11 @@ XES/OCEL export, but the analytics index takes case attributes from the FIRST ev
 what is filterable is the system a case *started* in. Per-event provenance has no home in the index
 until the handover work, and the UI says so rather than implying the map is already there.
 
-**Deferred from this slice:** `parseAnyLog.ts` was not created. The dispatch it would centralise is
-eleven lines inside `onFile`, and extracting it while the OCEL/XES/wide branches are still moving
-would be churn. `.xlsx` shipped in 2.1, so the merge inherits workbooks for free.
+**Correction to the note first written here.** It said `parseAnyLog.ts` "was not created". It already
+exists and has since the pull connectors shipped — `pull.ts` uses it for every file it downloads. What
+is true is narrower: the *console's* `onFile` is a near-duplicate of it that additionally handles
+`.xlsx` and the OCEL-study branch, and converging the two is still outstanding. `.xlsx` shipped in
+2.1, so the merge inherits workbooks either way.
 
 **Reuses.** `guessMapping`, `parseCsv`, `parseTimestamp`, `buildEventLog` — all unchanged.
 

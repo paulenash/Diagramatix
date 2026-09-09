@@ -6,7 +6,9 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
-import { prisma, pgPool } from "@/app/lib/db";
+import { prisma } from "@/app/lib/db";
+import { updateRunJson } from "@/app/lib/mining/runStore";
+import { writeDiagramData } from "@/app/lib/mining/diagramStore";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 import { gateFeature } from "@/app/lib/subscription-route";
@@ -45,10 +47,9 @@ export async function POST(req: Request, { params }: Params) {
   const variants = (run.variants ?? []) as unknown as Variant[];
   const result = checkTransitionConformance(variants, (ref.data ?? { elements: [], connectors: [] }) as unknown as ReferenceSm);
 
-  await pgPool.query(
-    'UPDATE "ProcessMiningRun" SET conformance = $1::jsonb, "referenceSmId" = $2, "updatedAt" = NOW() WHERE id = $3',
-    [JSON.stringify(result), referenceSmId, runId],
-  );
+  // One statement: a run whose result and reference disagree is worse than
+  // either being stale.
+  await updateRunJson(runId, { conformance: result, referenceSmId });
 
   // Paint the illegal (undocumented) transitions red on the DISCOVERED state
   // machine so the count badges show which moves the reference disallows.
@@ -56,7 +57,7 @@ export async function POST(req: Request, { params }: Params) {
     const disc = await prisma.diagram.findFirst({ where: { id: run.discoveredSmId, projectId: id, type: "state-machine" }, select: { data: true } });
     if (disc?.data) {
       const flagged = flagIllegalTransitions(disc.data as unknown as DiagramData, result.transitionStats);
-      await pgPool.query('UPDATE "Diagram" SET data = $1::jsonb, "updatedAt" = NOW() WHERE id = $2', [JSON.stringify(flagged), run.discoveredSmId]);
+      await writeDiagramData(run.discoveredSmId, flagged);
     }
   }
 

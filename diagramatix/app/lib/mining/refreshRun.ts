@@ -7,7 +7,9 @@
  * pure pipeline functions as the interactive importer; only deterministic
  * discovery is re-run automatically (AI discovery costs quota and stays manual).
  */
-import { prisma, pgPool } from "@/app/lib/db";
+import { prisma } from "@/app/lib/db";
+import { updateRunJson } from "./runStore";
+import { writeDiagramData } from "./diagramStore";
 import { buildEventLog } from "./parseEventLog";
 import { computePerformance } from "./performance";
 import { computeAnalytics } from "./analytics";
@@ -45,11 +47,12 @@ export async function refreshRunFromSource(source: RefreshableSource): Promise<R
   const analytics = computeAnalytics(log);
   const governance = computeGovernance(log.traces);
 
-  // kpiConfig is preserved (not overwritten) across a live refresh.
-  await pgPool.query(
-    'UPDATE "ProcessMiningRun" SET stats = $1::jsonb, variants = $2::jsonb, performance = $3::jsonb, analytics = $4::jsonb, governance = $5::jsonb, "updatedAt" = NOW() WHERE id = $6',
-    [JSON.stringify(log.stats), JSON.stringify(log.variants), JSON.stringify(performance), JSON.stringify(analytics), JSON.stringify(hasGovernance(governance) ? governance : null), source.runId],
-  );
+  // kpiConfig is preserved across a live refresh — it is absent from the patch,
+  // which is what "leave this column alone" now looks like.
+  await updateRunJson(source.runId, {
+    stats: log.stats, variants: log.variants, performance, analytics,
+    governance: hasGovernance(governance) ? governance : null,
+  });
 
   const run = await prisma.processMiningRun.findUnique({
     where: { id: source.runId },
@@ -61,7 +64,7 @@ export async function refreshRunFromSource(source: RefreshableSource): Promise<R
     if (run.discoveredBpmnId) {
       const { plan } = discoverProcess(log.variants, { edgeThreshold: 0 });
       const data = badgeEdgeCounts(layoutBpmnDiagram(plan.elements, plan.connections)); // no promptLabel → no "AI Generated" tag
-      await pgPool.query('UPDATE "Diagram" SET data = $1::jsonb, "updatedAt" = NOW() WHERE id = $2', [JSON.stringify(data), run.discoveredBpmnId]);
+      await writeDiagramData(run.discoveredBpmnId, data);
     }
     // Re-discover the state machine in place (deterministic mirror + frequencies).
     let smData: DiagramData | null = run.discoveredSmId ? discoverStateMachine(log.variants) : null;
@@ -71,12 +74,12 @@ export async function refreshRunFromSource(source: RefreshableSource): Promise<R
       const ref = await prisma.diagram.findFirst({ where: { id: run.referenceSmId, type: "state-machine" }, select: { data: true } });
       if (ref) {
         const result = checkTransitionConformance(log.variants, (ref.data ?? { elements: [], connectors: [] }) as unknown as ReferenceSm);
-        await pgPool.query('UPDATE "ProcessMiningRun" SET conformance = $1::jsonb, "updatedAt" = NOW() WHERE id = $2', [JSON.stringify(result), source.runId]);
+        await updateRunJson(source.runId, { conformance: result });
         if (smData) smData = flagIllegalTransitions(smData, result.transitionStats);
       }
     }
     if (run.discoveredSmId && smData) {
-      await pgPool.query('UPDATE "Diagram" SET data = $1::jsonb, "updatedAt" = NOW() WHERE id = $2', [JSON.stringify(smData), run.discoveredSmId]);
+      await writeDiagramData(run.discoveredSmId, smData);
     }
   }
 

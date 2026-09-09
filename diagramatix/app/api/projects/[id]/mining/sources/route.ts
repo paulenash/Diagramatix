@@ -8,6 +8,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma, pgPool } from "@/app/lib/db";
+import { updateRunJson } from "@/app/lib/mining/runStore";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 import { gateFeature } from "@/app/lib/subscription-route";
@@ -68,7 +69,7 @@ export async function POST(req: Request, { params }: Params) {
   const run = await prisma.processMiningRun.create({
     data: { name, projectId: id, orgId, createdById: session?.user?.id ?? null },
   });
-  await pgPool.query('UPDATE "ProcessMiningRun" SET mapping = $1::jsonb, "updatedAt" = NOW() WHERE id = $2', [JSON.stringify(mapping), run.id]);
+  await updateRunJson(run.id, { mapping });
 
   const minted = kind === "webhook" ? mintIngestKey() : null;
   const source = await prisma.miningSource.create({

@@ -10,6 +10,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma, pgPool } from "@/app/lib/db";
+import { writeDiagramData } from "@/app/lib/mining/diagramStore";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 import { gateFeature } from "@/app/lib/subscription-route";
@@ -78,7 +79,7 @@ export async function POST(_req: Request, { params }: Params) {
 
   // ── Calibrate ──
   const cal = calibrateSimulation(baseData, perf);
-  await pgPool.query('UPDATE "Diagram" SET data = $1::jsonb, "updatedAt" = NOW() WHERE id = $2', [JSON.stringify(cal.data), bpmnId]);
+  await writeDiagramData(bpmnId, cal.data);
 
   // Mined working calendar (upsert by name).
   const CAL_NAME = "Working hours (mined)";

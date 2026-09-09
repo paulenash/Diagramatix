@@ -11,7 +11,8 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { randomUUID } from "node:crypto";
 import { auth } from "@/auth";
-import { prisma, pgPool } from "@/app/lib/db";
+import { prisma } from "@/app/lib/db";
+import { updateRunJson } from "@/app/lib/mining/runStore";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 import { gateFeature } from "@/app/lib/subscription-route";
@@ -92,10 +93,10 @@ export async function POST(req: Request, { params }: Params) {
       },
       select: { id: true },
     });
-    await pgPool.query(
-      'UPDATE "ProcessMiningRun" SET mapping = $1::jsonb, stats = $2::jsonb, variants = $3::jsonb, performance = $4::jsonb, governance = $5::jsonb, "updatedAt" = NOW() WHERE id = $6',
-      [JSON.stringify(t.mapping), JSON.stringify(t.log.stats), JSON.stringify(t.log.variants), JSON.stringify(t.performance), JSON.stringify(t.governance), run.id],
-    );
+    await updateRunJson(run.id, {
+      mapping: t.mapping, stats: t.log.stats, variants: t.log.variants,
+      performance: t.performance, governance: t.governance,
+    });
     runs.push({ id: run.id, objectType: t.objectType, cases: t.log.stats.cases });
   }
 

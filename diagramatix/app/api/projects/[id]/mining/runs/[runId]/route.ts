@@ -8,7 +8,8 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
-import { prisma, pgPool } from "@/app/lib/db";
+import { prisma } from "@/app/lib/db";
+import { updateRunJson } from "@/app/lib/mining/runStore";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 import { gateFeature } from "@/app/lib/subscription-route";
@@ -61,7 +62,7 @@ export async function PATCH(req: Request, { params }: Params) {
   if (Object.keys(data).length > 0) await prisma.processMiningRun.update({ where: { id: runId }, data });
   if (hasKpi) {
     const kpi = body.kpiConfig && typeof body.kpiConfig === "object" ? body.kpiConfig : null;
-    await pgPool.query('UPDATE "ProcessMiningRun" SET "kpiConfig" = $1::jsonb, "updatedAt" = NOW() WHERE id = $2', [JSON.stringify(kpi), runId]);
+    await updateRunJson(runId, { kpiConfig: kpi });
   }
   return NextResponse.json({ ok: true, id: runId, ...data });
 }

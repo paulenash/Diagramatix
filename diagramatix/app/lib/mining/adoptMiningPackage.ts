@@ -10,6 +10,7 @@
  * Mirrors app/lib/simulation/adoptPackage.ts.
  */
 import { prisma } from "@/app/lib/db";
+import { runPatchSql } from "./runStore";
 import type { MiningExamplePackage, MiningExampleRun } from "./examplePackage";
 
 export interface AdoptMiningCtx {
@@ -132,7 +133,13 @@ export async function adoptMiningPackage(
         const run = await tx.processMiningRun.create({
           data: { name: r.name, projectId: project.id, orgId: ctx.orgId, createdById: ctx.userId, referenceSmId: refId, discoveredSmId: smId, ocelGroupId, objectType: r.objectType ?? null, domainDiagramId },
         });
-        await tx.$executeRaw`UPDATE "ProcessMiningRun" SET mapping = ${JSON.stringify(r.mapping)}::jsonb, stats = ${JSON.stringify(r.stats)}::jsonb, variants = ${JSON.stringify(r.variants)}::jsonb, performance = ${JSON.stringify(r.performance)}::jsonb, analytics = ${r.analytics ? JSON.stringify(r.analytics) : null}::jsonb, "kpiConfig" = ${r.kpiConfig ? JSON.stringify(r.kpiConfig) : null}::jsonb, governance = ${r.governance ? JSON.stringify(r.governance) : null}::jsonb, "updatedAt" = NOW() WHERE id = ${run.id}`;
+        {
+          const sql = runPatchSql(run.id, {
+            mapping: r.mapping, stats: r.stats, variants: r.variants, performance: r.performance,
+            analytics: r.analytics ?? null, kpiConfig: r.kpiConfig ?? null, governance: r.governance ?? null,
+          })!;
+          await tx.$executeRawUnsafe(sql.text, ...sql.values);
+        }
         await createTwin(r, run.id);
         firstRunId ??= run.id;
       }
@@ -161,7 +168,13 @@ export async function adoptMiningPackage(
     const run = await tx.processMiningRun.create({
       data: { name: r.name, projectId: project.id, orgId: ctx.orgId, createdById: ctx.userId, referenceSmId },
     });
-    await tx.$executeRaw`UPDATE "ProcessMiningRun" SET mapping = ${JSON.stringify(r.mapping)}::jsonb, stats = ${JSON.stringify(r.stats)}::jsonb, variants = ${JSON.stringify(r.variants)}::jsonb, performance = ${JSON.stringify(r.performance)}::jsonb, analytics = ${r.analytics ? JSON.stringify(r.analytics) : null}::jsonb, "kpiConfig" = ${r.kpiConfig ? JSON.stringify(r.kpiConfig) : null}::jsonb, governance = ${r.governance ? JSON.stringify(r.governance) : null}::jsonb, "updatedAt" = NOW() WHERE id = ${run.id}`;
+    {
+      const sql = runPatchSql(run.id, {
+        mapping: r.mapping, stats: r.stats, variants: r.variants, performance: r.performance,
+        analytics: r.analytics ?? null, kpiConfig: r.kpiConfig ?? null, governance: r.governance ?? null,
+      })!;
+      await tx.$executeRawUnsafe(sql.text, ...sql.values);
+    }
     await createTwin(r, run.id);
 
     return { projectId: project.id, projectName: project.name, runId: run.id, openDiagramId };
