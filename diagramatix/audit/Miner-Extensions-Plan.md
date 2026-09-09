@@ -7,7 +7,7 @@
 | **This document** | The **live worklist** for building them. Every phase names the files it touches and the existing functions it reuses. The review is the historical argument; this is the burn-down. |
 | **Scope** | All 8 extensions + all 11 smaller items. Nothing dropped — two are **re-specified** rather than built as written, and each says why on its face. |
 | **How to use** | Work an item, tick its box, set **Status** → `In progress` / `Shipped (<commit>)` / `Won't do (<reason>)`. Record what actually happened — including deviations — in the phase's own **As built** paragraph, so this doubles as a decision log. |
-| **Progress log** | **2026-09-09** — **0.2 SHIPPED**: the console went 1,183 → 153 lines (44 `useState` → 5) into `console/ImportPanel`, `console/RunList`, `console/RunDetail`. **No tab shell** — this plan's own text contradicted itself and the e2e settled it. Which turned up the next thing: that e2e looked for a button renamed months ago, so the Miner's only route-level coverage was failing before it reached what it covered. **2.1 SHIPPED** (T3647–T3656): `.xlsx` read directly, no new dependency. **2.2 SHIPPED** (T3631–T3646): wide exports expand to one row per event. — Plan written. Reconnaissance found **four things the review got wrong** and **one it does not mention at all** (the gating hole), all recorded below against the item they affect. **Step 1 SHIPPED**: 20 of 26 mining routes now carry a subscription gate (was 3), the three dormant tier keys are enforced, and `tests/mining/route-gating.test.ts` (T3609–T3613) enumerates the route tree so the twenty-seventh route cannot be added ungated. **Phase 1 SHIPPED** (T3614–T3630) — and its budget test found a CRASH: `Math.min(...xs)` threw past ~125k elements in three places, so any log beyond ~125,000 events could not be imported at all. **Phase 8 ADDED** after Paul asked whether the plan gave the user a course of action; it did not, and neither does the review. The cut line moved to after it. **Phase 2 ADDED** — three input questions the plan could not answer: no `.xlsx`, wide-format exports silently read as one event, and no way to merge several systems' exports of the same cases. Placed second, because a user who cannot load their export is not reached by anything else. Phases 2–10 renumbered to 3–11. |
+| **Progress log** | **2026-09-09** — **2.3 SHIPPED** (T3657–T3680): several systems merge into one lifecycle, ids unified by shared key or crosswalk (union-find, so chains resolve), a refusal when nothing overlaps, and CROSS-SYSTEM HANDOVER measured at the join — the days nobody owns, which neither export contains. **0.2 SHIPPED**: the console went 1,183 → 153 lines (44 `useState` → 5) into `console/ImportPanel`, `console/RunList`, `console/RunDetail`. **No tab shell** — this plan's own text contradicted itself and the e2e settled it. Which turned up the next thing: that e2e looked for a button renamed months ago, so the Miner's only route-level coverage was failing before it reached what it covered. **2.1 SHIPPED** (T3647–T3656): `.xlsx` read directly, no new dependency. **2.2 SHIPPED** (T3631–T3646): wide exports expand to one row per event. — Plan written. Reconnaissance found **four things the review got wrong** and **one it does not mention at all** (the gating hole), all recorded below against the item they affect. **Step 1 SHIPPED**: 20 of 26 mining routes now carry a subscription gate (was 3), the three dormant tier keys are enforced, and `tests/mining/route-gating.test.ts` (T3609–T3613) enumerates the route tree so the twenty-seventh route cannot be added ungated. **Phase 1 SHIPPED** (T3614–T3630) — and its budget test found a CRASH: `Math.min(...xs)` threw past ~125k elements in three places, so any log beyond ~125,000 events could not be imported at all. **Phase 8 ADDED** after Paul asked whether the plan gave the user a course of action; it did not, and neither does the review. The cut line moved to after it. **Phase 2 ADDED** — three input questions the plan could not answer: no `.xlsx`, wide-format exports silently read as one event, and no way to merge several systems' exports of the same cases. Placed second, because a user who cannot load their export is not reached by anything else. Phases 2–10 renumbered to 3–11. |
 
 **Status values:** `Not started` · `In progress` · `Shipped (<commit>)` · `Blocked (<on what>)` · `Won't do (<reason>)`
 
@@ -270,14 +270,14 @@ pre-existing `analytics` field, for all five catalog examples, with the new fiel
 
 ## Phase 2 — Getting the log in at all
 
-**Status:** `Not started` · **Added 2026-09-09**, after Paul asked three questions about input that
+**Status:** ✅ `Shipped` — 2.1, 2.2 and 2.3 all done. · **Added 2026-09-09**, after Paul asked three questions about input that
 this plan — and the review — had no answer to. **Placed second on purpose: if someone cannot load
 their export, no later phase matters to them.**
 
 - [x] `.xlsx` import — the format people actually have
 - [x] **Wide-format unpivot** — one row per case, `state1, ts1, state2, ts2, …`
-- [ ] **Multi-file merge** — several systems' exports assembled into one run, with source provenance
-- [ ] An id **crosswalk** for merging, when the systems do not agree on the case id
+- [x] **Multi-file merge** — several systems' exports assembled into one run, with source provenance
+- [x] An id **crosswalk** for merging, when the systems do not agree on the case id
 
 ### What already works, and is easy to mistake for a gap
 
@@ -365,7 +365,9 @@ ignored"* — and waits for the button.
 Events are sorted **by time, not by column order** (T3637): a spreadsheet's layout is not a claim
 about sequence.
 
-### 2.3 Several systems, one lifecycle
+### 2.3 Several systems, one lifecycle ✅
+
+**Status:** ✅ `Shipped` — T3657–T3680.
 
 Today a manual import creates one run per file, always. Only a **live source** accumulates, and only
 over the webhook.
@@ -390,14 +392,57 @@ Two things it needs that are not obvious from the requirement:
 file, and how many in only one. A merge where the two files share almost no cases is a crosswalk
 problem, and the user should be told that instead of being handed a run full of fragments.
 
-**Files.** `app/lib/mining/parseAnyLog.ts` (dispatch), a new `app/lib/mining/wideFormat.ts` (pure),
-a new `app/lib/mining/mergeSources.ts` (pure), `ProcessMiningConsole.tsx`'s import panel, and the
-file picker's `accept` list. An `.xlsx` reader is the only new dependency in the plan; the repo
-already hand-rolls an xlsx **writer** in `app/lib/riskControls/xlsx.ts`, so read the same way if the
-sheet shapes allow, rather than adding a library for one screen.
+**As built.** `app/lib/mining/mergeSources.ts` (pure) + `console/MergeCard.tsx`. The merged table is
+an ordinary long-format log with canonical column names, so `buildEventLog`, discovery, conformance
+and calibration are untouched and have no idea the log came from several systems.
 
-**Reuses.** `guessMapping`, `validateEventLogMapping` (the pre-import advisory panel already exists
-and is the right place to report ragged pairs and poor overlap), `buildEventLog` unchanged.
+**One call, not two.** `mergeSources()` returns the rows AND the assessment together, and the panel
+reads both off the same result. A separate "summarise the merge" function would have been the
+obvious shape and exactly the wrong one: the failure this phase exists to prevent is a merge that
+*looks* like it worked, and a summary computed independently of the rows can say it worked when it
+did not. Pinned by T3673 — the case count the banner promises is the case count the importer produces.
+
+**Ids are unified with union-find, not a pairwise map.** A crosswalk of `OPP-1 → MID-1` and
+`MID-1 → SO-9` describes ONE case across three systems; a pairwise lookup gives two, and a
+three-system case cut in half is invisible in every downstream number (T3664). Links via a shared
+business key go through the same structure, so a key and a crosswalk can be mixed.
+
+**The canonical id follows the FIRST source, not the alphabet** (T3665). Reversing the file order
+flips which system's ids the merged run speaks — which makes it the user's choice rather than an
+artefact of sorting.
+
+**Handover measurement is the payoff, and it is free here.** Walking the merged, time-ordered events
+and noting where the reporting system changes gives *how often* a case crosses from one system to the
+next and *the median wait* when it does. Neither export contains it — it only exists in the union —
+and this is the one moment both halves are in the same place. Two traps, both pinned: an event both
+systems report is not a handover (T3672, a 0-hour "wait" that would have flattered every merge), and
+a duplicate is counted and reported rather than de-duplicated, because which copy is redundant is a
+business question (T3670).
+
+**Honest floors.**
+- `verdict: "no-overlap"` **blocks the import** and names the two fixes (T3667). Silently merging
+  files that share no cases doubles the case count and halves every trace.
+- `verdict: "thin-overlap"` (under 5% shared) warns without blocking (T3668) — a crosswalk that
+  only half works looks like a successful import too.
+- Rows with no case id are dropped **and counted per source** (T3669); everything else, including an
+  unparseable timestamp, is passed through so `buildEventLog` stays the single authority on
+  "rows dropped" (T3678).
+
+**Privacy travels with the ROLE, not the column name.** "Hash this case id" is attached to a column
+called `opp` that ceases to exist at merge time; the instruction moves to `Case` (T3675), and where
+two systems disagree about a column the stricter mode wins (T3676) — if one system says a column
+identifies a person, it does.
+
+**Stated rather than implied:** every event carries its `Source system` into the log and its
+XES/OCEL export, but the analytics index takes case attributes from the FIRST event, so after import
+what is filterable is the system a case *started* in. Per-event provenance has no home in the index
+until the handover work, and the UI says so rather than implying the map is already there.
+
+**Deferred from this slice:** `parseAnyLog.ts` was not created. The dispatch it would centralise is
+eleven lines inside `onFile`, and extracting it while the OCEL/XES/wide branches are still moving
+would be churn. `.xlsx` shipped in 2.1, so the merge inherits workbooks for free.
+
+**Reuses.** `guessMapping`, `parseCsv`, `parseTimestamp`, `buildEventLog` — all unchanged.
 
 ---
 

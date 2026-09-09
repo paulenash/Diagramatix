@@ -21,13 +21,18 @@ import { parseXes } from "@/app/lib/mining/formats/xes";
 import { parseOcel } from "@/app/lib/mining/formats/ocel";
 import { parseXlsx, type XlsxSheet } from "@/app/lib/mining/formats/xlsx";
 import { detectWideSpec, unpivotWide, describeWideSpec, type WideSpec, type UnpivotResult } from "@/app/lib/mining/wideFormat";
+import { mergeSources, parseCrosswalk, type Crosswalk, type MergeSource } from "@/app/lib/mining/mergeSources";
 import { validateEventLogMapping } from "@/app/lib/mining/validateLog";
 import { enrichResources, enrichStates } from "@/app/lib/mining/enrich";
 import { activityToState } from "@/app/lib/mining/stateNaming";
 import type { LogMapping } from "@/app/lib/mining/types";
 import type { DiagramData } from "@/app/lib/diagram/types";
 import { MiningLogViewer } from "../MiningLogViewer";
+import { MergeCard } from "./MergeCard";
 import { INPUT_CLASS as inp, ROLES, type SampleScenario } from "./shared";
+
+/** Strip a file extension, for turning a file name into a default label. */
+const EXT_RE = /\.[^.]+$/;
 
 export interface ImportPanelProps {
   projectId: string;
@@ -56,6 +61,16 @@ export function ImportPanel({ projectId, onImported, openDiagram, stashReturn }:
   // Sheets from a workbook, so a multi-sheet file does not silently lose the
   // ones that were not first.
   const [xlsxSheets, setXlsxSheets] = useState<XlsxSheet[]>([]);
+
+  // ── Merging several systems (Phase 2.3) ──────────────────────────────────
+  // Exports already committed to the merge. The file still in the staging area
+  // joins them IMPLICITLY, so the last file does not have to be "added" before
+  // importing — forgetting to would quietly drop a whole system.
+  const [committed, setCommitted] = useState<MergeSource[]>([]);
+  const [stagingName, setStagingName] = useState("");
+  const [stagingLink, setStagingLink] = useState("");
+  const [crosswalk, setCrosswalk] = useState<Crosswalk | null>(null);
+  const [crosswalkName, setCrosswalkName] = useState<string | null>(null);
 
   // Choosable scenarios (an example may ship several period logs to pick between).
   const [scenarios, setScenarios] = useState<SampleScenario[] | null>(null);
@@ -91,6 +106,8 @@ export function ImportPanel({ projectId, onImported, openDiagram, stashReturn }:
     setHeaders(h); setRows(r);
     setMapping(map); setEnrichMsg(null);
     setRunName(runLabel ?? name.replace(/\.[^.]+$/, ""));
+    setStagingName(name.replace(EXT_RE, ""));
+    setStagingLink("");
     setScenarioIdx(-1);
   }, []);
 
@@ -250,19 +267,81 @@ export function ImportPanel({ projectId, onImported, openDiagram, stashReturn }:
     [headers, rows, mapping],
   );
 
+  // The file currently in the staging area, as a merge source. Only once its
+  // three required roles are mapped — a half-mapped file would drag the whole
+  // assessment down and read as a crosswalk problem.
+  const stagedSource: MergeSource | null = useMemo(() => (
+    canImport
+      ? { id: "staging", name: stagingName || fileName || "This file", headers, rows, mapping, linkColumn: stagingLink || undefined }
+      : null
+  ), [canImport, stagingName, fileName, headers, rows, mapping, stagingLink]);
+
+  const mergeList = useMemo(
+    () => (stagedSource ? [...committed, stagedSource] : committed),
+    [committed, stagedSource],
+  );
+  const stagingIdx = stagedSource ? mergeList.length - 1 : -1;
+  const merging = mergeList.length >= 2;
+
+  // ONE call. The banner the user reads and the rows that get imported come from
+  // the same result, so there is no second calculation that could disagree.
+  const merge = useMemo(
+    () => (merging ? mergeSources(mergeList, crosswalk ?? undefined) : null),
+    [merging, mergeList, crosswalk],
+  );
+  const mergeBlocked = merge?.assessment.verdict === "no-overlap";
+
+  /** Commit the staged file to the merge and clear the staging area for the next. */
+  const addToMerge = () => {
+    if (!stagedSource) return;
+    setCommitted((c) => [...c, { ...stagedSource, id: `src-${c.length}-${Date.now()}` }]);
+    setFileName(null); setHeaders([]); setRows([]); setWide(null); setWideResult(null);
+    setMapping({}); setXlsxSheets([]); setStagingName(""); setStagingLink("");
+  };
+
+  const renameSource = (i: number, name: string) => {
+    if (i === stagingIdx) setStagingName(name);
+    else setCommitted((c) => c.map((s, j) => (j === i ? { ...s, name } : s)));
+  };
+  const setSourceLink = (i: number, column: string) => {
+    if (i === stagingIdx) setStagingLink(column);
+    else setCommitted((c) => c.map((s, j) => (j === i ? { ...s, linkColumn: column || undefined } : s)));
+  };
+  const removeSource = (i: number) => {
+    if (i === stagingIdx) { setFileName(null); setHeaders([]); setRows([]); setMapping({}); setStagingName(""); setStagingLink(""); }
+    else setCommitted((c) => c.filter((_, j) => j !== i));
+  };
+
+  async function onCrosswalkFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    const csv = parseCsv(await file.text());
+    setCrosswalk(parseCrosswalk(csv.rows));
+    setCrosswalkName(file.name);
+  }
+
   /** Clear staging after a successful import. */
   const clearStaging = () => {
     setFileName(null); setHeaders([]); setRows([]); setWide(null); setWideResult(null);
     setMapping({}); setRunName(""); setXlsxSheets([]);
+    setCommitted([]); setStagingName(""); setStagingLink("");
+    setCrosswalk(null); setCrosswalkName(null);
   };
 
   async function doImport() {
-    if (!canImport) return;
+    if (!canImport && !merging) return;
+    if (mergeBlocked) return;                  // refused, not silently merged
     setBusy(true); setErr(null);
+    // A merge posts the unified table; everything downstream reads it as an
+    // ordinary long-format log and has no idea it came from several systems.
+    const payload = merge
+      ? { mapping: merge.mapping, headers: merge.headers, rows: merge.rows }
+      : { mapping, headers, rows };
     try {
       const res = await fetch(`/api/projects/${projectId}/mining/import`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: runName.trim() || "Event log", mapping, headers, rows, kpiConfig: pendingKpi.current ?? undefined }),
+        body: JSON.stringify({ name: runName.trim() || "Event log", ...payload, kpiConfig: pendingKpi.current ?? undefined }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) { setErr(json.error ?? "Import failed"); return; }
@@ -421,6 +500,23 @@ export function ImportPanel({ projectId, onImported, openDiagram, stashReturn }:
           </div>
         )}
 
+        {/* Merging several systems. Shown as soon as one export is committed, so
+            it is visible while the next file is being mapped. */}
+        {committed.length > 0 && (
+          <MergeCard
+            sources={mergeList}
+            stagingIdx={stagingIdx}
+            onRename={renameSource}
+            onSetLink={setSourceLink}
+            onRemove={removeSource}
+            crosswalkName={crosswalkName}
+            crosswalkPairs={crosswalk?.pairs.length ?? 0}
+            onCrosswalkFile={onCrosswalkFile}
+            onClearCrosswalk={() => { setCrosswalk(null); setCrosswalkName(null); }}
+            merge={merge}
+          />
+        )}
+
         {headers.length > 0 && (
           <div className="mt-4 flex flex-col gap-3">
             <div className="grid grid-cols-2 gap-2">
@@ -569,6 +665,24 @@ export function ImportPanel({ projectId, onImported, openDiagram, stashReturn }:
               </div>
             )}
 
+          </div>
+        )}
+
+        {(headers.length > 0 || merging) && (
+          <div className="mt-3 flex flex-col gap-3">
+            {/* Another system's export of the SAME cases. Not another month of the
+                same system — that is a linked run series, a different question,
+                and it lands in a later phase. */}
+            {headers.length > 0 && (
+              <div>
+                <button onClick={addToMerge} disabled={!canImport}
+                  className="text-[11px] rounded px-2.5 py-1 border border-stone-600 text-stone-300 hover:border-amber-600 hover:text-amber-200 disabled:opacity-40"
+                  title="Add this export to a merge, then load the next system's export of the same cases">
+                  ＋ Add another system&rsquo;s export of these cases
+                </button>
+              </div>
+            )}
+
             <div className="flex items-center gap-2">
               <input value={runName} onChange={(e) => setRunName(e.target.value)} placeholder="run name" className={`${inp} flex-1`} />
               {rows.length > 0 && (
@@ -576,11 +690,12 @@ export function ImportPanel({ projectId, onImported, openDiagram, stashReturn }:
                   🔍 View / filter log
                 </button>
               )}
-              <button onClick={doImport} disabled={!canImport || busy} className="text-xs bg-amber-700 hover:bg-amber-600 disabled:opacity-40 text-white rounded px-3 py-1.5">
-                {busy ? "Importing…" : "Import log"}
+              <button onClick={doImport} disabled={(!canImport && !merging) || mergeBlocked || busy} className="text-xs bg-amber-700 hover:bg-amber-600 disabled:opacity-40 text-white rounded px-3 py-1.5">
+                {busy ? "Importing…" : merging ? `Import merged log (${mergeList.length} systems)` : "Import log"}
               </button>
             </div>
-            {!canImport && <p className="text-[10px] text-amber-400">Map case id, activity and timestamp to continue.</p>}
+            {headers.length > 0 && !canImport && <p className="text-[10px] text-amber-400">Map case id, activity and timestamp to continue.</p>}
+            {mergeBlocked && <p className="text-[10px] text-rose-400">These exports cannot be merged as they stand — link them on a shared key, attach a crosswalk, or remove one.</p>}
           </div>
         )}
         {err && <p className="text-rose-400 text-xs mt-2">{err}</p>}
