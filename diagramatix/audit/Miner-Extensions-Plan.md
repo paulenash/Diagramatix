@@ -7,7 +7,7 @@
 | **This document** | The **live worklist** for building them. Every phase names the files it touches and the existing functions it reuses. The review is the historical argument; this is the burn-down. |
 | **Scope** | All 8 extensions + all 11 smaller items. Nothing dropped — two are **re-specified** rather than built as written, and each says why on its face. |
 | **How to use** | Work an item, tick its box, set **Status** → `In progress` / `Shipped (<commit>)` / `Won't do (<reason>)`. Record what actually happened — including deviations — in the phase's own **As built** paragraph, so this doubles as a decision log. |
-| **Progress log** | **2026-09-09** — Plan written. Reconnaissance found **four things the review got wrong** and **one it does not mention at all** (the gating hole), all recorded below against the item they affect. **Step 1 SHIPPED**: 20 of 26 mining routes now carry a subscription gate (was 3), the three dormant tier keys are enforced, and `tests/mining/route-gating.test.ts` (T3609–T3613) enumerates the route tree so the twenty-seventh route cannot be added ungated. |
+| **Progress log** | **2026-09-09** — Plan written. Reconnaissance found **four things the review got wrong** and **one it does not mention at all** (the gating hole), all recorded below against the item they affect. **Step 1 SHIPPED**: 20 of 26 mining routes now carry a subscription gate (was 3), the three dormant tier keys are enforced, and `tests/mining/route-gating.test.ts` (T3609–T3613) enumerates the route tree so the twenty-seventh route cannot be added ungated. **Phase 1 SHIPPED** (T3614–T3630) — and its budget test found a CRASH: `Math.min(...xs)` threw past ~125k elements in three places, so any log beyond ~125,000 events could not be imported at all. **Phase 7 ADDED** after Paul asked whether the plan gave the user a course of action; it did not, and neither does the review. The cut line moved to after it. |
 
 **Status values:** `Not started` · `In progress` · `Shipped (<commit>)` · `Blocked (<on what>)` · `Won't do (<reason>)`
 
@@ -384,19 +384,92 @@ approximation and is labelled **approximate**.
 
 ---
 
-> ## — CUT LINE —
+## Phase 7 — What should I do about it?
+
+**Status:** `Not started` · **Added 2026-09-09**, after Paul asked whether the plan gave the user a
+course of action. It did not, and neither does the review — see *Corrections*.
+
+Every other phase in this plan answers a question about the process. This one answers the question
+the reader asks *next*, and it is the one the Miner is worst at: **so what do I do?**
+
+- [ ] `app/lib/mining/nextSteps.ts` (pure) — `findActions(run) → MinerAction[]`, ranked
+- [ ] A "What to do next" panel in the console, above the workbench
+- [ ] Every action is a **button**, not a sentence
+- [ ] Optional AI narration over the computed findings; the ranking is never the model's
+
+**Why the Miner has a better claim to this than the Simulator.** The Simulator has shipped
+`suggestNextSteps()` since its own Phase 1 — ranked deterministically, each suggestion carrying the
+overrides that create the scenario, with an honest floor that refuses to advise below three runs. The
+Miner has nothing like it, and its recommendations would rest on **measured** behaviour rather than a
+model's. Today the closest thing is the Automation tab, which is genuinely actionable and fires only
+on *task* logs, so an ordinary business process gets none of it.
+
+**The signals, and where each already comes from.** Nothing here needs new mining:
+
+| Finding | Computed by | The recommendation |
+|---|---|---|
+| Bottleneck | `analytics.activities` — today | "38% of elapsed time is in *Approve*" |
+| Slowest handover | `analytics.edges` — Phase 3 | "*Check → Approve* takes 4 days. That is a queue, not work" |
+| Rework | `detectReworkActivities` — Phase 6 | "*Credit check* runs 2.4× per case" |
+| Lateness driver | `computeOutcomes` lift — today | "Cases via *Escalate* are 3× more likely to miss the SLA" |
+| Deviation | `conformance` — today | "14 cases skipped the credit check" |
+| Backlog | `analytics.throughput` — Phase 4 | "You took in more work than you finished for six weeks" |
+| Cross-team bouncing | Phase 1's `res` vectors — Phase 6 | "Work crosses Finance and Ops four times per case" |
+
+**The actions are the point, and most of them hand off.** A finding that ends in prose is homework.
+Each one carries a button:
+
+- *Show me the cases* → the Phase 5 drill-through
+- *Slice to this* → the Phase 4 filter, pre-set
+- *Simplify the map* → the Phase 3 threshold
+- ***Calibrate a twin and sweep that team*** → the existing calibrate route, then the Simulator's own
+  sweep. **This is the one that closes the loop the product already claims**: mine → calibrate →
+  simulate → re-mine. Today a user has to know to do that, and then do it by hand.
+- *Generate an RPA spec* → the existing task-mining path
+
+**Deterministic ranking; the model only narrates.** The Miner is 100% algorithmic by design, and that
+is exactly what makes a conformance number safe to put in front of an auditor. Findings are ranked by
+share of total elapsed time wherever a share exists, so they are comparable to each other; AI, when
+allowed, rewrites the top few into prose and never reorders them. Same *compute first, narrate second*
+rule as the Simulator plan, and the same reason.
+
+**Honest floors — this phase needs more of them than any other, because it is the phase that gives
+advice.**
+
+- **No SLA set** → no lateness findings, said out loud rather than silently omitted.
+- **No reference model** → no conformance findings, same.
+- **`detail !== "full"`** → no handover or rework findings; they need the per-event durations Phase 1
+  stores, and a run that predates them cannot support the claim.
+- **Nothing clears the threshold** → *"nothing stands out in this run"*. A tool that always produces a
+  top recommendation will eventually recommend noise, and the first time it does, nobody believes the
+  next one.
+- **Every finding cites its number and resolves to its cases.** A recommendation that cannot be
+  traced back to the evidence is the one thing this feature cannot afford to ship.
+
+**A thin first slice can land early.** Bottleneck, lateness driver and deviations all run off data
+that exists **today** — before Phases 3, 5 and 6. If something actionable is wanted before the long
+middle of this plan, that slice is where to take it from.
+
+---
+
+> ## — CUT LINE — *(moved 2026-09-09)*
 >
-> After Phase 6 the Miner is a complete **analysis** tool: it slices, it attributes deviations to
-> cases, it shows where the delay actually is, and it shows who hands work to whom.
+> After Phase 7 the Miner is a complete **analysis and advice** tool: it slices, it attributes
+> deviations to cases, it shows where the delay actually is, who hands work to whom — and it tells
+> you what to do about it, with a button.
 >
-> Phases 7 and 8 are the **second visit** — the thing the review's whole judgement is about, and the
+> **The line moved when Phase 7 was added, and deliberately.** It sat after Phase 6; a tool that says
+> what to do is worth more than one that lets you compare two runs, so recommendations belong inside
+> the set you keep rather than the set you might drop.
+>
+> Phases 8 and 9 are the **second visit** — the thing the review's whole judgement is about, and the
 > point at which the product stops being *a study you commission* and becomes *a monitor that tells
 > you when your process changed*. **This is where you would stop for cost, not where you would stop
 > for value.** Both halves of that are worth saying.
 
 ---
 
-## Phase 7 — Nobody mines a process once
+## Phase 8 — Nobody mines a process once
 
 **Status:** `Not started` · **The only phase that adds a real column.**
 
@@ -423,9 +496,9 @@ nonsense.
 
 ---
 
-## Phase 8 — Watch it, rather than visit it
+## Phase 9 — Watch it, rather than visit it
 
-**Status:** `Not started` · **Depends on Phase 7** and cannot precede it.
+**Status:** `Not started` · **Depends on Phase 8** and cannot precede it.
 
 - [ ] **The cheapest alarm first: the source stopped sending.** No thresholds, no history, no
       statistics — only `lastIngestAt` staleness
@@ -451,7 +524,7 @@ reports *not enough history yet* rather than firing on noise.
 
 ---
 
-## Phase 9 — The examples programme
+## Phase 10 — The examples programme
 
 **Status:** `Not started` · Its own final phase, deliberately.
 
@@ -463,11 +536,11 @@ Building one worked example there found **five shipped defects** nothing else ha
 
 | | Example | Slug | Teaches | Phase |
 |---|---|---|---|---|
-| [ ] | *(extend)* Accounts Payable | `accounts-payable-invoice-lifecycle` | Its three period logs already show compliance decay — that **is** the comparison example | 7 |
+| [ ] | *(extend)* Accounts Payable | `accounts-payable-invoice-lifecycle` | Its three period logs already show compliance decay — that **is** the comparison example | 8 |
 | [ ] | *(extend)* Order-to-Cash | `order-to-cash-lifecycle` | Add `Region` / `Order value` / `Channel` columns — cheaper and truer than a sixth near-duplicate | 4 |
 | [ ] | Handover-heavy log | `three-team-handover` | Work crossing three teams with a genuine ping-pong pair | 6 |
 | [ ] | Business-process rework | `credit-check-rework` | "Credit check" three times, labels nothing like a UI step — **the example that proves the widened trigger** | 6 |
-| [ ] | Live source with an alarm | *(extend)* `live-order-processing` | An alert that actually fires during the batch demo — the best demo in the feature | 8 |
+| [ ] | Live source with an alarm | *(extend)* `live-order-processing` | An alert that actually fires during the batch demo — the best demo in the feature | 9 |
 
 **The cold start is a bug, not an example.** A user opening the Miner on their own project gets a bare
 file picker: *"Load built-in example data"* renders only when a catalog example was adopted, and no
@@ -499,7 +572,7 @@ generated or authored.
 - **Regression bar (Phase 1):** bit-identical `stats` / `variants` / `performance` / `governance` and
   every pre-existing `analytics` field, with the new fields ignored. **The single most important
   guard in this plan.**
-- **Docs:** `schema/UPDATE_EVERYTHING.md` Steps 0–12 on **Phase 7 only**.
+- **Docs:** `schema/UPDATE_EVERYTHING.md` Steps 0–12 on **Phase 8 only** (the `parentRunId` column).
 - **New tests** from **T3609**, appended to `tests/TESTS_SUMMARY.md`.
 
 ---
@@ -543,3 +616,4 @@ is right about the shape of the problem; these are the places the detail differs
 | Item 06 | *append to a manual run* | Needs retained raw events. **Re-specified** as a linked run series (Phase 7). |
 | Item 11 | a smaller thing | A **prerequisite** of ext 8. No history, no alarm. |
 | — | *(not mentioned)* | **The gating hole.** 3 routes of 26 enforced; three tier keys sold and enforced nowhere. Fixed in 0.1. |
+| — | *(not mentioned)* | **No course of action.** All eight extensions are ways of READING; the review's own three missing questions — what changed, for which cases, tell me when it moves — are all questions about looking. *"What should I do about it?"* is absent, and it is the question a reader asks next. Added as **Phase 7**, and the cut line moved to sit after it. |
