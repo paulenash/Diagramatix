@@ -7,7 +7,7 @@
 | **This document** | The **live worklist** for building them. Every phase names the files it touches and the existing functions it reuses. The review is the historical argument; this is the burn-down. |
 | **Scope** | All 8 extensions + all 11 smaller items. Nothing dropped — two are **re-specified** rather than built as written, and each says why on its face. |
 | **How to use** | Work an item, tick its box, set **Status** → `In progress` / `Shipped (<commit>)` / `Won't do (<reason>)`. Record what actually happened — including deviations — in the phase's own **As built** paragraph, so this doubles as a decision log. |
-| **Progress log** | **2026-09-09** — Plan written. Reconnaissance found **four things the review got wrong** and **one it does not mention at all** (the gating hole), all recorded below against the item they affect. **Step 1 SHIPPED**: 20 of 26 mining routes now carry a subscription gate (was 3), the three dormant tier keys are enforced, and `tests/mining/route-gating.test.ts` (T3609–T3613) enumerates the route tree so the twenty-seventh route cannot be added ungated. **Phase 1 SHIPPED** (T3614–T3630) — and its budget test found a CRASH: `Math.min(...xs)` threw past ~125k elements in three places, so any log beyond ~125,000 events could not be imported at all. **Phase 7 ADDED** after Paul asked whether the plan gave the user a course of action; it did not, and neither does the review. The cut line moved to after it. |
+| **Progress log** | **2026-09-09** — Plan written. Reconnaissance found **four things the review got wrong** and **one it does not mention at all** (the gating hole), all recorded below against the item they affect. **Step 1 SHIPPED**: 20 of 26 mining routes now carry a subscription gate (was 3), the three dormant tier keys are enforced, and `tests/mining/route-gating.test.ts` (T3609–T3613) enumerates the route tree so the twenty-seventh route cannot be added ungated. **Phase 1 SHIPPED** (T3614–T3630) — and its budget test found a CRASH: `Math.min(...xs)` threw past ~125k elements in three places, so any log beyond ~125,000 events could not be imported at all. **Phase 8 ADDED** after Paul asked whether the plan gave the user a course of action; it did not, and neither does the review. The cut line moved to after it. **Phase 2 ADDED** — three input questions the plan could not answer: no `.xlsx`, wide-format exports silently read as one event, and no way to merge several systems' exports of the same cases. Placed second, because a user who cannot load their export is not reached by anything else. Phases 2–10 renumbered to 3–11. |
 
 **Status values:** `Not started` · `In progress` · `Shipped (<commit>)` · `Blocked (<on what>)` · `Won't do (<reason>)`
 
@@ -55,7 +55,7 @@ cannot. Phase 0.3 makes that distinction explicit rather than letting it be disc
 3. **Defaults preserve behaviour.** Every addition is inert when unset; the regression bar for
    Phase 1 is bit-identical results for the five catalog examples with the new fields ignored.
    Per `schema/UPDATE_EVERYTHING.md` Step 0, a new key inside an existing `Json` column is **data,
-   not structure** — no version bump. Only Phase 7 adds a real column.
+   not structure** — no version bump. Only Phase 8 adds a real column.
 4. **Honest floors: refuse rather than flatter.** Below a support threshold, report the count and
    decline the statistic. A median over two samples is not a median.
 5. **Tests** are numbered append-only from **T3609** and added to `tests/TESTS_SUMMARY.md`. Never
@@ -99,7 +99,7 @@ The gallery was the sharpest case: the *link* was hidden for unentitled users wh
 **Not fixed here, and stated rather than left implied:** `task-mining` is still not enforced
 server-side. The Automation tab, the RPA spec and the SOP are computed **in the browser** from
 `variants` the run fetch already returns, so there is no server boundary to gate without moving that
-computation. Phase 6 touches those files and is where it belongs.
+computation. Phase 7 touches those files and is where it belongs.
 
 **Safe because gaps fail open.** `getLevelMatrix` defaults every key to `available` and only
 restricts once a row explicitly says otherwise, so gating a key that has not been seeded is a no-op
@@ -149,7 +149,7 @@ Phase 1's exit criteria, not a nicety.**
 - [ ] `updateRunJson(runId, patch)`
 
 All JSON persistence bypasses Prisma via raw `pgPool` SQL across six call sites, each an untyped
-column name inside a string literal. Phases 1, 5 and 7 each add a seventh.
+column name inside a string literal. Phases 1, 6 and 9 each add a seventh.
 
 **Regression bar for the whole phase:** no user-visible change whatsoever.
 
@@ -206,7 +206,7 @@ shorter. Both are debts, and both are named rather than quietly carried.
 
 **Why the seam ships now, with no filter behind it.** One rule, adopted here and enforced for the
 rest of the programme: **no panel reads the fetched `analytics` directly; every panel reads the run
-view.** It costs about an hour, and it converts Phase 4 from a six-panel retrofit into a single
+view.** It costs about an hour, and it converts Phase 5 from a six-panel retrofit into a single
 insertion. A panel that reads around the seam is a panel that will one day show unfiltered numbers
 beside filtered ones — the one failure that makes every number on the screen unciteable.
 
@@ -231,7 +231,90 @@ pre-existing `analytics` field, for all five catalog examples, with the new fiel
 
 ---
 
-## Phase 2 — The twin is a claim; make it checkable, and make it reachable
+## Phase 2 — Getting the log in at all
+
+**Status:** `Not started` · **Added 2026-09-09**, after Paul asked three questions about input that
+this plan — and the review — had no answer to. **Placed second on purpose: if someone cannot load
+their export, no later phase matters to them.**
+
+- [ ] `.xlsx` import — the format people actually have
+- [ ] **Wide-format unpivot** — one row per case, `state1, ts1, state2, ts2, …`
+- [ ] **Multi-file merge** — several systems' exports assembled into one run, with source provenance
+- [ ] An id **crosswalk** for merging, when the systems do not agree on the case id
+
+### What already works, and is easy to mistake for a gap
+
+A CSV or TSV from any system, with the columns mapped by hand, is the Miner's *primary* path and has
+been since the first slice: `guessMapping()` reads the headers, pre-fills nine role dropdowns, the
+user confirms or overrides, and a validation panel reports usable and dropped rows before anything is
+committed. **That question is already answered.** The three below are not.
+
+### 2.1 `.xlsx`
+
+The picker takes `.csv .tsv .txt .xes .json .ocel .xml` — **not `.xlsx`**. Anyone with a genuine
+Excel export has to Save As → CSV first, which is a small indignity in a product whose whole promise
+is "start from the spreadsheet you already have". `excelSerialToMs` already exists to cope with
+Excel's serial dates arriving inside a CSV, so the shape was half-anticipated and then not finished.
+
+Listed as optional in Phase 1 and deferred there. **That was the wrong call** — the phase was about
+storage and this is about reach, so it belongs here, not as a rider on something unrelated.
+
+### 2.2 Wide format — the shape most status reports actually come in
+
+The parser assumes **long** format: one row is one event. A wide row —
+`row id, case name, case id, state1, state1 timestamp, state2, state2 timestamp, …` — is read as a
+single event and the rest of the row is **silently ignored**, which is the worst possible failure:
+the import succeeds, the case looks like it had one step, and nothing says otherwise.
+
+This is not an edge case. It is how nearly every status-history report comes out of an ERP or CRM,
+and how anyone building one by hand in a spreadsheet would naturally lay it out.
+
+The fix is small and entirely **before** the existing pipeline: identify the case-id column, identify
+the `(state, timestamp)` column **pairs**, and emit one event per non-empty pair. Downstream is
+untouched, because the output is exactly the long format `buildEventLog` already takes. Pairs can be
+detected from header patterns and confirmed by the user, in the same idiom as the role mapping.
+
+**Honest floor:** a row whose pairs are ragged (a state with no timestamp, or the reverse) is
+reported, not guessed at — and a file that looks wide but cannot be paired should say so rather than
+importing one event per case.
+
+### 2.3 Several systems, one lifecycle
+
+Today a manual import creates one run per file, always. Only a **live source** accumulates, and only
+over the webhook.
+
+**This is a different problem from smaller item 06, and the more valuable one.** Item 06 is *time*
+continuation — "append next month's export" — and is re-specified as a linked run series in Phase 9.
+This is *source union*: the CRM holds the front half of the lifecycle, the ERP the back half, for the
+**same cases**. Neither system's export is the process; the union is.
+
+Two things it needs that are not obvious from the requirement:
+
+- **An id crosswalk.** If the CRM calls it `OPP-123` and the ERP calls it `SO-456`, merging by case
+  id silently produces twice as many half-length cases — which, again, looks like a successful
+  import. Either a shared column or a third mapping file, and a **refusal** when neither is present
+  rather than a merge that cannot work.
+- **Source provenance on every event.** Which system reported it, carried through as an attribute.
+  This is the part that pays for the phase: it makes **cross-system handover** visible, and in a real
+  process that is where the worst delay usually is — the days a case spends between two systems that
+  nobody owns. It drops straight into the Phase 4 handover work.
+
+**Honest floor:** report the overlap before importing — how many case ids appear in more than one
+file, and how many in only one. A merge where the two files share almost no cases is a crosswalk
+problem, and the user should be told that instead of being handed a run full of fragments.
+
+**Files.** `app/lib/mining/parseAnyLog.ts` (dispatch), a new `app/lib/mining/wideFormat.ts` (pure),
+a new `app/lib/mining/mergeSources.ts` (pure), `ProcessMiningConsole.tsx`'s import panel, and the
+file picker's `accept` list. An `.xlsx` reader is the only new dependency in the plan; the repo
+already hand-rolls an xlsx **writer** in `app/lib/riskControls/xlsx.ts`, so read the same way if the
+sheet shapes allow, rather than adding a library for one screen.
+
+**Reuses.** `guessMapping`, `validateEventLogMapping` (the pre-import advisory panel already exists
+and is the right place to report ragged pairs and poor overlap), `buildEventLog` unchanged.
+
+---
+
+## Phase 3 — The twin is a claim; make it checkable, and make it reachable
 
 **Status:** `Not started` · The smallest phase, and the cheapest credibility in the programme.
 
@@ -260,7 +343,7 @@ shipped and tested.
 
 ---
 
-## Phase 3 — Most of the elapsed time is between the steps, not inside them
+## Phase 4 — Most of the elapsed time is between the steps, not inside them
 
 **Status:** `Not started`
 
@@ -290,7 +373,7 @@ control is the twin of arrow heat, not a stray polish item. It also repairs publ
 
 ---
 
-## Phase 4 — Slicing is what turns a finding into a cause
+## Phase 5 — Slicing is what turns a finding into a cause
 
 **Status:** `Not started` · The big one, and the one that pays back everything Phase 1 stored.
 
@@ -329,7 +412,7 @@ feeds them. The Word and Excel reports filter for free.
 
 ---
 
-## Phase 5 — Fourteen cases skipped the credit check; here they are
+## Phase 6 — Fourteen cases skipped the credit check; here they are
 
 **Status:** `Not started`
 
@@ -350,7 +433,7 @@ silently short list presented as the list — that is exactly what stops an audi
 
 ---
 
-## Phase 6 — Who hands work to whom, and who does the same thing three times
+## Phase 7 — Who hands work to whom, and who does the same thing three times
 
 **Status:** `Not started`
 
@@ -384,7 +467,7 @@ approximation and is labelled **approximate**.
 
 ---
 
-## Phase 7 — What should I do about it?
+## Phase 8 — What should I do about it?
 
 **Status:** `Not started` · **Added 2026-09-09**, after Paul asked whether the plan gave the user a
 course of action. It did not, and neither does the review — see *Corrections*.
@@ -409,19 +492,19 @@ on *task* logs, so an ordinary business process gets none of it.
 | Finding | Computed by | The recommendation |
 |---|---|---|
 | Bottleneck | `analytics.activities` — today | "38% of elapsed time is in *Approve*" |
-| Slowest handover | `analytics.edges` — Phase 3 | "*Check → Approve* takes 4 days. That is a queue, not work" |
-| Rework | `detectReworkActivities` — Phase 6 | "*Credit check* runs 2.4× per case" |
+| Slowest handover | `analytics.edges` — Phase 4 | "*Check → Approve* takes 4 days. That is a queue, not work" |
+| Rework | `detectReworkActivities` — Phase 7 | "*Credit check* runs 2.4× per case" |
 | Lateness driver | `computeOutcomes` lift — today | "Cases via *Escalate* are 3× more likely to miss the SLA" |
 | Deviation | `conformance` — today | "14 cases skipped the credit check" |
-| Backlog | `analytics.throughput` — Phase 4 | "You took in more work than you finished for six weeks" |
-| Cross-team bouncing | Phase 1's `res` vectors — Phase 6 | "Work crosses Finance and Ops four times per case" |
+| Backlog | `analytics.throughput` — Phase 5 | "You took in more work than you finished for six weeks" |
+| Cross-team bouncing | Phase 1's `res` vectors — Phase 7 | "Work crosses Finance and Ops four times per case" |
 
 **The actions are the point, and most of them hand off.** A finding that ends in prose is homework.
 Each one carries a button:
 
-- *Show me the cases* → the Phase 5 drill-through
-- *Slice to this* → the Phase 4 filter, pre-set
-- *Simplify the map* → the Phase 3 threshold
+- *Show me the cases* → the Phase 6 drill-through
+- *Slice to this* → the Phase 5 filter, pre-set
+- *Simplify the map* → the Phase 4 threshold
 - ***Calibrate a twin and sweep that team*** → the existing calibrate route, then the Simulator's own
   sweep. **This is the one that closes the loop the product already claims**: mine → calibrate →
   simulate → re-mine. Today a user has to know to do that, and then do it by hand.
@@ -447,29 +530,29 @@ advice.**
   traced back to the evidence is the one thing this feature cannot afford to ship.
 
 **A thin first slice can land early.** Bottleneck, lateness driver and deviations all run off data
-that exists **today** — before Phases 3, 5 and 6. If something actionable is wanted before the long
+that exists **today** — before Phases 4, 6 and 7. If something actionable is wanted before the long
 middle of this plan, that slice is where to take it from.
 
 ---
 
 > ## — CUT LINE — *(moved 2026-09-09)*
 >
-> After Phase 7 the Miner is a complete **analysis and advice** tool: it slices, it attributes
+> After Phase 8 the Miner is a complete **analysis and advice** tool: it slices, it attributes
 > deviations to cases, it shows where the delay actually is, who hands work to whom — and it tells
 > you what to do about it, with a button.
 >
-> **The line moved when Phase 7 was added, and deliberately.** It sat after Phase 6; a tool that says
+> **The line moved when Phase 8 was added, and deliberately.** It sat after Phase 7; a tool that says
 > what to do is worth more than one that lets you compare two runs, so recommendations belong inside
 > the set you keep rather than the set you might drop.
 >
-> Phases 8 and 9 are the **second visit** — the thing the review's whole judgement is about, and the
+> Phases 9 and 10 are the **second visit** — the thing the review's whole judgement is about, and the
 > point at which the product stops being *a study you commission* and becomes *a monitor that tells
 > you when your process changed*. **This is where you would stop for cost, not where you would stop
 > for value.** Both halves of that are worth saying.
 
 ---
 
-## Phase 8 — Nobody mines a process once
+## Phase 9 — Nobody mines a process once
 
 **Status:** `Not started` · **The only phase that adds a real column.**
 
@@ -496,9 +579,9 @@ nonsense.
 
 ---
 
-## Phase 9 — Watch it, rather than visit it
+## Phase 10 — Watch it, rather than visit it
 
-**Status:** `Not started` · **Depends on Phase 8** and cannot precede it.
+**Status:** `Not started` · **Depends on Phase 9** and cannot precede it.
 
 - [ ] **The cheapest alarm first: the source stopped sending.** No thresholds, no history, no
       statistics — only `lastIngestAt` staleness
@@ -524,7 +607,7 @@ reports *not enough history yet* rather than firing on noise.
 
 ---
 
-## Phase 10 — The examples programme
+## Phase 11 — The examples programme
 
 **Status:** `Not started` · Its own final phase, deliberately.
 
@@ -561,7 +644,7 @@ generated or authored.
 
 - **`npm run build` — NOT OPTIONAL, and run it before pushing.** `refreshRun.ts` imports Prisma and
   lives in `app/lib/mining/` beside pure modules that client components import; `filterAnalytics.ts`
-  lands in the same directory in Phase 4. `tsc` and the unit suite were both fully green while a
+  lands in the same directory in Phase 5. `tsc` and the unit suite were both fully green while a
   client component transitively imported Prisma, and it broke the production build, the deploy and
   two CI jobs.
 - **Local:** `export PATH="$PATH:/c/Program Files/nodejs"; cd /c/Git/Diagramatix/diagramatix; npm run go`.
@@ -572,7 +655,7 @@ generated or authored.
 - **Regression bar (Phase 1):** bit-identical `stats` / `variants` / `performance` / `governance` and
   every pre-existing `analytics` field, with the new fields ignored. **The single most important
   guard in this plan.**
-- **Docs:** `schema/UPDATE_EVERYTHING.md` Steps 0–12 on **Phase 8 only** (the `parentRunId` column).
+- **Docs:** `schema/UPDATE_EVERYTHING.md` Steps 0–12 on **Phase 9 only** (the `parentRunId` column).
 - **New tests** from **T3609**, appended to `tests/TESTS_SUMMARY.md`.
 
 ---
@@ -594,8 +677,8 @@ generated or authored.
    are frequently customer identifiers. Masking ships in the same phase or not at all.
 6. **Client-bundle hygiene.** See Verification. Not hypothetical — it has happened once already.
 7. **Live-source write cost.** `MiningSource.buffer` is rewritten **in full** on every webhook append,
-   and Phase 8 adds threshold evaluation to the same loop (already capped at 200 sources per poll).
-8. **Canvas blast radius.** Phase 3(b) touches the renderer used by every diagram in the product.
+   and Phase 9 adds threshold evaluation to the same loop (already capped at 200 sources per poll).
+8. **Canvas blast radius.** Phase 4(b) touches the renderer used by every diagram in the product.
 
 ---
 
@@ -613,7 +696,8 @@ is right about the shape of the problem; these are the places the detail differs
 | Ext 2, feasibility step 5 | *leave conformance and discovery alone* | Conformance filters **nearly free**. **Discovery** is the un-filterable one, because it emits a persisted diagram. |
 | Item 02 | a labelling nicety | A **correctness precondition** for ext 2 — the stride turns every filtered figure into an estimate. |
 | Item 05 | *a recompute action would fix it* | **Not implementable as written** for manual runs — raw events do not exist. Two honest answers, not one (0.3). |
-| Item 06 | *append to a manual run* | Needs retained raw events. **Re-specified** as a linked run series (Phase 7). |
+| Item 06 | *append to a manual run* | Needs retained raw events. **Re-specified** as a linked run series (Phase 8). |
 | Item 11 | a smaller thing | A **prerequisite** of ext 8. No history, no alarm. |
 | — | *(not mentioned)* | **The gating hole.** 3 routes of 26 enforced; three tier keys sold and enforced nowhere. Fixed in 0.1. |
-| — | *(not mentioned)* | **No course of action.** All eight extensions are ways of READING; the review's own three missing questions — what changed, for which cases, tell me when it moves — are all questions about looking. *"What should I do about it?"* is absent, and it is the question a reader asks next. Added as **Phase 7**, and the cut line moved to sit after it. |
+| — | *(not mentioned)* | **Input flexibility.** The review's only input observation is item 10 (connectors); it assumes the file path works for whatever people have. It does not: there is no `.xlsx` reader, a wide "one row per case" export is silently read as one event, and several systems' exports of the same cases cannot be merged. Added as **Phase 2**. |
+| — | *(not mentioned)* | **No course of action.** All eight extensions are ways of READING; the review's own three missing questions — what changed, for which cases, tell me when it moves — are all questions about looking. *"What should I do about it?"* is absent, and it is the question a reader asks next. Added as **Phase 8**, and the cut line moved to sit after it. |

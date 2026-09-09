@@ -533,7 +533,6 @@
           <span class="chip">Render only</span>
           <span class="chip">Small</span>
           <span class="chip phase">Phase 4</span>
-          <span class="chip phase">Phase 3</span>
         </div>
         <div class="corr">
           <span class="lab">Correction &middot; 9 Sep 2026</span>
@@ -569,7 +568,7 @@
           <span class="chip new">Needs new data</span>
           <span class="chip">Import + every tab</span>
           <span class="chip">Largest</span>
-          <span class="chip phase">Phases 1 + 4</span>
+          <span class="chip phase">Phases 1 + 5</span>
         </div>
       </div>
 
@@ -592,7 +591,7 @@
           <span class="chip have">Both runs persisted</span>
           <span class="chip">New view</span>
           <span class="chip">Medium</span>
-          <span class="chip phase">Phase 7</span>
+          <span class="chip phase">Phase 9</span>
         </div>
       </div>
 
@@ -614,7 +613,7 @@
           <span class="chip have">Derivable today</span>
           <span class="chip">Drill-through</span>
           <span class="chip">Small</span>
-          <span class="chip phase">Phase 5</span>
+          <span class="chip phase">Phase 6</span>
         </div>
       </div>
 
@@ -638,7 +637,7 @@
           <span class="chip have">Data already mined</span>
           <span class="chip">New view</span>
           <span class="chip">Medium</span>
-          <span class="chip phase">Phase 6</span>
+          <span class="chip phase">Phase 7</span>
         </div>
         <div class="corr">
           <span class="lab">Correction &middot; 9 Sep 2026</span>
@@ -673,7 +672,7 @@
           <span class="chip have">Analysis exists</span>
           <span class="chip">Widen the trigger</span>
           <span class="chip">Small</span>
-          <span class="chip phase">Phase 6</span>
+          <span class="chip phase">Phase 7</span>
         </div>
         <div class="corr">
           <span class="lab">Correction &middot; 9 Sep 2026</span>
@@ -708,6 +707,7 @@
           <span class="chip have">Data already stored</span>
           <span class="chip">Render only</span>
           <span class="chip">Small</span>
+          <span class="chip phase">Phase 5</span>
         </div>
       </div>
 
@@ -730,7 +730,7 @@
           <span class="chip have">Trend already stored</span>
           <span class="chip new">Thresholds + notify</span>
           <span class="chip">Medium</span>
-          <span class="chip phase">Phase 9</span>
+          <span class="chip phase">Phase 10</span>
         </div>
       </div>
 
@@ -770,15 +770,61 @@
           <span class="chip have">Signals already computed</span>
           <span class="chip">Rank + hand off</span>
           <span class="chip">Medium</span>
-          <span class="chip phase">Phase 7</span>
+          <span class="chip phase">Phase 8</span>
         </div>
         <div class="corr">
           <span class="lab">Added 9 Sep 2026</span>
           <p>
             Not in the original eight. Added after Paul asked whether the plan gave the user a course
-            of action &mdash; it did not, and nor did this document. It is now <strong>Phase 7</strong>
+            of action &mdash; it did not, and nor did this document. It is now <strong>Phase 8</strong>
             of the plan, and the cut line moved to sit after it: a tool that says what to do is worth
             more than one that lets you compare two runs.
+          </p>
+        </div>
+      </div>
+
+      <div class="ext" style="border-left: 3px solid var(--alt); padding-left: 18px">
+        <h4>The tenth &mdash; whether the log gets in at all</h4>
+        <p>
+          The only remark this document makes about input is smaller item 10, which is about
+          <em>connectors</em>. Everything else assumes the file path already works for whatever people
+          have. Three cases show it does not, and each fails in a way the user is not told about.
+        </p>
+        <p>
+          <strong>There is no <code>.xlsx</code> reader.</strong> The picker takes CSV, TSV, XES, OCEL
+          and XML. Anyone with a genuine Excel export must Save As &rarr; CSV first &mdash; a small
+          indignity in a product whose promise is to start from the spreadsheet you already have. The
+          parser already understands Excel&rsquo;s serial dates arriving inside a CSV, so the shape was
+          half-anticipated and then not finished.
+        </p>
+        <p>
+          <strong>A wide export is read as one event.</strong> The parser assumes one row is one
+          event. Given the shape most status-history reports actually come in &mdash;
+          <code>case id, state1, state1 timestamp, state2, state2 timestamp, &hellip;</code> &mdash; it
+          reads the first pair and <em>silently ignores the rest of the row</em>. The import succeeds,
+          every case appears to have had one step, and nothing says otherwise. That is the worst of
+          the three, because it produces a confident wrong answer rather than a refusal.
+        </p>
+        <p>
+          <strong>Two systems cannot be merged into one lifecycle.</strong> A manual import makes one
+          run per file. But the CRM holds the front half of a case and the ERP the back half, for the
+          same cases &mdash; neither export is the process; the union is. Merging needs an id crosswalk
+          when the two systems disagree on the case id, and it needs <em>source provenance</em> on each
+          event &mdash; which is also the prize, because it makes cross-system handover visible, and
+          that is where the worst delay in a real process usually sits.
+        </p>
+        <div class="ext-tags">
+          <span class="chip new">Needs new parsing</span>
+          <span class="chip">Import only</span>
+          <span class="chip">Medium</span>
+          <span class="chip phase">Phase 2</span>
+        </div>
+        <div class="corr">
+          <span class="lab">Added 9 Sep 2026</span>
+          <p>
+            Also not in the original eight, and raised by Paul. It is <strong>Phase 2</strong> of the
+            plan &mdash; placed almost first, because a user who cannot load their export is not
+            reached by any of the other nine.
           </p>
         </div>
       </div>
