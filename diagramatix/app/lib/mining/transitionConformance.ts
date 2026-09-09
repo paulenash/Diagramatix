@@ -25,6 +25,11 @@ export interface ConformanceViolation {
   severity: "error" | "warning";
   message: string;
   cases: number;                 // cases exhibiting it (frequency-weighted)
+  /** WHICH variants exhibit it — the bridge from "14 cases did this" to
+   *  "here they are". Joined against `analytics.cases[].variantIdx` to name
+   *  the actual cases. Absent on a run whose conformance predates this;
+   *  callers must treat that as unknown, not as none. */
+  variantIdxs?: number[];
   ids?: string[];                // reference element/connector ids (for the overlay)
   data?: Record<string, unknown>;
 }
@@ -69,12 +74,22 @@ export function checkTransitionConformance(variants: Variant[], ref: ReferenceSm
   // ── Replay each variant ──
   const totalCases = variants.reduce((a, v) => a + v.count, 0);
   let conformingCases = 0;
-  const undoc = new Map<string, number>(), unknown = new Map<string, number>();
-  const badEntry = new Map<string, number>(), badExit = new Map<string, number>();
   const observed = new Map<string, number>();
   const bump = (m: Map<string, number>, k: string, n: number) => m.set(k, (m.get(k) ?? 0) + n);
 
-  for (const v of variants) {
+  // Each violation now carries both its case count AND the variants that
+  // exhibit it. The count alone is a metric; the variants are what turn it
+  // into evidence somebody can go and look at.
+  type Hits = { cases: number; idxs: number[] };
+  const undoc = new Map<string, Hits>(), unknown = new Map<string, Hits>();
+  const badEntry = new Map<string, Hits>(), badExit = new Map<string, Hits>();
+  const hit = (m: Map<string, Hits>, k: string, n: number, vi: number) => {
+    const h = m.get(k) ?? { cases: 0, idxs: [] };
+    h.cases += n; h.idxs.push(vi);
+    m.set(k, h);
+  };
+
+  variants.forEach((v, vi) => {
     const S = v.states;
     const seenUndoc = new Set<string>(), seenUnknown = new Set<string>();
     for (const s of S) if (s && !refStates.has(norm(s))) seenUnknown.add(s);
@@ -90,20 +105,20 @@ export function checkTransitionConformance(variants: Variant[], ref: ReferenceSm
 
     const clean = seenUndoc.size === 0 && seenUnknown.size === 0 && !entryBad && !exitBad;
     if (clean) conformingCases += v.count;
-    for (const k of seenUndoc) bump(undoc, k, v.count);
-    for (const s of seenUnknown) bump(unknown, s, v.count);
-    if (entryBad && first) bump(badEntry, first, v.count);
-    if (exitBad && last) bump(badExit, last, v.count);
-  }
+    for (const k of seenUndoc) hit(undoc, k, v.count, vi);
+    for (const s of seenUnknown) hit(unknown, s, v.count, vi);
+    if (entryBad && first) hit(badEntry, first, v.count, vi);
+    if (exitBad && last) hit(badExit, last, v.count, vi);
+  });
 
   // ── Assemble violations ──
   const violations: ConformanceViolation[] = [];
-  for (const [k, cases] of undoc) { const [from, to] = unkey(k); violations.push({ rule: "undocumented-transition", severity: "error", message: `Undocumented transition: ${from} → ${to}`, cases, data: { from, to } }); }
-  for (const [s, cases] of unknown) violations.push({ rule: "unknown-state", severity: "error", message: `State "${s}" is not in the reference`, cases, data: { state: s } });
-  for (const [s, cases] of badEntry) violations.push({ rule: "unexpected-entry", severity: "warning", message: `Cases start in "${s}", not a reference entry state`, cases, data: { state: s } });
-  for (const [s, cases] of badExit) violations.push({ rule: "unexpected-exit", severity: "warning", message: `Cases end in "${s}", not a reference final state`, cases, data: { state: s } });
+  for (const [k, h] of undoc) { const [from, to] = unkey(k); violations.push({ rule: "undocumented-transition", severity: "error", message: `Undocumented transition: ${from} → ${to}`, cases: h.cases, variantIdxs: h.idxs, data: { from, to } }); }
+  for (const [s, h] of unknown) violations.push({ rule: "unknown-state", severity: "error", message: `State "${s}" is not in the reference`, cases: h.cases, variantIdxs: h.idxs, data: { state: s } });
+  for (const [s, h] of badEntry) violations.push({ rule: "unexpected-entry", severity: "warning", message: `Cases start in "${s}", not a reference entry state`, cases: h.cases, variantIdxs: h.idxs, data: { state: s } });
+  for (const [s, h] of badExit) violations.push({ rule: "unexpected-exit", severity: "warning", message: `Cases end in "${s}", not a reference final state`, cases: h.cases, variantIdxs: h.idxs, data: { state: s } });
   const observedNorm = new Set([...observed.keys()].map((k) => { const [f, t] = unkey(k); return key(norm(f), norm(t)); }));
-  for (const [k, e] of refEdges) if (!observedNorm.has(k)) violations.push({ rule: "dead-transition", severity: "warning", message: `Reference transition ${e.from} → ${e.to} was never observed`, cases: 0, ids: [e.id], data: { from: e.from, to: e.to } });
+  for (const [k, e] of refEdges) if (!observedNorm.has(k)) violations.push({ rule: "dead-transition", severity: "warning", message: `Reference transition ${e.from} → ${e.to} was never observed`, cases: 0, variantIdxs: [], ids: [e.id], data: { from: e.from, to: e.to } });
   violations.sort((a, b) => b.cases - a.cases);
 
   const transitionStats: TransitionStat[] = [...observed].map(([k, o]) => {

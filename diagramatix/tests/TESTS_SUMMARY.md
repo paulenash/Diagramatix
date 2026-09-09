@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-09-07  ·  **Document version:** 7.0  ·  **Suite:** 439 test files · 3,143 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T3821  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-09-07  ·  **Document version:** 7.0  ·  **Suite:** 440 test files · 3,163 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T3841  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
@@ -34,9 +34,9 @@ Each test file has its own section below, grouped into layers. Within each secti
 | **Protects you against** | In plain terms, the real-world problem that would occur if this behaviour regressed. |
 | **How it would break (go red)** | The kind of code or data change that would make this specific test fail — i.e. what the test is watching. |
 
-**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T3822**, the one after **T3823**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
+**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T3842**, the one after **T3843**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T3821`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
+> **Highest ref allocated: `T3841`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -2928,6 +2928,26 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 | T3819 | `tests/mining/insights-seam.test.ts` | No tab is handed the raw, unfiltered variants. |
 | T3820 | `tests/mining/insights-seam.test.ts` | Every tab taking analytics or variants takes the VIEW's. |
 | T3821 | `tests/mining/insights-seam.test.ts` | The seam is actually given the filter. |
+| T3822 | `tests/mining/case-evidence.test.ts` | An undocumented transition records WHICH variants exhibit it. |
+| T3823 | `tests/mining/case-evidence.test.ts` | A transition nobody took records an EMPTY list, not an absent one. |
+| T3824 | `tests/mining/case-evidence.test.ts` | The offending cases are named, with the claim stated. |
+| T3825 | `tests/mining/case-evidence.test.ts` | Conforming cases are not swept into the list. |
+| T3826 | `tests/mining/case-evidence.test.ts` | A strided run says how many of the claimed cases it can actually name. |
+| T3827 | `tests/mining/case-evidence.test.ts` | A run conformed before attribution existed reports UNKNOWN, not none. |
+| T3828 | `tests/mining/case-evidence.test.ts` | Nothing selected, or no analytics, is an honest empty rather than a throw. |
+| T3829 | `tests/mining/case-evidence.test.ts` | A case timeline is its path with its own per-step timings and teams. |
+| T3830 | `tests/mining/case-evidence.test.ts` | The final step has NO duration, rather than a zero. |
+| T3831 | `tests/mining/case-evidence.test.ts` | Offsets accumulate, so the timeline can be drawn to scale. |
+| T3832 | `tests/mining/case-evidence.test.ts` | A run with no per-event durations still gives the PATH, with null timings. |
+| T3833 | `tests/mining/case-evidence.test.ts` | A case whose variant cannot be resolved yields no timeline, not a crash. |
+| T3834 | `tests/mining/case-evidence.test.ts` | Every stored case is a CSV row - not the sixty the screen shows. |
+| T3835 | `tests/mining/case-evidence.test.ts` | Kept columns become CSV columns, so the export can be pivoted. |
+| T3836 | `tests/mining/case-evidence.test.ts` | The path is exported, so a reader can see what each case did. |
+| T3837 | `tests/mining/case-evidence.test.ts` | A value containing a comma or a quote does not break the file. |
+| T3838 | `tests/mining/case-evidence.test.ts` | The claim is the SLICE's count when the variants are a slice's. |
+| T3839 | `tests/mining/case-evidence.test.ts` | A slice containing none of the offenders reports zero, not the run's count. |
+| T3840 | `tests/mining/case-evidence.test.ts` | With no variants passed, the stored whole-run count still stands. |
+| T3841 | `tests/mining/case-evidence.test.ts` | The recompute route now has a caller - the Phase 0.3 debt, settled. |
 
 > **Keep this section in sync.** Whenever an e2e spec is added, removed, or changes what it asserts, update this section. It is hand-maintained, not generated.
 

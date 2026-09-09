@@ -26,6 +26,9 @@ import { isTaskRun, detectReworkActivities, pingPongFromVariants } from "@/app/l
 import { buildTaskProcedure } from "@/app/lib/mining/taskMining/procedure";
 import { ReplayDiagramBackdrop } from "@/app/components/simulation/replay/ReplayDiagramBackdrop";
 import { transitionRows, MIN_EDGE_OBS } from "@/app/lib/mining/handover";
+import { evidenceFor, caseTimeline, casesCsv } from "@/app/lib/mining/caseEvidence";
+import { computeTeamFlow } from "@/app/lib/mining/teamFlow";
+import type { ConformanceResult } from "@/app/lib/mining/transitionConformance";
 import { useRunView, exactnessLabel, exactnessTone } from "./useRunView";
 import { FilterBar } from "./FilterBar";
 import { EMPTY_FILTER, type MiningFilter } from "@/app/lib/mining/filterAnalytics";
@@ -36,14 +39,16 @@ const EXPAND_BTN = "ml-auto text-[11px] rounded px-2 py-0.5 bg-stone-800 text-am
 
 interface RunLite { id: string; discoveredBpmnId: string | null; discoveredSmId: string | null }
 
-type TabKey = "tasks" | "activities" | "between" | "heat" | "variants" | "cases" | "outcomes" | "export";
+type TabKey = "tasks" | "activities" | "between" | "heat" | "teams" | "variants" | "cases" | "conformance" | "outcomes" | "export";
 const TASK_TAB: { key: TabKey; label: string } = { key: "tasks", label: "🤖 Automation" };
 const TABS: { key: TabKey; label: string }[] = [
   { key: "activities", label: "📋 Activities" },
   { key: "between", label: "⏳ Between steps" },
   { key: "heat", label: "🔥 Insights" },
+  { key: "teams", label: "👥 Teams" },
   { key: "variants", label: "🔀 Variants" },
   { key: "cases", label: "🎞 Cases" },
+  { key: "conformance", label: "⚖ Deviations" },
   { key: "outcomes", label: "🎯 Outcomes" },
   { key: "export", label: "⬇ Export" },
 ];
@@ -52,8 +57,8 @@ const TABS: { key: TabKey; label: string }[] = [
  *  under a filter. Counts filter from the case index alone; timings need the
  *  per-event vectors, which not every run carries. */
 const TAB_SHAPE: Record<TabKey, "count" | "time"> = {
-  tasks: "time", activities: "time", between: "time", heat: "time",
-  variants: "count", cases: "count", outcomes: "count", export: "count",
+  tasks: "time", activities: "time", between: "time", heat: "time", teams: "time",
+  variants: "count", cases: "count", conformance: "count", outcomes: "count", export: "count",
 };
 
 export function MiningInsightsPanel({ projectId, run }: { projectId: string; run: RunLite }) {
@@ -63,17 +68,19 @@ export function MiningInsightsPanel({ projectId, run }: { projectId: string; run
   const [variants, setVariants] = useState<Variant[]>([]);
   const [kpiConfig, setKpiConfig] = useState<KpiConfig | null>(null);
   const [bpmn, setBpmn] = useState<DiagramData | null>(null);
+  const [conformance, setConformance] = useState<ConformanceResult | null>(null);
   const [loading, setLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
-    setAnalytics(null); setVariants([]); setKpiConfig(null); setBpmn(null);
+    setAnalytics(null); setVariants([]); setKpiConfig(null); setBpmn(null); setConformance(null);
     try {
       const rd = await fetch(`/api/projects/${projectId}/mining/runs/${run.id}`, { cache: "no-store" });
       const rj = rd.ok ? await rd.json() : null;
       setAnalytics((rj?.run?.analytics ?? null) as RunAnalytics | null);
       setVariants((rj?.run?.variants ?? []) as Variant[]);
       setKpiConfig((rj?.run?.kpiConfig ?? null) as KpiConfig | null);
+      setConformance((rj?.run?.conformance ?? null) as ConformanceResult | null);
       if (run.discoveredBpmnId) {
         const dd = await fetch(`/api/diagrams/${run.discoveredBpmnId}`, { cache: "no-store" });
         if (dd.ok) setBpmn(((await dd.json())?.data ?? null) as DiagramData | null);
@@ -130,12 +137,14 @@ export function MiningInsightsPanel({ projectId, run }: { projectId: string; run
         )}
       </div>
       <FilterBar analytics={analytics} filter={filter} onChange={setFilter} view={view} />
-      {tab === "tasks" && <TasksTab variants={view.variants} loading={loading} />}
+      {tab === "tasks" && <TasksTab variants={view.variants} loading={loading} projectId={projectId} runId={run.id} />}
       {tab === "activities" && <ActivitiesTab analytics={view.analytics} loading={loading} />}
       {tab === "between" && <BetweenStepsTab analytics={view.analytics} loading={loading} />}
       {tab === "heat" && <HeatTab analytics={view.analytics} bpmn={bpmn} hasBpmn={!!run.discoveredBpmnId} loading={loading} />}
+      {tab === "teams" && <TeamsTab analytics={view.analytics} variants={view.variants} loading={loading} />}
       {tab === "variants" && <VariantsTab variants={view.variants} bpmn={bpmn} hasBpmn={!!run.discoveredBpmnId} />}
       {tab === "cases" && <CasesTab analytics={view.analytics} variants={view.variants} bpmn={bpmn} hasBpmn={!!run.discoveredBpmnId} />}
+      {tab === "conformance" && <ConformanceTab analytics={view.analytics} variants={view.variants} conformance={conformance} loading={loading} projectId={projectId} runId={run.id} onRecomputed={() => void load()} />}
       {tab === "outcomes" && <OutcomesTab analytics={view.analytics} variants={view.variants} kpiConfig={kpiConfig} onSave={saveKpi} />}
       {tab === "export" && <ExportTab projectId={projectId} runId={run.id} filter={filter} filterNote={view.description} hasAnalytics={!!analytics && analytics.activities.length > 0} />}
     </div>
@@ -146,13 +155,18 @@ export function MiningInsightsPanel({ projectId, run }: { projectId: string; run
 
 const verdictColor = (v: "high" | "medium" | "low") => (v === "high" ? "#86efac" : v === "medium" ? "#fcd34d" : "#94a3b8");
 
-function TasksTab({ variants, loading }: { variants: Variant[]; loading: boolean }) {
+function TasksTab({ variants, loading, projectId, runId }: { variants: Variant[]; loading: boolean; projectId: string; runId: string }) {
   const [copied, setCopied] = useState(false);
   const opps = useMemo(() => automationOpportunities(variants), [variants]);
   const score = useMemo(() => taskAutomationScore(variants), [variants]);
   const rework = useMemo(() => detectReworkActivities(variants), [variants]);
   const bounces = useMemo(() => pingPongFromVariants(variants), [variants]);
-  const roi = useMemo(() => automationRoi(variants), [variants]);
+  // Item 07. Six seconds a step was a reasonable default and an unarguable
+  // number: a reader who thinks their steps take fifteen has no way to say so,
+  // and the whole ROI rests on it. Making it editable turns "we assume 6s"
+  // from a caveat into a control.
+  const [secondsPerStep, setSecondsPerStep] = useState(6);
+  const roi = useMemo(() => automationRoi(variants, { secondsPerStep }), [variants, secondsPerStep]);
   const spec = useMemo(() => buildAutomationSpec(variants, "this task"), [variants]);
   const sop = useMemo(() => buildTaskProcedure(variants, "Enter Invoice"), [variants]);
 
@@ -184,13 +198,32 @@ function TasksTab({ variants, loading }: { variants: Variant[]; loading: boolean
             <span className="tabular-nums font-semibold text-emerald-300">{(roi.savedPct * 100).toFixed(0)}%</span>
           </div>
           <div className="text-[10px] text-stone-500 mt-0.5">
-            ~{roi.currentHours.toFixed(1)}h of handling across {roi.cases} case{roi.cases === 1 ? "" : "s"} → ~{roi.savedHours.toFixed(1)}h saved ({roi.automatableCases} automatable). Scales with volume; assumes ~{roi.secondsPerStep}s/step + oversight.
+            ~{roi.currentHours.toFixed(1)}h of handling across {roi.cases} case{roi.cases === 1 ? "" : "s"} → ~{roi.savedHours.toFixed(1)}h saved ({roi.automatableCases} automatable). Scales with volume.
           </div>
+          <label className="flex items-center gap-1.5 mt-1 text-[10px] text-stone-400">
+            <span>Assume</span>
+            <input type="number" min={1} max={120} value={secondsPerStep}
+              onChange={(e) => setSecondsPerStep(Math.max(1, Math.min(120, Number(e.target.value) || 1)))}
+              className="w-14 bg-stone-800 border border-stone-600 rounded px-1 py-0.5 text-stone-100 tabular-nums" />
+            <span>seconds per step</span>
+            {secondsPerStep !== 6 && (
+              <button onClick={() => setSecondsPerStep(6)} className="text-amber-300 hover:text-amber-200 underline">reset</button>
+            )}
+            <span className="text-stone-600">· the saving above is entirely proportional to this</span>
+          </label>
         </div>
         <div className="flex items-center gap-2 mb-3 flex-wrap">
           <button onClick={copySpec} className="text-[11px] rounded px-2.5 py-1 bg-amber-700 hover:bg-amber-600 text-white">{copied ? "Copied ✓" : "Copy RPA spec"}</button>
           <button onClick={() => downloadText(spec, "automation-spec.md")} className="text-[11px] rounded px-2.5 py-1 bg-stone-800 text-amber-200 hover:bg-stone-700">RPA spec .md</button>
-          <button onClick={() => downloadText(sop, "task-sop.md")} className="text-[11px] rounded px-2.5 py-1 bg-stone-800 text-amber-200 hover:bg-stone-700">Download SOP .md</button>
+          {/* Item 08. The SOP was the only document in the product that did not
+              go out through buildDocx, so somebody handed one could not tell it
+              came from the same tool. Produced server-side now — which is also
+              the boundary that lets `task-mining` finally be enforced. */}
+          <a href={`/api/projects/${projectId}/mining/runs/${runId}/task-sop?format=docx`}
+            className="text-[11px] rounded px-2.5 py-1 bg-amber-700 hover:bg-amber-600 text-white">SOP (.docx)</a>
+          <a href={`/api/projects/${projectId}/mining/runs/${runId}/task-sop?format=pdf`} target="_blank" rel="noopener"
+            className="text-[11px] rounded px-2.5 py-1 bg-stone-800 text-amber-200 hover:bg-stone-700">SOP (PDF)</a>
+          <button onClick={() => downloadText(sop, "task-sop.md")} className="text-[11px] rounded px-2.5 py-1 bg-stone-800 text-amber-200 hover:bg-stone-700">SOP .md</button>
         </div>
         <div className="text-xs font-semibold text-amber-200 mb-1">Rework — repeated work steps</div>
         {rework.length ? (
@@ -266,6 +299,250 @@ function ExportTab({ projectId, runId, filter, filterNote, hasAnalytics }: { pro
   );
 }
 
+/** Hand the browser a file built in memory. Revoked immediately: the blob is
+ *  only needed for the duration of the click. */
+function downloadText(name: string, text: string, mime = "text/csv;charset=utf-8") {
+  const url = URL.createObjectURL(new Blob([text], { type: mime }));
+  const a = document.createElement("a");
+  a.href = url; a.download = name;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+// ── Teams tab (who hands work to whom, and who repeats themselves) ──────────
+
+function TeamsTab({ analytics, variants, loading }: { analytics: RunAnalytics | null; variants: Variant[]; loading: boolean }) {
+  const flow = useMemo(() => computeTeamFlow(analytics, variants), [analytics, variants]);
+  if (loading && !analytics) return <p className="text-[11px] text-stone-500">Loading…</p>;
+  if (!analytics) return <NoAnalytics />;
+  const unit = analytics.clockUnit;
+  const fmt = (ms: number) => formatDuration(ms, unit);
+  const pct = (x: number) => `${(x * 100).toFixed(0)}%`;
+
+  return (
+    <div className="flex flex-col gap-3">
+      {/* What this map is allowed to claim, before the map. An approximate map
+          read as measured is worse than no map, because it invents hand-offs on
+          exactly the activities more than one team performs. */}
+      {flow.note && (
+        <p className={`text-[11px] leading-relaxed ${flow.basis === "none" ? "text-stone-400" : "text-amber-300"}`}>
+          {flow.basis !== "none" && "⚠ "}{flow.note}
+        </p>
+      )}
+
+      {flow.handovers.length > 0 && (
+        <div>
+          <div className="text-xs font-semibold text-amber-200 mb-1">
+            Hand-offs between teams
+            {flow.basis === "approximate" && <span className="ml-2 text-[10px] rounded px-1.5 py-0.5 border border-amber-700/50 bg-amber-900/30 text-amber-200">approximate</span>}
+          </div>
+          <div className="overflow-x-auto max-h-[30vh]">
+            <table className="w-full text-[11px]">
+              <thead className="text-stone-400 text-left sticky top-0 bg-stone-900">
+                <tr>
+                  <th className="font-normal py-1 pr-3">From</th>
+                  <th className="font-normal py-1 pr-3">To</th>
+                  <th className="font-normal py-1 pr-2 text-right">Times</th>
+                  <th className="font-normal py-1 pr-2 text-right">Median wait</th>
+                  <th className="font-normal py-1 text-right">Total waiting</th>
+                </tr>
+              </thead>
+              <tbody>
+                {flow.handovers.map((h, i) => (
+                  <tr key={i} className="border-b border-stone-800 hover:bg-stone-800/60">
+                    <td className="py-1 pr-3 text-stone-200">{h.from}</td>
+                    <td className="py-1 pr-3 text-stone-200">{h.to}</td>
+                    <td className="py-1 pr-2 text-right text-stone-400 tabular-nums">{h.count.toLocaleString()}</td>
+                    <td className="py-1 pr-2 text-right text-stone-300 tabular-nums whitespace-nowrap">
+                      {h.medianGapMs === null ? <span className="text-stone-600" title="Not measurable without per-event teams">—</span> : fmt(h.medianGapMs)}
+                    </td>
+                    <td className="py-1 text-right text-amber-200 tabular-nums whitespace-nowrap">{fmt(h.totalGapMs)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-[10px] text-stone-500 mt-1">The wait is the gap between one team&rsquo;s last step and the next team&rsquo;s first — the part of the process nobody owns.</p>
+        </div>
+      )}
+
+      <div className="grid gap-3 md:grid-cols-2">
+        {flow.loads.length > 0 && (
+          <div>
+            <div className="text-xs font-semibold text-amber-200 mb-1">Workload</div>
+            <table className="w-full text-[11px]">
+              <tbody>
+                {flow.loads.map((l) => (
+                  <tr key={l.team} className="border-b border-stone-800">
+                    <td className="py-1 pr-2 text-stone-200">{l.team}</td>
+                    <td className="py-1 pr-2 text-stone-500 tabular-nums">{l.events.toLocaleString()} steps</td>
+                    <td className="py-1 pr-2 text-stone-400 tabular-nums whitespace-nowrap">{fmt(l.totalTimeMs)}</td>
+                    <td className="py-1 text-right text-amber-200 tabular-nums">{pct(l.share)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div>
+          <div className="text-xs font-semibold text-amber-200 mb-1">Passed back and forth</div>
+          {flow.pingPong.length === 0
+            ? <p className="text-[11px] text-stone-500">{flow.basis === "exact" ? "No case comes back to a team it had already left." : "Not measurable on this run."}</p>
+            : (
+              <table className="w-full text-[11px]">
+                <tbody>
+                  {flow.pingPong.map((p, i) => (
+                    <tr key={i} className="border-b border-stone-800">
+                      <td className="py-1 pr-2 text-stone-200">{p.a} ↔ {p.b}</td>
+                      <td className="py-1 pr-2 text-stone-400 tabular-nums">{p.bounces.toLocaleString()} bounces</td>
+                      <td className="py-1 text-right text-stone-500 tabular-nums">{p.cases.toLocaleString()} cases</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+
+          <div className="text-xs font-semibold text-amber-200 mt-3 mb-1">Done more than once</div>
+          {flow.rework.length === 0
+            ? <p className="text-[11px] text-stone-500">No step repeats within a case.</p>
+            : (
+              <table className="w-full text-[11px]">
+                <tbody>
+                  {flow.rework.map((r) => (
+                    <tr key={r.activity} className="border-b border-stone-800">
+                      <td className="py-1 pr-2 text-stone-200">{r.activity}</td>
+                      <td className="py-1 pr-2 text-amber-200 tabular-nums">{r.perCase.toFixed(1)}× per case</td>
+                      <td className="py-1 text-right text-stone-500 tabular-nums">{r.cases.toLocaleString()} cases</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+        </div>
+      </div>
+    </div>
+  );
+}
+// ── Conformance tab (a violation → the cases behind it) ─────────────────────
+
+function ConformanceTab({ analytics, variants, conformance, loading, projectId, runId, onRecomputed }: { analytics: RunAnalytics | null; variants: Variant[]; conformance: ConformanceResult | null; loading: boolean; projectId: string; runId: string; onRecomputed: () => void }) {
+  const [selected, setSelected] = useState<number | null>(null);
+  const [openCase, setOpenCase] = useState<string | null>(null);
+  const [rechecking, setRechecking] = useState(false);
+
+  /**
+   * Re-run what the STORED data supports — which for an already-conformed run
+   * means replaying it against its own reference, now recording which variants
+   * deviated. No re-import: the variants and the reference have both been in
+   * the run row all along.
+   *
+   * This is the recompute contract's first real consumer. It was built in
+   * Phase 0.3 with no caller and that debt named at the time; this is it.
+   */
+  const recheck = async () => {
+    setRechecking(true);
+    try {
+      await fetch(`/api/projects/${projectId}/mining/runs/${runId}/recompute`, { method: "POST" });
+      onRecomputed();
+    } finally { setRechecking(false); }
+  };
+
+  const violation = selected != null ? conformance?.violations[selected] ?? null : null;
+  const evidence = useMemo(() => evidenceFor(violation, analytics, variants), [violation, analytics, variants]);
+  const shown = useMemo(() => analytics?.cases.find((c) => c.caseId === openCase) ?? null, [analytics, openCase]);
+  const steps = useMemo(() => caseTimeline(shown, variants, analytics?.resourceDict ?? []), [shown, variants, analytics]);
+
+  if (loading && !conformance) return <p className="text-[11px] text-stone-500">Loading…</p>;
+  if (!conformance) {
+    return <p className="text-[11px] text-stone-400">No conformance result yet. Pick a reference state machine and run the check, and the deviations will be listed here with the cases behind them.</p>;
+  }
+  const unit = analytics?.clockUnit ?? "hour";
+  const fmt = (ms: number) => formatDuration(ms, unit);
+
+  return (
+    <div className="grid gap-3 md:grid-cols-2">
+      <div>
+        <div className="text-[11px] text-stone-400 mb-1">
+          <span className="text-stone-200">{Math.round(conformance.fitness * 100)}%</span> of cases replay cleanly.
+          Select a deviation to see which cases it refers to.
+        </div>
+        <div className="max-h-[44vh] overflow-auto">
+          <table className="w-full text-[11px]">
+            <tbody>
+              {conformance.violations.map((v, i) => (
+                <tr key={i} onClick={() => { setSelected(selected === i ? null : i); setOpenCase(null); }}
+                  className={`cursor-pointer border-b border-stone-800 ${selected === i ? "bg-amber-600/20" : "hover:bg-stone-800"}`}>
+                  <td className="py-1 pr-2 whitespace-nowrap">
+                    <span className={v.severity === "error" ? "text-rose-300" : "text-amber-300"}>{v.severity === "error" ? "✕" : "!"}</span>
+                  </td>
+                  <td className="py-1 pr-2 text-stone-300">{v.message}</td>
+                  <td className="py-1 text-right text-stone-200 tabular-nums">{v.cases || "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div>
+        {!violation && <p className="text-[11px] text-stone-500">Nothing selected.</p>}
+        {violation && (
+          <>
+            <div className="text-xs font-semibold text-amber-200 mb-0.5">{violation.message}</div>
+            {/* The claim and how much of it can be shown, in one sentence. A list
+                that quietly omits cases is what stops an auditor trusting this. */}
+            <div className={`text-[11px] mb-1.5 ${evidence.partial || evidence.unattributed ? "text-amber-300" : "text-stone-400"}`}>
+              {(evidence.partial || evidence.unattributed) && "⚠ "}{evidence.statement}
+              {evidence.unattributed && (
+                <button onClick={recheck} disabled={rechecking}
+                  className="ml-2 rounded px-2 py-0.5 bg-amber-700 hover:bg-amber-600 disabled:opacity-40 text-white">
+                  {rechecking ? "Re-checking…" : "Re-check now"}
+                </button>
+              )}
+            </div>
+            <div className="max-h-[36vh] overflow-auto">
+              <table className="w-full text-[11px]">
+                <tbody>
+                  {evidence.cases.map((c) => (
+                    <tr key={c.idx} onClick={() => setOpenCase(openCase === c.caseId ? null : c.caseId)}
+                      className={`cursor-pointer border-b border-stone-800 ${openCase === c.caseId ? "bg-amber-600/20" : "hover:bg-stone-800"}`}>
+                      <td className="py-1 pr-2 text-stone-300 truncate max-w-[10rem]" title={c.caseId}>{c.caseId}</td>
+                      <td className="py-1 pr-2 text-stone-500">#{c.variantIdx + 1}</td>
+                      <td className="py-1 text-right text-stone-200 tabular-nums whitespace-nowrap">{fmt(c.cycleMs)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+
+        {shown && steps.length > 0 && (
+          <div className="mt-2 rounded border border-stone-700 p-2">
+            <div className="text-[11px] font-semibold text-amber-200 mb-1">Case {shown.caseId}</div>
+            <div className="flex flex-col gap-0.5">
+              {steps.map((s, i) => (
+                <div key={i} className="flex items-baseline gap-2 text-[10px]">
+                  <span className="text-stone-500 w-4 text-right tabular-nums">{i + 1}</span>
+                  <span className="text-stone-200">{s.activity}</span>
+                  {s.state && s.state !== s.activity && <span className="text-amber-300/70">→ {s.state}</span>}
+                  {s.resource && <span className="text-blue-300/70">{s.resource}</span>}
+                  {/* Null, not zero: the last step has nothing after it to
+                      measure against, and a run without per-event durations
+                      has no timings at all. Neither is "took no time". */}
+                  {s.durMs !== null && <span className="ml-auto text-stone-400 tabular-nums">{fmt(s.durMs)}</span>}
+                </div>
+              ))}
+            </div>
+            {steps.every((s) => s.durMs === null) && (
+              <p className="text-[10px] text-stone-500 mt-1">This run did not keep per-event timings, so only the path is shown.</p>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 // ── Outcomes tab (KPI/SLA on-time vs late + drivers) ─────────────────────────
 
 function OutcomesTab({ analytics, variants, kpiConfig, onSave }: { analytics: RunAnalytics | null; variants: Variant[]; kpiConfig: KpiConfig | null; onSave: (k: KpiConfig) => void }) {
@@ -373,6 +650,10 @@ function ModelSvg({ data, visibleIds, emphasize, captions, maxVh = 46 }: { data:
 // ── Activities tab (one row per activity: stats + team(s) + state(s)) ────────
 
 function ActivitiesTab({ analytics, loading }: { analytics: RunAnalytics | null; loading: boolean }) {
+  // Item 03. The amber flag has been able to say "more than one team does
+  // this" since the run summary shipped, and there was no way to open it —
+  // which is the whole question a reader has when they see it.
+  const [openSplit, setOpenSplit] = useState<string | null>(null);
   if (loading && !analytics) return <p className="text-[11px] text-stone-500">Loading analytics…</p>;
   if (!analytics || analytics.activities.length === 0) return <NoAnalytics />;
   const unit = analytics.clockUnit;
@@ -424,7 +705,29 @@ function ActivitiesTab({ analytics, loading }: { analytics: RunAnalytics | null;
                   <td className="py-1 pr-2 text-right text-stone-400 tabular-nums">{a.eventFreq.toLocaleString()}</td>
                   <td className="py-1 pr-2 text-right text-stone-300 tabular-nums whitespace-nowrap">{formatDuration(a.medianDurMs, unit)}</td>
                   <td className="py-1 pr-2 text-right text-stone-300 tabular-nums whitespace-nowrap">{formatDuration(a.totalTimeMs, unit)}</td>
-                  <td className={`py-1 pr-3 ${multiRes ? "text-amber-300" : "text-stone-300"}`} title={multiRes ? "More than one team seen for this activity" : undefined}>{res.length ? res.join(", ") : "—"}</td>
+                  <td className={`py-1 pr-3 ${multiRes ? "text-amber-300" : "text-stone-300"}`}>
+                    {multiRes && a.resourceCounts ? (
+                      <button onClick={() => setOpenSplit(openSplit === a.activity ? null : a.activity)}
+                        className="text-left underline decoration-dotted hover:text-amber-200"
+                        title="More than one team does this — open the split">
+                        {res.join(", ")} {openSplit === a.activity ? "▾" : "▸"}
+                      </button>
+                    ) : (res.length ? res.join(", ") : "—")}
+                    {openSplit === a.activity && a.resourceCounts && (
+                      <div className="mt-1 flex flex-col gap-0.5">
+                        {Object.entries(a.resourceCounts).sort((x, y) => y[1] - x[1]).map(([team, n]) => (
+                          <div key={team} className="flex items-center gap-2 text-[10px]">
+                            <span className="text-stone-300">{team}</span>
+                            <span className="text-stone-500 tabular-nums">{n.toLocaleString()}</span>
+                            <span className="text-stone-600 tabular-nums">{a.eventFreq > 0 ? `${Math.round((n / a.eventFreq) * 100)}%` : ""}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {multiRes && !a.resourceCounts && (
+                      <span className="block text-[10px] text-stone-500">the split was not recorded for this run — re-import to see it</span>
+                    )}
+                  </td>
                   <td className={`py-1 ${multiState ? "text-amber-300" : "text-stone-300"}`} title={multiState ? "More than one state seen for this activity" : undefined}>{sts.length ? sts.join(", ") : "—"}</td>
                 </tr>
               );
@@ -676,6 +979,17 @@ function CasesTab({ analytics, variants, bpmn, hasBpmn }: { analytics: RunAnalyt
         <div className="flex items-center gap-2 mb-1 text-[11px]">
           <span className="text-xs font-semibold text-amber-200">Cases</span>
           <span className="text-stone-500">{analytics.totalCases}{analytics.capped ? " (sampled)" : ""}</span>
+          {/* The list on screen stops at 60 rows, which is right for reading
+              and useless to anyone who wants to check the work — and checking
+              the work is the first thing a sceptical reader asks to do. */}
+          <button
+            onClick={() => downloadText(
+              `cases${analytics.capped ? "-sample" : ""}-${analytics.cases.length}.csv`,
+              casesCsv(analytics, variants))}
+            title={analytics.capped
+              ? `Every case this run stores (${analytics.cases.length.toLocaleString()} of about ${analytics.totalCases.toLocaleString()}) — not just the 60 shown`
+              : `All ${analytics.cases.length.toLocaleString()} cases — not just the 60 shown`}
+            className="rounded px-2 py-0.5 bg-stone-800 text-amber-200 hover:bg-stone-700">⬇ CSV</button>
           <button onClick={() => setExpanded(true)} className="ml-auto rounded px-2 py-0.5 bg-stone-800 text-amber-200 hover:bg-stone-700">⤢ Expand</button>
           <button onClick={() => setSortDesc((s) => !s)} className="rounded px-2 py-0.5 bg-stone-800 hover:bg-stone-700 text-stone-300">
             cycle {sortDesc ? "↓ longest" : "↑ shortest"}
@@ -701,6 +1015,13 @@ function CasesTab({ analytics, variants, bpmn, hasBpmn }: { analytics: RunAnalyt
             </tbody>
           </table>
         </div>
+        {rows.length >= 60 && (
+          <p className="text-[10px] text-stone-500 mt-1">
+            Showing the 60 longest of {analytics.cases.length.toLocaleString()} stored cases
+            {analytics.capped && <> (themselves a sample of about {analytics.totalCases.toLocaleString()})</>}.
+            The CSV has every one.
+          </p>
+        )}
         {sel && (
           <div className="mt-2 rounded border border-stone-700 p-2 text-[11px]">
             <div className="font-semibold text-amber-200 mb-0.5">Case {sel.caseId}</div>

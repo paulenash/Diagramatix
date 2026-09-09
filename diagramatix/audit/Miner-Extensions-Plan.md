@@ -7,7 +7,7 @@
 | **This document** | The **live worklist** for building them. Every phase names the files it touches and the existing functions it reuses. The review is the historical argument; this is the burn-down. |
 | **Scope** | All 8 extensions + all 11 smaller items. Nothing dropped — two are **re-specified** rather than built as written, and each says why on its face. |
 | **How to use** | Work an item, tick its box, set **Status** → `In progress` / `Shipped (<commit>)` / `Won't do (<reason>)`. Record what actually happened — including deviations — in the phase's own **As built** paragraph, so this doubles as a decision log. |
-| **Progress log** | **2026-09-09** — **PHASE 5 SHIPPED** (T3791–T3821): the run slices by date, team and any kept column; the throughput chart is the date brush; the filtered rebuild is EXACT (T3800 proves it equals recomputing that slice from scratch); the report filters server-side and restates its own Summary. Phase 1's seam paid off exactly as designed — the filter reached eight panels by changing ONE line. The seam's rule is now a test, proved by reverting a tab to the raw data. **PHASE 4 SHIPPED** (T3773–T3790): `analytics.edges` reaches a screen at last as a ranked "Between steps" table, the discovered model's arrows carry the median gap and a thickness, and the detail slider the User Guide already described now exists. **The in-step vs between-step split was REFUSED**: one timestamp per event means the same milliseconds are already counted under the from-activity, so the split would have been fabricated and summing the two tables would have doubled the process. Slice (b) turned out to be one conditional, safe because almost nothing in the tree sets `weight` — now a test. **PHASE 3 SHIPPED** (T3763–T3772): the hold-back reaches a screen for the first time, the calibrate hand-off stops discarding its study, and a refreshed run marks its twin stale rather than silently re-calibrating. A FOURTH defect surfaced while building: a live refresh was silently DROPPING the hold-back, so an out-of-sample validation quietly became in-sample and the panel said otherwise. **PHASE 0 COMPLETE** (0.3–0.6, T3681–T3762): the recompute contract refuses the four per-event fields by name rather than approximating them from variants; a test floor under the five untested modules; eleven hand-written run-JSON statements (not six) became one patch helper with a guard that was proved to fire; and **0.5 answered on evidence — the generator is deterministic, the baked catalog was merely STALE, and all five examples had been teaching pre-Phase-1 analytics since Phase 1 shipped ahead of its own gate.** **2.3 SHIPPED** (T3657–T3680): several systems merge into one lifecycle, ids unified by shared key or crosswalk (union-find, so chains resolve), a refusal when nothing overlaps, and CROSS-SYSTEM HANDOVER measured at the join — the days nobody owns, which neither export contains. **0.2 SHIPPED**: the console went 1,183 → 153 lines (44 `useState` → 5) into `console/ImportPanel`, `console/RunList`, `console/RunDetail`. **No tab shell** — this plan's own text contradicted itself and the e2e settled it. Which turned up the next thing: that e2e looked for a button renamed months ago, so the Miner's only route-level coverage was failing before it reached what it covered. **2.1 SHIPPED** (T3647–T3656): `.xlsx` read directly, no new dependency. **2.2 SHIPPED** (T3631–T3646): wide exports expand to one row per event. — Plan written. Reconnaissance found **four things the review got wrong** and **one it does not mention at all** (the gating hole), all recorded below against the item they affect. **Step 1 SHIPPED**: 20 of 26 mining routes now carry a subscription gate (was 3), the three dormant tier keys are enforced, and `tests/mining/route-gating.test.ts` (T3609–T3613) enumerates the route tree so the twenty-seventh route cannot be added ungated. **Phase 1 SHIPPED** (T3614–T3630) — and its budget test found a CRASH: `Math.min(...xs)` threw past ~125k elements in three places, so any log beyond ~125,000 events could not be imported at all. **Phase 8 ADDED** after Paul asked whether the plan gave the user a course of action; it did not, and neither does the review. The cut line moved to after it. **Phase 2 ADDED** — three input questions the plan could not answer: no `.xlsx`, wide-format exports silently read as one event, and no way to merge several systems' exports of the same cases. Placed second, because a user who cannot load their export is not reached by anything else. Phases 2–10 renumbered to 3–11. |
+| **Progress log** | **2026-09-09** — **PHASE 6 SHIPPED** (T3822–T3841): a deviation now names the cases behind it, a case shows its own timeline, and the whole index exports as CSV. The floor gained a THIRD state the plan did not name — `unattributed`, for a run checked before attribution existed, where an empty list would be a confident lie. **The Phase 0.3 recompute debt is settled**: its consumer is the Re-check button, and an existing run gains attribution with no re-import. Deviations also filter, which the plan expected of Phase 5. **PHASE 5 SHIPPED** (T3791–T3821): the run slices by date, team and any kept column; the throughput chart is the date brush; the filtered rebuild is EXACT (T3800 proves it equals recomputing that slice from scratch); the report filters server-side and restates its own Summary. Phase 1's seam paid off exactly as designed — the filter reached eight panels by changing ONE line. The seam's rule is now a test, proved by reverting a tab to the raw data. **PHASE 4 SHIPPED** (T3773–T3790): `analytics.edges` reaches a screen at last as a ranked "Between steps" table, the discovered model's arrows carry the median gap and a thickness, and the detail slider the User Guide already described now exists. **The in-step vs between-step split was REFUSED**: one timestamp per event means the same milliseconds are already counted under the from-activity, so the split would have been fabricated and summing the two tables would have doubled the process. Slice (b) turned out to be one conditional, safe because almost nothing in the tree sets `weight` — now a test. **PHASE 3 SHIPPED** (T3763–T3772): the hold-back reaches a screen for the first time, the calibrate hand-off stops discarding its study, and a refreshed run marks its twin stale rather than silently re-calibrating. A FOURTH defect surfaced while building: a live refresh was silently DROPPING the hold-back, so an out-of-sample validation quietly became in-sample and the panel said otherwise. **PHASE 0 COMPLETE** (0.3–0.6, T3681–T3762): the recompute contract refuses the four per-event fields by name rather than approximating them from variants; a test floor under the five untested modules; eleven hand-written run-JSON statements (not six) became one patch helper with a guard that was proved to fire; and **0.5 answered on evidence — the generator is deterministic, the baked catalog was merely STALE, and all five examples had been teaching pre-Phase-1 analytics since Phase 1 shipped ahead of its own gate.** **2.3 SHIPPED** (T3657–T3680): several systems merge into one lifecycle, ids unified by shared key or crosswalk (union-find, so chains resolve), a refusal when nothing overlaps, and CROSS-SYSTEM HANDOVER measured at the join — the days nobody owns, which neither export contains. **0.2 SHIPPED**: the console went 1,183 → 153 lines (44 `useState` → 5) into `console/ImportPanel`, `console/RunList`, `console/RunDetail`. **No tab shell** — this plan's own text contradicted itself and the e2e settled it. Which turned up the next thing: that e2e looked for a button renamed months ago, so the Miner's only route-level coverage was failing before it reached what it covered. **2.1 SHIPPED** (T3647–T3656): `.xlsx` read directly, no new dependency. **2.2 SHIPPED** (T3631–T3646): wide exports expand to one row per event. — Plan written. Reconnaissance found **four things the review got wrong** and **one it does not mention at all** (the gating hole), all recorded below against the item they affect. **Step 1 SHIPPED**: 20 of 26 mining routes now carry a subscription gate (was 3), the three dormant tier keys are enforced, and `tests/mining/route-gating.test.ts` (T3609–T3613) enumerates the route tree so the twenty-seventh route cannot be added ungated. **Phase 1 SHIPPED** (T3614–T3630) — and its budget test found a CRASH: `Math.min(...xs)` threw past ~125k elements in three places, so any log beyond ~125,000 events could not be imported at all. **Phase 8 ADDED** after Paul asked whether the plan gave the user a course of action; it did not, and neither does the review. The cut line moved to after it. **Phase 2 ADDED** — three input questions the plan could not answer: no `.xlsx`, wide-format exports silently read as one event, and no way to merge several systems' exports of the same cases. Placed second, because a user who cannot load their export is not reached by anything else. Phases 2–10 renumbered to 3–11. |
 
 **Status values:** `Not started` · `In progress` · `Shipped (<commit>)` · `Blocked (<on what>)` · `Won't do (<reason>)`
 
@@ -843,11 +843,12 @@ better done together.
 
 ## Phase 6 — Fourteen cases skipped the credit check; here they are
 
-**Status:** `Not started`
+**Status:** ✅ `Shipped` — T3822–T3841.
 
-- [ ] `ConformanceViolation.variantIdxs`, joined to `analytics.cases`
-- [ ] Click a violation → the cases; click a case → its path, and (with Phase 1's `durs`) its timeline
-- [ ] Smaller item **01** — the whole per-case index out as CSV
+- [x] `ConformanceViolation.variantIdxs`, joined to `analytics.cases`
+- [x] Click a violation → the cases; click a case → its path and its timeline
+- [x] Smaller item **01** — the whole per-case index out as CSV
+- [x] **(bonus)** The deviations list FILTERS, which the plan expected of Phase 5
 
 **Absorbs.** **Extension 4**, **item 01**. Both are the same argument: *evidence, not a metric.* The
 case list is capped at 60 rows with no export, and a sceptical stakeholder asks for the rest first.
@@ -859,6 +860,53 @@ existing run gains case attribution without a re-import.**
 **Honest floor — the most important in the programme.** With a strided case index the fourteen cases
 may resolve to nine. The UI must read **"14 cases · 9 identifiable in the stored sample"**. Never a
 silently short list presented as the list — that is exactly what stops an auditor trusting the tool.
+
+---
+
+### As built
+
+**A new "⚖ Deviations" tab in Insights.** Select a deviation, get the cases; select a case, get its
+path with per-step timings and the team on each step. Nothing needed raw events: the violation now
+records the variants that exhibit it, every stored case carries the variant it followed, and the
+join is over data that has been sitting in the run row since import.
+
+**The floor, as built** (`caseEvidence.ts`, T3826). The statement is one sentence carrying the claim,
+how much of it can be shown, and why: *"3 cases · 2 identifiable in the stored sample (this run
+stores 999 of 1,000 cases)."* The list is never quietly short.
+
+**A THIRD state the plan did not name, and it matters more than the second.** A run conformed
+before this shipped has no attribution at all — and an empty list there would be a confident lie
+about a run that has simply not been asked again. `unattributed` is distinct from `partial`: it
+reports *"which ones was not recorded when this run was checked"* and offers the remedy as a
+button (T3827). Absent is not empty, and neither is a short list.
+
+**This is where the 0.3 recompute debt gets settled, exactly as predicted.** The route was built in
+Phase 0 with no caller and the debt named at the time rather than left to accumulate — the
+`holdoutPct` pattern this programme has now hit three times. Its consumer is the *Re-check now*
+button on an unattributed deviation: the run replays its OWN stored variants against its OWN stored
+reference and gains case attribution. **No re-import, on any existing run.** Pinned by T3841.
+
+**A correctness problem the filter created, found while wiring the tab.** A stored violation counts
+the WHOLE log. Under a Phase 5 slice that would have put a whole-run claim ("3 cases") beside a
+filtered list ("1 identifiable") — and the honest floor would then have fired on a gap that striding
+did not cause and re-checking would not fix. `claimed` is therefore derived from the variants passed
+in: the filtered variant counts ARE the slice's, so summing them over the violating variants gives
+the slice's own figure (T3838, T3839).
+
+That fix is also the bonus: **the deviations list filters for free**, which is what the plan
+predicted about conformance being nearly free to filter. It arrived one phase later than expected,
+for the same reason it was cheap.
+
+**Item 01 — the whole index out.** The on-screen list stops at sixty rows, which is right for
+reading and useless to anyone who wants to check the work; checking the work is the first thing a
+sceptical reader asks to do. The CSV is built in the browser from the SAME `view.analytics` the
+table draws from, so the file and the screen cannot disagree — and it honours the active filter for
+nothing. It carries the path and every kept column, so it can be pivoted. The count and the coverage
+are stated beside the button and in the file name; a strided run's export says `-sample-` in its own
+name rather than passing for complete.
+
+**Still not done, and still named together:** discovery *from* a slice, and arrow-to-table linking
+from Phase 4. Both are "connect the model to the analysis" work and are cheaper as one piece.
 
 ---
 
