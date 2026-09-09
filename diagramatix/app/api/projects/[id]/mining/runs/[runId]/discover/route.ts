@@ -23,6 +23,9 @@ import { enterAiContext, AI_INVOCATION_POINTS, recordDiagramGenerated } from "@/
 import { discoverProcess } from "@/app/lib/mining/discoverProcess";
 import { isTaskRun, collapseNavForDiscovery } from "@/app/lib/mining/taskMining/insights";
 import { badgeEdgeCounts } from "@/app/lib/mining/edgeBadges";
+import { annotateTransitions } from "@/app/lib/mining/handover";
+import { formatDuration } from "@/app/lib/mining/analytics";
+import type { RunAnalytics } from "@/app/lib/mining/analytics";
 import { generateProcessViaAi } from "@/app/lib/mining/aiProcess";
 import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
 import { layoutBpmnDiagram } from "@/app/lib/diagram/bpmnLayout";
@@ -112,6 +115,10 @@ export async function POST(req: Request, { params }: Params) {
   // V06 defects survive three regenerations (Paul, 2026-08-29). Not surfaced in
   // this feature's UI yet — the log is the floor, not the ceiling.
     data = badgeEdgeCounts(layoutBpmnDiagram(plan.elements, plan.connections, { onDiagnostic: logLayoutDiagnostic("mining discover") }));
+    // How often each path was taken is already a badge; how LONG it took is
+    // the half that was mined, persisted since import and never shown.
+    const an = run.analytics as unknown as RunAnalytics | null;
+    if (an?.edges) data = annotateTransitions(data, an.edges, (ms) => formatDuration(ms, an.clockUnit));
   }
 
   const diagram = await prisma.diagram.create({

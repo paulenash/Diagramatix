@@ -23,6 +23,8 @@ import { updateRunJson } from "@/app/lib/mining/runStore";
 import { discoverProcess } from "@/app/lib/mining/discoverProcess";
 import { discoverStateMachine } from "@/app/lib/mining/discoverStateMachine";
 import { badgeEdgeCounts } from "@/app/lib/mining/edgeBadges";
+import { annotateTransitions } from "@/app/lib/mining/handover";
+import { formatDuration, type RunAnalytics } from "@/app/lib/mining/analytics";
 import { flagIllegalTransitions } from "@/app/lib/mining/flagIllegalTransitions";
 import { layoutBpmnDiagram } from "@/app/lib/diagram/bpmnLayout";
 import { logLayoutDiagnostic } from "@/app/lib/diagram/layoutDiagnosticLog";
@@ -87,7 +89,9 @@ export async function POST(_req: Request, { params }: Params) {
     // Same account of what the layout could not take at face value as the
     // discover route gives — a re-layout can dangle a reference just as an
     // original can, and a diagram that LOOKS fine is how those survive.
-    const data = badgeEdgeCounts(layoutBpmnDiagram(bpmn.elements, bpmn.connections, { onDiagnostic: logLayoutDiagnostic("mining recompute") }));
+    let data = badgeEdgeCounts(layoutBpmnDiagram(bpmn.elements, bpmn.connections, { onDiagnostic: logLayoutDiagnostic("mining recompute") }));
+    const an = run.analytics as unknown as RunAnalytics | null;
+    if (an?.edges) data = annotateTransitions(data, an.edges, (ms) => formatDuration(ms, an.clockUnit));
     await writeDiagramData(run.discoveredBpmnId, data);
   }
   if (run.discoveredSmId) {

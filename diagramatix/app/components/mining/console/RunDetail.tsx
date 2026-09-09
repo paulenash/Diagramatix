@@ -59,6 +59,12 @@ export function RunDetail({
   const [explanation, setExplanation] = useState<string | null>(null);
   const [explaining, setExplaining] = useState(false);
   const [calibrating, setCalibrating] = useState(false);
+  // How much of the real spaghetti to draw. The discover route has accepted
+  // `edgeThreshold` since it shipped and nothing ever sent it, while the
+  // published User Guide already told users to "leave the detail slider on all
+  // paths" — a control that did not exist. Shipping it repairs the guide,
+  // which is better than editing the guide down to what the product does.
+  const [edgeThreshold, setEdgeThreshold] = useState(0);
   // Hide the AI-curate / Explain actions when the org disables AI (server enforces regardless).
   const aiAllowed = useAiAllowed();
 
@@ -134,7 +140,7 @@ export function RunDetail({
     setDiscovering(true); if (ai) setAiBpmn(true); else setBpmnBusy(true); setErr(null);
     try {
       const res = await fetch(`/api/projects/${projectId}/mining/runs/${runId}/discover`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ai }),
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ai, edgeThreshold }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) { setErr(json.error ?? "Discovery failed"); return; }
@@ -277,6 +283,25 @@ export function RunDetail({
             <a href={openDiagram(run.discoveredBpmnId)} onClick={stashReturn} className="text-xs text-amber-300 hover:text-amber-200 underline">Open discovered diagram →</a>
           )}
         </div>
+        {/* Real logs are noisy and an arrow-centric model is unreadable at full
+            density, so this is the twin of the timing views rather than a
+            polish item. Applies to the deterministic discovery only — AI
+            curation does its own simplifying. */}
+        <label className="mt-2.5 flex items-center gap-2 flex-wrap text-[11px]">
+          <span className="text-stone-400">Detail:</span>
+          <input type="range" min={0} max={0.5} step={0.05} value={edgeThreshold}
+            onChange={(e) => setEdgeThreshold(Number(e.target.value))}
+            className="w-40 accent-amber-500"
+            title="Drop the rarest paths. 0 draws every path the log contains." />
+          <span className="text-stone-300 tabular-nums w-28">
+            {edgeThreshold === 0 ? "all paths" : `≥ ${Math.round(edgeThreshold * 100)}% of the busiest`}
+          </span>
+          <span className="text-[10px] text-stone-500">
+            {edgeThreshold === 0
+              ? "Every path in the log, spaghetti and all."
+              : "Simpler: rare routes are dropped, so the model shows the dominant flow rather than everything that ever happened."}
+          </span>
+        </label>
       </div>
 
       {/* Discover the entity state machine (deterministic mirror of the log) */}

@@ -17,6 +17,8 @@ import { computeGovernance, hasGovernance } from "./governance";
 import { splitByTime } from "@/app/lib/simulation/validate";
 import { discoverProcess } from "./discoverProcess";
 import { badgeEdgeCounts } from "./edgeBadges";
+import { annotateTransitions } from "./handover";
+import { formatDuration } from "./analytics";
 import { discoverStateMachine } from "./discoverStateMachine";
 import { layoutBpmnDiagram } from "@/app/lib/diagram/bpmnLayout";
 import { checkTransitionConformance, type ReferenceSm } from "./transitionConformance";
@@ -94,7 +96,8 @@ export async function refreshRunFromSource(source: RefreshableSource): Promise<R
     // Re-discover the BPMN in place (deterministic).
     if (run.discoveredBpmnId) {
       const { plan } = discoverProcess(log.variants, { edgeThreshold: 0 });
-      const data = badgeEdgeCounts(layoutBpmnDiagram(plan.elements, plan.connections)); // no promptLabel → no "AI Generated" tag
+      let data = badgeEdgeCounts(layoutBpmnDiagram(plan.elements, plan.connections)); // no promptLabel → no "AI Generated" tag
+      data = annotateTransitions(data, analytics.edges, (ms) => formatDuration(ms, analytics.clockUnit));
       await writeDiagramData(run.discoveredBpmnId, data);
     }
     // Re-discover the state machine in place (deterministic mirror + frequencies).

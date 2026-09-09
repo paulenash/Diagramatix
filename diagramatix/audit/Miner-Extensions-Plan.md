@@ -7,7 +7,7 @@
 | **This document** | The **live worklist** for building them. Every phase names the files it touches and the existing functions it reuses. The review is the historical argument; this is the burn-down. |
 | **Scope** | All 8 extensions + all 11 smaller items. Nothing dropped — two are **re-specified** rather than built as written, and each says why on its face. |
 | **How to use** | Work an item, tick its box, set **Status** → `In progress` / `Shipped (<commit>)` / `Won't do (<reason>)`. Record what actually happened — including deviations — in the phase's own **As built** paragraph, so this doubles as a decision log. |
-| **Progress log** | **2026-09-09** — **PHASE 3 SHIPPED** (T3763–T3772): the hold-back reaches a screen for the first time, the calibrate hand-off stops discarding its study, and a refreshed run marks its twin stale rather than silently re-calibrating. A FOURTH defect surfaced while building: a live refresh was silently DROPPING the hold-back, so an out-of-sample validation quietly became in-sample and the panel said otherwise. **PHASE 0 COMPLETE** (0.3–0.6, T3681–T3762): the recompute contract refuses the four per-event fields by name rather than approximating them from variants; a test floor under the five untested modules; eleven hand-written run-JSON statements (not six) became one patch helper with a guard that was proved to fire; and **0.5 answered on evidence — the generator is deterministic, the baked catalog was merely STALE, and all five examples had been teaching pre-Phase-1 analytics since Phase 1 shipped ahead of its own gate.** **2.3 SHIPPED** (T3657–T3680): several systems merge into one lifecycle, ids unified by shared key or crosswalk (union-find, so chains resolve), a refusal when nothing overlaps, and CROSS-SYSTEM HANDOVER measured at the join — the days nobody owns, which neither export contains. **0.2 SHIPPED**: the console went 1,183 → 153 lines (44 `useState` → 5) into `console/ImportPanel`, `console/RunList`, `console/RunDetail`. **No tab shell** — this plan's own text contradicted itself and the e2e settled it. Which turned up the next thing: that e2e looked for a button renamed months ago, so the Miner's only route-level coverage was failing before it reached what it covered. **2.1 SHIPPED** (T3647–T3656): `.xlsx` read directly, no new dependency. **2.2 SHIPPED** (T3631–T3646): wide exports expand to one row per event. — Plan written. Reconnaissance found **four things the review got wrong** and **one it does not mention at all** (the gating hole), all recorded below against the item they affect. **Step 1 SHIPPED**: 20 of 26 mining routes now carry a subscription gate (was 3), the three dormant tier keys are enforced, and `tests/mining/route-gating.test.ts` (T3609–T3613) enumerates the route tree so the twenty-seventh route cannot be added ungated. **Phase 1 SHIPPED** (T3614–T3630) — and its budget test found a CRASH: `Math.min(...xs)` threw past ~125k elements in three places, so any log beyond ~125,000 events could not be imported at all. **Phase 8 ADDED** after Paul asked whether the plan gave the user a course of action; it did not, and neither does the review. The cut line moved to after it. **Phase 2 ADDED** — three input questions the plan could not answer: no `.xlsx`, wide-format exports silently read as one event, and no way to merge several systems' exports of the same cases. Placed second, because a user who cannot load their export is not reached by anything else. Phases 2–10 renumbered to 3–11. |
+| **Progress log** | **2026-09-09** — **PHASE 4 SHIPPED** (T3773–T3790): `analytics.edges` reaches a screen at last as a ranked "Between steps" table, the discovered model's arrows carry the median gap and a thickness, and the detail slider the User Guide already described now exists. **The in-step vs between-step split was REFUSED**: one timestamp per event means the same milliseconds are already counted under the from-activity, so the split would have been fabricated and summing the two tables would have doubled the process. Slice (b) turned out to be one conditional, safe because almost nothing in the tree sets `weight` — now a test. **PHASE 3 SHIPPED** (T3763–T3772): the hold-back reaches a screen for the first time, the calibrate hand-off stops discarding its study, and a refreshed run marks its twin stale rather than silently re-calibrating. A FOURTH defect surfaced while building: a live refresh was silently DROPPING the hold-back, so an out-of-sample validation quietly became in-sample and the panel said otherwise. **PHASE 0 COMPLETE** (0.3–0.6, T3681–T3762): the recompute contract refuses the four per-event fields by name rather than approximating them from variants; a test floor under the five untested modules; eleven hand-written run-JSON statements (not six) became one patch helper with a guard that was proved to fire; and **0.5 answered on evidence — the generator is deterministic, the baked catalog was merely STALE, and all five examples had been teaching pre-Phase-1 analytics since Phase 1 shipped ahead of its own gate.** **2.3 SHIPPED** (T3657–T3680): several systems merge into one lifecycle, ids unified by shared key or crosswalk (union-find, so chains resolve), a refusal when nothing overlaps, and CROSS-SYSTEM HANDOVER measured at the join — the days nobody owns, which neither export contains. **0.2 SHIPPED**: the console went 1,183 → 153 lines (44 `useState` → 5) into `console/ImportPanel`, `console/RunList`, `console/RunDetail`. **No tab shell** — this plan's own text contradicted itself and the e2e settled it. Which turned up the next thing: that e2e looked for a button renamed months ago, so the Miner's only route-level coverage was failing before it reached what it covered. **2.1 SHIPPED** (T3647–T3656): `.xlsx` read directly, no new dependency. **2.2 SHIPPED** (T3631–T3646): wide exports expand to one row per event. — Plan written. Reconnaissance found **four things the review got wrong** and **one it does not mention at all** (the gating hole), all recorded below against the item they affect. **Step 1 SHIPPED**: 20 of 26 mining routes now carry a subscription gate (was 3), the three dormant tier keys are enforced, and `tests/mining/route-gating.test.ts` (T3609–T3613) enumerates the route tree so the twenty-seventh route cannot be added ungated. **Phase 1 SHIPPED** (T3614–T3630) — and its budget test found a CRASH: `Math.min(...xs)` threw past ~125k elements in three places, so any log beyond ~125,000 events could not be imported at all. **Phase 8 ADDED** after Paul asked whether the plan gave the user a course of action; it did not, and neither does the review. The cut line moved to after it. **Phase 2 ADDED** — three input questions the plan could not answer: no `.xlsx`, wide-format exports silently read as one event, and no way to merge several systems' exports of the same cases. Placed second, because a user who cannot load their export is not reached by anything else. Phases 2–10 renumbered to 3–11. |
 
 **Status values:** `Not started` · `In progress` · `Shipped (<commit>)` · `Blocked (<on what>)` · `Won't do (<reason>)`
 
@@ -652,13 +652,13 @@ shipped and tested.
 
 ## Phase 4 — Most of the elapsed time is between the steps, not inside them
 
-**Status:** `Not started`
+**Status:** ✅ `Shipped` — T3773–T3790. **Both slices landed**, including the canvas one.
 
-- [ ] **(a)** A ranked **handover table** beside the bottleneck table, the in-step vs between-step
-      split of total elapsed time, and transition medians on the discovered model via the existing
-      `label` / `transitionCount` channels
-- [ ] **(b)** Arrow thickness or colour — scoped separately, as a **canvas** change
-- [ ] Smaller item **04** — the `edgeThreshold` slider
+- [x] **(a)** A ranked **transitions table** ("⏳ Between steps"), and transition medians on the
+      discovered model via the existing `label` / `transitionCount` channels
+- [x] **(b)** Arrow thickness — the canvas change, and far cheaper than feared (see below)
+- [x] Smaller item **04** — the `edgeThreshold` slider
+- [x] ~~the in-step vs between-step split~~ — **REFUSED. The data cannot support it.** See below.
 
 **Absorbs.** **Extension 1**, **item 04**.
 
@@ -677,6 +677,62 @@ control is the twin of arrow heat, not a stray polish item. It also repairs publ
 **shipping the slider fixes the guide, which is better than editing the guide down.**
 
 **Honest floor.** An edge with fewer than N observations shows a frequency and no median.
+
+---
+
+### As built
+
+**The phase's own headline is not something this data can demonstrate, and the deliverable that
+assumed it has been refused.** An event log records ONE timestamp per event. The interval between
+two consecutive events is therefore a single number, and nothing in the log says how much of it was
+work and how much was waiting. Worse, `computeAnalytics` pushes that same interval into BOTH the
+from-activity's `totalTimeMs` and the edge's samples — **the same milliseconds under two names**
+(`analytics.ts`, one `d` appended to `durByActivity[a]` and to `edgeDur[a→next]`).
+
+So an "in-step vs between-step split" would have been a fabricated distinction that looked entirely
+plausible, and summing the two tables would have doubled the elapsed time of the user's own process.
+What shipped instead is a **decomposition**: the transitions table breaks the bottleneck figure down
+by where the case was going next, and says so on screen. T3777 pins the arithmetic — the transitions
+leaving a step sum to exactly that step's total — so the claim is checkable rather than a comment.
+
+**This is a genuinely useful finding without the fabricated half.** "Check takes eight hours" is not
+one fact: three quarters of it may be the wait before *Approve* and a quarter the wait before
+*Reject*, and that is the difference between fixing the check and fixing the approval queue.
+
+**Ranked by TOTAL, not median** (T3773). A two-day wait that happens twice matters less than a
+two-hour wait that happens four hundred times, and ranking on median puts the rare one at the top of
+the screen. That required `EdgeMetric.totalMs`, added at import — Phase 1's rule again, store or
+never. Existing runs cannot gain it, so they fall back to `freq × median` **marked ≈**, with the
+reason: the estimate is right for a symmetric spread and understates a skewed one, which is the
+usual shape of a waiting time.
+
+**Slice (b) was far cheaper than the review or this plan expected, and the reason is worth keeping.**
+The plan said colouring an arrow means changing the shared renderer used by every diagram in the
+product. True of colour; not true of thickness. `Connector.weight` already exists and is already
+rendered — it was simply gated to `uml-association`. Widening that gate to include `sequence` is a
+**one-conditional change**, and it is safe not because the renderer was inspected but because of a
+fact about the rest of the tree: **almost nothing sets `weight` at all**. `buildDomainFromOcel` sets
+it on UML associations; the Visio domain importer round-trips it and can only ever produce UML
+connector types; nothing else does. So no existing diagram changes by a pixel.
+
+That fact is now a test rather than an argument (T3790) — a third producer putting a weight on a
+sequence flow would silently re-thicken arrows in a diagram nobody was measuring, and the guard was
+proved to fire by planting one.
+
+**The arrow now says how often AND how long.** `badgeEdgeCounts` had already moved the frequency off
+`label` and onto the `transitionCount` badge, leaving `label` free for the median gap. Applied in
+all three places that build a discovered BPMN — discover, recompute and live refresh — so the three
+cannot drift apart.
+
+**Item 04 was another shipped-and-unreachable capability**, the same shape as all of Phase 3: the
+discover route has accepted `edgeThreshold` since it shipped and nothing ever sent it, while the
+published User Guide already told users to *"leave the detail slider on all paths"*. The slider now
+exists, so the guide is true — which was always the better direction than editing the guide down to
+match the product.
+
+**Not done, and named rather than implied:** the transitions table is not yet reachable from the
+model — clicking an arrow does not select its row, and the table does not highlight an edge. That is
+a linking job, not an analysis one, and it belongs with Phase 5's filtering seam.
 
 ---
 

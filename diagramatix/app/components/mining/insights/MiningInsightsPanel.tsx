@@ -25,6 +25,7 @@ import { automationOpportunities, taskAutomationScore, buildAutomationSpec, auto
 import { isTaskRun, detectReworkActivities, pingPongFromVariants } from "@/app/lib/mining/taskMining/insights";
 import { buildTaskProcedure } from "@/app/lib/mining/taskMining/procedure";
 import { ReplayDiagramBackdrop } from "@/app/components/simulation/replay/ReplayDiagramBackdrop";
+import { transitionRows, MIN_EDGE_OBS } from "@/app/lib/mining/handover";
 import { useRunView } from "./useRunView";
 import { ExpandedView } from "./ExpandedView";
 import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
@@ -33,10 +34,11 @@ const EXPAND_BTN = "ml-auto text-[11px] rounded px-2 py-0.5 bg-stone-800 text-am
 
 interface RunLite { id: string; discoveredBpmnId: string | null; discoveredSmId: string | null }
 
-type TabKey = "tasks" | "activities" | "heat" | "variants" | "cases" | "outcomes" | "export";
+type TabKey = "tasks" | "activities" | "between" | "heat" | "variants" | "cases" | "outcomes" | "export";
 const TASK_TAB: { key: TabKey; label: string } = { key: "tasks", label: "🤖 Automation" };
 const TABS: { key: TabKey; label: string }[] = [
   { key: "activities", label: "📋 Activities" },
+  { key: "between", label: "⏳ Between steps" },
   { key: "heat", label: "🔥 Insights" },
   { key: "variants", label: "🔀 Variants" },
   { key: "cases", label: "🎞 Cases" },
@@ -106,6 +108,7 @@ export function MiningInsightsPanel({ projectId, run }: { projectId: string; run
       {view.note && <p className="text-[11px] text-amber-300/80 mb-2">{view.note}</p>}
       {tab === "tasks" && <TasksTab variants={view.variants} loading={loading} />}
       {tab === "activities" && <ActivitiesTab analytics={view.analytics} loading={loading} />}
+      {tab === "between" && <BetweenStepsTab analytics={view.analytics} loading={loading} />}
       {tab === "heat" && <HeatTab analytics={view.analytics} bpmn={bpmn} hasBpmn={!!run.discoveredBpmnId} loading={loading} />}
       {tab === "variants" && <VariantsTab variants={view.variants} bpmn={bpmn} hasBpmn={!!run.discoveredBpmnId} />}
       {tab === "cases" && <CasesTab analytics={view.analytics} variants={view.variants} bpmn={bpmn} hasBpmn={!!run.discoveredBpmnId} />}
@@ -728,6 +731,70 @@ function DiffRow({ label, items, tone }: { label: string; items: string[]; tone:
 
 function NeedBpmn({ what }: { what: string }) {
   return <p className="text-[11px] text-stone-400">Discover the <span className="text-amber-200">process (BPMN)</span> first — the {what} needs the discovered activities.</p>;
+}
+function BetweenStepsTab({ analytics, loading }: { analytics: RunAnalytics | null; loading: boolean }) {
+  const view = useMemo(() => transitionRows(analytics?.edges), [analytics]);
+  if (loading && !analytics) return <p className="text-[11px] text-stone-500">Loading analytics…</p>;
+  if (!analytics) return <NoAnalytics />;
+  if (view.rows.length === 0) {
+    return <p className="text-[11px] text-stone-400">No transitions in this run — every case is a single event, so there is no gap between steps to measure.</p>;
+  }
+  const unit = analytics.clockUnit;
+  const share = (x: number) => `${(x * 100).toFixed(0)}%`;
+  return (
+    <div>
+      {/* The disclosure that makes this table honest. An event log records ONE
+          timestamp per event, so the interval between two events is a single
+          number and nothing says how much was work and how much was waiting —
+          and the SAME milliseconds appear in the Activities table under the
+          step they leave. Without this, a reader sums both tables and doubles
+          the elapsed time of their own process. */}
+      <div className="text-[11px] text-stone-400 mb-2 leading-relaxed">
+        Every step-to-step gap in the log, ranked by how much of the total elapsed time it accounts for.
+        <span className="text-stone-300"> These are the same milliseconds the Activities table charges to the step they leave</span> —
+        this breaks that figure down by where the case was going next, rather than adding to it.
+      </div>
+      <div className="text-[10px] text-stone-500 mb-2 leading-relaxed">
+        A log records one timestamp per event, so a gap cannot be split into work and waiting. Every figure here is the whole gap.
+        {view.anyEstimated && <span className="text-amber-400"> Totals marked ≈ are estimated as median × count: this run was imported before totals were recorded, and re-importing would measure them.</span>}
+      </div>
+      <div className="overflow-x-auto max-h-[52vh]">
+        <table className="w-full text-[11px]">
+          <thead className="text-stone-400 text-left sticky top-0 bg-stone-900">
+            <tr>
+              <th className="font-normal py-1 pr-3">From</th>
+              <th className="font-normal py-1 pr-3">To</th>
+              <th className="font-normal py-1 pr-2 text-right">Times</th>
+              <th className="font-normal py-1 pr-2 text-right">Median gap</th>
+              <th className="font-normal py-1 pr-2 text-right">Total</th>
+              <th className="font-normal py-1 pr-2 text-right">Share of run</th>
+              <th className="font-normal py-1 text-right">Share of step</th>
+            </tr>
+          </thead>
+          <tbody>
+            {view.rows.map((r) => (
+              <tr key={`${r.from}->${r.to}`} className="border-b border-stone-800 hover:bg-stone-800/60">
+                <td className="py-1 pr-3 text-stone-200">{r.from}</td>
+                <td className="py-1 pr-3 text-stone-200">{r.to}</td>
+                <td className="py-1 pr-2 text-right text-stone-400 tabular-nums">{r.freq.toLocaleString()}</td>
+                <td className="py-1 pr-2 text-right text-stone-300 tabular-nums whitespace-nowrap">
+                  {r.medianMs === null
+                    ? <span className="text-stone-600" title={`Fewer than ${MIN_EDGE_OBS} observations — too few for a median worth quoting`}>—</span>
+                    : formatDuration(r.medianMs, unit)}
+                </td>
+                <td className="py-1 pr-2 text-right text-amber-200 tabular-nums whitespace-nowrap">
+                  {r.estimated && <span className="text-amber-500/70" title="Estimated as median × count">≈ </span>}
+                  {formatDuration(r.totalMs, unit)}
+                </td>
+                <td className="py-1 pr-2 text-right text-stone-400 tabular-nums">{view.totalMs > 0 ? share(r.totalMs / view.totalMs) : "—"}</td>
+                <td className="py-1 text-right text-stone-400 tabular-nums" title={`Share of all the time leaving "${r.from}"`}>{share(r.shareOfFrom)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 }
 function NoAnalytics() {
   return <p className="text-[11px] text-stone-400">No analytics for this run yet. Re-import the log to compute the Insights (older runs predate this feature).</p>;

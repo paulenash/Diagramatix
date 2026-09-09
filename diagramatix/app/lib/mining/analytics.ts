@@ -54,6 +54,15 @@ export interface EdgeMetric {
   to: string;
   freq: number;           // observed directly-follows count
   medianMs: number;       // median transition time between the two events
+  /** Sum of every observed transition time on this edge — how much of the log's
+   *  elapsed time this one hand-off accounts for, which is what a RANKED view
+   *  needs and what a median cannot give it: a rare two-day wait outranks a
+   *  frequent two-hour one on median, and matters far less.
+   *
+   *  Optional because a run imported before this existed cannot gain it — raw
+   *  events are transient. Readers fall back to `freq × median` and SAY it is
+   *  an estimate rather than presenting it as measured. */
+  totalMs?: number;
 }
 export interface ThroughputBucket { t: number; started: number; completed: number; }
 export interface CaseSummary {
@@ -199,7 +208,12 @@ export function computeAnalytics(log: EventLog): RunAnalytics {
 
   const edges: EdgeMetric[] = [...edgeDur.entries()].map(([k, ds]) => {
     const [from, to] = JSON.parse(k) as [string, string];
-    return { from, to, freq: ds.length, medianMs: quantile(sortedNums(ds), 0.5) };
+    return {
+      from, to,
+      freq: ds.length,
+      medianMs: quantile(sortedNums(ds), 0.5),
+      totalMs: ds.reduce((s, d) => s + d, 0),
+    };
   }).sort((x, y) => y.freq - x.freq);
 
   // Per-case summaries (capped, even-strided when over CASE_CAP).
