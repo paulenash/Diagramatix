@@ -446,7 +446,7 @@ export function RunDetail({
       {err && <p className="text-rose-400 text-xs mt-3">{err}</p>}
 
       {/* Insights — bottleneck/frequency heat over the discovered model (+ Variants/Cases/Outcomes/Export). */}
-      <MiningInsightsPanel projectId={projectId} run={run} />
+      <MiningInsightsPanel projectId={projectId} run={run} onCalibrate={() => void calibrate(run.id)} />
 
       {/* Admin: capture this run into the Mining-Example catalog */}
       {isAdmin && <SaveRunAsExample projectId={projectId} runId={run.id} defaultTitle={run.name} />}

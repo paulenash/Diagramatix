@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-09-07  ·  **Document version:** 7.0  ·  **Suite:** 440 test files · 3,163 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T3841  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-09-07  ·  **Document version:** 7.0  ·  **Suite:** 442 test files · 3,200 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T3878  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
@@ -34,9 +34,9 @@ Each test file has its own section below, grouped into layers. Within each secti
 | **Protects you against** | In plain terms, the real-world problem that would occur if this behaviour regressed. |
 | **How it would break (go red)** | The kind of code or data change that would make this specific test fail — i.e. what the test is watching. |
 
-**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T3842**, the one after **T3843**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
+**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T3879**, the one after **T3880**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T3841`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
+> **Highest ref allocated: `T3878`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -2948,6 +2948,43 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 | T3839 | `tests/mining/case-evidence.test.ts` | A slice containing none of the offenders reports zero, not the run's count. |
 | T3840 | `tests/mining/case-evidence.test.ts` | With no variants passed, the stored whole-run count still stands. |
 | T3841 | `tests/mining/case-evidence.test.ts` | The recompute route now has a caller - the Phase 0.3 debt, settled. |
+| T3842 | `tests/mining/team-flow.test.ts` | Hand-offs are counted between teams, in both directions. |
+| T3843 | `tests/mining/team-flow.test.ts` | Ranked by what the hand-off COSTS, not how often it happens. |
+| T3844 | `tests/mining/team-flow.test.ts` | Work staying inside one team is not a hand-off. |
+| T3845 | `tests/mining/team-flow.test.ts` | TEAM ping-pong is measured: the case came back to a team it had left. |
+| T3846 | `tests/mining/team-flow.test.ts` | A process that never doubles back reports no ping-pong. |
+| T3847 | `tests/mining/team-flow.test.ts` | Without per-event teams the map is APPROXIMATE and says so. |
+| T3848 | `tests/mining/team-flow.test.ts` | The fallback names the multi-team activities that make it a guess. |
+| T3849 | `tests/mining/team-flow.test.ts` | Ping-pong is OMITTED in fallback mode, never reported as zero. |
+| T3850 | `tests/mining/team-flow.test.ts` | A log with no teams says so, and does not draw an empty map. |
+| T3851 | `tests/mining/team-flow.test.ts` | No analytics is an honest empty rather than a throw. |
+| T3852 | `tests/mining/team-flow.test.ts` | The review's app-based ping-pong really does return 0 on a business log. |
+| T3853 | `tests/mining/team-flow.test.ts` | An activity repeating within a case is rework, on any log. |
+| T3854 | `tests/mining/team-flow.test.ts` | An activity that happens once per case is not rework. |
+| T3855 | `tests/mining/team-flow.test.ts` | The per-case rework rate is over the cases that HAVE the step. |
+| T3856 | `tests/mining/team-flow.test.ts` | Each team's share is of the time actually recorded against it. |
+| T3857 | `tests/mining/next-steps.test.ts` | The bottleneck is named with its share of elapsed time. |
+| T3858 | `tests/mining/next-steps.test.ts` | The slowest hand-off is named separately from the step. |
+| T3859 | `tests/mining/next-steps.test.ts` | Every finding ends in an action, not a sentence. |
+| T3860 | `tests/mining/next-steps.test.ts` | Findings are ranked by share of elapsed time where one exists. |
+| T3861 | `tests/mining/next-steps.test.ts` | An even process produces NO recommendations and says so. |
+| T3862 | `tests/mining/next-steps.test.ts` | A run with no analytics says re-import rather than advising. |
+| T3863 | `tests/mining/next-steps.test.ts` | No SLA means no lateness advice, and the reason is stated. |
+| T3864 | `tests/mining/next-steps.test.ts` | No reference model means no conformance advice, and the reason is stated. |
+| T3865 | `tests/mining/next-steps.test.ts` | No per-event detail means no hand-off or rework advice at all. |
+| T3866 | `tests/mining/next-steps.test.ts` | A log with no teams says so rather than staying quiet. |
+| T3867 | `tests/mining/next-steps.test.ts` | A deviation finding carries the INDEX of the violation it came from. |
+| T3868 | `tests/mining/next-steps.test.ts` | A time-shaped finding offers to calibrate a twin and sweep the busiest team. |
+| T3869 | `tests/mining/next-steps.test.ts` | A run that already has a twin is told to open it, not build another. |
+| T3870 | `tests/mining/next-steps.test.ts` | A healthy process is not told to build a twin for nothing. |
+| T3871 | `tests/mining/next-steps.test.ts` | CONSECUTIVE backlog periods count; isolated busy ones do not. |
+| T3872 | `tests/mining/next-steps.test.ts` | An empty throughput is zero, not a crash. |
+| T3873 | `tests/mining/next-steps.test.ts` | The facts handed to AI are the computed findings and nothing else. |
+| T3874 | `tests/mining/next-steps.test.ts` | What was NOT assessed travels with the facts. |
+| T3875 | `tests/mining/next-steps.test.ts` | The narration route's only user content is narrationFacts. |
+| T3876 | `tests/mining/next-steps.test.ts` | findActions runs BEFORE any model call, unconditionally. |
+| T3877 | `tests/mining/next-steps.test.ts` | The computed findings are returned whatever the model does. |
+| T3878 | `tests/mining/next-steps.test.ts` | The system prompt forbids reordering and inventing. |
 
 > **Keep this section in sync.** Whenever an e2e spec is added, removed, or changes what it asserts, update this section. It is hand-maintained, not generated.
 

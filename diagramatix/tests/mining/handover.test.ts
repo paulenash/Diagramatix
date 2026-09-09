@@ -247,6 +247,7 @@ describe("Phase 4 — the canvas change is safe because of who sets weight", () 
       join("app", "lib", "diagram", "v3", "importVisioDomainV3.ts"), // UML types only, never "sequence"
       join("app", "lib", "mining", "buildDomainFromOcel.ts"),        // uml-association
       join("app", "lib", "mining", "handover.ts"),                   // this phase, on "sequence"
+      join("app", "lib", "mining", "nextSteps.ts"),                  // a different weight: how a recommendation ranks
       join("app", "lib", "mining", "replayRunners.ts"),              // a different weight: replay dot size
     ]);
   });

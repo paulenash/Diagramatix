@@ -31,13 +31,15 @@ import { computeTeamFlow } from "@/app/lib/mining/teamFlow";
 import type { ConformanceResult } from "@/app/lib/mining/transitionConformance";
 import { useRunView, exactnessLabel, exactnessTone } from "./useRunView";
 import { FilterBar } from "./FilterBar";
+import { NextStepsPanel } from "./NextStepsPanel";
+import type { MinerAction } from "@/app/lib/mining/nextSteps";
 import { EMPTY_FILTER, type MiningFilter } from "@/app/lib/mining/filterAnalytics";
 import { ExpandedView } from "./ExpandedView";
 import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
 
 const EXPAND_BTN = "ml-auto text-[11px] rounded px-2 py-0.5 bg-stone-800 text-amber-200 hover:bg-stone-700";
 
-interface RunLite { id: string; discoveredBpmnId: string | null; discoveredSmId: string | null }
+interface RunLite { id: string; discoveredBpmnId: string | null; discoveredSmId: string | null; studyId?: string | null }
 
 type TabKey = "tasks" | "activities" | "between" | "heat" | "teams" | "variants" | "cases" | "conformance" | "outcomes" | "export";
 const TASK_TAB: { key: TabKey; label: string } = { key: "tasks", label: "🤖 Automation" };
@@ -61,7 +63,7 @@ const TAB_SHAPE: Record<TabKey, "count" | "time"> = {
   variants: "count", cases: "count", conformance: "count", outcomes: "count", export: "count",
 };
 
-export function MiningInsightsPanel({ projectId, run }: { projectId: string; run: RunLite }) {
+export function MiningInsightsPanel({ projectId, run, onCalibrate }: { projectId: string; run: RunLite; onCalibrate?: () => void }) {
   const [tab, setTab] = useState<TabKey>("activities");
   const [filter, setFilter] = useState<MiningFilter>(EMPTY_FILTER);
   const [analytics, setAnalytics] = useState<RunAnalytics | null>(null);
@@ -111,6 +113,17 @@ export function MiningInsightsPanel({ projectId, run }: { projectId: string; run
   // `analytics` directly — see useRunView for why. The filter arrived in
   // Phase 5 and this line is the only place any panel had to learn about it.
   const view = useRunView(analytics, variants, filter);
+  // Carry out a recommendation. Everything a finding can ask for already
+  // exists somewhere in the console; this is the wiring that means a finding
+  // ends in a click rather than in prose.
+  const [pendingViolation, setPendingViolation] = useState<number | null>(null);
+  const act = useCallback((a: MinerAction) => {
+    if (a.kind === "slice" && a.filter?.resource) { setFilter((f) => ({ ...f, resource: a.filter!.resource })); return; }
+    if (a.kind === "calibrate") { onCalibrate?.(); return; }
+    if (a.violationIdx != null) setPendingViolation(a.violationIdx);
+    if (a.tab) setTab(a.tab as TabKey);
+  }, [onCalibrate]);
+
   // The chip beside the active tab: what THESE figures are entitled to claim.
   const exactness = TAB_SHAPE[tab] === "time" ? view.timeExactness : view.countExactness;
   const chip = exactnessLabel(exactness);
@@ -137,6 +150,16 @@ export function MiningInsightsPanel({ projectId, run }: { projectId: string; run
         )}
       </div>
       <FilterBar analytics={analytics} filter={filter} onChange={setFilter} view={view} />
+      {/* Above the workbench, because "what do I do" comes before "which tab". */}
+      <NextStepsPanel
+        analytics={view.analytics}
+        variants={view.variants}
+        conformance={conformance}
+        kpiConfig={kpiConfig}
+        hasTwin={!!run.studyId}
+        filtered={view.filtered}
+        onAct={act}
+      />
       {tab === "tasks" && <TasksTab variants={view.variants} loading={loading} projectId={projectId} runId={run.id} />}
       {tab === "activities" && <ActivitiesTab analytics={view.analytics} loading={loading} />}
       {tab === "between" && <BetweenStepsTab analytics={view.analytics} loading={loading} />}
@@ -144,7 +167,7 @@ export function MiningInsightsPanel({ projectId, run }: { projectId: string; run
       {tab === "teams" && <TeamsTab analytics={view.analytics} variants={view.variants} loading={loading} />}
       {tab === "variants" && <VariantsTab variants={view.variants} bpmn={bpmn} hasBpmn={!!run.discoveredBpmnId} />}
       {tab === "cases" && <CasesTab analytics={view.analytics} variants={view.variants} bpmn={bpmn} hasBpmn={!!run.discoveredBpmnId} />}
-      {tab === "conformance" && <ConformanceTab analytics={view.analytics} variants={view.variants} conformance={conformance} loading={loading} projectId={projectId} runId={run.id} onRecomputed={() => void load()} />}
+      {tab === "conformance" && <ConformanceTab analytics={view.analytics} variants={view.variants} conformance={conformance} loading={loading} projectId={projectId} runId={run.id} onRecomputed={() => void load()} initialViolation={pendingViolation} />}
       {tab === "outcomes" && <OutcomesTab analytics={view.analytics} variants={view.variants} kpiConfig={kpiConfig} onSave={saveKpi} />}
       {tab === "export" && <ExportTab projectId={projectId} runId={run.id} filter={filter} filterNote={view.description} hasAnalytics={!!analytics && analytics.activities.length > 0} />}
     </div>
@@ -425,8 +448,11 @@ function TeamsTab({ analytics, variants, loading }: { analytics: RunAnalytics | 
 }
 // ── Conformance tab (a violation → the cases behind it) ─────────────────────
 
-function ConformanceTab({ analytics, variants, conformance, loading, projectId, runId, onRecomputed }: { analytics: RunAnalytics | null; variants: Variant[]; conformance: ConformanceResult | null; loading: boolean; projectId: string; runId: string; onRecomputed: () => void }) {
-  const [selected, setSelected] = useState<number | null>(null);
+function ConformanceTab({ analytics, variants, conformance, loading, projectId, runId, onRecomputed, initialViolation }: { analytics: RunAnalytics | null; variants: Variant[]; conformance: ConformanceResult | null; loading: boolean; projectId: string; runId: string; onRecomputed: () => void; initialViolation?: number | null }) {
+  // "Show me the cases" has to LAND on the deviation it named, or the button
+  // is a tab switch with extra steps.
+  const [selected, setSelected] = useState<number | null>(initialViolation ?? null);
+  useEffect(() => { if (initialViolation != null) setSelected(initialViolation); }, [initialViolation]);
   const [openCase, setOpenCase] = useState<string | null>(null);
   const [rechecking, setRechecking] = useState(false);
 
