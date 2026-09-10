@@ -66,6 +66,19 @@ export const DEFAULT_SYMBOL_COLORS: Record<SymbolType, string> = {
   "flowchart-database": "#ffffff", "flowchart-onpage": "#ffffff", "flowchart-offpage": "#ffffff",
   "flowchart-merge": "#ffffff", "flowchart-parallel": "#ffffff", "flowchart-comment": "#ffffff",
   "flowchart-vswimlane": "#ffffff",
+  // EPC — the conventional ARIS palette. These colours ARE the notation: a
+  // reader identifies an event or a function by its colour before reading a
+  // word of it, so they are defaults worth matching rather than house style.
+  "epc-event":       "#ffd6e7",  // pink   — passive: something has come about
+  "epc-function":    "#c5e17a",  // green  — active: work being done
+  "epc-xor":         "#ffffff",  // the three connectors stay white; a coloured
+  "epc-and":         "#ffffff",  // one reads as a state rather than a junction
+  "epc-or":          "#ffffff",
+  "epc-org-unit":    "#ffe699",  // yellow — who is responsible
+  "epc-position":    "#ffe699",
+  "epc-data":        "#cce5ff",  // blue   — information
+  "epc-application": "#e5ccff",  // purple — systems
+  "epc-interface":   "#e5e5e5",  // grey   — a link out to another chain
 };
 
 /** Black & white colour scheme: fills → white, lines/strokes → black. */
@@ -125,6 +138,13 @@ export const BW_SYMBOL_COLORS: Record<SymbolType, string> = {
   "flowchart-database": "#ffffff", "flowchart-onpage": "#ffffff", "flowchart-offpage": "#ffffff",
   "flowchart-merge": "#ffffff", "flowchart-parallel": "#ffffff", "flowchart-comment": "#ffffff",
   "flowchart-vswimlane": "#ffffff",
+  // EPC in black and white. The shapes still distinguish an event from a
+  // function — a hexagon from a rounded rectangle — which is why the notation
+  // survives being printed on a mono office printer.
+  "epc-event": "#ffffff", "epc-function": "#ffffff",
+  "epc-xor": "#ffffff", "epc-and": "#ffffff", "epc-or": "#ffffff",
+  "epc-org-unit": "#ffffff", "epc-position": "#ffffff",
+  "epc-data": "#ffffff", "epc-application": "#ffffff", "epc-interface": "#ffffff",
 };
 
 /** Return the effective colour for a symbol type, preferring the project config over defaults. */

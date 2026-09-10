@@ -481,6 +481,18 @@
     Also formally records Connector/@branchPercent, added to this file on 2026-08-14
     with the gateway branch-share work, whose version bump was deferred to this batch.
     Files written before v46 need no migration: they were already this shape.
+
+  v47 — Event-driven Process Chain (ARIS eEPC).
+    DiagramTypeEnum   + "epc"
+    SymbolTypeEnum    + 10 "epc-*" objects (event, function, the three connectors,
+                        organisational unit, position, information object,
+                        application system, process interface)
+    ConnectorTypeEnum + 3 "epc-*" arcs (control flow, information flow, org
+                        assignment)
+    A structural addition only — no existing element, attribute or enumeration
+    changed, so every file written against v46 is a valid v47 file and needs no
+    migration. The bump exists because the enumerations here are CLOSED: without
+    it, an EPC export would not validate against its own schema.
 -->
 
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
@@ -589,6 +601,8 @@
       <xs:enumeration value="archimate"/>          <!-- schema 1.9 -->
       <!-- schema 46 — Standard Flowchart diagram type. -->
       <xs:enumeration value="flowchart"/>
+      <!-- schema 47 — Event-driven Process Chain (ARIS eEPC). -->
+      <xs:enumeration value="epc"/>
     </xs:restriction>
   </xs:simpleType>
 
@@ -838,6 +852,22 @@
       <xs:enumeration value="flowchart-parallel"/>
       <xs:enumeration value="flowchart-comment"/>
       <xs:enumeration value="flowchart-vswimlane"/>
+      <!-- schema 47 — EPC (eEPC core). The alternation of passive events and
+           active functions is the notation; the three connectors are separate
+           types rather than one with a variant attribute, because the legality
+           rules key off the element type (an event may not precede a decision).
+           The last four never sit on the control flow — they attach to a
+           function. -->
+      <xs:enumeration value="epc-event"/>
+      <xs:enumeration value="epc-function"/>
+      <xs:enumeration value="epc-xor"/>
+      <xs:enumeration value="epc-and"/>
+      <xs:enumeration value="epc-or"/>
+      <xs:enumeration value="epc-org-unit"/>
+      <xs:enumeration value="epc-position"/>
+      <xs:enumeration value="epc-data"/>
+      <xs:enumeration value="epc-application"/>
+      <xs:enumeration value="epc-interface"/>
     </xs:restriction>
   </xs:simpleType>
 
@@ -1321,6 +1351,14 @@
       <!-- schema 46 — Standard Flowchart connectors. -->
       <xs:enumeration value="flowline"/>
       <xs:enumeration value="flowchart-association"/>
+      <!-- schema 47 — EPC. Three arc kinds, and only the first carries
+           sequence: control flow is "and then"; information flow says a function
+           reads or writes an object, where the DIRECTION is the meaning; and org
+           assignment carries no arrowhead at all, because responsibility is not
+           a direction. -->
+      <xs:enumeration value="epc-control-flow"/>
+      <xs:enumeration value="epc-information-flow"/>
+      <xs:enumeration value="epc-org-assignment"/>
     </xs:restriction>
   </xs:simpleType>
 

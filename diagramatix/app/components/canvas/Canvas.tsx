@@ -1689,6 +1689,25 @@ export function Canvas({
             } else {
               connType = "flowline"; connRouting = defaultRoutingType; connDirection = defaultDirectionType;
             }
+          } else if (diagramType === "epc") {
+            // EPC has three arc kinds and the right one is DEDUCIBLE from what is
+            // being joined, so the user never picks from a menu: an org unit means
+            // responsibility, a data object or system means information, and
+            // anything else on the chain means sequence. Guessing here is safe
+            // precisely because canConnect refuses the combinations that are not
+            // legal anyway.
+            const epcOrg = (t?: string) => t === "epc-org-unit" || t === "epc-position";
+            const epcData = (t?: string) => t === "epc-data" || t === "epc-application";
+            if (epcOrg(sourceEl?.type) || epcOrg(targetEl.type)) {
+              // Responsibility is not a direction, so no arrowhead.
+              connType = "epc-org-assignment"; connRouting = "direct"; connDirection = "non-directed";
+            } else if (epcData(sourceEl?.type) || epcData(targetEl.type)) {
+              // Direction IS the semantics here: data → function reads it,
+              // function → data writes it. So it keeps its arrowhead.
+              connType = "epc-information-flow"; connRouting = "direct"; connDirection = "open-directed";
+            } else {
+              connType = "epc-control-flow"; connRouting = defaultRoutingType; connDirection = "directed";
+            }
           } else if (diagramType === "domain") {
             // A connector from/to a Note is a dashed direct note anchor (no
             // arrowhead). Packages accept dependency (default) or containment —

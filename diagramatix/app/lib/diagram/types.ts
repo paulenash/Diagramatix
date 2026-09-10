@@ -1,4 +1,4 @@
-export type DiagramType = "context" | "basic" | "process-context" | "state-machine" | "bpmn" | "domain" | "value-chain" | "archimate" | "flowchart";
+export type DiagramType = "context" | "basic" | "process-context" | "state-machine" | "bpmn" | "domain" | "value-chain" | "archimate" | "flowchart" | "epc";
 
 export type SymbolType =
   | "task"
@@ -63,7 +63,26 @@ export type SymbolType =
   | "flowchart-merge"
   | "flowchart-parallel"
   | "flowchart-comment"
-  | "flowchart-vswimlane";
+  | "flowchart-vswimlane"
+  // ── Event-driven Process Chain (eEPC core) ────────────────────────────────
+  // The alternation of PASSIVE events and ACTIVE functions is the whole notation:
+  // an event is a state that has come about, a function is work being done, and
+  // they take turns. Everything else here hangs off a function.
+  | "epc-event"
+  | "epc-function"
+  // The three connectors. Separate symbols rather than one with a variant
+  // property, because the palette should offer the reader a choice of three
+  // shapes rather than a shape plus a form field — and because `canConnect`
+  // rules key off the element type (E3: an event may not precede a decision).
+  | "epc-xor"
+  | "epc-and"
+  | "epc-or"
+  // Assignments. None of these ever sits on the control flow (E6).
+  | "epc-org-unit"
+  | "epc-position"
+  | "epc-data"
+  | "epc-application"
+  | "epc-interface";
 
 export type BpmnTaskType =
   | "none"
@@ -112,6 +131,16 @@ export type ConnectorType =
   | "uml-dependency" | "uml-realisation"
   | "uml-containment" | "uml-note-anchor"
   | "review-comment-link"
+  // ── EPC: three arc kinds, and only the first carries sequence ─────────────
+  // `epc-control-flow`      solid, filled arrowhead — "and then". Events,
+  //                         functions and connectors only.
+  // `epc-information-flow`  solid, OPEN arrowhead — a function reads (data →
+  //                         function) or writes (function → data) an object.
+  //                         The direction IS the semantics.
+  // `epc-org-assignment`    plain line, NO arrowhead — responsibility is not a
+  //                         direction, so drawing one would assert something the
+  //                         notation does not mean.
+  | "epc-control-flow" | "epc-information-flow" | "epc-org-assignment"
   | ArchimateConnectorType;
 
 /**
@@ -1217,8 +1246,16 @@ export interface TemplateData {
  * in every export and carried on `<xs:schema version=…>`. Bumps ONLY on an XSD export-shape
  * change (new first-class element/attribute or typed-enum value). NOT bumped by DB-only or
  * open-`properties` changes — those move PRODUCT_VERSION instead.
+ *
+ * 47 — Event-driven Process Chain (ARIS eEPC): the "epc" diagram type, 10 "epc-*"
+ *      symbols and 3 "epc-*" connectors. A structural ADDITION only — nothing
+ *      existing changed shape, so every v46 file is a valid v47 file and needs no
+ *      migration. It bumps because the XSD enumerations are CLOSED: without the
+ *      new values an EPC export would not validate against its own schema, which
+ *      is precisely what `tests/xml/xsd-enum-drift.test.ts` exists to catch. It
+ *      caught this one.
  */
-export const SCHEMA_VERSION = "46";
+export const SCHEMA_VERSION = "47";
 
 /**
  * DIAGRAMATIX PRODUCT VERSION — a two-tier `major.minor` product line (currently "2.2"). The

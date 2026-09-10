@@ -1963,6 +1963,129 @@ function LaneShape({ el, isSublane }: { el: DiagramElement; isSublane?: boolean 
   );
 }
 
+// ── EPC (Event-driven Process Chain) shapes ──
+// The palette colours ARE the notation — a reader identifies an event or a
+// function by colour before reading a word of it — so every shape fills from
+// the colour config rather than hard-coding white the way flowchart does.
+const EPC_STROKE = "#374151";
+const EPC_SW = 1.5;
+function epcFill(el: DiagramElement, colors: SymbolColorConfig | undefined): string {
+  return (el.properties?.fill as string | undefined) ?? resolveColor(el.type, colors) ?? "#ffffff";
+}
+
+/** Event — an elongated hexagon, flat top and bottom, pointed left and right. */
+function EpcEventShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  const { x, y, width: w, height: h } = el;
+  // The points are a fraction of the HEIGHT, so a long event name lengthens the
+  // body without turning the shape into an arrowhead.
+  const n = Math.min(h * 0.34, w / 3);
+  const pts = [
+    [x + n, y], [x + w - n, y], [x + w, y + h / 2],
+    [x + w - n, y + h], [x + n, y + h], [x, y + h / 2],
+  ].map((q) => q.join(",")).join(" ");
+  return <polygon points={pts} fill={epcFill(el, colors)} stroke={EPC_STROKE} strokeWidth={EPC_SW} />;
+}
+
+/** Function — a rounded rectangle. Deliberately the softest shape on the
+ *  canvas: it is where all the work, and all the assignments, live. */
+function EpcFunctionShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  return <rect x={el.x} y={el.y} width={el.width} height={el.height} rx={12} ry={12}
+    fill={epcFill(el, colors)} stroke={EPC_STROKE} strokeWidth={EPC_SW} />;
+}
+
+/** The three connectors share a circle and differ only by the glyph inside. */
+function EpcConnectorShape({ el, glyph }: { el: DiagramElement; glyph: "xor" | "and" | "or" }) {
+  const colors = useContext(SymbolColorCtx);
+  const { x, y, width: w, height: h } = el;
+  const cx = x + w / 2, cy = y + h / 2;
+  const r = Math.min(w, h) / 2;
+  const k = r * 0.5;
+  // Drawn as strokes rather than typed as characters: at 44px a text glyph
+  // renders at the mercy of the font, and these three marks are the difference
+  // between "exactly one branch" and "all of them".
+  const marks =
+    glyph === "xor"
+      ? [<line key="a" x1={cx - k} y1={cy - k} x2={cx + k} y2={cy + k} />,
+         <line key="b" x1={cx + k} y1={cy - k} x2={cx - k} y2={cy + k} />]
+      : glyph === "and"
+        ? [<polyline key="a" points={[[cx - k, cy + k * 0.7], [cx, cy - k * 0.8], [cx + k, cy + k * 0.7]].map((q) => q.join(",")).join(" ")} fill="none" />]
+        : [<polyline key="a" points={[[cx - k, cy - k * 0.8], [cx, cy + k * 0.7], [cx + k, cy - k * 0.8]].map((q) => q.join(",")).join(" ")} fill="none" />];
+  return (
+    <g>
+      <circle cx={cx} cy={cy} r={r} fill={epcFill(el, colors)} stroke={EPC_STROKE} strokeWidth={EPC_SW} />
+      <g stroke={EPC_STROKE} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">{marks}</g>
+    </g>
+  );
+}
+
+/** Organisational unit — a rectangle whose left edge is a half-ellipse, with a
+ *  divider separating the cap from the body. */
+function EpcOrgUnitShape({ el, person }: { el: DiagramElement; person?: boolean }) {
+  const colors = useContext(SymbolColorCtx);
+  const { x, y, width: w, height: h } = el;
+  const r = Math.min(h / 2, w * 0.22);
+  const d = "M " + (x + r) + " " + y + " L " + (x + w) + " " + y + " L " + (x + w) + " " + (y + h) +
+    " L " + (x + r) + " " + (y + h) + " A " + r + " " + (h / 2) + " 0 0 1 " + (x + r) + " " + y + " Z";
+  const px = x + r / 2, headR = h * 0.11;
+  const body = "M " + (px - h * 0.16) + " " + (y + h * 0.72) +
+    " a " + (h * 0.16) + " " + (h * 0.16) + " 0 0 1 " + (h * 0.32) + " 0";
+  return (
+    <g>
+      <path d={d} fill={epcFill(el, colors)} stroke={EPC_STROKE} strokeWidth={EPC_SW} />
+      <line x1={x + r} y1={y} x2={x + r} y2={y + h} stroke={EPC_STROKE} strokeWidth={EPC_SW} />
+      {/* A Position is the same object with a person in the cap — one glyph is
+          the whole difference between a department and a role. */}
+      {person && (
+        <g stroke={EPC_STROKE} strokeWidth={1.2} fill="none">
+          <circle cx={px} cy={y + h * 0.36} r={headR} />
+          <path d={body} />
+        </g>
+      )}
+    </g>
+  );
+}
+
+/** Information object — a rectangle with a bar down the left edge. */
+function EpcDataShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  const { x, y, width: w, height: h } = el;
+  const bar = Math.min(10, w * 0.09);
+  return (
+    <g>
+      <rect x={x} y={y} width={w} height={h} fill={epcFill(el, colors)} stroke={EPC_STROKE} strokeWidth={EPC_SW} />
+      <line x1={x + bar} y1={y} x2={x + bar} y2={y + h} stroke={EPC_STROKE} strokeWidth={EPC_SW} />
+    </g>
+  );
+}
+
+/** Application system — a rectangle with bars at BOTH sides. */
+function EpcApplicationShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  const { x, y, width: w, height: h } = el;
+  const bar = Math.min(10, w * 0.09);
+  return (
+    <g>
+      <rect x={x} y={y} width={w} height={h} fill={epcFill(el, colors)} stroke={EPC_STROKE} strokeWidth={EPC_SW} />
+      <line x1={x + bar} y1={y} x2={x + bar} y2={y + h} stroke={EPC_STROKE} strokeWidth={EPC_SW} />
+      <line x1={x + w - bar} y1={y} x2={x + w - bar} y2={y + h} stroke={EPC_STROKE} strokeWidth={EPC_SW} />
+    </g>
+  );
+}
+
+/** Process interface — a chevron: pointed right, notched left, so a chain of
+ *  them reads as "continues from" and "continues into". */
+function EpcInterfaceShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  const { x, y, width: w, height: h } = el;
+  const n = Math.min(h * 0.4, w / 4);
+  const pts = [
+    [x, y], [x + w - n, y], [x + w, y + h / 2], [x + w - n, y + h],
+    [x, y + h], [x + n, y + h / 2],
+  ].map((q) => q.join(",")).join(" ");
+  return <polygon points={pts} fill={epcFill(el, colors)} stroke={EPC_STROKE} strokeWidth={EPC_SW} />;
+}
 // ── Standard Flowchart shapes (monochrome: white fill, black stroke) ──
 const FC_STROKE = "#111111";
 const FC_SW = 1.6;
@@ -2183,6 +2306,16 @@ function SymbolShape({ el }: { el: DiagramElement }) {
       case "flowchart-terminator":   return <FlowchartTerminatorShape el={el} />;
       case "flowchart-process":      return <FlowchartProcessShape el={el} />;
       case "flowchart-decision":     return <FlowchartDecisionShape el={el} />;
+      case "epc-event":              return <EpcEventShape el={el} />;
+      case "epc-function":           return <EpcFunctionShape el={el} />;
+      case "epc-xor":                return <EpcConnectorShape el={el} glyph="xor" />;
+      case "epc-and":                return <EpcConnectorShape el={el} glyph="and" />;
+      case "epc-or":                 return <EpcConnectorShape el={el} glyph="or" />;
+      case "epc-org-unit":           return <EpcOrgUnitShape el={el} />;
+      case "epc-position":           return <EpcOrgUnitShape el={el} person />;
+      case "epc-data":               return <EpcDataShape el={el} />;
+      case "epc-application":        return <EpcApplicationShape el={el} />;
+      case "epc-interface":          return <EpcInterfaceShape el={el} />;
       case "flowchart-io":           return <FlowchartIOShape el={el} />;
       case "flowchart-document":     return <FlowchartDocumentShape el={el} />;
       case "flowchart-multidoc":     return <FlowchartMultidocShape el={el} />;
@@ -2262,6 +2395,11 @@ function getLabelPos(el: DiagramElement, archimateDepth: number = 0): { x: numbe
   }
   if (el.type === "uml-enumeration") {
     return { x: el.x + el.width / 2, y: el.y + HEADER_H / 2 + 6, baseline: "middle" };
+  }
+  // EPC connectors: the mark owns the centre of the circle, so a label goes
+  // underneath it rather than on top of the thing that gives it meaning.
+  if (el.type === "epc-xor" || el.type === "epc-and" || el.type === "epc-or") {
+    return { x: el.x + el.width / 2, y: el.y + el.height + 4, baseline: "hanging" };
   }
   // Merge (down-triangle): nudge the label 20px up out of the narrow point.
   if (el.type === "flowchart-merge") {

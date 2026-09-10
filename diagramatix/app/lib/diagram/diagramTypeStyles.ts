@@ -51,8 +51,9 @@ export const DEFAULT_DIAGRAM_TYPE_STYLES: DiagramTypeStyle[] = [
   { typeKey: "archimate",       label: "Archimate",          code: "AM", bgColor: "#fce7f3", textColor: "#be185c", boundaryColor: "#ff0ff0", sortOrder: 3 },
   { typeKey: "bpmn",            label: "BPMN",               code: "BP", bgColor: "#dcfefc", textColor: "#19a455", boundaryColor: "#11a4ff", sortOrder: 4 },
   { typeKey: "flowchart",       label: "Standard Flowchart", code: "FC", bgColor: "#f3f4f6", textColor: "#000000", boundaryColor: "#7c2d12", sortOrder: 5 },
-  { typeKey: "state-machine",   label: "State Machine",      code: "SM", bgColor: "#efe6e7", textColor: "#2289ff", boundaryColor: "#666666", sortOrder: 6 },
-  { typeKey: "domain",          label: "Domain",             code: "DM", bgColor: "#d1fae5", textColor: "#047857", boundaryColor: "#0c4a6e", sortOrder: 7 },
+  { typeKey: "epc",             label: "EPC",                code: "EP", bgColor: "#ffd6e7", textColor: "#4a1d33", boundaryColor: "#9d174d", sortOrder: 6 },
+  { typeKey: "state-machine",   label: "State Machine",      code: "SM", bgColor: "#efe6e7", textColor: "#2289ff", boundaryColor: "#666666", sortOrder: 7 },
+  { typeKey: "domain",          label: "Domain",             code: "DM", bgColor: "#d1fae5", textColor: "#047857", boundaryColor: "#0c4a6e", sortOrder: 8 },
 ];
 
 /** Canonical editable keys (excludes the `basic` alias). */

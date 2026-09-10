@@ -330,6 +330,20 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
   { type: "flowchart-parallel",     label: "Parallel",           defaultWidth: 120, defaultHeight: 8,  description: "Fork/join bar — concurrent branches start or re-join (flip for vertical)" },
   { type: "flowchart-comment",      label: "Comment",            defaultWidth: 120, defaultHeight: 60, description: "A note attached to an element by a dotted association (rounded rectangle)" },
   { type: "flowchart-vswimlane",    label: "Swimlane",           defaultWidth: 220, defaultHeight: 480, description: "A vertical swimlane column; drop again to add another column to the right" },
+  // ── Event-driven Process Chain (eEPC core) ──
+  // The alternation is the notation: a PASSIVE event (something has come about)
+  // then an ACTIVE function (work being done), then an event again. Everything
+  // below the connectors attaches to a function and never to the control flow.
+  { type: "epc-event",       label: "Event",               defaultWidth: 160, defaultHeight: 50, description: "A passive state that has come about — \"Invoice received\". An EPC starts and ends with one (hexagon)" },
+  { type: "epc-function",    label: "Function",            defaultWidth: 160, defaultHeight: 70, description: "An active step — \"Verify invoice\". Carries the organisation and data assignments (rounded rectangle)" },
+  { type: "epc-xor",         label: "XOR",                 defaultWidth: 44,  defaultHeight: 44, description: "Exclusive: exactly one branch is taken. Only a function may precede it — an event cannot decide" },
+  { type: "epc-and",         label: "AND",                 defaultWidth: 44,  defaultHeight: 44, description: "Parallel: every branch is taken. May follow an event, because it is not a choice" },
+  { type: "epc-or",          label: "OR",                  defaultWidth: 44,  defaultHeight: 44, description: "Inclusive: one or more branches are taken. Only a function may precede it" },
+  { type: "epc-org-unit",    label: "Organisational Unit", defaultWidth: 150, defaultHeight: 50, description: "Who is responsible — \"Accounts Payable\". Becomes a BPMN lane on conversion" },
+  { type: "epc-position",    label: "Position",            defaultWidth: 150, defaultHeight: 50, description: "A role rather than a department — \"Credit Officer\". Also becomes a lane" },
+  { type: "epc-data",        label: "Information Object",  defaultWidth: 150, defaultHeight: 50, description: "Data a function reads or writes — \"Invoice\". Direction of the arc says which" },
+  { type: "epc-application", label: "Application System",  defaultWidth: 150, defaultHeight: 50, description: "The system the work happens in — \"SAP\". Converts to a black-box system pool" },
+  { type: "epc-interface",   label: "Process Interface",   defaultWidth: 160, defaultHeight: 50, description: "A link to another EPC, standing at the start or end of a chain (chevron)" },
 ];
 
 // Pain Point + Issue are type-agnostic problem markers offered on EVERY diagram
@@ -376,6 +390,16 @@ export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
     "flowchart-vswimlane",
     ...PROBLEM_MARKERS, ...REVIEW_MARKERS,
   ],
+  // Ordered as an EPC is built: the alternating pair first, then the three
+  // connectors, then the things that hang off a function.
+  epc: [
+    "epc-event", "epc-function",
+    "epc-xor", "epc-and", "epc-or",
+    "epc-org-unit", "epc-position", "epc-data", "epc-application",
+    "epc-interface",
+    "text-annotation",
+    ...PROBLEM_MARKERS, ...REVIEW_MARKERS,
+  ],
 };
 
 /** Colour-picker palette — includes body colour entries and lane that aren't in the drag palette. */
@@ -405,6 +429,10 @@ export const COLOR_PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = 
   archimate: ["archimate-shape"],
   // Flowcharts are strictly monochrome — no per-symbol colour customisation.
   flowchart: [],
+  // EPC's colours ARE the notation — green functions, pink events, yellow org
+  // units — so recolouring is offered per symbol like BPMN, not withheld like
+  // flowchart. The connectors stay white: a coloured XOR reads as a state.
+  epc: ["epc-event", "epc-function", "epc-org-unit", "epc-position", "epc-data", "epc-application", "epc-interface"],
 };
 
 export function getSymbolDefinition(type: SymbolType): SymbolDefinition {

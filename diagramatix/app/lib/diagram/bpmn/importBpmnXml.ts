@@ -490,6 +490,19 @@ const FALLBACK_SIZE: Record<SymbolType, { w: number; h: number }> = {
   "flowchart-parallel":     { w: 120, h: 8 },
   "flowchart-comment":      { w: 120, h: 60 },
   "flowchart-vswimlane":    { w: 220, h: 480 },
+  // EPC symbols never appear in a BPMN file. They are here because the record is
+  // exhaustive over SymbolType, and the sizes match the palette defaults so a
+  // future EPC importer reusing this table gets sensible boxes rather than zeros.
+  "epc-event":              { w: 160, h: 50 },
+  "epc-function":           { w: 160, h: 70 },
+  "epc-xor":                { w: 44, h: 44 },
+  "epc-and":                { w: 44, h: 44 },
+  "epc-or":                 { w: 44, h: 44 },
+  "epc-org-unit":           { w: 150, h: 50 },
+  "epc-position":           { w: 150, h: 50 },
+  "epc-data":               { w: 150, h: 50 },
+  "epc-application":        { w: 150, h: 50 },
+  "epc-interface":          { w: 160, h: 50 },
 };
 
 interface BuiltElement {

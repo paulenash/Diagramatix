@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-09-10  ·  **Document version:** 7.0  ·  **Suite:** 452 test files · 3,346 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T4024  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-09-10  ·  **Document version:** 7.0  ·  **Suite:** 453 test files · 3,362 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T4040  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
@@ -34,9 +34,9 @@ Each test file has its own section below, grouped into layers. Within each secti
 | **Protects you against** | In plain terms, the real-world problem that would occur if this behaviour regressed. |
 | **How it would break (go red)** | The kind of code or data change that would make this specific test fail — i.e. what the test is watching. |
 
-**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T4025**, the one after **T4026**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
+**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T4041**, the one after **T4042**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T4024`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
+> **Highest ref allocated: `T4040`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -3131,6 +3131,22 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 | T4022 | `tests/simulation/preemption-and-cost.test.ts` | Without preemption the urgent case waits for a job that started first. |
 | T4023 | `tests/simulation/preemption-and-cost.test.ts` | With it, the urgent SEGMENT is served sooner and the routine one pays. |
 | T4024 | `tests/simulation/preemption-and-cost.test.ts` | Preempt-RESUME: interrupted work is not done twice. |
+| T4025 | `tests/epc/connector-rules.test.ts` | E1: an event gives rise to a function, and a function to an event. |
+| T4026 | `tests/epc/connector-rules.test.ts` | E1: two functions may NOT be directly connected. |
+| T4027 | `tests/epc/connector-rules.test.ts` | E1: two events may NOT be directly connected. |
+| T4028 | `tests/epc/connector-rules.test.ts` | E1: a connector may sit between them without breaking the chain. |
+| T4029 | `tests/epc/connector-rules.test.ts` | E3: an event may NOT be followed by an XOR — a passive state cannot choose. |
+| T4030 | `tests/epc/connector-rules.test.ts` | E3: nor by an OR. |
+| T4031 | `tests/epc/connector-rules.test.ts` | E3: but an AND after an event IS legal — every branch is not a choice. |
+| T4032 | `tests/epc/connector-rules.test.ts` | E3: a function may precede any of the three connectors. |
+| T4033 | `tests/epc/connector-rules.test.ts` | E6: an org unit is never on the control flow. |
+| T4034 | `tests/epc/connector-rules.test.ts` | E6: nor is data or an application system. |
+| T4035 | `tests/epc/connector-rules.test.ts` | E6: responsibility attaches an org unit to a FUNCTION, either way round. |
+| T4036 | `tests/epc/connector-rules.test.ts` | E6: but never to an event — nobody performs a state. |
+| T4037 | `tests/epc/connector-rules.test.ts` | E6: information flows between data and a function, in either direction. |
+| T4038 | `tests/epc/connector-rules.test.ts` | E6: the arcs are typed — the wrong arc between the right objects is refused. |
+| T4039 | `tests/epc/connector-rules.test.ts` | A diagram with no EPC symbols behaves exactly as it did. |
+| T4040 | `tests/epc/connector-rules.test.ts` | An EPC object refuses a foreign connector type outright. |
 
 > **Keep this section in sync.** Whenever an e2e spec is added, removed, or changes what it asserts, update this section. It is hand-maintained, not generated.
 

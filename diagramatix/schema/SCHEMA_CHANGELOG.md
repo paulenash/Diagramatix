@@ -6,7 +6,7 @@ Canonical human-readable changelog for the export schema. Mirrors the inline his
 - **`schemaVersion`** — a standalone **integer** (the XSD schema version). Bumped only when the XSD **export shape** changes (a field/element/enum added, removed, or renamed). Carried on `<xs:schema version="…">`. This changelog tracks THIS number.
 - **`appVersion`** = **`PRODUCT_VERSION`** (`major.middle.patch`) — the Diagramatix *product* version. Its MIDDLE increments on any physical DB change; patch on fixes; major manually. The header badge appends `(build <git-commit-count>)` for display. Product-version history lives in [`../VERSION_HISTORY.md`](../VERSION_HISTORY.md).
 
-**Current XSD schema version:** `46` · **Product version:** `2.9` (split 2026-08-10 — the old single `major.minor` reached `1.45`; the `45` minor became this standalone integer, and the product version restarted at `2.1.1`). Versioning began at **v1.0**; **v1.2** was the first enumerated XSD content; the XSD inline history block starts at **v1.10**.
+**Current XSD schema version:** `47` · **Product version:** `2.9` (split 2026-08-10 — the old single `major.minor` reached `1.45`; the `45` minor became this standalone integer, and the product version restarted at `2.1.1`). Versioning began at **v1.0**; **v1.2** was the first enumerated XSD content; the XSD inline history block starts at **v1.10**.
 
 > **When to bump the schema integer:** ONLY when the **XSD export shape** changes (the original, narrow criterion) — a new first-class element/attribute or a typed-enum value. Physical-DB changes and open-`properties` additions do NOT bump it — they move `PRODUCT_VERSION.middle` instead (recorded in `VERSION_HISTORY.md`, not here). See [`UPDATE_EVERYTHING.md`](UPDATE_EVERYTHING.md) Step 0 (Q1 = DB → product middle; Q2 = XSD → schema integer).
 
@@ -20,6 +20,7 @@ Canonical human-readable changelog for the export schema. Mirrors the inline his
 
 | Version | Title | Schema shape change? |
 |---|---|---|
+| **schema 47** | **Event-driven Process Chain (ARIS eEPC).** `DiagramTypeEnum` + `epc`; `SymbolTypeEnum` + the ten `epc-*` objects (event, function, the XOR/AND/OR connectors, organisational unit, position, information object, application system, process interface); `ConnectorTypeEnum` + the three `epc-*` arcs (control flow, information flow, organisation assignment). | **Yes** — 14 additive enumerations. Nothing existing changed shape, so every v46 file is a valid v47 file and needs no migration. It bumps because the enumerations are **closed**: without them an EPC export would not validate against its own schema. |
 | **schema 46** | **Enum catch-up — the schema now declares what the exporter already writes.** `SymbolTypeEnum` + `history-state` / `deep-history-state` and the twenty-one `flowchart-*` shapes; `ConnectorTypeEnum` + `flowline` / `flowchart-association`; `DiagramTypeEnum` + `flowchart`. Also formally records `Connector/@branchPercent` (added to the XSD 2026-08-14, bump deferred to this batch). | **Yes** — 24 additive enumerations. They were being **exported without being declared**, so every Standard Flowchart and every history-state State Machine was invalid against the published schema. |
 | **schema 45** (was 1.45) | **Version model split** — `schemaVersion` became a standalone integer (this changelog); the product version restarted at **2.1.1** and now carries DB/JSON structure changes (its middle bumps on any physical-DB change, logged in VERSION_HISTORY.md). The XSD integer stays **45** and moves only on an XSD-shape change. | **No** — pure renumbering; no XSD shape change. |
 | **1.44** | Full BPMN Tier-1 palette + compensation. *(Feature window 2026-08-04 also carries the AI Assist + Abracadabra Mode suite — assist-while-you-draw ghosts, live voice/typed command editing, the editable Assist/NL-Rules catalog, and voice-dictation metering — but that half is feature-only, no export-shape change.)* | **Yes** — new `GatewayType "complex"` + `EventType "multiple"` / `"parallel-multiple"` enumerations. The Assist/Abracadabra half changes nothing in the diagram XML (existing types + open `properties` + DB/telemetry tables only). |
@@ -72,7 +73,40 @@ Canonical human-readable changelog for the export schema. Mirrors the inline his
 
 ## Details (newest first)
 
-### schema 46 — Enum catch-up: declaring what was already being exported  · SHAPE CHANGE (additive)
+### schema 47 — Event-driven Process Chain (ARIS eEPC)
+
+**Schema shape change: YES** — fourteen additive enumerations across three enums.
+
+| Enum | Added |
+|---|---|
+| `DiagramTypeEnum` | `epc` |
+| `SymbolTypeEnum` | `epc-event`, `epc-function`, `epc-xor`, `epc-and`, `epc-or`, `epc-org-unit`, `epc-position`, `epc-data`, `epc-application`, `epc-interface` |
+| `ConnectorTypeEnum` | `epc-control-flow`, `epc-information-flow`, `epc-org-assignment` |
+
+**Why a bump, when the simulator work in the same window did not get one.** Sim
+parameters ride in `element.properties.sim`, and `PropertiesType` is open — the
+reasoning recorded at v1.24 and v1.30. These enumerations are **closed**, so an
+EPC export would simply not validate against the published schema without them.
+That is the whole criterion, and it is the difference between the two.
+
+**No migration.** Purely additive: no element, attribute or existing enumeration
+changed, so a file written against v46 is a valid v47 file.
+
+**Found by the drift guard, not by a person.** `tests/xml/xsd-enum-drift.test.ts`
+compares every TypeScript union value against the XSD enumerations and failed the
+moment the type union gained `epc`, naming all fourteen missing values and the
+procedure to follow. It was written after schema 46 found twenty-four values that
+had been exported for months without being declared; this is the first time it has
+caught one before it shipped.
+
+**The three arc kinds, since the names alone do not say it.** Only
+`epc-control-flow` carries sequence. `epc-information-flow` says a function reads
+or writes an object — the DIRECTION is the meaning, so it keeps an arrowhead.
+`epc-org-assignment` carries none at all, because responsibility is not a
+direction and drawing one would assert something the notation does not mean.
+
+---
+## schema 46 — Enum catch-up: declaring what was already being exported  · SHAPE CHANGE (additive)
 
 **What changed**
 

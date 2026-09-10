@@ -445,6 +445,7 @@ const DIAGRAM_TYPES: { value: DiagramType; label: string; description: string }[
   { value: "value-chain", label: "Value Chain", description: "Process-based value chain diagrams with value chain containers" },
   { value: "archimate", label: "ArchiMate", description: "Enterprise architecture using the ArchiMate 3.2 standard (Business, Motivation, Strategy, Application layers)" },
   { value: "flowchart", label: "Standard Flowchart", description: "Classic black-and-white flowchart with terminators, processes, decisions, and flowlines" },
+  { value: "epc", label: "EPC", description: "Event-driven Process Chain (ARIS eEPC) — alternating events and functions, XOR/AND/OR connectors, and organisational units that convert to BPMN lanes" },
 ];
 
 export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, version, readOnly, viewingAsName, viewingAsEmail, impersonationMode, isAdmin, hasMicrosoft, entitlements }: Props) {

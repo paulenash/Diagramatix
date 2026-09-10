@@ -20,6 +20,83 @@ const MARKER_TYPES = new Set<string>(["uml-pain-point", "uml-issue"]);
 const EVENT_CONN_TYPES = new Set<string>(["start-event", "intermediate-event", "end-event"]);
 const COMPENSATION_TARGET_TYPES = new Set<string>(["task", "subprocess", "subprocess-expanded"]);
 
+// ── EPC ──
+/** The three connectors. Split or join; never a shape on their own account. */
+const EPC_CONNECTORS = new Set<string>(["epc-xor", "epc-and", "epc-or"]);
+/** The connectors that represent a CHOICE. An AND is not one — it takes every
+ *  branch — which is why an event may precede an AND but not these. */
+const EPC_DECISIONS = new Set<string>(["epc-xor", "epc-or"]);
+/** Everything the control flow may pass through. */
+const EPC_FLOW_TYPES = new Set<string>(["epc-event", "epc-function", "epc-xor", "epc-and", "epc-or", "epc-interface"]);
+const EPC_ORG_TYPES = new Set<string>(["epc-org-unit", "epc-position"]);
+const EPC_DATA_TYPES = new Set<string>(["epc-data", "epc-application"]);
+
+/**
+ * EPC connector legality — rules E1, E3 and E6 of the notation.
+ *
+ * Returns `undefined` when neither end is an EPC object, so the BPMN/UML/state
+ * gauntlet below is untouched by this existing. A diagram that contains no EPC
+ * symbols behaves exactly as it did.
+ *
+ * E2 (starts and ends with an event), E4 (a connector is a split or a join,
+ * never both), E5 (a split should be matched by a join) and E7 (one responsible
+ * org unit) are NOT here. Two reasons, and both matter:
+ *
+ * They are properties of the WHOLE DIAGRAM rather than of one edge — E4 in
+ * particular needs the connector list, which this predicate never receives, and
+ * giving it one would change a signature the reducer and the assist engine both
+ * depend on. And refusing an edge because the diagram is not yet balanced would
+ * make an EPC impossible to draw: you would be blocked halfway through every
+ * branch, before the join you were on your way to adding.
+ *
+ * So they are RED RULES, reported by the scan, where an EPC in progress is
+ * allowed to be temporarily wrong.
+ */
+function epcCanConnect(
+  source: DiagramElement,
+  target: DiagramElement,
+  connectorType: ConnectorType,
+): boolean | undefined {
+  const sEpc = source.type.startsWith("epc-");
+  const tEpc = target.type.startsWith("epc-");
+  if (!sEpc && !tEpc) return undefined;
+
+  // The arc kinds are typed, so the wrong arc between the right objects is
+  // caught as surely as the wrong objects.
+  if (connectorType === "epc-org-assignment") {
+    // E6, positive half: responsibility attaches an ORG to a FUNCTION, either way
+    // round, and to nothing else. Never to an event — nobody performs a state.
+    return (EPC_ORG_TYPES.has(source.type) && target.type === "epc-function")
+      || (source.type === "epc-function" && EPC_ORG_TYPES.has(target.type));
+  }
+  if (connectorType === "epc-information-flow") {
+    // Direction is the semantics: data → function reads, function → data writes.
+    return (EPC_DATA_TYPES.has(source.type) && target.type === "epc-function")
+      || (source.type === "epc-function" && EPC_DATA_TYPES.has(target.type));
+  }
+  if (connectorType !== "epc-control-flow") return false;
+
+  // E6, control-flow half: only the six flow objects may carry sequence, which
+  // excludes every satellite by construction. An explicit satellite veto used to
+  // sit above this line; planting an offender proved it could not fail, because
+  // the whitelist had already refused. One mechanism, and it is the live one.
+  if (!EPC_FLOW_TYPES.has(source.type) || !EPC_FLOW_TYPES.has(target.type)) return false;
+
+  // E1: strict alternation. Two functions may never be directly connected, nor
+  // two events — the notation says a state gives rise to work which gives rise
+  // to a state, and a chain that skips one is not an EPC.
+  if (source.type === "epc-event" && target.type === "epc-event") return false;
+  if (source.type === "epc-function" && target.type === "epc-function") return false;
+
+  // E3: an event may not be followed by a DECISION. THE classic EPC rule: an
+  // event is passive — it is a thing that has come about — and a passive thing
+  // cannot choose. Only a function may precede an XOR or an OR. An AND after an
+  // event is fine, because taking every branch is not a choice.
+  if (source.type === "epc-event" && EPC_DECISIONS.has(target.type)) return false;
+
+  return true;
+}
+
 export function canConnect(
   source: DiagramElement,
   target: DiagramElement,
@@ -29,6 +106,11 @@ export function canConnect(
   // Review-comment endpoints are coerced to a (non-directed) review link before
   // the gauntlet runs — always valid.
   if (source.type === "review-comment" || target.type === "review-comment") return true;
+
+  // EPC answers for its own objects and abstains for everything else, so the
+  // BPMN / UML / state-machine gauntlet below is unchanged by its existence.
+  const epc = epcCanConnect(source, target, connectorType);
+  if (epc !== undefined) return epc;
 
   const isDataConn = DATA_ELEMENT_TYPES.has(source.type) || DATA_ELEMENT_TYPES.has(target.type);
   const isCompensationLink =

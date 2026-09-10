@@ -864,6 +864,11 @@ function ConnectorRendererInner({ connector, selected, onSelect, svgToWorld, onU
   const isMessage = connector.type === "message";
   const isAssocBPMN = connector.type === "associationBPMN";
   const isFlowchartAssoc = connector.type === "flowchart-association";
+  // EPC: control flow is the default grey line and needs no special case — the
+  // other two are tinted to match the objects they join, so a reader can tell
+  // at a glance which arcs carry sequence and which are assignments.
+  const isEpcInfo = connector.type === "epc-information-flow";
+  const isEpcOrg = connector.type === "epc-org-assignment";
   const isMessageBPMN = connector.type === "messageBPMN";
   // Only on a free-form / imported diagram is a message a rectilinear,
   // segment-editable connector. A NORMAL message also stores routingType
@@ -885,6 +890,8 @@ function ConnectorRendererInner({ connector, selected, onSelect, svgToWorld, onU
     : isMessageBPMN ? "#b0b7c3"
     : isAssocBPMN ? "#9ca3af"
     : isFlowchartAssoc ? "#9333ea"   // dotted comment association (purple)
+    : isEpcInfo ? "#3b82f6"          // blue, like the information objects it joins
+    : isEpcOrg ? "#b45309"           // amber, like the organisational units
     : isReviewLink ? (reviewLinkColor ?? "#ec4899")   // matches the note's per-author colour (item K)
     : "#6b7280";
   const isUmlConn = isUmlConnType(connector.type);

@@ -136,6 +136,7 @@ const DIAGRAM_TYPES: { value: DiagramType; label: string; description: string }[
   { value: "bpmn", label: "BPMN", description: "Full Business Process Model and Notation" },
   { value: "domain", label: "Domain", description: "UML class diagrams with classes, enumerations, and relationships" },
   { value: "flowchart", label: "Standard Flowchart", description: "Classic black-and-white flowchart with terminators, processes, decisions, and flowlines" },
+  { value: "epc", label: "EPC", description: "Event-driven Process Chain (ARIS eEPC) — alternating events and functions, XOR/AND/OR connectors, and organisational units that convert to BPMN lanes" },
 ];
 
 function DiagramCard({
