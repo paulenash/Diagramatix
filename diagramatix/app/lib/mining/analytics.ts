@@ -18,7 +18,11 @@ import { minOf, maxOf } from "./numeric";
 export const CASE_CAP = 50_000;
 
 const MS_PER_UNIT: Record<ClockUnit, number> = { second: 1000, minute: 60_000, hour: 3_600_000, day: 86_400_000 };
-function pickUnit(medianMs: number): ClockUnit {
+/** The unit a duration of this size should be read in. Exported because the
+ *  Compare view humanises durations that never passed through `computeAnalytics`
+ *  — a second, private rule of thumb there would have two screens describing the
+ *  same delay in different units. */
+export function pickClockUnit(medianMs: number): ClockUnit {
   if (medianMs < 60_000) return "second";
   if (medianMs < 3_600_000) return "minute";
   if (medianMs < 86_400_000) return "hour";
@@ -188,7 +192,7 @@ export function computeAnalytics(log: EventLog): RunAnalytics {
     if (evs.length) cycleAll.push(evs[evs.length - 1].timestamp - evs[0].timestamp);
   });
 
-  const clockUnit = pickUnit(quantile(sortedNums(allDur), 0.5));
+  const clockUnit = pickClockUnit(quantile(sortedNums(allDur), 0.5));
 
   const activities: ActivityMetric[] = Object.keys(eventCountByActivity).map((a) => {
     const ds = sortedNums(durByActivity[a] ?? []);

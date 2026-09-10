@@ -1,0 +1,1647 @@
+Application,Activity,Timestamp,Stage,Team
+APP-2026-0001,Receive Application,2026-04-01T08:03:31Z,Received,Intake
+APP-2026-0002,Receive Application,2026-04-01T10:32:14Z,Received,Intake
+APP-2026-0003,Receive Application,2026-04-01T11:13:29Z,Received,Intake
+APP-2026-0004,Receive Application,2026-04-01T11:59:38Z,Received,Intake
+APP-2026-0005,Receive Application,2026-04-01T13:30:34Z,Received,Intake
+APP-2026-0006,Receive Application,2026-04-01T14:10:04Z,Received,Intake
+APP-2026-0007,Receive Application,2026-04-01T14:50:51Z,Received,Intake
+APP-2026-0003,Verify Identity,2026-04-01T15:08:29Z,Identity Verified,Intake
+APP-2026-0005,Verify Identity,2026-04-01T15:36:34Z,Identity Verified,Intake
+APP-2026-0002,Verify Identity,2026-04-01T16:16:14Z,Identity Verified,Intake
+APP-2026-0008,Receive Application,2026-04-01T16:29:35Z,Received,Intake
+APP-2026-0009,Receive Application,2026-04-01T16:30:20Z,Received,Intake
+APP-2026-0001,Verify Identity,2026-04-01T16:51:31Z,Identity Verified,Intake
+APP-2026-0006,Verify Identity,2026-04-01T17:11:04Z,Identity Verified,Intake
+APP-2026-0010,Receive Application,2026-04-01T17:35:03Z,Received,Intake
+APP-2026-0009,Verify Identity,2026-04-01T18:51:20Z,Identity Verified,Intake
+APP-2026-0004,Verify Identity,2026-04-01T19:17:38Z,Identity Verified,Intake
+APP-2026-0008,Verify Identity,2026-04-01T19:23:35Z,Identity Verified,Intake
+APP-2026-0003,Credit Check,2026-04-01T19:35:29Z,Credit Checked,Credit Team
+APP-2026-0007,Verify Identity,2026-04-01T20:29:51Z,Identity Verified,Intake
+APP-2026-0003,Request Documents,2026-04-01T21:07:29Z,Awaiting Documents,Credit Team
+APP-2026-0010,Verify Identity,2026-04-02T01:19:03Z,Identity Verified,Intake
+APP-2026-0007,Credit Check,2026-04-02T01:19:51Z,Credit Checked,Credit Team
+APP-2026-0001,Credit Check,2026-04-02T02:14:31Z,Credit Checked,Credit Team
+APP-2026-0004,Credit Check,2026-04-02T05:06:38Z,Credit Checked,Credit Team
+APP-2026-0002,Credit Check,2026-04-02T05:33:14Z,Credit Checked,Credit Team
+APP-2026-0004,Request Documents,2026-04-02T06:36:38Z,Awaiting Documents,Credit Team
+APP-2026-0001,Request Documents,2026-04-02T07:59:31Z,Awaiting Documents,Credit Team
+APP-2026-0007,Request Documents,2026-04-02T08:02:51Z,Awaiting Documents,Credit Team
+APP-2026-0011,Receive Application,2026-04-02T08:07:25Z,Received,Intake
+APP-2026-0012,Receive Application,2026-04-02T08:41:51Z,Received,Intake
+APP-2026-0013,Receive Application,2026-04-02T09:29:38Z,Received,Intake
+APP-2026-0014,Receive Application,2026-04-02T09:30:55Z,Received,Intake
+APP-2026-0002,Request Documents,2026-04-02T09:33:14Z,Awaiting Documents,Credit Team
+APP-2026-0015,Receive Application,2026-04-02T09:35:03Z,Received,Intake
+APP-2026-0008,Credit Check,2026-04-02T10:21:35Z,Credit Checked,Credit Team
+APP-2026-0012,Verify Identity,2026-04-02T10:25:51Z,Identity Verified,Intake
+APP-2026-0016,Receive Application,2026-04-02T10:43:33Z,Received,Intake
+APP-2026-0017,Receive Application,2026-04-02T10:58:12Z,Received,Intake
+APP-2026-0018,Receive Application,2026-04-02T11:00:57Z,Received,Intake
+APP-2026-0005,Credit Check,2026-04-02T11:44:34Z,Credit Checked,Credit Team
+APP-2026-0019,Receive Application,2026-04-02T11:57:35Z,Received,Intake
+APP-2026-0020,Receive Application,2026-04-02T13:13:00Z,Received,Intake
+APP-2026-0021,Receive Application,2026-04-02T13:30:04Z,Received,Intake
+APP-2026-0011,Verify Identity,2026-04-02T13:40:25Z,Identity Verified,Intake
+APP-2026-0013,Verify Identity,2026-04-02T14:10:38Z,Identity Verified,Intake
+APP-2026-0015,Verify Identity,2026-04-02T14:14:03Z,Identity Verified,Intake
+APP-2026-0022,Receive Application,2026-04-02T14:14:44Z,Received,Intake
+APP-2026-0017,Verify Identity,2026-04-02T14:57:12Z,Identity Verified,Intake
+APP-2026-0023,Receive Application,2026-04-02T15:04:14Z,Received,Intake
+APP-2026-0019,Verify Identity,2026-04-02T15:19:35Z,Identity Verified,Intake
+APP-2026-0024,Receive Application,2026-04-02T15:23:20Z,Received,Intake
+APP-2026-0006,Credit Check,2026-04-02T15:32:04Z,Credit Checked,Credit Team
+APP-2026-0022,Verify Identity,2026-04-02T15:54:44Z,Identity Verified,Intake
+APP-2026-0009,Credit Check,2026-04-02T16:08:20Z,Credit Checked,Credit Team
+APP-2026-0010,Credit Check,2026-04-02T16:23:03Z,Credit Checked,Credit Team
+APP-2026-0018,Verify Identity,2026-04-02T16:24:57Z,Identity Verified,Intake
+APP-2026-0023,Verify Identity,2026-04-02T16:29:14Z,Identity Verified,Intake
+APP-2026-0020,Verify Identity,2026-04-02T16:38:00Z,Identity Verified,Intake
+APP-2026-0025,Receive Application,2026-04-02T16:45:00Z,Received,Intake
+APP-2026-0021,Verify Identity,2026-04-02T16:45:04Z,Identity Verified,Intake
+APP-2026-0026,Receive Application,2026-04-02T16:50:18Z,Received,Intake
+APP-2026-0014,Verify Identity,2026-04-02T16:58:55Z,Identity Verified,Intake
+APP-2026-0008,Request Documents,2026-04-02T17:00:35Z,Awaiting Documents,Credit Team
+APP-2026-0011,Credit Check,2026-04-02T17:10:25Z,Credit Checked,Credit Team
+APP-2026-0027,Receive Application,2026-04-02T17:22:10Z,Received,Intake
+APP-2026-0005,Request Documents,2026-04-02T17:52:34Z,Awaiting Documents,Credit Team
+APP-2026-0024,Verify Identity,2026-04-02T18:04:20Z,Identity Verified,Intake
+APP-2026-0015,Credit Check,2026-04-02T18:05:03Z,Credit Checked,Credit Team
+APP-2026-0016,Verify Identity,2026-04-02T18:15:33Z,Identity Verified,Intake
+APP-2026-0010,Request Documents,2026-04-02T19:50:03Z,Awaiting Documents,Credit Team
+APP-2026-0006,Request Documents,2026-04-02T19:53:04Z,Awaiting Documents,Credit Team
+APP-2026-0009,Request Documents,2026-04-02T19:54:20Z,Awaiting Documents,Credit Team
+APP-2026-0022,Credit Check,2026-04-02T19:55:44Z,Credit Checked,Credit Team
+APP-2026-0023,Credit Check,2026-04-02T20:39:14Z,Credit Checked,Credit Team
+APP-2026-0015,Request Documents,2026-04-02T21:16:03Z,Awaiting Documents,Credit Team
+APP-2026-0026,Verify Identity,2026-04-02T23:33:18Z,Identity Verified,Intake
+APP-2026-0025,Verify Identity,2026-04-03T00:18:00Z,Identity Verified,Intake
+APP-2026-0022,Request Documents,2026-04-03T00:36:44Z,Awaiting Documents,Credit Team
+APP-2026-0011,Underwrite,2026-04-03T00:44:25Z,Underwritten,Underwriting
+APP-2026-0016,Credit Check,2026-04-03T00:55:33Z,Credit Checked,Credit Team
+APP-2026-0027,Verify Identity,2026-04-03T01:15:10Z,Identity Verified,Intake
+APP-2026-0019,Credit Check,2026-04-03T01:49:35Z,Credit Checked,Credit Team
+APP-2026-0023,Request Documents,2026-04-03T02:06:14Z,Awaiting Documents,Credit Team
+APP-2026-0012,Credit Check,2026-04-03T06:25:51Z,Credit Checked,Credit Team
+APP-2026-0011,Approve Application,2026-04-03T06:51:25Z,Approved,Underwriting
+APP-2026-0027,Credit Check,2026-04-03T07:43:10Z,Credit Checked,Credit Team
+APP-2026-0021,Credit Check,2026-04-03T07:49:04Z,Credit Checked,Credit Team
+APP-2026-0028,Receive Application,2026-04-03T08:07:54Z,Received,Intake
+APP-2026-0013,Credit Check,2026-04-03T08:59:38Z,Credit Checked,Credit Team
+APP-2026-0029,Receive Application,2026-04-03T09:22:03Z,Received,Intake
+APP-2026-0030,Receive Application,2026-04-03T10:09:05Z,Received,Intake
+APP-2026-0027,Request Documents,2026-04-03T10:51:10Z,Awaiting Documents,Credit Team
+APP-2026-0024,Credit Check,2026-04-03T10:57:20Z,Credit Checked,Credit Team
+APP-2026-0012,Request Documents,2026-04-03T11:53:51Z,Awaiting Documents,Credit Team
+APP-2026-0031,Receive Application,2026-04-03T11:54:33Z,Received,Intake
+APP-2026-0028,Verify Identity,2026-04-03T12:37:54Z,Identity Verified,Intake
+APP-2026-0025,Credit Check,2026-04-03T12:52:00Z,Credit Checked,Credit Team
+APP-2026-0032,Receive Application,2026-04-03T12:52:13Z,Received,Intake
+APP-2026-0033,Receive Application,2026-04-03T13:02:08Z,Received,Intake
+APP-2026-0034,Receive Application,2026-04-03T13:11:23Z,Received,Intake
+APP-2026-0035,Receive Application,2026-04-03T13:54:25Z,Received,Intake
+APP-2026-0029,Verify Identity,2026-04-03T14:02:03Z,Identity Verified,Intake
+APP-2026-0021,Request Documents,2026-04-03T14:11:04Z,Awaiting Documents,Credit Team
+APP-2026-0036,Receive Application,2026-04-03T14:17:12Z,Received,Intake
+APP-2026-0037,Receive Application,2026-04-03T14:54:56Z,Received,Intake
+APP-2026-0017,Credit Check,2026-04-03T15:00:12Z,Credit Checked,Credit Team
+APP-2026-0018,Credit Check,2026-04-03T15:13:57Z,Credit Checked,Credit Team
+APP-2026-0026,Credit Check,2026-04-03T15:20:18Z,Credit Checked,Credit Team
+APP-2026-0035,Verify Identity,2026-04-03T15:43:25Z,Identity Verified,Intake
+APP-2026-0038,Receive Application,2026-04-03T15:55:25Z,Received,Intake
+APP-2026-0031,Verify Identity,2026-04-03T15:57:33Z,Identity Verified,Intake
+APP-2026-0017,Request Documents,2026-04-03T16:16:12Z,Awaiting Documents,Credit Team
+APP-2026-0019,Underwrite,2026-04-03T16:33:35Z,Underwritten,Underwriting
+APP-2026-0020,Credit Check,2026-04-03T16:59:00Z,Credit Checked,Credit Team
+APP-2026-0025,Request Documents,2026-04-03T17:20:00Z,Awaiting Documents,Credit Team
+APP-2026-0014,Credit Check,2026-04-03T17:21:55Z,Credit Checked,Credit Team
+APP-2026-0039,Receive Application,2026-04-03T17:27:20Z,Received,Intake
+APP-2026-0032,Verify Identity,2026-04-03T18:10:13Z,Identity Verified,Intake
+APP-2026-0030,Verify Identity,2026-04-03T19:04:05Z,Identity Verified,Intake
+APP-2026-0018,Request Documents,2026-04-03T19:50:57Z,Awaiting Documents,Credit Team
+APP-2026-0036,Verify Identity,2026-04-03T19:55:12Z,Identity Verified,Intake
+APP-2026-0034,Verify Identity,2026-04-03T20:49:23Z,Identity Verified,Intake
+APP-2026-0038,Verify Identity,2026-04-03T20:51:25Z,Identity Verified,Intake
+APP-2026-0033,Verify Identity,2026-04-03T21:07:08Z,Identity Verified,Intake
+APP-2026-0014,Request Documents,2026-04-03T21:39:55Z,Awaiting Documents,Credit Team
+APP-2026-0039,Verify Identity,2026-04-03T22:39:20Z,Identity Verified,Intake
+APP-2026-0035,Credit Check,2026-04-03T22:40:25Z,Credit Checked,Credit Team
+APP-2026-0037,Verify Identity,2026-04-03T23:33:56Z,Identity Verified,Intake
+APP-2026-0004,Receive Documents,2026-04-04T00:43:38Z,Documents Received,Intake
+APP-2026-0006,Receive Documents,2026-04-04T00:44:04Z,Documents Received,Intake
+APP-2026-0026,Underwrite,2026-04-04T00:52:18Z,Underwritten,Underwriting
+APP-2026-0019,Approve Application,2026-04-04T03:06:35Z,Approved,Underwriting
+APP-2026-0028,Credit Check,2026-04-04T04:13:54Z,Credit Checked,Credit Team
+APP-2026-0031,Credit Check,2026-04-04T06:08:33Z,Credit Checked,Credit Team
+APP-2026-0032,Credit Check,2026-04-04T06:26:13Z,Credit Checked,Credit Team
+APP-2026-0005,Receive Documents,2026-04-04T08:33:34Z,Documents Received,Intake
+APP-2026-0035,Underwrite,2026-04-04T08:34:25Z,Underwritten,Underwriting
+APP-2026-0031,Request Documents,2026-04-04T10:36:33Z,Awaiting Documents,Credit Team
+APP-2026-0033,Credit Check,2026-04-04T10:38:08Z,Credit Checked,Credit Team
+APP-2026-0032,Request Documents,2026-04-04T10:56:13Z,Awaiting Documents,Credit Team
+APP-2026-0030,Credit Check,2026-04-04T11:21:05Z,Credit Checked,Credit Team
+APP-2026-0026,Decline Application,2026-04-04T11:45:18Z,Declined,Underwriting
+APP-2026-0029,Credit Check,2026-04-04T12:01:03Z,Credit Checked,Credit Team
+APP-2026-0024,Underwrite,2026-04-04T12:08:20Z,Underwritten,Underwriting
+APP-2026-0034,Credit Check,2026-04-04T13:13:23Z,Credit Checked,Credit Team
+APP-2026-0006,Credit Check,2026-04-04T13:29:04Z,Credit Checked,Credit Team
+APP-2026-0004,Credit Check,2026-04-04T14:29:38Z,Credit Checked,Credit Team
+APP-2026-0016,Underwrite,2026-04-04T15:26:33Z,Underwritten,Underwriting
+APP-2026-0033,Request Documents,2026-04-04T15:47:08Z,Awaiting Documents,Credit Team
+APP-2026-0034,Request Documents,2026-04-04T16:01:23Z,Awaiting Documents,Credit Team
+APP-2026-0030,Request Documents,2026-04-04T16:15:05Z,Awaiting Documents,Credit Team
+APP-2026-0006,Request Documents,2026-04-04T17:07:04Z,Awaiting Documents,Credit Team
+APP-2026-0039,Credit Check,2026-04-04T17:30:20Z,Credit Checked,Credit Team
+APP-2026-0029,Request Documents,2026-04-04T17:49:03Z,Awaiting Documents,Credit Team
+APP-2026-0035,Approve Application,2026-04-04T18:47:25Z,Approved,Underwriting
+APP-2026-0038,Credit Check,2026-04-04T18:54:25Z,Credit Checked,Credit Team
+APP-2026-0037,Credit Check,2026-04-04T19:36:56Z,Credit Checked,Credit Team
+APP-2026-0036,Credit Check,2026-04-04T19:44:12Z,Credit Checked,Credit Team
+APP-2026-0038,Request Documents,2026-04-04T20:20:25Z,Awaiting Documents,Credit Team
+APP-2026-0039,Request Documents,2026-04-05T00:09:20Z,Awaiting Documents,Credit Team
+APP-2026-0020,Underwrite,2026-04-05T00:41:00Z,Underwritten,Underwriting
+APP-2026-0016,Approve Application,2026-04-05T01:41:33Z,Approved,Underwriting
+APP-2026-0037,Underwrite,2026-04-05T01:53:56Z,Underwritten,Underwriting
+APP-2026-0009,Receive Documents,2026-04-05T02:08:20Z,Documents Received,Intake
+APP-2026-0013,Underwrite,2026-04-05T03:12:38Z,Underwritten,Underwriting
+APP-2026-0005,Credit Check,2026-04-05T03:20:34Z,Credit Checked,Credit Team
+APP-2026-0037,Approve Application,2026-04-05T04:30:56Z,Approved,Underwriting
+APP-2026-0035,Disburse Funds,2026-04-05T06:44:25Z,Disbursed,Payments
+APP-2026-0024,Decline Application,2026-04-05T08:05:20Z,Declined,Underwriting
+APP-2026-0020,Approve Application,2026-04-05T08:25:00Z,Approved,Underwriting
+APP-2026-0013,Approve Application,2026-04-05T09:20:38Z,Approved,Underwriting
+APP-2026-0004,Underwrite,2026-04-05T09:23:38Z,Underwritten,Underwriting
+APP-2026-0011,Disburse Funds,2026-04-05T15:52:25Z,Disbursed,Payments
+APP-2026-0004,Approve Application,2026-04-05T17:17:38Z,Approved,Underwriting
+APP-2026-0017,Receive Documents,2026-04-05T17:42:12Z,Documents Received,Intake
+APP-2026-0023,Receive Documents,2026-04-05T19:13:14Z,Documents Received,Intake
+APP-2026-0019,Disburse Funds,2026-04-05T19:15:35Z,Disbursed,Payments
+APP-2026-0014,Receive Documents,2026-04-05T21:38:55Z,Documents Received,Intake
+APP-2026-0009,Credit Check,2026-04-05T22:29:20Z,Credit Checked,Credit Team
+APP-2026-0028,Underwrite,2026-04-06T01:24:54Z,Underwritten,Underwriting
+APP-2026-0009,Request Documents,2026-04-06T01:32:20Z,Awaiting Documents,Credit Team
+APP-2026-0028,Approve Application,2026-04-06T02:26:54Z,Approved,Underwriting
+APP-2026-0016,Disburse Funds,2026-04-06T05:57:33Z,Disbursed,Payments
+APP-2026-0001,Receive Documents,2026-04-06T07:05:31Z,Documents Received,Intake
+APP-2026-0028,Disburse Funds,2026-04-06T08:39:54Z,Disbursed,Payments
+APP-2026-0040,Receive Application,2026-04-06T09:37:55Z,Received,Intake
+APP-2026-0041,Receive Application,2026-04-06T10:39:48Z,Received,Intake
+APP-2026-0023,Credit Check,2026-04-06T11:37:14Z,Credit Checked,Credit Team
+APP-2026-0042,Receive Application,2026-04-06T12:12:13Z,Received,Intake
+APP-2026-0043,Receive Application,2026-04-06T12:20:22Z,Received,Intake
+APP-2026-0044,Receive Application,2026-04-06T12:28:30Z,Received,Intake
+APP-2026-0023,Request Documents,2026-04-06T12:39:14Z,Awaiting Documents,Credit Team
+APP-2026-0040,Verify Identity,2026-04-06T13:19:55Z,Identity Verified,Intake
+APP-2026-0017,Credit Check,2026-04-06T13:25:12Z,Credit Checked,Credit Team
+APP-2026-0045,Receive Application,2026-04-06T13:28:41Z,Received,Intake
+APP-2026-0046,Receive Application,2026-04-06T13:45:48Z,Received,Intake
+APP-2026-0047,Receive Application,2026-04-06T15:08:25Z,Received,Intake
+APP-2026-0048,Receive Application,2026-04-06T15:23:36Z,Received,Intake
+APP-2026-0041,Verify Identity,2026-04-06T15:27:48Z,Identity Verified,Intake
+APP-2026-0007,Receive Documents,2026-04-06T15:44:51Z,Documents Received,Intake
+APP-2026-0005,Underwrite,2026-04-06T16:04:34Z,Underwritten,Underwriting
+APP-2026-0045,Verify Identity,2026-04-06T16:06:41Z,Identity Verified,Intake
+APP-2026-0017,Request Documents,2026-04-06T16:13:12Z,Awaiting Documents,Credit Team
+APP-2026-0043,Verify Identity,2026-04-06T16:53:22Z,Identity Verified,Intake
+APP-2026-0049,Receive Application,2026-04-06T16:59:16Z,Received,Intake
+APP-2026-0044,Verify Identity,2026-04-06T17:04:30Z,Identity Verified,Intake
+APP-2026-0036,Underwrite,2026-04-06T18:31:12Z,Underwritten,Underwriting
+APP-2026-0046,Verify Identity,2026-04-06T18:42:48Z,Identity Verified,Intake
+APP-2026-0049,Verify Identity,2026-04-06T18:44:16Z,Identity Verified,Intake
+APP-2026-0014,Credit Check,2026-04-06T19:07:55Z,Credit Checked,Credit Team
+APP-2026-0042,Verify Identity,2026-04-06T19:12:13Z,Identity Verified,Intake
+APP-2026-0005,Approve Application,2026-04-06T20:02:34Z,Approved,Underwriting
+APP-2026-0014,Request Documents,2026-04-06T21:11:55Z,Awaiting Documents,Credit Team
+APP-2026-0007,Credit Check,2026-04-06T21:45:51Z,Credit Checked,Credit Team
+APP-2026-0048,Verify Identity,2026-04-06T22:10:36Z,Identity Verified,Intake
+APP-2026-0044,Credit Check,2026-04-06T22:44:30Z,Credit Checked,Credit Team
+APP-2026-0001,Credit Check,2026-04-06T22:49:31Z,Credit Checked,Credit Team
+APP-2026-0047,Verify Identity,2026-04-06T22:59:25Z,Identity Verified,Intake
+APP-2026-0043,Credit Check,2026-04-07T01:03:22Z,Credit Checked,Credit Team
+APP-2026-0001,Request Documents,2026-04-07T01:49:31Z,Awaiting Documents,Credit Team
+APP-2026-0040,Credit Check,2026-04-07T02:10:55Z,Credit Checked,Credit Team
+APP-2026-0049,Credit Check,2026-04-07T03:23:16Z,Credit Checked,Credit Team
+APP-2026-0044,Request Documents,2026-04-07T03:49:30Z,Awaiting Documents,Credit Team
+APP-2026-0006,Receive Documents,2026-04-07T03:52:04Z,Documents Received,Intake
+APP-2026-0036,Approve Application,2026-04-07T04:58:12Z,Approved,Underwriting
+APP-2026-0049,Request Documents,2026-04-07T06:14:16Z,Awaiting Documents,Credit Team
+APP-2026-0046,Credit Check,2026-04-07T07:07:48Z,Credit Checked,Credit Team
+APP-2026-0043,Request Documents,2026-04-07T07:44:22Z,Awaiting Documents,Credit Team
+APP-2026-0040,Underwrite,2026-04-07T07:51:55Z,Underwritten,Underwriting
+APP-2026-0021,Receive Documents,2026-04-07T08:52:04Z,Documents Received,Intake
+APP-2026-0050,Receive Application,2026-04-07T09:33:52Z,Received,Intake
+APP-2026-0047,Credit Check,2026-04-07T09:35:25Z,Credit Checked,Credit Team
+APP-2026-0051,Receive Application,2026-04-07T09:53:02Z,Received,Intake
+APP-2026-0052,Receive Application,2026-04-07T10:25:14Z,Received,Intake
+APP-2026-0053,Receive Application,2026-04-07T10:31:11Z,Received,Intake
+APP-2026-0054,Receive Application,2026-04-07T11:09:21Z,Received,Intake
+APP-2026-0055,Receive Application,2026-04-07T11:30:11Z,Received,Intake
+APP-2026-0056,Receive Application,2026-04-07T11:33:36Z,Received,Intake
+APP-2026-0041,Credit Check,2026-04-07T11:56:48Z,Credit Checked,Credit Team
+APP-2026-0054,Verify Identity,2026-04-07T12:14:21Z,Identity Verified,Intake
+APP-2026-0057,Receive Application,2026-04-07T12:56:46Z,Received,Intake
+APP-2026-0058,Receive Application,2026-04-07T13:13:23Z,Received,Intake
+APP-2026-0045,Credit Check,2026-04-07T13:21:41Z,Credit Checked,Credit Team
+APP-2026-0050,Verify Identity,2026-04-07T13:21:52Z,Identity Verified,Intake
+APP-2026-0046,Request Documents,2026-04-07T14:02:48Z,Awaiting Documents,Credit Team
+APP-2026-0059,Receive Application,2026-04-07T14:07:17Z,Received,Intake
+APP-2026-0057,Verify Identity,2026-04-07T14:10:46Z,Identity Verified,Intake
+APP-2026-0058,Verify Identity,2026-04-07T14:14:23Z,Identity Verified,Intake
+APP-2026-0060,Receive Application,2026-04-07T14:22:13Z,Received,Intake
+APP-2026-0061,Receive Application,2026-04-07T14:23:00Z,Received,Intake
+APP-2026-0055,Verify Identity,2026-04-07T14:32:11Z,Identity Verified,Intake
+APP-2026-0039,Receive Documents,2026-04-07T14:32:20Z,Documents Received,Intake
+APP-2026-0062,Receive Application,2026-04-07T14:32:54Z,Received,Intake
+APP-2026-0056,Verify Identity,2026-04-07T14:52:36Z,Identity Verified,Intake
+APP-2026-0003,Receive Documents,2026-04-07T14:59:29Z,Documents Received,Intake
+APP-2026-0053,Verify Identity,2026-04-07T15:09:11Z,Identity Verified,Intake
+APP-2026-0041,Request Documents,2026-04-07T15:48:48Z,Awaiting Documents,Credit Team
+APP-2026-0052,Verify Identity,2026-04-07T16:00:14Z,Identity Verified,Intake
+APP-2026-0063,Receive Application,2026-04-07T16:04:06Z,Received,Intake
+APP-2026-0042,Credit Check,2026-04-07T16:35:13Z,Credit Checked,Credit Team
+APP-2026-0037,Disburse Funds,2026-04-07T16:35:56Z,Disbursed,Payments
+APP-2026-0020,Disburse Funds,2026-04-07T17:33:00Z,Disbursed,Payments
+APP-2026-0059,Verify Identity,2026-04-07T17:40:17Z,Identity Verified,Intake
+APP-2026-0064,Receive Application,2026-04-07T17:44:17Z,Received,Intake
+APP-2026-0045,Request Documents,2026-04-07T17:48:41Z,Awaiting Documents,Credit Team
+APP-2026-0051,Verify Identity,2026-04-07T18:07:02Z,Identity Verified,Intake
+APP-2026-0063,Verify Identity,2026-04-07T18:26:06Z,Identity Verified,Intake
+APP-2026-0062,Verify Identity,2026-04-07T19:08:54Z,Identity Verified,Intake
+APP-2026-0008,Receive Documents,2026-04-07T19:55:35Z,Documents Received,Intake
+APP-2026-0061,Verify Identity,2026-04-07T20:16:00Z,Identity Verified,Intake
+APP-2026-0064,Verify Identity,2026-04-07T20:29:17Z,Identity Verified,Intake
+APP-2026-0060,Verify Identity,2026-04-07T20:43:13Z,Identity Verified,Intake
+APP-2026-0048,Credit Check,2026-04-07T21:01:36Z,Credit Checked,Credit Team
+APP-2026-0062,Credit Check,2026-04-07T21:09:54Z,Credit Checked,Credit Team
+APP-2026-0004,Disburse Funds,2026-04-07T21:10:38Z,Disbursed,Payments
+APP-2026-0057,Credit Check,2026-04-07T21:22:46Z,Credit Checked,Credit Team
+APP-2026-0023,Receive Documents,2026-04-07T21:24:14Z,Documents Received,Intake
+APP-2026-0054,Credit Check,2026-04-07T21:25:21Z,Credit Checked,Credit Team
+APP-2026-0050,Credit Check,2026-04-07T22:39:52Z,Credit Checked,Credit Team
+APP-2026-0062,Request Documents,2026-04-07T23:01:54Z,Awaiting Documents,Credit Team
+APP-2026-0031,Receive Documents,2026-04-07T23:32:33Z,Documents Received,Intake
+APP-2026-0042,Request Documents,2026-04-07T23:34:13Z,Awaiting Documents,Credit Team
+APP-2026-0059,Credit Check,2026-04-07T23:34:17Z,Credit Checked,Credit Team
+APP-2026-0048,Request Documents,2026-04-08T00:21:36Z,Awaiting Documents,Credit Team
+APP-2026-0050,Request Documents,2026-04-08T01:11:52Z,Awaiting Documents,Credit Team
+APP-2026-0063,Credit Check,2026-04-08T01:23:06Z,Credit Checked,Credit Team
+APP-2026-0006,Credit Check,2026-04-08T01:30:04Z,Credit Checked,Credit Team
+APP-2026-0052,Credit Check,2026-04-08T02:19:14Z,Credit Checked,Credit Team
+APP-2026-0040,Decline Application,2026-04-08T02:48:55Z,Declined,Underwriting
+APP-2026-0013,Disburse Funds,2026-04-08T02:55:38Z,Disbursed,Payments
+APP-2026-0051,Credit Check,2026-04-08T03:06:02Z,Credit Checked,Credit Team
+APP-2026-0063,Request Documents,2026-04-08T03:23:06Z,Awaiting Documents,Credit Team
+APP-2026-0059,Request Documents,2026-04-08T03:30:17Z,Awaiting Documents,Credit Team
+APP-2026-0057,Request Documents,2026-04-08T03:31:46Z,Awaiting Documents,Credit Team
+APP-2026-0052,Request Documents,2026-04-08T05:12:14Z,Awaiting Documents,Credit Team
+APP-2026-0017,Withdraw Application,2026-04-08T06:12:12Z,Withdrawn,Intake
+APP-2026-0061,Credit Check,2026-04-08T07:02:00Z,Credit Checked,Credit Team
+APP-2026-0058,Credit Check,2026-04-08T07:21:23Z,Credit Checked,Credit Team
+APP-2026-0051,Request Documents,2026-04-08T07:41:02Z,Awaiting Documents,Credit Team
+APP-2026-0055,Credit Check,2026-04-08T08:02:11Z,Credit Checked,Credit Team
+APP-2026-0001,Receive Documents,2026-04-08T08:08:31Z,Documents Received,Intake
+APP-2026-0065,Receive Application,2026-04-08T08:11:44Z,Received,Intake
+APP-2026-0066,Receive Application,2026-04-08T08:23:45Z,Received,Intake
+APP-2026-0061,Request Documents,2026-04-08T08:33:00Z,Awaiting Documents,Credit Team
+APP-2026-0067,Receive Application,2026-04-08T08:37:25Z,Received,Intake
+APP-2026-0021,Credit Check,2026-04-08T08:56:04Z,Credit Checked,Credit Team
+APP-2026-0039,Credit Check,2026-04-08T09:09:20Z,Credit Checked,Credit Team
+APP-2026-0058,Request Documents,2026-04-08T09:11:23Z,Awaiting Documents,Credit Team
+APP-2026-0068,Receive Application,2026-04-08T09:18:56Z,Received,Intake
+APP-2026-0069,Receive Application,2026-04-08T09:30:17Z,Received,Intake
+APP-2026-0007,Underwrite,2026-04-08T09:30:51Z,Underwritten,Underwriting
+APP-2026-0064,Credit Check,2026-04-08T09:33:17Z,Credit Checked,Credit Team
+APP-2026-0056,Credit Check,2026-04-08T09:42:36Z,Credit Checked,Credit Team
+APP-2026-0001,Credit Check,2026-04-08T10:16:31Z,Credit Checked,Credit Team
+APP-2026-0070,Receive Application,2026-04-08T10:31:18Z,Received,Intake
+APP-2026-0055,Request Documents,2026-04-08T10:37:11Z,Awaiting Documents,Credit Team
+APP-2026-0038,Receive Documents,2026-04-08T10:51:25Z,Documents Received,Intake
+APP-2026-0071,Receive Application,2026-04-08T11:10:09Z,Received,Intake
+APP-2026-0069,Verify Identity,2026-04-08T11:19:17Z,Identity Verified,Intake
+APP-2026-0067,Verify Identity,2026-04-08T11:20:25Z,Identity Verified,Intake
+APP-2026-0053,Credit Check,2026-04-08T11:25:11Z,Credit Checked,Credit Team
+APP-2026-0031,Credit Check,2026-04-08T11:42:33Z,Credit Checked,Credit Team
+APP-2026-0043,Receive Documents,2026-04-08T11:44:22Z,Documents Received,Intake
+APP-2026-0072,Receive Application,2026-04-08T11:47:55Z,Received,Intake
+APP-2026-0007,Approve Application,2026-04-08T11:53:51Z,Approved,Underwriting
+APP-2026-0003,Credit Check,2026-04-08T12:19:29Z,Credit Checked,Credit Team
+APP-2026-0064,Request Documents,2026-04-08T12:35:17Z,Awaiting Documents,Credit Team
+APP-2026-0012,Receive Documents,2026-04-08T12:45:51Z,Documents Received,Intake
+APP-2026-0031,Request Documents,2026-04-08T13:07:33Z,Awaiting Documents,Credit Team
+APP-2026-0008,Credit Check,2026-04-08T13:33:35Z,Credit Checked,Credit Team
+APP-2026-0073,Receive Application,2026-04-08T14:01:37Z,Received,Intake
+APP-2026-0056,Request Documents,2026-04-08T14:28:36Z,Awaiting Documents,Credit Team
+APP-2026-0065,Verify Identity,2026-04-08T14:56:44Z,Identity Verified,Intake
+APP-2026-0074,Receive Application,2026-04-08T15:14:13Z,Received,Intake
+APP-2026-0053,Request Documents,2026-04-08T15:21:11Z,Awaiting Documents,Credit Team
+APP-2026-0066,Verify Identity,2026-04-08T15:38:45Z,Identity Verified,Intake
+APP-2026-0012,Credit Check,2026-04-08T15:44:51Z,Credit Checked,Credit Team
+APP-2026-0039,Request Documents,2026-04-08T15:54:20Z,Awaiting Documents,Credit Team
+APP-2026-0075,Receive Application,2026-04-08T16:13:10Z,Received,Intake
+APP-2026-0018,Receive Documents,2026-04-08T16:45:57Z,Documents Received,Intake
+APP-2026-0070,Verify Identity,2026-04-08T17:05:18Z,Identity Verified,Intake
+APP-2026-0076,Receive Application,2026-04-08T17:13:08Z,Received,Intake
+APP-2026-0077,Receive Application,2026-04-08T17:37:17Z,Received,Intake
+APP-2026-0078,Receive Application,2026-04-08T17:39:13Z,Received,Intake
+APP-2026-0012,Request Documents,2026-04-08T17:43:51Z,Awaiting Documents,Credit Team
+APP-2026-0068,Verify Identity,2026-04-08T17:45:56Z,Identity Verified,Intake
+APP-2026-0075,Verify Identity,2026-04-08T18:12:10Z,Identity Verified,Intake
+APP-2026-0003,Underwrite,2026-04-08T18:22:29Z,Underwritten,Underwriting
+APP-2026-0047,Underwrite,2026-04-08T18:27:25Z,Underwritten,Underwriting
+APP-2026-0072,Verify Identity,2026-04-08T18:29:55Z,Identity Verified,Intake
+APP-2026-0071,Verify Identity,2026-04-08T18:31:09Z,Identity Verified,Intake
+APP-2026-0066,Credit Check,2026-04-08T18:42:45Z,Credit Checked,Credit Team
+APP-2026-0073,Verify Identity,2026-04-08T18:47:37Z,Identity Verified,Intake
+APP-2026-0067,Credit Check,2026-04-08T18:52:25Z,Credit Checked,Credit Team
+APP-2026-0008,Request Documents,2026-04-08T20:01:35Z,Awaiting Documents,Credit Team
+APP-2026-0002,Receive Documents,2026-04-08T20:22:14Z,Documents Received,Intake
+APP-2026-0007,Disburse Funds,2026-04-08T20:27:51Z,Disbursed,Payments
+APP-2026-0060,Credit Check,2026-04-08T21:05:13Z,Credit Checked,Credit Team
+APP-2026-0054,Underwrite,2026-04-08T21:18:21Z,Underwritten,Underwriting
+APP-2026-0077,Verify Identity,2026-04-08T21:35:17Z,Identity Verified,Intake
+APP-2026-0074,Verify Identity,2026-04-08T21:36:13Z,Identity Verified,Intake
+APP-2026-0018,Credit Check,2026-04-08T21:50:57Z,Credit Checked,Credit Team
+APP-2026-0076,Verify Identity,2026-04-08T22:02:08Z,Identity Verified,Intake
+APP-2026-0023,Credit Check,2026-04-08T22:15:14Z,Credit Checked,Credit Team
+APP-2026-0071,Credit Check,2026-04-08T22:55:09Z,Credit Checked,Credit Team
+APP-2026-0038,Credit Check,2026-04-08T23:00:25Z,Credit Checked,Credit Team
+APP-2026-0067,Request Documents,2026-04-08T23:00:25Z,Awaiting Documents,Credit Team
+APP-2026-0047,Approve Application,2026-04-08T23:39:25Z,Approved,Underwriting
+APP-2026-0001,Underwrite,2026-04-08T23:58:31Z,Underwritten,Underwriting
+APP-2026-0038,Request Documents,2026-04-09T00:06:25Z,Awaiting Documents,Credit Team
+APP-2026-0070,Credit Check,2026-04-09T00:30:18Z,Credit Checked,Credit Team
+APP-2026-0078,Verify Identity,2026-04-09T02:29:13Z,Identity Verified,Intake
+APP-2026-0043,Credit Check,2026-04-09T02:59:22Z,Credit Checked,Credit Team
+APP-2026-0073,Credit Check,2026-04-09T03:48:37Z,Credit Checked,Credit Team
+APP-2026-0018,Request Documents,2026-04-09T04:07:57Z,Awaiting Documents,Credit Team
+APP-2026-0070,Request Documents,2026-04-09T04:34:18Z,Awaiting Documents,Credit Team
+APP-2026-0071,Request Documents,2026-04-09T05:24:09Z,Awaiting Documents,Credit Team
+APP-2026-0069,Credit Check,2026-04-09T05:36:17Z,Credit Checked,Credit Team
+APP-2026-0068,Credit Check,2026-04-09T06:39:56Z,Credit Checked,Credit Team
+APP-2026-0054,Approve Application,2026-04-09T07:00:21Z,Approved,Underwriting
+APP-2026-0003,Approve Application,2026-04-09T07:02:29Z,Approved,Underwriting
+APP-2026-0025,Receive Documents,2026-04-09T07:20:00Z,Documents Received,Intake
+APP-2026-0043,Request Documents,2026-04-09T07:22:22Z,Awaiting Documents,Credit Team
+APP-2026-0045,Receive Documents,2026-04-09T07:33:41Z,Documents Received,Intake
+APP-2026-0069,Request Documents,2026-04-09T08:19:17Z,Awaiting Documents,Credit Team
+APP-2026-0079,Receive Application,2026-04-09T08:54:15Z,Received,Intake
+APP-2026-0001,Approve Application,2026-04-09T09:21:31Z,Approved,Underwriting
+APP-2026-0080,Receive Application,2026-04-09T09:37:59Z,Received,Intake
+APP-2026-0022,Receive Documents,2026-04-09T09:51:44Z,Documents Received,Intake
+APP-2026-0073,Request Documents,2026-04-09T10:06:37Z,Awaiting Documents,Credit Team
+APP-2026-0081,Receive Application,2026-04-09T10:10:47Z,Received,Intake
+APP-2026-0082,Receive Application,2026-04-09T10:46:07Z,Received,Intake
+APP-2026-0083,Receive Application,2026-04-09T11:10:25Z,Received,Intake
+APP-2026-0084,Receive Application,2026-04-09T11:55:37Z,Received,Intake
+APP-2026-0085,Receive Application,2026-04-09T11:58:06Z,Received,Intake
+APP-2026-0081,Verify Identity,2026-04-09T12:17:47Z,Identity Verified,Intake
+APP-2026-0022,Credit Check,2026-04-09T12:21:44Z,Credit Checked,Credit Team
+APP-2026-0083,Verify Identity,2026-04-09T13:00:25Z,Identity Verified,Intake
+APP-2026-0080,Verify Identity,2026-04-09T13:24:59Z,Identity Verified,Intake
+APP-2026-0086,Receive Application,2026-04-09T13:29:26Z,Received,Intake
+APP-2026-0065,Credit Check,2026-04-09T13:29:44Z,Credit Checked,Credit Team
+APP-2026-0066,Underwrite,2026-04-09T14:03:45Z,Underwritten,Underwriting
+APP-2026-0087,Receive Application,2026-04-09T14:12:16Z,Received,Intake
+APP-2026-0088,Receive Application,2026-04-09T14:19:32Z,Received,Intake
+APP-2026-0089,Receive Application,2026-04-09T14:46:16Z,Received,Intake
+APP-2026-0060,Underwrite,2026-04-09T14:47:13Z,Underwritten,Underwriting
+APP-2026-0072,Credit Check,2026-04-09T14:53:55Z,Credit Checked,Credit Team
+APP-2026-0090,Receive Application,2026-04-09T15:04:41Z,Received,Intake
+APP-2026-0074,Credit Check,2026-04-09T15:08:13Z,Credit Checked,Credit Team
+APP-2026-0022,Request Documents,2026-04-09T15:12:44Z,Awaiting Documents,Credit Team
+APP-2026-0010,Receive Documents,2026-04-09T15:33:03Z,Documents Received,Intake
+APP-2026-0002,Credit Check,2026-04-09T15:51:14Z,Credit Checked,Credit Team
+APP-2026-0091,Receive Application,2026-04-09T16:03:52Z,Received,Intake
+APP-2026-0083,Credit Check,2026-04-09T16:12:25Z,Credit Checked,Credit Team
+APP-2026-0090,Verify Identity,2026-04-09T16:16:41Z,Identity Verified,Intake
+APP-2026-0092,Receive Application,2026-04-09T16:43:28Z,Received,Intake
+APP-2026-0093,Receive Application,2026-04-09T16:56:03Z,Received,Intake
+APP-2026-0094,Receive Application,2026-04-09T16:58:51Z,Received,Intake
+APP-2026-0005,Disburse Funds,2026-04-09T17:01:34Z,Disbursed,Payments
+APP-2026-0085,Verify Identity,2026-04-09T17:05:06Z,Identity Verified,Intake
+APP-2026-0079,Verify Identity,2026-04-09T17:21:15Z,Identity Verified,Intake
+APP-2026-0002,Request Documents,2026-04-09T17:25:14Z,Awaiting Documents,Credit Team
+APP-2026-0060,Approve Application,2026-04-09T17:32:13Z,Approved,Underwriting
+APP-2026-0093,Verify Identity,2026-04-09T18:07:03Z,Identity Verified,Intake
+APP-2026-0087,Verify Identity,2026-04-09T18:08:16Z,Identity Verified,Intake
+APP-2026-0065,Underwrite,2026-04-09T18:10:44Z,Underwritten,Underwriting
+APP-2026-0083,Request Documents,2026-04-09T18:19:25Z,Awaiting Documents,Credit Team
+APP-2026-0084,Verify Identity,2026-04-09T18:27:37Z,Identity Verified,Intake
+APP-2026-0078,Credit Check,2026-04-09T18:39:13Z,Credit Checked,Credit Team
+APP-2026-0092,Verify Identity,2026-04-09T18:43:28Z,Identity Verified,Intake
+APP-2026-0006,Underwrite,2026-04-09T18:46:04Z,Underwritten,Underwriting
+APP-2026-0075,Credit Check,2026-04-09T18:56:10Z,Credit Checked,Credit Team
+APP-2026-0082,Verify Identity,2026-04-09T19:30:07Z,Identity Verified,Intake
+APP-2026-0021,Underwrite,2026-04-09T19:33:04Z,Underwritten,Underwriting
+APP-2026-0089,Verify Identity,2026-04-09T19:47:16Z,Identity Verified,Intake
+APP-2026-0075,Request Documents,2026-04-09T20:42:10Z,Awaiting Documents,Credit Team
+APP-2026-0015,Receive Documents,2026-04-09T20:44:03Z,Documents Received,Intake
+APP-2026-0008,Receive Documents,2026-04-09T20:52:35Z,Documents Received,Intake
+APP-2026-0036,Disburse Funds,2026-04-09T21:12:12Z,Disbursed,Payments
+APP-2026-0074,Request Documents,2026-04-09T21:18:13Z,Awaiting Documents,Credit Team
+APP-2026-0077,Credit Check,2026-04-09T21:37:17Z,Credit Checked,Credit Team
+APP-2026-0093,Credit Check,2026-04-09T22:03:03Z,Credit Checked,Credit Team
+APP-2026-0086,Verify Identity,2026-04-09T22:18:26Z,Identity Verified,Intake
+APP-2026-0088,Verify Identity,2026-04-09T22:31:32Z,Identity Verified,Intake
+APP-2026-0027,Receive Documents,2026-04-09T22:32:10Z,Documents Received,Intake
+APP-2026-0059,Receive Documents,2026-04-09T22:41:17Z,Documents Received,Intake
+APP-2026-0076,Credit Check,2026-04-09T22:53:08Z,Credit Checked,Credit Team
+APP-2026-0047,Disburse Funds,2026-04-09T22:57:25Z,Disbursed,Payments
+APP-2026-0082,Credit Check,2026-04-09T23:24:07Z,Credit Checked,Credit Team
+APP-2026-0006,Approve Application,2026-04-09T23:25:04Z,Approved,Underwriting
+APP-2026-0094,Verify Identity,2026-04-09T23:38:51Z,Identity Verified,Intake
+APP-2026-0068,Underwrite,2026-04-09T23:44:56Z,Underwritten,Underwriting
+APP-2026-0066,Approve Application,2026-04-10T00:10:45Z,Approved,Underwriting
+APP-2026-0021,Approve Application,2026-04-10T00:12:04Z,Approved,Underwriting
+APP-2026-0080,Credit Check,2026-04-10T00:44:59Z,Credit Checked,Credit Team
+APP-2026-0025,Credit Check,2026-04-10T00:47:00Z,Credit Checked,Credit Team
+APP-2026-0091,Verify Identity,2026-04-10T00:56:52Z,Identity Verified,Intake
+APP-2026-0068,Decline Application,2026-04-10T01:12:56Z,Declined,Underwriting
+APP-2026-0093,Request Documents,2026-04-10T01:38:03Z,Awaiting Documents,Credit Team
+APP-2026-0086,Credit Check,2026-04-10T01:45:26Z,Credit Checked,Credit Team
+APP-2026-0038,Receive Documents,2026-04-10T01:52:25Z,Documents Received,Intake
+APP-2026-0076,Request Documents,2026-04-10T02:09:08Z,Awaiting Documents,Credit Team
+APP-2026-0094,Credit Check,2026-04-10T02:14:51Z,Credit Checked,Credit Team
+APP-2026-0025,Request Documents,2026-04-10T02:26:00Z,Awaiting Documents,Credit Team
+APP-2026-0015,Credit Check,2026-04-10T02:33:03Z,Credit Checked,Credit Team
+APP-2026-0045,Credit Check,2026-04-10T02:55:41Z,Credit Checked,Credit Team
+APP-2026-0072,Underwrite,2026-04-10T04:20:55Z,Underwritten,Underwriting
+APP-2026-0077,Request Documents,2026-04-10T04:27:17Z,Awaiting Documents,Credit Team
+APP-2026-0087,Credit Check,2026-04-10T04:54:16Z,Credit Checked,Credit Team
+APP-2026-0046,Receive Documents,2026-04-10T05:08:48Z,Documents Received,Intake
+APP-2026-0094,Request Documents,2026-04-10T05:11:51Z,Awaiting Documents,Credit Team
+APP-2026-0080,Request Documents,2026-04-10T05:59:59Z,Awaiting Documents,Credit Team
+APP-2026-0044,Receive Documents,2026-04-10T06:05:30Z,Documents Received,Intake
+APP-2026-0045,Request Documents,2026-04-10T06:05:41Z,Awaiting Documents,Credit Team
+APP-2026-0038,Credit Check,2026-04-10T06:19:25Z,Credit Checked,Credit Team
+APP-2026-0015,Request Documents,2026-04-10T06:41:03Z,Awaiting Documents,Credit Team
+APP-2026-0090,Credit Check,2026-04-10T07:05:41Z,Credit Checked,Credit Team
+APP-2026-0027,Credit Check,2026-04-10T07:38:10Z,Credit Checked,Credit Team
+APP-2026-0065,Decline Application,2026-04-10T08:09:44Z,Declined,Underwriting
+APP-2026-0095,Receive Application,2026-04-10T08:21:38Z,Received,Intake
+APP-2026-0088,Credit Check,2026-04-10T09:06:32Z,Credit Checked,Credit Team
+APP-2026-0091,Credit Check,2026-04-10T09:09:52Z,Credit Checked,Credit Team
+APP-2026-0096,Receive Application,2026-04-10T09:48:35Z,Received,Intake
+APP-2026-0097,Receive Application,2026-04-10T09:53:19Z,Received,Intake
+APP-2026-0010,Credit Check,2026-04-10T09:57:03Z,Credit Checked,Credit Team
+APP-2026-0081,Credit Check,2026-04-10T10:25:47Z,Credit Checked,Credit Team
+APP-2026-0033,Receive Documents,2026-04-10T10:44:08Z,Documents Received,Intake
+APP-2026-0090,Request Documents,2026-04-10T11:15:41Z,Awaiting Documents,Credit Team
+APP-2026-0091,Request Documents,2026-04-10T11:23:52Z,Awaiting Documents,Credit Team
+APP-2026-0097,Verify Identity,2026-04-10T11:32:19Z,Identity Verified,Intake
+APP-2026-0059,Credit Check,2026-04-10T11:50:17Z,Credit Checked,Credit Team
+APP-2026-0098,Receive Application,2026-04-10T12:17:50Z,Received,Intake
+APP-2026-0006,Disburse Funds,2026-04-10T12:30:04Z,Disbursed,Payments
+APP-2026-0098,Verify Identity,2026-04-10T13:31:50Z,Identity Verified,Intake
+APP-2026-0095,Verify Identity,2026-04-10T13:34:38Z,Identity Verified,Intake
+APP-2026-0023,Underwrite,2026-04-10T14:16:14Z,Underwritten,Underwriting
+APP-2026-0099,Receive Application,2026-04-10T14:18:44Z,Received,Intake
+APP-2026-0070,Receive Documents,2026-04-10T15:24:18Z,Documents Received,Intake
+APP-2026-0084,Credit Check,2026-04-10T15:27:37Z,Credit Checked,Credit Team
+APP-2026-0081,Request Documents,2026-04-10T15:30:47Z,Awaiting Documents,Credit Team
+APP-2026-0010,Request Documents,2026-04-10T15:43:03Z,Awaiting Documents,Credit Team
+APP-2026-0096,Verify Identity,2026-04-10T16:03:35Z,Identity Verified,Intake
+APP-2026-0046,Credit Check,2026-04-10T16:05:48Z,Credit Checked,Credit Team
+APP-2026-0085,Credit Check,2026-04-10T16:32:06Z,Credit Checked,Credit Team
+APP-2026-0012,Receive Documents,2026-04-10T16:35:51Z,Documents Received,Intake
+APP-2026-0100,Receive Application,2026-04-10T16:42:09Z,Received,Intake
+APP-2026-0101,Receive Application,2026-04-10T16:42:15Z,Received,Intake
+APP-2026-0102,Receive Application,2026-04-10T16:45:51Z,Received,Intake
+APP-2026-0097,Credit Check,2026-04-10T16:56:19Z,Credit Checked,Credit Team
+APP-2026-0079,Credit Check,2026-04-10T17:36:15Z,Credit Checked,Credit Team
+APP-2026-0089,Credit Check,2026-04-10T18:20:16Z,Credit Checked,Credit Team
+APP-2026-0086,Underwrite,2026-04-10T18:43:26Z,Underwritten,Underwriting
+APP-2026-0092,Credit Check,2026-04-10T19:11:28Z,Credit Checked,Credit Team
+APP-2026-0084,Request Documents,2026-04-10T19:40:37Z,Awaiting Documents,Credit Team
+APP-2026-0099,Verify Identity,2026-04-10T20:01:44Z,Identity Verified,Intake
+APP-2026-0101,Verify Identity,2026-04-10T20:11:15Z,Identity Verified,Intake
+APP-2026-0079,Request Documents,2026-04-10T20:32:15Z,Awaiting Documents,Credit Team
+APP-2026-0100,Verify Identity,2026-04-10T21:02:09Z,Identity Verified,Intake
+APP-2026-0046,Request Documents,2026-04-10T21:07:48Z,Awaiting Documents,Credit Team
+APP-2026-0072,Decline Application,2026-04-10T21:20:55Z,Declined,Underwriting
+APP-2026-0008,Credit Check,2026-04-10T21:46:35Z,Credit Checked,Credit Team
+APP-2026-0057,Receive Documents,2026-04-10T22:02:46Z,Documents Received,Intake
+APP-2026-0085,Request Documents,2026-04-10T22:54:06Z,Awaiting Documents,Credit Team
+APP-2026-0092,Request Documents,2026-04-10T23:02:28Z,Awaiting Documents,Credit Team
+APP-2026-0095,Credit Check,2026-04-10T23:11:38Z,Credit Checked,Credit Team
+APP-2026-0102,Verify Identity,2026-04-10T23:51:51Z,Identity Verified,Intake
+APP-2026-0023,Approve Application,2026-04-11T00:50:14Z,Approved,Underwriting
+APP-2026-0098,Credit Check,2026-04-11T00:59:50Z,Credit Checked,Credit Team
+APP-2026-0066,Disburse Funds,2026-04-11T01:06:45Z,Disbursed,Payments
+APP-2026-0057,Credit Check,2026-04-11T01:21:46Z,Credit Checked,Credit Team
+APP-2026-0044,Credit Check,2026-04-11T02:51:30Z,Credit Checked,Credit Team
+APP-2026-0086,Approve Application,2026-04-11T03:08:26Z,Approved,Underwriting
+APP-2026-0029,Receive Documents,2026-04-11T03:50:03Z,Documents Received,Intake
+APP-2026-0098,Request Documents,2026-04-11T03:59:50Z,Awaiting Documents,Credit Team
+APP-2026-0060,Disburse Funds,2026-04-11T05:42:13Z,Disbursed,Payments
+APP-2026-0095,Request Documents,2026-04-11T05:44:38Z,Awaiting Documents,Credit Team
+APP-2026-0078,Underwrite,2026-04-11T05:50:13Z,Underwritten,Underwriting
+APP-2026-0059,Underwrite,2026-04-11T05:52:17Z,Underwritten,Underwriting
+APP-2026-0096,Credit Check,2026-04-11T06:19:35Z,Credit Checked,Credit Team
+APP-2026-0012,Credit Check,2026-04-11T06:19:51Z,Credit Checked,Credit Team
+APP-2026-0061,Receive Documents,2026-04-11T06:37:00Z,Documents Received,Intake
+APP-2026-0033,Credit Check,2026-04-11T07:22:08Z,Credit Checked,Credit Team
+APP-2026-0057,Request Documents,2026-04-11T07:41:46Z,Awaiting Documents,Credit Team
+APP-2026-0032,Receive Documents,2026-04-11T07:55:13Z,Documents Received,Intake
+APP-2026-0088,Underwrite,2026-04-11T09:11:32Z,Underwritten,Underwriting
+APP-2026-0034,Receive Documents,2026-04-11T09:24:23Z,Documents Received,Intake
+APP-2026-0096,Request Documents,2026-04-11T09:37:35Z,Awaiting Documents,Credit Team
+APP-2026-0070,Credit Check,2026-04-11T10:16:18Z,Credit Checked,Credit Team
+APP-2026-0030,Receive Documents,2026-04-11T10:55:05Z,Documents Received,Intake
+APP-2026-0033,Request Documents,2026-04-11T13:07:08Z,Awaiting Documents,Credit Team
+APP-2026-0099,Credit Check,2026-04-11T13:20:44Z,Credit Checked,Credit Team
+APP-2026-0052,Receive Documents,2026-04-11T13:28:14Z,Documents Received,Intake
+APP-2026-0100,Credit Check,2026-04-11T14:08:09Z,Credit Checked,Credit Team
+APP-2026-0003,Disburse Funds,2026-04-11T14:23:29Z,Disbursed,Payments
+APP-2026-0101,Credit Check,2026-04-11T14:58:15Z,Credit Checked,Credit Team
+APP-2026-0100,Request Documents,2026-04-11T15:50:09Z,Awaiting Documents,Credit Team
+APP-2026-0008,Underwrite,2026-04-11T16:26:35Z,Underwritten,Underwriting
+APP-2026-0102,Credit Check,2026-04-11T16:41:51Z,Credit Checked,Credit Team
+APP-2026-0059,Approve Application,2026-04-11T17:00:17Z,Approved,Underwriting
+APP-2026-0078,Approve Application,2026-04-11T17:01:13Z,Approved,Underwriting
+APP-2026-0034,Credit Check,2026-04-11T17:58:23Z,Credit Checked,Credit Team
+APP-2026-0054,Disburse Funds,2026-04-11T18:22:21Z,Disbursed,Payments
+APP-2026-0088,Decline Application,2026-04-11T18:41:32Z,Declined,Underwriting
+APP-2026-0082,Underwrite,2026-04-11T19:09:07Z,Underwritten,Underwriting
+APP-2026-0099,Request Documents,2026-04-11T19:59:44Z,Awaiting Documents,Credit Team
+APP-2026-0070,Underwrite,2026-04-11T20:02:18Z,Underwritten,Underwriting
+APP-2026-0102,Request Documents,2026-04-11T20:12:51Z,Awaiting Documents,Credit Team
+APP-2026-0070,Decline Application,2026-04-11T21:27:18Z,Declined,Underwriting
+APP-2026-0038,Underwrite,2026-04-11T22:27:25Z,Underwritten,Underwriting
+APP-2026-0055,Receive Documents,2026-04-11T23:12:11Z,Documents Received,Intake
+APP-2026-0034,Request Documents,2026-04-11T23:45:23Z,Awaiting Documents,Credit Team
+APP-2026-0025,Receive Documents,2026-04-12T00:36:00Z,Documents Received,Intake
+APP-2026-0032,Credit Check,2026-04-12T00:39:13Z,Credit Checked,Credit Team
+APP-2026-0021,Disburse Funds,2026-04-12T00:40:04Z,Disbursed,Payments
+APP-2026-0029,Credit Check,2026-04-12T00:47:03Z,Credit Checked,Credit Team
+APP-2026-0097,Underwrite,2026-04-12T01:00:19Z,Underwritten,Underwriting
+APP-2026-0001,Disburse Funds,2026-04-12T01:27:31Z,Disbursed,Payments
+APP-2026-0087,Underwrite,2026-04-12T02:03:16Z,Underwritten,Underwriting
+APP-2026-0032,Request Documents,2026-04-12T02:06:13Z,Awaiting Documents,Credit Team
+APP-2026-0008,Approve Application,2026-04-12T02:40:35Z,Approved,Underwriting
+APP-2026-0061,Credit Check,2026-04-12T04:13:00Z,Credit Checked,Credit Team
+APP-2026-0082,Decline Application,2026-04-12T04:30:07Z,Declined,Underwriting
+APP-2026-0027,Underwrite,2026-04-12T04:47:10Z,Underwritten,Underwriting
+APP-2026-0038,Approve Application,2026-04-12T05:02:25Z,Approved,Underwriting
+APP-2026-0087,Approve Application,2026-04-12T05:13:16Z,Approved,Underwriting
+APP-2026-0030,Credit Check,2026-04-12T05:28:05Z,Credit Checked,Credit Team
+APP-2026-0097,Approve Application,2026-04-12T05:30:19Z,Approved,Underwriting
+APP-2026-0049,Receive Documents,2026-04-12T05:32:16Z,Documents Received,Intake
+APP-2026-0052,Credit Check,2026-04-12T05:46:14Z,Credit Checked,Credit Team
+APP-2026-0023,Disburse Funds,2026-04-12T06:07:14Z,Disbursed,Payments
+APP-2026-0050,Receive Documents,2026-04-12T06:20:52Z,Documents Received,Intake
+APP-2026-0061,Request Documents,2026-04-12T07:35:00Z,Awaiting Documents,Credit Team
+APP-2026-0055,Credit Check,2026-04-12T08:09:11Z,Credit Checked,Credit Team
+APP-2026-0064,Receive Documents,2026-04-12T09:35:17Z,Documents Received,Intake
+APP-2026-0049,Credit Check,2026-04-12T10:53:16Z,Credit Checked,Credit Team
+APP-2026-0030,Request Documents,2026-04-12T10:54:05Z,Awaiting Documents,Credit Team
+APP-2026-0055,Request Documents,2026-04-12T11:23:11Z,Awaiting Documents,Credit Team
+APP-2026-0051,Receive Documents,2026-04-12T12:24:02Z,Documents Received,Intake
+APP-2026-0101,Underwrite,2026-04-12T13:44:15Z,Underwritten,Underwriting
+APP-2026-0009,Receive Documents,2026-04-12T14:25:20Z,Documents Received,Intake
+APP-2026-0027,Approve Application,2026-04-12T15:20:10Z,Approved,Underwriting
+APP-2026-0098,Receive Documents,2026-04-12T15:37:50Z,Documents Received,Intake
+APP-2026-0025,Credit Check,2026-04-12T15:51:00Z,Credit Checked,Credit Team
+APP-2026-0058,Receive Documents,2026-04-12T16:17:23Z,Documents Received,Intake
+APP-2026-0050,Credit Check,2026-04-12T16:27:52Z,Credit Checked,Credit Team
+APP-2026-0101,Approve Application,2026-04-12T17:10:15Z,Approved,Underwriting
+APP-2026-0051,Credit Check,2026-04-12T17:42:02Z,Credit Checked,Credit Team
+APP-2026-0029,Underwrite,2026-04-12T17:54:03Z,Underwritten,Underwriting
+APP-2026-0089,Underwrite,2026-04-12T18:11:16Z,Underwritten,Underwriting
+APP-2026-0018,Receive Documents,2026-04-12T19:13:57Z,Documents Received,Intake
+APP-2026-0009,Credit Check,2026-04-12T19:27:20Z,Credit Checked,Credit Team
+APP-2026-0008,Disburse Funds,2026-04-12T19:36:35Z,Disbursed,Payments
+APP-2026-0051,Request Documents,2026-04-12T19:55:02Z,Awaiting Documents,Credit Team
+APP-2026-0025,Underwrite,2026-04-12T20:20:00Z,Underwritten,Underwriting
+APP-2026-0044,Underwrite,2026-04-12T20:36:30Z,Underwritten,Underwriting
+APP-2026-0080,Receive Documents,2026-04-12T20:55:59Z,Documents Received,Intake
+APP-2026-0044,Approve Application,2026-04-12T21:37:30Z,Approved,Underwriting
+APP-2026-0050,Request Documents,2026-04-12T22:09:52Z,Awaiting Documents,Credit Team
+APP-2026-0025,Approve Application,2026-04-12T22:41:00Z,Approved,Underwriting
+APP-2026-0078,Disburse Funds,2026-04-12T23:31:13Z,Disbursed,Payments
+APP-2026-0087,Disburse Funds,2026-04-12T23:44:16Z,Disbursed,Payments
+APP-2026-0098,Credit Check,2026-04-13T00:54:50Z,Credit Checked,Credit Team
+APP-2026-0086,Disburse Funds,2026-04-13T01:05:26Z,Disbursed,Payments
+APP-2026-0094,Receive Documents,2026-04-13T01:18:51Z,Documents Received,Intake
+APP-2026-0089,Approve Application,2026-04-13T01:57:16Z,Approved,Underwriting
+APP-2026-0029,Approve Application,2026-04-13T02:02:03Z,Approved,Underwriting
+APP-2026-0090,Receive Documents,2026-04-13T03:59:41Z,Documents Received,Intake
+APP-2026-0098,Request Documents,2026-04-13T03:59:50Z,Awaiting Documents,Credit Team
+APP-2026-0012,Underwrite,2026-04-13T04:05:51Z,Underwritten,Underwriting
+APP-2026-0014,Receive Documents,2026-04-13T04:35:55Z,Documents Received,Intake
+APP-2026-0094,Credit Check,2026-04-13T04:52:51Z,Credit Checked,Credit Team
+APP-2026-0064,Credit Check,2026-04-13T06:56:17Z,Credit Checked,Credit Team
+APP-2026-0032,Receive Documents,2026-04-13T07:19:13Z,Documents Received,Intake
+APP-2026-0018,Credit Check,2026-04-13T07:51:57Z,Credit Checked,Credit Team
+APP-2026-0075,Receive Documents,2026-04-13T08:46:10Z,Documents Received,Intake
+APP-2026-0103,Receive Application,2026-04-13T09:12:24Z,Received,Intake
+APP-2026-0104,Receive Application,2026-04-13T10:26:06Z,Received,Intake
+APP-2026-0103,Verify Identity,2026-04-13T10:26:24Z,Identity Verified,Intake
+APP-2026-0105,Receive Application,2026-04-13T11:02:47Z,Received,Intake
+APP-2026-0058,Credit Check,2026-04-13T11:33:23Z,Credit Checked,Credit Team
+APP-2026-0064,Request Documents,2026-04-13T11:48:17Z,Awaiting Documents,Credit Team
+APP-2026-0106,Receive Application,2026-04-13T11:54:46Z,Received,Intake
+APP-2026-0107,Receive Application,2026-04-13T11:56:34Z,Received,Intake
+APP-2026-0080,Credit Check,2026-04-13T12:46:59Z,Credit Checked,Credit Team
+APP-2026-0107,Verify Identity,2026-04-13T13:06:34Z,Identity Verified,Intake
+APP-2026-0012,Approve Application,2026-04-13T13:12:51Z,Approved,Underwriting
+APP-2026-0108,Receive Application,2026-04-13T13:20:45Z,Received,Intake
+APP-2026-0104,Verify Identity,2026-04-13T13:24:06Z,Identity Verified,Intake
+APP-2026-0032,Credit Check,2026-04-13T13:44:13Z,Credit Checked,Credit Team
+APP-2026-0014,Credit Check,2026-04-13T14:14:55Z,Credit Checked,Credit Team
+APP-2026-0109,Receive Application,2026-04-13T14:28:28Z,Received,Intake
+APP-2026-0110,Receive Application,2026-04-13T15:08:39Z,Received,Intake
+APP-2026-0002,Receive Documents,2026-04-13T15:40:14Z,Documents Received,Intake
+APP-2026-0039,Receive Documents,2026-04-13T15:57:20Z,Documents Received,Intake
+APP-2026-0105,Verify Identity,2026-04-13T16:04:47Z,Identity Verified,Intake
+APP-2026-0058,Request Documents,2026-04-13T16:15:23Z,Awaiting Documents,Credit Team
+APP-2026-0108,Verify Identity,2026-04-13T17:36:45Z,Identity Verified,Intake
+APP-2026-0106,Verify Identity,2026-04-13T18:08:46Z,Identity Verified,Intake
+APP-2026-0100,Receive Documents,2026-04-13T18:40:09Z,Documents Received,Intake
+APP-2026-0062,Receive Documents,2026-04-13T18:42:54Z,Documents Received,Intake
+APP-2026-0110,Verify Identity,2026-04-13T18:57:39Z,Identity Verified,Intake
+APP-2026-0053,Receive Documents,2026-04-13T18:59:11Z,Documents Received,Intake
+APP-2026-0074,Receive Documents,2026-04-13T19:15:13Z,Documents Received,Intake
+APP-2026-0080,Request Documents,2026-04-13T19:31:59Z,Awaiting Documents,Credit Team
+APP-2026-0089,Disburse Funds,2026-04-13T19:51:16Z,Disbursed,Payments
+APP-2026-0109,Verify Identity,2026-04-13T20:07:28Z,Identity Verified,Intake
+APP-2026-0106,Credit Check,2026-04-13T20:22:46Z,Credit Checked,Credit Team
+APP-2026-0018,Underwrite,2026-04-13T21:01:57Z,Underwritten,Underwriting
+APP-2026-0102,Receive Documents,2026-04-13T21:06:51Z,Documents Received,Intake
+APP-2026-0059,Disburse Funds,2026-04-13T21:59:17Z,Disbursed,Payments
+APP-2026-0043,Receive Documents,2026-04-13T22:40:22Z,Documents Received,Intake
+APP-2026-0027,Disburse Funds,2026-04-13T23:05:10Z,Disbursed,Payments
+APP-2026-0084,Receive Documents,2026-04-13T23:07:37Z,Documents Received,Intake
+APP-2026-0062,Credit Check,2026-04-13T23:09:54Z,Credit Checked,Credit Team
+APP-2026-0053,Credit Check,2026-04-13T23:15:11Z,Credit Checked,Credit Team
+APP-2026-0002,Credit Check,2026-04-14T00:13:14Z,Credit Checked,Credit Team
+APP-2026-0053,Request Documents,2026-04-14T00:15:11Z,Awaiting Documents,Credit Team
+APP-2026-0110,Credit Check,2026-04-14T02:23:39Z,Credit Checked,Credit Team
+APP-2026-0103,Credit Check,2026-04-14T02:33:24Z,Credit Checked,Credit Team
+APP-2026-0052,Underwrite,2026-04-14T03:14:14Z,Underwritten,Underwriting
+APP-2026-0106,Request Documents,2026-04-14T03:16:46Z,Awaiting Documents,Credit Team
+APP-2026-0049,Underwrite,2026-04-14T03:18:16Z,Underwritten,Underwriting
+APP-2026-0100,Credit Check,2026-04-14T03:51:09Z,Credit Checked,Credit Team
+APP-2026-0105,Credit Check,2026-04-14T04:10:47Z,Credit Checked,Credit Team
+APP-2026-0090,Credit Check,2026-04-14T04:25:41Z,Credit Checked,Credit Team
+APP-2026-0067,Receive Documents,2026-04-14T05:23:25Z,Documents Received,Intake
+APP-2026-0110,Request Documents,2026-04-14T05:33:39Z,Awaiting Documents,Credit Team
+APP-2026-0018,Approve Application,2026-04-14T05:52:57Z,Approved,Underwriting
+APP-2026-0051,Receive Documents,2026-04-14T05:59:02Z,Documents Received,Intake
+APP-2026-0105,Request Documents,2026-04-14T05:59:47Z,Awaiting Documents,Credit Team
+APP-2026-0103,Request Documents,2026-04-14T06:12:24Z,Awaiting Documents,Credit Team
+APP-2026-0062,Underwrite,2026-04-14T06:27:54Z,Underwritten,Underwriting
+APP-2026-0014,Underwrite,2026-04-14T06:27:55Z,Underwritten,Underwriting
+APP-2026-0049,Decline Application,2026-04-14T07:28:16Z,Declined,Underwriting
+APP-2026-0002,Underwrite,2026-04-14T07:36:14Z,Underwritten,Underwriting
+APP-2026-0009,Underwrite,2026-04-14T08:31:20Z,Underwritten,Underwriting
+APP-2026-0014,Approve Application,2026-04-14T08:31:55Z,Approved,Underwriting
+APP-2026-0111,Receive Application,2026-04-14T08:33:36Z,Received,Intake
+APP-2026-0075,Credit Check,2026-04-14T08:51:10Z,Credit Checked,Credit Team
+APP-2026-0112,Receive Application,2026-04-14T09:02:55Z,Received,Intake
+APP-2026-0063,Receive Documents,2026-04-14T09:09:06Z,Documents Received,Intake
+APP-2026-0039,Credit Check,2026-04-14T09:15:20Z,Credit Checked,Credit Team
+APP-2026-0113,Receive Application,2026-04-14T10:03:04Z,Received,Intake
+APP-2026-0104,Credit Check,2026-04-14T10:19:06Z,Credit Checked,Credit Team
+APP-2026-0114,Receive Application,2026-04-14T10:26:28Z,Received,Intake
+APP-2026-0090,Request Documents,2026-04-14T10:39:41Z,Awaiting Documents,Credit Team
+APP-2026-0107,Credit Check,2026-04-14T10:57:34Z,Credit Checked,Credit Team
+APP-2026-0112,Verify Identity,2026-04-14T11:35:55Z,Identity Verified,Intake
+APP-2026-0115,Receive Application,2026-04-14T11:58:14Z,Received,Intake
+APP-2026-0093,Receive Documents,2026-04-14T11:59:03Z,Documents Received,Intake
+APP-2026-0031,Receive Documents,2026-04-14T12:05:33Z,Documents Received,Intake
+APP-2026-0009,Approve Application,2026-04-14T12:10:20Z,Approved,Underwriting
+APP-2026-0109,Credit Check,2026-04-14T12:39:28Z,Credit Checked,Credit Team
+APP-2026-0114,Verify Identity,2026-04-14T12:42:28Z,Identity Verified,Intake
+APP-2026-0048,Receive Documents,2026-04-14T12:49:36Z,Documents Received,Intake
+APP-2026-0032,Underwrite,2026-04-14T12:56:13Z,Underwritten,Underwriting
+APP-2026-0074,Credit Check,2026-04-14T13:25:13Z,Credit Checked,Credit Team
+APP-2026-0052,Approve Application,2026-04-14T13:57:14Z,Approved,Underwriting
+APP-2026-0116,Receive Application,2026-04-14T14:06:01Z,Received,Intake
+APP-2026-0093,Credit Check,2026-04-14T14:20:03Z,Credit Checked,Credit Team
+APP-2026-0117,Receive Application,2026-04-14T14:20:52Z,Received,Intake
+APP-2026-0116,Verify Identity,2026-04-14T15:13:01Z,Identity Verified,Intake
+APP-2026-0041,Receive Documents,2026-04-14T15:14:48Z,Documents Received,Intake
+APP-2026-0045,Receive Documents,2026-04-14T15:18:41Z,Documents Received,Intake
+APP-2026-0118,Receive Application,2026-04-14T15:35:54Z,Received,Intake
+APP-2026-0108,Credit Check,2026-04-14T15:40:45Z,Credit Checked,Credit Team
+APP-2026-0075,Request Documents,2026-04-14T15:44:10Z,Awaiting Documents,Credit Team
+APP-2026-0032,Approve Application,2026-04-14T15:46:13Z,Approved,Underwriting
+APP-2026-0104,Request Documents,2026-04-14T15:48:06Z,Awaiting Documents,Credit Team
+APP-2026-0093,Request Documents,2026-04-14T16:08:03Z,Awaiting Documents,Credit Team
+APP-2026-0033,Withdraw Application,2026-04-14T16:20:08Z,Withdrawn,Intake
+APP-2026-0062,Approve Application,2026-04-14T17:03:54Z,Approved,Underwriting
+APP-2026-0111,Verify Identity,2026-04-14T17:07:36Z,Identity Verified,Intake
+APP-2026-0002,Approve Application,2026-04-14T17:11:14Z,Approved,Underwriting
+APP-2026-0114,Credit Check,2026-04-14T17:22:28Z,Credit Checked,Credit Team
+APP-2026-0119,Receive Application,2026-04-14T17:33:46Z,Received,Intake
+APP-2026-0051,Credit Check,2026-04-14T17:42:02Z,Credit Checked,Credit Team
+APP-2026-0120,Receive Application,2026-04-14T17:49:33Z,Received,Intake
+APP-2026-0038,Disburse Funds,2026-04-14T18:08:25Z,Disbursed,Payments
+APP-2026-0063,Credit Check,2026-04-14T18:27:06Z,Credit Checked,Credit Team
+APP-2026-0102,Credit Check,2026-04-14T18:30:51Z,Credit Checked,Credit Team
+APP-2026-0113,Verify Identity,2026-04-14T18:58:04Z,Identity Verified,Intake
+APP-2026-0109,Request Documents,2026-04-14T19:06:28Z,Awaiting Documents,Credit Team
+APP-2026-0074,Request Documents,2026-04-14T19:13:13Z,Awaiting Documents,Credit Team
+APP-2026-0083,Receive Documents,2026-04-14T19:34:25Z,Documents Received,Intake
+APP-2026-0118,Verify Identity,2026-04-14T19:37:54Z,Identity Verified,Intake
+APP-2026-0043,Credit Check,2026-04-14T19:55:22Z,Credit Checked,Credit Team
+APP-2026-0084,Credit Check,2026-04-14T19:57:37Z,Credit Checked,Credit Team
+APP-2026-0055,Receive Documents,2026-04-14T20:08:11Z,Documents Received,Intake
+APP-2026-0094,Underwrite,2026-04-14T20:14:51Z,Underwritten,Underwriting
+APP-2026-0067,Credit Check,2026-04-14T20:26:25Z,Credit Checked,Credit Team
+APP-2026-0107,Underwrite,2026-04-14T20:27:34Z,Underwritten,Underwriting
+APP-2026-0111,Credit Check,2026-04-14T20:48:36Z,Credit Checked,Credit Team
+APP-2026-0117,Verify Identity,2026-04-14T20:50:52Z,Identity Verified,Intake
+APP-2026-0115,Verify Identity,2026-04-14T20:56:14Z,Identity Verified,Intake
+APP-2026-0041,Credit Check,2026-04-14T20:58:48Z,Credit Checked,Credit Team
+APP-2026-0042,Receive Documents,2026-04-14T21:22:13Z,Documents Received,Intake
+APP-2026-0044,Disburse Funds,2026-04-14T21:24:30Z,Disbursed,Payments
+APP-2026-0108,Request Documents,2026-04-14T21:57:45Z,Awaiting Documents,Credit Team
+APP-2026-0094,Approve Application,2026-04-14T22:00:51Z,Approved,Underwriting
+APP-2026-0084,Request Documents,2026-04-14T22:15:37Z,Awaiting Documents,Credit Team
+APP-2026-0079,Receive Documents,2026-04-14T22:26:15Z,Documents Received,Intake
+APP-2026-0111,Request Documents,2026-04-14T23:16:36Z,Awaiting Documents,Credit Team
+APP-2026-0119,Verify Identity,2026-04-14T23:18:46Z,Identity Verified,Intake
+APP-2026-0042,Credit Check,2026-04-14T23:39:13Z,Credit Checked,Credit Team
+APP-2026-0120,Verify Identity,2026-04-15T00:02:33Z,Identity Verified,Intake
+APP-2026-0041,Request Documents,2026-04-15T00:06:48Z,Awaiting Documents,Credit Team
+APP-2026-0101,Disburse Funds,2026-04-15T00:08:15Z,Disbursed,Payments
+APP-2026-0097,Disburse Funds,2026-04-15T01:14:19Z,Disbursed,Payments
+APP-2026-0079,Credit Check,2026-04-15T01:57:15Z,Credit Checked,Credit Team
+APP-2026-0099,Receive Documents,2026-04-15T02:43:44Z,Documents Received,Intake
+APP-2026-0042,Request Documents,2026-04-15T02:48:13Z,Awaiting Documents,Credit Team
+APP-2026-0083,Credit Check,2026-04-15T03:05:25Z,Credit Checked,Credit Team
+APP-2026-0079,Request Documents,2026-04-15T03:14:15Z,Awaiting Documents,Credit Team
+APP-2026-0025,Disburse Funds,2026-04-15T03:53:00Z,Disbursed,Payments
+APP-2026-0052,Disburse Funds,2026-04-15T04:26:14Z,Disbursed,Payments
+APP-2026-0071,Receive Documents,2026-04-15T04:48:09Z,Documents Received,Intake
+APP-2026-0120,Credit Check,2026-04-15T04:48:33Z,Credit Checked,Credit Team
+APP-2026-0057,Receive Documents,2026-04-15T06:55:46Z,Documents Received,Intake
+APP-2026-0107,Approve Application,2026-04-15T07:19:34Z,Approved,Underwriting
+APP-2026-0029,Disburse Funds,2026-04-15T07:39:03Z,Disbursed,Payments
+APP-2026-0055,Credit Check,2026-04-15T08:08:11Z,Credit Checked,Credit Team
+APP-2026-0039,Underwrite,2026-04-15T08:09:20Z,Underwritten,Underwriting
+APP-2026-0121,Receive Application,2026-04-15T08:10:37Z,Received,Intake
+APP-2026-0112,Credit Check,2026-04-15T08:14:55Z,Credit Checked,Credit Team
+APP-2026-0048,Credit Check,2026-04-15T08:21:36Z,Credit Checked,Credit Team
+APP-2026-0122,Receive Application,2026-04-15T08:22:07Z,Received,Intake
+APP-2026-0031,Credit Check,2026-04-15T08:47:33Z,Credit Checked,Credit Team
+APP-2026-0030,Receive Documents,2026-04-15T09:43:05Z,Documents Received,Intake
+APP-2026-0122,Verify Identity,2026-04-15T09:53:07Z,Identity Verified,Intake
+APP-2026-0123,Receive Application,2026-04-15T09:54:01Z,Received,Intake
+APP-2026-0124,Receive Application,2026-04-15T10:50:48Z,Received,Intake
+APP-2026-0045,Credit Check,2026-04-15T11:23:41Z,Credit Checked,Credit Team
+APP-2026-0119,Credit Check,2026-04-15T11:37:46Z,Credit Checked,Credit Team
+APP-2026-0113,Credit Check,2026-04-15T11:47:04Z,Credit Checked,Credit Team
+APP-2026-0125,Receive Application,2026-04-15T11:57:02Z,Received,Intake
+APP-2026-0126,Receive Application,2026-04-15T12:13:08Z,Received,Intake
+APP-2026-0121,Verify Identity,2026-04-15T12:18:37Z,Identity Verified,Intake
+APP-2026-0112,Request Documents,2026-04-15T12:54:55Z,Awaiting Documents,Credit Team
+APP-2026-0118,Credit Check,2026-04-15T13:16:54Z,Credit Checked,Credit Team
+APP-2026-0116,Credit Check,2026-04-15T13:32:01Z,Credit Checked,Credit Team
+APP-2026-0012,Disburse Funds,2026-04-15T13:42:51Z,Disbursed,Payments
+APP-2026-0015,Receive Documents,2026-04-15T14:20:03Z,Documents Received,Intake
+APP-2026-0076,Receive Documents,2026-04-15T14:22:08Z,Documents Received,Intake
+APP-2026-0117,Credit Check,2026-04-15T14:22:52Z,Credit Checked,Credit Team
+APP-2026-0056,Receive Documents,2026-04-15T14:43:36Z,Documents Received,Intake
+APP-2026-0123,Verify Identity,2026-04-15T14:49:01Z,Identity Verified,Intake
+APP-2026-0121,Credit Check,2026-04-15T15:18:37Z,Credit Checked,Credit Team
+APP-2026-0127,Receive Application,2026-04-15T15:25:17Z,Received,Intake
+APP-2026-0128,Receive Application,2026-04-15T15:37:06Z,Received,Intake
+APP-2026-0122,Credit Check,2026-04-15T16:02:07Z,Credit Checked,Credit Team
+APP-2026-0058,Receive Documents,2026-04-15T16:11:23Z,Documents Received,Intake
+APP-2026-0124,Verify Identity,2026-04-15T16:11:48Z,Identity Verified,Intake
+APP-2026-0118,Request Documents,2026-04-15T16:13:54Z,Awaiting Documents,Credit Team
+APP-2026-0129,Receive Application,2026-04-15T16:26:10Z,Received,Intake
+APP-2026-0116,Request Documents,2026-04-15T16:31:01Z,Awaiting Documents,Credit Team
+APP-2026-0102,Underwrite,2026-04-15T16:43:51Z,Underwritten,Underwriting
+APP-2026-0051,Underwrite,2026-04-15T17:03:02Z,Underwritten,Underwriting
+APP-2026-0130,Receive Application,2026-04-15T17:11:52Z,Received,Intake
+APP-2026-0126,Verify Identity,2026-04-15T17:13:08Z,Identity Verified,Intake
+APP-2026-0107,Disburse Funds,2026-04-15T17:20:34Z,Disbursed,Payments
+APP-2026-0122,Request Documents,2026-04-15T17:33:07Z,Awaiting Documents,Credit Team
+APP-2026-0131,Receive Application,2026-04-15T17:36:43Z,Received,Intake
+APP-2026-0121,Request Documents,2026-04-15T17:50:37Z,Awaiting Documents,Credit Team
+APP-2026-0115,Credit Check,2026-04-15T17:54:14Z,Credit Checked,Credit Team
+APP-2026-0113,Request Documents,2026-04-15T17:58:04Z,Awaiting Documents,Credit Team
+APP-2026-0119,Request Documents,2026-04-15T18:08:46Z,Awaiting Documents,Credit Team
+APP-2026-0130,Verify Identity,2026-04-15T18:17:52Z,Identity Verified,Intake
+APP-2026-0039,Approve Application,2026-04-15T18:23:20Z,Approved,Underwriting
+APP-2026-0069,Receive Documents,2026-04-15T18:44:17Z,Documents Received,Intake
+APP-2026-0125,Verify Identity,2026-04-15T19:26:02Z,Identity Verified,Intake
+APP-2026-0043,Underwrite,2026-04-15T20:22:22Z,Underwritten,Underwriting
+APP-2026-0080,Receive Documents,2026-04-15T20:22:59Z,Documents Received,Intake
+APP-2026-0076,Credit Check,2026-04-15T20:51:08Z,Credit Checked,Credit Team
+APP-2026-0048,Underwrite,2026-04-15T20:57:36Z,Underwritten,Underwriting
+APP-2026-0126,Credit Check,2026-04-15T21:00:08Z,Credit Checked,Credit Team
+APP-2026-0117,Request Documents,2026-04-15T21:00:52Z,Awaiting Documents,Credit Team
+APP-2026-0073,Receive Documents,2026-04-15T21:34:37Z,Documents Received,Intake
+APP-2026-0128,Verify Identity,2026-04-15T22:00:06Z,Identity Verified,Intake
+APP-2026-0115,Request Documents,2026-04-15T22:36:14Z,Awaiting Documents,Credit Team
+APP-2026-0100,Underwrite,2026-04-15T22:41:09Z,Underwritten,Underwriting
+APP-2026-0057,Credit Check,2026-04-15T22:59:46Z,Credit Checked,Credit Team
+APP-2026-0076,Request Documents,2026-04-15T23:10:08Z,Awaiting Documents,Credit Team
+APP-2026-0127,Verify Identity,2026-04-15T23:26:17Z,Identity Verified,Intake
+APP-2026-0085,Receive Documents,2026-04-15T23:42:06Z,Documents Received,Intake
+APP-2026-0051,Approve Application,2026-04-15T23:47:02Z,Approved,Underwriting
+APP-2026-0125,Credit Check,2026-04-15T23:55:02Z,Credit Checked,Credit Team
+APP-2026-0043,Approve Application,2026-04-16T00:07:22Z,Approved,Underwriting
+APP-2026-0053,Receive Documents,2026-04-16T00:53:11Z,Documents Received,Intake
+APP-2026-0046,Receive Documents,2026-04-16T01:04:48Z,Documents Received,Intake
+APP-2026-0099,Credit Check,2026-04-16T01:15:44Z,Credit Checked,Credit Team
+APP-2026-0123,Credit Check,2026-04-16T01:16:01Z,Credit Checked,Credit Team
+APP-2026-0129,Verify Identity,2026-04-16T01:24:10Z,Identity Verified,Intake
+APP-2026-0126,Request Documents,2026-04-16T01:34:08Z,Awaiting Documents,Credit Team
+APP-2026-0071,Credit Check,2026-04-16T01:38:09Z,Credit Checked,Credit Team
+APP-2026-0015,Credit Check,2026-04-16T01:39:03Z,Credit Checked,Credit Team
+APP-2026-0131,Verify Identity,2026-04-16T02:13:43Z,Identity Verified,Intake
+APP-2026-0031,Underwrite,2026-04-16T03:29:33Z,Underwritten,Underwriting
+APP-2026-0114,Underwrite,2026-04-16T04:01:28Z,Underwritten,Underwriting
+APP-2026-0058,Credit Check,2026-04-16T04:10:23Z,Credit Checked,Credit Team
+APP-2026-0030,Credit Check,2026-04-16T05:21:05Z,Credit Checked,Credit Team
+APP-2026-0102,Approve Application,2026-04-16T05:29:51Z,Approved,Underwriting
+APP-2026-0071,Request Documents,2026-04-16T05:35:09Z,Awaiting Documents,Credit Team
+APP-2026-0056,Credit Check,2026-04-16T05:49:36Z,Credit Checked,Credit Team
+APP-2026-0100,Approve Application,2026-04-16T06:07:09Z,Approved,Underwriting
+APP-2026-0125,Request Documents,2026-04-16T06:19:02Z,Awaiting Documents,Credit Team
+APP-2026-0031,Approve Application,2026-04-16T06:28:33Z,Approved,Underwriting
+APP-2026-0127,Credit Check,2026-04-16T06:55:17Z,Credit Checked,Credit Team
+APP-2026-0080,Credit Check,2026-04-16T06:57:59Z,Credit Checked,Credit Team
+APP-2026-0073,Credit Check,2026-04-16T07:05:37Z,Credit Checked,Credit Team
+APP-2026-0085,Credit Check,2026-04-16T07:48:06Z,Credit Checked,Credit Team
+APP-2026-0123,Request Documents,2026-04-16T07:58:01Z,Awaiting Documents,Credit Team
+APP-2026-0129,Credit Check,2026-04-16T08:09:10Z,Credit Checked,Credit Team
+APP-2026-0132,Receive Application,2026-04-16T08:22:22Z,Received,Intake
+APP-2026-0133,Receive Application,2026-04-16T08:26:37Z,Received,Intake
+APP-2026-0134,Receive Application,2026-04-16T08:28:51Z,Received,Intake
+APP-2026-0046,Credit Check,2026-04-16T08:32:48Z,Credit Checked,Credit Team
+APP-2026-0135,Receive Application,2026-04-16T08:50:25Z,Received,Intake
+APP-2026-0063,Underwrite,2026-04-16T09:26:06Z,Underwritten,Underwriting
+APP-2026-0048,Approve Application,2026-04-16T09:32:36Z,Approved,Underwriting
+APP-2026-0009,Disburse Funds,2026-04-16T10:01:20Z,Disbursed,Payments
+APP-2026-0124,Credit Check,2026-04-16T10:13:48Z,Credit Checked,Credit Team
+APP-2026-0022,Receive Documents,2026-04-16T10:20:44Z,Documents Received,Intake
+APP-2026-0132,Verify Identity,2026-04-16T10:23:22Z,Identity Verified,Intake
+APP-2026-0136,Receive Application,2026-04-16T10:38:46Z,Received,Intake
+APP-2026-0137,Receive Application,2026-04-16T10:41:27Z,Received,Intake
+APP-2026-0138,Receive Application,2026-04-16T11:04:23Z,Received,Intake
+APP-2026-0129,Request Documents,2026-04-16T11:16:10Z,Awaiting Documents,Credit Team
+APP-2026-0139,Receive Application,2026-04-16T11:26:08Z,Received,Intake
+APP-2026-0085,Request Documents,2026-04-16T11:30:06Z,Awaiting Documents,Credit Team
+APP-2026-0073,Request Documents,2026-04-16T11:36:37Z,Awaiting Documents,Credit Team
+APP-2026-0140,Receive Application,2026-04-16T11:45:25Z,Received,Intake
+APP-2026-0141,Receive Application,2026-04-16T11:51:22Z,Received,Intake
+APP-2026-0142,Receive Application,2026-04-16T11:54:51Z,Received,Intake
+APP-2026-0022,Credit Check,2026-04-16T12:24:44Z,Credit Checked,Credit Team
+APP-2026-0127,Request Documents,2026-04-16T12:25:17Z,Awaiting Documents,Credit Team
+APP-2026-0056,Request Documents,2026-04-16T12:29:36Z,Awaiting Documents,Credit Team
+APP-2026-0133,Verify Identity,2026-04-16T12:41:37Z,Identity Verified,Intake
+APP-2026-0143,Receive Application,2026-04-16T12:43:13Z,Received,Intake
+APP-2026-0138,Verify Identity,2026-04-16T12:59:23Z,Identity Verified,Intake
+APP-2026-0144,Receive Application,2026-04-16T13:08:58Z,Received,Intake
+APP-2026-0069,Credit Check,2026-04-16T13:33:17Z,Credit Checked,Credit Team
+APP-2026-0032,Disburse Funds,2026-04-16T14:03:13Z,Disbursed,Payments
+APP-2026-0134,Verify Identity,2026-04-16T14:44:51Z,Identity Verified,Intake
+APP-2026-0120,Underwrite,2026-04-16T14:52:33Z,Underwritten,Underwriting
+APP-2026-0124,Request Documents,2026-04-16T14:56:48Z,Awaiting Documents,Credit Team
+APP-2026-0130,Credit Check,2026-04-16T14:56:52Z,Credit Checked,Credit Team
+APP-2026-0136,Verify Identity,2026-04-16T14:58:46Z,Identity Verified,Intake
+APP-2026-0069,Request Documents,2026-04-16T15:02:17Z,Awaiting Documents,Credit Team
+APP-2026-0083,Underwrite,2026-04-16T15:06:25Z,Underwritten,Underwriting
+APP-2026-0145,Receive Application,2026-04-16T15:10:08Z,Received,Intake
+APP-2026-0135,Verify Identity,2026-04-16T15:11:25Z,Identity Verified,Intake
+APP-2026-0063,Approve Application,2026-04-16T15:45:06Z,Approved,Underwriting
+APP-2026-0100,Disburse Funds,2026-04-16T15:54:09Z,Disbursed,Payments
+APP-2026-0146,Receive Application,2026-04-16T16:02:33Z,Received,Intake
+APP-2026-0106,Receive Documents,2026-04-16T16:03:46Z,Documents Received,Intake
+APP-2026-0091,Receive Documents,2026-04-16T16:04:52Z,Documents Received,Intake
+APP-2026-0139,Verify Identity,2026-04-16T16:23:08Z,Identity Verified,Intake
+APP-2026-0147,Receive Application,2026-04-16T16:38:36Z,Received,Intake
+APP-2026-0148,Receive Application,2026-04-16T16:42:43Z,Received,Intake
+APP-2026-0128,Credit Check,2026-04-16T16:55:06Z,Credit Checked,Credit Team
+APP-2026-0039,Disburse Funds,2026-04-16T17:37:20Z,Disbursed,Payments
+APP-2026-0031,Disburse Funds,2026-04-16T17:54:33Z,Disbursed,Payments
+APP-2026-0140,Verify Identity,2026-04-16T18:22:25Z,Identity Verified,Intake
+APP-2026-0136,Credit Check,2026-04-16T18:24:46Z,Credit Checked,Credit Team
+APP-2026-0067,Underwrite,2026-04-16T18:33:25Z,Underwritten,Underwriting
+APP-2026-0138,Credit Check,2026-04-16T18:46:23Z,Credit Checked,Credit Team
+APP-2026-0014,Disburse Funds,2026-04-16T18:55:55Z,Disbursed,Payments
+APP-2026-0137,Verify Identity,2026-04-16T18:59:27Z,Identity Verified,Intake
+APP-2026-0057,Underwrite,2026-04-16T19:14:46Z,Underwritten,Underwriting
+APP-2026-0043,Disburse Funds,2026-04-16T19:24:22Z,Disbursed,Payments
+APP-2026-0022,Underwrite,2026-04-16T19:47:44Z,Underwritten,Underwriting
+APP-2026-0142,Verify Identity,2026-04-16T20:06:51Z,Identity Verified,Intake
+APP-2026-0092,Receive Documents,2026-04-16T20:11:28Z,Documents Received,Intake
+APP-2026-0053,Credit Check,2026-04-16T20:13:11Z,Credit Checked,Credit Team
+APP-2026-0114,Decline Application,2026-04-16T20:28:28Z,Declined,Underwriting
+APP-2026-0102,Disburse Funds,2026-04-16T20:44:51Z,Disbursed,Payments
+APP-2026-0141,Verify Identity,2026-04-16T20:50:22Z,Identity Verified,Intake
+APP-2026-0143,Verify Identity,2026-04-16T21:01:13Z,Identity Verified,Intake
+APP-2026-0144,Verify Identity,2026-04-16T21:07:58Z,Identity Verified,Intake
+APP-2026-0034,Receive Documents,2026-04-16T21:35:23Z,Documents Received,Intake
+APP-2026-0018,Disburse Funds,2026-04-16T21:48:57Z,Disbursed,Payments
+APP-2026-0128,Underwrite,2026-04-16T22:09:06Z,Underwritten,Underwriting
+APP-2026-0063,Disburse Funds,2026-04-16T22:13:06Z,Disbursed,Payments
+APP-2026-0146,Verify Identity,2026-04-16T22:35:33Z,Identity Verified,Intake
+APP-2026-0131,Credit Check,2026-04-16T22:49:43Z,Credit Checked,Credit Team
+APP-2026-0145,Verify Identity,2026-04-16T23:10:08Z,Identity Verified,Intake
+APP-2026-0112,Receive Documents,2026-04-16T23:11:55Z,Documents Received,Intake
+APP-2026-0120,Approve Application,2026-04-16T23:17:33Z,Approved,Underwriting
+APP-2026-0148,Verify Identity,2026-04-16T23:18:43Z,Identity Verified,Intake
+APP-2026-0121,Receive Documents,2026-04-16T23:30:37Z,Documents Received,Intake
+APP-2026-0147,Verify Identity,2026-04-16T23:31:36Z,Identity Verified,Intake
+APP-2026-0136,Request Documents,2026-04-16T23:36:46Z,Awaiting Documents,Credit Team
+APP-2026-0140,Credit Check,2026-04-17T00:15:25Z,Credit Checked,Credit Team
+APP-2026-0094,Disburse Funds,2026-04-17T00:20:51Z,Disbursed,Payments
+APP-2026-0079,Receive Documents,2026-04-17T00:58:15Z,Documents Received,Intake
+APP-2026-0138,Request Documents,2026-04-17T01:02:23Z,Awaiting Documents,Credit Team
+APP-2026-0095,Receive Documents,2026-04-17T01:28:38Z,Documents Received,Intake
+APP-2026-0002,Disburse Funds,2026-04-17T01:39:14Z,Disbursed,Payments
+APP-2026-0067,Approve Application,2026-04-17T01:42:25Z,Approved,Underwriting
+APP-2026-0147,Credit Check,2026-04-17T01:48:36Z,Credit Checked,Credit Team
+APP-2026-0135,Credit Check,2026-04-17T02:12:25Z,Credit Checked,Credit Team
+APP-2026-0091,Credit Check,2026-04-17T02:17:52Z,Credit Checked,Credit Team
+APP-2026-0116,Receive Documents,2026-04-17T02:28:01Z,Documents Received,Intake
+APP-2026-0046,Underwrite,2026-04-17T02:53:48Z,Underwritten,Underwriting
+APP-2026-0099,Underwrite,2026-04-17T02:54:44Z,Underwritten,Underwriting
+APP-2026-0081,Receive Documents,2026-04-17T02:57:47Z,Documents Received,Intake
+APP-2026-0055,Underwrite,2026-04-17T03:07:11Z,Underwritten,Underwriting
+APP-2026-0131,Request Documents,2026-04-17T03:29:43Z,Awaiting Documents,Credit Team
+APP-2026-0057,Approve Application,2026-04-17T03:33:46Z,Approved,Underwriting
+APP-2026-0077,Receive Documents,2026-04-17T03:39:17Z,Documents Received,Intake
+APP-2026-0135,Request Documents,2026-04-17T04:20:25Z,Awaiting Documents,Credit Team
+APP-2026-0079,Credit Check,2026-04-17T04:22:15Z,Credit Checked,Credit Team
+APP-2026-0141,Credit Check,2026-04-17T04:33:22Z,Credit Checked,Credit Team
+APP-2026-0128,Approve Application,2026-04-17T04:52:06Z,Approved,Underwriting
+APP-2026-0121,Credit Check,2026-04-17T04:54:37Z,Credit Checked,Credit Team
+APP-2026-0147,Request Documents,2026-04-17T05:15:36Z,Awaiting Documents,Credit Team
+APP-2026-0118,Receive Documents,2026-04-17T05:15:54Z,Documents Received,Intake
+APP-2026-0145,Credit Check,2026-04-17T05:23:08Z,Credit Checked,Credit Team
+APP-2026-0095,Credit Check,2026-04-17T05:46:38Z,Credit Checked,Credit Team
+APP-2026-0022,Approve Application,2026-04-17T05:46:44Z,Approved,Underwriting
+APP-2026-0133,Credit Check,2026-04-17T05:49:37Z,Credit Checked,Credit Team
+APP-2026-0062,Disburse Funds,2026-04-17T06:30:54Z,Disbursed,Payments
+APP-2026-0105,Receive Documents,2026-04-17T06:32:47Z,Documents Received,Intake
+APP-2026-0143,Credit Check,2026-04-17T07:23:13Z,Credit Checked,Credit Team
+APP-2026-0046,Approve Application,2026-04-17T07:51:48Z,Approved,Underwriting
+APP-2026-0092,Credit Check,2026-04-17T08:10:28Z,Credit Checked,Credit Team
+APP-2026-0144,Credit Check,2026-04-17T08:49:58Z,Credit Checked,Credit Team
+APP-2026-0139,Credit Check,2026-04-17T08:52:08Z,Credit Checked,Credit Team
+APP-2026-0141,Request Documents,2026-04-17T09:18:22Z,Awaiting Documents,Credit Team
+APP-2026-0149,Receive Application,2026-04-17T09:30:31Z,Received,Intake
+APP-2026-0132,Credit Check,2026-04-17T10:04:22Z,Credit Checked,Credit Team
+APP-2026-0150,Receive Application,2026-04-17T10:09:47Z,Received,Intake
+APP-2026-0151,Receive Application,2026-04-17T10:16:22Z,Received,Intake
+APP-2026-0152,Receive Application,2026-04-17T10:23:46Z,Received,Intake
+APP-2026-0095,Underwrite,2026-04-17T10:24:38Z,Underwritten,Underwriting
+APP-2026-0104,Receive Documents,2026-04-17T10:52:06Z,Documents Received,Intake
+APP-2026-0153,Receive Application,2026-04-17T10:59:26Z,Received,Intake
+APP-2026-0154,Receive Application,2026-04-17T10:59:43Z,Received,Intake
+APP-2026-0045,Underwrite,2026-04-17T11:00:41Z,Underwritten,Underwriting
+APP-2026-0121,Request Documents,2026-04-17T11:05:37Z,Awaiting Documents,Credit Team
+APP-2026-0155,Receive Application,2026-04-17T11:10:00Z,Received,Intake
+APP-2026-0133,Request Documents,2026-04-17T11:14:37Z,Awaiting Documents,Credit Team
+APP-2026-0055,Approve Application,2026-04-17T11:51:11Z,Approved,Underwriting
+APP-2026-0139,Request Documents,2026-04-17T12:08:08Z,Awaiting Documents,Credit Team
+APP-2026-0106,Credit Check,2026-04-17T12:31:46Z,Credit Checked,Credit Team
+APP-2026-0058,Underwrite,2026-04-17T12:34:23Z,Underwritten,Underwriting
+APP-2026-0143,Request Documents,2026-04-17T12:42:13Z,Awaiting Documents,Credit Team
+APP-2026-0146,Credit Check,2026-04-17T12:54:33Z,Credit Checked,Credit Team
+APP-2026-0134,Credit Check,2026-04-17T13:04:51Z,Credit Checked,Credit Team
+APP-2026-0118,Credit Check,2026-04-17T13:12:54Z,Credit Checked,Credit Team
+APP-2026-0156,Receive Application,2026-04-17T13:28:53Z,Received,Intake
+APP-2026-0151,Verify Identity,2026-04-17T13:30:22Z,Identity Verified,Intake
+APP-2026-0157,Receive Application,2026-04-17T13:31:13Z,Received,Intake
+APP-2026-0083,Decline Application,2026-04-17T13:37:25Z,Declined,Underwriting
+APP-2026-0149,Verify Identity,2026-04-17T13:59:31Z,Identity Verified,Intake
+APP-2026-0150,Verify Identity,2026-04-17T14:03:47Z,Identity Verified,Intake
+APP-2026-0091,Underwrite,2026-04-17T14:04:52Z,Underwritten,Underwriting
+APP-2026-0144,Request Documents,2026-04-17T14:11:58Z,Awaiting Documents,Credit Team
+APP-2026-0034,Credit Check,2026-04-17T14:17:23Z,Credit Checked,Credit Team
+APP-2026-0010,Receive Documents,2026-04-17T14:23:03Z,Documents Received,Intake
+APP-2026-0148,Credit Check,2026-04-17T14:27:43Z,Credit Checked,Credit Team
+APP-2026-0132,Request Documents,2026-04-17T14:30:22Z,Awaiting Documents,Credit Team
+APP-2026-0158,Receive Application,2026-04-17T14:31:02Z,Received,Intake
+APP-2026-0126,Receive Documents,2026-04-17T14:35:08Z,Documents Received,Intake
+APP-2026-0159,Receive Application,2026-04-17T15:16:11Z,Received,Intake
+APP-2026-0045,Approve Application,2026-04-17T15:23:41Z,Approved,Underwriting
+APP-2026-0015,Underwrite,2026-04-17T15:33:03Z,Underwritten,Underwriting
+APP-2026-0081,Credit Check,2026-04-17T16:08:47Z,Credit Checked,Credit Team
+APP-2026-0160,Receive Application,2026-04-17T16:15:11Z,Received,Intake
+APP-2026-0118,Request Documents,2026-04-17T16:21:54Z,Awaiting Documents,Credit Team
+APP-2026-0161,Receive Application,2026-04-17T16:26:51Z,Received,Intake
+APP-2026-0149,Credit Check,2026-04-17T16:31:31Z,Credit Checked,Credit Team
+APP-2026-0125,Receive Documents,2026-04-17T16:43:02Z,Documents Received,Intake
+APP-2026-0148,Request Documents,2026-04-17T16:49:43Z,Awaiting Documents,Credit Team
+APP-2026-0153,Verify Identity,2026-04-17T17:08:26Z,Identity Verified,Intake
+APP-2026-0156,Verify Identity,2026-04-17T17:11:53Z,Identity Verified,Intake
+APP-2026-0106,Request Documents,2026-04-17T17:35:46Z,Awaiting Documents,Credit Team
+APP-2026-0162,Receive Application,2026-04-17T17:38:59Z,Received,Intake
+APP-2026-0137,Credit Check,2026-04-17T17:42:27Z,Credit Checked,Credit Team
+APP-2026-0152,Verify Identity,2026-04-17T17:47:46Z,Identity Verified,Intake
+APP-2026-0099,Decline Application,2026-04-17T18:04:44Z,Declined,Underwriting
+APP-2026-0112,Credit Check,2026-04-17T18:05:55Z,Credit Checked,Credit Team
+APP-2026-0154,Verify Identity,2026-04-17T18:10:43Z,Identity Verified,Intake
+APP-2026-0096,Receive Documents,2026-04-17T18:17:35Z,Documents Received,Intake
+APP-2026-0162,Verify Identity,2026-04-17T18:38:59Z,Identity Verified,Intake
+APP-2026-0158,Verify Identity,2026-04-17T18:40:02Z,Identity Verified,Intake
+APP-2026-0081,Request Documents,2026-04-17T18:54:47Z,Awaiting Documents,Credit Team
+APP-2026-0095,Approve Application,2026-04-17T19:04:38Z,Approved,Underwriting
+APP-2026-0104,Credit Check,2026-04-17T19:15:06Z,Credit Checked,Credit Team
+APP-2026-0058,Approve Application,2026-04-17T19:24:23Z,Approved,Underwriting
+APP-2026-0146,Request Documents,2026-04-17T19:27:33Z,Awaiting Documents,Credit Team
+APP-2026-0142,Credit Check,2026-04-17T19:31:51Z,Credit Checked,Credit Team
+APP-2026-0160,Verify Identity,2026-04-17T19:35:11Z,Identity Verified,Intake
+APP-2026-0155,Verify Identity,2026-04-17T19:45:00Z,Identity Verified,Intake
+APP-2026-0050,Receive Documents,2026-04-17T20:01:52Z,Documents Received,Intake
+APP-2026-0140,Underwrite,2026-04-17T20:11:25Z,Underwritten,Underwriting
+APP-2026-0137,Request Documents,2026-04-17T20:46:27Z,Awaiting Documents,Credit Team
+APP-2026-0157,Verify Identity,2026-04-17T21:09:13Z,Identity Verified,Intake
+APP-2026-0057,Disburse Funds,2026-04-17T21:19:46Z,Disbursed,Payments
+APP-2026-0126,Credit Check,2026-04-17T21:24:08Z,Credit Checked,Credit Team
+APP-2026-0149,Request Documents,2026-04-17T21:36:31Z,Awaiting Documents,Credit Team
+APP-2026-0010,Credit Check,2026-04-17T22:19:03Z,Credit Checked,Credit Team
+APP-2026-0145,Underwrite,2026-04-17T22:29:08Z,Underwritten,Underwriting
+APP-2026-0077,Credit Check,2026-04-17T22:33:17Z,Credit Checked,Credit Team
+APP-2026-0161,Verify Identity,2026-04-17T22:39:51Z,Identity Verified,Intake
+APP-2026-0150,Credit Check,2026-04-17T22:50:47Z,Credit Checked,Credit Team
+APP-2026-0159,Verify Identity,2026-04-17T23:07:11Z,Identity Verified,Intake
+APP-2026-0112,Request Documents,2026-04-17T23:10:55Z,Awaiting Documents,Credit Team
+APP-2026-0091,Approve Application,2026-04-17T23:35:52Z,Approved,Underwriting
+APP-2026-0104,Request Documents,2026-04-17T23:53:06Z,Awaiting Documents,Credit Team
+APP-2026-0015,Approve Application,2026-04-17T23:56:03Z,Approved,Underwriting
+APP-2026-0030,Underwrite,2026-04-18T00:03:05Z,Underwritten,Underwriting
+APP-2026-0080,Underwrite,2026-04-18T00:32:59Z,Underwritten,Underwriting
+APP-2026-0058,Disburse Funds,2026-04-18T00:37:23Z,Disbursed,Payments
+APP-2026-0113,Receive Documents,2026-04-18T00:39:04Z,Documents Received,Intake
+APP-2026-0125,Credit Check,2026-04-18T00:40:02Z,Credit Checked,Credit Team
+APP-2026-0150,Request Documents,2026-04-18T00:45:47Z,Awaiting Documents,Credit Team
+APP-2026-0161,Credit Check,2026-04-18T00:50:51Z,Credit Checked,Credit Team
+APP-2026-0140,Approve Application,2026-04-18T01:19:25Z,Approved,Underwriting
+APP-2026-0151,Credit Check,2026-04-18T01:30:22Z,Credit Checked,Credit Team
+APP-2026-0125,Request Documents,2026-04-18T01:44:02Z,Awaiting Documents,Credit Team
+APP-2026-0051,Disburse Funds,2026-04-18T01:57:02Z,Disbursed,Payments
+APP-2026-0156,Credit Check,2026-04-18T02:05:53Z,Credit Checked,Credit Team
+APP-2026-0076,Receive Documents,2026-04-18T03:13:08Z,Documents Received,Intake
+APP-2026-0116,Credit Check,2026-04-18T03:16:01Z,Credit Checked,Credit Team
+APP-2026-0061,Receive Documents,2026-04-18T03:52:00Z,Documents Received,Intake
+APP-2026-0030,Approve Application,2026-04-18T03:55:05Z,Approved,Underwriting
+APP-2026-0145,Approve Application,2026-04-18T03:57:08Z,Approved,Underwriting
+APP-2026-0162,Credit Check,2026-04-18T04:12:59Z,Credit Checked,Credit Team
+APP-2026-0080,Approve Application,2026-04-18T04:22:59Z,Approved,Underwriting
+APP-2026-0161,Request Documents,2026-04-18T04:37:51Z,Awaiting Documents,Credit Team
+APP-2026-0105,Credit Check,2026-04-18T04:47:47Z,Credit Checked,Credit Team
+APP-2026-0015,Disburse Funds,2026-04-18T05:49:03Z,Disbursed,Payments
+APP-2026-0151,Request Documents,2026-04-18T07:01:22Z,Awaiting Documents,Credit Team
+APP-2026-0154,Credit Check,2026-04-18T07:11:43Z,Credit Checked,Credit Team
+APP-2026-0157,Credit Check,2026-04-18T07:38:13Z,Credit Checked,Credit Team
+APP-2026-0109,Receive Documents,2026-04-18T07:47:28Z,Documents Received,Intake
+APP-2026-0130,Underwrite,2026-04-18T08:14:52Z,Underwritten,Underwriting
+APP-2026-0158,Credit Check,2026-04-18T08:37:02Z,Credit Checked,Credit Team
+APP-2026-0162,Request Documents,2026-04-18T09:40:59Z,Awaiting Documents,Credit Team
+APP-2026-0154,Request Documents,2026-04-18T09:55:43Z,Awaiting Documents,Credit Team
+APP-2026-0159,Credit Check,2026-04-18T10:18:11Z,Credit Checked,Credit Team
+APP-2026-0134,Underwrite,2026-04-18T10:46:51Z,Underwritten,Underwriting
+APP-2026-0152,Credit Check,2026-04-18T10:53:46Z,Credit Checked,Credit Team
+APP-2026-0010,Underwrite,2026-04-18T11:06:03Z,Underwritten,Underwriting
+APP-2026-0055,Disburse Funds,2026-04-18T11:47:11Z,Disbursed,Payments
+APP-2026-0048,Disburse Funds,2026-04-18T11:50:36Z,Disbursed,Payments
+APP-2026-0157,Request Documents,2026-04-18T12:24:13Z,Awaiting Documents,Credit Team
+APP-2026-0010,Approve Application,2026-04-18T12:26:03Z,Approved,Underwriting
+APP-2026-0120,Disburse Funds,2026-04-18T13:10:33Z,Disbursed,Payments
+APP-2026-0130,Approve Application,2026-04-18T13:12:52Z,Approved,Underwriting
+APP-2026-0160,Credit Check,2026-04-18T13:29:11Z,Credit Checked,Credit Team
+APP-2026-0136,Receive Documents,2026-04-18T13:58:46Z,Documents Received,Intake
+APP-2026-0153,Credit Check,2026-04-18T14:23:26Z,Credit Checked,Credit Team
+APP-2026-0095,Disburse Funds,2026-04-18T14:26:38Z,Disbursed,Payments
+APP-2026-0098,Receive Documents,2026-04-18T14:28:50Z,Documents Received,Intake
+APP-2026-0155,Credit Check,2026-04-18T14:45:00Z,Credit Checked,Credit Team
+APP-2026-0152,Request Documents,2026-04-18T15:05:46Z,Awaiting Documents,Credit Team
+APP-2026-0096,Credit Check,2026-04-18T15:08:35Z,Credit Checked,Credit Team
+APP-2026-0158,Request Documents,2026-04-18T15:22:02Z,Awaiting Documents,Credit Team
+APP-2026-0056,Receive Documents,2026-04-18T15:22:36Z,Documents Received,Intake
+APP-2026-0141,Receive Documents,2026-04-18T16:06:22Z,Documents Received,Intake
+APP-2026-0076,Credit Check,2026-04-18T16:23:08Z,Credit Checked,Credit Team
+APP-2026-0159,Request Documents,2026-04-18T16:41:11Z,Awaiting Documents,Credit Team
+APP-2026-0098,Credit Check,2026-04-18T17:01:50Z,Credit Checked,Credit Team
+APP-2026-0053,Underwrite,2026-04-18T17:15:11Z,Underwritten,Underwriting
+APP-2026-0138,Receive Documents,2026-04-18T17:24:23Z,Documents Received,Intake
+APP-2026-0123,Receive Documents,2026-04-18T17:26:01Z,Documents Received,Intake
+APP-2026-0050,Credit Check,2026-04-18T17:36:52Z,Credit Checked,Credit Team
+APP-2026-0160,Request Documents,2026-04-18T18:19:11Z,Awaiting Documents,Credit Team
+APP-2026-0156,Underwrite,2026-04-18T18:26:53Z,Underwritten,Underwriting
+APP-2026-0053,Approve Application,2026-04-18T19:01:11Z,Approved,Underwriting
+APP-2026-0061,Credit Check,2026-04-18T19:46:00Z,Credit Checked,Credit Team
+APP-2026-0141,Credit Check,2026-04-18T19:58:22Z,Credit Checked,Credit Team
+APP-2026-0096,Request Documents,2026-04-18T20:34:35Z,Awaiting Documents,Credit Team
+APP-2026-0092,Underwrite,2026-04-18T21:11:28Z,Underwritten,Underwriting
+APP-2026-0113,Credit Check,2026-04-18T21:20:04Z,Credit Checked,Credit Team
+APP-2026-0134,Approve Application,2026-04-18T21:46:51Z,Approved,Underwriting
+APP-2026-0155,Underwrite,2026-04-18T21:48:00Z,Underwritten,Underwriting
+APP-2026-0090,Withdraw Application,2026-04-18T22:37:41Z,Withdrawn,Intake
+APP-2026-0122,Receive Documents,2026-04-18T22:38:07Z,Documents Received,Intake
+APP-2026-0080,Disburse Funds,2026-04-18T22:42:59Z,Disbursed,Payments
+APP-2026-0113,Request Documents,2026-04-18T23:12:04Z,Awaiting Documents,Credit Team
+APP-2026-0076,Underwrite,2026-04-18T23:22:08Z,Underwritten,Underwriting
+APP-2026-0010,Disburse Funds,2026-04-18T23:30:03Z,Disbursed,Payments
+APP-2026-0105,Underwrite,2026-04-18T23:43:47Z,Underwritten,Underwriting
+APP-2026-0077,Underwrite,2026-04-19T00:10:17Z,Underwritten,Underwriting
+APP-2026-0109,Credit Check,2026-04-19T00:12:28Z,Credit Checked,Credit Team
+APP-2026-0128,Disburse Funds,2026-04-19T01:20:06Z,Disbursed,Payments
+APP-2026-0145,Disburse Funds,2026-04-19T01:26:08Z,Disbursed,Payments
+APP-2026-0141,Request Documents,2026-04-19T01:47:22Z,Awaiting Documents,Credit Team
+APP-2026-0098,Underwrite,2026-04-19T01:52:50Z,Underwritten,Underwriting
+APP-2026-0073,Receive Documents,2026-04-19T01:59:37Z,Documents Received,Intake
+APP-2026-0079,Underwrite,2026-04-19T02:32:15Z,Underwritten,Underwriting
+APP-2026-0156,Approve Application,2026-04-19T03:57:53Z,Approved,Underwriting
+APP-2026-0155,Approve Application,2026-04-19T04:03:00Z,Approved,Underwriting
+APP-2026-0117,Receive Documents,2026-04-19T05:08:52Z,Documents Received,Intake
+APP-2026-0084,Receive Documents,2026-04-19T05:17:37Z,Documents Received,Intake
+APP-2026-0104,Receive Documents,2026-04-19T05:41:06Z,Documents Received,Intake
+APP-2026-0137,Receive Documents,2026-04-19T05:49:27Z,Documents Received,Intake
+APP-2026-0098,Approve Application,2026-04-19T06:53:50Z,Approved,Underwriting
+APP-2026-0123,Credit Check,2026-04-19T07:32:01Z,Credit Checked,Credit Team
+APP-2026-0122,Credit Check,2026-04-19T07:48:07Z,Credit Checked,Credit Team
+APP-2026-0077,Approve Application,2026-04-19T07:51:17Z,Approved,Underwriting
+APP-2026-0073,Credit Check,2026-04-19T07:54:37Z,Credit Checked,Credit Team
+APP-2026-0126,Underwrite,2026-04-19T08:24:08Z,Underwritten,Underwriting
+APP-2026-0130,Disburse Funds,2026-04-19T08:38:52Z,Disbursed,Payments
+APP-2026-0053,Disburse Funds,2026-04-19T09:17:11Z,Disbursed,Payments
+APP-2026-0138,Credit Check,2026-04-19T09:24:23Z,Credit Checked,Credit Team
+APP-2026-0092,Approve Application,2026-04-19T09:25:28Z,Approved,Underwriting
+APP-2026-0034,Underwrite,2026-04-19T09:28:23Z,Underwritten,Underwriting
+APP-2026-0076,Approve Application,2026-04-19T10:27:08Z,Approved,Underwriting
+APP-2026-0056,Credit Check,2026-04-19T10:57:36Z,Credit Checked,Credit Team
+APP-2026-0136,Credit Check,2026-04-19T11:26:46Z,Credit Checked,Credit Team
+APP-2026-0034,Approve Application,2026-04-19T11:46:23Z,Approved,Underwriting
+APP-2026-0143,Receive Documents,2026-04-19T11:49:13Z,Documents Received,Intake
+APP-2026-0103,Receive Documents,2026-04-19T12:43:24Z,Documents Received,Intake
+APP-2026-0079,Approve Application,2026-04-19T13:20:15Z,Approved,Underwriting
+APP-2026-0105,Decline Application,2026-04-19T13:38:47Z,Declined,Underwriting
+APP-2026-0064,Receive Documents,2026-04-19T13:39:17Z,Documents Received,Intake
+APP-2026-0117,Credit Check,2026-04-19T14:38:52Z,Credit Checked,Credit Team
+APP-2026-0138,Request Documents,2026-04-19T14:58:23Z,Awaiting Documents,Credit Team
+APP-2026-0137,Credit Check,2026-04-19T15:41:27Z,Credit Checked,Credit Team
+APP-2026-0126,Approve Application,2026-04-19T16:13:08Z,Approved,Underwriting
+APP-2026-0136,Request Documents,2026-04-19T16:15:46Z,Awaiting Documents,Credit Team
+APP-2026-0148,Receive Documents,2026-04-19T16:35:43Z,Documents Received,Intake
+APP-2026-0134,Disburse Funds,2026-04-19T16:36:51Z,Disbursed,Payments
+APP-2026-0110,Receive Documents,2026-04-19T16:48:39Z,Documents Received,Intake
+APP-2026-0123,Underwrite,2026-04-19T17:00:01Z,Underwritten,Underwriting
+APP-2026-0135,Receive Documents,2026-04-19T17:00:25Z,Documents Received,Intake
+APP-2026-0143,Credit Check,2026-04-19T18:45:13Z,Credit Checked,Credit Team
+APP-2026-0030,Disburse Funds,2026-04-19T19:40:05Z,Disbursed,Payments
+APP-2026-0116,Underwrite,2026-04-19T19:56:01Z,Underwritten,Underwriting
+APP-2026-0142,Underwrite,2026-04-19T20:05:51Z,Underwritten,Underwriting
+APP-2026-0093,Receive Documents,2026-04-19T20:25:03Z,Documents Received,Intake
+APP-2026-0123,Approve Application,2026-04-19T20:28:01Z,Approved,Underwriting
+APP-2026-0045,Disburse Funds,2026-04-19T22:06:41Z,Disbursed,Payments
+APP-2026-0148,Credit Check,2026-04-19T22:15:43Z,Credit Checked,Credit Team
+APP-2026-0149,Receive Documents,2026-04-19T22:54:31Z,Documents Received,Intake
+APP-2026-0084,Credit Check,2026-04-20T00:12:37Z,Credit Checked,Credit Team
+APP-2026-0022,Disburse Funds,2026-04-20T00:23:44Z,Disbursed,Payments
+APP-2026-0139,Receive Documents,2026-04-20T00:35:08Z,Documents Received,Intake
+APP-2026-0116,Approve Application,2026-04-20T00:55:01Z,Approved,Underwriting
+APP-2026-0067,Disburse Funds,2026-04-20T02:02:25Z,Disbursed,Payments
+APP-2026-0108,Receive Documents,2026-04-20T02:08:45Z,Documents Received,Intake
+APP-2026-0104,Credit Check,2026-04-20T02:31:06Z,Credit Checked,Credit Team
+APP-2026-0046,Disburse Funds,2026-04-20T03:06:48Z,Disbursed,Payments
+APP-2026-0146,Receive Documents,2026-04-20T03:40:33Z,Documents Received,Intake
+APP-2026-0085,Receive Documents,2026-04-20T03:52:06Z,Documents Received,Intake
+APP-2026-0131,Receive Documents,2026-04-20T04:23:43Z,Documents Received,Intake
+APP-2026-0149,Credit Check,2026-04-20T04:47:31Z,Credit Checked,Credit Team
+APP-2026-0124,Receive Documents,2026-04-20T05:23:48Z,Documents Received,Intake
+APP-2026-0064,Credit Check,2026-04-20T05:43:17Z,Credit Checked,Credit Team
+APP-2026-0142,Approve Application,2026-04-20T06:59:51Z,Approved,Underwriting
+APP-2026-0152,Receive Documents,2026-04-20T07:40:46Z,Documents Received,Intake
+APP-2026-0117,Underwrite,2026-04-20T07:43:52Z,Underwritten,Underwriting
+APP-2026-0163,Receive Application,2026-04-20T08:05:36Z,Received,Intake
+APP-2026-0139,Credit Check,2026-04-20T08:14:08Z,Credit Checked,Credit Team
+APP-2026-0146,Credit Check,2026-04-20T08:18:33Z,Credit Checked,Credit Team
+APP-2026-0153,Underwrite,2026-04-20T08:22:26Z,Underwritten,Underwriting
+APP-2026-0125,Withdraw Application,2026-04-20T08:48:02Z,Withdrawn,Intake
+APP-2026-0050,Underwrite,2026-04-20T09:04:52Z,Underwritten,Underwriting
+APP-2026-0137,Underwrite,2026-04-20T09:45:27Z,Underwritten,Underwriting
+APP-2026-0091,Disburse Funds,2026-04-20T10:16:52Z,Disbursed,Payments
+APP-2026-0108,Credit Check,2026-04-20T10:27:45Z,Credit Checked,Credit Team
+APP-2026-0110,Credit Check,2026-04-20T10:31:39Z,Credit Checked,Credit Team
+APP-2026-0153,Decline Application,2026-04-20T10:42:26Z,Declined,Underwriting
+APP-2026-0103,Credit Check,2026-04-20T11:21:24Z,Credit Checked,Credit Team
+APP-2026-0139,Request Documents,2026-04-20T11:38:08Z,Awaiting Documents,Credit Team
+APP-2026-0124,Credit Check,2026-04-20T11:49:48Z,Credit Checked,Credit Team
+APP-2026-0115,Receive Documents,2026-04-20T12:07:14Z,Documents Received,Intake
+APP-2026-0119,Receive Documents,2026-04-20T12:14:46Z,Documents Received,Intake
+APP-2026-0135,Credit Check,2026-04-20T13:10:25Z,Credit Checked,Credit Team
+APP-2026-0155,Disburse Funds,2026-04-20T13:18:00Z,Disbursed,Payments
+APP-2026-0163,Verify Identity,2026-04-20T14:04:36Z,Identity Verified,Intake
+APP-2026-0117,Decline Application,2026-04-20T14:17:52Z,Declined,Underwriting
+APP-2026-0103,Request Documents,2026-04-20T14:18:24Z,Awaiting Documents,Credit Team
+APP-2026-0093,Credit Check,2026-04-20T14:51:03Z,Credit Checked,Credit Team
+APP-2026-0079,Disburse Funds,2026-04-20T15:10:15Z,Disbursed,Payments
+APP-2026-0164,Receive Application,2026-04-20T15:14:41Z,Received,Intake
+APP-2026-0109,Underwrite,2026-04-20T15:21:28Z,Underwritten,Underwriting
+APP-2026-0108,Request Documents,2026-04-20T15:22:45Z,Awaiting Documents,Credit Team
+APP-2026-0085,Credit Check,2026-04-20T15:26:06Z,Credit Checked,Credit Team
+APP-2026-0165,Receive Application,2026-04-20T15:29:24Z,Received,Intake
+APP-2026-0166,Receive Application,2026-04-20T15:34:53Z,Received,Intake
+APP-2026-0167,Receive Application,2026-04-20T15:41:31Z,Received,Intake
+APP-2026-0168,Receive Application,2026-04-20T16:15:58Z,Received,Intake
+APP-2026-0061,Underwrite,2026-04-20T16:34:00Z,Underwritten,Underwriting
+APP-2026-0165,Verify Identity,2026-04-20T16:35:24Z,Identity Verified,Intake
+APP-2026-0112,Receive Documents,2026-04-20T16:57:55Z,Documents Received,Intake
+APP-2026-0169,Receive Application,2026-04-20T17:10:48Z,Received,Intake
+APP-2026-0168,Verify Identity,2026-04-20T17:25:58Z,Identity Verified,Intake
+APP-2026-0124,Request Documents,2026-04-20T17:27:48Z,Awaiting Documents,Credit Team
+APP-2026-0140,Disburse Funds,2026-04-20T17:51:25Z,Disbursed,Payments
+APP-2026-0149,Underwrite,2026-04-20T18:17:31Z,Underwritten,Underwriting
+APP-2026-0069,Receive Documents,2026-04-20T18:27:17Z,Documents Received,Intake
+APP-2026-0084,Underwrite,2026-04-20T18:29:37Z,Underwritten,Underwriting
+APP-2026-0164,Verify Identity,2026-04-20T19:23:41Z,Identity Verified,Intake
+APP-2026-0050,Approve Application,2026-04-20T19:29:52Z,Approved,Underwriting
+APP-2026-0143,Underwrite,2026-04-20T19:37:13Z,Underwritten,Underwriting
+APP-2026-0073,Underwrite,2026-04-20T20:03:37Z,Underwritten,Underwriting
+APP-2026-0137,Approve Application,2026-04-20T20:23:27Z,Approved,Underwriting
+APP-2026-0041,Receive Documents,2026-04-20T20:29:48Z,Documents Received,Intake
+APP-2026-0074,Receive Documents,2026-04-20T20:32:13Z,Documents Received,Intake
+APP-2026-0152,Credit Check,2026-04-20T20:35:46Z,Credit Checked,Credit Team
+APP-2026-0085,Underwrite,2026-04-20T20:40:06Z,Underwritten,Underwriting
+APP-2026-0169,Verify Identity,2026-04-20T20:51:48Z,Identity Verified,Intake
+APP-2026-0138,Receive Documents,2026-04-20T20:54:23Z,Documents Received,Intake
+APP-2026-0131,Credit Check,2026-04-20T21:03:43Z,Credit Checked,Credit Team
+APP-2026-0143,Approve Application,2026-04-20T21:07:13Z,Approved,Underwriting
+APP-2026-0167,Verify Identity,2026-04-20T21:15:31Z,Identity Verified,Intake
+APP-2026-0084,Approve Application,2026-04-20T22:20:37Z,Approved,Underwriting
+APP-2026-0110,Underwrite,2026-04-20T22:29:39Z,Underwritten,Underwriting
+APP-2026-0034,Disburse Funds,2026-04-20T22:33:23Z,Disbursed,Payments
+APP-2026-0127,Receive Documents,2026-04-20T22:39:17Z,Documents Received,Intake
+APP-2026-0126,Disburse Funds,2026-04-20T22:51:08Z,Disbursed,Payments
+APP-2026-0138,Credit Check,2026-04-20T23:52:23Z,Credit Checked,Credit Team
+APP-2026-0166,Verify Identity,2026-04-21T00:19:53Z,Identity Verified,Intake
+APP-2026-0109,Decline Application,2026-04-21T00:34:28Z,Declined,Underwriting
+APP-2026-0149,Approve Application,2026-04-21T00:43:31Z,Approved,Underwriting
+APP-2026-0073,Approve Application,2026-04-21T01:19:37Z,Approved,Underwriting
+APP-2026-0146,Underwrite,2026-04-21T01:22:33Z,Underwritten,Underwriting
+APP-2026-0152,Request Documents,2026-04-21T01:27:46Z,Awaiting Documents,Credit Team
+APP-2026-0085,Approve Application,2026-04-21T02:17:06Z,Approved,Underwriting
+APP-2026-0115,Credit Check,2026-04-21T02:17:14Z,Credit Checked,Credit Team
+APP-2026-0104,Underwrite,2026-04-21T02:40:06Z,Underwritten,Underwriting
+APP-2026-0123,Disburse Funds,2026-04-21T02:52:01Z,Disbursed,Payments
+APP-2026-0122,Underwrite,2026-04-21T02:52:07Z,Underwritten,Underwriting
+APP-2026-0092,Disburse Funds,2026-04-21T03:02:28Z,Disbursed,Payments
+APP-2026-0064,Underwrite,2026-04-21T03:21:17Z,Underwritten,Underwriting
+APP-2026-0165,Credit Check,2026-04-21T04:10:24Z,Credit Checked,Credit Team
+APP-2026-0110,Approve Application,2026-04-21T04:30:39Z,Approved,Underwriting
+APP-2026-0111,Receive Documents,2026-04-21T04:32:36Z,Documents Received,Intake
+APP-2026-0119,Credit Check,2026-04-21T04:44:46Z,Credit Checked,Credit Team
+APP-2026-0166,Credit Check,2026-04-21T05:13:53Z,Credit Checked,Credit Team
+APP-2026-0061,Approve Application,2026-04-21T05:18:00Z,Approved,Underwriting
+APP-2026-0132,Receive Documents,2026-04-21T05:49:22Z,Documents Received,Intake
+APP-2026-0069,Credit Check,2026-04-21T06:10:17Z,Credit Checked,Credit Team
+APP-2026-0074,Credit Check,2026-04-21T06:12:13Z,Credit Checked,Credit Team
+APP-2026-0135,Underwrite,2026-04-21T06:41:25Z,Underwritten,Underwriting
+APP-2026-0064,Approve Application,2026-04-21T06:47:17Z,Approved,Underwriting
+APP-2026-0056,Underwrite,2026-04-21T06:57:36Z,Underwritten,Underwriting
+APP-2026-0160,Receive Documents,2026-04-21T07:04:11Z,Documents Received,Intake
+APP-2026-0075,Receive Documents,2026-04-21T07:14:10Z,Documents Received,Intake
+APP-2026-0115,Request Documents,2026-04-21T07:29:14Z,Awaiting Documents,Credit Team
+APP-2026-0170,Receive Application,2026-04-21T08:17:42Z,Received,Intake
+APP-2026-0135,Approve Application,2026-04-21T08:38:25Z,Approved,Underwriting
+APP-2026-0165,Request Documents,2026-04-21T08:50:24Z,Awaiting Documents,Credit Team
+APP-2026-0168,Credit Check,2026-04-21T08:51:58Z,Credit Checked,Credit Team
+APP-2026-0171,Receive Application,2026-04-21T08:59:40Z,Received,Intake
+APP-2026-0172,Receive Application,2026-04-21T09:00:51Z,Received,Intake
+APP-2026-0042,Receive Documents,2026-04-21T09:57:13Z,Documents Received,Intake
+APP-2026-0146,Approve Application,2026-04-21T10:00:33Z,Approved,Underwriting
+APP-2026-0041,Credit Check,2026-04-21T10:54:48Z,Credit Checked,Credit Team
+APP-2026-0163,Credit Check,2026-04-21T11:05:36Z,Credit Checked,Credit Team
+APP-2026-0171,Verify Identity,2026-04-21T11:05:40Z,Identity Verified,Intake
+APP-2026-0104,Approve Application,2026-04-21T11:22:06Z,Approved,Underwriting
+APP-2026-0112,Credit Check,2026-04-21T11:42:55Z,Credit Checked,Credit Team
+APP-2026-0173,Receive Application,2026-04-21T11:47:56Z,Received,Intake
+APP-2026-0136,Receive Documents,2026-04-21T11:57:46Z,Documents Received,Intake
+APP-2026-0106,Receive Documents,2026-04-21T12:19:46Z,Documents Received,Intake
+APP-2026-0174,Receive Application,2026-04-21T12:22:28Z,Received,Intake
+APP-2026-0148,Underwrite,2026-04-21T12:46:43Z,Underwritten,Underwriting
+APP-2026-0163,Request Documents,2026-04-21T13:12:36Z,Awaiting Documents,Credit Team
+APP-2026-0132,Credit Check,2026-04-21T13:13:22Z,Credit Checked,Credit Team
+APP-2026-0170,Verify Identity,2026-04-21T14:02:42Z,Identity Verified,Intake
+APP-2026-0174,Verify Identity,2026-04-21T14:13:28Z,Identity Verified,Intake
+APP-2026-0175,Receive Application,2026-04-21T14:16:45Z,Received,Intake
+APP-2026-0176,Receive Application,2026-04-21T14:34:59Z,Received,Intake
+APP-2026-0166,Underwrite,2026-04-21T14:36:53Z,Underwritten,Underwriting
+APP-2026-0076,Disburse Funds,2026-04-21T14:45:08Z,Disbursed,Payments
+APP-2026-0122,Approve Application,2026-04-21T14:53:07Z,Approved,Underwriting
+APP-2026-0168,Request Documents,2026-04-21T14:53:58Z,Awaiting Documents,Credit Team
+APP-2026-0093,Underwrite,2026-04-21T15:01:03Z,Underwritten,Underwriting
+APP-2026-0148,Approve Application,2026-04-21T15:01:43Z,Approved,Underwriting
+APP-2026-0177,Receive Application,2026-04-21T15:07:46Z,Received,Intake
+APP-2026-0178,Receive Application,2026-04-21T15:09:24Z,Received,Intake
+APP-2026-0179,Receive Application,2026-04-21T15:28:01Z,Received,Intake
+APP-2026-0056,Approve Application,2026-04-21T15:30:36Z,Approved,Underwriting
+APP-2026-0156,Disburse Funds,2026-04-21T15:35:53Z,Disbursed,Payments
+APP-2026-0175,Verify Identity,2026-04-21T15:43:45Z,Identity Verified,Intake
+APP-2026-0172,Verify Identity,2026-04-21T15:48:51Z,Identity Verified,Intake
+APP-2026-0180,Receive Application,2026-04-21T15:52:07Z,Received,Intake
+APP-2026-0176,Verify Identity,2026-04-21T16:00:59Z,Identity Verified,Intake
+APP-2026-0179,Verify Identity,2026-04-21T17:24:01Z,Identity Verified,Intake
+APP-2026-0178,Verify Identity,2026-04-21T17:31:24Z,Identity Verified,Intake
+APP-2026-0167,Credit Check,2026-04-21T17:40:31Z,Credit Checked,Credit Team
+APP-2026-0093,Approve Application,2026-04-21T17:55:03Z,Approved,Underwriting
+APP-2026-0098,Disburse Funds,2026-04-21T18:29:50Z,Disbursed,Payments
+APP-2026-0164,Credit Check,2026-04-21T19:07:41Z,Credit Checked,Credit Team
+APP-2026-0180,Verify Identity,2026-04-21T19:37:07Z,Identity Verified,Intake
+APP-2026-0173,Verify Identity,2026-04-21T19:46:56Z,Identity Verified,Intake
+APP-2026-0151,Receive Documents,2026-04-21T19:57:22Z,Documents Received,Intake
+APP-2026-0177,Verify Identity,2026-04-21T20:47:46Z,Identity Verified,Intake
+APP-2026-0170,Credit Check,2026-04-21T21:01:42Z,Credit Checked,Credit Team
+APP-2026-0144,Receive Documents,2026-04-21T21:13:58Z,Documents Received,Intake
+APP-2026-0169,Credit Check,2026-04-21T21:14:48Z,Credit Checked,Credit Team
+APP-2026-0164,Request Documents,2026-04-21T21:38:41Z,Awaiting Documents,Credit Team
+APP-2026-0146,Disburse Funds,2026-04-21T21:48:33Z,Disbursed,Payments
+APP-2026-0104,Disburse Funds,2026-04-21T22:05:06Z,Disbursed,Payments
+APP-2026-0111,Credit Check,2026-04-21T22:49:36Z,Credit Checked,Credit Team
+APP-2026-0075,Credit Check,2026-04-21T22:50:10Z,Credit Checked,Credit Team
+APP-2026-0167,Request Documents,2026-04-21T23:30:31Z,Awaiting Documents,Credit Team
+APP-2026-0127,Credit Check,2026-04-21T23:38:17Z,Credit Checked,Credit Team
+APP-2026-0179,Credit Check,2026-04-21T23:54:01Z,Credit Checked,Credit Team
+APP-2026-0149,Disburse Funds,2026-04-22T00:02:31Z,Disbursed,Payments
+APP-2026-0169,Request Documents,2026-04-22T00:16:48Z,Awaiting Documents,Credit Team
+APP-2026-0106,Credit Check,2026-04-22T00:30:46Z,Credit Checked,Credit Team
+APP-2026-0160,Credit Check,2026-04-22T01:12:11Z,Credit Checked,Credit Team
+APP-2026-0150,Receive Documents,2026-04-22T01:14:47Z,Documents Received,Intake
+APP-2026-0170,Underwrite,2026-04-22T01:24:42Z,Underwritten,Underwriting
+APP-2026-0166,Approve Application,2026-04-22T02:21:53Z,Approved,Underwriting
+APP-2026-0050,Disburse Funds,2026-04-22T02:43:52Z,Disbursed,Payments
+APP-2026-0175,Credit Check,2026-04-22T02:46:45Z,Credit Checked,Credit Team
+APP-2026-0111,Request Documents,2026-04-22T02:51:36Z,Awaiting Documents,Credit Team
+APP-2026-0141,Receive Documents,2026-04-22T03:17:22Z,Documents Received,Intake
+APP-2026-0180,Credit Check,2026-04-22T03:32:07Z,Credit Checked,Credit Team
+APP-2026-0077,Disburse Funds,2026-04-22T04:06:17Z,Disbursed,Payments
+APP-2026-0137,Disburse Funds,2026-04-22T04:10:27Z,Disbursed,Payments
+APP-2026-0119,Underwrite,2026-04-22T04:14:46Z,Underwritten,Underwriting
+APP-2026-0180,Request Documents,2026-04-22T04:43:07Z,Awaiting Documents,Credit Team
+APP-2026-0069,Underwrite,2026-04-22T04:46:17Z,Underwritten,Underwriting
+APP-2026-0074,Underwrite,2026-04-22T04:58:13Z,Underwritten,Underwriting
+APP-2026-0162,Receive Documents,2026-04-22T05:04:59Z,Documents Received,Intake
+APP-2026-0064,Disburse Funds,2026-04-22T06:05:17Z,Disbursed,Payments
+APP-2026-0179,Request Documents,2026-04-22T06:07:01Z,Awaiting Documents,Credit Team
+APP-2026-0073,Disburse Funds,2026-04-22T06:26:37Z,Disbursed,Payments
+APP-2026-0160,Request Documents,2026-04-22T06:27:11Z,Awaiting Documents,Credit Team
+APP-2026-0170,Approve Application,2026-04-22T06:34:42Z,Approved,Underwriting
+APP-2026-0174,Credit Check,2026-04-22T08:01:28Z,Credit Checked,Credit Team
+APP-2026-0151,Credit Check,2026-04-22T08:20:22Z,Credit Checked,Credit Team
+APP-2026-0141,Credit Check,2026-04-22T08:42:22Z,Credit Checked,Credit Team
+APP-2026-0171,Credit Check,2026-04-22T08:55:40Z,Credit Checked,Credit Team
+APP-2026-0069,Approve Application,2026-04-22T09:19:17Z,Approved,Underwriting
+APP-2026-0166,Disburse Funds,2026-04-22T09:28:53Z,Disbursed,Payments
+APP-2026-0175,Request Documents,2026-04-22T09:32:45Z,Awaiting Documents,Credit Team
+APP-2026-0119,Approve Application,2026-04-22T09:49:46Z,Approved,Underwriting
+APP-2026-0042,Credit Check,2026-04-22T10:15:13Z,Credit Checked,Credit Team
+APP-2026-0162,Credit Check,2026-04-22T10:20:59Z,Credit Checked,Credit Team
+APP-2026-0074,Approve Application,2026-04-22T10:27:13Z,Approved,Underwriting
+APP-2026-0136,Credit Check,2026-04-22T10:57:46Z,Credit Checked,Credit Team
+APP-2026-0144,Credit Check,2026-04-22T11:07:58Z,Credit Checked,Credit Team
+APP-2026-0093,Disburse Funds,2026-04-22T11:11:03Z,Disbursed,Payments
+APP-2026-0131,Underwrite,2026-04-22T11:45:43Z,Underwritten,Underwriting
+APP-2026-0172,Credit Check,2026-04-22T12:06:51Z,Credit Checked,Credit Team
+APP-2026-0085,Disburse Funds,2026-04-22T12:10:06Z,Disbursed,Payments
+APP-2026-0174,Request Documents,2026-04-22T12:48:28Z,Awaiting Documents,Credit Team
+APP-2026-0176,Credit Check,2026-04-22T14:36:59Z,Credit Checked,Credit Team
+APP-2026-0151,Request Documents,2026-04-22T14:43:22Z,Awaiting Documents,Credit Team
+APP-2026-0177,Credit Check,2026-04-22T14:45:46Z,Credit Checked,Credit Team
+APP-2026-0121,Receive Documents,2026-04-22T15:10:37Z,Documents Received,Intake
+APP-2026-0171,Request Documents,2026-04-22T15:48:40Z,Awaiting Documents,Credit Team
+APP-2026-0075,Underwrite,2026-04-22T16:37:10Z,Underwritten,Underwriting
+APP-2026-0118,Receive Documents,2026-04-22T17:21:54Z,Documents Received,Intake
+APP-2026-0173,Credit Check,2026-04-22T17:35:56Z,Credit Checked,Credit Team
+APP-2026-0127,Underwrite,2026-04-22T17:37:17Z,Underwritten,Underwriting
+APP-2026-0116,Disburse Funds,2026-04-22T17:48:01Z,Disbursed,Payments
+APP-2026-0119,Disburse Funds,2026-04-22T17:53:46Z,Disbursed,Payments
+APP-2026-0138,Underwrite,2026-04-22T17:57:23Z,Underwritten,Underwriting
+APP-2026-0178,Credit Check,2026-04-22T18:22:24Z,Credit Checked,Credit Team
+APP-2026-0106,Underwrite,2026-04-22T18:28:46Z,Underwritten,Underwriting
+APP-2026-0041,Underwrite,2026-04-22T18:46:48Z,Underwritten,Underwriting
+APP-2026-0084,Disburse Funds,2026-04-22T18:53:37Z,Disbursed,Payments
+APP-2026-0103,Receive Documents,2026-04-22T19:27:24Z,Documents Received,Intake
+APP-2026-0106,Approve Application,2026-04-22T20:39:46Z,Approved,Underwriting
+APP-2026-0158,Receive Documents,2026-04-22T20:43:02Z,Documents Received,Intake
+APP-2026-0176,Request Documents,2026-04-22T20:47:59Z,Awaiting Documents,Credit Team
+APP-2026-0178,Request Documents,2026-04-22T21:06:24Z,Awaiting Documents,Credit Team
+APP-2026-0127,Approve Application,2026-04-22T22:09:17Z,Approved,Underwriting
+APP-2026-0075,Approve Application,2026-04-22T22:24:10Z,Approved,Underwriting
+APP-2026-0071,Withdraw Application,2026-04-22T22:35:09Z,Withdrawn,Intake
+APP-2026-0113,Receive Documents,2026-04-22T23:27:04Z,Documents Received,Intake
+APP-2026-0150,Credit Check,2026-04-22T23:44:47Z,Credit Checked,Credit Team
+APP-2026-0132,Underwrite,2026-04-22T23:58:22Z,Underwritten,Underwriting
+APP-2026-0170,Disburse Funds,2026-04-22T23:59:42Z,Disbursed,Payments
+APP-2026-0173,Underwrite,2026-04-23T00:44:56Z,Underwritten,Underwriting
+APP-2026-0041,Approve Application,2026-04-23T00:48:48Z,Approved,Underwriting
+APP-2026-0106,Disburse Funds,2026-04-23T01:01:46Z,Disbursed,Payments
+APP-2026-0069,Disburse Funds,2026-04-23T01:04:17Z,Disbursed,Payments
+APP-2026-0131,Decline Application,2026-04-23T01:29:43Z,Declined,Underwriting
+APP-2026-0158,Credit Check,2026-04-23T03:19:02Z,Credit Checked,Credit Team
+APP-2026-0132,Approve Application,2026-04-23T04:05:22Z,Approved,Underwriting
+APP-2026-0177,Underwrite,2026-04-23T04:29:46Z,Underwritten,Underwriting
+APP-2026-0158,Request Documents,2026-04-23T05:20:02Z,Awaiting Documents,Credit Team
+APP-2026-0129,Receive Documents,2026-04-23T05:32:10Z,Documents Received,Intake
+APP-2026-0108,Receive Documents,2026-04-23T05:48:45Z,Documents Received,Intake
+APP-2026-0096,Receive Documents,2026-04-23T06:00:35Z,Documents Received,Intake
+APP-2026-0110,Disburse Funds,2026-04-23T06:11:39Z,Disbursed,Payments
+APP-2026-0142,Disburse Funds,2026-04-23T06:24:51Z,Disbursed,Payments
+APP-2026-0138,Approve Application,2026-04-23T06:53:23Z,Approved,Underwriting
+APP-2026-0112,Underwrite,2026-04-23T07:16:55Z,Underwritten,Underwriting
+APP-2026-0103,Credit Check,2026-04-23T08:32:24Z,Credit Checked,Credit Team
+APP-2026-0113,Credit Check,2026-04-23T09:04:04Z,Credit Checked,Credit Team
+APP-2026-0159,Receive Documents,2026-04-23T09:59:11Z,Documents Received,Intake
+APP-2026-0121,Credit Check,2026-04-23T10:15:37Z,Credit Checked,Credit Team
+APP-2026-0124,Withdraw Application,2026-04-23T10:16:48Z,Withdrawn,Intake
+APP-2026-0173,Approve Application,2026-04-23T10:43:56Z,Approved,Underwriting
+APP-2026-0141,Underwrite,2026-04-23T11:24:22Z,Underwritten,Underwriting
+APP-2026-0112,Approve Application,2026-04-23T11:27:55Z,Approved,Underwriting
+APP-2026-0159,Credit Check,2026-04-23T12:18:11Z,Credit Checked,Credit Team
+APP-2026-0136,Underwrite,2026-04-23T12:46:46Z,Underwritten,Underwriting
+APP-2026-0118,Credit Check,2026-04-23T13:01:54Z,Credit Checked,Credit Team
+APP-2026-0141,Approve Application,2026-04-23T13:55:22Z,Approved,Underwriting
+APP-2026-0133,Receive Documents,2026-04-23T13:55:37Z,Documents Received,Intake
+APP-2026-0113,Underwrite,2026-04-23T14:01:04Z,Underwritten,Underwriting
+APP-2026-0177,Approve Application,2026-04-23T14:47:46Z,Approved,Underwriting
+APP-2026-0179,Receive Documents,2026-04-23T15:29:01Z,Documents Received,Intake
+APP-2026-0042,Underwrite,2026-04-23T15:29:13Z,Underwritten,Underwriting
+APP-2026-0159,Request Documents,2026-04-23T16:06:11Z,Awaiting Documents,Credit Team
+APP-2026-0143,Disburse Funds,2026-04-23T16:18:13Z,Disbursed,Payments
+APP-2026-0111,Receive Documents,2026-04-23T17:48:36Z,Documents Received,Intake
+APP-2026-0147,Receive Documents,2026-04-23T18:30:36Z,Documents Received,Intake
+APP-2026-0162,Underwrite,2026-04-23T19:49:59Z,Underwritten,Underwriting
+APP-2026-0042,Approve Application,2026-04-23T22:32:13Z,Approved,Underwriting
+APP-2026-0096,Credit Check,2026-04-23T23:19:35Z,Credit Checked,Credit Team
+APP-2026-0135,Disburse Funds,2026-04-24T00:42:25Z,Disbursed,Payments
+APP-2026-0108,Credit Check,2026-04-24T00:43:45Z,Credit Checked,Credit Team
+APP-2026-0136,Approve Application,2026-04-24T01:12:46Z,Approved,Underwriting
+APP-2026-0113,Approve Application,2026-04-24T02:02:04Z,Approved,Underwriting
+APP-2026-0148,Disburse Funds,2026-04-24T03:34:43Z,Disbursed,Payments
+APP-2026-0161,Receive Documents,2026-04-24T03:42:51Z,Documents Received,Intake
+APP-2026-0129,Credit Check,2026-04-24T04:18:10Z,Credit Checked,Credit Team
+APP-2026-0074,Disburse Funds,2026-04-24T04:38:13Z,Disbursed,Payments
+APP-2026-0157,Receive Documents,2026-04-24T05:04:13Z,Documents Received,Intake
+APP-2026-0129,Request Documents,2026-04-24T05:57:10Z,Awaiting Documents,Credit Team
+APP-2026-0061,Disburse Funds,2026-04-24T06:01:00Z,Disbursed,Payments
+APP-2026-0127,Disburse Funds,2026-04-24T06:06:17Z,Disbursed,Payments
+APP-2026-0118,Underwrite,2026-04-24T06:33:54Z,Underwritten,Underwriting
+APP-2026-0133,Credit Check,2026-04-24T06:37:37Z,Credit Checked,Credit Team
+APP-2026-0162,Approve Application,2026-04-24T07:19:59Z,Approved,Underwriting
+APP-2026-0150,Underwrite,2026-04-24T07:28:47Z,Underwritten,Underwriting
+APP-2026-0081,Receive Documents,2026-04-24T07:31:47Z,Documents Received,Intake
+APP-2026-0103,Underwrite,2026-04-24T07:56:24Z,Underwritten,Underwriting
+APP-2026-0179,Credit Check,2026-04-24T08:00:01Z,Credit Checked,Credit Team
+APP-2026-0096,Underwrite,2026-04-24T08:26:35Z,Underwritten,Underwriting
+APP-2026-0133,Request Documents,2026-04-24T09:16:37Z,Awaiting Documents,Credit Team
+APP-2026-0172,Underwrite,2026-04-24T09:18:51Z,Underwritten,Underwriting
+APP-2026-0113,Disburse Funds,2026-04-24T09:24:04Z,Disbursed,Payments
+APP-2026-0118,Approve Application,2026-04-24T09:35:54Z,Approved,Underwriting
+APP-2026-0147,Credit Check,2026-04-24T09:44:36Z,Credit Checked,Credit Team
+APP-2026-0121,Underwrite,2026-04-24T10:34:37Z,Underwritten,Underwriting
+APP-2026-0122,Disburse Funds,2026-04-24T10:36:07Z,Disbursed,Payments
+APP-2026-0056,Disburse Funds,2026-04-24T10:58:36Z,Disbursed,Payments
+APP-2026-0179,Request Documents,2026-04-24T11:57:01Z,Awaiting Documents,Credit Team
+APP-2026-0144,Underwrite,2026-04-24T11:59:58Z,Underwritten,Underwriting
+APP-2026-0150,Approve Application,2026-04-24T13:04:47Z,Approved,Underwriting
+APP-2026-0172,Approve Application,2026-04-24T13:19:51Z,Approved,Underwriting
+APP-2026-0075,Disburse Funds,2026-04-24T13:40:10Z,Disbursed,Payments
+APP-2026-0041,Disburse Funds,2026-04-24T14:11:48Z,Disbursed,Payments
+APP-2026-0144,Approve Application,2026-04-24T15:24:58Z,Approved,Underwriting
+APP-2026-0147,Request Documents,2026-04-24T15:34:36Z,Awaiting Documents,Credit Team
+APP-2026-0096,Approve Application,2026-04-24T15:41:35Z,Approved,Underwriting
+APP-2026-0154,Receive Documents,2026-04-24T15:59:43Z,Documents Received,Intake
+APP-2026-0108,Underwrite,2026-04-24T15:59:45Z,Underwritten,Underwriting
+APP-2026-0111,Credit Check,2026-04-24T17:28:36Z,Credit Checked,Credit Team
+APP-2026-0161,Credit Check,2026-04-24T18:07:51Z,Credit Checked,Credit Team
+APP-2026-0152,Receive Documents,2026-04-24T18:46:46Z,Documents Received,Intake
+APP-2026-0103,Approve Application,2026-04-24T19:55:24Z,Approved,Underwriting
+APP-2026-0158,Receive Documents,2026-04-24T20:01:02Z,Documents Received,Intake
+APP-2026-0112,Disburse Funds,2026-04-24T20:08:55Z,Disbursed,Payments
+APP-2026-0121,Approve Application,2026-04-24T20:38:37Z,Approved,Underwriting
+APP-2026-0175,Receive Documents,2026-04-24T21:21:45Z,Documents Received,Intake
+APP-2026-0161,Request Documents,2026-04-24T22:42:51Z,Awaiting Documents,Credit Team
+APP-2026-0108,Approve Application,2026-04-24T22:55:45Z,Approved,Underwriting
+APP-2026-0158,Credit Check,2026-04-24T23:35:02Z,Credit Checked,Credit Team
+APP-2026-0165,Receive Documents,2026-04-25T00:02:24Z,Documents Received,Intake
+APP-2026-0081,Credit Check,2026-04-25T02:05:47Z,Credit Checked,Credit Team
+APP-2026-0141,Disburse Funds,2026-04-25T03:28:22Z,Disbursed,Payments
+APP-2026-0042,Disburse Funds,2026-04-25T03:42:13Z,Disbursed,Payments
+APP-2026-0157,Credit Check,2026-04-25T04:00:13Z,Credit Checked,Credit Team
+APP-2026-0154,Credit Check,2026-04-25T05:12:43Z,Credit Checked,Credit Team
+APP-2026-0157,Request Documents,2026-04-25T05:45:13Z,Awaiting Documents,Credit Team
+APP-2026-0144,Disburse Funds,2026-04-25T05:46:58Z,Disbursed,Payments
+APP-2026-0175,Credit Check,2026-04-25T06:03:45Z,Credit Checked,Credit Team
+APP-2026-0121,Disburse Funds,2026-04-25T06:44:37Z,Disbursed,Payments
+APP-2026-0132,Disburse Funds,2026-04-25T06:48:22Z,Disbursed,Payments
+APP-2026-0173,Disburse Funds,2026-04-25T08:07:56Z,Disbursed,Payments
+APP-2026-0111,Underwrite,2026-04-25T09:07:36Z,Underwritten,Underwriting
+APP-2026-0081,Underwrite,2026-04-25T13:04:47Z,Underwritten,Underwriting
+APP-2026-0103,Disburse Funds,2026-04-25T13:33:24Z,Disbursed,Payments
+APP-2026-0115,Withdraw Application,2026-04-25T14:57:14Z,Withdrawn,Intake
+APP-2026-0139,Receive Documents,2026-04-25T15:03:08Z,Documents Received,Intake
+APP-2026-0154,Underwrite,2026-04-25T15:59:43Z,Underwritten,Underwriting
+APP-2026-0177,Disburse Funds,2026-04-25T17:10:46Z,Disbursed,Payments
+APP-2026-0111,Approve Application,2026-04-25T17:47:36Z,Approved,Underwriting
+APP-2026-0152,Credit Check,2026-04-25T18:53:46Z,Credit Checked,Credit Team
+APP-2026-0081,Approve Application,2026-04-25T21:48:47Z,Approved,Underwriting
+APP-2026-0165,Credit Check,2026-04-25T21:52:24Z,Credit Checked,Credit Team
+APP-2026-0158,Underwrite,2026-04-25T22:02:02Z,Underwritten,Underwriting
+APP-2026-0118,Disburse Funds,2026-04-25T22:11:54Z,Disbursed,Payments
+APP-2026-0179,Receive Documents,2026-04-25T23:24:01Z,Documents Received,Intake
+APP-2026-0151,Receive Documents,2026-04-26T00:02:22Z,Documents Received,Intake
+APP-2026-0139,Credit Check,2026-04-26T01:54:08Z,Credit Checked,Credit Team
+APP-2026-0175,Underwrite,2026-04-26T03:12:45Z,Underwritten,Underwriting
+APP-2026-0179,Credit Check,2026-04-26T03:16:01Z,Credit Checked,Credit Team
+APP-2026-0165,Request Documents,2026-04-26T03:16:24Z,Awaiting Documents,Credit Team
+APP-2026-0158,Approve Application,2026-04-26T05:20:02Z,Approved,Underwriting
+APP-2026-0138,Disburse Funds,2026-04-26T05:28:23Z,Disbursed,Payments
+APP-2026-0147,Receive Documents,2026-04-26T06:49:36Z,Documents Received,Intake
+APP-2026-0175,Approve Application,2026-04-26T07:50:45Z,Approved,Underwriting
+APP-2026-0176,Receive Documents,2026-04-26T08:47:59Z,Documents Received,Intake
+APP-2026-0136,Disburse Funds,2026-04-26T08:51:46Z,Disbursed,Payments
+APP-2026-0154,Decline Application,2026-04-26T08:58:43Z,Declined,Underwriting
+APP-2026-0139,Underwrite,2026-04-26T11:11:08Z,Underwritten,Underwriting
+APP-2026-0152,Underwrite,2026-04-26T13:26:46Z,Underwritten,Underwriting
+APP-2026-0151,Credit Check,2026-04-26T16:24:22Z,Credit Checked,Credit Team
+APP-2026-0172,Disburse Funds,2026-04-26T16:47:51Z,Disbursed,Payments
+APP-2026-0171,Receive Documents,2026-04-26T17:56:40Z,Documents Received,Intake
+APP-2026-0163,Receive Documents,2026-04-26T17:59:36Z,Documents Received,Intake
+APP-2026-0139,Approve Application,2026-04-26T19:46:08Z,Approved,Underwriting
+APP-2026-0151,Underwrite,2026-04-26T21:08:22Z,Underwritten,Underwriting
+APP-2026-0164,Receive Documents,2026-04-26T21:59:41Z,Documents Received,Intake
+APP-2026-0162,Disburse Funds,2026-04-26T22:11:59Z,Disbursed,Payments
+APP-2026-0175,Disburse Funds,2026-04-26T23:48:45Z,Disbursed,Payments
+APP-2026-0151,Approve Application,2026-04-27T00:07:22Z,Approved,Underwriting
+APP-2026-0171,Credit Check,2026-04-27T00:41:40Z,Credit Checked,Credit Team
+APP-2026-0152,Approve Application,2026-04-27T01:14:46Z,Approved,Underwriting
+APP-2026-0176,Credit Check,2026-04-27T01:18:59Z,Credit Checked,Credit Team
+APP-2026-0180,Receive Documents,2026-04-27T01:44:07Z,Documents Received,Intake
+APP-2026-0167,Receive Documents,2026-04-27T03:17:31Z,Documents Received,Intake
+APP-2026-0161,Receive Documents,2026-04-27T03:18:51Z,Documents Received,Intake
+APP-2026-0171,Request Documents,2026-04-27T03:33:40Z,Awaiting Documents,Credit Team
+APP-2026-0168,Receive Documents,2026-04-27T04:08:58Z,Documents Received,Intake
+APP-2026-0176,Request Documents,2026-04-27T05:04:59Z,Awaiting Documents,Credit Team
+APP-2026-0147,Credit Check,2026-04-27T05:56:36Z,Credit Checked,Credit Team
+APP-2026-0163,Credit Check,2026-04-27T06:59:36Z,Credit Checked,Credit Team
+APP-2026-0096,Disburse Funds,2026-04-27T09:06:35Z,Disbursed,Payments
+APP-2026-0108,Disburse Funds,2026-04-27T09:20:45Z,Disbursed,Payments
+APP-2026-0179,Underwrite,2026-04-27T11:08:01Z,Underwritten,Underwriting
+APP-2026-0164,Credit Check,2026-04-27T11:43:41Z,Credit Checked,Credit Team
+APP-2026-0168,Credit Check,2026-04-27T12:37:58Z,Credit Checked,Credit Team
+APP-2026-0150,Disburse Funds,2026-04-27T13:05:47Z,Disbursed,Payments
+APP-2026-0180,Credit Check,2026-04-27T13:14:07Z,Credit Checked,Credit Team
+APP-2026-0164,Request Documents,2026-04-27T13:51:41Z,Awaiting Documents,Credit Team
+APP-2026-0159,Receive Documents,2026-04-27T16:07:11Z,Documents Received,Intake
+APP-2026-0161,Credit Check,2026-04-27T17:18:51Z,Credit Checked,Credit Team
+APP-2026-0158,Disburse Funds,2026-04-27T18:27:02Z,Disbursed,Payments
+APP-2026-0179,Approve Application,2026-04-27T19:17:01Z,Approved,Underwriting
+APP-2026-0167,Credit Check,2026-04-27T21:15:31Z,Credit Checked,Credit Team
+APP-2026-0111,Disburse Funds,2026-04-27T22:12:36Z,Disbursed,Payments
+APP-2026-0161,Underwrite,2026-04-27T22:35:51Z,Underwritten,Underwriting
+APP-2026-0167,Request Documents,2026-04-28T01:38:31Z,Awaiting Documents,Credit Team
+APP-2026-0178,Receive Documents,2026-04-28T02:26:24Z,Documents Received,Intake
+APP-2026-0157,Receive Documents,2026-04-28T04:28:13Z,Documents Received,Intake
+APP-2026-0168,Underwrite,2026-04-28T05:06:58Z,Underwritten,Underwriting
+APP-2026-0163,Underwrite,2026-04-28T07:02:36Z,Underwritten,Underwriting
+APP-2026-0157,Credit Check,2026-04-28T07:07:13Z,Credit Checked,Credit Team
+APP-2026-0161,Approve Application,2026-04-28T08:51:51Z,Approved,Underwriting
+APP-2026-0168,Approve Application,2026-04-28T11:46:58Z,Approved,Underwriting
+APP-2026-0151,Disburse Funds,2026-04-28T12:51:22Z,Disbursed,Payments
+APP-2026-0159,Credit Check,2026-04-28T14:06:11Z,Credit Checked,Credit Team
+APP-2026-0081,Disburse Funds,2026-04-28T15:15:47Z,Disbursed,Payments
+APP-2026-0147,Underwrite,2026-04-28T16:19:36Z,Underwritten,Underwriting
+APP-2026-0160,Receive Documents,2026-04-28T16:42:11Z,Documents Received,Intake
+APP-2026-0152,Disburse Funds,2026-04-28T17:00:46Z,Disbursed,Payments
+APP-2026-0163,Approve Application,2026-04-28T17:03:36Z,Approved,Underwriting
+APP-2026-0147,Approve Application,2026-04-28T18:19:36Z,Approved,Underwriting
+APP-2026-0178,Credit Check,2026-04-28T21:53:24Z,Credit Checked,Credit Team
+APP-2026-0178,Request Documents,2026-04-28T23:35:24Z,Awaiting Documents,Credit Team
+APP-2026-0139,Disburse Funds,2026-04-29T00:05:08Z,Disbursed,Payments
+APP-2026-0169,Receive Documents,2026-04-29T00:38:48Z,Documents Received,Intake
+APP-2026-0161,Disburse Funds,2026-04-29T04:02:51Z,Disbursed,Payments
+APP-2026-0163,Disburse Funds,2026-04-29T05:21:36Z,Disbursed,Payments
+APP-2026-0160,Credit Check,2026-04-29T06:08:11Z,Credit Checked,Credit Team
+APP-2026-0180,Underwrite,2026-04-29T06:23:07Z,Underwritten,Underwriting
+APP-2026-0174,Receive Documents,2026-04-29T08:36:28Z,Documents Received,Intake
+APP-2026-0133,Withdraw Application,2026-04-29T09:12:37Z,Withdrawn,Intake
+APP-2026-0159,Underwrite,2026-04-29T11:10:11Z,Underwritten,Underwriting
+APP-2026-0159,Approve Application,2026-04-29T13:45:11Z,Approved,Underwriting
+APP-2026-0169,Credit Check,2026-04-29T14:00:48Z,Credit Checked,Credit Team
+APP-2026-0180,Approve Application,2026-04-29T14:56:07Z,Approved,Underwriting
+APP-2026-0169,Request Documents,2026-04-29T17:38:48Z,Awaiting Documents,Credit Team
+APP-2026-0179,Disburse Funds,2026-04-29T18:48:01Z,Disbursed,Payments
+APP-2026-0180,Disburse Funds,2026-04-29T21:10:07Z,Disbursed,Payments
+APP-2026-0157,Underwrite,2026-04-30T02:02:13Z,Underwritten,Underwriting
+APP-2026-0174,Credit Check,2026-04-30T07:32:28Z,Credit Checked,Credit Team
+APP-2026-0147,Disburse Funds,2026-04-30T08:16:36Z,Disbursed,Payments
+APP-2026-0178,Receive Documents,2026-04-30T12:41:24Z,Documents Received,Intake
+APP-2026-0168,Disburse Funds,2026-04-30T13:47:58Z,Disbursed,Payments
+APP-2026-0157,Approve Application,2026-04-30T14:32:13Z,Approved,Underwriting
+APP-2026-0165,Receive Documents,2026-04-30T16:25:24Z,Documents Received,Intake
+APP-2026-0129,Receive Documents,2026-04-30T20:54:10Z,Documents Received,Intake
+APP-2026-0167,Receive Documents,2026-04-30T21:18:31Z,Documents Received,Intake
+APP-2026-0159,Disburse Funds,2026-04-30T21:28:11Z,Disbursed,Payments

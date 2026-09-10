@@ -25,8 +25,9 @@ import { pollBlobSource } from "@/app/lib/mining/pull";
 import { refreshRunFromSource } from "@/app/lib/mining/refreshRun";
 import { evaluateAlerts, type AlertPoint } from "@/app/lib/mining/alerts";
 import { dispatchAlerts } from "@/app/lib/mining/alertDispatch";
-import { fitnessHistory, type ComparableRun } from "@/app/lib/mining/compareRuns";
-import { computeOutcomes, type KpiConfig } from "@/app/lib/mining/outcomes";
+import { type ComparableRun } from "@/app/lib/mining/compareRuns";
+import { alertPointsFrom, type HistoryRow } from "@/app/lib/mining/alertHistory";
+import { type KpiConfig } from "@/app/lib/mining/outcomes";
 import type { RunAnalytics } from "@/app/lib/mining/analytics";
 import type { ConformanceResult } from "@/app/lib/mining/transitionConformance";
 import type { Variant } from "@/app/lib/mining/types";
@@ -123,21 +124,17 @@ async function buildHistory(runId: string, projectId: string | null): Promise<Al
 
   // `kpiConfig` lives on each run, so the late rate is per observation rather
   // than a single current SLA applied backwards over history that predates it.
-  const lateBy = new Map<string, number | null>();
+  const withKpi: HistoryRow[] = [];
   for (const r of rows) {
     const full = await prisma.processMiningRun.findUnique({ where: { id: r.id }, select: { kpiConfig: true } });
-    const kpi = (full?.kpiConfig ?? null) as unknown as KpiConfig | null;
-    const outcome = r.analytics ? computeOutcomes(r.analytics, r.variants, kpi) : null;
-    lateBy.set(r.id, outcome && outcome.total > 0 ? outcome.late / outcome.total : null);
+    withKpi.push({ ...r, kpiConfig: (full?.kpiConfig ?? null) as unknown as KpiConfig | null });
   }
 
   // Oldest first by date, which is the order the alerts want. Date order and
   // parent order agree here because the walk only ever goes back through
   // parents, and a snapshot is always older than the run it came from.
-  return fitnessHistory(rows).map((p) => ({
-    runId: p.runId, name: p.name, at: p.at, fitness: p.fitness,
-    lateRate: lateBy.get(p.runId) ?? null,
-    violations: (rows.find((r) => r.id === p.runId)?.conformance?.violations ?? [])
-      .filter((v) => v.cases > 0).map((v) => v.message),
-  }));
+  //
+  // The arithmetic is shared with the Compare view (Phase 11), so the cron and
+  // the screen cannot disagree about whether anything is wrong.
+  return alertPointsFrom(withKpi);
 }

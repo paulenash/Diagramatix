@@ -222,7 +222,9 @@ const example = {
     "",
     "Choose one of **three past periods** on entry — **January 2025**, **July 2025** or the **current January 2026** — the same process but with **compliance declining the further back in time you go**: older months skip approvals, pay without scheduling, run a non-standard *Disputed* state and even reopen paid invoices, and they run slower.",
     "",
-    "**Discover** the implied BPMN and the entity lifecycle, run **Conformance** against the bundled **reference** state machine (the current month scores ~89% — only in-flight invoices deviate; older months score far lower), then switch to the **strict** reference (no rework) to flag undocumented *On Hold → In Progress* cases. Finally hit **Calibrate & simulate** to turn the discovered process into a digital twin and watch invoices animate through it in the Simulator. Every mining run is saved — re-select it to replay its discovered process, lifecycle and conformance.",
+    "**Discover** the implied BPMN and the entity lifecycle, run **Conformance** against the bundled **reference** state machine (the current month scores ~90% — only in-flight invoices deviate; older months score far lower), then switch to the **strict** reference (no rework) to flag undocumented *On Hold → In Progress* cases. Finally hit **Calibrate & simulate** to turn the discovered process into a digital twin and watch invoices animate through it in the Simulator. Every mining run is saved — re-select it to replay its discovered process, lifecycle and conformance.",
+    "",
+    "**This is the comparison example.** Import two of the three periods as separate runs, then open **Insights → Compare** and pick the other one. Conformance goes **44% → 66% → 90%** across the three; eight deviations that were live in January 2025 are gone by January 2026, and the cycle time falls by a quarter. Compare them the other way round — current first, then the old period — and the panel shows what the alert rules would raise: *conformance fell from 91% to 44%* and *8 deviations appeared that were not there before*. Those are the real thresholds, not demo ones.",
   ].join("\n"),
   difficulty: "core",
   package: pkg,
@@ -235,12 +237,52 @@ const example = {
 // operating-effectiveness. Order lifecycle:
 //   Received → Credit Check → Approved (or On Credit Hold → Approved) →
 //   Fulfilled → Invoiced → Paid   (+ Cancelled / off-book Disputed exceptions)
-const O2C_HEADERS = ["Order ID", "Customer", "Amount", "Activity", "Timestamp", "Order Status", "Resource"];
-const O2C_MAP: LogMapping = { caseId: "Order ID", activity: "Activity", timestamp: "Timestamp", state: "Order Status", resource: "Resource" };
+const O2C_HEADERS = ["Order ID", "Customer", "Region", "Channel", "Amount", "Activity", "Timestamp", "Order Status", "Resource"];
+// Retention is OPT-IN at import — an unmapped column defaults to "drop", because
+// a spare column is as likely to hold a customer name as a region. So the two
+// slicing dimensions have to be asked for by name here; without this the example
+// imports, looks perfectly healthy, and has an empty filter bar.
+//
+// Deliberately NOT kept: "Customer" (a name, and the example should not teach
+// that identifying columns are retained by default) and "Amount" (the filter
+// matches values exactly, and slicing to orders of $4,812.37 is not a slice).
+const O2C_MAP: LogMapping = {
+  caseId: "Order ID", activity: "Activity", timestamp: "Timestamp", state: "Order Status", resource: "Resource",
+  attributeMode: { Region: "keep", Channel: "keep" },
+};
 const O2C_END = Date.UTC(2026, 1, 28, 23, 59, 59);
 const salesReps = ["Nadia Rahman", "Tom Becker", "Priya Nair", "Luis Ortega"];
 const O2C_ROLE: Record<string, string> = { sales: "", credit: "Credit Desk", approver: "Order Desk", warehouse: "Fulfilment Centre", billing: "Billing System" };
 const o2cCustomers = ["Acme Retail", "Globex Stores", "Initech Ltd", "Umbrella Group", "Wayne Enterprises", "Soylent Foods", "Hooli Inc", "Stark Traders", "Vandelay Co", "Wonka Brands"];
+
+// ── The two slicing dimensions (Phase 11) ───────────────────────────────────
+// Spare columns are only worth keeping if slicing by them CHANGES the answer. A
+// Region column with the same distribution in every slice teaches the mechanic
+// and nothing else — the reader learns which control to click and comes away
+// believing the answer was already on the screen.
+//
+// So both are causal, and each explains a different kind of finding:
+//
+//   Region  — EMEA fulfilment carries a backlog, so the Fulfil/Ship step takes
+//             about two and a half times as long there. The whole-run figure
+//             shows a fulfilment bottleneck; slicing shows it is one region's,
+//             and the other two are fine. That is the difference between "we
+//             have a fulfilment problem" and "EMEA has a fulfilment problem",
+//             and they have different budgets.
+//
+//   Channel — the control failures concentrate in Partner orders: most credit
+//             bypasses, unapproved fulfilments and shipments on hold come in
+//             through partners. The conformance tab reports a deviation rate;
+//             slicing reports WHO is deviating, which is the thing anyone can
+//             act on.
+const o2cRegions = ["APAC", "EMEA", "Americas"];
+const o2cChannels = ["Direct", "Partner", "Web"];
+/** EMEA's fulfilment backlog, as a multiplier on the fulfil/ship wait. */
+const EMEA_FULFIL_SLOW = 2.5;
+/** Share of each control-failure case that arrived through a partner. */
+const PARTNER_SHARE_OF_BYPASS = 0.8;
+const O2C_BYPASS_TYPES = new Set(["creditBypass", "fulfilNoApproval", "shipOnHold"]);
+const O2C_SLOW_STEPS = new Set(["Fulfil Order", "Ship Goods"]);
 
 type O2Step = [activity: string, state: string, role: string, gap: [number, number] | null];
 const OS_RECEIVE: O2Step = ["Receive Order", "Received", "sales", null];
@@ -276,24 +318,37 @@ function buildO2CLog() {
   const rint = (lo: number, hi: number) => lo + Math.floor(rnd() * (hi - lo + 1));
   const pick = <T,>(arr: T[]) => arr[Math.floor(rnd() * arr.length)];
   const arrival = () => { let ms; do { ms = Date.UTC(2026, 1, rint(1, 28), rint(8, 16), rint(0, 59), rint(0, 59)); } while (isWeekend(ms)); return ms; };
-  const cases = O2C_MIX.map((type) => ({ type, arrival: arrival() })) as { type: string; arrival: number; id: string; customer: string; rep: string }[];
+  const cases = O2C_MIX.map((type) => ({ type, arrival: arrival() })) as { type: string; arrival: number; id: string; customer: string; rep: string; region: string; channel: string }[];
   cases.sort((a, b) => a.arrival - b.arrival);
-  cases.forEach((c, i) => { c.id = `SO-2026-${String(i + 1).padStart(4, "0")}`; c.customer = pick(o2cCustomers); c.rep = pick(salesReps); });
-  const rows: { id: string; customer: string; amount: string; activity: string; state: string; resource: string; t: number }[] = [];
+  cases.forEach((c, i) => {
+    c.id = `SO-2026-${String(i + 1).padStart(4, "0")}`;
+    c.customer = pick(o2cCustomers);
+    c.rep = pick(salesReps);
+    c.region = pick(o2cRegions);
+    // Partner orders carry most of the control failures — but NOT all of them,
+    // and partners also place plenty of clean orders. A dimension that split
+    // the log perfectly would make the slice a tautology rather than a finding.
+    c.channel = O2C_BYPASS_TYPES.has(c.type) && rnd() < PARTNER_SHARE_OF_BYPASS ? "Partner" : pick(o2cChannels);
+  });
+  const rows: { id: string; customer: string; region: string; channel: string; amount: string; activity: string; state: string; resource: string; t: number }[] = [];
   for (const c of cases) {
     let t = c.arrival;
     for (const [activity, state, role, gap] of O2C_PATHS[c.type]) {
-      if (gap) t += rint(gap[0], gap[1]) * HOUR + rint(0, 59) * MIN;
+      // The backlog is on the fulfilment step in one region, not on the whole
+      // region — an order that is slow from end to end teaches nothing about
+      // WHERE the time goes, which is the question the Between-steps tab asks.
+      const slow = c.region === "EMEA" && O2C_SLOW_STEPS.has(activity) ? EMEA_FULFIL_SLOW : 1;
+      if (gap) t += Math.round(rint(gap[0], gap[1]) * slow) * HOUR + rint(0, 59) * MIN;
       if (t > O2C_END) break;
       const resource = role === "sales" ? c.rep : (O2C_ROLE[role] || role);
-      rows.push({ id: c.id, customer: c.customer, amount: (rint(200, 48000) + rint(0, 99) / 100).toFixed(2), activity, state, resource, t });
+      rows.push({ id: c.id, customer: c.customer, region: c.region, channel: c.channel, amount: (rint(200, 48000) + rint(0, 99) / 100).toFixed(2), activity, state, resource, t });
     }
   }
   rows.sort((a, b) => a.t - b.t || a.id.localeCompare(b.id));
   return {
     fileName: "order-to-cash-february-2026.csv", runName: "Order-to-Cash — February 2026",
     headers: O2C_HEADERS, mapping: O2C_MAP,
-    rows: rows.map((r) => [r.id, r.customer, r.amount, r.activity, iso(r.t), r.state, r.resource]),
+    rows: rows.map((r) => [r.id, r.customer, r.region, r.channel, r.amount, r.activity, iso(r.t), r.state, r.resource]),
   };
 }
 
@@ -335,6 +390,10 @@ const o2cExample = {
     "A month of Order-to-Cash activity — ~200 sales orders flowing through **Received → Credit Check → Approved → Fulfilled → Invoiced → Paid**, with an On Credit Hold branch and a Cancelled branch.",
     "",
     "The log deliberately contains the control-failure patterns an auditor cares about: orders **approved without a credit check**, orders **fulfilled without approval**, goods **shipped while on credit hold**, and an off-book **Disputed** status. Discover the lifecycle, run **Conformance** against the bundled reference state machine (~66% fitness — the off-book cases + in-flight orders deviate), then — after adopting the **Order-to-Cash Sample GRC Library** into the same project — map each control to the deviation it guards to see its **operating effectiveness** (“bypassed in N of 200 cases”) right in the Risk-Control Matrix.",
+    "",
+    "**This is also the slicing example.** Two spare columns are kept at import — **Region** and **Channel** — and both change the answer rather than decorating it. The whole-run view shows fulfilment as the biggest delay; slice to **EMEA** and it is far worse, slice to **APAC** or **Americas** and it is unremarkable — the backlog belongs to one region, not to the process. Slice to **Partner** and most of the credit bypasses, unapproved fulfilments and shipments-on-hold are there. That is the move the whole workbench exists for: a finding becomes a cause the moment you can say *whose*.",
+    "",
+    "Note what is **not** kept: *Customer* is a name and *Amount* is a number no two cases share. Column retention is opt-in at import for exactly that reason — you choose what becomes a dimension, and everything else is discarded rather than quietly stored.",
   ].join("\n"),
   difficulty: "core",
   package: {
@@ -477,13 +536,278 @@ const serviceDeskExample = {
   } as MiningExamplePackage,
 };
 
+// ── Purchase Requisition — three teams, and one pair that argues ─────────────
+// Phase 11. The Teams tab was built in Phase 7 and no catalog example exercises
+// it: Accounts Payable resources are individual clerks, Order-to-Cash mixes
+// people with function names, and the Service Desk is one team of agents. So
+// the hand-off map, the workload split and the ping-pong pair all ship
+// untaught.
+//
+// Two things this log is shaped to make visible, and both are shaped rather
+// than sprinkled — a random resource column produces a hand-off map with no
+// structure, which reads exactly like a process with no problem.
+//
+// 1. THE HAND-OFF THAT COSTS THE TIME. Legal has a queue: work waits days to be
+//    picked up, and minutes to be done. So Finance → Legal dominates the
+//    hand-off table by total elapsed while being unremarkable by count, which
+//    is the distinction the Between-steps and Teams tabs exist to draw.
+//
+// 2. A GENUINE PING-PONG PAIR. The happy path visits Procurement → Finance →
+//    Legal → Procurement and never returns to a team it has left, so the
+//    baseline is ZERO bounces — deliberately. In a process that naturally
+//    alternates between two teams, every case registers as ping-pong and the
+//    signal means nothing. Here only the disputed-terms path bounces Finance
+//    and Legal back and forth three times, so the figure names something real.
+const PR_HEADERS = ["Requisition", "Activity", "Timestamp", "Status", "Team"];
+const PR_MAP: LogMapping = {
+  caseId: "Requisition", activity: "Activity", timestamp: "Timestamp", state: "Status", resource: "Team",
+};
+const PR_PROC = "Procurement", PR_FIN = "Finance", PR_LEGAL = "Legal";
+
+type PRStep = [activity: string, state: string, team: string, gap: [number, number] | null];
+const PR_RAISE: PRStep = ["Raise Requisition", "Raised", PR_PROC, null];
+const PR_BUDGET: PRStep = ["Check Budget", "Budget Checked", PR_FIN, [2, 12]];
+// The queue. Long wait, then the work itself is quick — the shape of every
+// specialist team in every organisation, and invisible in a model that only
+// shows which steps exist.
+const PR_TERMS: PRStep = ["Review Terms", "Terms Reviewed", PR_LEGAL, [24, 120]];
+const PR_QUERY: PRStep = ["Query Terms", "Terms Queried", PR_FIN, [4, 24]];
+const PR_REVISE: PRStep = ["Revise Terms", "Terms Revised", PR_LEGAL, [24, 96]];
+const PR_ACCEPT: PRStep = ["Accept Terms", "Terms Agreed", PR_FIN, [2, 16]];
+const PR_PO: PRStep = ["Raise Purchase Order", "Ordered", PR_PROC, [1, 8]];
+const PR_GOODS: PRStep = ["Receive Goods", "Received", PR_PROC, [48, 240]];
+const PR_CLOSE: PRStep = ["Close Requisition", "Closed", PR_PROC, [1, 12]];
+const PR_REJECT: PRStep = ["Reject Requisition", "Rejected", PR_FIN, [2, 24]];
+
+const PR_PATHS: Record<string, PRStep[]> = {
+  // P → F → L → P, and never back. Zero bounces, on purpose.
+  happy: [PR_RAISE, PR_BUDGET, PR_TERMS, PR_PO, PR_GOODS, PR_CLOSE],
+  // Finance and Legal pass it back and forth: F → L → F → L → F.
+  disputedTerms: [PR_RAISE, PR_BUDGET, PR_TERMS, PR_QUERY, PR_REVISE, PR_ACCEPT, PR_PO, PR_GOODS, PR_CLOSE],
+  // One round of query, not three — so the ping-pong figure is a rate rather
+  // than a property every disputed case shares.
+  oneQuery: [PR_RAISE, PR_BUDGET, PR_TERMS, PR_QUERY, PR_ACCEPT, PR_PO, PR_GOODS, PR_CLOSE],
+  budgetReject: [PR_RAISE, PR_BUDGET, PR_REJECT],
+  legalReject: [PR_RAISE, PR_BUDGET, PR_TERMS, PR_REJECT],
+};
+const PR_MIX: Record<string, number> = { happy: 92, disputedTerms: 34, oneQuery: 22, budgetReject: 14, legalReject: 10 };
+
+function buildPRLog() {
+  const rnd = mulberry32(20260331);
+  const rint = (lo: number, hi: number) => lo + Math.floor(rnd() * (hi - lo + 1));
+  const END = Date.UTC(2026, 2, 31, 23, 59, 59);
+  const arrival = () => { let ms; do { ms = Date.UTC(2026, 2, rint(1, 31), rint(8, 16), rint(0, 59), rint(0, 59)); } while (isWeekend(ms)); return ms; };
+  const mix: string[] = [];
+  for (const [type, n] of Object.entries(PR_MIX)) for (let i = 0; i < n; i++) mix.push(type);
+  const cases = mix.map((type) => ({ type, arrival: arrival() })) as { type: string; arrival: number; id: string }[];
+  cases.sort((a, b) => a.arrival - b.arrival);
+  cases.forEach((c, i) => { c.id = `REQ-2026-${String(i + 1).padStart(4, "0")}`; });
+  const rows: { id: string; activity: string; state: string; team: string; t: number }[] = [];
+  for (const c of cases) {
+    let t = c.arrival;
+    for (const [activity, state, team, gap] of PR_PATHS[c.type]) {
+      if (gap) t += rint(gap[0], gap[1]) * HOUR + rint(0, 59) * MIN;
+      if (t > END) break;
+      rows.push({ id: c.id, activity, state, team, t });
+    }
+  }
+  rows.sort((a, b) => a.t - b.t || a.id.localeCompare(b.id));
+  return {
+    fileName: "purchase-requisition-march-2026.csv", runName: "Purchase Requisition — March 2026",
+    headers: PR_HEADERS, mapping: PR_MAP,
+    rows: rows.map((r) => [r.id, r.activity, iso(r.t), r.state, r.team]),
+  };
+}
+
+const PR_REF_ELEMENTS = [
+  { id: INIT, type: "initial-state", label: "" },
+  { id: FINAL, type: "final-state", label: "" },
+  { id: "raised", type: "state", label: "Raised" },
+  { id: "budget-checked", type: "state", label: "Budget Checked" },
+  { id: "terms-reviewed", type: "state", label: "Terms Reviewed" },
+  { id: "ordered", type: "state", label: "Ordered" },
+  { id: "received", type: "state", label: "Received" },
+  { id: "closed", type: "state", label: "Closed" },
+  { id: "rejected", type: "state", label: "Rejected" },
+];
+// The reference is the process as WRITTEN DOWN: raise, check, review, order.
+// It has no query/revise loop at all, so the disputed-terms cases are exactly
+// the deviation — and the Teams tab then explains who is doing the deviating.
+const PR_CONNS = [
+  T(INIT, "raised", "Raise Requisition"),
+  T("raised", "budget-checked", "Check Budget"),
+  T("budget-checked", "terms-reviewed", "Review Terms"),
+  T("terms-reviewed", "ordered", "Raise Purchase Order"),
+  T("ordered", "received", "Receive Goods"),
+  T("received", "closed", "Close Requisition"),
+  T("budget-checked", "rejected", "Reject Requisition"),
+  T("terms-reviewed", "rejected", "Reject Requisition"),
+  T("closed", FINAL, ""),
+  T("rejected", FINAL, ""),
+];
+
+const prSampleLog = buildPRLog();
+const prLog = buildEventLog(prSampleLog.headers, prSampleLog.rows, prSampleLog.mapping);
+const prPerformance = computePerformance(prLog.traces);
+const handoverExample = {
+  slug: "three-team-handover",
+  title: "Purchase Requisition — Three Teams",
+  concept: "See who hands work to whom, which hand-off costs the time, and which two teams pass a case back and forth.",
+  description: [
+    "A month of purchase requisitions crossing **three teams** — **Procurement** raises and receives, **Finance** checks the budget, **Legal** reviews the terms.",
+    "",
+    "**The hand-off is the process.** Every step here is quick; almost all of the elapsed time is spent waiting between them, and one hand-off accounts for most of it. Open **Between steps** and then **Teams**: *Finance → Legal* is unremarkable by count and dominant by total elapsed, because Legal has a queue. Work waits days to be picked up and minutes to be done — the shape of every specialist team in every organisation, and completely invisible in a model that only shows which steps exist.",
+    "",
+    "**And one pair argues.** The written-down process goes Procurement → Finance → Legal → Procurement and never returns to a team it has left, so most cases bounce **zero** times. A third of them do not: *Review Terms → Query Terms → Revise Terms → Accept Terms* passes the requisition between Legal and Finance three times before it moves on. The Teams tab names that pair and counts it.",
+    "",
+    "Run **Conformance** against the bundled reference — which has no query loop at all, because nobody wrote one down — and the disputed cases are the deviation. Then use **Deviations → show me the cases** to read the actual requisitions, and **What to do next** for the ranked version of all of it.",
+  ].join("\n"),
+  difficulty: "core",
+  package: {
+    version: 1 as const,
+    diagrams: [{ key: "pr-reference", name: "Requisition Lifecycle (Reference)", type: "state-machine", data: buildRef(PR_REF_ELEMENTS, PR_CONNS) }],
+    run: { name: prSampleLog.runName, mapping: PR_MAP, stats: prLog.stats, variants: prLog.variants, performance: prPerformance, ...demoKpi(prLog), referenceSmKey: "pr-reference" },
+    sampleLog: { ...prSampleLog },
+  } as MiningExamplePackage,
+};
+
+// ── Credit Application — the credit check that runs three times ──────────────
+// Phase 11, and this one exists to PROVE a correction rather than to show a
+// feature. The Capability Review claimed extension 6 was a matter of widening a
+// trigger. Half of that was right: the rework detector really is
+// label-agnostic. The other half was wrong — the ping-pong detector inherited
+// from task mining parses app names out of "Switch to X" / "Open X" / "X:"
+// labels, and on an ordinary business log it returns 0. A confident zero, which
+// is worse than an absent figure.
+//
+// Nothing in this log looks remotely like a UI step. "Credit Check" is not an
+// application anybody switches to; it is a thing a credit team does, three
+// times, because the applicant keeps being asked for another document. So the
+// rework figure has to come from repeats within a case, and it does.
+const CA_HEADERS = ["Application", "Activity", "Timestamp", "Stage", "Team"];
+const CA_MAP: LogMapping = {
+  caseId: "Application", activity: "Activity", timestamp: "Timestamp", state: "Stage", resource: "Team",
+};
+const CA_INTAKE = "Intake", CA_CREDIT = "Credit Team", CA_UW = "Underwriting", CA_PAY = "Payments";
+
+type CAStep = [activity: string, state: string, team: string, gap: [number, number] | null];
+const CA_RECEIVE: CAStep = ["Receive Application", "Received", CA_INTAKE, null];
+const CA_VERIFY: CAStep = ["Verify Identity", "Identity Verified", CA_INTAKE, [1, 8]];
+const CA_CHECK: CAStep = ["Credit Check", "Credit Checked", CA_CREDIT, [2, 24]];
+const CA_DOCS: CAStep = ["Request Documents", "Awaiting Documents", CA_CREDIT, [1, 6]];
+const CA_RECEIVED_DOCS: CAStep = ["Receive Documents", "Documents Received", CA_INTAKE, [24, 168]];
+const CA_UNDERWRITE: CAStep = ["Underwrite", "Underwritten", CA_UW, [4, 48]];
+const CA_APPROVE: CAStep = ["Approve Application", "Approved", CA_UW, [1, 12]];
+const CA_DISBURSE: CAStep = ["Disburse Funds", "Disbursed", CA_PAY, [4, 72]];
+const CA_DECLINE: CAStep = ["Decline Application", "Declined", CA_UW, [1, 24]];
+const CA_WITHDRAW: CAStep = ["Withdraw Application", "Withdrawn", CA_INTAKE, [24, 240]];
+
+const CA_PATHS: Record<string, CAStep[]> = {
+  // Checked once and through — the process as anyone would describe it.
+  clean: [CA_RECEIVE, CA_VERIFY, CA_CHECK, CA_UNDERWRITE, CA_APPROVE, CA_DISBURSE],
+  // One more document, one more check.
+  oneRecheck: [CA_RECEIVE, CA_VERIFY, CA_CHECK, CA_DOCS, CA_RECEIVED_DOCS, CA_CHECK, CA_UNDERWRITE, CA_APPROVE, CA_DISBURSE],
+  // The case the example is named after: Credit Check three times, and a week
+  // of the applicant's life between each one.
+  twoRechecks: [CA_RECEIVE, CA_VERIFY, CA_CHECK, CA_DOCS, CA_RECEIVED_DOCS, CA_CHECK, CA_DOCS, CA_RECEIVED_DOCS, CA_CHECK, CA_UNDERWRITE, CA_APPROVE, CA_DISBURSE],
+  declined: [CA_RECEIVE, CA_VERIFY, CA_CHECK, CA_UNDERWRITE, CA_DECLINE],
+  declinedAfterDocs: [CA_RECEIVE, CA_VERIFY, CA_CHECK, CA_DOCS, CA_RECEIVED_DOCS, CA_CHECK, CA_UNDERWRITE, CA_DECLINE],
+  // Asked three times, gave up. The most expensive outcome in the log and the
+  // one nobody measures.
+  withdrew: [CA_RECEIVE, CA_VERIFY, CA_CHECK, CA_DOCS, CA_RECEIVED_DOCS, CA_CHECK, CA_DOCS, CA_WITHDRAW],
+};
+const CA_MIX: Record<string, number> = { clean: 34, oneRecheck: 42, twoRechecks: 76, declined: 10, declinedAfterDocs: 10, withdrew: 8 };
+
+function buildCALog() {
+  const rnd = mulberry32(20260430);
+  const rint = (lo: number, hi: number) => lo + Math.floor(rnd() * (hi - lo + 1));
+  const END = Date.UTC(2026, 3, 30, 23, 59, 59);
+  // Arrivals land in the first three weeks rather than across the whole month.
+  // A rework example truncated at month end is a rework example that UNDER-
+  // reports rework: the cases cut off in flight are the ones being checked for
+  // the third time, so the very figure the example exists to show is the one
+  // the truncation eats.
+  const arrival = () => { let ms; do { ms = Date.UTC(2026, 3, rint(1, 21), rint(8, 17), rint(0, 59), rint(0, 59)); } while (isWeekend(ms)); return ms; };
+  const mix: string[] = [];
+  for (const [type, n] of Object.entries(CA_MIX)) for (let i = 0; i < n; i++) mix.push(type);
+  const cases = mix.map((type) => ({ type, arrival: arrival() })) as { type: string; arrival: number; id: string }[];
+  cases.sort((a, b) => a.arrival - b.arrival);
+  cases.forEach((c, i) => { c.id = `APP-2026-${String(i + 1).padStart(4, "0")}`; });
+  const rows: { id: string; activity: string; state: string; team: string; t: number }[] = [];
+  for (const c of cases) {
+    let t = c.arrival;
+    for (const [activity, state, team, gap] of CA_PATHS[c.type]) {
+      if (gap) t += rint(gap[0], gap[1]) * HOUR + rint(0, 59) * MIN;
+      if (t > END) break;
+      rows.push({ id: c.id, activity, state, team, t });
+    }
+  }
+  rows.sort((a, b) => a.t - b.t || a.id.localeCompare(b.id));
+  return {
+    fileName: "credit-application-april-2026.csv", runName: "Credit Application — April 2026",
+    headers: CA_HEADERS, mapping: CA_MAP,
+    rows: rows.map((r) => [r.id, r.activity, iso(r.t), r.state, r.team]),
+  };
+}
+
+const CA_REF_ELEMENTS = [
+  { id: INIT, type: "initial-state", label: "" },
+  { id: FINAL, type: "final-state", label: "" },
+  { id: "received", type: "state", label: "Received" },
+  { id: "identity-verified", type: "state", label: "Identity Verified" },
+  { id: "credit-checked", type: "state", label: "Credit Checked" },
+  { id: "underwritten", type: "state", label: "Underwritten" },
+  { id: "approved", type: "state", label: "Approved" },
+  { id: "disbursed", type: "state", label: "Disbursed" },
+  { id: "declined", type: "state", label: "Declined" },
+];
+// One credit check. That is what the procedure says, and it is why the log is
+// interesting: the deviation is not a wrong path, it is the SAME path walked
+// three times.
+const CA_CONNS = [
+  T(INIT, "received", "Receive Application"),
+  T("received", "identity-verified", "Verify Identity"),
+  T("identity-verified", "credit-checked", "Credit Check"),
+  T("credit-checked", "underwritten", "Underwrite"),
+  T("underwritten", "approved", "Approve Application"),
+  T("approved", "disbursed", "Disburse Funds"),
+  T("underwritten", "declined", "Decline Application"),
+  T("disbursed", FINAL, ""),
+  T("declined", FINAL, ""),
+];
+
+const caSampleLog = buildCALog();
+const caLog = buildEventLog(caSampleLog.headers, caSampleLog.rows, caSampleLog.mapping);
+const caPerformance = computePerformance(caLog.traces);
+const reworkExample = {
+  slug: "credit-check-rework",
+  title: "Credit Application — The Check That Runs Three Times",
+  concept: "Rework on an ordinary business log: the same step, repeated, and what it costs the applicant.",
+  description: [
+    "A month of credit applications. The written procedure runs **Received → Identity Verified → Credit Checked → Underwritten → Approved → Disbursed**, with one credit check.",
+    "",
+    "**Most applications are not checked once.** The credit team runs the check, asks for a document, waits up to a week for the applicant to send it, and runs the check again — and for a good share of cases, does that twice. Open **Teams** and the rework figure names the step and the rate: *Credit Check runs about 2.1× per application, in 136 of 180 cases*. Nothing about that number came from a path being wrong; the path is right, and it is walked three times.",
+    "",
+    "**Why this example exists.** The rework detector reads repeats within a case, so it works on any log. Its sibling — the *ping-pong* detector inherited from task mining — does not: it reads application names out of labels like *Switch to Excel* and *Open SAP*, and on a business log it returns a confident **zero**. Nothing here looks like a UI step, so the two detectors disagree, and that disagreement is the point. A number that is wrong in the same direction every time is worse than no number.",
+    "",
+    "Look at **Between steps** for where the time actually goes — *Request Documents → Receive Documents* is days of somebody else's life, not yours — and at the **withdrawn** cases, which were asked three times and gave up. That is the most expensive outcome in the log and the one nobody measures.",
+  ].join("\n"),
+  difficulty: "core",
+  package: {
+    version: 1 as const,
+    diagrams: [{ key: "ca-reference", name: "Application Lifecycle (Reference)", type: "state-machine", data: buildRef(CA_REF_ELEMENTS, CA_CONNS) }],
+    run: { name: caSampleLog.runName, mapping: CA_MAP, stats: caLog.stats, variants: caLog.variants, performance: caPerformance, ...demoKpi(caLog), referenceSmKey: "ca-reference" },
+    sampleLog: { ...caSampleLog },
+  } as MiningExamplePackage,
+};
+
 // Task-Mining flagship example ("Enter Invoice") — built from the task sample log.
 const taskExample = buildTaskMiningExample();
 // Live-source flagship example ("Order Processing" real-time polling).
 const liveExample = buildLiveOrderProcessingExample();
 
 const outFile = join(__dirname, "..", "app", "lib", "mining", "miningExampleData.json");
-writeFileSync(outFile, JSON.stringify({ examples: [example, o2cExample, serviceDeskExample, taskExample, liveExample] }, null, 2) + "\n", "utf8");
+writeFileSync(outFile, JSON.stringify({ examples: [example, o2cExample, serviceDeskExample, handoverExample, reworkExample, taskExample, liveExample] }, null, 2) + "\n", "utf8");
 console.log(`Wrote ${outFile}`);
 console.log(`  O2C: ${o2cLog.stats.cases} cases, ${o2cLog.stats.events} events, ${o2cLog.stats.variants} variants`);
 
@@ -498,6 +822,10 @@ for (const s of sampleLogs) {
   writeFileSync(join(miningDir, diskName), toCsv(s.headers, s.rows), "utf8");
   console.log(`  scenario "${s.scenario}": ${s.rows.length} rows → mining/${diskName}`);
 }
+writeFileSync(join(miningDir, prSampleLog.fileName), toCsv(prSampleLog.headers, prSampleLog.rows), "utf8");
+console.log(`  Purchase Requisition (3 teams) → mining/${prSampleLog.fileName}`);
+writeFileSync(join(miningDir, caSampleLog.fileName), toCsv(caSampleLog.headers, caSampleLog.rows), "utf8");
+console.log(`  Credit Application (rework) → mining/${caSampleLog.fileName}`);
 writeFileSync(join(miningDir, o2cSampleLog.fileName), toCsv(o2cSampleLog.headers, o2cSampleLog.rows), "utf8");
 console.log(`  O2C log → mining/${o2cSampleLog.fileName}`);
 

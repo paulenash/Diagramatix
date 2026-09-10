@@ -1299,34 +1299,118 @@ for a specific one.
 
 ## Phase 11 — The examples programme
 
-**Status:** `Not started` · Its own final phase, deliberately.
+**Status:** ✅ `Shipped` — T3948–T3981. Its own final phase, deliberately, and it behaved exactly as the
+Simulator's did: **building the examples is what found the defects.**
 
 The lesson from the Simulator's programme, which is worth carrying over verbatim: *the code teaches
 nothing on its own — every capability is reachable only by someone who already knows it is there.*
 Building one worked example there found **five shipped defects** nothing else had caught.
 
-**Reuse before authoring.**
-
 | | Example | Slug | Teaches | Phase |
 |---|---|---|---|---|
-| [ ] | *(extend)* Accounts Payable | `accounts-payable-invoice-lifecycle` | Its three period logs already show compliance decay — that **is** the comparison example | 8 |
-| [ ] | *(extend)* Order-to-Cash | `order-to-cash-lifecycle` | Add `Region` / `Order value` / `Channel` columns — cheaper and truer than a sixth near-duplicate | 4 |
-| [ ] | Handover-heavy log | `three-team-handover` | Work crossing three teams with a genuine ping-pong pair | 6 |
-| [ ] | Business-process rework | `credit-check-rework` | "Credit check" three times, labels nothing like a UI step — **the example that proves the widened trigger** | 6 |
-| [ ] | Live source with an alarm | *(extend)* `live-order-processing` | An alert that actually fires during the batch demo — the best demo in the feature | 9 |
+| [x] | *(extend)* Accounts Payable | `accounts-payable-invoice-lifecycle` | Its three period logs already show compliance decay — that **is** the comparison example | 9, 10 |
+| [x] | *(extend)* Order-to-Cash | `order-to-cash-lifecycle` | `Region` / `Channel` columns, both causal — cheaper and truer than a sixth near-duplicate | 5 |
+| [x] | Handover-heavy log | `three-team-handover` | Work crossing three teams with a genuine ping-pong pair | 7 |
+| [x] | Business-process rework | `credit-check-rework` | "Credit Check" three times, labels nothing like a UI step — **the example that proves the widened trigger** | 7 |
+| [ ] | Live source with an alarm | *(extend)* `live-order-processing` | **Declined — see below.** An alert that fires during a batch demo can only be fabricated | 10 |
+| [x] | **The cold start** | — | A first-time user got a bare file picker. Fixed first, as the plan said it should be | — |
 
-**The cold start is a bug, not an example.** A user opening the Miner on their own project gets a bare
-file picker: *"Load built-in example data"* renders only when a catalog example was adopted, and no
-sample log is served from `public/`. **Serving one CSV is the cheapest onboarding fix in the
-programme** and should not wait for this phase.
+### As built
 
-**No example carries a `twin` payload** despite the package format supporting one, and
-`live-order-processing` is the only example adopted as a **pre-created run** rather than a staged
-sample log — so it is the one whose baked `analytics` goes stale when Phase 1 changes the shape. The
-other four re-import at adopt time, which limits that risk considerably.
+**THE COLD START WAS WORSE THAN "NO SAMPLE DATA".** The *Load built-in example data* button renders on
+`builtInSample`, which is populated from a `sessionStorage` hand-off **the example gallery stashes on
+adopt**. So the button existed for precisely the people who did not need it — the ones who had already
+found the gallery — and a user opening DiagramatixMINER on their own project saw an upload control and
+nothing else. Ten phases went past it because nothing was broken: every screen behaved correctly, and
+the person it failed filed nothing and closed the tab. Fixed with one CSV served from
+`public/mining/sample-order-to-cash.csv` and a button rendered on the opposite condition. The tests
+resolve the ADVERTISED path on disk and mine what they find there, because a served path is a string
+and a string that has stopped pointing at anything still compiles, still renders and still looks right
+in a diff.
 
-Every new package must pass `validateMiningExamplePackage`; the 0.5 decision governs whether it is
-generated or authored.
+**THE COMPARE PANEL, WHICH THIS PHASE FORCED.** Phase 9 shipped `compareRuns` and the `series` route;
+Phase 10 shipped the alert rules. Both were reachable only by the cron and by curl — fully built,
+fully tested, and worth nothing to the person the product is for. The Accounts Payable row above could
+not be ticked without a screen, so one was built: **Insights → Compare**. It computes nothing. Every
+delta, refusal and alert is produced server-side by the same functions the cron uses, so the panel and
+the alert email cannot disagree about whether anything is wrong; T3961 forbids a call to any of them
+in the browser.
+
+Three decisions inside it worth recording:
+
+- **`?against=<runId>` compares two runs the analyst NAMED, with no lineage required.** The route
+  originally walked `parentRunId` only. But the commonest comparison anybody wants is last period
+  against this one, and two period imports of the same process have no link between them whatsoever —
+  requiring a snapshot chain would have meant the ordinary case had no answer. Older is always
+  *before*, whichever order they are asked for in: a comparison run backwards reports every
+  improvement as a regression and reads perfectly plausibly while doing so.
+- **The panel answers "what would be raised right now"** — the same evaluation the cron performs,
+  asked on demand. A watcher you cannot interrogate is one nobody trusts. It is a second CALLER of the
+  rules, never a second copy: `alertPointsFrom` was lifted out of the poll route so both go through
+  it, and T3959/T3960 fail if either route grows its own arithmetic or restates a threshold.
+- **Compare ignores the filter, and says so on the screen.** The other run was never sliced, and two
+  differently-sliced runs side by side is a table nobody can cite. The exactness chip is suppressed on
+  this tab for the same reason — wearing one would claim the figures describe the slice.
+
+**THE EXAMPLES WERE MEASURED, NOT ASSERTED.** Every claim in the four descriptions is pinned to a
+number the real detectors produce from the real log (T3965–T3981), because the failure mode here has
+no symptom: a synthetic log with a random resource column produces a hand-off map with no structure,
+and a map with no structure reads exactly like a process with no problem. Measuring found three things
+that had to change:
+
+1. **The rework example claimed 2.4× and measured 1.68×.** The mix was tuned — and the deeper cause
+   was that arrivals ran to month end, so the cases truncated in flight were the ones being checked
+   for the third time. A rework example truncated at month end UNDER-reports rework: the very figure
+   it exists to show is the one the truncation eats. Now 2.13×, and T3981 pins the quoted figure to
+   the measured one so the generator's mix can be tuned but not silently.
+2. **A hand-off example must have a happy path that does not bounce.** The first draft alternated
+   Procurement and Finance, which registers every case as ping-pong and makes the figure meaningless.
+   The shipped path visits Procurement → Finance → Legal → Procurement and never returns to a team it
+   has left, so the baseline is zero and a bounce is a finding. Finance ↔ Legal now bounces in 60 of
+   172 cases and nothing else does.
+3. **Column retention is opt-in, so the slicing columns had to be named at import.** Without
+   `attributeMode`, Order-to-Cash imports looking perfectly healthy with an empty filter bar. Kept:
+   `Region`, `Channel`. Deliberately not kept: `Customer` (a name — the example should not teach that
+   identifying columns are retained by default) and `Amount` (the filter matches exactly, and slicing
+   to orders of $4,812.37 is not a slice).
+
+Both new dimensions are **causal**, which is the whole difference between teaching the mechanic and
+teaching the move. The whole run shows a 34h wait before fulfilment; EMEA is 78h and the other two
+regions are 28h — the whole-run figure is the average of a problem and two non-problems. Partner
+orders carry 20 of the 23 credit-check bypasses, but not all of them: a dimension that splits the log
+perfectly makes the slice a tautology rather than a finding.
+
+**ACCOUNTS PAYABLE NEEDED NOTHING BUT A SCREEN.** Its three periods score **44% → 66% → 90.5%** against
+the bundled reference, overlap 0.73 (comfortably over the refusal floor), and eight deviations live in
+January 2025 are gone by January 2026. Mined in the other direction it fires *"Conformance fell from
+91% to 44%"* and *"8 deviations appeared that were not there before"* — **at the shipped thresholds,
+with nothing lowered for the demo** — and mined in the improving direction it correctly says nothing
+(T3979, because half of a watcher's credibility is what it stays quiet about).
+
+**THE LIVE-SOURCE ALARM IS DECLINED, WITH REASONS.** The row asked for an alert that fires during the
+six-batch demo. It cannot be had honestly. The silence alarm needs `SILENCE_HOURS` (48) of quiet; the
+conformance and late-rate alarms need a second observation, and the demo's batches all land within
+seconds of each other into a single run that carries no reference model and no SLA. Making one fire
+would mean fabricating a history the source never had, or bending a threshold for the demo — and an
+example that fires because a threshold was lowered teaches the reader something false about when they
+would actually be told. Accounts Payable now carries the alerting lesson under the real rules, which
+is the better home for it. What the live example DOES gain is the Compare tab's `not watched` list,
+which names precisely why nothing is being raised — and that is a more useful thing to show a
+newcomer than a manufactured alarm.
+
+**A TRAP THIS PHASE FOUND, and did not fix.** A run series is ordered by **when each run was mined**
+(`fitnessHistory` sorts on `createdAt`), not by the period its log covers. For a live source those two
+agree. For an analyst back-filling history — mining this quarter, then loading last year's export to
+see the trend — they do not, and the watcher will report *"conformance fell from 91% to 44%"* about a
+period that ended a year ago. The fix is to order on the log's own last event where the analytics
+carry one, falling back to `createdAt`; it is not made here because it changes the ordering Phases
+9–10 shipped and belongs with its own tests. **It is also what makes the AP demo work**: import the
+current month first, then the old one, and the alert fires, which is precisely what the example's
+description tells the reader to do.
+
+**Still open, recorded rather than rediscovered:** no example carries a `twin` payload despite the
+package format supporting one, and `live-order-processing` remains the only example adopted as a
+pre-created run rather than a staged sample log.
 
 ---
 

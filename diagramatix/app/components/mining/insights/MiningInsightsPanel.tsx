@@ -35,13 +35,14 @@ import { NextStepsPanel } from "./NextStepsPanel";
 import type { MinerAction } from "@/app/lib/mining/nextSteps";
 import { EMPTY_FILTER, type MiningFilter } from "@/app/lib/mining/filterAnalytics";
 import { ExpandedView } from "./ExpandedView";
+import { CompareTab } from "./CompareTab";
 import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
 
 const EXPAND_BTN = "ml-auto text-[11px] rounded px-2 py-0.5 bg-stone-800 text-amber-200 hover:bg-stone-700";
 
 interface RunLite { id: string; name?: string; discoveredBpmnId: string | null; discoveredSmId: string | null; studyId?: string | null }
 
-type TabKey = "tasks" | "activities" | "between" | "heat" | "teams" | "variants" | "cases" | "conformance" | "outcomes" | "export";
+type TabKey = "tasks" | "activities" | "between" | "heat" | "teams" | "variants" | "cases" | "conformance" | "outcomes" | "compare" | "export";
 const TASK_TAB: { key: TabKey; label: string } = { key: "tasks", label: "🤖 Automation" };
 const TABS: { key: TabKey; label: string }[] = [
   { key: "activities", label: "📋 Activities" },
@@ -52,6 +53,7 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: "cases", label: "🎞 Cases" },
   { key: "conformance", label: "⚖ Deviations" },
   { key: "outcomes", label: "🎯 Outcomes" },
+  { key: "compare", label: "📈 Compare" },
   { key: "export", label: "⬇ Export" },
 ];
 
@@ -61,6 +63,8 @@ const TABS: { key: TabKey; label: string }[] = [
 const TAB_SHAPE: Record<TabKey, "count" | "time"> = {
   tasks: "time", activities: "time", between: "time", heat: "time", teams: "time",
   variants: "count", cases: "count", conformance: "count", outcomes: "count", export: "count",
+  // Compare reads neither: it is always of whole runs, and says so itself.
+  compare: "count",
 };
 
 export function MiningInsightsPanel({ projectId, run, onCalibrate }: { projectId: string; run: RunLite; onCalibrate?: () => void }) {
@@ -144,7 +148,11 @@ export function MiningInsightsPanel({ projectId, run, onCalibrate }: { projectId
 
   // The chip beside the active tab: what THESE figures are entitled to claim.
   const exactness = TAB_SHAPE[tab] === "time" ? view.timeExactness : view.countExactness;
-  const chip = exactnessLabel(exactness);
+  // Compare ignores the filter deliberately — the OTHER run was never filtered,
+  // and two differently-sliced runs side by side is a table nobody can cite. So
+  // it must not wear a chip claiming these figures describe the slice; it
+  // carries its own line saying they describe the whole runs.
+  const chip = tab === "compare" ? null : exactnessLabel(exactness);
 
   return (
     <div className="mt-4 pt-3 border-t border-stone-700">
@@ -194,6 +202,13 @@ export function MiningInsightsPanel({ projectId, run, onCalibrate }: { projectId
       {tab === "cases" && <CasesTab analytics={view.analytics} variants={view.variants} bpmn={bpmn} hasBpmn={!!run.discoveredBpmnId} />}
       {tab === "conformance" && <ConformanceTab analytics={view.analytics} variants={view.variants} conformance={conformance} loading={loading} projectId={projectId} runId={run.id} onRecomputed={() => void load()} initialViolation={pendingViolation} />}
       {tab === "outcomes" && <OutcomesTab analytics={view.analytics} variants={view.variants} kpiConfig={kpiConfig} onSave={saveKpi} />}
+      {/* Compare takes NO analytics. Everything it shows is computed server-side
+          by the same functions the cron uses, so the panel and the alert email
+          cannot disagree — and so a comparison is never quietly of a slice.
+          The filter describes THIS run; the other run was never filtered, and
+          two differently-filtered runs put side by side is a table of numbers
+          nobody can cite. */}
+      {tab === "compare" && <CompareTab projectId={projectId} runId={run.id} />}
       {tab === "export" && <ExportTab projectId={projectId} runId={run.id} filter={filter} filterNote={view.description} hasAnalytics={!!analytics && analytics.activities.length > 0} />}
     </div>
   );
