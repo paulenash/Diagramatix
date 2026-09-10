@@ -37,7 +37,25 @@ async function main() {
       const existing = await prisma.riskControlLibrary.findFirst({ where: { orgId, name: O2C_SAMPLE.name }, select: { id: true } });
       if (existing) { skipped++; console.log(`  skip org ${orgId} (already has "${O2C_SAMPLE.name}")`); continue; }
 
-      await prisma.$transaction((tx) => createO2cLibrary(tx, { orgId }));
+      // TIMEOUT RAISED FROM PRISMA'S 5s DEFAULT, and this is a fix for a live
+      // failure rather than a precaution. On every prod deploy this threw:
+      //
+      //   Transaction API error: A query cannot be executed on an expired
+      //   transaction. The timeout for this transaction was 5000 ms, however
+      //   5413 ms passed since the start of the transaction.
+      //
+      // It rolled back cleanly, so nothing was half-written and nothing looked
+      // broken — which is why it went unnoticed: the Order-to-Cash sample GRC
+      // library has simply never existed on prod.
+      //
+      // The cause is round trips, not slowness. The library is written one row
+      // at a time — 38 items and their links, each its own query — and against
+      // prod latency that is comfortably past five seconds while being fine on
+      // a local socket. Raising the ceiling is the honest fix for a seed that
+      // runs once; the round-trip count is the thing to reduce if this ever
+      // grows (`createMany` with pre-generated ids), and it is noted here so
+      // the next person does not have to rediscover why 5s was not enough.
+      await prisma.$transaction((tx) => createO2cLibrary(tx, { orgId }), { timeout: 30_000, maxWait: 10_000 });
       created++;
       console.log(`  seeded "${O2C_SAMPLE.name}" (${O2C_SAMPLE.items.length} items, ${O2C_SAMPLE.links.length} links) into org ${orgId}`);
     }

@@ -26,6 +26,10 @@ export async function GET(_req: Request, { params }: Params) {
   return NextResponse.json({ teams });
 }
 
+/** The three orderings the engine implements. Anything else is ignored rather
+ *  than stored, so a typo cannot put a team into a state the pool has no branch
+ *  for. */
+const DISCIPLINES = new Set(["fifo", "priority", "shortest-first"]);
 /** POST /api/projects/[id]/simulation-teams { name, capacity?, costPerHour?, efficiency? } */
 export async function POST(req: Request, { params }: Params) {
   const session = await auth();
@@ -58,6 +62,8 @@ export async function POST(req: Request, { params }: Params) {
       capacity: clampInt(body.capacity, 1),
       costPerHour: typeof body.costPerHour === "number" ? body.costPerHour : null,
       efficiency: typeof body.efficiency === "number" && body.efficiency > 0 ? body.efficiency : 1,
+      discipline: typeof body.discipline === "string" && DISCIPLINES.has(body.discipline) && body.discipline !== "fifo" ? body.discipline : null,
+      preemptive: body.preemptive === true,
       calendarId: typeof body.calendarId === "string" && body.calendarId ? body.calendarId : null,
     },
   });

@@ -7,6 +7,10 @@ import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext
 
 type Params = { params: Promise<{ id: string; teamId: string }> };
 
+/** The three orderings the engine implements. Anything else is ignored rather
+ *  than stored, so a typo cannot put a team into a state the pool has no branch
+ *  for. */
+const DISCIPLINES = new Set(["fifo", "priority", "shortest-first"]);
 /** PUT /api/projects/[id]/simulation-teams/[teamId] — update name/capacity/etc. */
 export async function PUT(req: Request, { params }: Params) {
   const session = await auth();
@@ -44,6 +48,13 @@ export async function PUT(req: Request, { params }: Params) {
   if (body.capacity !== undefined) data.capacity = Math.max(1, Math.round(Number(body.capacity)) || 1);
   if (body.costPerHour !== undefined) data.costPerHour = body.costPerHour === null ? null : Number(body.costPerHour);
   if (body.efficiency !== undefined) data.efficiency = Number(body.efficiency) > 0 ? Number(body.efficiency) : 1;
+  // "fifo" is stored as NULL so the column keeps ONE meaning for "the default"
+  // rather than two values that behave identically.
+  if (body.discipline !== undefined) {
+    const d = typeof body.discipline === "string" ? body.discipline : "";
+    data.discipline = DISCIPLINES.has(d) && d !== "fifo" ? d : null;
+  }
+  if (body.preemptive !== undefined) data.preemptive = body.preemptive === true;
   if (body.calendarId !== undefined) data.calendarId = typeof body.calendarId === "string" && body.calendarId ? body.calendarId : null;
   const team = await prisma.simulationTeam.update({ where: { id: teamId }, data });
   return NextResponse.json({ team });

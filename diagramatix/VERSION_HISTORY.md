@@ -15,6 +15,47 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.10.2530 — 2026-09-10 — Two engine capabilities that had no door
+
+Queue discipline and preemption were both **shipped, tested, correct and
+unreachable**. `SimulationTeam` had no column for either, the API took no field,
+and the team editor showed no control — so the only ways to set them were a
+hand-built network or a BPSim import.
+
+That failure has one property that makes it hard to notice: **everything works.**
+The suite is green, the engine is right, and nothing anywhere reports a problem.
+The capability simply has no way in.
+
+- **Two columns** — `discipline` (`null` = first-come, so every existing team is
+  unchanged) and `preemptive`. `"fifo"` is stored as NULL rather than as a string,
+  so the column carries one meaning for "the default" instead of two values that
+  behave identically.
+- **Two controls** in the team library: a queue picker (*First-come* / *Urgent
+  first* / *Shortest first*) and an **interrupts** checkbox, disabled unless the
+  queue is *Urgent first*. Preemption is about who **stops**, and with no
+  priorities there is nobody to stop for — the control says so by being
+  unavailable rather than by being available and doing nothing.
+- **Three run routes** — run, sensitivity and sweep — now select the columns and
+  pass them to `assemble`. That was the hop most likely to fail quietly: a run
+  that never reads the column produces a perfectly good simulation of the wrong
+  queue.
+
+**Tested as a chain, not as an engine.** T4047–T4054 assert the setting survives
+every hop from the database to the resource pool, including the separate
+`assemble` path for a team the library does not know. Both halves were proved by
+planting an offender: stop selecting the column, or drop it on the unknown-team
+path, and a test goes red.
+
+Also in this release: **BPSim now carries cost** in both directions
+(`CostParameters/FixedCost` — standard, not an extension, so a priced model
+survives a trip through any conforming tool), and the **Order-to-Cash sample GRC
+library seed** stops timing out on deploy. That one had failed on *every*
+production deploy for months; it rolled back cleanly, so there was no error
+anywhere a person looks and the library simply never existed on prod.
+
+`SCHEMA_VERSION` stays **47** — a resource pool is not part of a diagram export.
+
+---
 ## 2.9.2517 — 2026-09-10 — DiagramatixMINER: the whole extensions programme
 
 The Miner stops being a study you commission and becomes a workbench that

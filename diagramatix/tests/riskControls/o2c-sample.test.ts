@@ -4,6 +4,7 @@
  * items, every kind present, and monitor signatures are well-formed.
  */
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
 import { O2C_SAMPLE, O2C_ATTACH } from "@/app/lib/riskControls/o2cSample";
 import { RISK_CONTROL_KINDS } from "@/app/lib/riskControls/types";
 import { validateRiskControlExamplePackage, summarizeRiskControlPackage, type RiskControlExamplePackage } from "@/app/lib/riskControls/examplePackage";
@@ -107,5 +108,28 @@ describe("Order-to-Cash sample GRC library", () => {
     expect(s.risks).toBe(10);
     expect(s.controls).toBe(11);
     expect(s.hasMining).toBe(false);
+  });
+});
+
+describe("the seed survives prod latency", () => {
+  it("T4041 - the O2C library is written inside a transaction with a RAISED timeout", () => {
+    // This failed on every production deploy and nobody noticed for months:
+    //
+    //   Transaction API error: ... timeout for this transaction was 5000 ms,
+    //   however 5413 ms passed since the start of the transaction.
+    //
+    // It rolled back cleanly, so there was no half-written library and no
+    // error anywhere a person looks — the sample GRC library simply never
+    // existed on prod. A silent, complete, repeatable no-op.
+    //
+    // The cause is round trips: 38 items and their links are written one query
+    // at a time, which is nothing on a local socket and past five seconds
+    // against a hosted database. Nothing about that is visible in development,
+    // which is why this is pinned in a test rather than left to be remembered.
+    const src = readFileSync("scripts/seed-risk-controls-o2c.ts", "utf8");
+    const call = src.split("\n").find((l) => l.includes("prisma.$transaction"));
+    expect(call, "the seed no longer wraps the library in a transaction").toBeTruthy();
+    expect(call, "the transaction is back on Prisma's 5s default and will fail on prod again")
+      .toMatch(/timeout:\s*\d/);
   });
 });

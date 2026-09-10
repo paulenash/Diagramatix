@@ -12,7 +12,15 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { MatrixButton } from "./matrix/MatrixChrome";
 import type { CalendarRow } from "./CalendarLibraryManager";
 
-interface Team { id: string; name: string; capacity: number; costPerHour: number | null; efficiency: number; calendarId: string | null }
+type Discipline = "fifo" | "priority" | "shortest-first";
+interface Team {
+  id: string; name: string; capacity: number; costPerHour: number | null; efficiency: number; calendarId: string | null;
+  /** null = fifo. Stored as NULL rather than the string so the column has one
+   *  meaning for "the default". */
+  discipline?: Discipline | null;
+  /** May this team interrupt work in progress for something more urgent? */
+  preemptive?: boolean;
+}
 
 /** An org-master team this project can adopt as its own copy. */
 interface OrgTeam {
@@ -134,6 +142,28 @@ export function TeamLibraryManager({
     });
   }
 
+  /**
+   * Queue discipline and preemption.
+   *
+   * The engine has supported both for a while and neither had anywhere to be
+   * stored, so they were reachable only from a hand-built network or a BPSim
+   * import — which is to say, not reachable. These two controls are the whole
+   * of what was missing.
+   */
+  async function setDiscipline(id: string, discipline: Discipline) {
+    setTeams((ts) => { const next = ts.map((t) => t.id === id ? { ...t, discipline: discipline === "fifo" ? null : discipline } : t); publish(next); return next; });
+    await fetch(`/api/projects/${projectId}/simulation-teams/${id}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ discipline }),
+    }).catch(() => {});
+  }
+
+  async function setPreemptive(id: string, preemptive: boolean) {
+    setTeams((ts) => { const next = ts.map((t) => t.id === id ? { ...t, preemptive } : t); publish(next); return next; });
+    await fetch(`/api/projects/${projectId}/simulation-teams/${id}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ preemptive }),
+    }).catch(() => {});
+  }
+
   async function setCalendar(id: string, calendarId: string | null) {
     setTeams((ts) => { const next = ts.map((t) => t.id === id ? { ...t, calendarId } : t); publish(next); return next; });
     if (!projectId) return;
@@ -218,6 +248,33 @@ export function TeamLibraryManager({
               <option value="">24/7</option>
               {calendars.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
+            <select
+              value={t.discipline ?? "fifo"}
+              onChange={(e) => setDiscipline(t.id, e.target.value as Discipline)}
+              title="Who this team serves next when it frees up. First-come is the default; Urgent first serves the highest-priority case waiting; Shortest first clears quick jobs before long ones."
+              className="w-28 shrink-0 bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-200 text-[10px] [color-scheme:dark]"
+            >
+              <option value="fifo">First-come</option>
+              <option value="priority">Urgent first</option>
+              <option value="shortest-first">Shortest first</option>
+            </select>
+            {/* Only meaningful alongside a priority queue: preemption is about
+                who STOPS, and without priorities there is nobody to stop for. */}
+            <label
+              className={`flex items-center gap-1 text-[10px] shrink-0 ${t.discipline === "priority" ? "text-green-300/80" : "text-green-400/30"}`}
+              title={t.discipline === "priority"
+                ? "An urgent case interrupts work already in progress, and the interrupted case RESUMES where it left off — it does not start again."
+                : "Set the queue to Urgent first to use this. Priority alone only decides who goes next, which does nothing while everyone is busy — exactly when an urgent case arrives."}
+            >
+              <input
+                type="checkbox"
+                className="accent-green-500"
+                checked={!!t.preemptive}
+                disabled={t.discipline !== "priority"}
+                onChange={(e) => setPreemptive(t.id, e.target.checked)}
+              />
+              interrupts
+            </label>
             <button onClick={() => remove(t.id)} className="text-red-400/70 hover:text-red-300 px-1" title="Delete">✕</button>
           </div>
         ))}

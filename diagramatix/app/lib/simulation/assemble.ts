@@ -24,7 +24,7 @@ import type { DiagramData, DiagramElement } from "@/app/lib/diagram/types";
 import { getSimParams, type LoopParams } from "@/app/lib/diagram/simParams";
 import type { SimNetwork, SimNode, SimEdge, SimTeam, NodeKind, Assignment, LoopSpec, EventSub, BoundaryEvent, EventChannel } from "./model";
 import type { SimDist, WorkCalendar } from "./types";
-import type { PoolUnit } from "./resourcePool";
+import type { QueueDiscipline, PoolUnit } from "./resourcePool";
 
 /** Resolvers for working calendars: team calendars keyed by team name (like
  *  teamCapacities), and a lookup from a source's calendarId → its WorkCalendar. */
@@ -51,6 +51,12 @@ export interface AssembleOpts extends CalendarOpts {
   teamUnits?: Record<string, PoolUnit[]>;
   /** Resource name → capacity, from the project's Resources library. */
   teamCapacities?: Record<string, number>;
+  /** How each team orders its queue — "fifo" | "priority" | "shortest-first".
+   *  Absent for a team = fifo, so a library that declares none behaves exactly
+   *  as it did before disciplines could be stored. */
+  teamDisciplines?: Record<string, QueueDiscipline>;
+  /** Which teams may interrupt work in progress for something more urgent. */
+  teamPreemptive?: Record<string, boolean>;
   /** Deny a pool to any resource the library does not declare, so only visible,
    *  adjustable resources can affect a run. The app sets this; tests and the
    *  BPSim interchange keep the permissive behaviour. */
@@ -420,6 +426,8 @@ export function assembleFromDiagram(
   const capIndex = resourceIndex(opts?.teamCapacities);
   const calIndex = resourceIndex(opts?.teamCalendars);
   const unitIndex = resourceIndex(opts?.teamUnits);
+  const discIndex = resourceIndex(opts?.teamDisciplines);
+  const preIndex = resourceIndex(opts?.teamPreemptive);
   // An EMPTY capacity map means the library isn't available — almost always
   // "not loaded yet" rather than "this project has no resources". Applying the
   // strict rule then would declare EVERY resource unknown and strip the lot,
@@ -446,14 +454,18 @@ export function assembleFromDiagram(
       canonical.set(id, id);
       const cal = calIndex.get(id.trim().toLowerCase())?.value;
       const us = unitIndex.get(id.trim().toLowerCase())?.value;
-      if (!teams.has(id)) teams.set(id, { id, capacity: 1, ...(cal ? { calendar: cal } : {}), ...(us?.length ? { units: us } : {}) });
+      const di = discIndex.get(id.trim().toLowerCase())?.value;
+      const pe = preIndex.get(id.trim().toLowerCase())?.value;
+      if (!teams.has(id)) teams.set(id, { id, capacity: 1, ...(cal ? { calendar: cal } : {}), ...(us?.length ? { units: us } : {}), ...(di ? { discipline: di } : {}), ...(pe ? { preemptive: true } : {}) });
       continue;
     }
     canonical.set(id, hit.key);
     if (!teams.has(hit.key)) {
       const cal = calIndex.get(hit.key.trim().toLowerCase())?.value;
       const us = unitIndex.get(hit.key.trim().toLowerCase())?.value;
-      teams.set(hit.key, { id: hit.key, capacity: hit.value, ...(cal ? { calendar: cal } : {}), ...(us?.length ? { units: us } : {}) });
+      const di = discIndex.get(hit.key.trim().toLowerCase())?.value;
+      const pe = preIndex.get(hit.key.trim().toLowerCase())?.value;
+      teams.set(hit.key, { id: hit.key, capacity: hit.value, ...(cal ? { calendar: cal } : {}), ...(us?.length ? { units: us } : {}), ...(di ? { discipline: di } : {}), ...(pe ? { preemptive: true } : {}) });
     }
   }
   // Point every activity at the canonical resource — or at nothing when strict

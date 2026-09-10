@@ -68,6 +68,16 @@ function elementXml(ref: string, p: BpsimElementParams, unit: ClockUnit, indent:
   if (p.condition) ctrl.push(`<${NS}:Condition><${NS}:ExpressionParameter value="${esc(p.condition)}"/></${NS}:Condition>`);
   if (ctrl.length) L.push(`<${NS}:ControlParameters>${ctrl.join("")}</${NS}:ControlParameters>`);
 
+  // CostParameters. Emitted before ResourceParameters to match the order the
+  // BPSim schema declares them in — a sequence, so order is not cosmetic.
+  // A zero is treated as UNPRICED, exactly as the engine treats it (see
+  // SimNode.fixedCost). Emitting <FixedCost value="0"/> would tell a receiving
+  // tool the step is free, which is a stronger claim than never having priced
+  // it — and it would disagree with the engine that produced the numbers.
+  if (p.fixedCost !== undefined && p.fixedCost > 0) {
+    L.push(`<${NS}:CostParameters><${NS}:FixedCost><${NS}:FloatingParameter value="${p.fixedCost}"/></${NS}:FixedCost></${NS}:CostParameters>`);
+  }
+
   const res: string[] = [];
   if (p.quantity !== undefined) res.push(`<${NS}:Quantity><${NS}:NumericParameter value="${p.quantity}"/></${NS}:Quantity>`);
   if (p.selection) res.push(`<${NS}:Selection><${NS}:ExpressionParameter value="${esc(p.selection)}"/></${NS}:Selection>`);

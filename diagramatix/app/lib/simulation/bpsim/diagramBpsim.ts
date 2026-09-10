@@ -49,6 +49,9 @@ export function diagramToBpsimScenario(data: DiagramData, opts: DiagramBpsimOpts
       if (sim.cycleTime) p.processingTime = sim.cycleTime;
       if (sim.waitTime) p.waitTime = sim.waitTime;
       if (sim.setupTime) p.setupTime = sim.setupTime;
+      // Only when it is actually priced. Emitting a zero would tell a receiving
+      // tool the work is free, which is a different claim from not saying.
+      if (typeof sim.fixedCost === "number" && sim.fixedCost > 0) p.fixedCost = sim.fixedCost;
       if (sim.teamId) p.selection = `getResource('${sim.teamId}'${sim.resourceUnits && sim.resourceUnits !== 1 ? `, ${sim.resourceUnits}` : ""})`;
       if (sim.requiredSkills?.length) p.requiredSkills = [...sim.requiredSkills];
       if (sim.assign?.length) {

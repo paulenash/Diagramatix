@@ -121,7 +121,7 @@ export async function POST(req: Request, { params }: Params) {
     .map((rid) => { const d = byId.get(rid); return d ? { id: rid, data: spliceLinkedSubprocesses(d, rid, byId) } : null; })
     .filter((x): x is { id: string; data: DiagramData } => x !== null);
 
-  const teams = await prisma.simulationTeam.findMany({ where: { projectId: id }, select: { name: true, capacity: true, costPerHour: true, calendarId: true, members: true } });
+  const teams = await prisma.simulationTeam.findMany({ where: { projectId: id }, select: { name: true, capacity: true, costPerHour: true, calendarId: true, members: true, discipline: true, preemptive: true } });
   const teamCapacities = Object.fromEntries(teams.map((t) => [t.name, t.capacity]));
   // Named people and their skills, when the team declares any. A team with no
   // members stays a counted pool, exactly as before skills existed.
@@ -132,6 +132,15 @@ export async function POST(req: Request, { params }: Params) {
       .filter((m) => typeof m?.name === "string" && m.name.trim())
       .map((m) => ({ id: m.name!.trim(), name: m.name!.trim(), skills: Array.isArray(m.skills) ? m.skills.filter((x) => typeof x === "string") : [] }));
     if (units.length) teamUnits[t.name] = units;
+  }
+  // How each team orders its queue, and whether it may interrupt work in
+  // progress. Both were engine capabilities with nowhere to store them, so they
+  // were reachable only from a hand-built network or a BPSim import.
+  const teamDisciplines: Record<string, "fifo" | "priority" | "shortest-first"> = {};
+  const teamPreemptive: Record<string, boolean> = {};
+  for (const t of teams) {
+    if (t.discipline === "priority" || t.discipline === "shortest-first") teamDisciplines[t.name] = t.discipline;
+    if (t.preemptive) teamPreemptive[t.name] = true;
   }
   const teamCosts = Object.fromEntries(teams.filter((t) => t.costPerHour != null).map((t) => [t.name, t.costPerHour as number]));
   const calendars = await prisma.simulationCalendar.findMany({ where: { projectId: id }, select: { id: true, pattern: true } });
@@ -145,7 +154,7 @@ export async function POST(req: Request, { params }: Params) {
   const cfg: ScenarioRunConfig = { ...rawCfg, ...sweepCfg };
 
   const baseOverrides = (scenario.overrides ?? {}) as unknown as OverrideSet;
-  const baseline = assemblePortfolio(rootDiagrams, { teamCapacities, strictTeams: true, teamCalendars, calendarsById, teamUnits });
+  const baseline = assemblePortfolio(rootDiagrams, { teamCapacities, strictTeams: true, teamCalendars, calendarsById, teamUnits, teamDisciplines, teamPreemptive });
   const stepsToRun = buildSweep(lever, from, to, steps);
 
   try {

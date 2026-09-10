@@ -34,6 +34,7 @@ export function applyBpsimToDiagram(
       if (p.processingTime) patch.cycleTime = p.processingTime;
       if (p.waitTime) patch.waitTime = p.waitTime;
       if (p.setupTime) patch.setupTime = p.setupTime;
+      if (typeof p.fixedCost === "number") patch.fixedCost = p.fixedCost;
       if (p.interArrival) patch.arrival = p.interArrival;
       // ResourceParameters Selection → getResource('team', units)
       if (p.selection) {

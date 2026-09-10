@@ -38,6 +38,16 @@ export interface BpsimElementParams {
   interArrival?: SimDist;   // InterTriggerTimer
   probability?: number;     // Probability / FloatingParameter (on a sequence flow)
   condition?: string;       // Condition / ExpressionParameter
+  // CostParameters
+  /**
+   * Cost incurred each time this element runs, independent of duration —
+   * BPSim's `FixedCost`. A bureau check, a courier, a card-scheme fee.
+   *
+   * Standard BPSim, unlike the skills extension below: `CostParameters` is part
+   * of the specification, so a priced model survives a round trip through any
+   * conforming tool rather than only through ours.
+   */
+  fixedCost?: number;
   // ResourceParameters
   quantity?: number;        // Quantity / NumericParameter (staffed capacity)
   /**

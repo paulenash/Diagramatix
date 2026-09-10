@@ -155,6 +155,18 @@ function parseElementParams(inner: string, unit: ClockUnit): BpsimElementParams 
     if (cond) { const e = exprValue(cond); if (e) p.condition = e; }
   }
 
+  const cost = blocks(inner, "CostParameters")[0]?.inner;
+  if (cost) {
+    const fixed = blocks(cost, "FixedCost")[0]?.inner;
+    if (fixed) {
+      // A FloatingParameter in the spec, but tools differ, so a NumericParameter
+      // is accepted too rather than dropping a price on a technicality.
+      const fp = firstTagAttrs(fixed, "FloatingParameter") ?? firstTagAttrs(fixed, "NumericParameter");
+      const v = fp ? num(attr(fp, "value")) : undefined;
+      if (v !== undefined) p.fixedCost = v;
+    }
+  }
+
   const res = blocks(inner, "ResourceParameters")[0]?.inner;
   if (res) {
     const qty = blocks(res, "Quantity")[0]?.inner;

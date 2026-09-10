@@ -83,7 +83,7 @@ export async function POST(req: Request, { params }: Params) {
 
   const teams = await prisma.simulationTeam.findMany({
     where: { projectId: id },
-    select: { name: true, capacity: true, costPerHour: true, calendarId: true, members: true },
+    select: { name: true, capacity: true, costPerHour: true, calendarId: true, members: true, discipline: true, preemptive: true },
   });
   const teamCapacities = Object.fromEntries(teams.map((t) => [t.name, t.capacity]));
   const teamCosts = Object.fromEntries(teams.filter((t) => t.costPerHour != null).map((t) => [t.name, t.costPerHour as number]));
@@ -95,13 +95,22 @@ export async function POST(req: Request, { params }: Params) {
       .map((m) => ({ id: m.name!.trim(), name: m.name!.trim(), skills: Array.isArray(m.skills) ? m.skills.filter((x) => typeof x === "string") : [] }));
     if (units.length) teamUnits[t.name] = units;
   }
+  // How each team orders its queue, and whether it may interrupt work in
+  // progress. Both were engine capabilities with nowhere to store them, so they
+  // were reachable only from a hand-built network or a BPSim import.
+  const teamDisciplines: Record<string, "fifo" | "priority" | "shortest-first"> = {};
+  const teamPreemptive: Record<string, boolean> = {};
+  for (const t of teams) {
+    if (t.discipline === "priority" || t.discipline === "shortest-first") teamDisciplines[t.name] = t.discipline;
+    if (t.preemptive) teamPreemptive[t.name] = true;
+  }
   const calendars = await prisma.simulationCalendar.findMany({ where: { projectId: id }, select: { id: true, pattern: true } });
   const calendarsById = Object.fromEntries(calendars.map((c) => [c.id, (c.pattern ?? { intervals: [] }) as unknown as WorkCalendar]));
   const teamCalendars: Record<string, WorkCalendar> = {};
   for (const t of teams) if (t.calendarId && calendarsById[t.calendarId]) teamCalendars[t.name] = calendarsById[t.calendarId];
 
   const baseOverrides = (scenario.overrides ?? {}) as unknown as OverrideSet;
-  const assembled = assemblePortfolio(rootDiagrams, { teamCapacities, strictTeams: true, teamCalendars, calendarsById, teamUnits });
+  const assembled = assemblePortfolio(rootDiagrams, { teamCapacities, strictTeams: true, teamCalendars, calendarsById, teamUnits, teamDisciplines, teamPreemptive });
   // Enumerate from the network the scenario ACTUALLY runs, overrides included —
   // otherwise the baselines shown would not be the ones being perturbed.
   const scenarioNet = applyOverrides(assembled, baseOverrides);

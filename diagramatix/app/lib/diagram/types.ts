@@ -1325,8 +1325,16 @@ export const SCHEMA_VERSION = "47";
  *   An OPERATIONAL column: the curated diagram-model DDL in ddlGenerate.ts is
  *   unaffected, and the XSD export shape is unchanged (a run is not part of a
  *   diagram export).
+ *
+ * 2.10 — SimulationTeam.discipline + .preemptive. Two OPERATIONAL columns, and
+ *   the reason they exist is worth recording: the engine had supported queue
+ *   discipline and preempt-resume for some time with nowhere to store either,
+ *   so both were reachable only from a hand-built network or a BPSim import.
+ *   The capability was shipped, tested, correct — and had no door.
+ *   The XSD export shape is unchanged (a resource pool is not part of a diagram
+ *   export), so SCHEMA_VERSION stays at 47.
  */
-export const PRODUCT_VERSION = "2.9";
+export const PRODUCT_VERSION = "2.10";
 
 /**
  * The structural (XSD) schema version of an export, as a single integer, tolerant of BOTH the

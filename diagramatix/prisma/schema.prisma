@@ -1506,6 +1506,18 @@ model SimulationTeam {
   capacity     Int      @default(1)
   costPerHour  Float?
   efficiency   Float    @default(1.0)
+  // How this team's queue is ordered: "fifo" | "priority" | "shortest-first".
+  // NULL = fifo, which is what every team did before disciplines existed.
+  //
+  // The engine has supported this since queue disciplines shipped and there was
+  // nowhere to store it, so it was reachable only from a hand-built network or a
+  // BPSim import. A capability nobody can reach is not shipped.
+  discipline   String?
+  // May this team interrupt work in progress for something more urgent?
+  // Priority alone decides who goes NEXT, which is powerless while every person
+  // is busy — exactly when an urgent case arrives. Preempt-RESUME: the
+  // interrupted case keeps the work already done.
+  preemptive   Boolean  @default(false)
   calendar     Json     @default("{}")
   // Working hours: id of the SimulationCalendar this team follows (a plain id
   // reference, not an FK, so a deleted calendar just falls back to always-open).
