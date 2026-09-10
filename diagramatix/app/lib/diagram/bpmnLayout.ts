@@ -546,7 +546,14 @@ function snapBoundaryEventToRim(
  * it happens, which is the only time anyone can act on it.
  */
 export interface LayoutDiagnostic {
-  kind: "recovered-reference" | "unresolved-reference" | "empty-subprocess" | "unplaced" | "no-sequence-flow" | "unreachable-event" | "message-within-pool" | "duplicate-label";
+  kind:
+    | "recovered-reference" | "unresolved-reference" | "empty-subprocess" | "unplaced"
+    | "no-sequence-flow" | "unreachable-event" | "message-within-pool" | "duplicate-label"
+    // EPC (layoutEpc.ts). An AI plan never passes through canConnect, so the
+    // rules the editor VETOES while you draw have to be reported here instead.
+    | "epc-alternation" | "epc-event-decides" | "epc-connector-both-ways"
+    | "epc-not-event-bounded" | "epc-unbalanced-connector" | "epc-multiple-org"
+    | "epc-assignment-not-on-function";
   elementId: string;
   label: string;
   field?: string;

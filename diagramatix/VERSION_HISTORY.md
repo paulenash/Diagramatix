@@ -15,6 +15,75 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.10.2531 — 2026-09-11 — EPC: the notation, and the rules that make one correct
+
+The **Event-driven Process Chain** — ARIS's signature notation, and one of the
+last three things in the "where ARIS wins" column. Ten symbols, three kinds of
+arc, vertical ARIS-style layout, and AI generation on the same two-phase path as
+BPMN and Flowchart: plan first, edit the plan, then a deterministic layout with
+**no model call in phase 2**.
+
+The commercial point is not the notation. It is the migration path — *import
+your ARIS models and convert them to BPMN* — and Convert to BPMN is the next
+slice. This one is what it needs underneath.
+
+### The rules are the product
+
+An EPC is defined by what may follow what, and the value of a converter comes
+entirely from getting that right. Seven rules, enforced in two places because
+there are two ways in:
+
+- **Drawing.** `canConnect` vetoes them, so the editor will not let you make the
+  mistake (shipped with the type itself).
+- **Generating.** An AI plan never passes through `canConnect` — the layout
+  builds the arcs itself — so every one of those rules is unenforced on the
+  generated path unless the layout checks it too. `layoutEpcDiagram` is the last
+  place an invalid EPC can be noticed before it looks like a clean success, and
+  it **reports rather than repairs**. Inserting the missing event between two
+  functions would produce a valid-looking chain containing a state nobody
+  described, which is worse than a chain that says which two steps are wrong.
+
+The rule worth naming is **E3: an event may not decide.** An event is passive —
+it records that something is now true — so an XOR or OR split must be preceded
+by a *function*. An AND split after an event is fine, because it is not a
+choice. It is the rule most implementations miss.
+
+**Two more rules are gone rather than enforced.** A function declares its
+responsible party, its data and its systems as ATTRIBUTES, and the layout draws
+the boxes. So "assignments attach to functions only" and "one responsible org
+unit" are not checks that can fail — there is nowhere in the plan to express
+the violation. A hand-built or imported plan can still carry them as real
+elements, and that path is checked.
+
+### Two defects the work turned up
+
+- **A rework loop laid out upside down.** Longest-path ranking counts a
+  loop-back as forward progress, so the relaxation pushed the loop's head down
+  a rank at a time until the iteration cap and the function landed *below* the
+  branch that returns to it, arcs snaking around the whole chain. Back edges are
+  now excluded from ranking — they remain real arcs, and still count for every
+  rule check; they just do not decide which row something sits in. A rework loop
+  is the most common thing an EPC draws.
+- **No EPC shape deflected a route.** `routing.ts` decides obstacles by element
+  type, and no `epc-*` type was in that list — so a loop-back drew straight
+  through every box it passed. The spine is now solid; the three connectors are
+  excluded because they sit ON the flow like intermediate events, and the
+  assignment boxes for the same reason Data Objects are (2026-06-10).
+
+### One list instead of two booleans
+
+Which types use the Plan panel, and which of them have a flat plan, were a pair
+of two-way booleans in two files. Two branches read as a choice; three read as a
+list someone forgot to write down. `app/lib/ai/planTypes.ts` is that list, and
+the second boolean was worse than it looked: `isFlowchart` was never asking "is
+this a flowchart" — it was asking "is this plan flat?" and answering it by
+naming the only flat type there was.
+
+`SCHEMA_VERSION` is **47**, bumped when the type was registered: `DiagramTypeEnum`,
+`SymbolTypeEnum` and `ConnectorTypeEnum` are all enumerated in the export XSD, so
+eleven new members changed the export shape.
+
+---
 ## 2.10.2530 — 2026-09-10 — Two engine capabilities that had no door
 
 Queue discipline and preemption were both **shipped, tested, correct and

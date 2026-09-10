@@ -22,15 +22,16 @@ import { prisma } from "@/app/lib/db";
 import { AiPlanSchema } from "@/app/lib/ai/planSchema";
 import { buildSystemPrompt as buildBpmnSystemPrompt } from "@/app/lib/ai/planBpmn";
 import { buildFlowchartSystemPrompt } from "@/app/lib/ai/planFlowchart";
+import { buildEpcSystemPrompt } from "@/app/lib/ai/planEpc";
 import {
   buildGenericSystemPrompt,
   DIAGRAM_PROMPTS,
 } from "@/app/lib/ai/generateDiagramPrompt";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
 
-// BPMN and Flowchart use their own dedicated two-phase planners (planBpmn /
-// planFlowchart); every other type uses the shared generic prompt builder.
-const SUPPORTED_TYPES = ["bpmn", "flowchart", ...Object.keys(DIAGRAM_PROMPTS)] as const;
+// BPMN, Flowchart and EPC use their own dedicated two-phase planners (planBpmn
+// / planFlowchart / planEpc); every other type uses the shared generic builder.
+const SUPPORTED_TYPES = ["bpmn", "flowchart", "epc", ...Object.keys(DIAGRAM_PROMPTS)] as const;
 type SupportedType = (typeof SUPPORTED_TYPES)[number];
 
 function isSupported(t: string | null): t is SupportedType {
@@ -64,6 +65,7 @@ export async function GET(req: Request) {
   const buildFor = (rulesArg: string) =>
     diagramType === "bpmn" ? buildBpmnSystemPrompt(rulesArg)
     : diagramType === "flowchart" ? buildFlowchartSystemPrompt(rulesArg)
+    : diagramType === "epc" ? buildEpcSystemPrompt(rulesArg)
     : buildGenericSystemPrompt(diagramType, rulesArg);
   const assembledPrompt = buildFor(aiRules);
   const promptTemplate = buildFor("");

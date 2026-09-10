@@ -4,6 +4,8 @@
  * invocation point has a friendly label + a unique value.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 
 let created: Record<string, unknown>[] = [];
 let diagCreated: Record<string, unknown>[] = [];
@@ -112,11 +114,11 @@ describe("aiTelemetry", () => {
     expect(created[0].userId).toBeNull();
   });
 
-  it("T1094 — AI_USER_METERED_POINTS = the 13 quota-metered routes; AI Tidy/Vectorize/Compare excluded", () => {
+  it("T1094 — AI_USER_METERED_POINTS = the 14 quota-metered routes; AI Tidy/Vectorize/Compare excluded", () => {
     // These MUST match the routes that call recordUsage(userId, "aiAttempts").
     const expected = new Set([
       AI_INVOCATION_POINTS.BpmnPlan, AI_INVOCATION_POINTS.BpmnGenerate, AI_INVOCATION_POINTS.BpmnRefine,
-      AI_INVOCATION_POINTS.FlowchartPlan, AI_INVOCATION_POINTS.FlowchartToBpmnRefine,
+      AI_INVOCATION_POINTS.FlowchartPlan, AI_INVOCATION_POINTS.EpcPlan, AI_INVOCATION_POINTS.FlowchartToBpmnRefine,
       AI_INVOCATION_POINTS.DiagramGenerate, AI_INVOCATION_POINTS.StaffNarrative, AI_INVOCATION_POINTS.GenerateSop,
       AI_INVOCATION_POINTS.ProcessDiff,
       AI_INVOCATION_POINTS.MiningDiscover, AI_INVOCATION_POINTS.MiningDiscoverSm, AI_INVOCATION_POINTS.MiningExplain,
@@ -129,6 +131,43 @@ describe("aiTelemetry", () => {
     for (const p of [AI_INVOCATION_POINTS.DictationRefine, AI_INVOCATION_POINTS.IconVectorize, AI_INVOCATION_POINTS.BpmnCompare, AI_INVOCATION_POINTS.ScriptModelCompare, AI_INVOCATION_POINTS.ScriptConformanceReport]) {
       expect(AI_USER_METERED_POINTS.has(p), `${p} must not be metered`).toBe(false);
     }
+  });
+
+  it("T4077 — the metered set is what the ROUTES actually meter", () => {
+    // T1094 above is a hand-written list, and a hand-written list of what the
+    // code does goes stale in silence — EPC was metered by its route and absent
+    // from the set for exactly as long as it took the suite to notice.
+    //
+    // So this one is DERIVED: walk the routes, pair each invocation point with
+    // whether that file calls recordUsage(..., "aiAttempts"), and compare. A new
+    // metered route is then in the set or the test is red; there is no third
+    // outcome.
+    const walk = (rel: string): string[] => {
+      const out: string[] = [];
+      for (const name of readdirSync(join(process.cwd(), rel))) {
+        const r = `${rel}/${name}`;
+        if (statSync(join(process.cwd(), r)).isDirectory()) out.push(...walk(r));
+        else if (name === "route.ts") out.push(r);
+      }
+      return out;
+    };
+
+    const METERS = /recordUsage\([^)]*"aiAttempts"/;
+    const meteredInCode = new Set<string>();
+    for (const rel of walk("app/api")) {
+      const src = readFileSync(join(process.cwd(), rel), "utf8");
+      if (!METERS.test(src)) continue;
+      for (const m of src.matchAll(/AI_INVOCATION_POINTS\.([A-Za-z]+)/g)) {
+        const value = (AI_INVOCATION_POINTS as Record<string, string>)[m[1]];
+        if (value) meteredInCode.add(value);
+      }
+    }
+    // The partner API meters from a worker rather than a route handler, so it is
+    // named here explicitly — the alternative is a scan broad enough to sweep up
+    // helpers that merely mention a point.
+    meteredInCode.add(AI_INVOCATION_POINTS.PartnerProcessMap);
+
+    expect([...meteredInCode].sort()).toEqual([...AI_USER_METERED_POINTS].sort());
   });
 
   it("T1095 — recordDiagramGenerated writes a row and never throws", async () => {

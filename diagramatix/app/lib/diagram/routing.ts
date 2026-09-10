@@ -599,6 +599,13 @@ const SEQ_OBSTACLE_TYPES = new Set<string>([
   // ArchiMate elements are obstacles for archi-* relationship routing (rule
   // A4.07). Only present in archimate diagrams, so never affects BPMN routing.
   "archimate-shape",
+  // EPC: the SPINE is solid — control flow may not run through an event or a
+  // function. The three connectors are excluded because they sit ON the flow,
+  // exactly as intermediate events do. Org units, positions, information
+  // objects and application systems are excluded for the same reason Data
+  // Objects are (Paul, 2026-06-10): they are assignments beside the chain, and
+  // an arc may pass one without detouring.
+  "epc-event", "epc-function", "epc-interface",
 ]);
 
 function buildOrthogonalPath(

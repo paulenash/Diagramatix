@@ -37,19 +37,24 @@ describe("layout diagnostics reach the editor", () => {
   for (const route of [
     "app/api/ai/generate-bpmn/route.ts",
     "app/api/ai/bpmn/apply-layout/route.ts",
+    "app/api/ai/epc/apply-layout/route.ts",
   ]) {
     it(`T2940 — ${route} collects and returns them`, () => {
       const src = read(route);
-      expect(src, "must pass onDiagnostic into layoutBpmnDiagram").toMatch(/onDiagnostic:/);
+      expect(src, "must pass onDiagnostic into the layout").toMatch(/onDiagnostic:/);
       expect(src, "must return them to the caller").toMatch(/\bdiagnostics,/);
     });
   }
 
-  it("T2941 — every route that lays out a BPMN diagram passes onDiagnostic", () => {
-    // The real guard: a third generate route added later must not silently drop
-    // them. Only routes that CALL layoutBpmnDiagram are in scope.
+  it("T2941 — every route that lays out a diagram passes onDiagnostic", () => {
+    // The real guard: a generate route added later must not silently drop them.
+    // Every layout engine that ACCEPTS onDiagnostic is in scope. EPC joined the
+    // list when it shipped, and it is the type that needs this most: an AI plan
+    // never passes through canConnect, so the rules the editor vetoes while you
+    // draw can only be caught by the layout reporting them.
+    const LAYOUTS = /(layoutBpmnDiagram|layoutEpcDiagram)\s*\(/;
     const offenders = routesUnder("app/api")
-      .filter((r) => /layoutBpmnDiagram\s*\(/.test(read(r)))
+      .filter((r) => LAYOUTS.test(read(r)))
       .filter((r) => !/onDiagnostic/.test(read(r)));
     expect(
       offenders,

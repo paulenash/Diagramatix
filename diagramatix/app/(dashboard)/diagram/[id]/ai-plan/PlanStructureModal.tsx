@@ -21,7 +21,7 @@ import { useDiagramTypeStyles } from "@/app/hooks/useDiagramTypeStyles";
 interface Props {
   plan: Plan;
   diagramType: string;
-  isFlowchart?: boolean;
+  flatPlan?: boolean;
   applying?: boolean;
   updateElement: (id: string, patch: Partial<AiElement>) => void;
   deleteElement: (id: string) => void;
@@ -46,7 +46,7 @@ function Panel({ title, accent, hint, children }: { title: string; accent: strin
 }
 
 export function PlanStructureModal(props: Props) {
-  const { plan, diagramType, isFlowchart, applying, updateElement, deleteElement, updateConnection, deleteConnection, moveElementRelativeTo, setPlan, onApply, onClose } = props;
+  const { plan, diagramType, flatPlan, applying, updateElement, deleteElement, updateConnection, deleteConnection, moveElementRelativeTo, setPlan, onApply, onClose } = props;
   const getTypeStyle = useDiagramTypeStyles();
   const accent = getTypeStyle(diagramType)?.bgColor || "#93c5fd";
 
@@ -91,7 +91,7 @@ export function PlanStructureModal(props: Props) {
 
       {/* Columns */}
       <main className="relative flex-1 min-h-0 p-4 grid gap-4 grid-cols-1 lg:grid-cols-4 overflow-auto">
-        {!isFlowchart && (
+        {!flatPlan && (
           <Panel title="Pools / Lanes" accent={accent} hint="drag ⋮⋮ to reorder">
             <PoolsLanesTree
               elements={plan.elements}
@@ -102,7 +102,7 @@ export function PlanStructureModal(props: Props) {
             />
           </Panel>
         )}
-        {!isFlowchart && (
+        {!flatPlan && (
           <Panel title="Elements" accent={accent} hint="badge: green=to · orange=from">
             <ElementsByContainerView
               elements={plan.elements}
@@ -116,7 +116,7 @@ export function PlanStructureModal(props: Props) {
             />
           </Panel>
         )}
-        {!isFlowchart && (
+        {!flatPlan && (
           <Panel title="Connectors" accent={accent} hint="green=seq · blue=msg · purple=assoc">
             <ConnectorsByTypeView
               elements={plan.elements}

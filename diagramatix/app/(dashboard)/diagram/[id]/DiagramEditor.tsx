@@ -22,6 +22,7 @@ import {
 } from "@/app/lib/diagram/types";
 import { mergeDiagram, type MergeConflict } from "@/app/lib/diagram/mergeDiagram";
 import { AI_PROMPT_ANNOTATION_ID, buildPromptAnnotation, contentBBox, stripPromptAnnotations, stripPromptAnnotationConnectors } from "@/app/lib/ai/promptAnnotation";
+import { usesPlanFlow } from "@/app/lib/ai/planTypes";
 import { useAllowedModels } from "./ModelSelect";
 import { BW_SYMBOL_COLORS, DEFAULT_SYMBOL_COLORS, type SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { setCurrentDiagramName } from "@/app/lib/help/currentDiagram";
@@ -1428,7 +1429,8 @@ export function DiagramEditor({
   const [clearSimMsg, setClearSimMsg] = useState<string | null>(null);
   // BPMN and Standard Flowchart both use the 2-phase Plan panel (plan → edit →
   // apply deterministic layout). Other types use the legacy one-shot AI panel.
-  const usesPlanPanel = diagramType === "bpmn" || diagramType === "flowchart";
+  // Registry, not a chain of ||: see app/lib/ai/planTypes.ts.
+  const usesPlanPanel = usesPlanFlow(diagramType);
   // Regenerate prefill: when the user hits "Regenerate" in Diagram Properties we
   // open the AI/Plan panel with the linked prompt's CURRENT text + a chosen model.
   /**

@@ -62,7 +62,7 @@ step("installing tsx once", "npm install --global tsx@4");
 // registerUser's `subscriptionLevelId: "free"` references).
 step("applying schema to diagramatix_test", `npx prisma db push --accept-data-loss --url "${env.DATABASE_URL}"`);
 step("seeding subscription levels", "tsx scripts/seed-subscriptions.ts");
-// The DiagramatixMINER Examples gallery needs its catalog, like subscriptions.
+// The Diagramatix Miner Examples gallery needs its catalog, like subscriptions.
 step("seeding mining example catalog", "tsx scripts/seed-mining-examples.ts");
 // A known SuperAdmin account so the admin-surface specs can sign in (test DB only).
 step("seeding e2e superadmin (test DB only)", "tsx scripts/e2e-seed-superadmin.ts");

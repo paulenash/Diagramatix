@@ -33,6 +33,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   "process-context": "Process Context",
   archimate: "ArchiMate",
   flowchart: "Standard Flowchart",
+  epc: "EPC (Event-driven Process Chain)",
   // "staff-narrative" is not a diagram-type rule but the editable
   // briefing the Staff Narrative prompt generator sends to Claude as
   // its system prompt. Lives in the same editor so admins can tune
@@ -53,7 +54,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   "md-prompt-archimate": "Repository Prompt — ArchiMate",
 };
 
-const CATEGORY_ORDER = ["general", "bpmn", "state-machine", "value-chain", "domain", "context", "process-context", "archimate", "flowchart", "staff-narrative", "assist", "md-prompt-bpmn", "md-prompt-value-chain", "md-prompt-context", "md-prompt-process-context", "md-prompt-archimate"];
+const CATEGORY_ORDER = ["general", "bpmn", "state-machine", "value-chain", "domain", "context", "process-context", "archimate", "flowchart", "epc", "staff-narrative", "assist", "md-prompt-bpmn", "md-prompt-value-chain", "md-prompt-context", "md-prompt-process-context", "md-prompt-archimate"];
 
 interface ClassifiedLine {
   index: number;       // original line index

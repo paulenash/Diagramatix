@@ -20,6 +20,7 @@ import type { Connector, DiagramData, DiagramElement, AiApplyMeta } from "@/app/
 import { ModelSelect, type AllowedModel } from "./ModelSelect";
 import { buildPromptFromDiagram } from "@/app/lib/diagram/prompt-from-diagram";
 import type { DiagramType } from "@/app/lib/diagram/types";
+import { planTypeConfig } from "@/app/lib/ai/planTypes";
 import { usePlanState, type Plan } from "./ai-plan/usePlanState";
 import { PoolsLanesTree } from "./ai-plan/PoolsLanesTree";
 import { ElementsByContainerView } from "./ai-plan/ElementsByContainerView";
@@ -168,13 +169,16 @@ export function PlanPanel({
   // "New" — start a fresh prompt, guarding the current one against loss.
   const [newGuardOpen, setNewGuardOpen] = useState(false);
   const pendingClearRef = useRef(false); // set when a save must clear afterwards
-  // Flowcharts use their own 2-phase endpoints + a deterministic top-down
-  // layout. The structured Pools/Elements/Connectors tabs are BPMN-plan
-  // shaped, so flowcharts edit the plan via the generic Raw JSON tab.
-  const isFlowchart = diagramType === "flowchart";
-  const apiBase = isFlowchart ? "/api/ai/flowchart" : "/api/ai/bpmn";
+  // Which endpoints to post to, and whether this type’s plan is BPMN-shaped.
+  // Both come from the registry in planTypes.ts rather than from naming a type
+  // here: the question is never "is this a flowchart", it is "is this plan
+  // FLAT" — and answering it by naming the only flat type there was is what
+  // made adding a second one touch ten call sites.
+  const planCfg = planTypeConfig(diagramType);
+  const flatPlan = !planCfg.structured;
+  const apiBase = planCfg.apiBase;
   const { plan, setPlan, updateElement, deleteElement, updateConnection, deleteConnection, moveElementRelativeTo, asJson } = usePlanState();
-  const [activeTab, setActiveTab] = useState<Tab>(isFlowchart ? "json" : "pools");
+  const [activeTab, setActiveTab] = useState<Tab>(flatPlan ? "json" : "pools");
   const [busy, setBusy] = useState<"plan" | "apply" | "save" | "load" | "narrative" | "compare" | "refine" | null>(null);
   // Propagate busy transitions up so DiagramEditor can overlay a wait
   // indicator on the canvas.
@@ -249,8 +253,8 @@ export function PlanPanel({
           models,
           attachment: attachment ?? undefined,
           // Reproduce original layout is BPMN image-only, same as the Plan flow.
-          captureGeometry: !isFlowchart && attachment?.type === "image" ? preserveLayout : false,
-          imageAspect: !isFlowchart && attachment?.type === "image" ? imageDimsRef.current ?? undefined : undefined,
+          captureGeometry: !flatPlan && attachment?.type === "image" ? preserveLayout : false,
+          imageAspect: !flatPlan && attachment?.type === "image" ? imageDimsRef.current ?? undefined : undefined,
           pcfNodeId: pcf?.nodeId,
           layoutMode,
         }),
@@ -383,7 +387,7 @@ export function PlanPanel({
       // Capture natural dimensions so an imported layout keeps the image aspect.
       // BPMN-only — the flowchart image path is left exactly as it was.
       imageDimsRef.current = null;
-      if (!isFlowchart) {
+      if (!flatPlan) {
         try {
           const dims = await new Promise<{ w: number; h: number } | null>((resolve) => {
             const img = new window.Image();
@@ -772,7 +776,7 @@ export function PlanPanel({
           model: model || undefined,
           // Reproduce original layout is a BPMN-only capability — never sent for
           // flowcharts (leave non-BPMN image ingestion exactly as it was).
-          captureGeometry: !isFlowchart && attachment?.type === "image" ? preserveLayout : false,
+          captureGeometry: !flatPlan && attachment?.type === "image" ? preserveLayout : false,
         }),
       });
       const json = await res.json();
@@ -874,7 +878,7 @@ export function PlanPanel({
       const planHasBounds = Array.isArray(plan?.elements)
         && plan.elements.some((e: { bounds?: unknown }) => e.bounds);
       // BPMN-only — flowchart apply-layout must be sent exactly as before.
-      const preservePositions = !isFlowchart && preserveLayout && planHasBounds;
+      const preservePositions = !flatPlan && preserveLayout && planHasBounds;
       // Cleared before the call: an apply that fails early returns without
       // reading a response, and a stale list would look like this attempt.
       setDiagnostics([]);
@@ -918,8 +922,8 @@ export function PlanPanel({
           planJson: plan,
         });
       }
-      if (isFlowchart) {
-        setStatus(`Applied: ${json.elementCount} elements, ${json.connectionCount} flowlines`);
+      if (flatPlan) {
+        setStatus(`Applied: ${json.elementCount} elements, ${json.connectionCount} ${planCfg.connectorNoun}s`);
       } else {
         const poolCount = plan.elements.filter(e => e.type === "pool").length;
         setStatus(`Applied: ${poolCount} pool${poolCount === 1 ? "" : "s"}, ${json.elementCount} elements, ${json.connectionCount} connections`);
@@ -930,7 +934,7 @@ export function PlanPanel({
     } finally {
       setBusy(null);
     }
-  }, [plan, hasPlan, busy, onApplyDiagram, activeTab, jsonDraft, asJson, commitJson, apiBase, isFlowchart, preserveLayout, prompt, editingPromptId, savedPrompts, layoutMode]);
+  }, [plan, hasPlan, busy, onApplyDiagram, activeTab, jsonDraft, asJson, commitJson, apiBase, flatPlan, preserveLayout, prompt, editingPromptId, savedPrompts, layoutMode]);
 
   return (
     <div className="w-96 border-l border-gray-200 bg-white flex flex-col shrink-0 overflow-hidden">
@@ -1250,7 +1254,7 @@ export function PlanPanel({
               </div>
             )}
           </div>
-          {!isFlowchart && attachment?.type === "image" && (
+          {!flatPlan && attachment?.type === "image" && (
             <label className="flex items-center gap-1 mt-1 cursor-pointer select-none" title="Rebuild the diagram at the positions drawn in the image (pools any size/placement, rectilinear messages) instead of Diagramatix's auto-layout.">
               <input type="checkbox" className="cursor-pointer" checked={preserveLayout}
                 onChange={e => setPreserveLayout(e.target.checked)} />
@@ -1474,7 +1478,7 @@ export function PlanPanel({
         {/* Tabs header (always visible) with expand/collapse chevron */}
         <div className="shrink-0 flex items-end border-b border-gray-200 text-[10px] -mb-px">
           <div className="flex flex-1">
-            {((isFlowchart
+            {((flatPlan
               ? [{ id: "json", label: "Plan JSON" }]
               : [
                   { id: "pools",      label: "Pools / Lanes" },
@@ -1557,7 +1561,7 @@ export function PlanPanel({
         <PlanStructureModal
           plan={plan}
           diagramType={diagramType}
-          isFlowchart={isFlowchart}
+          flatPlan={flatPlan}
           applying={busy === "apply"}
           updateElement={updateElement}
           deleteElement={deleteElement}

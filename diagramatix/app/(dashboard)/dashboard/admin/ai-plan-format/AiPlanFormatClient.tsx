@@ -41,6 +41,7 @@ const TYPE_LABELS: Record<string, string> = {
   "process-context": "Process Context",
   archimate: "ArchiMate",
   flowchart: "Standard Flowchart",
+  epc: "EPC (Event-driven Process Chain)",
 };
 
 export function AiPlanFormatClient() {
