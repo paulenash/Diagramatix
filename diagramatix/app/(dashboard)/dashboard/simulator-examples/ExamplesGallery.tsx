@@ -6,14 +6,17 @@ import Link from "next/link";
  * one-click "Load & open" any into a fresh project, landing on its diagram so
  * you can open the ◈ Simulator and Run / Replay immediately.
  *
- * Matrix-themed: a digital-rain backdrop + green-phosphor cards/buttons, so the
- * gallery already feels like the Simulator you're about to enter.
+ * Matrix-themed: the green BPMN cascade + green-phosphor cards/buttons, so the
+ * gallery already feels like the Simulator you're about to enter. Each card also
+ * offers a SUMMARY — what that example actually illustrates, derived from its
+ * own package rather than written beside it.
  */
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MatrixRain } from "@/app/components/simulation/matrix/MatrixRain";
 import { MatrixButton } from "@/app/components/simulation/matrix/MatrixChrome";
+import { ExampleSummaryModal } from "@/app/components/examples/ExampleSummaryModal";
 
 interface ExampleCard {
   id: string;
@@ -37,6 +40,9 @@ export function ExamplesGallery({ isAdmin }: { isAdmin: boolean }) {
   const [loading, setLoading] = useState(true);
   const [adopting, setAdopting] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  // Which example's summary is open — see the Miner gallery; same reasoning,
+  // same component, different paint.
+  const [summaryFor, setSummaryFor] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -73,7 +79,7 @@ export function ExamplesGallery({ isAdmin }: { isAdmin: boolean }) {
     <div className="relative min-h-[calc(100vh-3.5rem)] bg-black text-green-400 font-mono overflow-hidden">
       {/* Matrix digital-rain backdrop */}
       <div className="absolute inset-0 opacity-20 pointer-events-none">
-        <MatrixRain fontSize={18} />
+        <MatrixRain fontSize={22} glyphs="bpmn" />
       </div>
 
       <div className="relative z-10 max-w-5xl mx-auto px-4 py-8">
@@ -108,14 +114,31 @@ export function ExamplesGallery({ isAdmin }: { isAdmin: boolean }) {
                 <span>{ex.summary.scenarios} scenario{ex.summary.scenarios === 1 ? "" : "s"}</span>
               </div>
               <div className="flex-1" />
-              <div className="mt-3">
+              <div className="mt-3 flex items-center gap-2">
                 <MatrixButton onClick={() => adopt(ex.id)}>
                   {adopting === ex.id ? "◴ Loading…" : "▶ Load"}
                 </MatrixButton>
+                <button
+                  onClick={() => setSummaryFor(ex.id)}
+                  className="rounded border border-green-500/30 px-3 py-1.5 text-sm text-green-400/80 hover:bg-green-500/10 hover:text-green-200"
+                >
+                  ⓘ Summary
+                </button>
               </div>
             </div>
           ))}
         </div>
+
+        {summaryFor && (
+          <ExampleSummaryModal
+            url={`/api/simulation-examples/${summaryFor}/summary`}
+            tone="green"
+            onClose={() => setSummaryFor(null)}
+            onLoad={() => adopt(summaryFor)}
+            loadLabel="▶ Load"
+            loading={adopting !== null}
+          />
+        )}
 
         {isAdmin && (
           <p className="mt-8 text-xs text-green-400/40">

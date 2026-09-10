@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-09-10  ·  **Document version:** 7.0  ·  **Suite:** 450 test files · 3,303 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T3981  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-09-10  ·  **Document version:** 7.0  ·  **Suite:** 451 test files · 3,322 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T4000  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
@@ -34,9 +34,9 @@ Each test file has its own section below, grouped into layers. Within each secti
 | **Protects you against** | In plain terms, the real-world problem that would occur if this behaviour regressed. |
 | **How it would break (go red)** | The kind of code or data change that would make this specific test fail — i.e. what the test is watching. |
 
-**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T3982**, the one after **T3983**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
+**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T4001**, the one after **T4002**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T3981`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
+> **Highest ref allocated: `T4000`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -3088,6 +3088,25 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 | T3979 | `tests/mining/example-catalog-teaches.test.ts` | Mined in the improving direction they fire nothing. |
 | T3980 | `tests/mining/example-catalog-teaches.test.ts` | Every slug the catalog promises is present exactly once. |
 | T3981 | `tests/mining/example-catalog-teaches.test.ts` | The rework example's quoted rate matches what the log measures. |
+| T3982 | `tests/features/example-summaries.test.ts` | Every Miner example produces at least one derived feature. |
+| T3983 | `tests/features/example-summaries.test.ts` | Every Simulator example produces at least one derived feature. |
+| T3984 | `tests/features/example-summaries.test.ts` | No feature is advertised with a missing or nonsense figure. |
+| T3985 | `tests/features/example-summaries.test.ts` | The three-team example advertises hand-offs and its ping-pong pair. |
+| T3986 | `tests/features/example-summaries.test.ts` | The rework example advertises rework, with the measured rate. |
+| T3987 | `tests/features/example-summaries.test.ts` | Order-to-Cash advertises slicing and names both dimensions. |
+| T3988 | `tests/features/example-summaries.test.ts` | Accounts Payable advertises comparison and alerts, from its three periods. |
+| T3989 | `tests/features/example-summaries.test.ts` | The live example advertises the live source and nothing it lacks. |
+| T3990 | `tests/features/example-summaries.test.ts` | Hand-offs are named by the log’s own column, not called “teams”. |
+| T3991 | `tests/features/example-summaries.test.ts` | A trivial rework rate is NOT advertised as rework. |
+| T3992 | `tests/features/example-summaries.test.ts` | A bounce pattern touching a handful of cases is NOT advertised. |
+| T3993 | `tests/features/example-summaries.test.ts` | A malformed package summarises to nothing rather than throwing. |
+| T3994 | `tests/features/example-summaries.test.ts` | The Simulator comparison example advertises as-is against to-be. |
+| T3995 | `tests/features/example-summaries.test.ts` | An example with a companion model says so. |
+| T3996 | `tests/features/example-summaries.test.ts` | Teams are listed with their capacities. |
+| T3997 | `tests/features/example-summaries.test.ts` | Each gallery’s advertised summary path resolves to a real route file. |
+| T3998 | `tests/features/example-summaries.test.ts` | Both galleries render the Summary button. |
+| T3999 | `tests/features/example-summaries.test.ts` | The summary modal renders what the server computed and computes nothing. |
+| T4000 | `tests/features/example-summaries.test.ts` | Both galleries use the new cascades, not the katakana default. |
 
 > **Keep this section in sync.** Whenever an e2e spec is added, removed, or changes what it asserts, update this section. It is hand-maintained, not generated.
 

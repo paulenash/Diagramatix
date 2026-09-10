@@ -9,12 +9,17 @@ import Link from "next/link";
  * project (via ?mining=<projectId>), the mined run already present so you can
  * Discover, check Conformance, and Calibrate & simulate immediately.
  *
- * Miner-skinned: an amber/brown digital-rain backdrop + stone/amber cards, to
- * match the DiagramatixMINER console you're about to enter.
+ * Miner-skinned: the amber/brown cascade of jagged rocks and BPMN symbols +
+ * stone/amber cards, to match the DiagramatixMINER console you're about to
+ * enter. Each card also offers a SUMMARY — what that example actually
+ * illustrates, derived from its own package rather than written beside it, so a
+ * capability that appears in one example is findable without adopting all of
+ * them.
  */
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MatrixRain } from "@/app/components/simulation/matrix/MatrixRain";
+import { ExampleSummaryModal } from "@/app/components/examples/ExampleSummaryModal";
 
 interface ExampleCard {
   id: string;
@@ -38,6 +43,10 @@ export function MiningExamplesGallery({ isAdmin }: { isAdmin: boolean }) {
   const [loading, setLoading] = useState(true);
   const [adopting, setAdopting] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  // Which example's summary is open. A catalog that can only be read by
+  // adopting every entry into a project you then have to tidy up is a catalog
+  // nobody reads.
+  const [summaryFor, setSummaryFor] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -83,7 +92,7 @@ export function MiningExamplesGallery({ isAdmin }: { isAdmin: boolean }) {
     <div className="relative min-h-[calc(100vh-3.5rem)] bg-stone-950 text-amber-200 font-mono overflow-hidden">
       {/* Amber digital-rain backdrop */}
       <div className="absolute inset-0 opacity-45 pointer-events-none">
-        <MatrixRain fontSize={18} color="#D97706" headColor="#FDE68A" />
+        <MatrixRain fontSize={22} color="#D97706" headColor="#FDE68A" glyphs="rocks-and-bpmn" />
       </div>
 
       <div className="relative z-10 max-w-5xl mx-auto px-4 py-8">
@@ -119,7 +128,7 @@ export function MiningExamplesGallery({ isAdmin }: { isAdmin: boolean }) {
                 <span>{ex.summary.references} reference{ex.summary.references === 1 ? "" : "s"}</span>
               </div>
               <div className="flex-1" />
-              <div className="mt-3">
+              <div className="mt-3 flex items-center gap-2">
                 <button
                   onClick={() => adopt(ex.id)}
                   disabled={adopting !== null}
@@ -127,10 +136,26 @@ export function MiningExamplesGallery({ isAdmin }: { isAdmin: boolean }) {
                 >
                   {adopting === ex.id ? "◴ Loading…" : "▶ Load & open"}
                 </button>
+                <button
+                  onClick={() => setSummaryFor(ex.id)}
+                  className="rounded border border-amber-500/30 px-3 py-1.5 text-sm text-amber-200/80 hover:bg-amber-500/10 hover:text-amber-100"
+                >
+                  ⓘ Summary
+                </button>
               </div>
             </div>
           ))}
         </div>
+
+        {summaryFor && (
+          <ExampleSummaryModal
+            url={`/api/mining-examples/${summaryFor}/summary`}
+            tone="amber"
+            onClose={() => setSummaryFor(null)}
+            onLoad={() => adopt(summaryFor)}
+            loading={adopting !== null}
+          />
+        )}
 
         {isAdmin && (
           <p className="mt-8 text-xs text-amber-200/40">
