@@ -13,3 +13,8 @@
 # and removed in the follow-up; keep them ignored so it can't recur.
 /scratchpad/
 /test/
+
+# Meeting recordings. They live inside the app folder for convenience, which
+# means `npm run build` copies them into .next/standalone — a 300MB+ file one
+# `git add -A` away from the repo, the Docker image and the deploy.
+cgsv meetings/
