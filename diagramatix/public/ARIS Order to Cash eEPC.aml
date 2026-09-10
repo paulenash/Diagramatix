@@ -1,0 +1,452 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE AML SYSTEM "ARIS-Export.dtd">
+<!--
+  SAMPLE ARIS Markup Language (AML) export — Diagramatix, 2026-09-11.
+
+  ============================ READ THIS FIRST ============================
+  This file is HAND-WRITTEN to exercise the EPC importer while a real ARIS
+  export is obtained. It is modelled on AML's documented structure, but it has
+  NOT been produced by ARIS and has NOT been checked against a real export.
+
+  Treat it as a FIXTURE, not as a specification. Where a real export differs —
+  attribute casing, extra wrapper elements, different connection type codes,
+  additional AttrDefs — the REAL FILE IS RIGHT and this one gets corrected.
+
+  The importer is deliberately built not to care about most of that: it keys off
+  the object TYPE CODES (TypeNum) and the types of the two objects at each end
+  of a connection, rather than on exact nesting or on the CT_ code alone. So a
+  real export that wraps things differently should still come through.
+  =========================================================================
+
+  The model below is a valid eEPC and uses EVERY EPC symbol at least once:
+
+    Event ................ OT_EVT                 (E1-E14)
+    Function ............. OT_FUNC                (F1-F9)
+    XOR .................. OT_RULE / ST_OPR_XOR_1 (X1 split, X2 join)
+    AND .................. OT_RULE / ST_OPR_AND_1 (A1 split, A2 join)
+    OR ................... OT_RULE / ST_OPR_OR_1  (O1 split, O2 join)
+    Organisational Unit .. OT_ORG_UNIT            (Sales, Warehouse, Finance)
+    Position ............. OT_PERS_TYPE           (Credit Officer)
+    Information Object ... OT_CLST                (Customer order, Credit file,
+                                                   Invoice, Delivery note)
+    Application System ... OT_APPL_SYS_TYPE       (SAP ERP, CRM System)
+    Process Interface .... OT_PROCESS_IF          (Accounts Receivable)
+
+  It is deliberately CLEAN — it breaks none of E1-E7 — so it is a baseline the
+  importer can be judged against. The second model in this file breaks three of
+  them on purpose, so the conversion's refusals can be seen working.
+
+  Chain:
+    E1 -> F1 -> E2 -> F2 -> X1 =(E3 approved | E4 refused)
+      E3 -> F3 -> E5 -> A1 =(F4 -> E6 | F5 -> E7)= A2 -> F6
+            -> O1 =(E8 -> F7 -> E10 | E9 -> F8 -> E11)= O2 -> E14
+      E4 -> F9 -> E12
+    E14, E12 -> X2 -> E13 -> I1 (continues in Accounts Receivable)
+-->
+<AML>
+  <Group Group.ID="Group.Root">
+    <AttrDef AttrDef.Type="AT_NAME">
+      <AttrValue LocaleId="1033">Diagramatix Sample</AttrValue>
+    </AttrDef>
+
+    <!-- ================= OBJECT DEFINITIONS ================= -->
+    <!-- In AML an ObjDef is the thing itself; an ObjOcc (further down, inside
+         the Model) is where it appears on a page. The same ObjDef may occur in
+         several models, which is why the control-flow CxnDefs hang off the
+         ObjDef rather than off the drawing. -->
+
+    <!-- Events -->
+    <ObjDef ObjDef.ID="ObjDef.E1" TypeNum="OT_EVT" SymbolNum="ST_EV">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Customer order received</AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.E1F1" CxnDef.Type="CT_IS_PRED_OF" ToObjDef.IdRef="ObjDef.F1"/>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.E2" TypeNum="OT_EVT" SymbolNum="ST_EV">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Order validated</AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.E2F2" CxnDef.Type="CT_IS_PRED_OF" ToObjDef.IdRef="ObjDef.F2"/>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.E3" TypeNum="OT_EVT" SymbolNum="ST_EV">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Credit approved</AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.E3F3" CxnDef.Type="CT_IS_PRED_OF" ToObjDef.IdRef="ObjDef.F3"/>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.E4" TypeNum="OT_EVT" SymbolNum="ST_EV">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Credit refused</AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.E4F9" CxnDef.Type="CT_IS_PRED_OF" ToObjDef.IdRef="ObjDef.F9"/>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.E5" TypeNum="OT_EVT" SymbolNum="ST_EV">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Order confirmed</AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.E5A1" CxnDef.Type="CT_IS_PRED_OF" ToObjDef.IdRef="ObjDef.A1"/>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.E6" TypeNum="OT_EVT" SymbolNum="ST_EV">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Goods picked</AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.E6A2" CxnDef.Type="CT_IS_PRED_OF" ToObjDef.IdRef="ObjDef.A2"/>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.E7" TypeNum="OT_EVT" SymbolNum="ST_EV">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Invoice raised</AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.E7A2" CxnDef.Type="CT_IS_PRED_OF" ToObjDef.IdRef="ObjDef.A2"/>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.E8" TypeNum="OT_EVT" SymbolNum="ST_EV">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Delivery note required</AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.E8F7" CxnDef.Type="CT_IS_PRED_OF" ToObjDef.IdRef="ObjDef.F7"/>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.E9" TypeNum="OT_EVT" SymbolNum="ST_EV">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Customer notification required</AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.E9F8" CxnDef.Type="CT_IS_PRED_OF" ToObjDef.IdRef="ObjDef.F8"/>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.E10" TypeNum="OT_EVT" SymbolNum="ST_EV">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Delivery note sent</AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.E10O2" CxnDef.Type="CT_IS_PRED_OF" ToObjDef.IdRef="ObjDef.O2"/>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.E11" TypeNum="OT_EVT" SymbolNum="ST_EV">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Customer notified</AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.E11O2" CxnDef.Type="CT_IS_PRED_OF" ToObjDef.IdRef="ObjDef.O2"/>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.E12" TypeNum="OT_EVT" SymbolNum="ST_EV">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Order rejected</AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.E12X2" CxnDef.Type="CT_IS_PRED_OF" ToObjDef.IdRef="ObjDef.X2"/>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.E13" TypeNum="OT_EVT" SymbolNum="ST_EV">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Order processing complete</AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.E13I1" CxnDef.Type="CT_IS_PRED_OF" ToObjDef.IdRef="ObjDef.I1"/>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.E14" TypeNum="OT_EVT" SymbolNum="ST_EV">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Goods despatched</AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.E14X2" CxnDef.Type="CT_IS_PRED_OF" ToObjDef.IdRef="ObjDef.X2"/>
+    </ObjDef>
+
+    <!-- Functions. Note the NOUN-PHRASE naming ARIS models conventionally use
+         ("Order validation" rather than "Validate order") — turning those into
+         verb phrases is what the optional AI pass on conversion does. -->
+    <ObjDef ObjDef.ID="ObjDef.F1" TypeNum="OT_FUNC" SymbolNum="ST_FUNC">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Order validation</AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.F1E2" CxnDef.Type="CT_IS_PRED_OF" ToObjDef.IdRef="ObjDef.E2"/>
+      <CxnDef CxnDef.ID="CxnDef.F1D1" CxnDef.Type="CT_USE_1" ToObjDef.IdRef="ObjDef.D1"/>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.F2" TypeNum="OT_FUNC" SymbolNum="ST_FUNC">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Credit rating check</AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.F2X1" CxnDef.Type="CT_IS_PRED_OF" ToObjDef.IdRef="ObjDef.X1"/>
+      <CxnDef CxnDef.ID="CxnDef.F2D2" CxnDef.Type="CT_USE_1" ToObjDef.IdRef="ObjDef.D2"/>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.F3" TypeNum="OT_FUNC" SymbolNum="ST_FUNC">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Order confirmation</AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.F3E5" CxnDef.Type="CT_IS_PRED_OF" ToObjDef.IdRef="ObjDef.E5"/>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.F4" TypeNum="OT_FUNC" SymbolNum="ST_FUNC">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Goods picking</AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.F4E6" CxnDef.Type="CT_IS_PRED_OF" ToObjDef.IdRef="ObjDef.E6"/>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.F5" TypeNum="OT_FUNC" SymbolNum="ST_FUNC">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Invoice creation</AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.F5E7" CxnDef.Type="CT_IS_PRED_OF" ToObjDef.IdRef="ObjDef.E7"/>
+      <CxnDef CxnDef.ID="CxnDef.F5D3" CxnDef.Type="CT_CRT_1" ToObjDef.IdRef="ObjDef.D3"/>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.F6" TypeNum="OT_FUNC" SymbolNum="ST_FUNC">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Goods despatch</AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.F6O1" CxnDef.Type="CT_IS_PRED_OF" ToObjDef.IdRef="ObjDef.O1"/>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.F7" TypeNum="OT_FUNC" SymbolNum="ST_FUNC">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Delivery note despatch</AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.F7E10" CxnDef.Type="CT_IS_PRED_OF" ToObjDef.IdRef="ObjDef.E10"/>
+      <CxnDef CxnDef.ID="CxnDef.F7D4" CxnDef.Type="CT_CRT_1" ToObjDef.IdRef="ObjDef.D4"/>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.F8" TypeNum="OT_FUNC" SymbolNum="ST_FUNC">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Customer notification</AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.F8E11" CxnDef.Type="CT_IS_PRED_OF" ToObjDef.IdRef="ObjDef.E11"/>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.F9" TypeNum="OT_FUNC" SymbolNum="ST_FUNC">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Order rejection</AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.F9E12" CxnDef.Type="CT_IS_PRED_OF" ToObjDef.IdRef="ObjDef.E12"/>
+    </ObjDef>
+
+    <!-- Rules (connectors). The SymbolNum, not the TypeNum, says which one. -->
+    <ObjDef ObjDef.ID="ObjDef.X1" TypeNum="OT_RULE" SymbolNum="ST_OPR_XOR_1">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033"></AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.X1E3" CxnDef.Type="CT_IS_PRED_OF" ToObjDef.IdRef="ObjDef.E3"/>
+      <CxnDef CxnDef.ID="CxnDef.X1E4" CxnDef.Type="CT_IS_PRED_OF" ToObjDef.IdRef="ObjDef.E4"/>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.X2" TypeNum="OT_RULE" SymbolNum="ST_OPR_XOR_1">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033"></AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.X2E13" CxnDef.Type="CT_IS_PRED_OF" ToObjDef.IdRef="ObjDef.E13"/>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.A1" TypeNum="OT_RULE" SymbolNum="ST_OPR_AND_1">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033"></AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.A1F4" CxnDef.Type="CT_IS_PRED_OF" ToObjDef.IdRef="ObjDef.F4"/>
+      <CxnDef CxnDef.ID="CxnDef.A1F5" CxnDef.Type="CT_IS_PRED_OF" ToObjDef.IdRef="ObjDef.F5"/>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.A2" TypeNum="OT_RULE" SymbolNum="ST_OPR_AND_1">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033"></AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.A2F6" CxnDef.Type="CT_IS_PRED_OF" ToObjDef.IdRef="ObjDef.F6"/>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.O1" TypeNum="OT_RULE" SymbolNum="ST_OPR_OR_1">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033"></AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.O1E8" CxnDef.Type="CT_IS_PRED_OF" ToObjDef.IdRef="ObjDef.E8"/>
+      <CxnDef CxnDef.ID="CxnDef.O1E9" CxnDef.Type="CT_IS_PRED_OF" ToObjDef.IdRef="ObjDef.E9"/>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.O2" TypeNum="OT_RULE" SymbolNum="ST_OPR_OR_1">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033"></AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.O2E14" CxnDef.Type="CT_IS_PRED_OF" ToObjDef.IdRef="ObjDef.E14"/>
+    </ObjDef>
+
+    <!-- Organisational units. CT_EXEC_1 runs FROM the org unit TO the function
+         it carries out — "executes". -->
+    <ObjDef ObjDef.ID="ObjDef.OU1" TypeNum="OT_ORG_UNIT" SymbolNum="ST_ORG_UNIT">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Sales Department</AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.OU1F1" CxnDef.Type="CT_EXEC_1" ToObjDef.IdRef="ObjDef.F1"/>
+      <CxnDef CxnDef.ID="CxnDef.OU1F3" CxnDef.Type="CT_EXEC_1" ToObjDef.IdRef="ObjDef.F3"/>
+      <CxnDef CxnDef.ID="CxnDef.OU1F8" CxnDef.Type="CT_EXEC_1" ToObjDef.IdRef="ObjDef.F8"/>
+      <CxnDef CxnDef.ID="CxnDef.OU1F9" CxnDef.Type="CT_EXEC_1" ToObjDef.IdRef="ObjDef.F9"/>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.OU2" TypeNum="OT_ORG_UNIT" SymbolNum="ST_ORG_UNIT">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Warehouse</AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.OU2F4" CxnDef.Type="CT_EXEC_1" ToObjDef.IdRef="ObjDef.F4"/>
+      <CxnDef CxnDef.ID="CxnDef.OU2F6" CxnDef.Type="CT_EXEC_1" ToObjDef.IdRef="ObjDef.F6"/>
+      <CxnDef CxnDef.ID="CxnDef.OU2F7" CxnDef.Type="CT_EXEC_1" ToObjDef.IdRef="ObjDef.F7"/>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.OU3" TypeNum="OT_ORG_UNIT" SymbolNum="ST_ORG_UNIT">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Finance</AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.OU3F5" CxnDef.Type="CT_EXEC_1" ToObjDef.IdRef="ObjDef.F5"/>
+    </ObjDef>
+
+    <!-- Position (a role rather than a department). -->
+    <ObjDef ObjDef.ID="ObjDef.P1" TypeNum="OT_PERS_TYPE" SymbolNum="ST_PERS_TYPE">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Credit Officer</AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.P1F2" CxnDef.Type="CT_EXEC_1" ToObjDef.IdRef="ObjDef.F2"/>
+    </ObjDef>
+
+    <!-- Information objects (clusters). -->
+    <ObjDef ObjDef.ID="ObjDef.D1" TypeNum="OT_CLST" SymbolNum="ST_CLST">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Customer order</AttrValue></AttrDef>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.D2" TypeNum="OT_CLST" SymbolNum="ST_CLST">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Credit file</AttrValue></AttrDef>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.D3" TypeNum="OT_CLST" SymbolNum="ST_CLST">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Invoice</AttrValue></AttrDef>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.D4" TypeNum="OT_CLST" SymbolNum="ST_CLST">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Delivery note</AttrValue></AttrDef>
+    </ObjDef>
+
+    <!-- Application systems. CT_CAN_SUPP_1 runs FROM the system TO the function
+         it supports. -->
+    <ObjDef ObjDef.ID="ObjDef.S1" TypeNum="OT_APPL_SYS_TYPE" SymbolNum="ST_APPL_SYS_TYPE">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">SAP ERP</AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.S1F1" CxnDef.Type="CT_CAN_SUPP_1" ToObjDef.IdRef="ObjDef.F1"/>
+      <CxnDef CxnDef.ID="CxnDef.S1F5" CxnDef.Type="CT_CAN_SUPP_1" ToObjDef.IdRef="ObjDef.F5"/>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.S2" TypeNum="OT_APPL_SYS_TYPE" SymbolNum="ST_APPL_SYS_TYPE">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">CRM System</AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.S2F8" CxnDef.Type="CT_CAN_SUPP_1" ToObjDef.IdRef="ObjDef.F8"/>
+    </ObjDef>
+
+    <!-- Process interface — the chain continues in another EPC. -->
+    <ObjDef ObjDef.ID="ObjDef.I1" TypeNum="OT_PROCESS_IF" SymbolNum="ST_PROCESS_IF">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Accounts Receivable</AttrValue></AttrDef>
+    </ObjDef>
+
+    <!-- An object type the importer is NOT expected to know. A real ARIS
+         repository is full of these (KPIs, risks, products, knowledge
+         categories). It must be REPORTED, not silently dropped. -->
+    <ObjDef ObjDef.ID="ObjDef.K1" TypeNum="OT_KPI_INST" SymbolNum="ST_KPI_INST">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Order cycle time</AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.K1F1" CxnDef.Type="CT_IS_MEASURED_BY" ToObjDef.IdRef="ObjDef.F1"/>
+    </ObjDef>
+
+    <!-- ================= THE MODEL (the drawn page) ================= -->
+    <Model Model.ID="Model.O2C" Model.Type="MT_EEPC">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Order to Cash</AttrValue></AttrDef>
+
+      <ObjOcc ObjOcc.ID="ObjOcc.E1" ObjDef.IdRef="ObjDef.E1" SymbolNum="ST_EV">
+        <Position Pos.X="400" Pos.Y="60"/><Size Size.dX="160" Size.dY="50"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.F1" ObjDef.IdRef="ObjDef.F1" SymbolNum="ST_FUNC">
+        <Position Pos.X="400" Pos.Y="160"/><Size Size.dX="160" Size.dY="70"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.E2" ObjDef.IdRef="ObjDef.E2" SymbolNum="ST_EV">
+        <Position Pos.X="400" Pos.Y="280"/><Size Size.dX="160" Size.dY="50"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.F2" ObjDef.IdRef="ObjDef.F2" SymbolNum="ST_FUNC">
+        <Position Pos.X="400" Pos.Y="380"/><Size Size.dX="160" Size.dY="70"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.X1" ObjDef.IdRef="ObjDef.X1" SymbolNum="ST_OPR_XOR_1">
+        <Position Pos.X="458" Pos.Y="500"/><Size Size.dX="44" Size.dY="44"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.E3" ObjDef.IdRef="ObjDef.E3" SymbolNum="ST_EV">
+        <Position Pos.X="240" Pos.Y="580"/><Size Size.dX="160" Size.dY="50"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.E4" ObjDef.IdRef="ObjDef.E4" SymbolNum="ST_EV">
+        <Position Pos.X="600" Pos.Y="580"/><Size Size.dX="160" Size.dY="50"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.F3" ObjDef.IdRef="ObjDef.F3" SymbolNum="ST_FUNC">
+        <Position Pos.X="240" Pos.Y="680"/><Size Size.dX="160" Size.dY="70"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.E5" ObjDef.IdRef="ObjDef.E5" SymbolNum="ST_EV">
+        <Position Pos.X="240" Pos.Y="800"/><Size Size.dX="160" Size.dY="50"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.A1" ObjDef.IdRef="ObjDef.A1" SymbolNum="ST_OPR_AND_1">
+        <Position Pos.X="298" Pos.Y="900"/><Size Size.dX="44" Size.dY="44"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.F4" ObjDef.IdRef="ObjDef.F4" SymbolNum="ST_FUNC">
+        <Position Pos.X="120" Pos.Y="980"/><Size Size.dX="160" Size.dY="70"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.F5" ObjDef.IdRef="ObjDef.F5" SymbolNum="ST_FUNC">
+        <Position Pos.X="360" Pos.Y="980"/><Size Size.dX="160" Size.dY="70"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.E6" ObjDef.IdRef="ObjDef.E6" SymbolNum="ST_EV">
+        <Position Pos.X="120" Pos.Y="1100"/><Size Size.dX="160" Size.dY="50"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.E7" ObjDef.IdRef="ObjDef.E7" SymbolNum="ST_EV">
+        <Position Pos.X="360" Pos.Y="1100"/><Size Size.dX="160" Size.dY="50"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.A2" ObjDef.IdRef="ObjDef.A2" SymbolNum="ST_OPR_AND_1">
+        <Position Pos.X="298" Pos.Y="1200"/><Size Size.dX="44" Size.dY="44"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.F6" ObjDef.IdRef="ObjDef.F6" SymbolNum="ST_FUNC">
+        <Position Pos.X="240" Pos.Y="1280"/><Size Size.dX="160" Size.dY="70"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.O1" ObjDef.IdRef="ObjDef.O1" SymbolNum="ST_OPR_OR_1">
+        <Position Pos.X="298" Pos.Y="1400"/><Size Size.dX="44" Size.dY="44"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.E8" ObjDef.IdRef="ObjDef.E8" SymbolNum="ST_EV">
+        <Position Pos.X="120" Pos.Y="1480"/><Size Size.dX="160" Size.dY="50"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.E9" ObjDef.IdRef="ObjDef.E9" SymbolNum="ST_EV">
+        <Position Pos.X="360" Pos.Y="1480"/><Size Size.dX="160" Size.dY="50"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.F7" ObjDef.IdRef="ObjDef.F7" SymbolNum="ST_FUNC">
+        <Position Pos.X="120" Pos.Y="1580"/><Size Size.dX="160" Size.dY="70"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.F8" ObjDef.IdRef="ObjDef.F8" SymbolNum="ST_FUNC">
+        <Position Pos.X="360" Pos.Y="1580"/><Size Size.dX="160" Size.dY="70"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.E10" ObjDef.IdRef="ObjDef.E10" SymbolNum="ST_EV">
+        <Position Pos.X="120" Pos.Y="1700"/><Size Size.dX="160" Size.dY="50"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.E11" ObjDef.IdRef="ObjDef.E11" SymbolNum="ST_EV">
+        <Position Pos.X="360" Pos.Y="1700"/><Size Size.dX="160" Size.dY="50"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.O2" ObjDef.IdRef="ObjDef.O2" SymbolNum="ST_OPR_OR_1">
+        <Position Pos.X="298" Pos.Y="1800"/><Size Size.dX="44" Size.dY="44"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.E14" ObjDef.IdRef="ObjDef.E14" SymbolNum="ST_EV">
+        <Position Pos.X="240" Pos.Y="1880"/><Size Size.dX="160" Size.dY="50"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.F9" ObjDef.IdRef="ObjDef.F9" SymbolNum="ST_FUNC">
+        <Position Pos.X="600" Pos.Y="680"/><Size Size.dX="160" Size.dY="70"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.E12" ObjDef.IdRef="ObjDef.E12" SymbolNum="ST_EV">
+        <Position Pos.X="600" Pos.Y="800"/><Size Size.dX="160" Size.dY="50"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.X2" ObjDef.IdRef="ObjDef.X2" SymbolNum="ST_OPR_XOR_1">
+        <Position Pos.X="458" Pos.Y="1960"/><Size Size.dX="44" Size.dY="44"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.E13" ObjDef.IdRef="ObjDef.E13" SymbolNum="ST_EV">
+        <Position Pos.X="400" Pos.Y="2040"/><Size Size.dX="160" Size.dY="50"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.I1" ObjDef.IdRef="ObjDef.I1" SymbolNum="ST_PROCESS_IF">
+        <Position Pos.X="400" Pos.Y="2140"/><Size Size.dX="160" Size.dY="50"/>
+      </ObjOcc>
+
+      <!-- Satellites: org units to the right of their function, data and
+           systems to the left. -->
+      <ObjOcc ObjOcc.ID="ObjOcc.OU1" ObjDef.IdRef="ObjDef.OU1" SymbolNum="ST_ORG_UNIT">
+        <Position Pos.X="620" Pos.Y="170"/><Size Size.dX="150" Size.dY="50"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.OU2" ObjDef.IdRef="ObjDef.OU2" SymbolNum="ST_ORG_UNIT">
+        <Position Pos.X="460" Pos.Y="1290"/><Size Size.dX="150" Size.dY="50"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.OU3" ObjDef.IdRef="ObjDef.OU3" SymbolNum="ST_ORG_UNIT">
+        <Position Pos.X="580" Pos.Y="990"/><Size Size.dX="150" Size.dY="50"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.P1" ObjDef.IdRef="ObjDef.P1" SymbolNum="ST_PERS_TYPE">
+        <Position Pos.X="620" Pos.Y="390"/><Size Size.dX="150" Size.dY="50"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.D1" ObjDef.IdRef="ObjDef.D1" SymbolNum="ST_CLST">
+        <Position Pos.X="190" Pos.Y="170"/><Size Size.dX="150" Size.dY="50"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.D2" ObjDef.IdRef="ObjDef.D2" SymbolNum="ST_CLST">
+        <Position Pos.X="190" Pos.Y="390"/><Size Size.dX="150" Size.dY="50"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.D3" ObjDef.IdRef="ObjDef.D3" SymbolNum="ST_CLST">
+        <Position Pos.X="560" Pos.Y="990"/><Size Size.dX="150" Size.dY="50"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.D4" ObjDef.IdRef="ObjDef.D4" SymbolNum="ST_CLST">
+        <Position Pos.X="-90" Pos.Y="1590"/><Size Size.dX="150" Size.dY="50"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.S1" ObjDef.IdRef="ObjDef.S1" SymbolNum="ST_APPL_SYS_TYPE">
+        <Position Pos.X="20" Pos.Y="170"/><Size Size.dX="150" Size.dY="50"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.S2" ObjDef.IdRef="ObjDef.S2" SymbolNum="ST_APPL_SYS_TYPE">
+        <Position Pos.X="190" Pos.Y="1590"/><Size Size.dX="150" Size.dY="50"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.K1" ObjDef.IdRef="ObjDef.K1" SymbolNum="ST_KPI_INST">
+        <Position Pos.X="800" Pos.Y="170"/><Size Size.dX="150" Size.dY="50"/>
+      </ObjOcc>
+    </Model>
+
+    <!-- ================= A DELIBERATELY BROKEN MODEL ================= -->
+    <!-- Three violations on purpose, so the refusals can be seen working:
+           E3  an event followed by an XOR split (an event cannot decide)
+           E5  an XOR split with no matching join
+           E7  one function assigned to two organisational units
+         Real ARIS repositories are full of exactly this. -->
+    <ObjDef ObjDef.ID="ObjDef.BE1" TypeNum="OT_EVT" SymbolNum="ST_EV">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Complaint received</AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.BE1BX1" CxnDef.Type="CT_IS_PRED_OF" ToObjDef.IdRef="ObjDef.BX1"/>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.BX1" TypeNum="OT_RULE" SymbolNum="ST_OPR_XOR_1">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033"></AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.BX1BF1" CxnDef.Type="CT_IS_PRED_OF" ToObjDef.IdRef="ObjDef.BF1"/>
+      <CxnDef CxnDef.ID="CxnDef.BX1BF2" CxnDef.Type="CT_IS_PRED_OF" ToObjDef.IdRef="ObjDef.BF2"/>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.BF1" TypeNum="OT_FUNC" SymbolNum="ST_FUNC">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Complaint investigation</AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.BF1BE2" CxnDef.Type="CT_IS_PRED_OF" ToObjDef.IdRef="ObjDef.BE2"/>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.BF2" TypeNum="OT_FUNC" SymbolNum="ST_FUNC">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Complaint dismissal</AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.BF2BE3" CxnDef.Type="CT_IS_PRED_OF" ToObjDef.IdRef="ObjDef.BE3"/>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.BE2" TypeNum="OT_EVT" SymbolNum="ST_EV">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Complaint investigated</AttrValue></AttrDef>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.BE3" TypeNum="OT_EVT" SymbolNum="ST_EV">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Complaint dismissed</AttrValue></AttrDef>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.BOU1" TypeNum="OT_ORG_UNIT" SymbolNum="ST_ORG_UNIT">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Customer Service</AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.BOU1BF1" CxnDef.Type="CT_EXEC_1" ToObjDef.IdRef="ObjDef.BF1"/>
+    </ObjDef>
+    <ObjDef ObjDef.ID="ObjDef.BOU2" TypeNum="OT_ORG_UNIT" SymbolNum="ST_ORG_UNIT">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Legal</AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.BOU2BF1" CxnDef.Type="CT_EXEC_1" ToObjDef.IdRef="ObjDef.BF1"/>
+    </ObjDef>
+
+    <Model Model.ID="Model.Complaints" Model.Type="MT_EEPC">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Complaint Handling (deliberately broken)</AttrValue></AttrDef>
+      <ObjOcc ObjOcc.ID="ObjOcc.BE1" ObjDef.IdRef="ObjDef.BE1" SymbolNum="ST_EV">
+        <Position Pos.X="400" Pos.Y="60"/><Size Size.dX="160" Size.dY="50"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.BX1" ObjDef.IdRef="ObjDef.BX1" SymbolNum="ST_OPR_XOR_1">
+        <Position Pos.X="458" Pos.Y="160"/><Size Size.dX="44" Size.dY="44"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.BF1" ObjDef.IdRef="ObjDef.BF1" SymbolNum="ST_FUNC">
+        <Position Pos.X="240" Pos.Y="240"/><Size Size.dX="160" Size.dY="70"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.BF2" ObjDef.IdRef="ObjDef.BF2" SymbolNum="ST_FUNC">
+        <Position Pos.X="600" Pos.Y="240"/><Size Size.dX="160" Size.dY="70"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.BE2" ObjDef.IdRef="ObjDef.BE2" SymbolNum="ST_EV">
+        <Position Pos.X="240" Pos.Y="360"/><Size Size.dX="160" Size.dY="50"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.BE3" ObjDef.IdRef="ObjDef.BE3" SymbolNum="ST_EV">
+        <Position Pos.X="600" Pos.Y="360"/><Size Size.dX="160" Size.dY="50"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.BOU1" ObjDef.IdRef="ObjDef.BOU1" SymbolNum="ST_ORG_UNIT">
+        <Position Pos.X="460" Pos.Y="250"/><Size Size.dX="150" Size.dY="50"/>
+      </ObjOcc>
+      <ObjOcc ObjOcc.ID="ObjOcc.BOU2" ObjDef.IdRef="ObjDef.BOU2" SymbolNum="ST_ORG_UNIT">
+        <Position Pos.X="460" Pos.Y="310"/><Size Size.dX="150" Size.dY="50"/>
+      </ObjOcc>
+    </Model>
+  </Group>
+</AML>

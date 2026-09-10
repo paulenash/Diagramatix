@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-09-11  ·  **Document version:** 7.0  ·  **Suite:** 458 test files · 3,427 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T4104  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-09-11  ·  **Document version:** 7.0  ·  **Suite:** 459 test files · 3,447 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T4124  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
@@ -34,9 +34,9 @@ Each test file has its own section below, grouped into layers. Within each secti
 | **Protects you against** | In plain terms, the real-world problem that would occur if this behaviour regressed. |
 | **How it would break (go red)** | The kind of code or data change that would make this specific test fail — i.e. what the test is watching. |
 
-**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T4105**, the one after **T4106**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
+**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T4125**, the one after **T4126**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T4104`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
+> **Highest ref allocated: `T4124`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -3211,6 +3211,26 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 | T4102 | `tests/epc/to-bpmn-reachable.test.ts` | The conversion is one-way, and the copy says so. |
 | T4103 | `tests/epc/to-bpmn-reachable.test.ts` | A hostile refine response changes nothing structural. |
 | T4104 | `tests/epc/to-bpmn-reachable.test.ts` | The EPC refine prompt asks for verb phrases and reuses the shared merge. |
+| T4105 | `tests/epc/import-aml.test.ts` | Both eEPC models in the sample export are found. |
+| T4106 | `tests/epc/import-aml.test.ts` | Every EPC symbol survives the import — the sample uses all ten. |
+| T4107 | `tests/epc/import-aml.test.ts` | Control, assignment and information arcs are separated. |
+| T4108 | `tests/epc/import-aml.test.ts` | An object type it does not model is REPORTED, not dropped in silence. |
+| T4109 | `tests/epc/import-aml.test.ts` | Attribute casing does not matter. |
+| T4110 | `tests/epc/import-aml.test.ts` | A connection code it has never seen still lands, classified by its endpoints. |
+| T4111 | `tests/epc/import-aml.test.ts` | Extra Group nesting does not hide the objects. |
+| T4112 | `tests/epc/import-aml.test.ts` | A non-EPC model in the same export is skipped by name, not mangled. |
+| T4113 | `tests/epc/import-aml.test.ts` | Assignments arrive as attributes on the function. |
+| T4114 | `tests/epc/import-aml.test.ts` | The clean sample lays out with NO rule diagnostics. |
+| T4115 | `tests/epc/import-aml.test.ts` | The deliberately broken model reports the planted faults. |
+| T4116 | `tests/epc/import-aml.test.ts` | An imported EPC converts to BPMN by the same rules as a drawn one. |
+| T4117 | `tests/epc/import-aml.test.ts` | The outcome events after each decision became branch labels. |
+| T4118 | `tests/epc/to-bpmn.test.ts` | One department drawn twice is ONE lane, and both tasks are in it. |
+| T4119 | `tests/epc/to-bpmn.test.ts` | One system drawn twice is ONE black-box pool. |
+| T4120 | `tests/epc/to-bpmn.test.ts` | Folding two boxes into one loses no message flow. |
+| T4121 | `tests/epc/to-bpmn.test.ts` | …and folding is not reported as losing the box. |
+| T4122 | `tests/epc/import-aml.test.ts` | The editor offers ARIS (AML) on an EPC and calls the handler. |
+| T4123 | `tests/epc/import-aml.test.ts` | It posts to a route that exists, and the warnings reach a person. |
+| T4124 | `tests/epc/import-aml.test.ts` | The hand-written sample keeps its caveat that it is not a real ARIS export. |
 
 > **Keep this section in sync.** Whenever an e2e spec is added, removed, or changes what it asserts, update this section. It is hand-maintained, not generated.
 

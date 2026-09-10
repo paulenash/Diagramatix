@@ -195,11 +195,26 @@ export function translateEpcToBpmn(
   // An org unit becomes a lane, and every function joined to it goes in that
   // lane. No geometry is consulted: that is the whole advantage of EPC as a
   // source, and it is why an EPC import beats a BPMN import here.
-  const laneIdOf = new Map<string, string>();
-  const laneOfElement = new Map<string, string>();
+  // Keyed by NAME, not by element id. An EPC draws the same organisational
+  // unit beside every function it carries out — and a generated EPC synthesises
+  // a fresh satellite box for each one — so "Sales Department" appears as many
+  // times as it does work. One lane per box would give a pool with four lanes
+  // all called the same thing, which is what the ARIS sample turned up.
+  const laneOfElement = new Map<string, string>(); // function id → lane id
+  const laneIdOf = new Map<string, string>();      // org element id → lane id
+  const laneIdByName = new Map<string, string>();  // normalised name → lane id
+  const laneLabel = new Map<string, string>();     // lane id → label as drawn
   for (const el of elements) {
     if (kindOf(el.id) !== "lane") continue;
-    laneIdOf.set(el.id, `lane_${el.id}`);
+    const label = labelOf(el) || "Lane";
+    const key = label.trim().toLowerCase();
+    let laneId = laneIdByName.get(key);
+    if (!laneId) {
+      laneId = `lane_${el.id}`;
+      laneIdByName.set(key, laneId);
+      laneLabel.set(laneId, label);
+    }
+    laneIdOf.set(el.id, laneId);
   }
   for (const e of otherEdges) {
     const [orgId, fnId] = kindOf(e.from) === "lane" ? [e.from, e.to] : [e.to, e.from];
@@ -212,13 +227,25 @@ export function translateEpcToBpmn(
   // ── 6. Build the BPMN elements ────────────────────────────────────────────
   const aiElements: AiElement[] = [];
   aiElements.push({ id: POOL_ID, type: "pool", label: processName, poolType: "white-box" });
-  for (const el of elements) {
-    if (kindOf(el.id) !== "lane" || !laneIdOf.has(el.id)) continue;
-    aiElements.push({
-      id: laneIdOf.get(el.id)!, type: "lane", label: labelOf(el) || "Lane",
-      parentPool: POOL_ID, pool: POOL_ID,
-    });
+  for (const [laneId, label] of laneLabel) {
+    aiElements.push({ id: laneId, type: "lane", label, parentPool: POOL_ID, pool: POOL_ID });
     report.laneCount++;
+  }
+
+  // One pool per SYSTEM, not per box — see the lane comment above; an EPC draws
+  // the same application system beside every function it supports.
+  const systemPoolOf = new Map<string, string>();   // element id → pool id
+  const systemPoolLabel = new Map<string, string>(); // pool id → label
+  {
+    const byName = new Map<string, string>();
+    for (const el of elements) {
+      if (kindOf(el.id) !== "system-pool") continue;
+      const label = labelOf(el) || "System";
+      const key = label.trim().toLowerCase();
+      let poolId = byName.get(key);
+      if (!poolId) { poolId = el.id; byName.set(key, poolId); systemPoolLabel.set(poolId, label); }
+      systemPoolOf.set(el.id, poolId);
+    }
   }
 
   const seqIn = new Map<string, number>(), seqOut = new Map<string, number>();
@@ -234,9 +261,10 @@ export function translateEpcToBpmn(
 
     if (m.kind === "system-pool") {
       // The house convention: a system of record IS the black-box IT system
-      // pool, never a data store.
+      // pool, never a data store. Emitted once per system.
+      if (systemPoolOf.get(el.id) !== el.id) continue;
       aiElements.push({
-        id: el.id, type: "pool", label: labelOf(el) || "System",
+        id: el.id, type: "pool", label: systemPoolLabel.get(el.id) ?? labelOf(el) ?? "System",
         poolType: "black-box", isSystem: true,
       });
       report.systemPoolCount++;
@@ -289,10 +317,15 @@ export function translateEpcToBpmn(
       aiConnections.push({ sourceId: e.from, targetId: e.to });
       continue;
     }
-    // Application system ↔ function: a message flow to the black-box pool.
+    // Application system ↔ function: a message flow to the black-box pool. The
+    // endpoint is resolved through systemPoolOf, or a flow would point at a box
+    // that was folded into another and no longer exists.
     if (aKind === "system-pool" || bKind === "system-pool") {
-      if (!elById.has(e.from) || !elById.has(e.to)) continue;
-      aiConnections.push({ sourceId: e.from, targetId: e.to, type: "message" });
+      const from = systemPoolOf.get(e.from) ?? e.from;
+      const to = systemPoolOf.get(e.to) ?? e.to;
+      if (!elById.has(from) || !elById.has(to)) continue;
+      if (aiConnections.some((c) => c.sourceId === from && c.targetId === to && c.type === "message")) continue;
+      aiConnections.push({ sourceId: from, targetId: to, type: "message" });
     }
   }
 
@@ -300,6 +333,8 @@ export function translateEpcToBpmn(
   for (const el of elements) {
     if (spliced.has(el.id) || kindOf(el.id) === "lane") continue;
     if (elById.has(el.id)) continue;
+    // Folded into another box of the same name, not lost.
+    if (systemPoolOf.has(el.id)) continue;
     report.drops.push(`${quoted(el)} (${el.type}) could not be placed in the flow`);
   }
 

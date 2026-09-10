@@ -1970,6 +1970,7 @@ export function DiagramEditor({
   const importTemplatesInputRef = useRef<HTMLInputElement>(null);
   const importVisioInputRef = useRef<HTMLInputElement>(null);
   const importBpmnInputRef = useRef<HTMLInputElement>(null);
+  const importAmlInputRef = useRef<HTMLInputElement>(null);
   // SharePoint save/open: the picker (null = closed), a busy flag while
   // uploading/downloading, and a result message shown via AlertDialog.
   // Import-from-SharePoint: which format the user chose (filters the picker).
@@ -3775,6 +3776,58 @@ export function DiagramEditor({
   // then surfaces the existing status modal. The single-file BPMN
   // endpoint accepts the same overwriteDiagramId field as the Visio
   // route. Stats reshaped into VisioImportResult so the modal renders.
+  /**
+   * ARIS AML import. Every eEPC in the export becomes its own diagram; the
+   * editor navigates to the first and the status modal lists the rest.
+   *
+   * The warnings are the interesting half. A real ARIS repository is full of
+   * objects an EPC does not draw, and connection codes this importer has never
+   * seen — those are reported rather than dropped in silence, and this is where
+   * a person reads them.
+   */
+  async function handleImportAmlFile(file: File) {
+    const baseName = file.name.replace(/\.(aml|xml)$/i, "").trim() || "Imported EPC";
+    /** Reuse the import status modal — the warnings are the point of an AML
+     *  import, and this is where a person reads them. Its stats block is
+     *  Visio-shaped; the fields that have no meaning here stay at zero rather
+     *  than being given a number that would read as a finding. */
+    const show = (diagram: { id: string }, warnings: string[], elements = 0, connectors = 0) =>
+      setVisioImportStatus({
+        kind: "bpmn",
+        diagram,
+        warnings,
+        stats: {
+          totalShapesOnPage: elements,
+          elementsCreated: elements,
+          connectorsCreated: connectors,
+          shapesSkipped: 0,
+          connectorsSkipped: 0,
+          implicitPools: 0,
+          masters: [],
+        },
+      });
+
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      if (projectId) form.append("projectId", projectId);
+      const resp = await fetch("/api/import/aml", { method: "POST", body: form });
+      const body = await resp.json().catch(() => null);
+      if (!resp.ok) {
+        show({ id: "" }, [body?.error ?? `ARIS import failed (${resp.status}).`, ...(body?.warnings ?? [])]);
+        return;
+      }
+      show(
+        body.diagram ?? { id: "" },
+        body.warnings ?? [],
+        body.stats?.elementsCreated ?? 0,
+        body.stats?.connectorsCreated ?? 0,
+      );
+    } catch (err) {
+      show({ id: "" }, [`ARIS import failed: ${err instanceof Error ? err.message : String(err)}`]);
+    }
+  }
+
   async function handleImportBpmnFile(file: File) {
     const baseName = file.name.replace(/\.bpmn$/i, "").replace(/\.xml$/i, "").trim() || "Imported BPMN Diagram";
     if (baseName === diagramName) {
@@ -5145,6 +5198,17 @@ export function DiagramEditor({
           }}
         />
         <input
+          ref={importAmlInputRef}
+          type="file"
+          accept=".aml,.xml"
+          className="hidden"
+          onChange={e => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (f) handleImportAmlFile(f);
+          }}
+        />
+        <input
           ref={importBpmnInputRef}
           type="file"
           accept=".bpmn,.xml"
@@ -5294,6 +5358,9 @@ export function DiagramEditor({
                                     <button onClick={() => { closeFm(); importVisioInputRef.current?.click(); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" title="Import a Visio BPMN .vsdx file as a new diagram">Visio</button>
                                     <button onClick={() => { closeFm(); importBpmnInputRef.current?.click(); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" title="Import an OMG BPMN 2.0 .bpmn file as a new diagram">BPMN</button>
                                   </>
+                                )}
+                                {diagramType === "epc" && (
+                                  <button onClick={() => { closeFm(); importAmlInputRef.current?.click(); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" title="Import an ARIS AML export — every EPC in the file becomes a diagram">ARIS (AML)</button>
                                 )}
                                 {diagramType === "domain" && isAdmin && (
                                   <button onClick={() => { closeFm(); importVisioInputRef.current?.click(); }} className="block w-full text-left px-3 py-2 text-xs text-red-700 hover:bg-red-50" title="Admin only — import a Visio UML .vsdx as a new domain diagram (still maturing).">Visio (UML)</button>

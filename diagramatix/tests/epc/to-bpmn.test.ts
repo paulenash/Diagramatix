@@ -213,6 +213,76 @@ describe("lanes come from the model, not from geometry", () => {
   });
 });
 
+describe("a department is one lane, a system is one pool", () => {
+  // Found by the ARIS sample, not by design: an EPC draws the same
+  // organisational unit beside EVERY function it carries out, and a generated
+  // EPC synthesises a fresh satellite box for each one. Identity is the NAME.
+  // Before this, "Sales Department" doing four things produced a pool with four
+  // lanes all called "Sales Department", and a system supporting two functions
+  // produced two black-box pools for the same system.
+  const shared = () => diagram(
+    [
+      el("e0", "epc-event", "Started"),
+      el("f1", "epc-function", "Take order"),
+      el("e1", "epc-event", "Order taken"),
+      el("f2", "epc-function", "Confirm order"),
+      el("e2", "epc-event", "Order confirmed"),
+      // Two boxes, one department. Two boxes, one system.
+      el("o1", "epc-org-unit", "Sales"),
+      el("o2", "epc-org-unit", "Sales"),
+      el("s1", "epc-application", "SAP"),
+      el("s2", "epc-application", "SAP"),
+    ],
+    [
+      arc("e0", "f1"), arc("f1", "e1"), arc("e1", "f2"), arc("f2", "e2"),
+      arc("o1", "f1", "epc-org-assignment"), arc("o2", "f2", "epc-org-assignment"),
+      arc("s1", "f1", "epc-information-flow"), arc("s2", "f2", "epc-information-flow"),
+    ],
+  );
+
+  it("T4118 - one department drawn twice is ONE lane, and both tasks are in it", () => {
+    const { aiElements, report } = tr(shared());
+    const lanes = aiElements.filter((e) => e.type === "lane");
+    expect(lanes.map((l) => l.label)).toEqual(["Sales"]);
+    expect(report.laneCount).toBe(1);
+    const laneOf = (id: string) => aiElements.find((e) => e.id === id)!.lane;
+    expect(laneOf("f1")).toBe(lanes[0].id);
+    expect(laneOf("f2")).toBe(lanes[0].id);
+  });
+
+  it("T4119 - one system drawn twice is ONE black-box pool", () => {
+    const { aiElements, report } = tr(shared());
+    const pools = aiElements.filter((e) => e.poolType === "black-box");
+    expect(pools.map((p) => p.label)).toEqual(["SAP"]);
+    expect(report.systemPoolCount).toBe(1);
+  });
+
+  it("T4120 - every message flow reaches a pool that exists", () => {
+    // The half that is easy to get wrong when folding two boxes into one: a
+    // flow left pointing at the box that was folded away dangles, and a
+    // dangling connector is the crash this codebase already has a regression
+    // for.
+    const { aiElements, aiConnections } = tr(shared());
+    const ids = new Set(aiElements.map((e) => e.id));
+    const messages = aiConnections.filter((c) => c.type === "message");
+    // BOTH functions must still reach the system. The first version of this
+    // test only checked that surviving flows resolve — and an unresolved one is
+    // silently DROPPED rather than left dangling, so losing half the message
+    // flows passed.
+    expect(messages).toHaveLength(2);
+    const reached = new Set(messages.flatMap((c) => [c.sourceId, c.targetId]));
+    expect(reached.has("f1") && reached.has("f2"), "a function lost its link to the system").toBe(true);
+    for (const c of messages) {
+      expect(ids.has(c.sourceId) && ids.has(c.targetId), `${c.sourceId}→${c.targetId} dangles`).toBe(true);
+    }
+  });
+
+  it("T4121 - folding a box away is not reported as losing it", () => {
+    const { report } = tr(shared());
+    expect(report.drops).toEqual([]);
+  });
+});
+
 describe("what it refuses to interpret", () => {
   it("T4089 - an unbalanced split is reported and NOT closed", () => {
     const { report, aiElements } = tr(diagram(
