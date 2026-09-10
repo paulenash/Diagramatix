@@ -13,6 +13,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { makeAiClient, cappedMaxTokens } from "@/app/lib/ai/anthropicClient";
 import type { AiElement, AiConnection } from "@/app/lib/diagram/bpmnLayout";
 import { renderFlowchartMappingForPrompt } from "@/app/lib/diagram/translate/flowchartBpmnMap";
+import { renderEpcMappingForPrompt } from "@/app/lib/diagram/translate/epcBpmnMap";
 import { hardWrapProcessName } from "@/app/lib/diagram/textMetrics";
 
 export type Attachment =
@@ -66,6 +67,7 @@ GEOMETRY CAPTURE — for THIS request, reproduce the DRAWN layout exactly as it 
 - Keep boxes tight to the drawn shape. If you genuinely cannot see a shape's box, omit "bounds" for that element only (do NOT guess a filler box). Never invent elements to fill empty space.` : ""}
 - If the image is already a BPMN diagram: copy the structure faithfully. Read pool names, lane names, task labels, gateway labels and event labels off the image. Map every shape to its hyphenated type: rounded rectangle → "task" (or "subprocess" / "subprocess-expanded" if it contains its own sub-flow), diamond → "gateway", circle with thin border → "start-event", circle with thick border → "end-event", circle with double border → "intermediate-event", parallel horizontal lines → "pool" / "lane" (a lane visibly split into stacked sub-bands → the inner bands are SUB-lanes: give each a "parentLane"), dashed-rectangle around tasks → "group", document icon → "data-object", cylinder → "data-store", sticky-note → "text-annotation". A diamond containing a SMALL ASTERISK / SIX-POINTED STAR (✳) → "gateway" with gatewayType "complex". A double-border circle containing a PENTAGON → "intermediate-event" with eventType "multiple"; containing a PLUS (✚) → eventType "parallel-multiple". A rounded rectangle drawn with a THICK / BOLD border → "subprocess" with properties.subprocessType "call" (a Call Activity). A small double-left-triangle "rewind" (◀◀) marker at the bottom-centre of an activity → set properties.isForCompensation true (a compensation handler). A data-object with three short vertical bars at its base → set properties.multiplicity "collection"; a data-object with a small hollow arrow → an input, a filled arrow → an output (usually auto-derived from its associations).
 - ${renderFlowchartMappingForPrompt()}
+- ${renderEpcMappingForPrompt()}
 - Read labels with OCR. Do NOT invent tasks, branches or roles that are not visible in the image. If a label is unreadable, use a short descriptive placeholder rather than guessing.
 - Where the user's text prompt adds detail beyond the image (extra rules, role names, message flows), apply it. Where the prompt CONTRADICTS the image, prefer the image.
 

@@ -68,6 +68,7 @@ import { setNoObstacleAvoidance } from "@/app/lib/diagram/routing";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { formatNameList } from "@/app/lib/formatNames";
 import { TranslateToBpmnDialog } from "@/app/components/TranslateToBpmnDialog";
+import { EpcToBpmnDialog } from "@/app/components/EpcToBpmnDialog";
 import { InfoDialog } from "@/app/components/InfoDialog";
 import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
 import { useDiagramTypeStyles } from "@/app/hooks/useDiagramTypeStyles";
@@ -993,6 +994,7 @@ export function DiagramEditor({
   const [showSaveAs, setShowSaveAs] = useState(false);
   // Flowchart → BPMN translation (one-way; flowchart diagrams only).
   const [showTranslate, setShowTranslate] = useState(false);
+  const [showEpcToBpmn, setShowEpcToBpmn] = useState(false);
   const [saveAsName, setSaveAsName] = useState("");
   const [saveAsBusy, setSaveAsBusy] = useState(false);
   const [saveAsError, setSaveAsError] = useState<string | null>(null);
@@ -5194,6 +5196,20 @@ export function DiagramEditor({
                   Translate to BPMN&hellip;
                 </button>
               )}
+              {diagramType === "epc" && (
+                <button
+                  onClick={() => {
+                    setFileMenuOpen(false);
+                    setFileSubmenu(null);
+                    setShowEpcToBpmn(true);
+                  }}
+                  onMouseEnter={() => setFileSubmenu(null)}
+                  className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                  title="Create a new BPMN diagram from this EPC (one-way)"
+                >
+                  Convert to BPMN&hellip;
+                </button>
+              )}
               <div className="border-t border-gray-100" />
 
               {(["export", "import"] as const).map((sect) => (
@@ -6736,6 +6752,19 @@ export function DiagramEditor({
             </div>
           </div>
         </div>
+      )}
+
+      {showEpcToBpmn && (
+        <EpcToBpmnDialog
+          source={data}
+          sourceName={diagramName}
+          projectId={projectId}
+          onClose={() => setShowEpcToBpmn(false)}
+          onCreated={(created) => {
+            setShowEpcToBpmn(false);
+            router.push(`/diagram/${created.id}`);
+          }}
+        />
       )}
 
       {showTranslate && (

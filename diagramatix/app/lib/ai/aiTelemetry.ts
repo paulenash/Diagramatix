@@ -24,6 +24,7 @@ export const AI_INVOCATION_POINTS = {
   FlowchartPlan: "flowchart.plan",
   EpcPlan: "epc.plan",
   FlowchartToBpmnRefine: "flowchart.to-bpmn.refine", // label/subtype tidy
+  EpcToBpmnRefine: "epc.to-bpmn.refine", // noun-phrase function names → verb-phrase tasks
   DiagramGenerate: "diagram.generate", // generic/ArchiMate/context/value-chain/state-machine + vision
   MiningDiscover: "mining.discover", // AI process discovery (BPMN)
   MiningDiscoverSm: "mining.discover-sm", // AI state-machine discovery
@@ -68,6 +69,7 @@ export const AI_USER_METERED_POINTS: ReadonlySet<string> = new Set<string>([
   AI_INVOCATION_POINTS.FlowchartPlan,
   AI_INVOCATION_POINTS.EpcPlan,
   AI_INVOCATION_POINTS.FlowchartToBpmnRefine,
+  AI_INVOCATION_POINTS.EpcToBpmnRefine,
   AI_INVOCATION_POINTS.DiagramGenerate,
   AI_INVOCATION_POINTS.StaffNarrative,
   AI_INVOCATION_POINTS.GenerateSop,
@@ -89,6 +91,7 @@ export const AI_INVOCATION_POINT_LABELS: Record<string, string> = {
   [AI_INVOCATION_POINTS.FlowchartPlan]: "Flowchart Plan",
   [AI_INVOCATION_POINTS.EpcPlan]: "EPC Plan",
   [AI_INVOCATION_POINTS.FlowchartToBpmnRefine]: "Flowchart→BPMN Refine",
+  [AI_INVOCATION_POINTS.EpcToBpmnRefine]: "EPC→BPMN Refine",
   [AI_INVOCATION_POINTS.DiagramGenerate]: "Diagram Generate (ArchiMate/generic)",
   [AI_INVOCATION_POINTS.MiningDiscover]: "Mining Discover",
   [AI_INVOCATION_POINTS.MiningDiscoverSm]: "Mining State-Machine Discover",

@@ -15,6 +15,77 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.10.2532 — 2026-09-11 — Convert to BPMN: the reason EPC is here at all
+
+An ARIS prospect has hundreds of EPCs and no way to bring them anywhere. *We
+also have EPC* is not a reason to switch; **import your models and convert them**
+is. So the notation was the vehicle and this is the product.
+
+One table, two consumers — `epcBpmnMap.ts` drives both the code translator and
+the AI image→BPMN prompt line, so a translation rule cannot exist in one and not
+the other. A screenshot of an ARIS model pasted into AI Generate now converts by
+the same rules as the real thing.
+
+### Two rules do the work, and both are about events
+
+**Most events disappear, and that is the point.** An EPC alternates event →
+function → event, so a faithful import puts a round shape between every two
+tasks. That is unreadable, and it is not what the process means: the events in
+the middle are *states*, not things that happen to the process from outside.
+First event becomes a start event, last an end event, and the rest go — each one
+named in the report, so nothing vanishes without saying so.
+
+**Events straight after a decision are branch conditions, not events.** *"Credit
+approved"* and *"Credit refused"* become the **labels on the gateway's outgoing
+sequence flows**. This single rule is the difference between a converted EPC you
+would publish and one you would delete.
+
+### Lanes are derived, not guessed
+
+This is where an EPC import beats a BPMN import. EPC records who does the work
+as an **explicit relationship**, not as geometry — so the lane comes from the
+model rather than from inferring which horizontal band a box happens to sit in.
+The test fixtures put every element at the same x on purpose: a geometric guess
+would have nothing to work with, and the lanes still come out right.
+
+### What it refuses
+
+Four things, each a question only a person can answer and each with a tempting
+wrong answer:
+
+- an **unbalanced split** — closing it is a decision about the process, not
+  about the drawing;
+- a **connector that both splits and joins** — which happens first is not
+  recorded, so there is no correct pair of gateways;
+- an **event that decides** — an event is passive, so nothing in the model says
+  what the gateway tests;
+- a **function owned by two departments** — only one can be the lane.
+
+They are shown before you commit, under **Needs a person**, and the Create button
+will not enable until they are acknowledged. A migration tool that quietly tidies
+an unbalanced branch hands you a model that looks finished and is wrong somewhere
+you will not look.
+
+### The AI pass, and the job it does NOT do
+
+EPC functions are conventionally **nouns** (*"Invoice verification"*); BPMN tasks
+are **verbs** (*"Verify invoice"*). Rewriting those is the optional pass's whole
+reason to exist. Structure is locked by construction — the merge starts from the
+deterministic plan and overlays only whitelisted fields matched by id, so nothing
+can be added, removed, re-typed or re-parented whatever the model returns, and
+that merge is shared with the flowchart pass rather than copied.
+
+The plan also gave this pass a second job: judge whether a dropped intermediate
+event was really a timer or a message, and reinstate it. **It is out of scope and
+stays out** — reinstating an element is a structural change, the one thing the
+safety story forbids. Those events are named in the report instead, where a
+person can put them back deliberately.
+
+`SCHEMA_VERSION` stays **47** and `PRODUCT_VERSION` **2.10**: a conversion
+produces an ordinary BPMN diagram through the existing `POST /api/diagrams`, so
+it inherits per-type gating and validation and changes no stored shape.
+
+---
 ## 2.10.2531 — 2026-09-11 — EPC: the notation, and the rules that make one correct
 
 The **Event-driven Process Chain** — ARIS's signature notation, and one of the

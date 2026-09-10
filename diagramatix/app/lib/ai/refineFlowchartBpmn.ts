@@ -48,7 +48,7 @@ export async function refineFlowchartBpmnPlan(opts: {
   }
 }
 
-interface RefinedPayload {
+export interface RefinedPayload {
   elements?: Array<Partial<AiElement> & { id?: string }>;
   connections?: Array<Partial<AiConnection>>;
 }

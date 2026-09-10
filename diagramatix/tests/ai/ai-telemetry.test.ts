@@ -114,11 +114,12 @@ describe("aiTelemetry", () => {
     expect(created[0].userId).toBeNull();
   });
 
-  it("T1094 — AI_USER_METERED_POINTS = the 14 quota-metered routes; AI Tidy/Vectorize/Compare excluded", () => {
+  it("T1094 — AI_USER_METERED_POINTS = the 15 quota-metered routes; AI Tidy/Vectorize/Compare excluded", () => {
     // These MUST match the routes that call recordUsage(userId, "aiAttempts").
     const expected = new Set([
       AI_INVOCATION_POINTS.BpmnPlan, AI_INVOCATION_POINTS.BpmnGenerate, AI_INVOCATION_POINTS.BpmnRefine,
       AI_INVOCATION_POINTS.FlowchartPlan, AI_INVOCATION_POINTS.EpcPlan, AI_INVOCATION_POINTS.FlowchartToBpmnRefine,
+      AI_INVOCATION_POINTS.EpcToBpmnRefine,
       AI_INVOCATION_POINTS.DiagramGenerate, AI_INVOCATION_POINTS.StaffNarrative, AI_INVOCATION_POINTS.GenerateSop,
       AI_INVOCATION_POINTS.ProcessDiff,
       AI_INVOCATION_POINTS.MiningDiscover, AI_INVOCATION_POINTS.MiningDiscoverSm, AI_INVOCATION_POINTS.MiningExplain,
