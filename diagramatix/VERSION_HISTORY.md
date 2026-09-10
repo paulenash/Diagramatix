@@ -15,7 +15,7 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
-## 2.9.2515 — 2026-09-10 — DiagramatixMINER: the whole extensions programme
+## 2.9.2517 — 2026-09-10 — DiagramatixMINER: the whole extensions programme
 
 The Miner stops being a study you commission and becomes a workbench that
 slices, attributes, advises — and tells you when your process changed.
@@ -59,10 +59,28 @@ slices, attributes, advises — and tells you when your process changed.
   subscription gate.
 - Phase 11 (the examples programme) is not started.
 
-> **Post-deploy, still to do (UPDATE_EVERYTHING Steps 10–12):** the User Guide
-> Overview version number must be set to the deployed `2.9.<build>`, and the
-> Miner's User Guide page and Features entry want updating for the new tabs.
-> Those are DB-backed content edited in the running app, not in this commit.
+**Documentation (UPDATE_EVERYTHING Steps 10–12)** — DB-backed content, seeded by
+idempotent scripts that ship in this commit and run on deploy:
+
+- **User Guide** — eight new sections on the Miner chapter: getting your log in,
+  slicing a run, where the elapsed time actually goes, who hands work to whom,
+  the cases behind a deviation, what to do next, comparing periods and alerts,
+  and the hold-back. (`scripts/add-guide-mining-workbench.ts`)
+- **Features** — three new rows, inserted as **DRAFTS**: *the log you actually
+  have*, *the analyst's workbench*, *watch it rather than visit it*. They need
+  reviewing and publishing in `/dashboard/admin/features`.
+  (`scripts/add-features-mining-workbench.ts`)
+- **Technical Design Notes** — a new chapter recording the storage constraint
+  everything follows from, the `useRunView` seam, the exactness vocabulary, what
+  the data cannot say, the two recurring defect classes, and the known gaps.
+  (`scripts/add-tech-notes-mining-workbench.ts`)
+
+> **Post-deploy, still to do — Step 10a is mandatory.** Read the build off the
+> live header badge, then against prod:
+> `npx tsx scripts/set-guide-version.ts 2.9.<build>` to stamp the User Guide
+> **Overview** version. The three content scripts above are idempotent and can be
+> re-run against prod if the deploy seed does not cover them. Then **publish the
+> three Feature drafts**.
 
 ---
 ## 2.8.2510 — 2026-09-08 — The Hire & Onboard example, asserted end to end

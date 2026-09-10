@@ -242,6 +242,12 @@ jobs:
           tsx scripts/add-features-mining-examples.ts
           tsx scripts/add-guide-mining-state-machine.ts
           tsx scripts/add-guide-mining-sample.ts
+          # The Miner extensions programme (product 2.9): the workbench the
+          # original chapter does not mention — slicing, the cases behind a
+          # deviation, hand-offs, what to do next, comparison and alerts.
+          tsx scripts/add-guide-mining-workbench.ts || echo "add-guide-mining-workbench skipped"
+          tsx scripts/add-features-mining-workbench.ts || echo "add-features-mining-workbench skipped"
+          tsx scripts/add-tech-notes-mining-workbench.ts || echo "add-tech-notes-mining-workbench skipped"
           tsx scripts/add-features-risk-controls.ts || echo "add-features-risk-controls skipped"
           tsx scripts/add-features-pcf.ts || echo "add-features-pcf skipped"
           tsx scripts/add-guide-pcf.ts || echo "add-guide-pcf skipped"
