@@ -38,6 +38,12 @@ export interface ElementSimParams {
   calendarId?: string;
   // task (BPSim TimeParameters + ResourceParameters)
   cycleTime?: SimDist;
+  /** Cost incurred each time this activity runs, independent of duration —
+   *  BPSim FixedCost. A bureau fee, a courier, a per-search charge: the costs a
+   *  redesign removes by stopping the work, not by speeding it up. Absent means
+   *  none; it is never defaulted to zero, because "not priced" and "free" are
+   *  different claims. */
+  fixedCost?: number;
   setupTime?: SimDist;
   waitTime?: SimDist;
   teamId?: string;

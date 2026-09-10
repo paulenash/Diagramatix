@@ -278,6 +278,7 @@ export function assembleFromDiagram(
       }
     } else if (kind === "task") {
       node.cycleTime = sim.cycleTime ?? DEFAULT_CYCLE;
+      if (typeof sim.fixedCost === "number" && sim.fixedCost > 0) node.fixedCost = sim.fixedCost;
       node.setupTime = sim.setupTime;
       node.waitTime = sim.waitTime;
       const teamId = sim.teamId ?? laneTeamOf(el); // inherit the lane's team if none set

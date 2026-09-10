@@ -60,6 +60,22 @@ export interface PoolUnit {
 /** How a pool chooses who to serve next when capacity frees up. */
 export type QueueDiscipline = "fifo" | "priority" | "shortest-first";
 
+/**
+ * A holder the pool would evict to make room for higher-priority work.
+ *
+ * PREEMPTION IS A DIFFERENT LEVER FROM PRIORITY, and the difference is the
+ * whole point of having it. A priority queue decides who goes NEXT — it is
+ * powerless while every server is busy, which is exactly when an urgent case
+ * arrives and exactly when it matters. Preemption decides who stops. Without
+ * it, "the emergency jumps the queue" models a process in which the emergency
+ * waits for whatever routine job happened to start ninety seconds earlier.
+ */
+export interface PreemptionVictim {
+  key: string;
+  units: number;
+  priority: number;
+}
+
 export interface QueuedRequest<R> {
   units: number;
   payload: R;
@@ -109,6 +125,10 @@ export class ResourcePool<R = unknown> {
   private units: PoolUnit[] = [];
   /** key → unit ids currently held, so a release frees the right people. */
   private assigned = new Map<string, string[]>();
+  /** key → units held and the priority it was granted at. Needed to answer
+   *  "who is the least urgent person currently working", which is the only
+   *  question preemption asks. Kept for every holder, skilled pool or not. */
+  private holders = new Map<string, { units: number; priority: number }>();
   /** Monotonic, so ordering never depends on array identity or insertion timing. */
   private seqCounter = 0;
   /** The pool's current size. Read by the engine to decide how many instances
@@ -124,10 +144,15 @@ export class ResourcePool<R = unknown> {
   private lastUpdate = 0;
   private statsStart = 0;
 
-  constructor(capacity: number, now = 0, discipline: QueueDiscipline = "fifo", units: PoolUnit[] = []) {
+  /** Whether this pool interrupts work in progress for more urgent work.
+   *  Off by default: a model that says nothing behaves exactly as it did. */
+  private preemptive = false;
+
+  constructor(capacity: number, now = 0, discipline: QueueDiscipline = "fifo", units: PoolUnit[] = [], preemptive = false) {
     this.capacity = Math.max(0, capacity);
     this.discipline = discipline;
     this.units = units.map((u) => ({ ...u, skills: [...(u.skills ?? [])] }));
+    this.preemptive = preemptive;
     this.lastUpdate = now;
     this.statsStart = now;
   }
@@ -181,12 +206,13 @@ export class ResourcePool<R = unknown> {
     if (this.busyUnits + units <= this.capacity) {
       if (!this.skilled) {
         this.busyUnits += units;
+        if (opts?.key) this.holders.set(opts.key, { units, priority: opts?.priority ?? 0 });
         return true;
       }
       const picked = this.pickUnits(units, opts?.requiredSkills);
       if (picked) {
         this.busyUnits += units;
-        if (opts?.key) this.assigned.set(opts.key, picked);
+        if (opts?.key) { this.assigned.set(opts.key, picked); this.holders.set(opts.key, { units, priority: opts?.priority ?? 0 }); }
         return true;
       }
     }
@@ -225,9 +251,37 @@ export class ResourcePool<R = unknown> {
     this.accrue(now);
     this.busyUnits = Math.max(0, this.busyUnits - units);
     // Free the specific people, not just the count.
-    if (key) this.assigned.delete(key);
+    if (key) { this.assigned.delete(key); this.holders.delete(key); }
     return this.drainQueue();
   }
+
+  /**
+   * The holder worth evicting for work of `priority`, or nothing.
+   *
+   * Two refusals, both deliberate:
+   *
+   * STRICTLY LOWER PRIORITY ONLY. Equal priority does not preempt, or two
+   * equally urgent cases would take turns interrupting each other and neither
+   * would finish — a livelock that would show up as a plausible-looking
+   * throughput collapse rather than as a crash.
+   *
+   * THE LEAST URGENT, AND AMONG EQUALS THE ONE WITH THE MOST LEFT TO LOSE IS
+   * NOT CHOSEN — the tie-break is arrival order, so eviction is deterministic
+   * and a run reproduces. Choosing "whoever has least remaining" would need the
+   * pool to know service times it deliberately does not track.
+   */
+  preemptionVictim(priority: number): PreemptionVictim | undefined {
+    if (!this.preemptive) return undefined;
+    let worst: PreemptionVictim | undefined;
+    for (const [key, h] of this.holders) {
+      if (h.priority >= priority) continue;
+      if (!worst || h.priority < worst.priority) worst = { key, units: h.units, priority: h.priority };
+    }
+    return worst;
+  }
+
+  /** Whether this pool may interrupt work in progress. */
+  get preempts(): boolean { return this.preemptive; }
 
   /** Live Operator lever: change capacity, then grant anything newly fitting. */
   setCapacity(now: number, capacity: number): R[] {

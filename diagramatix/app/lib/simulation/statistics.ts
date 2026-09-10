@@ -37,6 +37,19 @@ export interface RepStats {
    *  neither, and every reader must say so rather than report a zero. */
   processWaitTotal?: number;
   queueWaitTotal?: number;
+  /**
+   * Per-execution activity costs incurred this replication — the sum of each
+   * node's `fixedCost` times the number of times it ran.
+   *
+   * Reported SEPARATELY from resource cost rather than folded in, because the
+   * two have different remedies: resource cost falls when the work gets faster
+   * or the team gets smaller, and activity cost falls only when the work stops
+   * happening. A total that mixed them would hide which lever applies.
+   *
+   * Optional: runs recorded before this existed have none, and a reader must
+   * say "not measured" rather than report a zero.
+   */
+  activityCost?: number;
   perNode: Record<string, NodeStat>;
   perTeam: Record<string, TeamStat>;
 }
@@ -117,6 +130,11 @@ export interface AggregatedStats {
   totalCost: Stat;
   /** Cost per completed case (totalCost / completed). */
   costPerCase: Stat;
+  /** The hours half of the cost — busy time x each team rate. */
+  resourceCost: Stat;
+  /** The per-execution half — each activity fixed cost x how often it ran.
+   *  Absent when nothing in the model carries one. */
+  activityCost?: Stat;
   /** Case-level flow-time distribution, pooled over all cases in all
    *  replications: true per-case p50/p95, spread (sd) + a histogram. Distinct
    *  from `flowTime`, which is the run-to-run variation of each run's mean. */
@@ -160,7 +178,14 @@ export function aggregate(reps: RepStats[]): AggregatedStats {
   }
   // Per-replication totals, then aggregate (so percentiles reflect run-to-run
   // variation, not a sum of percentiles).
-  const totalCostPerRep = reps.map((r) => Object.values(r.perTeam).reduce((s, t) => s + (t.cost ?? 0), 0));
+  const resourceCostPerRep = reps.map((r) => Object.values(r.perTeam).reduce((s, t) => s + (t.cost ?? 0), 0));
+  const activityCostPerRep = reps.map((r) => r.activityCost ?? 0);
+  // Cost per case counts BOTH: the hours somebody spent, and the per-execution
+  // charges the work incurs whether or not it takes any time. They are
+  // aggregated separately as well, because they have different remedies —
+  // resource cost falls when the work speeds up, activity cost falls only when
+  // the work stops happening.
+  const totalCostPerRep = resourceCostPerRep.map((c, i) => c + activityCostPerRep[i]);
   const costPerCasePerRep = reps.map((r, i) => (r.completed > 0 ? totalCostPerRep[i] / r.completed : 0));
   // Pool every individual case's flow time across all replications → the true
   // case-level distribution (percentiles describe cases, not run averages).
@@ -193,6 +218,10 @@ export function aggregate(reps: RepStats[]): AggregatedStats {
     flowTime: statOf(reps.map((r) => r.avgFlowTime)),
     totalCost: statOf(totalCostPerRep),
     costPerCase: statOf(costPerCasePerRep),
+    resourceCost: statOf(resourceCostPerRep),
+    // Absent, not zero, when no activity in the model is priced: "nothing was
+    // charged" and "nothing was measured" are different statements.
+    ...(activityCostPerRep.some((c) => c > 0) ? { activityCost: statOf(activityCostPerRep) } : {}),
     caseFlow: caseDistOf(allCaseFlows),
     ...(caseFlowBySegment ? { caseFlowBySegment } : {}),
     perNode, perTeam,

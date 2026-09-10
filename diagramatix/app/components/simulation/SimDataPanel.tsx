@@ -26,6 +26,9 @@ const isEventEP = (e: DiagramElement) => e.type === "subprocess-expanded" && e.p
 // ── Compact green distribution editor ──────────────────────────────────────
 const KIND_FIELDS: Record<SimDist["kind"], string[]> = {
   fixed: ["value"], uniform: ["min", "max"], triangular: ["min", "mode", "max"], normal: ["mean", "sd"], exponential: ["mean"],
+  lognormal: ["mean", "sd"],
+  // Empirical carries measured values, not parameters — nothing to type.
+  empirical: [],
 };
 function distOfKind(kind: SimDist["kind"]): SimDist {
   switch (kind) {
@@ -34,6 +37,10 @@ function distOfKind(kind: SimDist["kind"]): SimDist {
     case "triangular": return { kind: "triangular", min: 0, mode: 1, max: 2 };
     case "normal": return { kind: "normal", mean: 1, sd: 0.5 };
     case "exponential": return { kind: "exponential", mean: 1 };
+    case "lognormal": return { kind: "lognormal", mean: 1, sd: 0.5 };
+    // Switching TO empirical by hand has nothing to seed it with; an empty
+    // sketch samples 0, which is visibly wrong rather than quietly wrong.
+    case "empirical": return { kind: "empirical", samples: [] };
   }
 }
 function MatrixDist({ value, onChange, auto }: { value?: SimDist; onChange: (d: SimDist | undefined) => void; auto?: boolean }) {

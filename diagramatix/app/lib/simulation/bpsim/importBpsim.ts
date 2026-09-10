@@ -68,6 +68,22 @@ function parseDist(inner: string, unit: ClockUnit): SimDist | undefined {
     const min = num(attr(t, "min")), max = num(attr(t, "max"));
     if (min !== undefined && max !== undefined) return { kind: "uniform", min, max };
   }
+  t = firstTagAttrs(inner, "LogNormalDistribution") ?? firstTagAttrs(inner, "LognormalDistribution");
+  if (t) {
+    const mean = num(attr(t, "mean")), sd = num(attr(t, "standardDeviation"));
+    if (mean !== undefined && sd !== undefined) return { kind: "lognormal", mean, sd };
+  }
+
+  // UserDistribution → the points themselves. Their probabilities are dropped:
+  // a uniform draw over the stored values is what the sampler does, and a
+  // weighted sketch would need a shape SimDist does not carry. Weighted points
+  // therefore round-trip as unweighted ones, which is a loss worth naming.
+  const ud = inner.match(/<[^>]*UserDistributionDataPoint\b[^>]*\/>/g);
+  if (ud && ud.length > 0) {
+    const vals = ud.map((tag) => Number((tag.match(/value="([^"]*)"/) ?? [])[1])).filter((v) => Number.isFinite(v));
+    if (vals.length > 0) return { kind: "empirical", samples: vals.sort((a, b) => a - b) };
+  }
+
   t = firstTagAttrs(inner, "NegativeExponentialDistribution") ?? firstTagAttrs(inner, "ExponentialDistribution");
   if (t) {
     const mean = num(attr(t, "mean"));

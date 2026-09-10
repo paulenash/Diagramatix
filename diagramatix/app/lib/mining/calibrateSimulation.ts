@@ -11,20 +11,42 @@ import { getSimParams, simPatch } from "@/app/lib/diagram/simParams";
 import type { SimDist, ClockUnit, WorkCalendar, CalendarInterval } from "@/app/lib/simulation/types";
 import type { Performance } from "./types";
 import { minOf, maxOf } from "./numeric";
+import { empiricalFrom } from "@/app/lib/simulation/distributions";
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 const median = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 
-/** Fit a service-time distribution to sojourn samples: fixed when constant/scarce,
- *  else a triangular(min, median, max). */
+/**
+ * Fit a service-time distribution to observed sojourn samples.
+ *
+ * THIS USED TO BE triangular(min, median, max), AND THAT WAS WRONG IN A WAY
+ * NOTHING WOULD HAVE SHOWN. `min` and `max` were the raw extremes of the
+ * samples, untrimmed — so one case that sat over a long weekend set the ceiling
+ * for every future run of that activity, and the triangular then spread
+ * probability all the way out to it. The twin ran, produced numbers, and
+ * overstated the tail of the one activity somebody had once forgotten about.
+ *
+ * It is now EMPIRICAL: the observed values themselves, trimmed at each end and
+ * kept as a bounded quantile sketch. Where the data exists, laying a curve over
+ * it is a claim the evidence does not make — and the tail, which is what makes
+ * a queue form, is reproduced rather than modelled.
+ *
+ * Scarce samples still collapse to a fixed value: three observations do not
+ * describe a distribution, and pretending otherwise would be the same error in
+ * a smaller font.
+ */
 export function fitDuration(samples: number[]): SimDist {
   if (samples.length === 0) return { kind: "fixed", value: 1 };
   // Spreading a per-event sample array throws past ~125k — see numeric.ts.
   const min = Math.max(0, minOf(samples) ?? 0), max = maxOf(samples) ?? 0;
   const mean = samples.reduce((a, b) => a + b, 0) / samples.length;
-  if (samples.length < 3 || min === max) return { kind: "fixed", value: Math.max(0, r2(mean)) };
-  return { kind: "triangular", min: r2(min), mode: r2(Math.max(min, median(samples))), max: r2(max) };
+  if (samples.length < MIN_FIT_SAMPLES || min === max) return { kind: "fixed", value: Math.max(0, r2(mean)) };
+  const emp = empiricalFrom(samples.map((v) => Math.max(0, r2(v))));
+  return emp.kind === "empirical" && emp.samples.length >= 2 ? emp : { kind: "fixed", value: Math.max(0, r2(mean)) };
 }
+
+/** Below this, an activity has anecdotes rather than a distribution. */
+export const MIN_FIT_SAMPLES = 5;
 
 /** Fit an inter-arrival distribution (exponential — the usual arrival model). */
 export function fitArrival(samples: number[]): SimDist {

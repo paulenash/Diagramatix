@@ -115,6 +115,20 @@ export interface SimNode {
   waitTime?: SimDist;    // BPSim WaitTime — non-seizing delay after service
   teamId?: string;
   units?: number;        // resource Quantity (default 1)
+  /**
+   * Cost incurred EACH TIME this activity runs, independent of how long it
+   * takes. BPSim's `FixedCost`.
+   *
+   * Cost was resource-hours and nothing else, which silently assumes every
+   * expense scales with somebody's time. A great many do not: a credit bureau
+   * check, a courier, a card-scheme fee, a per-search charge. They are exactly
+   * the costs a redesign is meant to remove — "stop checking twice" saves the
+   * bureau fee whether or not it saves a minute — and a model that could not
+   * express them could not price the change it was being run to evaluate.
+   *
+   * In the study's currency; absent means none, never zero-as-a-guess.
+   */
+  fixedCost?: number;
   // delay
   delay?: SimDist;
   // Timer-delay interpretation. Absent → plain elapsed time.
@@ -178,6 +192,20 @@ export interface SimTeam {
    *  did before disciplines existed. See ResourcePool for why head-of-line
    *  blocking is kept in every discipline. */
   discipline?: QueueDiscipline;
+  /**
+   * May this team interrupt work in progress for something more urgent?
+   *
+   * Priority alone only decides who goes NEXT, which is powerless while every
+   * server is busy — exactly when an urgent case arrives and exactly when it
+   * matters. Without this, "the emergency jumps the queue" models a process in
+   * which the emergency waits for whatever routine job started ninety seconds
+   * earlier.
+   *
+   * Preempt-RESUME: the interrupted case keeps the work already done and
+   * finishes the remainder when it next gets a person. Absent = false, so every
+   * existing model behaves exactly as it did.
+   */
+  preemptive?: boolean;
   /** Named people and what each can do. ABSENT = a counted pool of
    *  interchangeable units, exactly as before skills existed. `capacity` still
    *  caps how many may work at once, so the calendar and interventions are

@@ -17,7 +17,27 @@ export type SimDist =
   | { kind: "uniform"; min: number; max: number }
   | { kind: "triangular"; min: number; mode: number; max: number }
   | { kind: "normal"; mean: number; sd: number } // truncated at 0
-  | { kind: "exponential"; mean: number };        // mean = 1/rate
+  | { kind: "exponential"; mean: number }        // mean = 1/rate
+  /**
+   * The one a modeller reaches for when the task is real work.
+   *
+   * Service times are right-skewed: most cases cluster and a few run far past
+   * the median. A truncated normal cannot produce that tail and a triangular
+   * puts a hard ceiling on it, so both understate exactly the cases that make a
+   * queue form. `mean` and `sd` are of the DISTRIBUTION, not of its underlying
+   * normal — a modeller has the average and the spread of the thing they
+   * measured, not of its logarithm.
+   */
+  | { kind: "lognormal"; mean: number; sd: number }
+  /**
+   * The observed values themselves, resampled — no distributional assumption at
+   * all. What mining calibration fits, because the samples ARE the evidence and
+   * choosing a curve to lay over them is a claim the data does not make.
+   *
+   * Held as an ordered quantile sketch (see `empiricalFrom`) so a diagram never
+   * carries fifty thousand numbers.
+   */
+  | { kind: "empirical"; samples: number[] };
 
 export type ClockUnit = "second" | "minute" | "hour" | "day";
 

@@ -52,6 +52,15 @@ interface Token {
   armed?: string[];
   /** Set while this token is running compensation handlers in sequence. */
   comp?: { queue: string[]; resume: string };
+  /**
+   * Service time still owed, when this token is a PREEMPTED case coming back.
+   *
+   * Preempt-resume, not preempt-restart: the work already done is not thrown
+   * away. Restart would be the easier implementation and would quietly inflate
+   * total work in the model — a process where being interrupted costs you the
+   * whole task is a different process, and not the common one.
+   */
+  resumeService?: number;
 }
 
 function cloneStack(s: Frame[]): Frame[] { return s.map((f) => ({ ...f })); }
@@ -130,7 +139,7 @@ const MAX_REPEAT_PASSES = 10_000;
 const MAX_LIVE_TOKENS = 50_000;
 
 /** A token-movement event for the live replay player (green-token animation). */
-export type TraceEventKind = "spawn" | "enter" | "queue" | "service" | "exit" | "fire";
+export type TraceEventKind = "spawn" | "enter" | "queue" | "service" | "exit" | "fire" | "preempt";
 /** `fire` = an element ACTIVATION flash (not a token move): a boundary event that
  *  fired (variant "boundary" → red) or an inline catch that was triggered by a
  *  matching throw (variant "catch" → green). tokenId is empty for these. */
@@ -168,7 +177,9 @@ export interface SimState {
   messageQueue?: Record<string, number>;
   catchArm?: Record<string, number>;
   nextCatchArm?: number;
-  inService: Record<string, { teamId: string; units: number }>;
+  inService: Record<string, { teamId: string; nodeId: string; units: number }>;
+  /** tokenId → scheduled SERVICE_END, so a restored run can still preempt. */
+  serviceEnds?: Record<string, number>;
   arrivalsByNode: Record<string, number>;
   // Applied-intervention state (so an Operator fork preserves timed changes).
   arrivalMult?: Record<string, number>;
@@ -202,7 +213,12 @@ export class Engine {
   private inCount = new Map<string, number>();   // node id → incoming edge count (converging test)
   private activeScopes = new Set<string>();      // scope instances currently running (for event-sub triggers)
   private cancelledTokens = new Set<string>();   // tokens whose pending events must be ignored (interrupt)
-  private inService = new Map<string, { teamId: string; units: number }>(); // resources a token currently holds
+  private inService = new Map<string, { teamId: string; nodeId: string; units: number }>(); // resources a token currently holds
+  /** tokenId → the clock time its SERVICE_END is scheduled for. Preemption
+   *  needs the REMAINING service, and the event calendar is a heap with no
+   *  lookup; recording the end when it is scheduled is cheaper than searching
+   *  for it and is what makes preempt-RESUME possible at all. */
+  private serviceEnds = new Map<string, number>();
   private esubById = new Map<string, EventSub>();
   private warmedUp: boolean;
   private arrivalsByNode = new Map<string, number>();
@@ -278,7 +294,7 @@ export class Engine {
       }
       for (const es of n.eventSubs ?? []) this.esubById.set(es.id, es);
     }
-    for (const t of network.teams) this.pools.set(t.id, new ResourcePool<Pending>(t.capacity, 0, t.discipline ?? "fifo", t.units ?? []));
+    for (const t of network.teams) this.pools.set(t.id, new ResourcePool<Pending>(t.capacity, 0, t.discipline ?? "fifo", t.units ?? [], t.preemptive === true));
   }
 
   /** Seed sources with their first arrival, and schedule any planned
@@ -634,11 +650,15 @@ export class Engine {
     const held = this.inService.get(tokenId);
     if (held) {
       const pool = this.pools.get(held.teamId);
-      if (pool) for (const p of pool.release(this.clock, held.units)) {
+      // Keyed, so the named people and the holder record are freed — not just
+      // the count. Without the key an interrupted token left its unit
+      // assignment behind and the pool slowly ran out of nameable people.
+      if (pool) for (const p of pool.release(this.clock, held.units, tokenId)) {
         const gt = this.tokens.get(p.tokenId), gn = this.nodeById.get(p.nodeId);
         if (gt && gn) this.startService(gt, gn, this.clock - p.requestedAt, p.plan);
       }
       this.inService.delete(tokenId);
+      this.serviceEnds.delete(tokenId);
     } else {
       // may be queued somewhere — drop its pending request from every pool
       for (const pool of this.pools.values()) pool.cancelWhere(this.clock, (p) => p.tokenId === tokenId);
@@ -923,7 +943,12 @@ export class Engine {
           // The token is the holder: releasing it frees exactly those people.
           key: token.id,
         });
-        if (granted) this.startService(token, node, 0, plan);
+        if (granted) { this.startService(token, node, 0, plan); return; }
+        // Not granted. If this team interrupts for urgent work, the request is
+        // now at the head of a priority queue, so freeing a person hands them
+        // straight to it.
+        const victim = pool.preemptionVictim(numProp(token, PRIORITY_PROP) ?? 0);
+        if (victim) this.preempt(node.teamId, victim.key);
         else this.emit("queue", token.id, node.id); // queued — service starts on a future release
         return;
       }
@@ -931,15 +956,69 @@ export class Engine {
     this.startService(token, node, 0, plan);
   }
 
+  /**
+   * Interrupt `victimKey`'s work so a more urgent case can start.
+   *
+   * Preempt-RESUME. The remaining service is carried on a FRESH token, for the
+   * same reason the interrupting-boundary path does it: `cancelToken`
+   * blacklists the old id so its already-scheduled SERVICE_END can never fire,
+   * and a blacklisted id cannot be reused. The new token keeps the case's
+   * identity — arrival time, properties, call stack — so its flow time still
+   * measures the case rather than the fragment.
+   *
+   * Releasing the victim's units is what starts the urgent work: the pool
+   * grants to the head of its queue, which under a priority discipline is the
+   * request that just failed. So the eviction and the promotion are one step,
+   * and there is no window in which the person is idle.
+   */
+  private preempt(teamId: string, victimKey: string): void {
+    const victim = this.tokens.get(victimKey);
+    const held = this.inService.get(victimKey);
+    if (!victim || !held) return;
+    const node = this.nodeById.get(held.nodeId);
+    if (!node) return;
+
+    const remaining = Math.max(0, (this.serviceEnds.get(victimKey) ?? this.clock) - this.clock);
+    this.emit("preempt", victimKey, node.id);
+
+    const resumed: Token = {
+      id: `t${this.nextTokenId++}`,
+      enteredAt: victim.enteredAt,
+      props: { ...victim.props },
+      callStack: cloneStack(victim.callStack),
+      internal: victim.internal,
+      joinStack: victim.joinStack ? [...victim.joinStack] : undefined,
+      armed: victim.armed ? [...victim.armed] : undefined,
+      resumeService: remaining,
+    };
+    // Frees the person AND grants them to the urgent case waiting at the head.
+    this.cancelToken(victimKey);
+    this.tokens.set(resumed.id, resumed);
+    // Back into the queue at its own priority — it does not lose its place
+    // among equals, it only loses to the case that outranked it.
+    this.startOrQueue(resumed, node);
+    void teamId;
+  }
+
   private startService(token: Token, node: SimNode, wait: number, plan?: RepeatPlan): void {
     const p = plan ?? this.repeatPlan(node);
     this.emit("service", token.id, node.id);
-    if (node.teamId) this.inService.set(token.id, { teamId: node.teamId, units: p.units });
+    if (node.teamId) this.inService.set(token.id, { teamId: node.teamId, nodeId: node.id, units: p.units });
     if (this.warmedUp) {
       const acc = this.perNode.get(node.id) ?? { count: 0, waitSum: 0 };
       acc.count++; acc.waitSum += wait;
       this.perNode.set(node.id, acc);
       this.queueWaitTotal += wait;
+    }
+    // A preempted case comes back owing only what was left. Re-sampling here
+    // would hand it a fresh full-length service and make interruption free.
+    if (token.resumeService !== undefined) {
+      const rem = Math.max(0, token.resumeService);
+      delete token.resumeService;
+      this.serviceEnds.set(token.id, this.clock + rem);
+      this.calendar.schedule(this.clock + rem, { type: "SERVICE_END", nodeId: node.id, tokenId: token.id });
+      this.armBoundary(token, node);
+      return;
     }
     let dur = 0;
     if (node.setupTime) dur += sample(node.setupTime, this.rng);
@@ -953,6 +1032,7 @@ export class Engine {
         dur += Math.max(...each.slice(i, i + p.concurrency));
       }
     }
+    this.serviceEnds.set(token.id, this.clock + dur);
     this.calendar.schedule(this.clock + dur, { type: "SERVICE_END", nodeId: node.id, tokenId: token.id });
     this.armBoundary(token, node);
   }
@@ -1203,7 +1283,15 @@ export class Engine {
   /** Compute the replication's statistics as of time `now`. */
   finalize(now: number): RepStats {
     const perNode: Record<string, NodeStat> = {};
-    for (const [id, a] of this.perNode) perNode[id] = { count: a.count, avgWait: a.count ? a.waitSum / a.count : 0 };
+    // Per-execution activity cost falls out of counts already being kept, so it
+    // costs the hot path nothing: each node ran `count` times, and each run
+    // incurs its fixedCost.
+    let activityCost = 0;
+    for (const [id, a] of this.perNode) {
+      perNode[id] = { count: a.count, avgWait: a.count ? a.waitSum / a.count : 0 };
+      const fc = this.nodeById.get(id)?.fixedCost;
+      if (typeof fc === "number" && fc > 0) activityCost += a.count * fc;
+    }
     const perTeam: RepStats["perTeam"] = {};
     // busyTime is in clock units; cost = busy-hours × costPerHour.
     const hoursPerUnit = SECONDS_PER_UNIT[this.config.clockUnit] / 3600;
@@ -1215,6 +1303,7 @@ export class Engine {
     return {
       arrived: this.arrived,
       completed: this.completed,
+      ...(activityCost > 0 ? { activityCost } : {}),
       avgFlowTime: this.flowCount ? this.flowSum / this.flowCount : 0,
       flowSamples: this.flowSamples,
       ...(this.flowBySegment.size ? { flowSamplesBySegment: Object.fromEntries(this.flowBySegment) } : {}),
@@ -1253,6 +1342,7 @@ export class Engine {
       catchArm: Object.fromEntries(this.catchArm),
       nextCatchArm: this.nextCatchArm,
       inService: Object.fromEntries(this.inService),
+      serviceEnds: Object.fromEntries(this.serviceEnds),
       arrivalsByNode: Object.fromEntries(this.arrivalsByNode),
       arrivalMult: Object.fromEntries(this.arrivalMult),
       edgeProb: Object.fromEntries(this.edgeProb),
@@ -1282,6 +1372,7 @@ export class Engine {
     e.catchArm = new Map(Object.entries(snap.catchArm ?? {}));
     e.nextCatchArm = snap.nextCatchArm ?? 1;
     e.inService = new Map(Object.entries(snap.inService ?? {}));
+    e.serviceEnds = new Map(Object.entries(snap.serviceEnds ?? {}));
     e.arrivalsByNode = new Map(Object.entries(snap.arrivalsByNode));
     e.arrivalMult = new Map(Object.entries(snap.arrivalMult ?? {}));
     e.edgeProb = new Map(Object.entries(snap.edgeProb ?? {}));

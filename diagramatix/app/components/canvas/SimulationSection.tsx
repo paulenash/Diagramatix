@@ -105,6 +105,21 @@ export function SimulationSection({
               <Field label="Wait time (non-resource)">
                 <DistributionInput value={sim.waitTime} onChange={(waitTime) => patch({ waitTime })} />
               </Field>
+              {/* Charged once per execution, whatever the duration — a bureau
+                  check, a courier, a per-search fee. Cost used to be busy-hours
+                  and nothing else, which assumed every expense scales with
+                  somebody time. Blank means NOT PRICED, which is not the same
+                  claim as free. */}
+              <Field label="Cost per run (fixed)">
+                <input
+                  type="number"
+                  min={0}
+                  className="w-full px-1.5 py-0.5 text-[11px] border border-gray-300 rounded bg-white text-gray-900 [color-scheme:light]"
+                  placeholder="e.g. 4.50 — a bureau fee, a courier"
+                  value={sim.fixedCost ?? ""}
+                  onChange={(e) => patch({ fixedCost: e.target.value === "" ? undefined : Number(e.target.value) })}
+                />
+              </Field>
               <div className="grid grid-cols-2 gap-2">
                 <Field label="Team / resource id">
                   <input

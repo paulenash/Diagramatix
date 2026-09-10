@@ -41,7 +41,33 @@ describe("distribution fitting + calendar", () => {
   it("T0601 — fitDuration/fitArrival pick sensible SimDists; active hours → a calendar", () => {
     expect(fitDuration([])).toEqual({ kind: "fixed", value: 1 });
     expect(fitDuration([5, 5, 5])).toEqual({ kind: "fixed", value: 5 });   // constant → fixed
-    expect(fitDuration([1, 2, 3, 4])).toEqual({ kind: "triangular", min: 1, mode: 2.5, max: 4 });
+    // CHANGED 2026-09-10. This used to assert a triangular(min, median, max)
+    // fitted from the RAW extremes, which meant one case that sat over a long
+    // weekend set the ceiling for every future run of that activity. The fit is
+    // now empirical — the observed values, fenced and resampled — and four
+    // samples is below the floor at which a distribution is claimed at all.
+    expect(fitDuration([1, 2, 3, 4])).toEqual({ kind: "fixed", value: 2.5 });
+    // Enough samples → the values themselves.
+    const fitted = fitDuration([1, 1, 2, 2, 3, 3, 4]);
+    expect(fitted.kind).toBe("empirical");
+
+    // THE DEFECT THIS REPLACED, as a check: a single absurd sample must not
+    // reach the tail. Under the old triangular fit its max became the model's
+    // longest possible service time, and the twin then queued cases behind an
+    // activity that had once been forgotten about for a fortnight.
+    const withOutlier = fitDuration([1, 1, 2, 2, 3, 3, 4, 1000]);
+    expect(withOutlier.kind).toBe("empirical");
+    if (withOutlier.kind === "empirical") {
+      expect(Math.max(...withOutlier.samples)).toBeLessThan(10);
+    }
+
+    // But a genuinely heavy tail is NOT an outlier and must survive: when many
+    // observations sit past the fence they are the distribution.
+    const heavy = fitDuration([1, 1, 1, 1, 1, 1, 40, 41, 42, 43]);
+    if (heavy.kind === "empirical") {
+      expect(Math.max(...heavy.samples)).toBeGreaterThan(30);
+    }
+
     expect(fitArrival([10, 20, 30])).toEqual({ kind: "exponential", mean: 20 });
     // Mon 09:00–11:00 active → a single open window.
     const hours = new Array(168).fill(0); hours[9] = 10; hours[10] = 10;

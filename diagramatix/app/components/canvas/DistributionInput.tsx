@@ -98,6 +98,21 @@ export function DistributionInput({
         {d.kind === "exponential" && (
           <Num label="mean" value={d.mean} onChange={(mean) => onChange({ kind: "exponential", mean })} />
         )}
+        {d.kind === "lognormal" && (
+          <>
+            <Num label="mean" value={d.mean} onChange={(mean) => onChange({ ...d, mean })} />
+            <Num label="std dev" value={d.sd} onChange={(sd) => onChange({ ...d, sd })} />
+          </>
+        )}
+        {d.kind === "empirical" && (
+          // Not editable by hand — these are measured values, and a form that
+          // invited someone to type sixty-four numbers would be a form nobody
+          // should use. Calibration writes them; this says what is there.
+          <span className="text-[11px] text-gray-500">
+            {d.samples.length} observed value{d.samples.length === 1 ? "" : "s"}, resampled
+            {d.samples.length > 0 && ` (${d.samples[0]}–${d.samples[d.samples.length - 1]})`}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -112,5 +127,7 @@ function meanGuess(d: SimDist): number {
     case "triangular": return (d.min + d.mode + d.max) / 3;
     case "normal": return d.mean;
     case "exponential": return d.mean;
+    case "lognormal": return d.mean;
+    case "empirical": return d.samples.length === 0 ? 0 : d.samples.reduce((a, b) => a + b, 0) / d.samples.length;
   }
 }

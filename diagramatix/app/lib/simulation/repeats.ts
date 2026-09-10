@@ -70,8 +70,22 @@ export function implausibleRepeatCount(el: DiagramElement): number | undefined {
     : d.kind === "uniform" ? d.max
     : d.kind === "triangular" ? d.max
     : d.kind === "normal" ? d.mean + 3 * d.sd
+    // Lognormal's tail is multiplicative, so mean + 3sd understates it; the
+    // 99th percentile is the honest "largest realistic" for a skewed shape.
+    : d.kind === "lognormal" ? lognormalP99(d.mean, d.sd)
+    : d.kind === "empirical" ? (d.samples.length ? d.samples[d.samples.length - 1] : 0)
     : d.mean; // exponential — the mean already implies a long tail
   return Number.isFinite(size) && size > IMPLAUSIBLE_REPEAT_COUNT ? Math.round(size) : undefined;
+}
+
+/** The 99th percentile of a lognormal given the distribution's own mean/sd. */
+function lognormalP99(mean: number, sd: number): number {
+  if (!(mean > 0)) return 0;
+  if (!(sd > 0)) return mean;
+  const cv2 = (sd / mean) * (sd / mean);
+  const sigma = Math.sqrt(Math.log(1 + cv2));
+  const mu = Math.log(mean) - (sigma * sigma) / 2;
+  return Math.exp(mu + 2.326 * sigma); // z(0.99)
 }
 
 /** The LoopParams an element should carry for its marker, for Fill missing to

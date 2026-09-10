@@ -37,6 +37,16 @@ function distXml(d: SimDist, time: boolean, unit: ClockUnit): string {
       return `<${NS}:UniformDistribution min="${d.min}" max="${d.max}"/>`;
     case "exponential":
       return `<${NS}:NegativeExponentialDistribution mean="${d.mean}"/>`;
+    case "lognormal":
+      return `<${NS}:LogNormalDistribution mean="${d.mean}" standardDeviation="${d.sd}"/>`;
+    case "empirical":
+      // BPSim's UserDistribution: an explicit set of points with equal weight,
+      // which is exactly what a resampled sketch is. Exporting it as a fitted
+      // curve would send a receiving tool a claim we deliberately avoided
+      // making.
+      return `<${NS}:UserDistribution>${d.samples
+        .map((v) => `<${NS}:UserDistributionDataPoint probability="${(1 / Math.max(1, d.samples.length)).toFixed(6)}" value="${v}"/>`)
+        .join("")}</${NS}:UserDistribution>`;
     case "fixed":
       return time
         ? `<${NS}:DurationParameter value="${unitToIso(d.value, unit)}"/>`
