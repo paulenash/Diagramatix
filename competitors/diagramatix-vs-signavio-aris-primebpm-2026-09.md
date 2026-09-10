@@ -1,8 +1,6 @@
 # Diagramatix vs SAP Signavio, ARIS & PRIME BPM — Feature & AI Comparison
 
-*Compiled: **September 2026**. Diagramatix data from the current codebase (product 2.9, export schema v1.2x / SCHEMA_VERSION 46; BPMN + 6 other diagram types incl. **ArchiMate**, plus **Diagramatix Miner** — process mining with an eleven-phase analyst workbench — a discrete-event **Process Simulator** with significance testing, parameter sweep, sensitivity analysis and a business case, an **AI SOP generator**, a **Risk & Control (GRC) matrix**, **APQC PCF** classification over a database-backed **Process Repository**, a partner-facing **Process API**, **multi-model AI** with usage metering, a **publishing & review lifecycle**, **real-time co-authoring**, **Microsoft 365 (SharePoint/OneDrive)** integration, **governed pool/lane naming**, **domain-managed org membership** and **role-based sharing / org admin**). Competitor data from public product pages/documentation accessed May–June 2026, carried forward unchanged through three editions — **re-verify against live competitor pages before quoting externally**; their AI/mining/simulation features move fast and this document has not tracked them since June.*
-
-> **Rev. 2026-09-10.** Headline change: **two extensions programmes shipped**, and both change what the product is rather than what it has. **Diagramatix Miner** went from a discovery module to an **analyst's workbench and a monitor** (eleven phases): it reads the spreadsheet you actually have — Excel, wide "one row per case" exports, several systems merged into one lifecycle — every figure **declares its own exactness**, a deviation resolves to the **case ids behind it**, hand-offs and rework are measured, and a linked **run series** brings period comparison and alerting, led by the alarm nobody else leads with: *the source stopped sending*. The **Simulator** gained the layer that lets an answer be defended in a meeting — **significance testing**, **parameter sweep with the knee marked**, a **sensitivity tornado**, **validation against the distribution the business actually had**, **skills and queue discipline**, and a **business case with a payback month**. Also new: a partner-facing **Process API** (a partner posts a document, gets back a PDF and a real project), **readability as a measured property** with an offline ratchet, and the **Process Repository** in the database — 26 value chains, 277 processes, 381 editable prompts. *(Rev 2026-08-04 shipped assist-while-you-draw, the NL command bar and Abracadabra voice editing; Rev 2026-08-03 real-time co-authoring and the completed BPMN 2.0 orchestration palette.)*
+*Diagramatix data read from the current codebase (product 2.9, export schema v1.2x / SCHEMA_VERSION 46). Competitor data from public product pages and documentation accessed May–June 2026 — **re-verify against live competitor pages before quoting externally**; their AI, mining and simulation features move fast and this document does not track them.*
 
 ---
 
@@ -15,7 +13,7 @@
 | **ARIS** (Software AG) | A long-established enterprise **BPA / EA suite** — signature **EPC** notation plus BPMN, deep repository/governance, process mining, mature simulation, and the **ARIS AI Companion** (text-to-model, NL search, GenAI mining insights). Enterprise. |
 | **PRIME BPM** | An Australian cloud BPM suite in two editions — **PRIME Modeller** and **PRIME Improver** — with a strong improvement/analysis angle (cycle time, cost, VA/NVA) and **AI add-on agents** (MapAI, AI Procedure Writer, Digital Process Analyst, PrimeGPT). |
 
-**The short version.** Diagramatix competes head-on with all three on **authoring + AI generation**, where its editable-plan + rules-governed deterministic layout remains genuinely distinctive — and readability is now a *measured* property with an offline ratchet, not an aspiration. The July gaps closed in August; this edition reports what happened when the two closed gaps were then **developed rather than left as checkboxes**. **Diagramatix Miner** is no longer "we have mining too": it reads the messy exports people actually have, every figure on the screen says whether it describes the whole run or a slice or an estimate, a deviation hands you the case ids behind it, hand-offs and rework are measured from per-event resources, and a linked run series turns a one-off study into a **monitor** that tells you when the process changed — leading with the alarm the others bury, *your feed went quiet*. The **Simulator** gained the layer that decides whether a business case survives the meeting: **is the difference real or is it noise**, **which assumption is load-bearing**, **where does the staffing curve bend**, and **how do we know the model is right** — answered against the distribution the business actually had, with the twin tested on cases **held back** at import rather than marking its own homework. Around them: a partner-facing **Process API** that turns a posted document into a PDF and a real project, and a database-backed **Process Repository** of 26 value chains and 381 editable prompts. The three enterprise suites still lead on **scale** — Signavio on the SAP ecosystem and the most industrialised mining, ARIS on EA breadth, EPC, repository governance and the deepest simulation *engine*, PRIME BPM on built-in improvement analytics — and on **configurable approval-workflow engines with full audit**. But the axis has moved: the remaining mining gap is **connector breadth and enterprise data volume**, which is an infrastructure argument, not an analytical one. On what a single analyst can actually find out, defend, and be told about without opening the tool, Diagramatix is now the more complete product — self-hosted, per-seat, in one place.
+**The short version.** Diagramatix competes head-on with all three on **authoring + AI generation**, where its editable-plan generation over rules-governed deterministic layout is genuinely distinctive, and where readability is a *measured* property rather than an aspiration — a corpus of stored AI plans is replayed offline on every test run and a ratchet fails the build if overlaps rise. **Diagramatix Miner** reads the messy exports people actually have, every figure on screen says whether it describes the whole run, a slice, or an estimate, a deviation hands you the case ids behind it, hand-offs and rework are measured from per-event resources, and a linked run series makes a one-off study into a **monitor** that says when the process changed — leading with the alarm the others bury: *your feed went quiet*. The **Simulator** carries the layer that decides whether a business case survives the meeting: **is the difference real or is it noise**, **which assumption is load-bearing**, **where does the staffing curve bend**, and **how do we know the model is right** — answered against the distribution the business actually had, with the twin tested on cases **held back** at import rather than marking its own homework. Around them: a partner-facing **Process API** that turns a posted document into a PDF and a real project, and a database-backed **Process Repository** of 26 value chains, 277 processes and 381 editable prompts. The three enterprise suites lead on **scale** — Signavio on the SAP ecosystem and the most industrialised mining, ARIS on EA breadth, EPC, repository governance and the deepest simulation *engine*, PRIME BPM on built-in improvement analytics — and on **configurable approval-workflow engines with full audit**. The remaining mining gap is **connector breadth and enterprise data volume**, which is an infrastructure argument rather than an analytical one. On what a single analyst can find out, defend, and be told about without opening the tool, Diagramatix is the more complete product — self-hosted, per-seat, in one place.
 
 ---
 
@@ -36,7 +34,7 @@ All four products do "describe a process → get a BPMN diagram", but differ sha
 | **AI → SOP document** (procedure writer) | ✅ **BPMN → SOP** (whole/lane/pool/subprocess/group) → AI prose → editable → **Word (.docx)** with org **template style-adoption** | — | — | ✅ **AI Procedure Writer** (from recordings/conversations) |
 | Grounding / knowledge base | The model + your rules + (optional) mined data; no external content library | ✅ **5,000 SAP best-practice models** | ARIS repository + GenAI on mining | Its own BPM methodology + guardrails |
 | Deterministic publish-ready auto-layout of AI output | ✅ 50+ codified rules run *after* plan approval; **40+ live scan rules** (B01–B41) flag structure issues | Basic auto-layout | Standard layout | Auto-map |
-| "Assist-while-you-draw" (suggest next step, NL search) | ✅ **Now shipped + overshot** — inline rules-grounded **ghost next-steps** (Tab to accept), a **NL command bar**, and **Abracadabra Mode: live hands-free voice editing** | ✅ Joule NL search | ✅ NL search / NL→calc-field | ✅ PrimeGPT NL search |
+| "Assist-while-you-draw" (suggest next step, NL search) | ✅ inline rules-grounded **ghost next-steps** (Tab to accept), a **NL command bar**, and **Abracadabra Mode: live hands-free voice editing** | ✅ Joule NL search | ✅ NL search / NL→calc-field | ✅ PrimeGPT NL search |
 | **Voice-driven live diagram editing** | ✅ **Unique** — speak/​type edits ("add a task after Review", "put a pool around everything", "delete Prepare and compact") applied live, undoable, rules-validated | ❌ | ❌ | ❌ |
 | Claimed time saving | "Seconds" to a laid-out diagram | Up to **80%** | — | Up to **90%** |
 
@@ -59,7 +57,7 @@ All four products do "describe a process → get a BPMN diagram", but differ sha
 
 Diagramatix is still the only one exposing an **editable intermediate plan** and a **user-editable layout rule set**, the only one generating **all its notations** (not just BPMN) and **image→BPMN** — and now the only one offering **LLM provider choice with per-org cost metering**.
 
-**Assist-while-you-draw — the last AI gap, now closed and overshot.** The July/early-August editions flagged this as Diagramatix's one clear AI weakness (generation was batch-only while all three rivals had NL search). It has now shipped as a full suite and gone past the competitors:
+**Assist-while-you-draw.** Canvas-native assistance, which the rivals answer with repository or mining NL chat rather than structural editing:
 
 - **Rules-grounded ghost suggestions** — select an element and translucent next-step chips appear (Tab/click to accept); every suggestion is validated by the same rules engine + `canConnect` legality that governs AI generation, so it's never illegal or badly laid out. Suggestions include next-step elements, boundary events, template fragments, and **content-aware data objects / template intents** driven by an **admin-editable keyword catalog** ("Assist / NL Rules", green rules editable, red geometry read-only).
 - **A natural-language command bar** — type an editing instruction and it's applied to the current diagram (an incremental delta, not a regenerate).
@@ -79,9 +77,9 @@ It's easy to score this as "everyone has NL now." They don't have the *same* NL.
 
 ---
 
-## 3. Process mining — the gap that became a strength
+## 3. Process mining
 
-The July edition listed process mining as **suite-only** and told Diagramatix "don't compete here." The August edition reported the gap closed by **Diagramatix Miner**. This edition reports something different again: an **eleven-phase extensions programme** (September 2026) that took the module from *discovery* to a *workbench and a monitor* — the reading, not just the mining.
+Diagramatix Miner is an in-tool process-mining module — discovery, conformance, an analyst's workbench over the result, and a monitor that speaks when the process changes. It is compared here in the three parts a buyer actually evaluates: can it read my data, can I get an answer out of it, and will it tell me when something moves.
 
 ### 3.1 Getting the log in
 
@@ -130,6 +128,7 @@ Nobody mines a process once.
 | Conformance fell · a new deviation appeared · the late rate doubled | ✅ | ✅ | ✅ | — |
 | Nothing fires on a **first** observation; a condition is announced **once** | ✅ and what is *not* being watched is listed by name | — | — | — |
 | **Hold back** the most recent cases at import so a twin is tested on data it never saw | ✅ | — | — | — |
+| Calibration fits the **observed values**, fenced against outliers — not a curve laid over them | ✅ a single case that sat over a long weekend cannot set the model tail | Fitted distributions | Fitted distributions | — |
 | A twin whose log has moved on is marked **stale**, with the date | ✅ never silently re-calibrated over your edits | — | — | — |
 | Self-hosted, per-seat, no separate mining product | ✅ | ❌ | ❌ | ❌ |
 
@@ -160,7 +159,7 @@ What has changed is the shape of the competition. The suites sell mining as a **
 
 ---
 
-## 5. Governance, Risk & Control (GRC) — NEW
+## 5. Governance, Risk & Control (GRC)
 
 A new pillar since July. Diagramatix now models **risk and control alongside the process**, and exports a **Risk-Control Matrix**.
 
@@ -177,7 +176,7 @@ A new pillar since July. Diagramatix now models **risk and control alongside the
 
 ---
 
-## 6. SOP / procedure generation — NEW
+## 6. SOP / procedure generation
 
 | SOP capability | **Diagramatix** | Signavio | ARIS | **PRIME BPM** |
 |---|---|---|---|---|
@@ -205,9 +204,9 @@ A new pillar since July. Diagramatix now models **risk and control alongside the
 
 ---
 
-## 8. Simulation — now an analysis tool, not just an engine
+## 8. Simulation
 
-The August edition reported calendars and mining calibration. Since then the Simulator has had its own extensions programme (September 2026), and the additions are almost all about **defending an answer** rather than producing one.
+The engine is discrete-event and BPSim-aligned. What distinguishes it is the layer around the engine: almost everything below is about **defending an answer** rather than producing one.
 
 | Simulation capability | **Diagramatix** | **Signavio** | **ARIS** | **PRIME BPM** |
 |---|---|---|---|---|
@@ -218,25 +217,26 @@ The August edition reported calendars and mining calibration. Since then the Sim
 | **Is the difference real?** Welch's test over per-replication means, reported as a confidence interval | ✅ and when it is not real it says so and offers to run the replications that would settle it | — | — | — |
 | **Parameter sweep** with the **knee** marked — the point where one more person stops buying much | ✅ and it refuses to invent an elbow in a flat curve | — | Partial | — |
 | **Sensitivity / tornado** — every input pushed ±20% and ranked by how far the answer moves | ✅ says where better data is worth buying, and where a guess is safe | — | Partial | — |
-| **Skills and cross-skilling** — named people, per-task required skills | ✅ the middle ground between "nobody helps" and "everybody does everything", previously impossible to express | — | ✅ | — |
+| **Skills and cross-skilling** — named people, per-task required skills | ✅ the middle ground between "nobody helps" and "everybody does everything" | — | ✅ | — |
 | **Queue discipline** — FIFO, priority, shortest-job-first; service level reported **per segment** as well as pooled | ✅ a pooled p95 can look healthy while the segment that matters misses entirely | Partial | ✅ | — |
 | **Model validation against reality** — simulated flow-time distribution vs the one the business actually had, with a p50/p90/p95 table and a verdict | ✅ "how do we know it is right" stops being judgement and becomes a number | — | — | — |
 | **Suggested next steps** from the study's run history, each with its evidence — including **negative results** reported as plainly as promising ones | ✅ | — | AI Companion narrative | — |
 | **Live "fork-the-timeline" Operator** (intervene mid-run) | ✅ | — | ✅ animation (not interactive fork) | — |
 | Working-hours **calendars / shifts**, holidays, shutdowns | ✅ | ✅ | ✅ | ✅ |
 | **Mining-calibrated** parameters, with an **out-of-sample hold-back** | ✅ mined logs → sim inputs, tested on cases the twin never saw | Separate | Separate | — |
+| **Distributions** | ✅ fixed, uniform, triangular, truncated normal, negative exponential, **lognormal** (the right-skewed shape service times actually have) and **empirical** (the observed values, resampled) | Documented set | Broad documented set | — |
+| **Preemption** — urgent work interrupts work in progress, and RESUMES it | ✅ preempt-resume, so the interrupted case keeps the work already done | — | Partial | — |
+| **Costs that do not scale with time** — a per-run charge on an activity | ✅ reported separately from resource cost, because the two have different remedies | — | ✅ activity-based costing | — |
 | Standards interchange (**BPSim**) | ✅ OMG/WfMC import + export | — | — | — |
 | Self-hosted, no separate simulation module | ✅ | ❌ | ❌ | ❌ |
 
 **Verdict.** ARIS still has the **deepest and most mature** simulation engine, and that is a genuine, years-deep lead.
 
-But engine depth is no longer the whole contest. The four rows nobody else has a column for — **significance testing, parameter sweep with a knee, a tornado, and validation against the actual distribution** — are not about simulating better; they are about being able to **defend the number in the room**. "But you guessed that input" and "is 4% real or is it noise?" are the two questions that kill a simulation-based business case, and they now have answers rather than assurances. Together with the payback month and the mining hold-back, the pitch has moved from *we can model your process* to *we can tell you which of your assumptions is load-bearing, whether the improvement survived the noise, and when it pays for itself*.
+Engine depth is not the whole contest. The rows nobody else has a column for — **significance testing, parameter sweep with a knee, a sensitivity tornado, and validation against the actual distribution** — are not about simulating better; they are about being able to **defend the number in the room**. "But you guessed that input" and "is 4% real, or is it noise?" are the two questions that kill a simulation-based business case, and both have answers here rather than assurances. With the payback month and the mining hold-back alongside them, the proposition is not *we can model your process* but *we can tell you which of your assumptions is load-bearing, whether the improvement survived the noise, and what month it pays for itself*.
 
 ---
 
 ## 9. Collaboration, review, publishing & access
-
-*(**Major change since the last edition: real-time co-authoring has shipped** — the single biggest lifecycle gap the previous edition conceded to the suites is closed.)*
 
 | Feature | Diagramatix | Signavio | ARIS | PRIME BPM |
 |---|---|---|---|---|
@@ -252,7 +252,7 @@ But engine depth is no longer the whole contest. The four rows nobody else has a
 | No-clobber concurrent save (never lose the whole document) | ✅ **optimistic version guard + auto-merge** | ✅ | ✅ | ✅ |
 | Configurable approval-**workflow engine** + full enterprise audit log | **Mid** (lifecycle, not a configurable engine/full audit) | ✅ Deep | ✅ Deep | ✅ |
 
-**Verdict.** Diagramatix is now a **real-time collaborative** authoring tool, not single-editor: multiple people edit the same diagram together with **live presence, cursors and soft locks**, and — crucially — a **version guard + automatic three-way merge** means concurrent saves never silently overwrite each other (edits to different shapes merge silently; only a same-shape clash is flagged). The suites still lead on a **configurable approval-workflow engine** and a **full enterprise audit log** — but **real-time co-editing is no longer their advantage**.
+**Verdict.** Diagramatix is a **real-time collaborative** authoring tool rather than a single-editor one: several people edit the same diagram together with **live presence, cursors and soft locks**, and a **version guard + automatic three-way merge** means concurrent saves never silently overwrite each other — edits to different shapes merge silently, and only a same-shape clash is flagged. The suites lead on a **configurable approval-workflow engine** and a **full enterprise audit log**; real-time co-editing is not among their advantages.
 
 ---
 
@@ -278,7 +278,7 @@ But engine depth is no longer the whole contest. The four rows nobody else has a
 ## 11. Where Diagramatix wins
 
 1. **Editable-plan AI generation** with **provider choice** (5 LLMs) and **per-org cost metering** — inspect/edit the plan before layout; text → **all 7 notations**; **image/sketch → editable BPMN**.
-2. **Rules-governed, publish-ready layout** (50+ rules) + **40+ live scan rules** (incl. SoD, coverage, boundary-event flow) — and, new this edition, **readability is a measured property**: a corpus of stored AI plans is replayed offline on every test run and a ratchet fails the build if overlaps rise.
+2. **Rules-governed, publish-ready layout** (50+ rules) + **40+ live scan rules** (incl. SoD, coverage, boundary-event flow), with **readability as a measured property**: a corpus of stored AI plans is replayed offline on every test run and a ratchet fails the build if overlaps rise.
 3. **One self-hosted tool that authors → AI-generates → mines → simulates → documents (SOP) → governs (GRC)** — where the suites need multiple enterprise modules.
 4. **Process mining that reads the log you actually have** — Excel, wide "one row per case" exports, and **several systems merged into one lifecycle** with the cross-system hand-off measured at the join. In the import screen, not an ETL project.
 5. **Every mined figure declares its own exactness** — filtered, estimated, or not filtered and why. No competitor found makes a number say what it is entitled to claim, and it is what makes one citable.
@@ -301,7 +301,7 @@ But engine depth is no longer the whole contest. The four rows nobody else has a
 - **PRIME BPM:** multi-modal AI capture (audio/video/Excel/conversation), built-in **improvement analytics**.
 - **All three:** a **configurable approval-workflow engine** and a **full enterprise audit log**; and **mining scale** — connector breadth and conformance hardened over years at enterprise volumes.
 
-*Two qualifications on that last line, both new this edition.* Mining **maturity of the reading** is no longer a fair entry — slicing with declared exactness, case-level deviation evidence, hand-off and rework analysis, period comparison and alerting all shipped. What remains is **scale and connector breadth**, which is an infrastructure argument rather than an analytical one. And **simulation** is now split: ARIS keeps the deeper engine; Diagramatix has the analysis layer around it — significance, sweep, sensitivity, validation, payback.
+*Two qualifications on that last line.* Mining **maturity of the reading** is not a fair entry: slicing with declared exactness, case-level deviation evidence, hand-off and rework analysis, period comparison and alerting are all present. What remains is **scale and connector breadth** — an infrastructure argument rather than an analytical one. And **simulation** splits in two: ARIS holds the deeper engine, Diagramatix the analysis layer around it — significance, sweep, sensitivity, validation, payback.
 
 ## 13. Positioning Diagramatix
 
@@ -315,7 +315,7 @@ But engine depth is no longer the whole contest. The four rows nobody else has a
 - "**Document it (SOP → Word)** and **govern it (risk-control matrix, APQC)** — the operate layer, not just an editor."
 - "Round-trips **Visio, BPMN XML, BPSim, XES, OCEL**; saves to **SharePoint/OneDrive**; **self-hosted**, per-seat — no enterprise contract."
 
-Where **not** to compete: **mining scale and connector breadth** (enterprise data volumes, hardened conformance at scale), a **configurable enterprise approval-workflow engine + full audit**, **SAP-ecosystem execution**, deep **enterprise GRC controls-testing**, and (for ARIS) **EPC + EA repository breadth** and the most mature simulation **engine**. *(Real-time co-editing and analytical mining depth are now strengths, not gaps.)*
+Where **not** to compete: **mining scale and connector breadth** (enterprise data volumes, hardened conformance at scale), a **configurable enterprise approval-workflow engine + full audit**, **SAP-ecosystem execution**, deep **enterprise GRC controls-testing**, and (for ARIS) **EPC + EA repository breadth**, **activity-based costing depth**, and the most mature simulation **engine** — years of hardening at scale, which no feature row substitutes for.
 
 ---
 

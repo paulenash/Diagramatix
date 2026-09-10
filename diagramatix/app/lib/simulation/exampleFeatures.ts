@@ -61,6 +61,31 @@ function processFeatures(pkg: ExamplePackage): ExampleFeature[] {
       where: "Properties → a gateway's flows",
     });
   }
+  // What SHAPE the durations have, which is the difference between a model
+  // that queues like the real process and one that does not.
+  const dists = new Set<string>();
+  for (const d of data) for (const e of d.elements ?? []) {
+    const k = (e.properties as { sim?: { cycleTime?: { kind?: string } } } | undefined)?.sim?.cycleTime?.kind;
+    if (k) dists.add(k);
+  }
+  if (dists.has("lognormal") || dists.has("empirical")) {
+    out.push({
+      id: "skewed-durations",
+      label: "Service times with the shape real work has",
+      detail: dists.has("empirical")
+        ? "Durations resampled from the observed values — no curve laid over the data at all."
+        : "The judgement tasks use a lognormal: most cases routine, a minority far longer. A symmetric distribution cannot produce that tail, and the tail is what makes a queue form.",
+      where: "Properties → Simulation → Cycle time",
+    });
+  }
+  if (has((d) => (d.elements ?? []).some((e) => typeof (e.properties as { sim?: { fixedCost?: number } } | undefined)?.sim?.fixedCost === "number"))) {
+    out.push({
+      id: "activity-cost",
+      label: "Costs that do not scale with time",
+      detail: "A per-run charge on an activity — a bureau fee, a courier — so a redesign that stops the work being done shows the saving even when it saves no time.",
+      where: "Properties → Simulation → Cost per run",
+    });
+  }
   if (has((d) => (d.elements ?? []).some((e) => !!e.boundaryHostId))) {
     out.push({
       id: "boundary-events",

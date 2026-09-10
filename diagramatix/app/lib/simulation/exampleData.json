@@ -943,9 +943,9 @@
                     "sim": {
                       "teamId": "loan-officer",
                       "cycleTime": {
-                        "sd": 4,
-                        "kind": "normal",
-                        "mean": 30
+                        "kind": "lognormal",
+                        "mean": 30,
+                        "sd": 4
                       },
                       "resourceUnits": 1
                     }
@@ -1138,9 +1138,9 @@
                     "sim": {
                       "teamId": "loan-underwriter",
                       "cycleTime": {
-                        "sd": 10,
-                        "kind": "normal",
-                        "mean": 50
+                        "kind": "lognormal",
+                        "mean": 50,
+                        "sd": 10
                       },
                       "resourceUnits": 1
                     }
@@ -5177,7 +5177,7 @@
                     "sim": {
                       "teamId": "Loan Assessment Team",
                       "cycleTime": {
-                        "kind": "normal",
+                        "kind": "lognormal",
                         "mean": 30,
                         "sd": 6
                       },
@@ -5312,7 +5312,7 @@
                     "sim": {
                       "teamId": "Loan Assessment Team",
                       "cycleTime": {
-                        "kind": "normal",
+                        "kind": "lognormal",
                         "mean": 45,
                         "sd": 9
                       },
@@ -5616,7 +5616,7 @@
                     "sim": {
                       "teamId": "Commercial Loans Team",
                       "cycleTime": {
-                        "kind": "normal",
+                        "kind": "lognormal",
                         "mean": 90,
                         "sd": 18
                       },
@@ -7451,7 +7451,7 @@
                     "sim": {
                       "teamId": "Loan Assessment AI Agent",
                       "cycleTime": {
-                        "kind": "normal",
+                        "kind": "lognormal",
                         "mean": 3,
                         "sd": 0.6
                       },
@@ -7602,7 +7602,7 @@
                     "sim": {
                       "teamId": "Loan Assessment AI Agent",
                       "cycleTime": {
-                        "kind": "normal",
+                        "kind": "lognormal",
                         "mean": 4,
                         "sd": 0.8
                       },
@@ -8032,7 +8032,7 @@
                     "sim": {
                       "teamId": "Commercial Loans Team",
                       "cycleTime": {
-                        "kind": "normal",
+                        "kind": "lognormal",
                         "mean": 90,
                         "sd": 18
                       },

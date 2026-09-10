@@ -248,6 +248,9 @@ jobs:
           tsx scripts/add-guide-mining-workbench.ts || echo "add-guide-mining-workbench skipped"
           tsx scripts/add-features-mining-workbench.ts || echo "add-features-mining-workbench skipped"
           tsx scripts/add-tech-notes-mining-workbench.ts || echo "add-tech-notes-mining-workbench skipped"
+          # The Simulator fidelity work: distributions, preemption, activity cost.
+          tsx scripts/add-features-simulator-fidelity.ts || echo "add-features-simulator-fidelity skipped"
+          tsx scripts/add-tech-notes-simulator-fidelity.ts || echo "add-tech-notes-simulator-fidelity skipped"
           tsx scripts/add-features-risk-controls.ts || echo "add-features-risk-controls skipped"
           tsx scripts/add-features-pcf.ts || echo "add-features-pcf skipped"
           tsx scripts/add-guide-pcf.ts || echo "add-guide-pcf skipped"
