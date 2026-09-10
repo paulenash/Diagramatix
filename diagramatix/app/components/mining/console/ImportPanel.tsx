@@ -29,7 +29,7 @@ import type { LogMapping } from "@/app/lib/mining/types";
 import type { DiagramData } from "@/app/lib/diagram/types";
 import { MiningLogViewer } from "../MiningLogViewer";
 import { MergeCard } from "./MergeCard";
-import { INPUT_CLASS as inp, ROLES, type SampleScenario } from "./shared";
+import { INPUT_CLASS as inp, ROLES, SAMPLE_LOG, type SampleScenario } from "./shared";
 
 /** Strip a file extension, for turning a file name into a default label. */
 const EXT_RE = /\.[^.]+$/;
@@ -156,6 +156,28 @@ export function ImportPanel({ projectId, onImported, openDiagram, stashReturn }:
     } catch { /* ignore */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
+
+  // The cold start. Before Phase 11 this screen offered a file picker and
+  // nothing else to anyone who had not been through the example gallery, which
+  // is every first-time user on their own project. One static CSV, fetched only
+  // when asked for, so it costs the bundle nothing.
+  const [sampleBusy, setSampleBusy] = useState(false);
+  const loadSampleLog = useCallback(async () => {
+    setSampleBusy(true);
+    setErr(null);
+    try {
+      const res = await fetch(SAMPLE_LOG.path, { cache: "force-cache" });
+      if (!res.ok) { setErr("The sample log could not be loaded. Choose a file instead."); return; }
+      const csv = parseCsv(await res.text());
+      if (csv.headers.length === 0 || csv.rows.length === 0) { setErr("The sample log could not be read. Choose a file instead."); return; }
+      setXlsxSheets([]); setOcelText(null); setOcelTypes([]);
+      stage(csv.headers, csv.rows, guessMapping(csv.headers), SAMPLE_LOG.fileName, SAMPLE_LOG.runName);
+    } catch {
+      setErr("The sample log could not be loaded. Choose a file instead.");
+    } finally {
+      setSampleBusy(false);
+    }
+  }, [stage]);
 
   /** Stage one worksheet, exactly as a parsed CSV would be staged. */
   const loadSheet = useCallback((sheet: XlsxSheet, name: string) => {
@@ -423,8 +445,22 @@ export function ImportPanel({ projectId, onImported, openDiagram, stashReturn }:
             ⭱ Choose file…
             <input type="file" accept=".csv,.tsv,.txt,text/csv,.xlsx,.xlsm,.xes,.json,.ocel,.jsonocel,.xml,application/xml,application/json" onChange={onFile} className="hidden" />
           </label>
+          {/* No adopted example, so no built-in log: offer the served sample
+              rather than a file picker on its own. Kept visible afterwards, like
+              the built-in button, so it can be come back to. */}
+          {!builtInSample && (!scenarios || scenarios.length === 0) && (
+            <button onClick={loadSampleLog} disabled={sampleBusy}
+              className="text-xs rounded px-3 py-1.5 border border-amber-700 text-amber-200 hover:bg-amber-950/40 disabled:opacity-40">
+              {sampleBusy ? "Loading sample…" : "📋 Try it with a sample log"}
+            </button>
+          )}
           {fileName && <span className="text-[11px] text-stone-400 truncate max-w-[18rem]" title={fileName}>loaded: <span className="text-stone-300">{fileName}</span></span>}
         </div>
+        {/* Said once, on the cold start only — it stops being useful the moment
+            a log is staged, and says plainly that the data is invented. */}
+        {!fileName && !builtInSample && (!scenarios || scenarios.length === 0) && (
+          <p className="mt-2 text-[11px] text-stone-500 leading-snug">{SAMPLE_LOG.note}</p>
+        )}
 
         {/* OCEL 2.0 object-centric study — one lifecycle per object type + a Domain Diagram. */}
         {ocelText && ocelTypes.length > 0 && (

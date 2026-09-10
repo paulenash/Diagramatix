@@ -500,6 +500,17 @@ for (const s of sampleLogs) {
 }
 writeFileSync(join(miningDir, o2cSampleLog.fileName), toCsv(o2cSampleLog.headers, o2cSampleLog.rows), "utf8");
 console.log(`  O2C log → mining/${o2cSampleLog.fileName}`);
+
+// The cold-start sample, served as a static file. The Miner's import screen
+// offers this to anyone who has NOT adopted a catalog example — which is every
+// first-time user on their own project, who until Phase 11 was shown a bare
+// file picker. It is the same Order-to-Cash log, written a second time under a
+// stable name so the button's URL never has to track a date in a file name.
+// SAMPLE_LOG.path in app/components/mining/console/shared.ts must agree, and a
+// test resolves it on disk and mines it rather than trusting that it does.
+const publicSample = join(__dirname, "..", "public", "mining", "sample-order-to-cash.csv");
+writeFileSync(publicSample, toCsv(o2cSampleLog.headers, o2cSampleLog.rows), "utf8");
+console.log(`  cold-start sample → public/mining/sample-order-to-cash.csv`);
 for (const s of sdSampleLogs) {
   const diskName = s.fileName.replace(/-current\.csv$/, ".csv");
   writeFileSync(join(miningDir, diskName), toCsv(s.headers, s.rows), "utf8");

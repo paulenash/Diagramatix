@@ -51,3 +51,26 @@ export function studyNameOf(name: string): string {
   const i = name.lastIndexOf(" — ");
   return i >= 0 ? name.slice(0, i) : name;
 }
+
+/**
+ * The one sample event log served as a static file, so the Miner is never a
+ * bare file picker.
+ *
+ * Until Phase 11 the "load the example data" button rendered ONLY when a
+ * catalog example had been adopted into the project — which is to say, only for
+ * someone who had already found the gallery. A user who opened the Miner on
+ * their own project was shown a file picker and nothing else, and the most
+ * likely next action was to close it.
+ *
+ * `path` is served from `public/` and is kept in step with the generated
+ * catalog by `scripts/gen-mining-examples.ts`. It is checked: a test resolves
+ * this path on disk and mines it, so a renamed or deleted file fails the suite
+ * rather than becoming a 404 behind a button nobody reports.
+ */
+export const SAMPLE_LOG = {
+  path: "/mining/sample-order-to-cash.csv",
+  fileName: "sample-order-to-cash.csv",
+  runName: "Sample — Order-to-Cash",
+  /** Said on the button's own line — synthetic, and openly so. */
+  note: "~200 sales orders over one month — invented data, so you can see what the Miner does before exporting anything of your own.",
+} as const;
