@@ -108,9 +108,15 @@ async function main() {
 
     let i = 0;
     for (const s of SECTIONS) {
-      const existing = chapter.sections.find((x) => x.heading === s.heading);
+      // Sections are matched by HEADING, so a renamed heading looks like a new
+      // section and would be inserted alongside the old one. "What
+      // DiagramatixMINER does" became "What Diagramatix Miner does"; the row in
+      // the database still carries the first of those until this runs.
+      const legacyHeading = s.heading.replace("Diagramatix Miner", ["Diagramatix", "MINER"].join(""));
+      const existing = chapter.sections.find((x) => x.heading === s.heading)
+        ?? (legacyHeading !== s.heading ? chapter.sections.find((x) => x.heading === legacyHeading) : undefined);
       if (existing) {
-        await prisma.helpSection.update({ where: { id: existing.id }, data: { bodyMarkdown: s.body, sortOrder: i } });
+        await prisma.helpSection.update({ where: { id: existing.id }, data: { heading: s.heading, bodyMarkdown: s.body, sortOrder: i } });
         console.log(`  update "${s.heading}"`);
       } else {
         await prisma.helpSection.create({ data: { chapterId: chapter.id, heading: s.heading, bodyMarkdown: s.body, sortOrder: i } });

@@ -100,3 +100,59 @@ Changes **A–C** deliberately work **with** this architecture rather than again
 - `npm run build` — clean (Next 16 / TypeScript). Full Vitest suite **770 green** (115 files), incl. the 8 new tests T0639–T0646.
 - Schema synced (`prisma db push`) — `ProcessMiningRun.governance Json?` added.
 - Example data regenerated: AP (3 periods), O2C, and the new **Service Desk** activity-only example (168 cases, 8 variants).
+
+---
+
+## 8. September 2026 update — what the extensions programme closed
+
+*Added 2026-09-10, product 2.9. This document was written in July against the module as it
+then stood: an importer, a discoverer and a conformance check. An eleven-phase extensions
+programme has since changed several of the judgements above. The standards rows (§2) are
+unchanged — no new interchange format was added — but the **data-model** rows (§3) and the
+**deliberately not done** list (§6) have moved, and the rows below supersede them.*
+
+**The constraint everything follows from, stated because it explains the shape of the rest.**
+The importer is the only moment the truth exists. `buildEventLog` produces traces, the
+aggregates are computed, and the raw events are then gone — so a field not captured at import
+is unavailable to that run **forever**, not "until we add a recompute". Every row below is
+therefore about what is now *stored*, not about what could later be derived.
+
+| §3 row | July status | September status |
+|---|---|---|
+| **Participants** — Resource / Role / Team / Dept | 🟡 a single free-text Resource, kept only as each activity's *dominant* resource | 🟢 **per-event resource vectors are stored**, so the hand-off map is measured rather than inferred. The distinct Role/Team/Dept *fields* are still absent — one column still carries whoever did it — but the analysis over it is now exact, and where it cannot be it is **labelled `approximate`** with the number of multi-team activities that make it so. |
+| **Performance** — Waiting, Processing, Queue, SLA, Cost, VA | 🟡 sojourn / inter-arrival derived only | 🟡→🟢 **SLA is now a first-class input** (`kpiConfig`), driving on-time/late outcomes and the late-rate alarm. Per-event durations are stored, so the **between-steps decomposition** (which transition accounts for the elapsed time) is measured. Cost, queue-time and value-added remain absent. |
+| **Business objects** | 🟡 OCEL projected to one object type | 🟡 unchanged as a data model — but **arbitrary kept columns** (Region, Channel, …) are now stored per case as slicing dimensions, with retention **opt-in** per column (keep / hash / drop). That covers most of what teams wanted business-object fields *for*, without the object model. |
+| **Simulation** — sim-vs-actual, run id, utilisation | 🟡 all derived at calibration | 🟢 **out-of-sample validation exists**: a share of the most recent cases can be **held back** at import so the twin is tested on data it was never fitted to, and a twin whose log has moved on is marked **stale** with the date rather than silently re-calibrated. |
+| **Core execution** — Event ID, lifecycle, sequence # | 🟡 | 🟡 unchanged. |
+| **Systems**, **AI attributes** | 🔴 | 🔴 unchanged. |
+
+**Also now shipped, and not anticipated by §6 because they are analysis rather than schema:**
+
+- **Slicing with declared exactness.** A run filters by date, team or any kept column, and every
+  figure states whether it is `filtered`, `filtered · estimated` (a sampled run), or
+  `not filtered` because the run cannot support it — never averaged into a plausible number.
+- **Input flexibility.** `.xlsx` read directly; **wide "one row per case"** exports detected and
+  expanded; **several systems merged into one lifecycle** with id unification by shared key or
+  crosswalk, and the **cross-system hand-off measured at the join** — a wait neither export
+  contains on its own. A merge with no overlapping cases is **refused**.
+- **Deviation → evidence.** A conformance violation resolves to the actual case ids, each with
+  its own timeline, and states how many of the affected cases it can name.
+- **Hand-offs, ping-pong and rework**, measured from the stored resource vectors — including the
+  correction that the inherited task-mining ping-pong detector reads app names out of UI labels
+  and returns a confident **zero** on a business log, so a team-level replacement was written.
+- **A run series.** `ProcessMiningRun.parentRunId` (the programme's only real column, product
+  2.8 → 2.9) links snapshots into a history, giving period comparison — which **refuses** two
+  runs whose activity vocabularies barely overlap — and threshold alerting, led by *the source
+  stopped sending*.
+- **Ranked next steps**, computed deterministically, with the AI narrating findings it is handed
+  and never seeing the run.
+
+**Still open, recorded rather than rediscovered.** No email path for alerts. `task-mining` is
+gated on the artefact rather than the tab. New REST/DB connectors were **declined** with reasons
+(item 10 of the source review). And a run series is ordered by **when each run was mined**, not
+by the period its log covers — right for a live source, wrong for anyone back-filling history,
+and not yet fixed.
+
+*Cross-reference: `diagramatix/audit/Miner-Extensions-Plan.md` is the phase-by-phase burn-down
+with the decisions and refusals on their face; the competitor-facing version of the same story is
+§3 of `diagramatix-vs-signavio-aris-primebpm-2026-09.md`.*
