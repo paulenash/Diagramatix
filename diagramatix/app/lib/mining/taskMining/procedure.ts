@@ -33,7 +33,7 @@ export function buildTaskProcedure(variants: Variant[], taskName: string): strin
 
   const lines: string[] = [];
   lines.push(`# Standard Operating Procedure — ${taskName}`);
-  lines.push(`_As actually done — discovered from ${total} observed execution${total === 1 ? "" : "s"} (DiagramatixMINER Task Mining)._`);
+  lines.push(`_As actually done — discovered from ${total} observed execution${total === 1 ? "" : "s"} (Diagramatix Miner Task Mining)._`);
   lines.push("");
   lines.push("## Purpose");
   lines.push(`Perform "${taskName}" as it is currently carried out by the team, across ${apps.join(" and ") || "the applications used"}.`);

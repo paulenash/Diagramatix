@@ -50,7 +50,7 @@ const CATEGORY: Record<string, string> = {
   "Value Analysis": "Analysis & Insights",
   "Bottleneck Highlighting": "Analysis & Insights",
   "Simulating Processes": "Analysis & Insights",
-  "DiagramatixMINER — Process Mining": "Analysis & Insights",
+  "Diagramatix Miner — Process Mining": "Analysis & Insights",
   "Risk & Controls (GRC)": "Analysis & Insights",
   "Process Classification (APQC PCF)": "Analysis & Insights",
   // Sharing & Governance

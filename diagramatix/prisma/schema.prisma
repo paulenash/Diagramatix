@@ -1721,7 +1721,7 @@ model SimulationExample {
   @@index([published, sortOrder])
 }
 
-// An editable, extensible catalog entry for DiagramatixMINER: a worked process-
+// An editable, extensible catalog entry for Diagramatix Miner: a worked process-
 // mining example a user can adopt into their own project. Mirrors
 // SimulationExample (global catalog, `published` gates visibility) — `package`
 // (JSON) holds the portable bundle: a compressed event log (mapping + variants

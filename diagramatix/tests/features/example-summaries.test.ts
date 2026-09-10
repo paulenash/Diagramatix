@@ -19,7 +19,7 @@
  * noise — which teaches the reader to stop believing the list.
  */
 import { describe, it, expect } from "vitest";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { STARTER_MINING_EXAMPLES } from "@/app/lib/mining/exampleSeeds";
 import { STARTER_EXAMPLES } from "@/app/lib/simulation/exampleSeeds";
@@ -323,13 +323,28 @@ describe("The two consoles name themselves the same way", () => {
     }
   });
 
-  it("T4008 - neither header carries the internal codename", () => {
-    // "DiagramatixMINER" is what the feature is called in the plan and the
-    // commit log. It is not what it is called to a customer.
-    for (const [path] of CONSOLES) {
-      const src = readFileSync(path, "utf8");
-      const header = src.slice(src.indexOf("<header"), src.indexOf("</header>"));
-      expect(header, `${path}: the codename is in the header`).not.toContain("DiagramatixMINER");
-    }
+  it("T4008 - the internal codename is gone from the whole app tree", () => {
+    // Started as a check on the two console headers. Widened when the rename
+    // went through, for the same reason T3336 sweeps for "DiagramMATRIX"
+    // rather than checking the one screen it was found on: fixing the strings
+    // you happen to know about and hoping is not a rename. It reached a
+    // browser-tab title, an exported log's producer name and the SOP prose,
+    // none of which anybody would have thought to look at.
+    //
+    // The literal survives HERE because this is the test that forbids it.
+    const codename = ["Diagramatix", "MINER"].join("");
+    const hits: string[] = [];
+    const walk = (dir: string) => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, e.name);
+        // `generated/` is regenerated from prisma/schema.prisma, which is
+        // renamed at source; a stale build output is not a product surface.
+        if (e.isDirectory()) { if (!["node_modules", ".next", "generated"].includes(e.name)) walk(full); continue; }
+        if (!/\.(tsx?|json)$/.test(e.name)) continue;
+        if (readFileSync(full, "utf8").includes(codename)) hits.push(full);
+      }
+    };
+    walk("app");
+    expect(hits, hits.join(", ")).toEqual([]);
   });
 });

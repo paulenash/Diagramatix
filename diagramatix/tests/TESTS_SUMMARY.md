@@ -852,7 +852,7 @@ The miner's "✨ AI state machine" reuses the app's AI Generate pipeline (rules 
 | T0609 | the brief carries states, entry, weighted transitions + terminals | The AI being fed an incomplete/incorrect picture of the mined lifecycle | If the serialisation dropped states/transitions/frequencies |
 | T0610 | respects the stats state-list ordering when provided | Inconsistent state ordering in the prompt | If the stats override was ignored |
 
-### `tests/mining/example-package.test.ts` — DiagramatixMINER Examples catalog
+### `tests/mining/example-package.test.ts` — Diagramatix Miner Examples catalog
 
 The adoptable process-mining sample (mirrors Simulator Examples): a portable package (compressed log + reference state machines) and the shipped Accounts Payable starter.
 
@@ -896,7 +896,7 @@ The User Guide editor generalised into a multi-collection **Document Editor** (`
 
 ### `tests/riskControls/` — Risk & Control (catalog + attach + RCM + checks)
 
-Attach Risks/Controls (from an org-master → project-copy GRC catalog — Risks, Controls, Policies, Regulations, Audit Findings, KRIs, KPIs, joined by a directed traceability graph) to process steps, scan for coverage/segregation-of-duties gaps, and export a multi-sheet Risk-Control Matrix (flat audit grid + registers + traceability), and prove **operating effectiveness** by tying each Control to the DiagramatixMINER conformance deviation it guards ("bypassed in N of M cases"). Pure helpers + checks, the hand-built `.xlsx` writer, and DB round-trips for adopt + export + effectiveness.
+Attach Risks/Controls (from an org-master → project-copy GRC catalog — Risks, Controls, Policies, Regulations, Audit Findings, KRIs, KPIs, joined by a directed traceability graph) to process steps, scan for coverage/segregation-of-duties gaps, and export a multi-sheet Risk-Control Matrix (flat audit grid + registers + traceability), and prove **operating effectiveness** by tying each Control to the Diagramatix Miner conformance deviation it guards ("bypassed in N of M cases"). Pure helpers + checks, the hand-built `.xlsx` writer, and DB round-trips for adopt + export + effectiveness.
 
 | Ref | Test | Protects you against | How it would break (go red) |
 |------|------|----------------------|------------------------------|

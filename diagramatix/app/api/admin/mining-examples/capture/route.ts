@@ -1,7 +1,7 @@
 /**
  * Capture a project's mining run into a NEW example catalog entry (SuperAdmin).
  * The authoring path: import a log + build the reference SM in a project with
- * the full DiagramatixMINER console, then snapshot the run (mapping + variants +
+ * the full Diagramatix Miner console, then snapshot the run (mapping + variants +
  * performance) + its reference state machine into a portable package. Created as
  * a DRAFT — edit metadata + publish from the catalog editor.
  *

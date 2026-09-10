@@ -1,6 +1,6 @@
 /**
  * Insight-layer analytics mined from an event log's traces — the numbers that
- * power the DiagramatixMINER Insights views (bottleneck HEAT on the discovered
+ * power the Diagramatix Miner Insights views (bottleneck HEAT on the discovered
  * model, variant Pareto, case explorer, and KPI/SLA outcomes). Distinct from
  * `performance.ts`, whose aggregates feed the SIMULATION twin; this module keeps
  * everything in raw milliseconds and adds a per-case index so cases can be drilled

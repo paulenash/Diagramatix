@@ -28,7 +28,7 @@ export interface FeatureColorScheme {
 /** Ordered metadata for the admin editor (label + which group it sits in). */
 export const FEATURE_META: { key: FeatureColorKey; label: string; group: "product" | "accent" | "role"; note: string }[] = [
   { key: "simulator",   label: "Simulator",           group: "product", note: "Simulator Examples (menu + tile), Simulator admin" },
-  { key: "mining",      label: "Process Mining",      group: "product", note: "Mining Examples, DiagramatixMINER admin" },
+  { key: "mining",      label: "Process Mining",      group: "product", note: "Mining Examples, Diagramatix Miner admin" },
   { key: "riskControl", label: "Risk & Control",      group: "product", note: "Risk & Control Examples, RCM / GRC admin" },
   { key: "apqc",        label: "APQC PCF",            group: "product", note: "APQC tiles, Create APQC Process" },
   { key: "portal",      label: "Portal / Publishing", group: "product", note: "Process Portal & publishing surfaces" },

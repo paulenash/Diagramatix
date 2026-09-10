@@ -1,7 +1,7 @@
 /**
  * Control operating-effectiveness from mined data (Phase 2). A Control can name
  * the conformance DEVIATION it guards against (its `monitorSignature`). When the
- * project's DiagramatixMINER conformance shows that deviation in N of M cases,
+ * project's Diagramatix Miner conformance shows that deviation in N of M cases,
  * the control was "bypassed" N times — real evidence of whether it is operating,
  * not just that it exists. Pure functions over a ConformanceResult.
  */

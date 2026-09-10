@@ -215,7 +215,7 @@ jobs:
 
       - name: Seed mining example catalog
         working-directory: ./diagramatix
-        # Non-blocking, idempotent (upsert by slug) — the DiagramatixMINER
+        # Non-blocking, idempotent (upsert by slug) — the Diagramatix Miner
         # starter examples (event log + reference state machines) for the
         # Process-Mining Examples gallery. Runs AFTER the schema push so the
         # MiningExample table exists. Same rationale as the simulator catalog.

@@ -3,7 +3,7 @@
  * Risk & Control Matrix: the org-master → project-copy catalog, attaching risks &
  * controls to steps, org-wide numbering + the Org Owner, the console's Catalog /
  * Analytics tabs, the on-canvas red/green highlight, coverage & SoD checks, and
- * control operating-effectiveness from mining. Placed right after "DiagramatixMINER
+ * control operating-effectiveness from mining. Placed right after "Diagramatix Miner
  * — Process Mining" (effectiveness is proven from mining runs). Idempotent:
  * re-running upserts the chapter + each section body in place by heading.
  *
@@ -20,7 +20,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 
 const SLUG = "risk-controls";
 const TITLE = "Risk & Controls (GRC)";
-const AFTER_SLUG = "process-mining"; // place immediately after DiagramatixMINER
+const AFTER_SLUG = "process-mining"; // place immediately after Diagramatix Miner
 
 const SECTIONS: Array<{ heading: string; body: string }> = [
   {
@@ -104,7 +104,7 @@ const SECTIONS: Array<{ heading: string; body: string }> = [
   {
     heading: "Proving controls actually operate (from mining)",
     body: [
-      "A control on paper isn't the same as a control that *works*. Risk & Controls ties each control to **real execution data** from **DiagramatixMINER**:",
+      "A control on paper isn't the same as a control that *works*. Risk & Controls ties each control to **real execution data** from **Diagramatix Miner**:",
       "",
       "- If a mining run reports **governance evidence** for the control's code, effectiveness is `applied ÷ expected` cases.",
       "- Otherwise, a control can name the **conformance deviation** it guards; when a run shows that deviation in N of M cases, the control was **bypassed** N times.",
@@ -132,7 +132,7 @@ async function main() {
   const url = process.env.DATABASE_URL ?? "postgres://postgres:postgres@localhost:5432/diagramatix";
   const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) });
   try {
-    // Place immediately after the "DiagramatixMINER" chapter; shift later chapters down.
+    // Place immediately after the "Diagramatix Miner" chapter; shift later chapters down.
     let chapter = await prisma.helpChapter.findFirst({ where: { slug: SLUG, collection: "user-guide" }, include: { sections: true } });
     if (!chapter) {
       const after = await prisma.helpChapter.findFirst({ where: { slug: AFTER_SLUG, collection: "user-guide" } });

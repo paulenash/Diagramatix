@@ -33,7 +33,7 @@ export async function GET(req: Request, { params }: Params) {
 
   const variants = (run.variants ?? []) as unknown as Variant[];
   const stats = (run.stats ?? null) as unknown as MiningStats | null;
-  const name = run.name || "DiagramatixMINER log";
+  const name = run.name || "Diagramatix Miner log";
   const format = new URL(req.url).searchParams.get("format") === "ocel" ? "ocel" : "xes";
   const safe = name.replace(/[^\w.-]+/g, "_").slice(0, 60) || "run";
 

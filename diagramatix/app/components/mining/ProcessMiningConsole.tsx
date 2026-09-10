@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * DiagramatixMINER console — ingest an event log, discover the implied BPMN + a
+ * Diagramatix Miner console — ingest an event log, discover the implied BPMN + a
  * candidate state machine, check conformance against a reference state machine,
  * and calibrate a digital twin. Amber/brown "mining" skin, styled like the
  * Simulator console.

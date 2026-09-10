@@ -9,7 +9,7 @@ import { MiningPollingClient, type PollingRow } from "./MiningPollingClient";
 export const metadata = { title: "Live-source Polling — Admin" };
 
 /**
- * Manage DiagramatixMINER live-source polling across projects.
+ * Manage Diagramatix Miner live-source polling across projects.
  *   • SuperAdmin (acting) → every project's live sources.
  *   • OrgAdmin (Owner/Admin of the active org) → their org's live sources only.
  * Turn per-source automatic polling on/off (writes MiningSource.autoRefresh via the

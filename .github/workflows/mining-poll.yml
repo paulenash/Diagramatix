@@ -1,6 +1,6 @@
 name: Mining live-source poll
 
-# Scheduled poller for DiagramatixMINER live sources (Phase 1 connectors).
+# Scheduled poller for Diagramatix Miner live sources (Phase 1 connectors).
 # Flushes debounced webhook buffers and polls Azure Blob sources, then refreshes
 # each affected live run. The app has no in-process scheduler (App Service
 # recycles), so this GitHub Actions cron is the trigger.

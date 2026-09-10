@@ -108,7 +108,7 @@ const CARDS: MenuCard[] = [
     href: "/dashboard/compliance?from=/dashboard/org-admin",
     title: "Compliance Monitoring",
     description:
-      "How well your controls are operating over time — effectiveness trends and alerts assembled from DiagramatixMINER runs across every project.",
+      "How well your controls are operating over time — effectiveness trends and alerts assembled from Diagramatix Miner runs across every project.",
     featureKey: "riskControl",
     feature: "riskControl",
   },

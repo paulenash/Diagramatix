@@ -1,5 +1,5 @@
 /**
- * Adopt a published DiagramatixMINER example into a fresh project owned by the
+ * Adopt a published Diagramatix Miner example into a fresh project owned by the
  * caller — the one-click "load a ready-made mining study" path. Recreates the
  * reference state-machine diagram(s) + a ready ProcessMiningRun (variants +
  * performance), so the user can Discover / check Conformance / Calibrate &

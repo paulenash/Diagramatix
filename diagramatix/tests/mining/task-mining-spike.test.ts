@@ -1,6 +1,6 @@
 /**
  * Task Mining — Phase 0 spike. Proves the central thesis: a UI-interaction (task)
- * log runs through the EXISTING DiagramatixMINER pipeline unchanged and yields a
+ * log runs through the EXISTING Diagramatix Miner pipeline unchanged and yields a
  * task ROUTINE MAP with a branch + rework loop, plus task-specific insights
  * (ping-pong, rework, automation signal). No new discovery engine.
  */

@@ -1,5 +1,5 @@
 /**
- * What a DiagramatixMINER example illustrates, derived from its own package.
+ * What a Diagramatix Miner example illustrates, derived from its own package.
  *
  * See `app/lib/exampleFeature.ts` for why these are derived rather than typed.
  * The short version: a hand-written feature list is a claim that goes stale in

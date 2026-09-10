@@ -69,7 +69,7 @@ const CHAPTERS: Chapter[] = [
         "",
         "| Area | Files | Lines | What lives here |",
         "|---|--:|--:|---|",
-        "| `app/lib` | 186 | 41,689 | Domain logic — diagram layout engines, DiagramatixMINER, Simulator, APQC PCF, risk/controls, AI generation, import/export |",
+        "| `app/lib` | 186 | 41,689 | Domain logic — diagram layout engines, Diagramatix Miner, Simulator, APQC PCF, risk/controls, AI generation, import/export |",
         "| `app/(dashboard)` | 117 | 38,555 | Pages, the diagram editor shell, and the Simulator / Miner / RCM / Compliance / PCF consoles |",
         "| `app/components` | 67 | 25,940 | The SVG canvas, symbol/connector renderers, properties panels and dialogs |",
         "| `app/api` | 206 | 17,793 | Route handlers (one `route.ts` per endpoint) |",
@@ -219,7 +219,7 @@ const CHAPTERS: Chapter[] = [
         "Database Domain diagrams **import DDL** and can **generate logical DDL** (PostgreSQL / MySQL / SQL Server) from the Diagramatix data model — the round-trip between a drawn domain model and executable schema.",
       ].join("\n") },
       { heading: "Mining & simulation interchange", body: [
-        "DiagramatixMINER reads/writes **IEEE XES** and **OCEL** event logs; the Simulator exports **BPSim** and a full **`.dgxsim`** bundle (study + scenarios + calendars). These sit alongside the engine chapters, which document each format's mapping in detail.",
+        "Diagramatix Miner reads/writes **IEEE XES** and **OCEL** event logs; the Simulator exports **BPSim** and a full **`.dgxsim`** bundle (study + scenarios + calendars). These sit alongside the engine chapters, which document each format's mapping in detail.",
       ].join("\n") },
       { heading: "SharePoint & format governance", body: [
         "**SharePoint** integration imports/exports diagrams and links Data Objects to files. Any change to an export format is mirrored into the corresponding **XSD** and version numbers — export-format governance is a maintained discipline, not incidental.",
@@ -304,12 +304,12 @@ const CHAPTERS: Chapter[] = [
   },
   {
     slug: "miner-design",
-    title: "Miner Design (DiagramatixMINER)",
+    title: "Miner Design (Diagramatix Miner)",
     sections: [
       {
         heading: "Overview & pipeline",
         body: [
-          "DiagramatixMINER is a **state-centric** process miner. The pipeline:",
+          "Diagramatix Miner is a **state-centric** process miner. The pipeline:",
           "",
           "`ingest → normalise to traces → compress to variants → discover (BPMN + state machine) → conformance → calibrate`.",
           "",
@@ -397,7 +397,7 @@ const CHAPTERS: Chapter[] = [
       {
         heading: "Interchange standards",
         body: [
-          "DiagramatixMINER imports and exports the industry event-log standards. Summary of what each is and our fidelity:",
+          "Diagramatix Miner imports and exports the industry event-log standards. Summary of what each is and our fidelity:",
           "",
           "| Standard | Import | Export | Notes |",
           "|---|---|---|---|",
@@ -502,7 +502,7 @@ const CHAPTERS: Chapter[] = [
     title: "Compliance Monitoring Design",
     sections: [
       { heading: "Overview", body: [
-        "Compliance Monitoring is the org-level counterpart to the per-project RCM screen: **how well controls are operating over time**, assembled from the DiagramatixMINER runs retained across *all* of an org's projects. It is a **read-only aggregation** — no new persistence, no schema change; the data already exists on the runs and in the RCM catalog.",
+        "Compliance Monitoring is the org-level counterpart to the per-project RCM screen: **how well controls are operating over time**, assembled from the Diagramatix Miner runs retained across *all* of an org's projects. It is a **read-only aggregation** — no new persistence, no schema change; the data already exists on the runs and in the RCM catalog.",
       ].join("\n") },
       { heading: "Data sources", body: [
         "`GET /api/orgs/[id]/compliance` (guarded by `requireOrgAdminFor`) enumerates every `ProcessMiningRun` across the org's projects (a relational `project.orgId` filter, which also covers legacy runs whose own `orgId` is null) and loads the org's control catalog (master + project copies), **deduped by code** — codes are org-wide, so a code is the canonical unit.",

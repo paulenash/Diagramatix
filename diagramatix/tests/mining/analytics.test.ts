@@ -1,6 +1,6 @@
 /**
  * Insight-layer analytics (computeAnalytics) — the per-activity/edge metrics,
- * per-case index and cycle-time stats that drive the DiagramatixMINER Insights
+ * per-case index and cycle-time stats that drive the Diagramatix Miner Insights
  * views (bottleneck heat, variant Pareto, case explorer, KPI/SLA outcomes).
  * Guards the maths + that the edge key round-trips activity names faithfully.
  */

@@ -199,7 +199,7 @@ function EmptyState({ excludedCount }: { excludedCount: number }) {
       <h2 className="text-sm font-semibold text-gray-800 mb-1">No compliance data yet</h2>
       <p className="text-xs text-gray-500">
         Compliance Monitoring trends control operating-effectiveness across your org’s
-        <span className="font-medium"> DiagramatixMINER</span> runs. Import an event log and run conformance in a
+        <span className="font-medium"> Diagramatix Miner</span> runs. Import an event log and run conformance in a
         project’s Miner (with controls attached in Risk &amp; Controls), then return here. It becomes meaningful once an
         org has <span className="font-medium">two or more runs</span> to trend across.
       </p>

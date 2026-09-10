@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The DiagramatixMINER entry — same shape as the Simulator's own intro
+ * The Diagramatix Miner entry — same shape as the Simulator's own intro
  * but in a mining amber/brown palette: types "Entering the Diagramatix Miner…",
  * holds it for a beat, plays a short amber digital-rain burst, then hands off to
  * the console. Skippable by click / any key.

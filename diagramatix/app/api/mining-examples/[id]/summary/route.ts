@@ -1,5 +1,5 @@
 /**
- * GET — what one published DiagramatixMINER example illustrates.
+ * GET — what one published Diagramatix Miner example illustrates.
  *
  * Split from the gallery list on purpose. That list's own docblock says the
  * full package is loaded only at adopt time, "keeping this list light", and the

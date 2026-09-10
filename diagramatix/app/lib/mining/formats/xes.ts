@@ -126,7 +126,7 @@ export function buildXes(input: XesExportInput): string {
   lines.push('  <extension name="Time" prefix="time" uri="http://www.xes-standard.org/time.xesext"/>');
   lines.push('  <extension name="Lifecycle" prefix="lifecycle" uri="http://www.xes-standard.org/lifecycle.xesext"/>');
   lines.push('  <extension name="Organizational" prefix="org" uri="http://www.xes-standard.org/org.xesext"/>');
-  lines.push(`  <string key="concept:name" value="${escapeXml(input.name || "DiagramatixMINER log")}"/>`);
+  lines.push(`  <string key="concept:name" value="${escapeXml(input.name || "Diagramatix Miner log")}"/>`);
 
   let traceNo = 0;
   outer: for (const v of input.variants) {

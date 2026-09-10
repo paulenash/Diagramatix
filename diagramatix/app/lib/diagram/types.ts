@@ -1021,7 +1021,7 @@ export interface TemplateData {
  *             pick them up automatically). Starter examples back-filled with a
  *             Business-hours (9–5 w/ lunch) calendar on their human teams.
  *
- *  v1.31 (2026-07-03): DiagramatixMINER — Process Mining. Ingest event logs →
+ *  v1.31 (2026-07-03): Diagramatix Miner — Process Mining. Ingest event logs →
  *             discover the implied BPMN + a candidate State-Machine, check state-
  *             change conformance against a reference State-Machine, and calibrate
  *             a simulation "digital twin" from the mined timing/resource data
@@ -1032,7 +1032,7 @@ export interface TemplateData {
  *             diagrams. Runtime/analytics only — NO diagram-export or BPMN-XSD
  *             shape change; the version advances with the release window.
  *
- *  v1.32 (2026-07-03): DiagramatixMINER Examples — an adoptable process-mining
+ *  v1.32 (2026-07-03): Diagramatix Miner Examples — an adoptable process-mining
  *             sample catalog (mirrors Simulator Examples). New runtime table
  *             MiningExample (global catalog; `package` JSON carries a compressed
  *             event log + reference State-Machine diagrams). One-click "Load &
@@ -1050,7 +1050,7 @@ export interface TemplateData {
  *             backup carries them). Two structure rules (B38 control-coverage,
  *             B39 segregation-of-duties) + a Risk-Control Matrix .xlsx export.
  *
- *  v1.34 (2026-07-06): DiagramatixMINER standards + Technical Design Notes +
+ *  v1.34 (2026-07-06): Diagramatix Miner standards + Technical Design Notes +
  *             Logical DDL. (1) Miner: event logs may omit the State column (an
  *             Activity→State table completes the lifecycle), events may carry
  *             Control/Risk/Policy IDs (a mined governance aggregate feeds control

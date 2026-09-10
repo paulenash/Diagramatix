@@ -1,5 +1,5 @@
 /**
- * Add a "DiagramatixMINER — the extensions programme" chapter to the SuperAdmin
+ * Add a "Diagramatix Miner — the extensions programme" chapter to the SuperAdmin
  * **Technical Design Notes** (`tech-design` collection, /tech-notes).
  *
  * Records the non-obvious engineering behind plan phases 0–10 (product 2.9,
@@ -21,7 +21,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 
 const COLLECTION = "tech-design";
 const SLUG = "mining-workbench";
-const TITLE = "DiagramatixMINER — the extensions programme (phases 0–10)";
+const TITLE = "Diagramatix Miner — the extensions programme (phases 0–10)";
 
 const SECTIONS: Array<{ heading: string; body: string }> = [
   {

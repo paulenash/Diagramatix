@@ -125,7 +125,7 @@ The Diagramatix side is grounded in the shipped feature catalogue. The comparato
 | **Personal "processes involving me" view** | **Strong** (admin-managed team membership) | Partial | Partial | Not found |
 | Linked procedure/SOP document per model | **Strong** (Portal + viewer) | **Strong** (attachments/links) | **Strong** | Partial |
 | Governed naming from org/entity lists | **Strong** | Partial (dictionary/glossary) | **Strong** (repository objects) | Partial |
-| **Process discovery from event logs (→ BPMN)** | **Strong** (DiagramatixMINER) | **Strong** (Process Intelligence) | **Strong** (ARIS Mining) | Not found |
+| **Process discovery from event logs (→ BPMN)** | **Strong** (Diagramatix Miner) | **Strong** (Process Intelligence) | **Strong** (ARIS Mining) | Not found |
 | **Entity state-machine lifecycle mining** | **Strong** (distinctive) | Partial | Partial | Not found |
 | **Conformance checking (token replay, fitness %)** | **Strong** | **Strong** | **Strong** | Not found |
 | **Digital-twin calibration from the log** | **Strong** (one-click, integrated) | Partial (PI + separate sim) | Partial (mining + separate sim) | Not found |

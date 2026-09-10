@@ -74,7 +74,7 @@ type ProjectRole = "owner" | "edit" | "view";
 
 /** Feature-coloured tiles for example projects (adopted from a ready-made
  *  example) — each tint + badge matches that feature's console identity:
- *  Simulator teal, DiagramatixMINER amber, Risk & Controls sky/blue. Applied
+ *  Simulator teal, Diagramatix Miner amber, Risk & Controls sky/blue. Applied
  *  only to owned (not shared) projects, so it replaces the plain-white tile. */
 const EXAMPLE_TILE: Record<string, { base: string; selected: string; badge: string; name: string }> = {
   simulation: {

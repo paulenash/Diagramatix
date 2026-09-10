@@ -1,6 +1,6 @@
 /**
  * The portable bundle stored on MiningExample.package — everything needed to
- * recreate a worked DiagramatixMINER example in a user's own project: the
+ * recreate a worked Diagramatix Miner example in a user's own project: the
  * compressed event log (mapping + variants + performance + stats) and the
  * reference state-machine diagram(s). Captured FROM a project (admin authoring)
  * and adopted INTO a fresh project (the learner).

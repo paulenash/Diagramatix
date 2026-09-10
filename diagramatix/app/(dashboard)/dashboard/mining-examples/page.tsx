@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { isSuperuser } from "@/app/lib/superuser";
 import { MiningExamplesGallery } from "./MiningExamplesGallery";
 
-export const metadata = { title: "Diagramatix — DiagramatixMINER Examples" };
+export const metadata = { title: "Diagramatix — Miner Examples" };
 
 export default async function MiningExamplesPage() {
   const session = await auth();

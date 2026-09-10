@@ -30,7 +30,7 @@ WHERE "collection" = 'user-guide' AND "title" IN
 
 UPDATE "HelpChapter" SET "category" = 'Analysis & Insights'
 WHERE "collection" = 'user-guide' AND "title" IN
-  ('Value Analysis','Bottleneck Highlighting','Simulating Processes','DiagramatixMINER — Process Mining','Risk & Controls (GRC)','Process Classification (APQC PCF)');
+  ('Value Analysis','Bottleneck Highlighting','Simulating Processes','Diagramatix Miner — Process Mining','Risk & Controls (GRC)','Process Classification (APQC PCF)');
 
 UPDATE "HelpChapter" SET "category" = 'Sharing & Governance'
 WHERE "collection" = 'user-guide' AND "title" IN

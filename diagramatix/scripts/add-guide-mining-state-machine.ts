@@ -1,6 +1,6 @@
 /**
  * Add a "Why a state machine? The entity's lifecycle" section to the
- * DiagramatixMINER User Guide chapter (HelpChapter `process-mining`) — a
+ * Diagramatix Miner User Guide chapter (HelpChapter `process-mining`) — a
  * conceptual primer on what the state-machine diagram is FOR: the two views
  * (BPMN activity flow vs entity lifecycle), the two roles (reference vs
  * discovered), and how conformance uses it. Inserted just before "The lifecycle
@@ -18,15 +18,15 @@ import { PrismaPg } from "@prisma/adapter-pg";
 const HEADING = "Why a state machine? The entity's lifecycle";
 const ANCHOR = "The lifecycle & conformance check"; // insert immediately before this
 const BODY = [
-  "DiagramatixMINER produces two very different diagrams from the same log, and they answer two different questions. The **BPMN** answers *“what do people do, and in what order?”* — the activity flow. The **state machine** answers *“what states does the thing being processed pass through, and which moves between them are legal?”* — the **entity lifecycle**.",
+  "Diagramatix Miner produces two very different diagrams from the same log, and they answer two different questions. The **BPMN** answers *“what do people do, and in what order?”* — the activity flow. The **state machine** answers *“what states does the thing being processed pass through, and which moves between them are legal?”* — the **entity lifecycle**.",
   "",
   "That second view is the point. These processes are really the lifecycle of a business entity — an **Invoice**, an **Employee**, a **Registrant**. An invoice isn't fundamentally a list of tasks; it's a thing that is *Received*, then *In Progress*, then *Approved*, then *Paid*. The activities are just what move it from one state to the next. So the state machine is the more durable, governable picture: who does the work and how the steps are arranged will change over time, but *“an invoice may only be paid after it is approved”* is a rule that should always hold.",
   "",
-  "**A state machine has two roles in DiagramatixMINER.**",
+  "**A state machine has two roles in Diagramatix Miner.**",
   "",
   "**1. The reference — your single source of truth.** A state-machine diagram is made of **state** nodes (plus an **initial** and a **final** marker) joined by **transition** connectors, each labelled with the event that triggers it. Together they encode a rulebook: which states exist, where a case is allowed to **start**, where it may legitimately **end**, and which state-to-state moves are **permitted**. This is the model conformance scores reality against — the single source of truth for the entity's states and transitions.",
   "",
-  "**2. The discovered candidate — what actually happened.** DiagramatixMINER also *mines* a state machine from the log's state column (**Discover the state machine**): the observed states become nodes and the observed moves become transitions, each labelled with its triggering activity. This is a proposal of the lifecycle reality reveals — handy for spotting states or transitions you didn't know existed, and you can edit it and promote it to become your reference when you don't already have one.",
+  "**2. The discovered candidate — what actually happened.** Diagramatix Miner also *mines* a state machine from the log's state column (**Discover the state machine**): the observed states become nodes and the observed moves become transitions, each labelled with its triggering activity. This is a proposal of the lifecycle reality reveals — handy for spotting states or transitions you didn't know existed, and you can edit it and promote it to become your reference when you don't already have one.",
   "",
   "**No reference yet? Create a draft.** If your project has no reference state machine, the **Conformance** panel offers **＋ Create draft reference** — it scaffolds one from the mined lifecycle in a single click and selects it, so you're never stuck at a dead end. Because that draft mirrors what the log actually did, it will conform almost perfectly at first — that's expected. The real work is to **edit it into your rulebook** (use the **edit reference →** link): prune the transitions and exits that *shouldn't* be allowed. The moment you remove a move and re-check, the cases that took it light up as **undocumented** — and you have a governed source of truth, authored from reality and tightened to your policy.",
   "",

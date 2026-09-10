@@ -1,5 +1,5 @@
 /**
- * Append a Feature-catalog row for DiagramatixMINER Examples — the adoptable
+ * Append a Feature-catalog row for Diagramatix Miner Examples — the adoptable
  * process-mining sample catalog, shipped 2026-07-03.
  *
  * Idempotent: skipped if a row with the same `name` already exists. Inserted as
@@ -17,12 +17,12 @@ import { PrismaPg } from "@prisma/adapter-pg";
 
 const FEATURES: Array<{ name: string; summary: string; details: string; sortOrder: number }> = [
   {
-    name: "DiagramatixMINER Examples",
+    name: "Diagramatix Miner Examples",
     sortOrder: 350,
     summary:
       "Ready-made process-mining studies you can load in one click — a real event log plus its reference lifecycle — to explore Discovery, Conformance and the digital-twin Simulator without any setup.",
     details: [
-      "- A gallery of published examples; Load & open copies one into a new project and opens ⛏ DiagramatixMINER on it",
+      "- A gallery of published examples; Load & open copies one into a new project and opens ⛏ Diagramatix Miner on it",
       "- Each example ships a ready mined run (compressed event log with timing + resource data) so Discovery, Conformance and Calibrate & simulate all work immediately",
       "- Reference state machines travel with the example, so conformance checking has a source-of-truth to score against out of the box",
       "- The Accounts Payable starter: a month of ~200 invoices, with a permissive lifecycle (≈90% conformant) and a strict one that flags dozens of undocumented rework cases",

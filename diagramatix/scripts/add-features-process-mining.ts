@@ -1,5 +1,5 @@
 /**
- * Append a Feature-catalog row for DiagramatixMINER (Process Mining), shipped
+ * Append a Feature-catalog row for Diagramatix Miner (Process Mining), shipped
  * 2026-07-03.
  *
  * Idempotent: skipped if a row with the same `name` already exists. Inserted as
@@ -18,10 +18,10 @@ import { PrismaPg } from "@prisma/adapter-pg";
 
 const FEATURES: Array<{ name: string; summary: string; details: string; sortOrder: number }> = [
   {
-    name: "DiagramatixMINER — Process Mining",
+    name: "Diagramatix Miner — Process Mining",
     sortOrder: 340,
     summary:
-      "Ingest event logs from your systems and DiagramatixMINER reconstructs the process you actually run — the implied BPMN, the entity's real lifecycle, and where reality deviates from your reference — then calibrates a credible simulation twin in one click.",
+      "Ingest event logs from your systems and Diagramatix Miner reconstructs the process you actually run — the implied BPMN, the entity's real lifecycle, and where reality deviates from your reference — then calibrates a credible simulation twin in one click.",
     details: [
       "- Import standard CSV event logs (case, activity, timestamp, state, optional resource) with auto-detected column mapping and a live preview",
       "- Discovers the implied BPMN process — an editable diagram with gateways at every branch, loops, and a detail slider to move between the happy path and the full spaghetti",

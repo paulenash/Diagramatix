@@ -9,7 +9,7 @@ import type { ObservedDeviation, ControlEffectiveness } from "@/app/lib/riskCont
 
 /**
  * Full-screen Risk & Control console for a project — its own screen (like the
- * Simulator / DiagramatixMINER consoles) for catalog maintenance: adopt or
+ * Simulator / Diagramatix Miner consoles) for catalog maintenance: adopt or
  * create the library, edit Risks / Controls / Policies / Regulations / Findings /
  * KRIs / KPIs and their traceability, export the Risk-Control Matrix, and see
  * control operating-effectiveness from the project's mining conformance. Teal

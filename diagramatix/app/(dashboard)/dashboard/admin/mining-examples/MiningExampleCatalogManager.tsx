@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * SuperAdmin catalog manager for DiagramatixMINER Examples. Edit metadata,
+ * SuperAdmin catalog manager for Diagramatix Miner Examples. Edit metadata,
  * toggle publish, duplicate (copy → extend), and delete. The bundle content
  * itself is authored by CAPTURING a project's mining run (the "Save run as
- * example" button in the ⛏ DiagramatixMINER console) or by the seed — this
+ * example" button in the ⛏ Diagramatix Miner console) or by the seed — this
  * screen curates + publishes.
  */
 import { useCallback, useEffect, useState } from "react";
@@ -65,12 +65,12 @@ export function MiningExampleCatalogManager() {
     <div className="h-screen flex flex-col overflow-hidden">
       <div className="flex-1 min-h-0 overflow-y-auto max-w-4xl mx-auto px-4 py-8 w-full">
       <div className="flex items-center justify-between mb-1">
-        <h1 className="text-2xl font-semibold text-gray-900">DiagramatixMINER Example Catalog</h1>
+        <h1 className="text-2xl font-semibold text-gray-900">Diagramatix Miner Example Catalog</h1>
         <a href="/dashboard/mining-examples" className="text-sm text-gray-500 hover:text-gray-700">View gallery →</a>
       </div>
       <p className="text-sm text-gray-500 mb-6">
-        Curate the process-mining examples. Author new ones by capturing a run in the DiagramatixMINER console
-        (<span className="font-mono">⛏ DiagramatixMINER → Save run as example</span>), or duplicate an existing one to extend it.
+        Curate the process-mining examples. Author new ones by capturing a run in the Diagramatix Miner console
+        (<span className="font-mono">⛏ Diagramatix Miner → Save run as example</span>), or duplicate an existing one to extend it.
       </p>
 
       {err && <div className="mb-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{err}</div>}

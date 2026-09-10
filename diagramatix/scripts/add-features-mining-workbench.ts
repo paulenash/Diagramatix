@@ -1,8 +1,8 @@
 /**
- * Feature-catalog rows for the DiagramatixMINER extensions programme
+ * Feature-catalog rows for the Diagramatix Miner extensions programme
  * (plan phases 0–10, product 2.9, 2026-09-10).
  *
- * The existing "DiagramatixMINER — Process Mining" row describes mine →
+ * The existing "Diagramatix Miner — Process Mining" row describes mine →
  * discover → conform → calibrate, which is still accurate and is left alone.
  * These are the things it does not mention, split into three rows because they
  * sell to different questions: *can it read my data*, *can I get an answer out
@@ -22,7 +22,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 
 const FEATURES: Array<{ name: string; summary: string; details: string; sortOrder: number }> = [
   {
-    name: "DiagramatixMINER — the log you actually have",
+    name: "Diagramatix Miner — the log you actually have",
     sortOrder: 341,
     summary:
       "Most people do not have an XES file — they have a spreadsheet, and it is rarely the shape a miner expects. Excel, exports with the whole lifecycle across one row, and several systems' extracts of the same cases all import, with a refusal rather than a wrong answer when they cannot be reconciled.",
@@ -37,7 +37,7 @@ const FEATURES: Array<{ name: string; summary: string; details: string; sortOrde
     ].join("\n"),
   },
   {
-    name: "DiagramatixMINER — the analyst's workbench",
+    name: "Diagramatix Miner — the analyst's workbench",
     sortOrder: 342,
     summary:
       "Slice the run by date, team or any column you kept; see which hand-off is actually costing the time; get the case ids behind a deviation; and be told what to do next — with every figure saying whether it can be cited.",
@@ -55,7 +55,7 @@ const FEATURES: Array<{ name: string; summary: string; details: string; sortOrde
     ].join("\n"),
   },
   {
-    name: "DiagramatixMINER — watch it, rather than visit it",
+    name: "Diagramatix Miner — watch it, rather than visit it",
     sortOrder: 343,
     summary:
       "Nobody mines a process once. Runs link into a series, two periods can be compared, and a live source tells you when the process changed — starting with the alarm that matters most: it stopped sending.",

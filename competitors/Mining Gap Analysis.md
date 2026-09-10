@@ -1,14 +1,14 @@
-# DiagramatixMINER — Process-Mining Standards Gap Analysis
+# Diagramatix Miner — Process-Mining Standards Gap Analysis
 
 *Assessed 2026-07-06 against the supplied summary of process-mining standards (IEEE XES, OCEL, CSV event logs, BPMN execution logs, OpenTelemetry) and the proposed "event log as core data model" schema.*
 
-This document records **what DiagramatixMINER covers today**, **where it diverges from the standards**, and the **remediation** being taken. Items marked ✅ **DONE** in the change log at the bottom were implemented in the same work as this analysis.
+This document records **what Diagramatix Miner covers today**, **where it diverges from the standards**, and the **remediation** being taken. Items marked ✅ **DONE** in the change log at the bottom were implemented in the same work as this analysis.
 
 ---
 
 ## 1. Executive summary
 
-DiagramatixMINER is a well-built **single-object, state-centric, CSV process miner** — arguably *ahead* of the field on state-machine conformance, but historically *behind* the standards on interoperability (no XES/OCEL) and on the "log as core data model" ambition.
+Diagramatix Miner is a well-built **single-object, state-centric, CSV process miner** — arguably *ahead* of the field on state-machine conformance, but historically *behind* the standards on interoperability (no XES/OCEL) and on the "log as core data model" ambition.
 
 The original ingest recognised exactly **five** column roles — `caseId`, `activity`, `timestamp`, `state`, `resource` — of which **four were mandatory**, and accepted **CSV only**. After import it compressed events to *variants* (state + activity sequences) and **discarded the raw event log**; performance, teams and the working calendar were re-derived at that moment into aggregates, never stored as events.
 
@@ -27,7 +27,7 @@ Three changes close the most valuable gaps:
 | **IEEE XES (1849)** | The industry standard | 🟡→🟢 Partial, now with import/export | Ingested the 3 mandatory XES attributes (case, activity, timestamp) but only as CSV, plus a **non-standard required `state`**. Of the typical additional attributes only **Resource** was carried; role/cost/lifecycle/department were dropped. **C** adds `.xes` import + export. |
 | **OCEL** | Multi-object process mining | 🔴→🟡 Single-object projection | No multi-object model; `entityType` was recognised but discarded. **C** adds OCEL 2.0 import (flattened to a chosen object type as the case) + export. True multi-object analytics remain a larger, separate effort. |
 | **CSV event log** | Simple interchange | 🟢 Covered | Always the primary format. Previously required a 4th `state` column; **A** makes the classic 3-column (Case, Activity, Timestamp) log import directly. |
-| **BPMN execution logs** | Workflow execution | ⚪ Different direction | DiagramatixMINER *discovers* BPMN from a log rather than consuming a vendor execution log — not a gap so much as an inversion. |
+| **BPMN execution logs** | Workflow execution | ⚪ Different direction | Diagramatix Miner *discovers* BPMN from a log rather than consuming a vendor execution log — not a gap so much as an inversion. |
 | **OpenTelemetry** | IT / distributed services | 🔴 Absent | No OTel span ingestion. Lowest priority for a BPM tool; revisit if mining IT/service traces becomes a goal. |
 
 ---
@@ -51,7 +51,7 @@ Assessed against the proposed comprehensive event record.
 
 ## 4. Architectural note — "log as core data model"
 
-The single largest divergence from the summary's recommendation is that DiagramatixMINER **does not persist an event log** — it persists *variants* + *aggregates*. The variant-compression step discards per-event timestamps, resources and (previously) everything else. This is efficient and bounded, but forecloses later analytics over cost / role / object / systems data.
+The single largest divergence from the summary's recommendation is that Diagramatix Miner **does not persist an event log** — it persists *variants* + *aggregates*. The variant-compression step discards per-event timestamps, resources and (previously) everything else. This is efficient and bounded, but forecloses later analytics over cost / role / object / systems data.
 
 Changes **A–C** deliberately work **with** this architecture rather than against it: governance effectiveness (B) is aggregated at import into a stored `governance` summary, and XES/OCEL export (C) reconstructs traces from variants (variant-level fidelity, synthetic timestamps). A future "persist raw events" decision would be the prerequisite for the remaining 🟡/🔴 tiers (cost, systems, AI, full OCEL multi-object).
 

@@ -1320,7 +1320,7 @@ Building one worked example there found **five shipped defects** nothing else ha
 **THE COLD START WAS WORSE THAN "NO SAMPLE DATA".** The *Load built-in example data* button renders on
 `builtInSample`, which is populated from a `sessionStorage` hand-off **the example gallery stashes on
 adopt**. So the button existed for precisely the people who did not need it — the ones who had already
-found the gallery — and a user opening DiagramatixMINER on their own project saw an upload control and
+found the gallery — and a user opening Diagramatix Miner on their own project saw an upload control and
 nothing else. Ten phases went past it because nothing was broken: every screen behaved correctly, and
 the person it failed filed nothing and closed the tab. Fixed with one CSV served from
 `public/mining/sample-order-to-cash.csv` and a button rendered on the opposite condition. The tests

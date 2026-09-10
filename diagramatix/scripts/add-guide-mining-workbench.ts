@@ -1,5 +1,5 @@
 /**
- * Extend the "DiagramatixMINER — Process Mining" User Guide chapter with the
+ * Extend the "Diagramatix Miner — Process Mining" User Guide chapter with the
  * workbench the extensions programme added (plan phases 0–10, product 2.9).
  *
  * The original chapter documents mine → discover → conform → calibrate. It says

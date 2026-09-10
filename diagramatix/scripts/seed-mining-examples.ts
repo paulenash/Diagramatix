@@ -1,5 +1,5 @@
 /**
- * Seed the Mining-Example catalog (DiagramatixMINER) with the starter set
+ * Seed the Mining-Example catalog (Diagramatix Miner) with the starter set
  * (app/lib/mining/exampleSeeds.ts). Upsert by slug so re-running refreshes the
  * bundled content; entries are published so they appear in the gallery and can
  * be adopted immediately. Admins can then edit, duplicate, or author new ones.

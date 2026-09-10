@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Full-screen DiagramatixMINER experience: plays the amber mining intro, then the
+ * Full-screen Diagramatix Miner experience: plays the amber mining intro, then the
  * console. Rendered as an overlay (not a route), mirroring the Simulator.
  */
 

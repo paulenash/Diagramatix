@@ -14,7 +14,7 @@ const CHAPTER_SLUG = "admin-roles";        // the "SuperAdmin" user-guide chapte
 const HEADING = "Technical Design Notes & the Document Editor";
 
 const BODY = [
-  "**Technical Design Notes** is a SuperAdmin-only document that captures the low-level design of the product's deep subsystems — **Simulator**, **DiagramatixMINER** and the **Risk & Control Matrix** — including the import/export **standards** each supports (XES, OCEL, BPSim, OOXML). It's edited in the same WYSIWYG editor as the User Guide, and any document can be exported to a Word **`.docx`** file.",
+  "**Technical Design Notes** is a SuperAdmin-only document that captures the low-level design of the product's deep subsystems — **Simulator**, **Diagramatix Miner** and the **Risk & Control Matrix** — including the import/export **standards** each supports (XES, OCEL, BPSim, OOXML). It's edited in the same WYSIWYG editor as the User Guide, and any document can be exported to a Word **`.docx`** file.",
   "",
   "### Where it lives",
   "",

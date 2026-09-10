@@ -7,7 +7,7 @@
  * milestone across a whole process).
  *
  * KEY THESIS (see plans/task-mining.md): a task log is just an event log at UI
- * granularity, so it feeds the EXISTING DiagramatixMINER discovery unchanged —
+ * granularity, so it feeds the EXISTING Diagramatix Miner discovery unchanged —
  * `taskCaseId` → caseId, a composed UI-step label → activity, timestamp → timestamp,
  * actor → resource. `toEventLog()` produces exactly the `{headers, rows, mapping}`
  * that `buildEventLog()` consumes. No new discovery engine; a new schema + mapping.
@@ -72,7 +72,7 @@ export const TASK_LOG_MAPPING: LogMapping = {
 };
 
 /** Project raw task interactions onto the `{headers, rows, mapping}` the existing
- *  DiagramatixMINER pipeline consumes — the whole point of Phase 0. Rows are sorted
+ *  Diagramatix Miner pipeline consumes — the whole point of Phase 0. Rows are sorted
  *  by (case, timestamp, seq) so directly-follows order is deterministic. */
 export function toEventLog(interactions: TaskInteraction[]): { headers: string[]; rows: string[][]; mapping: LogMapping } {
   const sorted = [...interactions].sort((a, b) =>

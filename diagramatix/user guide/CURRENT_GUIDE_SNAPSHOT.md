@@ -1057,7 +1057,7 @@ The project-tile right-click menu shows an extra third tier for SuperAdmins on p
 SuperAdmin's Registered Users page covers every Org; the Org Settings page exposes an Org picker (top of page), a "+ New Org" button, and the Danger Zone with Delete Org. SuperAdmin can delete any non-last Org regardless of subscription tier; the cascade removes every member, project and diagram.
 
 ### Technical Design Notes & the Document Editor [admin]
-**Technical Design Notes** is a SuperAdmin-only document that captures the low-level design of the product's deep subsystems — **Simulator**, **DiagramatixMINER** and the **Risk & Control Matrix** — including the import/export **standards** each supports (XES, OCEL, BPSim, OOXML). It's edited in the same WYSIWYG editor as the User Guide, and any document can be exported to a Word **`.docx`** file.
+**Technical Design Notes** is a SuperAdmin-only document that captures the low-level design of the product's deep subsystems — **Simulator**, **Diagramatix Miner** and the **Risk & Control Matrix** — including the import/export **standards** each supports (XES, OCEL, BPSim, OOXML). It's edited in the same WYSIWYG editor as the User Guide, and any document can be exported to a Word **`.docx`** file.
 
 ### Where it lives
 
@@ -1343,17 +1343,17 @@ When you simulate a **set of related processes**, give the same **team name** to
 
 The simulation parameters follow the industry **BPSim** standard, so models can be exchanged with other BPSim-compatible tools, and decision-branch routing is included in the diagram’s XML export.
 
-## [36] DiagramatixMINER — Process Mining  `(process-mining)`
+## [36] Diagramatix Miner — Process Mining  `(process-mining)`
 
-### What DiagramatixMINER does
-Diagramatix models the process you *design*. **DiagramatixMINER** reveals the process you *actually run*. Point it at a standard **event log** — the rows any real system emits as work happens (a case id, an activity, a timestamp, and the entity's resulting state) — and it reconstructs the real process for you: the **BPMN implied by the log**, the **lifecycle** of the underlying entity (Invoice, Employee, Registrant…), and where reality **deviates** from the model that's meant to be the single source of truth.
+### What Diagramatix Miner does
+Diagramatix models the process you *design*. **Diagramatix Miner** reveals the process you *actually run*. Point it at a standard **event log** — the rows any real system emits as work happens (a case id, an activity, a timestamp, and the entity's resulting state) — and it reconstructs the real process for you: the **BPMN implied by the log**, the **lifecycle** of the underlying entity (Invoice, Employee, Registrant…), and where reality **deviates** from the model that's meant to be the single source of truth.
 
 It closes a full loop: **mine → discover → conform → calibrate → simulate → improve**. The same log that shows you the as-is process also carries the numbers a simulation needs — so one click turns the discovered process into a *credible* digital twin you can run in the **Simulator**, with arrival rates, durations, branch odds, teams and working hours all taken from reality instead of guessed.
 
-Open it from a project's action menu — **⛏ DiagramatixMINER**. The console is styled like the Simulator (DiagramMATRIX), in mining browns.
+Open it from a project's action menu — **⛏ Diagramatix Miner**. The console is styled like the Simulator (DiagramMATRIX), in mining browns.
 
 ### Importing an event log
-In the **Import** panel, upload a **CSV** export from one or more source systems. DiagramatixMINER parses it in the browser for a quick preview, then processes the full file on the server so large logs aren't capped by an upload limit.
+In the **Import** panel, upload a **CSV** export from one or more source systems. Diagramatix Miner parses it in the browser for a quick preview, then processes the full file on the server so large logs aren't capped by an upload limit.
 
 **Map the columns.** Tell the miner which column is which — it auto-guesses from the header names and you adjust:
 
@@ -1374,15 +1374,15 @@ Real logs are noisy, so a **detail slider** filters out the rarest paths: slide 
 The result is an ordinary Diagram — **open it in the editor**, tidy it, rename things, or use it as the starting point for a to-be redesign. Re-discover at any detail level; it refreshes the same diagram.
 
 ### Why a state machine? The entity's lifecycle
-DiagramatixMINER produces two very different diagrams from the same log, and they answer two different questions. The **BPMN** answers *“what do people do, and in what order?”* — the activity flow. The **state machine** answers *“what states does the thing being processed pass through, and which moves between them are legal?”* — the **entity lifecycle**.
+Diagramatix Miner produces two very different diagrams from the same log, and they answer two different questions. The **BPMN** answers *“what do people do, and in what order?”* — the activity flow. The **state machine** answers *“what states does the thing being processed pass through, and which moves between them are legal?”* — the **entity lifecycle**.
 
 That second view is the point. These processes are really the lifecycle of a business entity — an **Invoice**, an **Employee**, a **Registrant**. An invoice isn't fundamentally a list of tasks; it's a thing that is *Received*, then *In Progress*, then *Approved*, then *Paid*. The activities are just what move it from one state to the next. So the state machine is the more durable, governable picture: who does the work and how the steps are arranged will change over time, but *“an invoice may only be paid after it is approved”* is a rule that should always hold.
 
-**A state machine has two roles in DiagramatixMINER.**
+**A state machine has two roles in Diagramatix Miner.**
 
 **1. The reference — your single source of truth.** A state-machine diagram is made of **state** nodes (plus an **initial** and a **final** marker) joined by **transition** connectors, each labelled with the event that triggers it. Together they encode a rulebook: which states exist, where a case is allowed to **start**, where it may legitimately **end**, and which state-to-state moves are **permitted**. This is the model conformance scores reality against — the single source of truth for the entity's states and transitions.
 
-**2. The discovered candidate — what actually happened.** DiagramatixMINER also *mines* a state machine from the log's state column (**Discover the state machine**): the observed states become nodes and the observed moves become transitions, each labelled with its triggering activity. This is a proposal of the lifecycle reality reveals — handy for spotting states or transitions you didn't know existed, and you can edit it and promote it to become your reference when you don't already have one.
+**2. The discovered candidate — what actually happened.** Diagramatix Miner also *mines* a state machine from the log's state column (**Discover the state machine**): the observed states become nodes and the observed moves become transitions, each labelled with its triggering activity. This is a proposal of the lifecycle reality reveals — handy for spotting states or transitions you didn't know existed, and you can edit it and promote it to become your reference when you don't already have one.
 
 **No reference yet? Create a draft.** If your project has no reference state machine, the **Conformance** panel offers **＋ Create draft reference** — it scaffolds one from the mined lifecycle in a single click and selects it, so you're never stuck at a dead end. Because that draft mirrors what the log actually did, it will conform almost perfectly at first — that's expected. The real work is to **edit it into your rulebook** (use the **edit reference →** link): prune the transitions and exits that *shouldn't* be allowed. The moment you remove a move and re-check, the cases that took it light up as **undocumented** — and you have a governed source of truth, authored from reality and tightened to your policy.
 
@@ -1391,9 +1391,9 @@ That second view is the point. These processes are really the lifecycle of a bus
 In short: the **BPMN** shows you the flow, but only the **state machine** can tell you whether the entity's lifecycle obeyed the rules — and, by swapping a permissive reference for a stricter one, *exactly which rule was broken and how often*.
 
 ### The lifecycle & conformance check
-Because these processes are really the **lifecycle of an entity**, DiagramatixMINER also reads the **state** column and proposes a candidate **State Machine** — the states the entity actually passed through and the transitions between them, each labelled with the activity that triggered it. Like the BPMN, it's an editable diagram you can promote into a reference.
+Because these processes are really the **lifecycle of an entity**, Diagramatix Miner also reads the **state** column and proposes a candidate **State Machine** — the states the entity actually passed through and the transitions between them, each labelled with the activity that triggered it. Like the BPMN, it's an editable diagram you can promote into a reference.
 
-**Conformance** is the governance payoff. Pick a **reference State Machine** — the drawn diagram that is your single source of truth for the states an entity may occupy and the transitions that are *allowed*. DiagramatixMINER replays every case's real state changes against it and reports a **fitness %** (the share of cases whose whole journey is legal) plus a **deviation table**:
+**Conformance** is the governance payoff. Pick a **reference State Machine** — the drawn diagram that is your single source of truth for the states an entity may occupy and the transitions that are *allowed*. Diagramatix Miner replays every case's real state changes against it and reports a **fitness %** (the share of cases whose whole journey is legal) plus a **deviation table**:
 
 - **Undocumented transition** — a state change that happened in reality but isn't allowed by the reference.
 - **Unknown state** — an observed state your reference doesn't define (often a naming mismatch — the labels must line up).
@@ -1403,7 +1403,7 @@ Because these processes are really the **lifecycle of an entity**, DiagramatixMI
 Each deviation is weighted by how many cases it affects, so you see the *material* gaps first — the difference between the process you published and the one people run.
 
 ### The digital twin — calibrate & simulate
-This is where mining meets the Simulator. Press **▶ Calibrate & simulate** and DiagramatixMINER writes the numbers it mined from the log straight onto the discovered BPMN and hands you a ready-to-run study:
+This is where mining meets the Simulator. Press **▶ Calibrate & simulate** and Diagramatix Miner writes the numbers it mined from the log straight onto the discovered BPMN and hands you a ready-to-run study:
 
 - **Task durations** — a distribution fitted from each activity's real timings (a fixed value when it barely varies, a triangular *min/typical/max* when it does).
 - **Arrivals** — how often new cases actually start, fitted from the gaps between case start times.
@@ -1416,7 +1416,7 @@ The console then jumps straight into the **Simulator** on the calibrated model. 
 ### Walkthrough — the Accounts Payable sample
 The fastest way to see the whole loop is the built-in **Accounts Payable — Invoice Lifecycle** sample. It needs no data, no setup, and no modelling — three clicks take you from an empty account to a discovered process, a quantified conformance gap, and an animated, reality-calibrated simulation.
 
-**Load it.** Open the **File** menu → **Process Mining Examples**. The gallery lists ready-made studies; the Accounts Payable card shows *200 cases · 10 variants · 2 references*. Click **▶ Load & open**. Diagramatix copies the example into a brand-new project of your own — its two reference state machines plus the sample event log — and drops you into the **⛏ DiagramatixMINER** console (after a brief intro) with the log **already loaded in the Import panel**. You don't need a CSV of your own to try everything. Nothing you already have is touched.
+**Load it.** Open the **File** menu → **Process Mining Examples**. The gallery lists ready-made studies; the Accounts Payable card shows *200 cases · 10 variants · 2 references*. Click **▶ Load & open**. Diagramatix copies the example into a brand-new project of your own — its two reference state machines plus the sample event log — and drops you into the **⛏ Diagramatix Miner** console (after a brief intro) with the log **already loaded in the Import panel**. You don't need a CSV of your own to try everything. Nothing you already have is touched.
 
 **1. Confirm the analysis, then import.** The **Import an event log** panel is pre-filled with the sample: the columns are mapped (Invoice ID → case, Activity, Timestamp, Invoice Status → state, Resource) and a verification summary shows *200 usable · 0 dropped*, the detected timestamp format and date range, and sample values so you can see the mapping is right. Review it, then click **Import log**. The run *Accounts Payable — January 2026* appears in **Mining runs** — click it for the summary: ~200 **cases**, ~990 **events**, 8 **activities**, 7 **states**, 10 **variants**, about a month's span.
 
@@ -1432,7 +1432,7 @@ The fastest way to see the whole loop is the built-in **Accounts Payable — Inv
 
 **7. Run & replay.** In the Simulator, run the baseline, then open **Replay**: invoices animate as tokens flowing through the discovered process over a slowed clock, banking up wherever the mined durations and staffing create a queue. Because every parameter came from the real log, this is a *credible* as-is twin — a sound footing for designing and comparing **to-be** improvements.
 
-That's the full loop — **mine → discover → conform → simulate → improve** — on real data, with no preparation. When you're ready, do the same with your own CSV: **⛏ DiagramatixMINER → Import an event log**.
+That's the full loop — **mine → discover → conform → simulate → improve** — on real data, with no preparation. When you're ready, do the same with your own CSV: **⛏ Diagramatix Miner → Import an event log**.
 
 ## [37] Risk & Controls (GRC)  `(risk-controls)`
 
@@ -1494,7 +1494,7 @@ Two governance checks run alongside the normal diagram issue scanner and flag th
 Fixing these before an audit is far cheaper than explaining them during one.
 
 ### Proving controls actually operate (from mining)
-A control on paper isn't the same as a control that *works*. Risk & Controls ties each control to **real execution data** from **DiagramatixMINER**:
+A control on paper isn't the same as a control that *works*. Risk & Controls ties each control to **real execution data** from **Diagramatix Miner**:
 
 - If a mining run reports **governance evidence** for the control's code, effectiveness is `applied ÷ expected` cases.
 - Otherwise, a control can name the **conformance deviation** it guards; when a run shows that deviation in N of M cases, the control was **bypassed** N times.

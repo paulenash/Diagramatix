@@ -72,7 +72,7 @@ export function MiningPollingClient({ rows, isSuperAdmin, scopeName }: { rows: P
       </a>
       <h1 className="text-xl font-semibold text-gray-900">Live-source Polling</h1>
       <p className="text-xs text-gray-500 mt-0.5">
-        {isSuperAdmin ? "All projects with a DiagramatixMINER live source." : `Live sources in ${scopeName ?? "your organisation"}.`}
+        {isSuperAdmin ? "All projects with a Diagramatix Miner live source." : `Live sources in ${scopeName ?? "your organisation"}.`}
         {" "}Turn automatic polling on/off per source. {onCount}/{rows.length} on.
       </p>
 

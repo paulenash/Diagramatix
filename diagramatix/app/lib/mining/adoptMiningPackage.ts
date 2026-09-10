@@ -4,7 +4,7 @@
  * ids preserved so conformance-by-label + overlay ids stay valid) and a ready
  * ProcessMiningRun (mapping + compressed variants + performance + stats), with
  * the run's `referenceSmId` remapped to the freshly-minted diagram id. The user
- * lands in DiagramatixMINER with the run present — Discover / Conformance /
+ * lands in Diagramatix Miner with the run present — Discover / Conformance /
  * Calibrate & simulate all work immediately. The inverse of captureMiningPackage.
  *
  * Mirrors app/lib/simulation/adoptPackage.ts.

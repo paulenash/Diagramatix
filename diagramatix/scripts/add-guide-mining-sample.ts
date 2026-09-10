@@ -1,6 +1,6 @@
 /**
  * Add a "Walkthrough — the Accounts Payable sample" section to the
- * DiagramatixMINER User Guide chapter (HelpChapter `process-mining`), a
+ * Diagramatix Miner User Guide chapter (HelpChapter `process-mining`), a
  * step-by-step of the one-click sample: Load & open → Discover → Conformance →
  * Calibrate & simulate → Replay. Appended at the end of the chapter. Idempotent:
  * re-running updates the section body in place.
@@ -18,7 +18,7 @@ const HEADING = "Walkthrough — the Accounts Payable sample";
 const BODY = [
   "The fastest way to see the whole loop is the built-in **Accounts Payable — Invoice Lifecycle** sample. It needs no data, no setup, and no modelling — three clicks take you from an empty account to a discovered process, a quantified conformance gap, and an animated, reality-calibrated simulation.",
   "",
-  "**Load it.** Open the **File** menu → **Process Mining Examples**. The gallery lists ready-made studies; the Accounts Payable card shows *200 cases · 10 variants · 2 references*. Click **▶ Load & open**. Diagramatix copies the example into a brand-new project of your own — its two reference state machines plus the sample event log — and drops you into the **⛏ DiagramatixMINER** console (after a brief intro) with the log **already loaded in the Import panel**. You don't need a CSV of your own to try everything. Nothing you already have is touched.",
+  "**Load it.** Open the **File** menu → **Process Mining Examples**. The gallery lists ready-made studies; the Accounts Payable card shows *200 cases · 10 variants · 2 references*. Click **▶ Load & open**. Diagramatix copies the example into a brand-new project of your own — its two reference state machines plus the sample event log — and drops you into the **⛏ Diagramatix Miner** console (after a brief intro) with the log **already loaded in the Import panel**. You don't need a CSV of your own to try everything. Nothing you already have is touched.",
   "",
   "**1. Confirm the analysis, then import.** The **Import an event log** panel is pre-filled with the sample: the columns are mapped (Invoice ID → case, Activity, Timestamp, Invoice Status → state, Resource) and a verification summary shows *200 usable · 0 dropped*, the detected timestamp format and date range, and sample values so you can see the mapping is right. Review it, then click **Import log**. The run *Accounts Payable — January 2026* appears in **Mining runs** — click it for the summary: ~200 **cases**, ~990 **events**, 8 **activities**, 7 **states**, 10 **variants**, about a month's span.",
   "",
@@ -34,7 +34,7 @@ const BODY = [
   "",
   "**7. Run & replay.** In the Simulator, run the baseline, then open **Replay**: invoices animate as tokens flowing through the discovered process over a slowed clock, banking up wherever the mined durations and staffing create a queue. Because every parameter came from the real log, this is a *credible* as-is twin — a sound footing for designing and comparing **to-be** improvements.",
   "",
-  "That's the full loop — **mine → discover → conform → simulate → improve** — on real data, with no preparation. When you're ready, do the same with your own CSV: **⛏ DiagramatixMINER → Import an event log**.",
+  "That's the full loop — **mine → discover → conform → simulate → improve** — on real data, with no preparation. When you're ready, do the same with your own CSV: **⛏ Diagramatix Miner → Import an event log**.",
 ].join("\n");
 
 async function main() {

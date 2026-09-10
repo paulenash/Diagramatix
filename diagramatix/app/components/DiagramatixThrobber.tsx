@@ -30,7 +30,7 @@ export function DiagramatixThrobber({
    *  only so existing call sites keep compiling. It has no effect. */
   auraRadius: _auraRadius,
   /** Icon colour. "red" = SuperAdmin model-comparison overlay; "amber" = the
-   *  Process Mining (DiagramatixMINER) brown skin. */
+   *  Process Mining (Diagramatix Miner) brown skin. */
   tone = "blue",
 }: {
   size?: number;

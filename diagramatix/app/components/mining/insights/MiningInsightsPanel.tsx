@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * DiagramatixMINER "Insights" — the analyst workbench over a mined run. Tabbed:
+ * Diagramatix Miner "Insights" — the analyst workbench over a mined run. Tabbed:
  * Heat (bottleneck/frequency colouring of the discovered model) and Variants
  * (Pareto + path isolation + compare). Later slices add Cases, Outcomes, Export.
  * Self-fetches the run's full detail (analytics + variants + kpiConfig) and the

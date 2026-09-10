@@ -1,5 +1,5 @@
 /**
- * Starter DiagramatixMINER examples — the seed set for the Mining-Example
+ * Starter Diagramatix Miner examples — the seed set for the Mining-Example
  * catalog. GENERATED (deterministically) by scripts/gen-mining-examples.ts into
  * miningExampleData.json; keeping the baked data in a committed JSON means the
  * seed + tests stay free of file I/O and stay fast. Regenerate with

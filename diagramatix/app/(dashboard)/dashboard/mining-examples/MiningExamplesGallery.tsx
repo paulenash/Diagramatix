@@ -3,14 +3,14 @@
 import Link from "next/link";
 
 /**
- * DiagramatixMINER Examples gallery — browse the published process-mining
+ * Diagramatix Miner Examples gallery — browse the published process-mining
  * examples and one-click "Load & open" any into a fresh project. Adopt lands you
- * on the dashboard with the ⛏ DiagramatixMINER console auto-opened on the new
+ * on the dashboard with the ⛏ Diagramatix Miner console auto-opened on the new
  * project (via ?mining=<projectId>), the mined run already present so you can
  * Discover, check Conformance, and Calibrate & simulate immediately.
  *
  * Miner-skinned: the amber/brown cascade of jagged rocks and BPMN symbols +
- * stone/amber cards, to match the DiagramatixMINER console you're about to
+ * stone/amber cards, to match the Diagramatix Miner console you're about to
  * enter, with OPAQUE cards — the cascade is chrome, and chrome falling through
  * the words of every card is interference. Each card also offers a SUMMARY — what that example actually
  * illustrates, derived from its own package rather than written beside it, so a
@@ -98,12 +98,12 @@ export function MiningExamplesGallery({ isAdmin }: { isAdmin: boolean }) {
 
       <div className="relative z-10 max-w-5xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-1">
-          <h1 className="text-2xl font-semibold text-amber-300 tracking-wide">⛏ DiagramatixMINER Examples</h1>
+          <h1 className="text-2xl font-semibold text-amber-300 tracking-wide">⛏ Diagramatix Miner Examples</h1>
           <Link href="/dashboard" className="text-sm text-amber-200/60 hover:text-amber-200">← Dashboard</Link>
         </div>
         <p className="text-sm text-amber-200/70 mb-6">
           Ready-made process-mining studies to explore or demo. <span className="text-amber-300">Load &amp; open</span> copies one
-          into a new project and opens <span className="text-amber-300">⛏ DiagramatixMINER</span> on it — Discover the process,
+          into a new project and opens <span className="text-amber-300">⛏ Diagramatix Miner</span> on it — Discover the process,
           check Conformance against the reference lifecycle, then Calibrate &amp; simulate.
         </p>
 

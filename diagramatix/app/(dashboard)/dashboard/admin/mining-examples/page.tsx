@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { isActingSuperuser } from "@/app/lib/auth/orgPolicy";
 import { MiningExampleCatalogManager } from "./MiningExampleCatalogManager";
 
-export const metadata = { title: "Diagramatix — DiagramatixMINER Example Catalog" };
+export const metadata = { title: "Diagramatix — Miner Example Catalog" };
 
 export default async function AdminMiningExamplesPage() {
   const session = await auth();

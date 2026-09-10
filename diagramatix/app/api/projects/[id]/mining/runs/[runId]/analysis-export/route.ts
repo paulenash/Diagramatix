@@ -1,6 +1,6 @@
 /**
  * GET /api/projects/:id/mining/runs/:runId/analysis-export?format=docx|xlsx|pdf
- * → the DiagramatixMINER analysis report (summary, bottlenecks, variants,
+ * → the Diagramatix Miner analysis report (summary, bottlenecks, variants,
  *   outcomes). Word via buildDocx, PDF via docxToPdf (LibreOffice), Excel via
  *   the hand-built xlsx writer. Project view access.
  */

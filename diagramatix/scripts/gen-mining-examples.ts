@@ -1,5 +1,5 @@
 /**
- * Generate the baked DiagramatixMINER example catalog (app/lib/mining/
+ * Generate the baked Diagramatix Miner example catalog (app/lib/mining/
  * miningExampleData.json) — self-contained + deterministic (seeded PRNG), so the
  * seed + tests stay free of file I/O. Regenerate with:
  *   export PATH="$PATH:/c/Program Files/nodejs"
@@ -522,7 +522,7 @@ const serviceDeskExample = {
   description: [
     "The smallest useful event log — just **Ticket ID, Activity, Timestamp and Agent**, with **no state column**, exactly what most systems export.",
     "",
-    "On import, DiagramatixMINER shows an **Activity → State** table (pre-filled here: *Log Ticket → Logged*, *Investigate → Investigating*, *Resolve → Resolved*…) so you define the lifecycle the discovery, conformance and generated **State Machine** all rely on — merge activities into shared states, or leave each as its own.",
+    "On import, Diagramatix Miner shows an **Activity → State** table (pre-filled here: *Log Ticket → Logged*, *Investigate → Investigating*, *Resolve → Resolved*…) so you define the lifecycle the discovery, conformance and generated **State Machine** all rely on — merge activities into shared states, or leave each as its own.",
     "",
     "Choose one of **three past periods** on entry — **August 2025**, **November 2025** or the **current February 2026** — the same service desk with **adherence declining the further back you go**: older months quick-close (triage straight to resolve) and assign without triage, and run slower. ~170 tickets flow **Logged → Triaged → Assigned → Investigating → Resolved → Closed**, with an Escalated branch and a Reopen loop. Discover the lifecycle, run **Conformance** against the bundled reference (older months score lower), then **Calibrate & simulate**.",
   ].join("\n"),

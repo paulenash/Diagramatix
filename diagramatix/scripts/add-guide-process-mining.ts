@@ -1,5 +1,5 @@
 /**
- * Add a "DiagramatixMINER — Process Mining" chapter to the in-app User Guide,
+ * Add a "Diagramatix Miner — Process Mining" chapter to the in-app User Guide,
  * documenting the mine → discover → conform → simulate loop. Placed right after
  * "Simulating Processes" (the twin hands off to the Simulator). Idempotent:
  * re-running upserts the chapter + each section body in place by heading.
@@ -16,24 +16,24 @@ import { PrismaClient } from "../app/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 
 const SLUG = "process-mining";
-const TITLE = "DiagramatixMINER — Process Mining";
+const TITLE = "Diagramatix Miner — Process Mining";
 const AFTER_SLUG = "simulation"; // place this chapter immediately after "Simulating Processes"
 
 const SECTIONS: Array<{ heading: string; body: string }> = [
   {
-    heading: "What DiagramatixMINER does",
+    heading: "What Diagramatix Miner does",
     body: [
-      "Diagramatix models the process you *design*. **DiagramatixMINER** reveals the process you *actually run*. Point it at a standard **event log** — the rows any real system emits as work happens (a case id, an activity, a timestamp, and the entity's resulting state) — and it reconstructs the real process for you: the **BPMN implied by the log**, the **lifecycle** of the underlying entity (Invoice, Employee, Registrant…), and where reality **deviates** from the model that's meant to be the single source of truth.",
+      "Diagramatix models the process you *design*. **Diagramatix Miner** reveals the process you *actually run*. Point it at a standard **event log** — the rows any real system emits as work happens (a case id, an activity, a timestamp, and the entity's resulting state) — and it reconstructs the real process for you: the **BPMN implied by the log**, the **lifecycle** of the underlying entity (Invoice, Employee, Registrant…), and where reality **deviates** from the model that's meant to be the single source of truth.",
       "",
       "It closes a full loop: **mine → discover → conform → calibrate → simulate → improve**. The same log that shows you the as-is process also carries the numbers a simulation needs — so one click turns the discovered process into a *credible* digital twin you can run in the **Simulator**, with arrival rates, durations, branch odds, teams and working hours all taken from reality instead of guessed.",
       "",
-      "Open it from a project's action menu — **⛏ DiagramatixMINER**. The console is styled like the Simulator (DiagramMATRIX), in mining browns.",
+      "Open it from a project's action menu — **⛏ Diagramatix Miner**. The console is styled like the Simulator (DiagramMATRIX), in mining browns.",
     ].join("\n"),
   },
   {
     heading: "Importing an event log",
     body: [
-      "In the **Import** panel, upload a **CSV** export from one or more source systems. DiagramatixMINER parses it in the browser for a quick preview, then processes the full file on the server so large logs aren't capped by an upload limit.",
+      "In the **Import** panel, upload a **CSV** export from one or more source systems. Diagramatix Miner parses it in the browser for a quick preview, then processes the full file on the server so large logs aren't capped by an upload limit.",
       "",
       "**Map the columns.** Tell the miner which column is which — it auto-guesses from the header names and you adjust:",
       "",
@@ -60,9 +60,9 @@ const SECTIONS: Array<{ heading: string; body: string }> = [
   {
     heading: "The lifecycle & conformance check",
     body: [
-      "Because these processes are really the **lifecycle of an entity**, DiagramatixMINER also reads the **state** column and proposes a candidate **State Machine** — the states the entity actually passed through and the transitions between them, each labelled with the activity that triggered it. Like the BPMN, it's an editable diagram you can promote into a reference.",
+      "Because these processes are really the **lifecycle of an entity**, Diagramatix Miner also reads the **state** column and proposes a candidate **State Machine** — the states the entity actually passed through and the transitions between them, each labelled with the activity that triggered it. Like the BPMN, it's an editable diagram you can promote into a reference.",
       "",
-      "**Conformance** is the governance payoff. Pick a **reference State Machine** — the drawn diagram that is your single source of truth for the states an entity may occupy and the transitions that are *allowed*. DiagramatixMINER replays every case's real state changes against it and reports a **fitness %** (the share of cases whose whole journey is legal) plus a **deviation table**:",
+      "**Conformance** is the governance payoff. Pick a **reference State Machine** — the drawn diagram that is your single source of truth for the states an entity may occupy and the transitions that are *allowed*. Diagramatix Miner replays every case's real state changes against it and reports a **fitness %** (the share of cases whose whole journey is legal) plus a **deviation table**:",
       "",
       "- **Undocumented transition** — a state change that happened in reality but isn't allowed by the reference.",
       "- **Unknown state** — an observed state your reference doesn't define (often a naming mismatch — the labels must line up).",
@@ -75,7 +75,7 @@ const SECTIONS: Array<{ heading: string; body: string }> = [
   {
     heading: "The digital twin — calibrate & simulate",
     body: [
-      "This is where mining meets the Simulator. Press **▶ Calibrate & simulate** and DiagramatixMINER writes the numbers it mined from the log straight onto the discovered BPMN and hands you a ready-to-run study:",
+      "This is where mining meets the Simulator. Press **▶ Calibrate & simulate** and Diagramatix Miner writes the numbers it mined from the log straight onto the discovered BPMN and hands you a ready-to-run study:",
       "",
       "- **Task durations** — a distribution fitted from each activity's real timings (a fixed value when it barely varies, a triangular *min/typical/max* when it does).",
       "- **Arrivals** — how often new cases actually start, fitted from the gaps between case start times.",

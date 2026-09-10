@@ -1,5 +1,5 @@
 /**
- * Build the DiagramatixMINER analysis report — summary stats, bottleneck table,
+ * Build the Diagramatix Miner analysis report — summary stats, bottleneck table,
  * variant Pareto, and (when an SLA is set) the on-time/late outcome split +
  * drivers — as Word chapters (buildDocx) and as spreadsheet sheets (buildXlsx).
  * The route renders Word directly, converts to PDF via docxToPdf, or ships xlsx.

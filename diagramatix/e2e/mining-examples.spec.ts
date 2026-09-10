@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { E2E_ADMIN } from "./_user";
 
 /**
- * DiagramatixMINER Examples — the sample-catalog journeys the Vitest suite can't
+ * Diagramatix Miner Examples — the sample-catalog journeys the Vitest suite can't
  * reach: real React render + real route handlers over authenticated sessions.
  *
  *  • As a normal user: gallery → Load & open (adopt over HTTP + ?mining deep-link
@@ -28,10 +28,10 @@ async function apExampleId(request: { get: (u: string) => Promise<{ ok(): boolea
 }
 
 // ── As a normal (non-admin) user — reuses the saved E2E_USER session ──────────
-test.describe("DiagramatixMINER Examples — user", () => {
+test.describe("Diagramatix Miner Examples — user", () => {
   test("gallery renders + Load & open pre-loads the sample CSV; import creates the run", async ({ page }) => {
     await page.goto("/dashboard/mining-examples");
-    await expect(page.getByRole("heading", { name: /DiagramatixMINER Examples/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Diagramatix Miner Examples/ })).toBeVisible();
     await expect(page.getByText("Accounts Payable — Invoice Lifecycle")).toBeVisible();
 
     await page.getByRole("button", { name: /Load & open/ }).first().click();
@@ -125,7 +125,7 @@ test.describe("DiagramatixMINER Examples — user", () => {
 });
 
 // ── As a SuperAdmin — signs in fresh as the seeded admin account ──────────────
-test.describe("DiagramatixMINER Examples — admin", () => {
+test.describe("Diagramatix Miner Examples — admin", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
   test.beforeEach(async ({ page }) => {
@@ -138,7 +138,7 @@ test.describe("DiagramatixMINER Examples — admin", () => {
 
   test("catalog manager loads for a superuser and CRUD works", async ({ page }) => {
     await page.goto("/dashboard/admin/mining-examples");
-    await expect(page.getByRole("heading", { name: /DiagramatixMINER Example Catalog/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Diagramatix Miner Example Catalog/ })).toBeVisible();
     // The row's title is an editable <input>; the slug renders as plain text.
     await expect(page.getByText(SLUG)).toBeVisible();
 
