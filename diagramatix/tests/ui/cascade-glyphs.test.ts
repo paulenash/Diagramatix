@@ -118,11 +118,24 @@ describe("the Simulator and Miner entries", () => {
     expect(hits, hits.join(", ")).toEqual([]);
   });
 
-  it("T3337 the Simulator title carries the logo and the trademark", () => {
+  it("T3337 the Simulator title is the FEATURE icon and the product name", () => {
+    // CHANGED 2026-09-10, at Paul's instruction. This previously pinned the
+    // Diagramatix logo and a ™ on the name — put there when the console was
+    // renamed off "DiagramMATRIX", so that a screen customers see carried the
+    // real trademark rather than a film pun.
+    //
+    // The name is still the real one; what changed is the mark beside it. The
+    // two consoles now head themselves identically — feature icon, then product
+    // name — because the logo answered which PRODUCT you were in and left which
+    // CONSOLE unanswered, which is the only question a header here needs to
+    // settle. T3336 still guards the old name across the whole tree, and that
+    // is the check that was actually protecting the trademark.
+    //
+    // The ™ is consequently absent from both headers. If it should come back it
+    // belongs on both, not on one.
     const src = read("app/components/simulation/SimulatorConsole.tsx");
-    expect(src).toContain("/logos/diagramatix-icon.svg");
-    expect(src).toContain("Diagramatix");
-    expect(src, "the TM belongs on the name").toContain("™");
+    expect(src).toContain("◈ Diagramatix Simulator");
+    expect(src, "the logo is back beside the feature icon").not.toContain("/logos/diagramatix-icon.svg");
   });
 
   it("T3338 the console cascade is the same BPMN one as the entry", () => {

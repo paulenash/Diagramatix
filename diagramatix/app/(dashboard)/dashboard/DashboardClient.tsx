@@ -1753,7 +1753,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                       className="feature-tile block w-full text-left px-3 py-2 text-xs"
                       title="Load a ready-made process-mining example (event log + reference lifecycle) to explore or demo"
                     >
-                      <span className="mr-2">⛏</span>Process Mining Examples
+                      <span className="mr-2">⛏</span>Miner Examples
                     </Link>
                     )}
                     {ent.riskControl && (

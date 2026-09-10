@@ -11,7 +11,8 @@ import Link from "next/link";
  *
  * Miner-skinned: the amber/brown cascade of jagged rocks and BPMN symbols +
  * stone/amber cards, to match the DiagramatixMINER console you're about to
- * enter. Each card also offers a SUMMARY — what that example actually
+ * enter, with OPAQUE cards — the cascade is chrome, and chrome falling through
+ * the words of every card is interference. Each card also offers a SUMMARY — what that example actually
  * illustrates, derived from its own package rather than written beside it, so a
  * capability that appears in one example is findable without adopting all of
  * them.
@@ -114,7 +115,7 @@ export function MiningExamplesGallery({ isAdmin }: { isAdmin: boolean }) {
 
         <div className="grid gap-4 sm:grid-cols-2">
           {examples.map((ex) => (
-            <div key={ex.id} className="rounded-lg border border-amber-500/40 bg-stone-900/70 p-4 flex flex-col shadow-[0_0_18px_rgba(180,83,9,0.15)]">
+            <div key={ex.id} className="rounded-lg border border-amber-500/40 bg-stone-900 p-4 flex flex-col shadow-[0_0_18px_rgba(180,83,9,0.15)]">
               <div className="flex items-start justify-between gap-2">
                 <h2 className="text-base font-semibold text-amber-100">{ex.title}</h2>
                 <span className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded border ${DIFF_STYLE[ex.difficulty] ?? "border-amber-400/40 text-amber-200/70"}`}>

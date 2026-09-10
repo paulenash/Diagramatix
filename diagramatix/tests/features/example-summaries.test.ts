@@ -219,3 +219,117 @@ describe("Example summaries — the button reaches a real route", () => {
     expect(gallery(SIM)).toContain('glyphs="bpmn"');
   });
 });
+
+describe("Example galleries — the cascade is chrome, not interference", () => {
+  const MINER = "app/(dashboard)/dashboard/mining-examples/MiningExamplesGallery.tsx";
+  const SIM = "app/(dashboard)/dashboard/simulator-examples/ExamplesGallery.tsx";
+  const src = (p: string) => readFileSync(p, "utf8");
+
+  /** The card's own root element — the line carrying `key={ex.id}`. */
+  function cardLine(p: string): string {
+    const line = src(p).split("\n").find((l) => l.includes("key={ex.id}"));
+    expect(line, `${p}: the card root moved — this guard needs updating`).toBeTruthy();
+    return line!;
+  }
+
+  /** The opacity utility on the wrapper the cascade is drawn into. */
+  function rainOpacity(p: string): number {
+    const m = src(p).match(/absolute inset-0 opacity-(\d+)/);
+    expect(m, `${p}: the cascade wrapper moved`).toBeTruthy();
+    return Number(m![1]);
+  }
+
+  it("T4001 - the tiles MASK the cascade — no translucent card backgrounds", () => {
+    // Both cards were partly transparent, so glyphs fell through the words of
+    // every example. The rain belongs between and around the tiles, not behind
+    // the text — and a background alpha is one keystroke away from coming back
+    // with nothing to notice it.
+    for (const p of [MINER, SIM]) {
+      expect(cardLine(p), `${p}: the card background is translucent, so the cascade shows through it`)
+        .not.toMatch(/\bbg-[a-z0-9-]+\/\d+/);
+    }
+  });
+
+  it("T4002 - neither cascade is a dimmer version of the other", () => {
+    // MatrixRain's own docblock says the two should read as "two versions of one
+    // thing rather than two effects". The Simulator's sat at opacity-20 against
+    // the Miner's opacity-45, which made it look like a weaker copy.
+    expect(rainOpacity(SIM)).toBe(rainOpacity(MINER));
+  });
+
+  it("T4003 - the Simulator cascade carries explicit colours, like the Miner's", () => {
+    // Falling back to the component default is how the two drift apart again:
+    // one screen tuned, the other inheriting whatever the default happens to be.
+    const line = src(SIM).split("\n").find((l) => l.includes("<MatrixRain"))!;
+    expect(line).toMatch(/color="#[0-9A-Fa-f]{6}"/);
+    expect(line).toMatch(/headColor="#[0-9A-Fa-f]{6}"/);
+  });
+
+  it("T4004 - the dashboard tile reads 'Miner Examples', and keeps its pick", () => {
+    const dash = readFileSync("app/(dashboard)/dashboard/DashboardClient.tsx", "utf8");
+    const link = dash.split("\n").find((l) => l.includes("Miner Examples"));
+    expect(link, "the Miner Examples tile was renamed or removed").toBeTruthy();
+    // The icon is how it is recognised in the menu; the label changed, the
+    // pick did not.
+    expect(link!).toContain("⛏");
+    expect(dash, "the tile still says 'Process Mining Examples'").not.toContain(">Process Mining Examples");
+  });
+});
+
+describe("Entry bursts — the two features announce themselves the same way", () => {
+  it("T4005 - both intros read 'Entering the Diagramatix <feature>…'", () => {
+    // The Simulator's has always said "Entering the Diagramatix Simulator…";
+    // the Miner's said "Entering DiagramatixMINER…", which is the internal
+    // codename and reads as a different product. Pinned so the pair cannot
+    // drift apart again the next time one of them is touched.
+    const intros = [
+      ["app/components/simulation/SimulatorIntro.tsx", "Simulator"],
+      ["app/components/mining/DiagramatixMinerIntro.tsx", "Miner"],
+    ] as const;
+    for (const [path, feature] of intros) {
+      const line = readFileSync(path, "utf8").split("\n").find((l) => l.includes("text=\"Entering"));
+      expect(line, `${path}: the entry text moved`).toBeTruthy();
+      expect(line!).toContain(`text="Entering the Diagramatix ${feature}…"`);
+    }
+  });
+});
+
+describe("The two consoles name themselves the same way", () => {
+  // The header is the one place every user of a feature looks. It carries the
+  // FEATURE icon and the product name — not the internal codename
+  // ("DiagramatixMINER"), and not the Diagramatix logo, which answered which
+  // product you were in while leaving which CONSOLE unanswered.
+  const CONSOLES = [
+    ["app/components/mining/ProcessMiningConsole.tsx", "⛏ Diagramatix Miner"],
+    ["app/components/simulation/SimulatorConsole.tsx", "◈ Diagramatix Simulator"],
+  ] as const;
+
+  it("T4006 - each top panel carries its feature icon and the product name", () => {
+    for (const [path, title] of CONSOLES) {
+      const line = readFileSync(path, "utf8").split("\n").find((l) => l.includes("tracking-[0.25em]"));
+      expect(line, `${path}: the console header moved — this guard needs updating`).toBeTruthy();
+      expect(line!).toContain(title);
+    }
+  });
+
+  it("T4007 - no product logo sits at the start of either top panel", () => {
+    // Removed deliberately, and worth pinning: an <img> mark beside the feature
+    // icon is the arrangement that was there before, and the natural thing for
+    // somebody to put back.
+    for (const [path] of CONSOLES) {
+      const src = readFileSync(path, "utf8");
+      const header = src.slice(src.indexOf("<header"), src.indexOf("</header>"));
+      expect(header, `${path}: a logo image is back in the header`).not.toMatch(/<img[^>]*logos\//);
+    }
+  });
+
+  it("T4008 - neither header carries the internal codename", () => {
+    // "DiagramatixMINER" is what the feature is called in the plan and the
+    // commit log. It is not what it is called to a customer.
+    for (const [path] of CONSOLES) {
+      const src = readFileSync(path, "utf8");
+      const header = src.slice(src.indexOf("<header"), src.indexOf("</header>"));
+      expect(header, `${path}: the codename is in the header`).not.toContain("DiagramatixMINER");
+    }
+  });
+});

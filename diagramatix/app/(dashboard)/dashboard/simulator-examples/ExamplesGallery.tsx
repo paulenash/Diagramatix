@@ -7,7 +7,9 @@ import Link from "next/link";
  * you can open the ◈ Simulator and Run / Replay immediately.
  *
  * Matrix-themed: the green BPMN cascade + green-phosphor cards/buttons, so the
- * gallery already feels like the Simulator you're about to enter. Each card also
+ * gallery already feels like the Simulator you're about to enter. The cards are
+ * OPAQUE: the cascade is chrome, and chrome falling through the words of every
+ * card is interference. Each card also
  * offers a SUMMARY — what that example actually illustrates, derived from its
  * own package rather than written beside it.
  */
@@ -78,8 +80,8 @@ export function ExamplesGallery({ isAdmin }: { isAdmin: boolean }) {
   return (
     <div className="relative min-h-[calc(100vh-3.5rem)] bg-black text-green-400 font-mono overflow-hidden">
       {/* Matrix digital-rain backdrop */}
-      <div className="absolute inset-0 opacity-20 pointer-events-none">
-        <MatrixRain fontSize={22} glyphs="bpmn" />
+      <div className="absolute inset-0 opacity-45 pointer-events-none">
+        <MatrixRain fontSize={22} glyphs="bpmn" color="#22C55E" headColor="#BBF7D0" />
       </div>
 
       <div className="relative z-10 max-w-5xl mx-auto px-4 py-8">
@@ -100,7 +102,7 @@ export function ExamplesGallery({ isAdmin }: { isAdmin: boolean }) {
 
         <div className="grid gap-4 sm:grid-cols-2">
           {examples.map((ex) => (
-            <div key={ex.id} className="rounded-lg border border-green-500/40 bg-black/60 p-4 flex flex-col shadow-[0_0_18px_rgba(34,197,94,0.12)]">
+            <div key={ex.id} className="rounded-lg border border-green-500/40 bg-black p-4 flex flex-col shadow-[0_0_18px_rgba(34,197,94,0.12)]">
               <div className="flex items-start justify-between gap-2">
                 <h2 className="text-base font-semibold text-green-200">{ex.title}</h2>
                 <span className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded border ${DIFF_STYLE[ex.difficulty] ?? "border-green-400/40 text-green-400/70"}`}>

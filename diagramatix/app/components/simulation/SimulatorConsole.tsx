@@ -298,13 +298,11 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId,
       <div className="relative z-10 flex flex-col h-full">
         <header className="flex items-center justify-between px-5 py-3 border-b border-green-500/40">
           <div className="flex items-center gap-3">
-            {/* The product's own mark and name. The film reference was in the
-                title of a screen customers see, and a trademark is not a place
-                to be clever. */}
-            <img src="/logos/diagramatix-icon.svg" alt="" aria-hidden className="w-5 h-5 shrink-0" />
-            <span className="text-green-300 tracking-[0.3em] text-sm whitespace-nowrap">
-              Diagramatix<sup className="tracking-normal text-[9px] align-super">™</sup> SIMULATOR
-            </span>
+            {/* The FEATURE icon and the product name, matching the Miner's header.
+                The Diagramatix logo used to sit here; two marks at the start of
+                one panel is one more than the reader needs, and the icon is what
+                identifies which of the two consoles you are looking at. */}
+            <span className="text-green-300 tracking-[0.25em] text-sm whitespace-nowrap">◈ Diagramatix Simulator</span>
             {projectMode ? (
               <>
                 {projectName && <span className="text-green-300 text-xs">{projectName}</span>}

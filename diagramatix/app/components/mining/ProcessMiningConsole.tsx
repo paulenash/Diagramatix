@@ -90,7 +90,7 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
     <div className="fixed inset-0 z-[60] bg-stone-950 text-stone-200 overflow-auto font-mono">
       <header className="flex items-center justify-between px-5 py-3 border-b border-amber-900/50 sticky top-0 bg-stone-950/95 backdrop-blur">
         <div className="flex items-center gap-3">
-          <span className="text-amber-300 tracking-[0.25em] text-sm">⛏ DiagramatixMINER</span>
+          <span className="text-amber-300 tracking-[0.25em] text-sm">⛏ Diagramatix Miner</span>
           {projectName && <span className="text-stone-400 text-xs">{projectName}</span>}
         </div>
         <div className="flex items-center gap-2">

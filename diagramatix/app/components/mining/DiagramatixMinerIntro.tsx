@@ -2,9 +2,9 @@
 
 /**
  * The DiagramatixMINER entry — same shape as the Simulator's own intro
- * but in a mining amber/brown palette: types "Entering DiagramatixMINER…", holds
- * it for a beat, plays a short amber digital-rain burst, then hands off to the
- * console. Skippable by click / any key.
+ * but in a mining amber/brown palette: types "Entering the Diagramatix Miner…",
+ * holds it for a beat, plays a short amber digital-rain burst, then hands off to
+ * the console. Skippable by click / any key.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -42,7 +42,7 @@ export function DiagramatixMinerIntro({ onEnter }: { onEnter: () => void }) {
       <div className="relative z-10 text-center px-6 pointer-events-none">
         {phase === "typing" ? (
           <MatrixTypewriter
-            text="Entering DiagramatixMINER…"
+            text="Entering the Diagramatix Miner…"
             speedMs={45}
             colorClass="text-amber-300"
             onDone={() => { pauseTimer.current = window.setTimeout(() => setPhase("rain"), 2500); }}
