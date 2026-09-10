@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-09-07  ·  **Document version:** 7.0  ·  **Suite:** 442 test files · 3,200 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T3878  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-09-07  ·  **Document version:** 7.0  ·  **Suite:** 447 test files · 3,269 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T3947  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
@@ -34,9 +34,9 @@ Each test file has its own section below, grouped into layers. Within each secti
 | **Protects you against** | In plain terms, the real-world problem that would occur if this behaviour regressed. |
 | **How it would break (go red)** | The kind of code or data change that would make this specific test fail — i.e. what the test is watching. |
 
-**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T3879**, the one after **T3880**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
+**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T3948**, the one after **T3949**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T3878`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
+> **Highest ref allocated: `T3947`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -2985,6 +2985,75 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 | T3876 | `tests/mining/next-steps.test.ts` | findActions runs BEFORE any model call, unconditionally. |
 | T3877 | `tests/mining/next-steps.test.ts` | The computed findings are returned whatever the model does. |
 | T3878 | `tests/mining/next-steps.test.ts` | The system prompt forbids reordering and inventing. |
+| T3879 | `tests/mining/slice-discovery.test.ts` | A slice discovers only the paths that slice actually took. |
+| T3880 | `tests/mining/slice-discovery.test.ts` | Zero-count variants are dropped before discovery, not drawn as paths. |
+| T3881 | `tests/mining/slice-discovery.test.ts` | The whole-log discovery is unchanged by any of this. |
+| T3882 | `tests/mining/slice-discovery.test.ts` | A slice matching nothing has no process to discover. |
+| T3883 | `tests/mining/slice-discovery.test.ts` | The slice's own edges are what label it - no whole-run timings leak in. |
+| T3884 | `tests/mining/slice-discovery.test.ts` | A sliced discovery NEVER becomes the run's own discoveredBpmnId. |
+| T3885 | `tests/mining/slice-discovery.test.ts` | The diagram is named after its slice, because it outlives the filter. |
+| T3886 | `tests/mining/slice-discovery.test.ts` | The slice's own edges label it, not the whole run's. |
+| T3887 | `tests/mining/slice-discovery.test.ts` | A run with no case index refuses to slice rather than guessing. |
+| T3888 | `tests/mining/slice-discovery.test.ts` | The filter reaches the discover route from the console. |
+| T3889 | `tests/mining/slice-discovery.test.ts` | Only edges the log contains are clickable on the transition map. |
+| T3890 | `tests/mining/slice-discovery.test.ts` | The picking layer is separate from the shared (pointer-events:none) renderer. |
+| T3891 | `tests/mining/slice-discovery.test.ts` | A row selected from the diagram is scrolled into view. |
+| T3892 | `tests/mining/slice-discovery.test.ts` | Both directions toggle off, so a mis-click is one click to undo. |
+| T3893 | `tests/mining/compare-runs.test.ts` | Two processes sharing almost no steps are REFUSED, not diffed. |
+| T3894 | `tests/mining/compare-runs.test.ts` | The same process at two times is compared. |
+| T3895 | `tests/mining/compare-runs.test.ts` | A process that gained one step is still the same process. |
+| T3896 | `tests/mining/compare-runs.test.ts` | A run with no analytics is refused rather than compared to nothing. |
+| T3897 | `tests/mining/compare-runs.test.ts` | Headline figures carry both values and the direction that is good. |
+| T3898 | `tests/mining/compare-runs.test.ts` | A change from zero has NO percentage rather than an infinite one. |
+| T3899 | `tests/mining/compare-runs.test.ts` | An activity absent from one run is ADDED or REMOVED, never zero. |
+| T3900 | `tests/mining/compare-runs.test.ts` | Activities are ranked by the SIZE of the change, in either direction. |
+| T3901 | `tests/mining/compare-runs.test.ts` | A deviation that appeared is named, and one that went away is too. |
+| T3902 | `tests/mining/compare-runs.test.ts` | Fitness is NOT compared when only one run was checked. |
+| T3903 | `tests/mining/compare-runs.test.ts` | Fitness history is oldest-first; an unchecked run is a GAP, not a zero. |
+| T3904 | `tests/mining/compare-runs.test.ts` | Runs chain oldest-first through parentRunId. |
+| T3905 | `tests/mining/compare-runs.test.ts` | A run whose parent is outside the set starts the chain. |
+| T3906 | `tests/mining/compare-runs.test.ts` | A cycle terminates rather than looping forever. |
+| T3907 | `tests/mining/compare-runs.test.ts` | A single unlinked run is a series of one. |
+| T3908 | `tests/mining/auto-snapshot.test.ts` | New events and no recent snapshot: keep one. |
+| T3909 | `tests/mining/auto-snapshot.test.ts` | Nothing new arrived: nothing to keep. |
+| T3910 | `tests/mining/auto-snapshot.test.ts` | A run that was empty before has no history to preserve. |
+| T3911 | `tests/mining/auto-snapshot.test.ts` | Inside the interval, no second copy however often it polls. |
+| T3912 | `tests/mining/auto-snapshot.test.ts` | Past the interval, the next refresh keeps one. |
+| T3913 | `tests/mining/auto-snapshot.test.ts` | The interval is caller-settable. |
+| T3914 | `tests/mining/auto-snapshot.test.ts` | The reason a snapshot was skipped is always specific enough to act on. |
+| T3915 | `tests/mining/auto-snapshot.test.ts` | The series cap and interval are real numbers: 30 daily snapshots. |
+| T3916 | `tests/mining/auto-snapshot.test.ts` | Automatic snapshots are marked, so pruning cannot touch a hand-made one. |
+| T3917 | `tests/mining/alerts.test.ts` | A source that has gone quiet is reported. |
+| T3918 | `tests/mining/alerts.test.ts` | A source quiet for a few hours is not an incident. |
+| T3919 | `tests/mining/alerts.test.ts` | A source set up today with nothing yet is not an incident; a week later it is. |
+| T3920 | `tests/mining/alerts.test.ts` | A run with no live source says silence is not watched. |
+| T3921 | `tests/mining/alerts.test.ts` | Auto-refresh off is a choice, and is named as the reason. |
+| T3922 | `tests/mining/alerts.test.ts` | One run means no trend - nothing fires on a first observation. |
+| T3923 | `tests/mining/alerts.test.ts` | An empty history is the same: no trend, no alerts. |
+| T3924 | `tests/mining/alerts.test.ts` | A real fall in conformance is reported with both numbers. |
+| T3925 | `tests/mining/alerts.test.ts` | Drift below the threshold is not an event. |
+| T3926 | `tests/mining/alerts.test.ts` | Steady-but-low is a WARNING that says it did not get worse. |
+| T3927 | `tests/mining/alerts.test.ts` | An unchecked run means conformance is not judged, and says which. |
+| T3928 | `tests/mining/alerts.test.ts` | A new violation is reported; a persisting one is not. |
+| T3929 | `tests/mining/alerts.test.ts` | Many new deviations are counted and the list is trimmed. |
+| T3930 | `tests/mining/alerts.test.ts` | A deviation that went AWAY is not an alert. |
+| T3931 | `tests/mining/alerts.test.ts` | A late rate more than doubling, and material, is reported. |
+| T3932 | `tests/mining/alerts.test.ts` | Doubling a trivial rate is arithmetic, not an event. |
+| T3933 | `tests/mining/alerts.test.ts` | The first late cases are a change of state, not an infinite multiple. |
+| T3934 | `tests/mining/alerts.test.ts` | No SLA means the late rate is not watched, and says so. |
+| T3935 | `tests/mining/alerts.test.ts` | The alert key is stable for an unchanged condition and differs when it worsens. |
+| T3936 | `tests/mining/alert-dispatch.test.ts` | The first time a condition is seen, it is sent. |
+| T3937 | `tests/mining/alert-dispatch.test.ts` | The same standing condition is NOT sent again. |
+| T3938 | `tests/mining/alert-dispatch.test.ts` | A condition that WORSENS is announced again. |
+| T3939 | `tests/mining/alert-dispatch.test.ts` | The same condition on a different run is its own message. |
+| T3940 | `tests/mining/alert-dispatch.test.ts` | A standing condition is re-announced after the window. |
+| T3941 | `tests/mining/alert-dispatch.test.ts` | Several alerts in one pass are each judged separately. |
+| T3942 | `tests/mining/alert-dispatch.test.ts` | A duplicate inside ONE pass is not sent twice. |
+| T3943 | `tests/mining/alert-dispatch.test.ts` | No recipient is counted, not silently dropped. |
+| T3944 | `tests/mining/alert-dispatch.test.ts` | Nothing to say costs nothing. |
+| T3945 | `tests/mining/alert-dispatch.test.ts` | If the history cannot be read, it ANNOUNCES rather than staying silent. |
+| T3946 | `tests/mining/alert-dispatch.test.ts` | A write that fails is counted and does not throw into the cron. |
+| T3947 | `tests/mining/alert-dispatch.test.ts` | Every auto-refresh source is watched, not just the pollable kinds. |
 
 > **Keep this section in sync.** Whenever an e2e spec is added, removed, or changes what it asserts, update this section. It is hand-maintained, not generated.
 

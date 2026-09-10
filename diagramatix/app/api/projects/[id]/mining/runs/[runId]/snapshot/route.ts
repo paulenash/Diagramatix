@@ -36,9 +36,22 @@ export async function POST(_req: Request, { params }: Params) {
   if (!run) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const stamp = new Date().toISOString().slice(0, 16).replace("T", " ");
+  // THE LINK. This route has frozen runs into dated copies since it shipped and
+  // recorded nothing about where they came from, so the history it created could
+  // only be reassembled by guessing at name prefixes. One column fixes that.
+  //
+  // The snapshot is the CHILD: it is the older observation, and the live run
+  // carries on from it. Pointing it the other way would make every new snapshot
+  // re-root the series.
   const snap = await prisma.processMiningRun.create({
-    data: { name: `${run.name} — ${stamp}`, projectId: id, orgId, createdById: session?.user?.id ?? null, referenceSmId: run.referenceSmId },
+    data: {
+      name: `${run.name} — ${stamp}`, projectId: id, orgId,
+      createdById: session?.user?.id ?? null, referenceSmId: run.referenceSmId,
+      parentRunId: run.parentRunId ?? null,
+    },
   });
+  // …and the live run now continues from the snapshot just taken.
+  await prisma.processMiningRun.update({ where: { id: runId }, data: { parentRunId: snap.id } });
   await updateRunJson(snap.id, {
     mapping: run.mapping, stats: run.stats, variants: run.variants,
     performance: run.performance, governance: run.governance ?? null, conformance: run.conformance ?? null,

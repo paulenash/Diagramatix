@@ -24,7 +24,9 @@ export type NotificationType =
   // BPMN lifecycle (publish bundles + feedback + review cadence).
   | "bundle-published"           // → each audience member when owner publishes a bundle
   | "feedback-received"          // → diagram owner when a business user files feedback
-  | "review-due";                // → diagram owner from the daily cron when nextReviewDate is past
+  | "review-due"                 // → diagram owner from the daily cron when nextReviewDate is past
+  // Process mining — the Miner speaking first rather than waiting to be opened.
+  | "mining-alert";              // → the source owner when a watched process changes
 
 export interface NotificationPayload {
   // group-invite / group-invite-accepted / group-invite-declined /
@@ -43,6 +45,16 @@ export interface NotificationPayload {
   diagramName?: string;
   objective?: string;
   dueDate?: string;   // ISO
+  // mining-alert: which run/source, what changed, and a stable key so the
+  // same standing condition is not announced every time the cron runs.
+  runId?: string;
+  sourceId?: string;
+  projectId?: string;
+  alertKind?: string;
+  alertKey?: string;
+  title?: string;
+  detail?: string;
+  severity?: string;
   // BPMN lifecycle — bundle-published / feedback-received / review-due.
   bundleId?: string;
   bundleName?: string;

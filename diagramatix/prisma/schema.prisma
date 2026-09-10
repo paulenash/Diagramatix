@@ -1578,6 +1578,11 @@ model ProcessMiningRun {
   referenceSmId    String?                    // Diagram id (user-selected)
   conformance      Json?                      // {fitness, violations[], transitionStats}
   studyId          String?                    // SimulationStudy id (calibrated twin)
+  // A LINKED RUN SERIES. Nobody mines a process once: a snapshot, or a fresh
+  // import of the next period, is the SAME process observed again. Without a
+  // link the history exists but cannot be assembled except by guessing at name
+  // prefixes, which is what the dated snapshot names were reduced to.
+  parentRunId      String?                    // the run this one continues from
   // OCEL study grouping — an object-centric OCEL import mines one run per object
   // type, tied together by ocelGroupId and to the shared Domain Diagram.
   ocelGroupId      String?                    // groups the per-object-type runs of one OCEL import

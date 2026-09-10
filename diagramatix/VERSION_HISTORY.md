@@ -15,6 +15,56 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.9.2515 — 2026-09-10 — DiagramatixMINER: the whole extensions programme
+
+The Miner stops being a study you commission and becomes a workbench that
+slices, attributes, advises — and tells you when your process changed.
+**Eleven phases, `Miner-Extensions-Plan.md` phases 0–10, shipped over two days.**
+
+- **Schema: 2.8 → 2.9** — `ProcessMiningRun.parentRunId`, the one real column in the
+  whole programme. A run is a photograph; the question everyone asks second is
+  whether things got better or worse. The snapshot route had frozen runs into dated
+  copies since it shipped and recorded no link back, so the history existed and could
+  only be reassembled by guessing at name prefixes. XSD unchanged.
+- **Getting the log in at all** — `.xlsx` read directly (no new dependency); wide
+  "one row per case" exports detected and expanded rather than silently read as one
+  event per case; several systems' exports merged into one lifecycle, with an id
+  crosswalk, a refusal when nothing overlaps, and the cross-system handover measured
+  at the join.
+- **Slicing** — filter by date, team, or any column kept at import. The throughput
+  chart IS the date brush. Every panel narrows through one seam, and every figure
+  says what it is entitled to claim: filtered, estimated from a sample, or *not
+  filtered* where the run cannot support it.
+- **Evidence, not metrics** — a deviation now names the cases behind it, a case shows
+  its own timeline, and the whole case index exports as CSV rather than stopping at
+  the sixty rows on screen.
+- **Where the time actually goes** — the transitions between steps, ranked by what
+  they cost, on the model as well as in a table. Click a row to light its arrow, or
+  an arrow to find its row.
+- **Who hands work to whom** — the handover map, workload, team ping-pong and rework,
+  built from per-event teams where they exist and labelled *approximate* where they
+  do not.
+- **What to do next** — ranked, deterministic recommendations, each with a button:
+  show me the cases, slice to this, calibrate a twin and sweep that team. AI may
+  narrate them and may never reorder them.
+- **Watching** — the source that stopped sending, conformance that fell, a deviation
+  that appeared, a late rate that doubled. Nothing fires on a first observation.
+- **The twin is checkable** — the hold-back reaches a screen for the first time, and
+  a refreshed run marks its twin stale rather than silently re-calibrating.
+- **Fixed along the way:** a live refresh silently DROPPED the hold-back, turning an
+  out-of-sample validation into an in-sample one while the panel said otherwise; the
+  baked example catalog had been stale since Phase 1, so all five examples were
+  teaching the previous version of the views; `Math.min(...)` threw past ~125k events,
+  so large logs could not be imported at all; and 20 of 26 mining routes had no
+  subscription gate.
+- Phase 11 (the examples programme) is not started.
+
+> **Post-deploy, still to do (UPDATE_EVERYTHING Steps 10–12):** the User Guide
+> Overview version number must be set to the deployed `2.9.<build>`, and the
+> Miner's User Guide page and Features entry want updating for the new tabs.
+> Those are DB-backed content edited in the running app, not in this commit.
+
+---
 ## 2.8.2510 — 2026-09-08 — The Hire & Onboard example, asserted end to end
 
 The capstone example is now a **regression test for the whole simulator**. The

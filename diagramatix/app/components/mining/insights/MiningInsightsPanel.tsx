@@ -25,7 +25,7 @@ import { automationOpportunities, taskAutomationScore, buildAutomationSpec, auto
 import { isTaskRun, detectReworkActivities, pingPongFromVariants } from "@/app/lib/mining/taskMining/insights";
 import { buildTaskProcedure } from "@/app/lib/mining/taskMining/procedure";
 import { ReplayDiagramBackdrop } from "@/app/components/simulation/replay/ReplayDiagramBackdrop";
-import { transitionRows, MIN_EDGE_OBS } from "@/app/lib/mining/handover";
+import { transitionRows, edgePairKey, MIN_EDGE_OBS, type TransitionRow } from "@/app/lib/mining/handover";
 import { evidenceFor, caseTimeline, casesCsv } from "@/app/lib/mining/caseEvidence";
 import { computeTeamFlow } from "@/app/lib/mining/teamFlow";
 import type { ConformanceResult } from "@/app/lib/mining/transitionConformance";
@@ -39,7 +39,7 @@ import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
 
 const EXPAND_BTN = "ml-auto text-[11px] rounded px-2 py-0.5 bg-stone-800 text-amber-200 hover:bg-stone-700";
 
-interface RunLite { id: string; discoveredBpmnId: string | null; discoveredSmId: string | null; studyId?: string | null }
+interface RunLite { id: string; name?: string; discoveredBpmnId: string | null; discoveredSmId: string | null; studyId?: string | null }
 
 type TabKey = "tasks" | "activities" | "between" | "heat" | "teams" | "variants" | "cases" | "conformance" | "outcomes" | "export";
 const TASK_TAB: { key: TabKey; label: string } = { key: "tasks", label: "🤖 Automation" };
@@ -117,6 +117,24 @@ export function MiningInsightsPanel({ projectId, run, onCalibrate }: { projectId
   // exists somewhere in the console; this is the wiring that means a finding
   // ends in a click rather than in prose.
   const [pendingViolation, setPendingViolation] = useState<number | null>(null);
+
+  // Discovery from a slice. Reported rather than silent: it produces a diagram
+  // somewhere else in the project, and a button that appears to do nothing is
+  // indistinguishable from one that failed.
+  const [slicing, setSlicing] = useState(false);
+  const [sliceMsg, setSliceMsg] = useState<{ ok: boolean; text: string; diagramId?: string } | null>(null);
+  const discoverSlice = useCallback(async () => {
+    setSlicing(true); setSliceMsg(null);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/mining/runs/${run.id}/discover`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ai: false, filter }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) { setSliceMsg({ ok: false, text: json.error ?? "That slice could not be discovered." }); return; }
+      setSliceMsg({ ok: true, text: `Created “${run.name ?? "the run"} — discovered (${json.filter})”.`, diagramId: json.diagramId });
+    } finally { setSlicing(false); }
+  }, [projectId, run.id, run.name, filter]);
   const act = useCallback((a: MinerAction) => {
     if (a.kind === "slice" && a.filter?.resource) { setFilter((f) => ({ ...f, resource: a.filter!.resource })); return; }
     if (a.kind === "calibrate") { onCalibrate?.(); return; }
@@ -149,7 +167,14 @@ export function MiningInsightsPanel({ projectId, run, onCalibrate }: { projectId
           </span>
         )}
       </div>
-      <FilterBar analytics={analytics} filter={filter} onChange={setFilter} view={view} />
+      <FilterBar analytics={analytics} filter={filter} onChange={setFilter} view={view}
+        onDiscoverSlice={analytics && analytics.activities.length > 0 ? discoverSlice : undefined} discovering={slicing} />
+      {sliceMsg && (
+        <p className={`text-[11px] mb-2 ${sliceMsg.ok ? "text-emerald-300" : "text-rose-400"}`}>
+          {sliceMsg.ok ? "✓ " : "✕ "}{sliceMsg.text}
+          {sliceMsg.diagramId && <> <a href={`/diagram/${sliceMsg.diagramId}`} className="underline hover:text-emerald-200">open it →</a></>}
+        </p>
+      )}
       {/* Above the workbench, because "what do I do" comes before "which tab". */}
       <NextStepsPanel
         analytics={view.analytics}
@@ -162,7 +187,7 @@ export function MiningInsightsPanel({ projectId, run, onCalibrate }: { projectId
       />
       {tab === "tasks" && <TasksTab variants={view.variants} loading={loading} projectId={projectId} runId={run.id} />}
       {tab === "activities" && <ActivitiesTab analytics={view.analytics} loading={loading} />}
-      {tab === "between" && <BetweenStepsTab analytics={view.analytics} loading={loading} />}
+      {tab === "between" && <BetweenStepsTab analytics={view.analytics} loading={loading} bpmn={bpmn} />}
       {tab === "heat" && <HeatTab analytics={view.analytics} bpmn={bpmn} hasBpmn={!!run.discoveredBpmnId} loading={loading} />}
       {tab === "teams" && <TeamsTab analytics={view.analytics} variants={view.variants} loading={loading} />}
       {tab === "variants" && <VariantsTab variants={view.variants} bpmn={bpmn} hasBpmn={!!run.discoveredBpmnId} />}
@@ -1119,8 +1144,79 @@ function DiffRow({ label, items, tone }: { label: string; items: string[]; tone:
 function NeedBpmn({ what }: { what: string }) {
   return <p className="text-[11px] text-stone-400">Discover the <span className="text-amber-200">process (BPMN)</span> first — the {what} needs the discovered activities.</p>;
 }
-function BetweenStepsTab({ analytics, loading }: { analytics: RunAnalytics | null; loading: boolean }) {
+/**
+ * The discovered model, with one transition picked out — and clickable.
+ *
+ * The table and the model have always described the same edges and had no way
+ * to point at each other: a reader who found a four-day wait in the table had
+ * to go and find it on the diagram by eye. Both directions work here.
+ *
+ * The picking layer is drawn separately rather than by making the renderer
+ * interactive. `ReplayDiagramBackdrop` sets `pointer-events: none` on purpose —
+ * it is a backdrop for animation, shared with the Simulator — so this lays
+ * transparent fat polylines over the connectors it cares about. Only edges the
+ * log actually contains are clickable; the gateways and the start and end
+ * events the layout inserted have no row to select.
+ */
+function TransitionMap({ data, rows, selected, onPick }: {
+  data: DiagramData;
+  rows: TransitionRow[];
+  selected: { from: string; to: string } | null;
+  onPick: (t: { from: string; to: string } | null) => void;
+}) {
+  const labelOf = useMemo(() => new Map(data.elements.map((e) => [e.id, (e.label ?? "").trim()])), [data]);
+  /** Connectors that correspond to a mined transition, and which one. */
+  const pairOf = useMemo(() => {
+    const known = new Set(rows.map((r) => edgePairKey(r.from, r.to)));
+    const m = new Map<string, { from: string; to: string }>();
+    for (const c of data.connectors) {
+      const from = labelOf.get(c.sourceId) ?? "", to = labelOf.get(c.targetId) ?? "";
+      if (from && to && known.has(edgePairKey(from, to))) m.set(c.id, { from, to });
+    }
+    return m;
+  }, [data, rows, labelOf]);
+
+  const emphasize = useMemo(() => {
+    if (!selected) return undefined;
+    const ids = new Set<string>();
+    for (const c of data.connectors) {
+      const p = pairOf.get(c.id);
+      if (p && p.from === selected.from && p.to === selected.to) { ids.add(c.id); ids.add(c.sourceId); ids.add(c.targetId); }
+    }
+    return ids.size ? ids : undefined;
+  }, [selected, pairOf, data]);
+
+  const same = (p: { from: string; to: string }) => !!selected && selected.from === p.from && selected.to === p.to;
+
+  return (
+    <svg viewBox={boundsViewBox(data)} className="w-full h-56 rounded border border-stone-700" style={{ background: "#f5f5f4" }}>
+      <ReplayDiagramBackdrop data={data} emphasize={emphasize} />
+      <g>
+        {data.connectors.map((c) => {
+          const p = pairOf.get(c.id);
+          const pts = (c.waypoints ?? []).map((w) => `${w.x},${w.y}`).join(" ");
+          if (!p || !pts) return null;
+          return (
+            <polyline key={`pick-${c.id}`} points={pts} fill="none"
+              stroke={same(p) ? "#f59e0b" : "transparent"} strokeOpacity={same(p) ? 0.35 : 1} strokeWidth={12}
+              style={{ pointerEvents: "stroke", cursor: "pointer" }}
+              onClick={() => onPick(same(p) ? null : p)}>
+              <title>{`${p.from} → ${p.to}`}</title>
+            </polyline>
+          );
+        })}
+      </g>
+    </svg>
+  );
+}
+function BetweenStepsTab({ analytics, loading, bpmn }: { analytics: RunAnalytics | null; loading: boolean; bpmn: DiagramData | null }) {
   const view = useMemo(() => transitionRows(analytics?.edges), [analytics]);
+  // The one piece of state both directions share.
+  const [selected, setSelected] = useState<{ from: string; to: string } | null>(null);
+  const selectedRow = useRef<HTMLTableRowElement | null>(null);
+  // Picked on the diagram? Bring its row into view — a highlight below the
+  // fold is the same as no highlight.
+  useEffect(() => { selectedRow.current?.scrollIntoView({ block: "nearest" }); }, [selected]);
   if (loading && !analytics) return <p className="text-[11px] text-stone-500">Loading analytics…</p>;
   if (!analytics) return <NoAnalytics />;
   if (view.rows.length === 0) {
@@ -1145,6 +1241,15 @@ function BetweenStepsTab({ analytics, loading }: { analytics: RunAnalytics | nul
         A log records one timestamp per event, so a gap cannot be split into work and waiting. Every figure here is the whole gap.
         {view.anyEstimated && <span className="text-amber-400"> Totals marked ≈ are estimated as median × count: this run was imported before totals were recorded, and re-importing would measure them.</span>}
       </div>
+      {bpmn && (
+        <div className="mb-2">
+          <TransitionMap data={bpmn} rows={view.rows} selected={selected} onPick={setSelected} />
+          <p className="text-[10px] text-stone-500 mt-0.5">
+            Click an arrow to find its row, or a row to find its arrow. Only the steps the log
+            contains are clickable &mdash; gateways and the start and end events have no measured gap.
+          </p>
+        </div>
+      )}
       <div className="overflow-x-auto max-h-[52vh]">
         <table className="w-full text-[11px]">
           <thead className="text-stone-400 text-left sticky top-0 bg-stone-900">
@@ -1159,8 +1264,12 @@ function BetweenStepsTab({ analytics, loading }: { analytics: RunAnalytics | nul
             </tr>
           </thead>
           <tbody>
-            {view.rows.map((r) => (
-              <tr key={`${r.from}->${r.to}`} className="border-b border-stone-800 hover:bg-stone-800/60">
+            {view.rows.map((r) => {
+              const on = !!selected && selected.from === r.from && selected.to === r.to;
+              return (
+              <tr key={`${r.from}->${r.to}`} ref={on ? selectedRow : undefined}
+                onClick={() => setSelected(on ? null : { from: r.from, to: r.to })}
+                className={`border-b border-stone-800 cursor-pointer ${on ? "bg-amber-600/20" : "hover:bg-stone-800/60"}`}>
                 <td className="py-1 pr-3 text-stone-200">{r.from}</td>
                 <td className="py-1 pr-3 text-stone-200">{r.to}</td>
                 <td className="py-1 pr-2 text-right text-stone-400 tabular-nums">{r.freq.toLocaleString()}</td>
@@ -1176,7 +1285,7 @@ function BetweenStepsTab({ analytics, loading }: { analytics: RunAnalytics | nul
                 <td className="py-1 pr-2 text-right text-stone-400 tabular-nums">{view.totalMs > 0 ? share(r.totalMs / view.totalMs) : "—"}</td>
                 <td className="py-1 text-right text-stone-400 tabular-nums" title={`Share of all the time leaving "${r.from}"`}>{share(r.shareOfFrom)}</td>
               </tr>
-            ))}
+            ); })}
           </tbody>
         </table>
       </div>

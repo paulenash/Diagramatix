@@ -7,7 +7,7 @@
 | **This document** | The **live worklist** for building them. Every phase names the files it touches and the existing functions it reuses. The review is the historical argument; this is the burn-down. |
 | **Scope** | All 8 extensions + all 11 smaller items. Nothing dropped — two are **re-specified** rather than built as written, and each says why on its face. |
 | **How to use** | Work an item, tick its box, set **Status** → `In progress` / `Shipped (<commit>)` / `Won't do (<reason>)`. Record what actually happened — including deviations — in the phase's own **As built** paragraph, so this doubles as a decision log. |
-| **Progress log** | **2026-09-09** — **PHASES 7 + 8 SHIPPED** (T3842–T3878), reaching the plan's CUT LINE. Phase 7 confirmed both corrections as tests: the review's ping-pong really does return 0 on a business log, and the dominant-team map now names how many multi-team activities make it a guess. Item 08 and the task-mining gating turned out to be the same work — producing the SOP server-side created the boundary 0.1 could not find. Phase 8 gives advice with buttons, refuses to advise from an approximation, and can say NOTHING STANDS OUT; a test caught a threshold that called a perfectly even process a bottleneck. The narration route is guarded so the model sees only the ranked findings. **PHASE 6 SHIPPED** (T3822–T3841): a deviation now names the cases behind it, a case shows its own timeline, and the whole index exports as CSV. The floor gained a THIRD state the plan did not name — `unattributed`, for a run checked before attribution existed, where an empty list would be a confident lie. **The Phase 0.3 recompute debt is settled**: its consumer is the Re-check button, and an existing run gains attribution with no re-import. Deviations also filter, which the plan expected of Phase 5. **PHASE 5 SHIPPED** (T3791–T3821): the run slices by date, team and any kept column; the throughput chart is the date brush; the filtered rebuild is EXACT (T3800 proves it equals recomputing that slice from scratch); the report filters server-side and restates its own Summary. Phase 1's seam paid off exactly as designed — the filter reached eight panels by changing ONE line. The seam's rule is now a test, proved by reverting a tab to the raw data. **PHASE 4 SHIPPED** (T3773–T3790): `analytics.edges` reaches a screen at last as a ranked "Between steps" table, the discovered model's arrows carry the median gap and a thickness, and the detail slider the User Guide already described now exists. **The in-step vs between-step split was REFUSED**: one timestamp per event means the same milliseconds are already counted under the from-activity, so the split would have been fabricated and summing the two tables would have doubled the process. Slice (b) turned out to be one conditional, safe because almost nothing in the tree sets `weight` — now a test. **PHASE 3 SHIPPED** (T3763–T3772): the hold-back reaches a screen for the first time, the calibrate hand-off stops discarding its study, and a refreshed run marks its twin stale rather than silently re-calibrating. A FOURTH defect surfaced while building: a live refresh was silently DROPPING the hold-back, so an out-of-sample validation quietly became in-sample and the panel said otherwise. **PHASE 0 COMPLETE** (0.3–0.6, T3681–T3762): the recompute contract refuses the four per-event fields by name rather than approximating them from variants; a test floor under the five untested modules; eleven hand-written run-JSON statements (not six) became one patch helper with a guard that was proved to fire; and **0.5 answered on evidence — the generator is deterministic, the baked catalog was merely STALE, and all five examples had been teaching pre-Phase-1 analytics since Phase 1 shipped ahead of its own gate.** **2.3 SHIPPED** (T3657–T3680): several systems merge into one lifecycle, ids unified by shared key or crosswalk (union-find, so chains resolve), a refusal when nothing overlaps, and CROSS-SYSTEM HANDOVER measured at the join — the days nobody owns, which neither export contains. **0.2 SHIPPED**: the console went 1,183 → 153 lines (44 `useState` → 5) into `console/ImportPanel`, `console/RunList`, `console/RunDetail`. **No tab shell** — this plan's own text contradicted itself and the e2e settled it. Which turned up the next thing: that e2e looked for a button renamed months ago, so the Miner's only route-level coverage was failing before it reached what it covered. **2.1 SHIPPED** (T3647–T3656): `.xlsx` read directly, no new dependency. **2.2 SHIPPED** (T3631–T3646): wide exports expand to one row per event. — Plan written. Reconnaissance found **four things the review got wrong** and **one it does not mention at all** (the gating hole), all recorded below against the item they affect. **Step 1 SHIPPED**: 20 of 26 mining routes now carry a subscription gate (was 3), the three dormant tier keys are enforced, and `tests/mining/route-gating.test.ts` (T3609–T3613) enumerates the route tree so the twenty-seventh route cannot be added ungated. **Phase 1 SHIPPED** (T3614–T3630) — and its budget test found a CRASH: `Math.min(...xs)` threw past ~125k elements in three places, so any log beyond ~125,000 events could not be imported at all. **Phase 8 ADDED** after Paul asked whether the plan gave the user a course of action; it did not, and neither does the review. The cut line moved to after it. **Phase 2 ADDED** — three input questions the plan could not answer: no `.xlsx`, wide-format exports silently read as one event, and no way to merge several systems' exports of the same cases. Placed second, because a user who cannot load their export is not reached by anything else. Phases 2–10 renumbered to 3–11. |
+| **Progress log** | **2026-09-10** — **PHASES 9 + 10 SHIPPED** (T3893–T3947), past the cut line. Phase 9 is the programme's only real column (`parentRunId`, PRODUCT_VERSION 2.8 → 2.9) and refuses to compare two runs whose vocabularies do not overlap — the failure there looks exactly like a real regression. Phase 10 found the flagged poll-loop detail to be TWO bugs: SharePoint sources were never fetched, and `if (hasNew)` meant silence was the one state the watcher could not see. Item 10 (new connectors) declined with reasons. **BOTH DEFERRED ITEMS CLOSED** (T3879–T3892): discovery from a slice, and arrow↔table linking. They were the same job. A sliced discovery is named after its slice and NEVER becomes the run's own model — that field is read by the heat map, calibration and recompute, so pointing it at a slice would narrow all of them silently. **2026-09-09** — **PHASES 7 + 8 SHIPPED** (T3842–T3878), reaching the plan's CUT LINE. Phase 7 confirmed both corrections as tests: the review's ping-pong really does return 0 on a business log, and the dominant-team map now names how many multi-team activities make it a guess. Item 08 and the task-mining gating turned out to be the same work — producing the SOP server-side created the boundary 0.1 could not find. Phase 8 gives advice with buttons, refuses to advise from an approximation, and can say NOTHING STANDS OUT; a test caught a threshold that called a perfectly even process a bottleneck. The narration route is guarded so the model sees only the ranked findings. **PHASE 6 SHIPPED** (T3822–T3841): a deviation now names the cases behind it, a case shows its own timeline, and the whole index exports as CSV. The floor gained a THIRD state the plan did not name — `unattributed`, for a run checked before attribution existed, where an empty list would be a confident lie. **The Phase 0.3 recompute debt is settled**: its consumer is the Re-check button, and an existing run gains attribution with no re-import. Deviations also filter, which the plan expected of Phase 5. **PHASE 5 SHIPPED** (T3791–T3821): the run slices by date, team and any kept column; the throughput chart is the date brush; the filtered rebuild is EXACT (T3800 proves it equals recomputing that slice from scratch); the report filters server-side and restates its own Summary. Phase 1's seam paid off exactly as designed — the filter reached eight panels by changing ONE line. The seam's rule is now a test, proved by reverting a tab to the raw data. **PHASE 4 SHIPPED** (T3773–T3790): `analytics.edges` reaches a screen at last as a ranked "Between steps" table, the discovered model's arrows carry the median gap and a thickness, and the detail slider the User Guide already described now exists. **The in-step vs between-step split was REFUSED**: one timestamp per event means the same milliseconds are already counted under the from-activity, so the split would have been fabricated and summing the two tables would have doubled the process. Slice (b) turned out to be one conditional, safe because almost nothing in the tree sets `weight` — now a test. **PHASE 3 SHIPPED** (T3763–T3772): the hold-back reaches a screen for the first time, the calibrate hand-off stops discarding its study, and a refreshed run marks its twin stale rather than silently re-calibrating. A FOURTH defect surfaced while building: a live refresh was silently DROPPING the hold-back, so an out-of-sample validation quietly became in-sample and the panel said otherwise. **PHASE 0 COMPLETE** (0.3–0.6, T3681–T3762): the recompute contract refuses the four per-event fields by name rather than approximating them from variants; a test floor under the five untested modules; eleven hand-written run-JSON statements (not six) became one patch helper with a guard that was proved to fire; and **0.5 answered on evidence — the generator is deterministic, the baked catalog was merely STALE, and all five examples had been teaching pre-Phase-1 analytics since Phase 1 shipped ahead of its own gate.** **2.3 SHIPPED** (T3657–T3680): several systems merge into one lifecycle, ids unified by shared key or crosswalk (union-find, so chains resolve), a refusal when nothing overlaps, and CROSS-SYSTEM HANDOVER measured at the join — the days nobody owns, which neither export contains. **0.2 SHIPPED**: the console went 1,183 → 153 lines (44 `useState` → 5) into `console/ImportPanel`, `console/RunList`, `console/RunDetail`. **No tab shell** — this plan's own text contradicted itself and the e2e settled it. Which turned up the next thing: that e2e looked for a button renamed months ago, so the Miner's only route-level coverage was failing before it reached what it covered. **2.1 SHIPPED** (T3647–T3656): `.xlsx` read directly, no new dependency. **2.2 SHIPPED** (T3631–T3646): wide exports expand to one row per event. — Plan written. Reconnaissance found **four things the review got wrong** and **one it does not mention at all** (the gating hole), all recorded below against the item they affect. **Step 1 SHIPPED**: 20 of 26 mining routes now carry a subscription gate (was 3), the three dormant tier keys are enforced, and `tests/mining/route-gating.test.ts` (T3609–T3613) enumerates the route tree so the twenty-seventh route cannot be added ungated. **Phase 1 SHIPPED** (T3614–T3630) — and its budget test found a CRASH: `Math.min(...xs)` threw past ~125k elements in three places, so any log beyond ~125,000 events could not be imported at all. **Phase 8 ADDED** after Paul asked whether the plan gave the user a course of action; it did not, and neither does the review. The cut line moved to after it. **Phase 2 ADDED** — three input questions the plan could not answer: no `.xlsx`, wide-format exports silently read as one event, and no way to merge several systems' exports of the same cases. Placed second, because a user who cannot load their export is not reached by anything else. Phases 2–10 renumbered to 3–11. |
 
 **Status values:** `Not started` · `In progress` · `Shipped (<commit>)` · `Blocked (<on what>)` · `Won't do (<reason>)`
 
@@ -730,9 +730,14 @@ published User Guide already told users to *"leave the detail slider on all path
 exists, so the guide is true — which was always the better direction than editing the guide down to
 match the product.
 
-**Not done, and named rather than implied:** the transitions table is not yet reachable from the
-model — clicking an arrow does not select its row, and the table does not highlight an edge. That is
-a linking job, not an analysis one, and it belongs with Phase 5's filtering seam.
+**Closed 2026-09-10** (T3889–T3892), together with Phase 5's slice discovery — they were the same
+job. The transitions table now carries the discovered model: click a row to light its arrow, click
+an arrow to find its row. Only edges the LOG contains are clickable; the gateways and start/end
+events the layout inserted have no measured gap and must not pretend to.
+
+The picking layer is drawn separately rather than by making `ReplayDiagramBackdrop` interactive —
+it is `pointer-events: none` on purpose and is shared with the Simulator's replay, so reaching into
+it to serve one tab would have been a long reach for a small feature (T3890).
 
 ---
 
@@ -833,11 +838,24 @@ Proved by reverting one tab to the raw data: the guard names it.
 The rule is about what the PANEL hands out; once data is inside a tab it has been through the seam
 by definition. Bounded to the panel's own function, with the reason recorded in the test.
 
-**Not done, and named:** *discovery* from a slice. The plan is right that it must be an explicit
-"discover from this slice" action creating a NEW diagram rather than a live overlay, because
-discovery emits a persisted artefact. Nothing about that is blocked — it is a button and a route
-parameter — but it belongs with the arrow-to-table linking deferred from Phase 4, and both are
-better done together.
+**Closed 2026-09-10** (T3879–T3888). The plan was right that it must be an explicit action, and the
+reason is worth keeping: every other filtered view here is a live recalculation that disappears
+when the filter clears, and discovery emits a **persisted diagram** that will sit in the project
+list long after the slice is forgotten. Two rules follow.
+
+**It is named after its slice.** A model of the Northern region indistinguishable from a model of
+the whole process is worse than no model at all (T3885).
+
+**It never becomes the run's `discoveredBpmnId`** (T3884) — the rule with the longest reach in this
+phase. That field is read by the heat map, the transitions map, calibration and the recompute
+route; pointing it at a slice would silently narrow every one of them with nothing on screen
+saying so. The run's canonical model stays the whole log, and the slice is a side-by-side.
+
+Two smaller things that would each have been a quiet defect: zero-count variants are dropped before
+discovery (T3880) — `filterAnalytics` keeps them positionally so `variantIdx` stays valid, which is
+right for counting and would draw paths the slice never took — and the **slice's own edges** label
+the diagram (T3883, T3886), because labelling a filtered model with whole-run timings is the
+mixed-provenance defect written into a file.
 
 ---
 
@@ -1126,12 +1144,12 @@ the list is the product and the prose is a garnish.
 
 ## Phase 9 — Nobody mines a process once
 
-**Status:** `Not started` · **The only phase that adds a real column.**
+**Status:** ✅ `Shipped` — T3893–T3916. **The only phase that adds a real column.**
 
-- [ ] `ProcessMiningRun.parentRunId` — `schema/UPDATE_EVERYTHING.md` Steps 0–12, product version bump
-- [ ] `app/lib/mining/compareRuns.ts` (pure) + `console/ComparePanel.tsx`
-- [ ] A bounded auto-snapshot on refresh, so a live run keeps its own history
-- [ ] Item **11** — conformance history: the weekly fitness chart
+- [x] `ProcessMiningRun.parentRunId` — **PRODUCT_VERSION 2.8 → 2.9**, Steps 0–5 done; 10–12 are post-deploy content and are listed below
+- [x] `app/lib/mining/compareRuns.ts` (pure) + `GET runs/[runId]/series`
+- [x] A bounded auto-snapshot on refresh, so a live run keeps its own history
+- [x] Item **11** — `fitnessHistory()`, conformance across the series
 
 **Absorbs.** **Extension 3**, **items 11 and 06**.
 
@@ -1151,15 +1169,64 @@ nonsense.
 
 ---
 
+### As built
+
+**The floor is different in kind from every other one in this plan, and it is the whole design.**
+Elsewhere the risk is a figure that is too precise. Here it is comparing two things that are not the
+same process: link January's *Order to Cash* to February's *Complaints Handling* by accident and
+every delta in the table is arithmetic on unrelated numbers — and it looks exactly like a real
+regression. So the vocabularies are checked FIRST and a pair below 60% overlap is refused (T3893).
+
+60% is deliberately generous. A process genuinely changes between periods — a step is added, one is
+retired — and refusing on any difference would refuse exactly the comparisons worth making (T3895).
+What it will not pass is two unrelated processes, which share almost nothing.
+
+**Three smaller refusals, each of which would otherwise read as a finding:**
+
+- An activity absent from one run is **added** or **removed**, never zero (T3899). "0ms, down 100%"
+  buries a change of shape inside a number.
+- A change from zero has **no** percentage (T3898) rather than an infinite improvement.
+- Fitness is **not compared** when only one of the two runs was ever checked (T3902). One result and
+  one absence is not a decline from 94% to nothing — and on the history chart an unchecked run is a
+  **gap**, because a zero would draw a catastrophic dip for a run that was simply never asked
+  (T3903). That is the most alarming possible way to say nothing.
+
+**The snapshot route finally records where it came from.** It has frozen runs into dated copies
+since it shipped and recorded no link, so the history it created could only be reassembled by
+guessing at name prefixes. The snapshot is the CHILD — it is the older observation and the live run
+carries on from it; pointing it the other way would make every new snapshot re-root the series.
+
+**The auto-snapshot is bounded three ways**, because a source polled every five minutes would
+otherwise write 288 runs a day and a history nobody can read is worse than none: an interval (one a
+day), a cap (30, oldest pruned first), and nothing written when nothing changed. It is also
+best-effort — the live run is the product and the archive is not worth failing a refresh over. Only
+snapshots the system made are eligible for pruning; a hand-taken one is somebody's deliberate record
+(T3916), and deleting a link re-points its child at its own parent so the chain never breaks.
+
+**Not built: a `ComparePanel.tsx`.** The comparison is computed and served by
+`GET runs/[runId]/series` — the same pure function, so an API consumer and a future panel cannot
+disagree about what changed, and the REFUSAL travels with it rather than being a UI convention. The
+console has no side-by-side view yet, and that is a real gap rather than a decision: it is the one
+item in this phase a user cannot reach. **Named, not hidden.**
+
+**UPDATE_EVERYTHING, as done.** Q1 yes (a physical column) → PRODUCT_VERSION 2.8 → 2.9, with the
+history note in `types.ts`, the pointer in `SCHEMA_CHANGELOG.md`, and a `VERSION_HISTORY.md` entry
+covering the whole programme. Q2 no — a run is not part of a diagram export, so the XSD shape and
+`SCHEMA_VERSION` are untouched, and `ddlGenerate.ts` is unaffected because this is an operational
+table rather than the curated diagram model. **Steps 10–12 remain**: they are DB-backed content
+edited in the running app after deploy, and 10a (the User Guide Overview version number) is
+mandatory.
+
+---
+
 ## Phase 10 — Watch it, rather than visit it
 
-**Status:** `Not started` · **Depends on Phase 9** and cannot precede it.
+**Status:** ✅ `Shipped` — T3917–T3947. **Depended on Phase 9** and followed it.
 
-- [ ] **The cheapest alarm first: the source stopped sending.** No thresholds, no history, no
-      statistics — only `lastIngestAt` staleness
-- [ ] Thresholds: fitness below X, a new undocumented transition, the late rate doubling
-- [ ] Notification wiring — a new `NotificationType`, the bell renderer, email
-- [ ] Item **10** — connectors beyond webhook / Blob / SharePoint
+- [x] **The cheapest alarm first: the source stopped sending.** Only `lastIngestAt` staleness
+- [x] Thresholds: fitness below X, a new undocumented transition, the late rate doubling
+- [x] Notification wiring — a new `NotificationType` + the bell's label/category/colour
+- [ ] Item **10** — connectors beyond webhook / Blob / SharePoint — **declined, see below**
 
 **Absorbs.** **Extension 8**, **item 10**.
 
@@ -1176,6 +1243,57 @@ SSRF guard is the template for any new connector. The optional tail of the tail.
 
 **Honest floor.** No alert fires on the first observation. A threshold with fewer than N prior points
 reports *not enough history yet* rather than firing on noise.
+
+---
+
+### As built
+
+**The detail the plan flagged was right, and it was two bugs rather than one.** The poll loop
+selected only `webhook` and `azure-blob` sources — so a SharePoint feed that died was never even
+fetched — and then short-circuited on `if (hasNew)`, so a source with nothing new did nothing at
+all. **Silence was precisely the state the watcher could not see.** The loop now watches every
+auto-refresh source whether or not anything arrived; refreshing still requires new data, watching no
+longer does (T3947). Genuinely the highest-value change in the phase.
+
+**The floor decides whether these alerts are still read in a month, so it is where the tests are.**
+A process mined once has no trend: a fitness of 71% on a first run is the as-is process, not a
+regression, and alerting on it teaches the recipient that the alerts are noise (T3922). Every
+history-based signal reports *not enough history yet* **by name**, because silence reads as a clean
+bill — a reader cannot otherwise tell "nothing is wrong" from "this cannot be judged".
+
+**Four more refusals, each one a message somebody would have learned to ignore:**
+
+- A source set up today that has received nothing is not an incident; the same source a week later
+  is (T3919) — a source configured and then forgotten is the commonest way a live dashboard becomes
+  a fossil.
+- Drift below the threshold is not an event; **steady-but-low** is a warning that says it did not get
+  worse (T3926). Distinguishing "this fell" from "this has been bad" is the difference between an
+  incident and a standing problem.
+- A deviation that already existed is not news (T3928). Repeating it every period is how a channel
+  becomes wallpaper.
+- A late rate going from 1% to 3% is a tripling and nothing happened (T3932).
+
+**Saying it once is its own module.** `alertDispatch.ts` announces a condition once, keyed on the
+run, the kind and the headline — so a condition that WORSENS (94→71, then 94→50) is a different key
+and is announced again, while one that merely persists is not (T3937, T3938). There is no new column
+for this: recent notifications are read back and their keys compared, because the record of what
+somebody was told IS the notification, and a separate "last alerted" field would be a second source
+of truth that can disagree with what is actually in their bell. A standing condition is re-announced
+after a fortnight (T3940) so a real problem cannot age out of view.
+
+When the history cannot be read it **announces** rather than staying silent (T3945) — a duplicate
+message is a smaller failure than a missed one — and a write that fails is counted rather than
+thrown, because this runs beside the refresh and a notification is not worth failing a poll over.
+
+**No email.** The in-app notification and the bell are wired; email is a separate delivery path and
+adding one for a single new type would have been a wider change than this phase justifies. Named
+rather than quietly dropped.
+
+**Item 10 is declined, with the plan's own reasoning.** It calls itself "the optional tail of the
+tail", and a REST or database connector is a real piece of work with its own SSRF surface — the
+`blobUrl.ts` guard is the template, not a formality. Half a connector is worse than none: it would
+ship a security boundary nobody had reason to trust yet. It belongs with a customer who has asked
+for a specific one.
 
 ---
 

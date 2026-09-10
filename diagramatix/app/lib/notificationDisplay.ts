@@ -23,6 +23,7 @@ export const NOTIFICATION_TYPE_LABEL: Record<string, string> = {
   "bundle-published": "Process Published to You",
   "feedback-received": "Publish Feedback Received",
   "review-due": "Review Due",
+  "mining-alert": "Process Alert",
 };
 
 // Coarser grouping for the filter dropdown — several fine-grained types
@@ -42,6 +43,7 @@ export const NOTIFICATION_CATEGORY: Record<string, string> = {
   "bundle-published": "Publishing",
   "feedback-received": "Publish Feedback",
   "review-due": "Review Due",
+  "mining-alert": "Process Alert",
 };
 
 // Per-category colour for the type chip — mirrors the colour-coding used
@@ -52,6 +54,7 @@ export const CATEGORY_CHIP_STYLE: Record<string, string> = {
   "Publishing": "bg-green-100 text-green-800",
   "Publish Feedback": "bg-amber-100 text-amber-800",
   "Review Due": "bg-red-100 text-red-800",
+  "Process Alert": "bg-amber-100 text-amber-900",
   "Other": "bg-gray-200 text-gray-700",
 };
 

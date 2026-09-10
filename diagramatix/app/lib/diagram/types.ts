@@ -1274,8 +1274,22 @@ export const SCHEMA_VERSION = "46";
  *   diagram-model DDL in ddlGenerate.ts is unaffected, and the XSD shape is
  *   unchanged — task requiredSkills ride in element sim params like every
  *   other simulation field.
+ * 2.9 (2026-09-10) — DB: ProcessMiningRun.parentRunId.
+ *   Nobody mines a process once. A mining run is a photograph, and the
+ *   question everyone asks second is whether things got better or worse —
+ *   which the Miner could not answer, because the snapshot route froze a run
+ *   into a dated copy and recorded NO LINK back. The history existed and
+ *   could only be reassembled by guessing at name prefixes.
+ *   One nullable self-reference makes a run series: snapshots chain, a live
+ *   refresh may leave a bounded dated copy behind, and two observations can
+ *   be put side by side. It is also what lets the watcher say "conformance
+ *   fell from 94% to 71%" rather than only "conformance is 71%" — there was
+ *   previously no earlier value anywhere to have fallen from.
+ *   An OPERATIONAL column: the curated diagram-model DDL in ddlGenerate.ts is
+ *   unaffected, and the XSD export shape is unchanged (a run is not part of a
+ *   diagram export).
  */
-export const PRODUCT_VERSION = "2.8";
+export const PRODUCT_VERSION = "2.9";
 
 /**
  * The structural (XSD) schema version of an export, as a single integer, tolerant of BOTH the

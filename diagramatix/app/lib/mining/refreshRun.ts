@@ -10,6 +10,7 @@
 import { prisma } from "@/app/lib/db";
 import { updateRunJson } from "./runStore";
 import { writeDiagramData } from "./diagramStore";
+import { autoSnapshot, shouldSnapshot, AUTO_SNAPSHOT_MARK } from "./autoSnapshot";
 import { buildEventLog } from "./parseEventLog";
 import { computePerformance } from "./performance";
 import { computeAnalytics } from "./analytics";
@@ -51,7 +52,7 @@ export async function refreshRunFromSource(source: RefreshableSource): Promise<R
   // neither did.
   const prior = await prisma.processMiningRun.findUnique({
     where: { id: source.runId },
-    select: { performance: true, studyId: true },
+    select: { performance: true, studyId: true, stats: true, projectId: true, parentRunId: true },
   });
   const priorPerf = (prior?.performance ?? {}) as Partial<Performance>;
 
@@ -79,6 +80,32 @@ export async function refreshRunFromSource(source: RefreshableSource): Promise<R
 
   const analytics = computeAnalytics(log);
   const governance = computeGovernance(log.traces);
+
+  // KEEP THE PICTURE THAT IS ABOUT TO BE OVERWRITTEN.
+  //
+  // A refresh rebuilds the run in place, which is right — the run is the
+  // current picture — and means the previous one is gone the moment new events
+  // arrive. By the time somebody asks "when did conformance start slipping?"
+  // there is nothing to answer with, and an alert on "fitness fell to 71%" has
+  // no earlier value to have fallen FROM.
+  //
+  // Bounded three ways (interval, series cap, and nothing written when nothing
+  // changed) and best-effort: the live run is the product; the archive is not
+  // worth failing a refresh over.
+  const priorStats = (prior?.stats ?? {}) as { events?: number };
+  const lastAuto = prior?.parentRunId
+    ? await prisma.processMiningRun.findFirst({
+        where: { id: prior.parentRunId, name: { contains: AUTO_SNAPSHOT_MARK } },
+        select: { createdAt: true },
+      })
+    : null;
+  const decision = shouldSnapshot({
+    lastAutoAt: lastAuto?.createdAt ?? null,
+    now: new Date(),
+    eventsBefore: priorStats.events ?? 0,
+    eventsAfter: log.stats.events,
+  });
+  if (decision.taken) await autoSnapshot(source.runId, prior?.projectId ?? null);
 
   // kpiConfig is preserved across a live refresh — it is absent from the patch,
   // which is what "leave this column alone" now looks like.
