@@ -80,21 +80,93 @@ describe("satellites sit beside the function, never in the chain", () => {
     expect(Math.abs(info.x - sys.x)).toBeGreaterThan(20);
   });
 
-  it("T4059 - satellites do not displace the chain", () => {
-    // The chain must lay out identically whether or not the function carries
-    // assignments — a satellite that pushed the spine sideways would make the
-    // process shift about depending on how much detail someone filled in.
-    const bare: AiEpcPlan = {
-      elements: straightChain.elements.map(({ id, type, label }) => ({ id, type, label })),
-      connections: straightChain.connections,
+  it("T4059 - every spine element sits in the same three-column band", () => {
+    // Item 1, and the reason the band exists. A function has assignments on
+    // BOTH sides, so branches laid out on their own widths put branch A's
+    // right-hand org unit on top of branch B's left-hand data object.
+    //
+    // Uniform bands mean the columns line up down the page as well as across
+    // it. Concretely: the horizontal distance between two elements sharing a
+    // rank is the same wherever they are, and it is wide enough to hold both
+    // gutters.
+    const { data } = lay({
+      elements: [
+        { id: "e0", type: "event", label: "Started" },
+        { id: "f0", type: "function", label: "Decide" },
+        { id: "x1", type: "xor", label: "" },
+        { id: "e1", type: "event", label: "Yes" },
+        { id: "e2", type: "event", label: "No" },
+        // Both branches carry assignments on both sides — the collision case.
+        { id: "f1", type: "function", label: "Do A", org: "Team A", data: ["Doc A"], system: ["Sys A"] },
+        { id: "f2", type: "function", label: "Do B", org: "Team B", data: ["Doc B"], system: ["Sys B"] },
+        { id: "e3", type: "event", label: "A done" },
+        { id: "e4", type: "event", label: "B done" },
+      ],
+      connections: [
+        { sourceId: "e0", targetId: "f0" }, { sourceId: "f0", targetId: "x1" },
+        { sourceId: "x1", targetId: "e1" }, { sourceId: "x1", targetId: "e2" },
+        { sourceId: "e1", targetId: "f1" }, { sourceId: "e2", targetId: "f2" },
+        { sourceId: "f1", targetId: "e3" }, { sourceId: "f2", targetId: "e4" },
+      ],
+    });
+    const cx = (id: string) => { const e = data.elements.find((x) => x.id === id)!; return e.x + e.width / 2; };
+
+    // The two branches keep the same pitch at every rank they share.
+    const pitchEvents = cx("e2") - cx("e1");
+    const pitchFns = cx("f2") - cx("f1");
+    const pitchEnds = cx("e4") - cx("e3");
+    expect(Math.abs(pitchFns - pitchEvents)).toBeLessThan(2);
+    expect(Math.abs(pitchEnds - pitchEvents)).toBeLessThan(2);
+
+    // And each branch's own column is straight: the event, the function and the
+    // closing event all share an axis.
+    expect(Math.abs(cx("f1") - cx("e1"))).toBeLessThan(2);
+    expect(Math.abs(cx("e3") - cx("e1"))).toBeLessThan(2);
+  });
+
+  it("T4125 - one branch's assignments never reach into the branch beside it", () => {
+    // The failure the band prevents, asserted directly rather than by proxy:
+    // no box in branch A may horizontally overlap any box in branch B.
+    const { data } = lay({
+      elements: [
+        { id: "f0", type: "function", label: "Decide" },
+        { id: "x1", type: "xor", label: "" },
+        { id: "e1", type: "event", label: "Yes" },
+        { id: "e2", type: "event", label: "No" },
+        { id: "f1", type: "function", label: "Do A", org: "Accounts Payable", data: ["Purchase order"], system: ["SAP ERP"] },
+        { id: "f2", type: "function", label: "Do B", org: "Credit Control", data: ["Credit file"], system: ["CRM System"] },
+        { id: "e3", type: "event", label: "A done" },
+        { id: "e4", type: "event", label: "B done" },
+      ],
+      connections: [
+        { sourceId: "f0", targetId: "x1" },
+        { sourceId: "x1", targetId: "e1" }, { sourceId: "x1", targetId: "e2" },
+        { sourceId: "e1", targetId: "f1" }, { sourceId: "e2", targetId: "f2" },
+        { sourceId: "f1", targetId: "e3" }, { sourceId: "f2", targetId: "e4" },
+      ],
+    });
+    // A satellite belongs to the function it is JOINED to. Grouping by
+    // proximity instead picks up both branches (they share a rank) and turns
+    // the assertion into "does this set overlap itself" — which it always does.
+    const belongingTo = (fnId: string) => {
+      const ids = new Set<string>([fnId]);
+      for (const c of data.connectors) {
+        if (c.type === "epc-control-flow") continue;
+        if (c.sourceId === fnId) ids.add(c.targetId);
+        if (c.targetId === fnId) ids.add(c.sourceId);
+      }
+      return data.elements.filter((e) => ids.has(e.id));
     };
-    const withSats = lay(straightChain).data;
-    const without = lay(bare).data;
-    for (const id of ["e1", "f1", "e2"]) {
-      const a = withSats.elements.find((e) => e.id === id)!;
-      const b = without.elements.find((e) => e.id === id)!;
-      expect({ id, x: a.x, y: a.y }).toEqual({ id, x: b.x, y: b.y });
-    }
+    const left = belongingTo("f1"), right = belongingTo("f2");
+    expect(left.length, "branch A should have its function plus assignments").toBeGreaterThan(1);
+    expect(right.length, "branch B should have its function plus assignments").toBeGreaterThan(1);
+
+    const rightmostOfLeft = Math.max(...left.map((e) => e.x + e.width));
+    const leftmostOfRight = Math.min(...right.map((e) => e.x));
+    expect(
+      rightmostOfLeft,
+      "branch A's assignments overlap branch B's — the three-column band is not holding",
+    ).toBeLessThanOrEqual(leftmostOfRight);
   });
 
   it("T4060 - the three arc kinds are distinguished", () => {
@@ -108,9 +180,15 @@ describe("satellites sit beside the function, never in the chain", () => {
 
     // Assignment is not a direction, so it carries no arrowhead.
     expect(byType("epc-org-assignment")[0].directionType).toBe("non-directed");
-    // Information flow's direction IS its meaning — an open head says "reads".
+    // Control flow and information flow both carry an OPEN head (Paul,
+    // 2026-09-11). They stay apart by ROUTING rather than by arrowhead —
+    // control flow is rectilinear and runs down the spine, an information arc
+    // is direct and runs horizontally — which is how an EPC distinguishes them
+    // on paper too.
     expect(byType("epc-information-flow")[0].directionType).toBe("open-directed");
-    expect(byType("epc-control-flow")[0].directionType).toBe("directed");
+    expect(byType("epc-control-flow")[0].directionType).toBe("open-directed");
+    expect(byType("epc-control-flow")[0].routingType).toBe("rectilinear");
+    expect(byType("epc-information-flow")[0].routingType).toBe("direct");
   });
 });
 

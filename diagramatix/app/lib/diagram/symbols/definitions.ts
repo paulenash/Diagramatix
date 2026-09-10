@@ -344,6 +344,20 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
   { type: "epc-data",        label: "Information Object",  defaultWidth: 150, defaultHeight: 50, description: "Data a function reads or writes — \"Invoice\". Direction of the arc says which" },
   { type: "epc-application", label: "Application System",  defaultWidth: 150, defaultHeight: 50, description: "The system the work happens in — \"SAP\". Converts to a black-box system pool" },
   { type: "epc-interface",   label: "Process Interface",   defaultWidth: 160, defaultHeight: 50, description: "A link to another EPC, standing at the start or end of a chain (chevron)" },
+  // The wider ARIS object set. Every one of these hangs off a FUNCTION and says
+  // something about it; none carries control flow. They are kept in their own
+  // collapsed palette section because a real EPC uses two or three of them, not
+  // ten, and putting them beside the core notation would bury it.
+  { type: "epc-kpi",           label: "KPI",                 defaultWidth: 150, defaultHeight: 50, description: "A measure the function is judged by — \"Order cycle time\"" },
+  { type: "epc-risk",          label: "Risk",                defaultWidth: 150, defaultHeight: 50, description: "Something that can go wrong in this step — \"Credit assessed on stale data\"" },
+  { type: "epc-product",       label: "Product / Service",   defaultWidth: 150, defaultHeight: 50, description: "What the function delivers — \"Approved credit limit\"" },
+  { type: "epc-knowledge",     label: "Knowledge Category",  defaultWidth: 150, defaultHeight: 50, description: "What a person must know to do the work — \"Credit policy\"" },
+  { type: "epc-business-rule", label: "Business Rule",       defaultWidth: 150, defaultHeight: 50, description: "A policy the function must obey — \"Orders over $10k need two approvals\"" },
+  { type: "epc-screen",        label: "Screen",              defaultWidth: 150, defaultHeight: 50, description: "The screen the work is done on — an application system's front end" },
+  { type: "epc-objective",     label: "Objective",           defaultWidth: 150, defaultHeight: 50, description: "The business goal this step serves — \"Reduce days sales outstanding\"" },
+  { type: "epc-machine",       label: "Machine / Resource",  defaultWidth: 150, defaultHeight: 50, description: "Physical equipment the function uses — a press, a vehicle, a scanner" },
+  { type: "epc-location",      label: "Location",            defaultWidth: 150, defaultHeight: 50, description: "Where the work happens — a site, a plant, a region" },
+  { type: "epc-requirement",   label: "Requirement",         defaultWidth: 150, defaultHeight: 50, description: "Something the function must satisfy — regulatory, contractual or internal" },
 ];
 
 // Pain Point + Issue are type-agnostic problem markers offered on EVERY diagram
@@ -353,6 +367,20 @@ const PROBLEM_MARKERS: SymbolType[] = ["uml-pain-point", "uml-issue"];
 // author can tether review notes to any element. Its show/hide is a diagram-level
 // toggle (`showReviewComments`), exactly like the problem markers.
 const REVIEW_MARKERS: SymbolType[] = ["review-comment"];
+
+/**
+ * The wider ARIS object set — everything an eEPC can hang off a function beyond
+ * the core notation.
+ *
+ * Separate from PALETTE_BY_DIAGRAM_TYPE.epc on purpose: the palette renders
+ * these in a section of their own, COLLAPSED by default. A real EPC uses two or
+ * three of them; showing all ten beside the core ten would bury the notation
+ * that actually carries the process.
+ */
+export const EPC_EXTENDED_SYMBOLS: SymbolType[] = [
+  "epc-kpi", "epc-risk", "epc-product", "epc-knowledge", "epc-business-rule",
+  "epc-screen", "epc-objective", "epc-machine", "epc-location", "epc-requirement",
+];
 
 export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
   context: ["external-entity", "process-system", ...PROBLEM_MARKERS, ...REVIEW_MARKERS],

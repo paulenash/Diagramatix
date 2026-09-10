@@ -493,6 +493,21 @@
     changed, so every file written against v46 is a valid v47 file and needs no
     migration. The bump exists because the enumerations here are CLOSED: without
     it, an EPC export would not validate against its own schema.
+
+  v48 — The wider ARIS object set.
+    SymbolTypeEnum    + 10 "epc-*" objects (KPI, risk, product, knowledge
+                        category, business rule, screen, objective, machine,
+                        location, requirement)
+    v47 deliberately left these out: none of them carries control-flow meaning,
+    and ten more shapes would have doubled a palette that had just doubled. What
+    changed is the migration case. A real ARIS repository is full of them, and an
+    import that dropped them would be discarding half of what a customer
+    modelled — so they are in, kept in a palette section of their own that is
+    collapsed by default.
+    A structural addition only, on the same terms as v47: every file written
+    against v47 is a valid v48 file and needs no migration.
+    None of them converts to a BPMN object, because BPMN has none — each becomes
+    a text annotation attached to its function, prefixed with its kind.
 -->
 
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
@@ -868,6 +883,22 @@
       <xs:enumeration value="epc-data"/>
       <xs:enumeration value="epc-application"/>
       <xs:enumeration value="epc-interface"/>
+      <!-- schema 48 — the wider ARIS object set. None of these carries control
+           flow: every one hangs off a FUNCTION and says something about it, and
+           the palette keeps them in a section of their own, collapsed by
+           default. They exist because a real ARIS repository is full of them and
+           an import that discarded them would be discarding half of what a
+           customer modelled. -->
+      <xs:enumeration value="epc-kpi"/>
+      <xs:enumeration value="epc-risk"/>
+      <xs:enumeration value="epc-product"/>
+      <xs:enumeration value="epc-knowledge"/>
+      <xs:enumeration value="epc-business-rule"/>
+      <xs:enumeration value="epc-screen"/>
+      <xs:enumeration value="epc-objective"/>
+      <xs:enumeration value="epc-machine"/>
+      <xs:enumeration value="epc-location"/>
+      <xs:enumeration value="epc-requirement"/>
     </xs:restriction>
   </xs:simpleType>
 

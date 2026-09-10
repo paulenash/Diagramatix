@@ -2287,6 +2287,26 @@ export function PropertiesPanel({
             );
           }
 
+          // --- EPC control flow: no arrowhead choice at all ---
+          // The three EPC arc kinds ARE the notation: a control flow has an
+          // open head, an information flow an open head on a direct line, an
+          // assignment none. Offering a dropdown here would let someone make a
+          // diagram that is no longer an EPC, one connector at a time — and the
+          // fault would be invisible, because it still looks like a diagram.
+          if (connector.type === "epc-control-flow") {
+            return (
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-medium text-gray-500 shrink-0">Direction:</span>
+                <span
+                  className="text-[10px] text-gray-500 italic"
+                  title="An EPC control flow always carries an open arrowhead — it is part of the notation, not a per-connector setting."
+                >
+                  Open (fixed by the notation)
+                </span>
+              </div>
+            );
+          }
+
           // --- Other connector types: dropdown ---
           // Check if either end is a "system" element
           const hasSystem = isAssocPC && allElements && (
@@ -3154,6 +3174,40 @@ export function PropertiesPanel({
             );
           })()}
         </div>
+        );
+      })()}
+
+      {element.type === "epc-interface" && siblingDiagrams && (() => {
+        // A Process Interface exists to say "the chain continues over there",
+        // so the link is not decoration — it is the element's whole meaning.
+        // Same mechanism as a collapsed subprocess: linkedDiagramId, and a
+        // double-click drills in.
+        const epcSiblings = siblingDiagrams.filter(d => d.type === "epc");
+        if (epcSiblings.length === 0) return null;
+        const linkedId = element.properties.linkedDiagramId as string | undefined;
+        const linkedExists = linkedId ? epcSiblings.some(d => d.id === linkedId) : true;
+        return (
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Linked Diagram</label>
+            <select
+              value={linkedId ?? ""}
+              onChange={(e) => onUpdateProperties(element.id, { linkedDiagramId: e.target.value || null })}
+              className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 bg-white text-gray-700 cursor-pointer"
+              onMouseDown={(e) => { e.stopPropagation(); }}
+              onClick={(e) => { e.stopPropagation(); (e.target as HTMLSelectElement).focus(); }}
+            >
+              <option value="">None</option>
+              {epcSiblings.map((d) => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+            {linkedId && !linkedExists && (
+              <p className="text-[10px] text-red-500 mt-1">Linked diagram not found — it may have been deleted</p>
+            )}
+            {linkedId && linkedExists && (
+              <p className="text-[10px] text-gray-400 mt-1">Double-click to drill into the linked EPC</p>
+            )}
+          </div>
         );
       })()}
 

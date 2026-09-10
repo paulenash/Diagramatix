@@ -45,7 +45,12 @@ export interface EpcModel {
 
 export type EpcObjectKind =
   | "event" | "function" | "xor" | "and" | "or"
-  | "org-unit" | "position" | "data" | "application" | "interface";
+  | "org-unit" | "position" | "data" | "application" | "interface"
+  // The wider ARIS set. These used to arrive as "unknown object types" and be
+  // reported — which was honest, and still meant a customer's KPIs and risks
+  // did not come across. Now they do.
+  | "kpi" | "risk" | "product" | "knowledge" | "business-rule"
+  | "screen" | "objective" | "machine" | "location" | "requirement";
 
 export interface EpcObject {
   id: string;
@@ -106,6 +111,20 @@ const OBJECT_TYPES: Record<string, EpcObjectKind> = {
   OT_APPL_SYS_TYPE: "application",
   OT_APPL_SYS: "application",
   OT_APPL_SYS_CLS: "application",
+  // The wider ARIS set. Several codes map to one symbol where ARIS
+  // distinguishes things an EPC draws identically — and the codes are listed
+  // generously because the point of this table is to recognise a real export,
+  // not to be minimal.
+  OT_KPI_INST: "kpi", OT_KPI: "kpi", OT_MEAS: "kpi",
+  OT_RISK: "risk", OT_RISK_CAT: "risk",
+  OT_PERF: "product", OT_SERV_TYPE: "product", OT_PROD: "product",
+  OT_KNWLDG_CAT: "knowledge", OT_DOCUMENTED_KNWLDG: "knowledge",
+  OT_BUSY_RULE: "business-rule", OT_RULE_BUS: "business-rule", OT_POLICY: "business-rule",
+  OT_SCRN: "screen", OT_SCRN_DGN: "screen",
+  OT_OBJECTIVE: "objective", OT_GOAL: "objective",
+  OT_MACH_RES: "machine", OT_RES: "machine",
+  OT_LOC: "location", OT_SITE: "location",
+  OT_REQ: "requirement", OT_REQUIREMENT: "requirement",
   // OT_RULE resolves by SymbolNum below — the type says "connector", the
   // symbol says which one.
 };
@@ -127,7 +146,19 @@ const ASSIGNMENT_CODES = new Set(["CT_EXEC_1", "CT_EXEC_2", "CT_EXEC_3", "CT_IS_
 const INFORMATION_CODES = new Set(["CT_USE_1", "CT_USE_2", "CT_CRT_1", "CT_CRT_2", "CT_PROVDS_INPT_FOR", "CT_CAN_SUPP_1", "CT_SUPP_1", "CT_IS_INP_FOR", "CT_HAS_OUT"]);
 
 const ORG_KINDS = new Set<EpcObjectKind>(["org-unit", "position"]);
-const DATA_KINDS = new Set<EpcObjectKind>(["data", "application"]);
+/** Object kind → the plan field it is carried on. */
+const ANNOTATION_FIELD: Partial<Record<EpcObjectKind, string>> = {
+  kpi: "kpi", risk: "risk", product: "product", knowledge: "knowledge",
+  "business-rule": "businessRule", screen: "screen", objective: "objective",
+  machine: "machine", location: "location", requirement: "requirement",
+};
+
+const ANNOTATION_KINDS = new Set<EpcObjectKind>([
+  "kpi", "risk", "product", "knowledge", "business-rule",
+  "screen", "objective", "machine", "location", "requirement",
+]);
+/** Everything that attaches to a function by an information arc. */
+const DATA_KINDS = new Set<EpcObjectKind>(["data", "application", ...ANNOTATION_KINDS]);
 const FLOW_KINDS = new Set<EpcObjectKind>(["event", "function", "xor", "and", "or", "interface"]);
 
 /** Case-insensitive, punctuation-tolerant attribute read. */
@@ -330,6 +361,9 @@ export function epcModelToPlan(model: EpcModel): AiEpcPlan {
     "org-unit": "org-unit", position: "position",
     data: "information object", application: "application system",
     interface: "process interface",
+    kpi: "kpi", risk: "risk", product: "product", knowledge: "knowledge",
+    "business-rule": "business rule", screen: "screen", objective: "objective",
+    machine: "machine", location: "location", requirement: "requirement",
   };
 
   // Assignments become ATTRIBUTES on the function, which is what the plan
@@ -340,6 +374,7 @@ export function epcModelToPlan(model: EpcModel): AiEpcPlan {
   const orgOf = new Map<string, string>();
   const dataOf = new Map<string, string[]>();
   const systemOf = new Map<string, string[]>();
+  const annotationOf = new Map<string, Record<string, string[]>>();
 
   for (const r of model.relations) {
     if (r.kind === "control") continue;
@@ -353,12 +388,21 @@ export function epcModelToPlan(model: EpcModel): AiEpcPlan {
       if (!orgOf.has(fn.id)) orgOf.set(fn.id, side.name);
     } else if (side.kind === "application") {
       (systemOf.get(fn.id) ?? systemOf.set(fn.id, []).get(fn.id)!).push(side.name);
+    } else if (ANNOTATION_KINDS.has(side.kind)) {
+      // Each keeps its own kind. Folding them onto `data` would draw an
+      // imported KPI as an information object — which is exactly the silent
+      // fidelity loss the whole importer is trying to avoid.
+      const field = ANNOTATION_FIELD[side.kind]!;
+      const list = annotationOf.get(fn.id) ?? annotationOf.set(fn.id, {}).get(fn.id)!;
+      (list[field] ??= []).push(side.name);
     } else if (side.kind === "data") {
       (dataOf.get(fn.id) ?? dataOf.set(fn.id, []).get(fn.id)!).push(side.name);
     }
   }
 
-  const satelliteKinds = new Set<EpcObjectKind>(["org-unit", "position", "data", "application"]);
+  const satelliteKinds = new Set<EpcObjectKind>([
+    "org-unit", "position", "data", "application", ...ANNOTATION_KINDS,
+  ]);
   for (const o of model.objects) {
     if (satelliteKinds.has(o.kind)) continue; // carried as attributes above
     const el: AiEpcElement = { id: o.id, type: kindToType[o.kind], label: o.name };
@@ -369,6 +413,7 @@ export function epcModelToPlan(model: EpcModel): AiEpcPlan {
       if (data?.length) el.data = data;
       const sys = systemOf.get(o.id);
       if (sys?.length) el.system = sys;
+      Object.assign(el, annotationOf.get(o.id) ?? {});
     }
     elements.push(el);
   }

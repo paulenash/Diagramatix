@@ -394,6 +394,16 @@ const FALLBACK_SIZE: Record<SymbolType, { w: number; h: number }> = {
   "epc-data":               { w: 150, h: 50 },
   "epc-application":        { w: 150, h: 50 },
   "epc-interface":          { w: 160, h: 50 },
+  "epc-kpi":                { w: 150, h: 50 },
+  "epc-risk":               { w: 150, h: 50 },
+  "epc-product":            { w: 150, h: 50 },
+  "epc-knowledge":          { w: 150, h: 50 },
+  "epc-business-rule":      { w: 150, h: 50 },
+  "epc-screen":             { w: 150, h: 50 },
+  "epc-objective":          { w: 150, h: 50 },
+  "epc-machine":            { w: 150, h: 50 },
+  "epc-location":           { w: 150, h: 50 },
+  "epc-requirement":        { w: 150, h: 50 },
 };
 
 interface BuiltElement {

@@ -15,6 +15,93 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.11.2533 — 2026-09-11 — Six things about EPC, and the half of ARIS we had left out
+
+### The palette teaches the notation, so it has to be right
+
+Every EPC symbol now draws its **own outline** in the palette. Until now the
+preview switch had no EPC cases, so all twenty fell through to a plain
+rectangle: twenty distinct shapes looking like one, in the exact place a person
+goes to learn which is which.
+
+### The wider ARIS object set
+
+**KPI, Risk, Product / Service, Knowledge Category, Business Rule, Screen,
+Objective, Machine / Resource, Location, Requirement** — ten symbols the EPC
+plan deliberately left out, with the reason on record: none of them carries
+control-flow meaning.
+
+That reason still stands for *drawing*. What changed is the **migration** case.
+A real ARIS repository is full of them, and an import that dropped them would be
+discarding half of what a customer modelled — which is a poor argument for
+switching. So they are in, and the cost is contained where it belongs: the
+palette keeps them in a section of their own, **closed by default**.
+
+Two things fell out of the existing design rather than needing new code:
+
+- **`canConnect` needed no new rule.** The control-flow whitelist names its six
+  members rather than listing what is banned, so ten new symbols were refused on
+  the flow the moment they existed. That is the argument for whitelists in one
+  line.
+- **The compiler named every place a symbol has to be registered** — two
+  exhaustive `Record<SymbolType, …>` maps and the import fallback table — so
+  there was no hunting for the fifth one.
+
+**None of them converts to a BPMN object, because BPMN has none.** Each becomes
+a text annotation attached to its function, prefixed with its kind (`KPI: Order
+cycle time`) and counted in the conversion report. The tempting answer — a task,
+or a data object — would put a thing in the process that is not a step in it,
+and a KPI was in fact falling through to the fallback and becoming a **task**
+until the test for this caught it.
+
+### Three columns per branch
+
+A function carries assignments on **both** sides: data and systems left, org
+units and the wider objects right. Lay branches out on their own widths and
+branch A's right-hand org unit lands on top of branch B's left-hand data object,
+because neither branch knows about the other's boxes.
+
+So every element in the spine now gets the same three-column band —
+`[ left gutter ][ spine ][ right gutter ]` — sized from the widest assignment
+anywhere in the diagram. Uniform bands mean the columns line up down the page as
+well as across it, which also fixes a rank of events being laid out to a
+different width from the functions above and below them. The cost is horizontal
+space when only one function carries an assignment; a wide diagram is readable
+and an overlapping one is not.
+
+### Names wrap, then the shape grows
+
+An EPC name wraps inside its own shape and, up to **two lines**, nothing moves.
+Past that the box grows **downward only**. Width is deliberately fixed: growing
+it sideways would move the assignment gutters, so one long function name would
+shove every branch's satellites out of column.
+
+A **Process Interface** holds **one** line, because the bottom of its box now
+belongs to a drill-down marker.
+
+The same function does the measuring for the layout, the renderer and the
+editor, so a hand-typed name and a generated one size identically — and what is
+drawn cannot disagree with what the box was grown to fit.
+
+### Two smaller things
+
+- **Control flow carries an open arrowhead**, and the Properties panel no longer
+  offers to change it. The three EPC arc kinds ARE the notation; a dropdown
+  there lets someone make a diagram that is no longer an EPC, one connector at a
+  time, and the fault is invisible because it still looks like a diagram.
+  Control and information flow stay apart by **routing** — one rectilinear down
+  the spine, one direct and horizontal — which is how an EPC distinguishes them
+  on paper.
+- **A Process Interface links to another EPC** and drills into it on a
+  double-click, the same `linkedDiagramId` mechanism a collapsed subprocess
+  uses. It is not decoration: "the chain continues over there" is the element's
+  entire meaning.
+
+`SCHEMA_VERSION` **47 → 48** — ten new `SymbolType`s, and the enumeration in the
+export XSD is closed. Additive only: every v47 file is a valid v48 file and
+needs no migration.
+
+---
 ## 2.10.2532 — 2026-09-11 — Convert to BPMN: the reason EPC is here at all
 
 An ARIS prospect has hundreds of EPCs and no way to bring them anywhere. *We

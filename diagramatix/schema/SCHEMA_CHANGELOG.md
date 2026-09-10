@@ -6,7 +6,7 @@ Canonical human-readable changelog for the export schema. Mirrors the inline his
 - **`schemaVersion`** — a standalone **integer** (the XSD schema version). Bumped only when the XSD **export shape** changes (a field/element/enum added, removed, or renamed). Carried on `<xs:schema version="…">`. This changelog tracks THIS number.
 - **`appVersion`** = **`PRODUCT_VERSION`** (`major.middle.patch`) — the Diagramatix *product* version. Its MIDDLE increments on any physical DB change; patch on fixes; major manually. The header badge appends `(build <git-commit-count>)` for display. Product-version history lives in [`../VERSION_HISTORY.md`](../VERSION_HISTORY.md).
 
-**Current XSD schema version:** `47` · **Product version:** `2.9` (split 2026-08-10 — the old single `major.minor` reached `1.45`; the `45` minor became this standalone integer, and the product version restarted at `2.1.1`). Versioning began at **v1.0**; **v1.2** was the first enumerated XSD content; the XSD inline history block starts at **v1.10**.
+**Current XSD schema version:** `48` · **Product version:** `2.9` (split 2026-08-10 — the old single `major.minor` reached `1.45`; the `45` minor became this standalone integer, and the product version restarted at `2.1.1`). Versioning began at **v1.0**; **v1.2** was the first enumerated XSD content; the XSD inline history block starts at **v1.10**.
 
 > **When to bump the schema integer:** ONLY when the **XSD export shape** changes (the original, narrow criterion) — a new first-class element/attribute or a typed-enum value. Physical-DB changes and open-`properties` additions do NOT bump it — they move `PRODUCT_VERSION.middle` instead (recorded in `VERSION_HISTORY.md`, not here). See [`UPDATE_EVERYTHING.md`](UPDATE_EVERYTHING.md) Step 0 (Q1 = DB → product middle; Q2 = XSD → schema integer).
 
@@ -20,6 +20,7 @@ Canonical human-readable changelog for the export schema. Mirrors the inline his
 
 | Version | Title | Schema shape change? |
 |---|---|---|
+| **schema 48** | **The wider ARIS object set.** `SymbolTypeEnum` + ten more `epc-*` objects (KPI, risk, product / service, knowledge category, business rule, screen, objective, machine / resource, location, requirement). None carries control flow — every one hangs off a function — and the palette keeps them in a section of their own, collapsed by default. | **Yes** — 10 additive enumerations. Every v47 file is a valid v48 file and needs no migration; it bumps only because the enumerations are **closed**. |
 | **schema 47** | **Event-driven Process Chain (ARIS eEPC).** `DiagramTypeEnum` + `epc`; `SymbolTypeEnum` + the ten `epc-*` objects (event, function, the XOR/AND/OR connectors, organisational unit, position, information object, application system, process interface); `ConnectorTypeEnum` + the three `epc-*` arcs (control flow, information flow, organisation assignment). | **Yes** — 14 additive enumerations. Nothing existing changed shape, so every v46 file is a valid v47 file and needs no migration. It bumps because the enumerations are **closed**: without them an EPC export would not validate against its own schema. |
 | **schema 46** | **Enum catch-up — the schema now declares what the exporter already writes.** `SymbolTypeEnum` + `history-state` / `deep-history-state` and the twenty-one `flowchart-*` shapes; `ConnectorTypeEnum` + `flowline` / `flowchart-association`; `DiagramTypeEnum` + `flowchart`. Also formally records `Connector/@branchPercent` (added to the XSD 2026-08-14, bump deferred to this batch). | **Yes** — 24 additive enumerations. They were being **exported without being declared**, so every Standard Flowchart and every history-state State Machine was invalid against the published schema. |
 | **schema 45** (was 1.45) | **Version model split** — `schemaVersion` became a standalone integer (this changelog); the product version restarted at **2.1.1** and now carries DB/JSON structure changes (its middle bumps on any physical-DB change, logged in VERSION_HISTORY.md). The XSD integer stays **45** and moves only on an XSD-shape change. | **No** — pure renumbering; no XSD shape change. |
@@ -72,6 +73,33 @@ Canonical human-readable changelog for the export schema. Mirrors the inline his
 ---
 
 ## Details (newest first)
+
+### schema 48 — The wider ARIS object set
+
+Ten more `epc-*` symbols: **KPI, Risk, Product / Service, Knowledge Category,
+Business Rule, Screen, Objective, Machine / Resource, Location, Requirement.**
+
+Schema 47 deliberately left these out, and the reason still stands for *drawing*:
+none of them carries control-flow meaning, and ten more shapes would have doubled
+a palette that had just doubled. What changed is the **migration** case. A real
+ARIS repository is full of them, and an import that dropped them would be
+discarding half of what a customer modelled.
+
+So they are in, and the cost is contained where it belongs:
+
+- the palette keeps them in a section of their own, **collapsed by default**;
+- `canConnect` needed no new rule. The control-flow whitelist names its six
+  members rather than listing what is banned, so ten new symbols were refused on
+  the flow the moment they existed — which is the argument for whitelists in one
+  line;
+- **none of them converts to a BPMN object**, because BPMN has none. Each becomes
+  a `text-annotation` attached to its function, prefixed with its kind
+  (`KPI: Order cycle time`) and counted in the conversion report. Inventing a task
+  or a data object for a KPI would put a thing in the process that is not a step
+  in it.
+
+A structural addition only, on the same terms as schema 47: every file written
+against v47 is a valid v48 file and needs no migration.
 
 ### schema 47 — Event-driven Process Chain (ARIS eEPC)
 

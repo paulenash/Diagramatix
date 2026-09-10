@@ -82,7 +82,22 @@ export type SymbolType =
   | "epc-position"
   | "epc-data"
   | "epc-application"
-  | "epc-interface";
+  | "epc-interface"
+  // The wider ARIS object set. These carry NO control-flow meaning — every one
+  // of them hangs off a function and says something ABOUT it — which is why the
+  // palette keeps them in a section of their own, collapsed by default. They
+  // exist because a real ARIS repository is full of them, and an import that
+  // discarded them would be discarding half of what a customer modelled.
+  | "epc-kpi"
+  | "epc-risk"
+  | "epc-product"
+  | "epc-knowledge"
+  | "epc-business-rule"
+  | "epc-screen"
+  | "epc-objective"
+  | "epc-machine"
+  | "epc-location"
+  | "epc-requirement";
 
 export type BpmnTaskType =
   | "none"
@@ -1255,7 +1270,7 @@ export interface TemplateData {
  *      is precisely what `tests/xml/xsd-enum-drift.test.ts` exists to catch. It
  *      caught this one.
  */
-export const SCHEMA_VERSION = "47";
+export const SCHEMA_VERSION = "48";
 
 /**
  * DIAGRAMATIX PRODUCT VERSION — a two-tier `major.minor` product line (currently "2.2"). The
@@ -1326,6 +1341,11 @@ export const SCHEMA_VERSION = "47";
  *   unaffected, and the XSD export shape is unchanged (a run is not part of a
  *   diagram export).
  *
+ * 2.11 — The wider ARIS object set: ten more "epc-*" symbols. No DB change —
+ *   the bump tracks SCHEMA_VERSION 48, because the XSD SymbolTypeEnum is a
+ *   CLOSED enumeration and an export using one of them would not otherwise
+ *   validate against its own schema.
+ *
  * 2.10 — SimulationTeam.discipline + .preemptive. Two OPERATIONAL columns, and
  *   the reason they exist is worth recording: the engine had supported queue
  *   discipline and preempt-resume for some time with nowhere to store either,
@@ -1334,7 +1354,7 @@ export const SCHEMA_VERSION = "47";
  *   The XSD export shape is unchanged (a resource pool is not part of a diagram
  *   export), so SCHEMA_VERSION stays at 47.
  */
-export const PRODUCT_VERSION = "2.10";
+export const PRODUCT_VERSION = "2.11";
 
 /**
  * The structural (XSD) schema version of an export, as a single integer, tolerant of BOTH the

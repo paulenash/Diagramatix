@@ -1,3 +1,5 @@
+import { getSymbolDefinition } from "./symbols/definitions";
+import type { SymbolType } from "./types";
 /**
  * Shared text-metric constants and helpers so the renderer's word-wrap and
  * the reducer's autosize calculation never drift apart.
@@ -355,4 +357,67 @@ export function externalLabelBox(
     w: size.w,
     h: size.h,
   };
+}
+
+/* ── EPC sizing ────────────────────────────────────────────────────────── */
+
+/**
+ * How much of an EPC shape's width its NAME may actually use.
+ *
+ * A hexagon's flat top and bottom are narrower than its widest point, and a
+ * chevron loses width at both the point and the notch — measuring against the
+ * bounding box would let a long name run out through the sloping edges.
+ */
+function epcTextInset(type: string): number {
+  if (type === "epc-event") return 44;      // both hexagon points
+  if (type === "epc-interface") return 40;  // the point and the notch
+  return 16;
+}
+
+/**
+ * Rows of text an EPC shape holds at its DEFAULT height, before it has to grow.
+ *
+ * Two for everything except the Process Interface, which spends the bottom of
+ * its box on the drill-down marker and so has room for one.
+ */
+export function epcFreeLines(type: string): number {
+  return type === "epc-interface" ? 1 : 2;
+}
+
+/** Vertical space a Process Interface reserves at the bottom for its link marker. */
+export const EPC_LINK_MARKER_H = 14;
+
+/**
+ * Size an EPC shape to its name: WRAP FIRST, GROW SECOND.
+ *
+ * The name wraps inside the shape's own width and, up to the free-line count,
+ * the shape does not change at all. Past that it grows DOWNWARD only.
+ *
+ * Width is deliberately fixed. Growing it sideways would move the assignment
+ * gutters that layoutEpc reserves either side of the spine, so one long
+ * function name would shove every branch's satellites out of column — the
+ * three-column band only holds if the middle column is a known width.
+ */
+export function epcFitSize(type: string, label: string): { w: number; h: number } {
+  // getDefaultSize only knows "task" and "subprocess" — it answers the
+  // subprocess default for anything else, silently, which is how the first
+  // version of this sized every EPC shape 108x72.
+  const def = getSymbolDefinition(type as SymbolType);
+  const w = def.defaultWidth;
+  // The three connectors are glyphs and carry their label OUTSIDE the circle,
+  // so no amount of text changes them.
+  if (type === "epc-xor" || type === "epc-and" || type === "epc-or") return { w, h: def.defaultHeight };
+
+  const free = epcFreeLines(type);
+  const lines = wrapText(label || "", w - epcTextInset(type), 12);
+  const extra = Math.max(0, lines.length - free);
+  return { w, h: def.defaultHeight + extra * LINE_HEIGHT };
+}
+
+/**
+ * How many lines an EPC name wraps to at a GIVEN box width — the renderer's
+ * side of the same rule, so what is drawn and what was measured agree.
+ */
+export function epcWrapLabel(type: string, label: string, width: number): string[] {
+  return wrapText(label || "", Math.max(24, width - epcTextInset(type)), 12);
 }

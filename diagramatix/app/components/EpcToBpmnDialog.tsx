@@ -106,6 +106,7 @@ export function EpcToBpmnDialog({ source, sourceName, projectId, onClose, onCrea
     { label: "Events", n: report.eventCount },
     { label: "Call activities", n: report.callActivityCount },
     { label: "Data objects", n: report.dataObjectCount },
+    { label: "Annotations", n: report.annotationCount },
     { label: "System pools", n: report.systemPoolCount },
     { label: "Lanes", n: report.laneCount },
   ].filter((c) => c.n > 0);

@@ -43,6 +43,8 @@ export interface EpcTranslationReport {
   eventCount: number;
   callActivityCount: number;
   dataObjectCount: number;
+  /** The wider ARIS objects kept as text annotations, because BPMN has no equivalent. */
+  annotationCount: number;
   systemPoolCount: number;
   laneCount: number;
   /** Events turned into a label on a sequence flow — the readability rule. */
@@ -96,7 +98,7 @@ export function translateEpcToBpmn(
   const report: EpcTranslationReport = {
     processName,
     taskCount: 0, gatewayCount: 0, eventCount: 0, callActivityCount: 0,
-    dataObjectCount: 0, systemPoolCount: 0, laneCount: 0,
+    dataObjectCount: 0, annotationCount: 0, systemPoolCount: 0, laneCount: 0,
     branchLabels: [], droppedEvents: [], approximations: [], drops: [], refusals: [],
   };
 
@@ -273,7 +275,10 @@ export function translateEpcToBpmn(
 
     const lane = laneOfElement.get(el.id);
     const base: AiElement = {
-      id: el.id, type: m.bpmn, label: labelOf(el),
+      id: el.id, type: m.bpmn,
+      // The prefix is what stops "Order cycle time" reading as a stray note
+      // once the KPI has become a text annotation.
+      label: m.labelPrefix ? `${m.labelPrefix}: ${labelOf(el)}` : labelOf(el),
       pool: POOL_ID, ...(lane ? { lane } : {}),
     };
     if (m.kind === "event") {
@@ -289,6 +294,7 @@ export function translateEpcToBpmn(
       case "gateway": report.gatewayCount++; break;
       case "subprocess": report.callActivityCount++; break;
       case "data-object": report.dataObjectCount++; break;
+      case "text-annotation": report.annotationCount++; break;
       case "start-event": case "end-event": report.eventCount++; break;
     }
     if (m.approx) report.approximations.push(`${quoted(el)} (${el.type}) → ${base.type}`);

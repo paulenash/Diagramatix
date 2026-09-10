@@ -5,7 +5,7 @@ import { canvasMemoEqual } from "./memoEqual";
 import type { BpmnTaskType, GatewayType, EventType, DiagramElement, Point, Side, SymbolType } from "@/app/lib/diagram/types";
 import { type SymbolColorConfig, resolveColor } from "@/app/lib/diagram/colors";
 import { DisplayModeCtx, FontScaleCtx, PoolFontSizeCtx, LaneFontSizeCtx, ProcessFontSizeCtx, ValueChainFontSizeCtx, DescriptionFontSizeCtx, sketchyFilter } from "@/app/lib/diagram/displayMode";
-import { wrapText, computePackageTab } from "@/app/lib/diagram/textMetrics";
+import { epcWrapLabel, EPC_LINK_MARKER_H, wrapText, computePackageTab } from "@/app/lib/diagram/textMetrics";
 import { archiNodeDepth } from "@/app/lib/diagram/nodeGeometry";
 import { readableTextOn } from "@/app/lib/diagram/chevronThemes";
 import { isRichText, sanitizeRichText, plainToHtml } from "@/app/lib/diagram/richText";
@@ -2084,8 +2084,137 @@ function EpcInterfaceShape({ el }: { el: DiagramElement }) {
     [x, y], [x + w - n, y], [x + w, y + h / 2], [x + w - n, y + h],
     [x, y + h], [x + n, y + h / 2],
   ].map((q) => q.join(",")).join(" ");
-  return <polygon points={pts} fill={epcFill(el, colors)} stroke={EPC_STROKE} strokeWidth={EPC_SW} />;
+  // A Process Interface says "the chain continues over there", so the link is
+  // its whole meaning rather than an extra. The marker sits at the BOTTOM —
+  // which is why the shape holds one line of text at its default height where
+  // everything else holds two (epcFreeLines).
+  const hasLink = !!(el.properties?.linkedDiagramId as string | undefined);
+  const mk = 11, mx = x + w / 2 - mk / 2, my = y + h - mk - 3;
+  return (
+    <g>
+      <polygon points={pts} fill={epcFill(el, colors)} stroke={EPC_STROKE} strokeWidth={EPC_SW} />
+      {hasLink && (
+        <g stroke={EPC_STROKE} strokeWidth={1.2} fill="none">
+          <rect x={mx} y={my} width={mk} height={mk} rx={2} />
+          <line x1={mx + mk / 2} y1={my + 2.5} x2={mx + mk / 2} y2={my + mk - 2.5} />
+          <line x1={mx + 2.5} y1={my + mk / 2} x2={mx + mk - 2.5} y2={my + mk / 2} />
+        </g>
+      )}
+    </g>
+  );
 }
+/**
+ * The wider ARIS object set — KPI, Risk, Product, Knowledge, Business Rule,
+ * Screen, Objective, Machine, Location, Requirement.
+ *
+ * ONE component with a glyph switch, not ten components. They share an outline
+ * on purpose: every one of them is something said ABOUT a function rather than
+ * a step in the process, and reading them as a family is the point. The corner
+ * glyph is the whole difference, and it sits in the corner rather than the
+ * middle so the name still gets the centre of the box.
+ */
+type AnnotationGlyph =
+  | "kpi" | "risk" | "product" | "knowledge" | "business-rule"
+  | "screen" | "objective" | "machine" | "location" | "requirement";
+
+function EpcAnnotationShape({ el, glyph }: { el: DiagramElement; glyph: AnnotationGlyph }) {
+  const colors = useContext(SymbolColorCtx);
+  const { x, y, width: w, height: h } = el;
+  // Glyph box: top-right corner, sized off the height so it scales with a
+  // vertically-grown box without ever crowding the name.
+  const g = Math.min(h * 0.42, 18);
+  const gx = x + w - g - 6, gy = y + 6;
+  const cx = gx + g / 2, cy = gy + g / 2;
+  const stroke = { stroke: EPC_STROKE, strokeWidth: 1.3, fill: "none" as const, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+
+  let mark: React.ReactNode = null;
+  switch (glyph) {
+    case "kpi":
+      // A rising trend line: a measure is a thing that moves.
+      mark = <polyline points={[[gx, gy + g], [gx + g * 0.35, gy + g * 0.45], [gx + g * 0.62, gy + g * 0.7], [gx + g, gy + g * 0.12]].map((q) => q.join(",")).join(" ")} {...stroke} />;
+      break;
+    case "risk":
+      // A warning triangle with a bang.
+      mark = (<g {...stroke}>
+        <polygon points={[[cx, gy], [gx + g, gy + g], [gx, gy + g]].map((q) => q.join(",")).join(" ")} />
+        <line x1={cx} y1={gy + g * 0.42} x2={cx} y2={gy + g * 0.66} />
+        <line x1={cx} y1={gy + g * 0.82} x2={cx} y2={gy + g * 0.86} />
+      </g>);
+      break;
+    case "product":
+      // A parcel: what comes out of the step.
+      mark = (<g {...stroke}>
+        <rect x={gx} y={gy + g * 0.18} width={g} height={g * 0.72} />
+        <line x1={cx} y1={gy + g * 0.18} x2={cx} y2={gy + g * 0.9} />
+        <line x1={gx} y1={gy + g * 0.46} x2={gx + g} y2={gy + g * 0.46} />
+      </g>);
+      break;
+    case "knowledge":
+      // An open book.
+      mark = (<g {...stroke}>
+        <path d={`M ${gx} ${gy + g * 0.22} q ${g * 0.25} -${g * 0.14} ${g * 0.5} 0 q ${g * 0.25} -${g * 0.14} ${g * 0.5} 0 v ${g * 0.62} q -${g * 0.25} ${g * 0.14} -${g * 0.5} 0 q -${g * 0.25} ${g * 0.14} -${g * 0.5} 0 Z`} />
+        <line x1={cx} y1={gy + g * 0.22} x2={cx} y2={gy + g * 0.84} />
+      </g>);
+      break;
+    case "business-rule":
+      // A gavel-free choice: a document with a tick, i.e. a rule that passes.
+      mark = (<g {...stroke}>
+        <rect x={gx + g * 0.12} y={gy} width={g * 0.76} height={g} />
+        <polyline points={[[gx + g * 0.28, gy + g * 0.55], [gx + g * 0.45, gy + g * 0.74], [gx + g * 0.76, gy + g * 0.3]].map((q) => q.join(",")).join(" ")} />
+      </g>);
+      break;
+    case "screen":
+      // A monitor on a stand.
+      mark = (<g {...stroke}>
+        <rect x={gx} y={gy} width={g} height={g * 0.68} />
+        <line x1={cx} y1={gy + g * 0.68} x2={cx} y2={gy + g * 0.86} />
+        <line x1={gx + g * 0.24} y1={gy + g * 0.9} x2={gx + g * 0.76} y2={gy + g * 0.9} />
+      </g>);
+      break;
+    case "objective":
+      // Concentric rings: a target.
+      mark = (<g {...stroke}>
+        <circle cx={cx} cy={cy} r={g * 0.46} />
+        <circle cx={cx} cy={cy} r={g * 0.18} />
+      </g>);
+      break;
+    case "machine":
+      // A cog, drawn as a circle with four teeth — a full gear at 18px is mud.
+      mark = (<g {...stroke}>
+        <circle cx={cx} cy={cy} r={g * 0.3} />
+        <line x1={cx} y1={gy} x2={cx} y2={gy + g * 0.16} />
+        <line x1={cx} y1={gy + g * 0.84} x2={cx} y2={gy + g} />
+        <line x1={gx} y1={cy} x2={gx + g * 0.16} y2={cy} />
+        <line x1={gx + g * 0.84} y1={cy} x2={gx + g} y2={cy} />
+      </g>);
+      break;
+    case "location":
+      // A map pin.
+      mark = (<g {...stroke}>
+        <path d={`M ${cx} ${gy + g} C ${gx + g * 0.1} ${gy + g * 0.55}, ${gx + g * 0.12} ${gy}, ${cx} ${gy} C ${gx + g * 0.88} ${gy}, ${gx + g * 0.9} ${gy + g * 0.55}, ${cx} ${gy + g} Z`} />
+        <circle cx={cx} cy={gy + g * 0.36} r={g * 0.13} />
+      </g>);
+      break;
+    case "requirement":
+      // A clipboard.
+      mark = (<g {...stroke}>
+        <rect x={gx + g * 0.1} y={gy + g * 0.14} width={g * 0.8} height={g * 0.86} />
+        <rect x={gx + g * 0.3} y={gy} width={g * 0.4} height={g * 0.24} />
+        <line x1={gx + g * 0.28} y1={gy + g * 0.52} x2={gx + g * 0.72} y2={gy + g * 0.52} />
+        <line x1={gx + g * 0.28} y1={gy + g * 0.74} x2={gx + g * 0.72} y2={gy + g * 0.74} />
+      </g>);
+      break;
+  }
+
+  return (
+    <g>
+      <rect x={x} y={y} width={w} height={h} rx={4} ry={4}
+        fill={epcFill(el, colors)} stroke={EPC_STROKE} strokeWidth={EPC_SW} />
+      {mark}
+    </g>
+  );
+}
+
 // ── Standard Flowchart shapes (monochrome: white fill, black stroke) ──
 const FC_STROKE = "#111111";
 const FC_SW = 1.6;
@@ -2316,6 +2445,16 @@ function SymbolShape({ el }: { el: DiagramElement }) {
       case "epc-data":               return <EpcDataShape el={el} />;
       case "epc-application":        return <EpcApplicationShape el={el} />;
       case "epc-interface":          return <EpcInterfaceShape el={el} />;
+      case "epc-kpi":                return <EpcAnnotationShape el={el} glyph="kpi" />;
+      case "epc-risk":               return <EpcAnnotationShape el={el} glyph="risk" />;
+      case "epc-product":            return <EpcAnnotationShape el={el} glyph="product" />;
+      case "epc-knowledge":          return <EpcAnnotationShape el={el} glyph="knowledge" />;
+      case "epc-business-rule":      return <EpcAnnotationShape el={el} glyph="business-rule" />;
+      case "epc-screen":             return <EpcAnnotationShape el={el} glyph="screen" />;
+      case "epc-objective":          return <EpcAnnotationShape el={el} glyph="objective" />;
+      case "epc-machine":            return <EpcAnnotationShape el={el} glyph="machine" />;
+      case "epc-location":           return <EpcAnnotationShape el={el} glyph="location" />;
+      case "epc-requirement":        return <EpcAnnotationShape el={el} glyph="requirement" />;
       case "flowchart-io":           return <FlowchartIOShape el={el} />;
       case "flowchart-document":     return <FlowchartDocumentShape el={el} />;
       case "flowchart-multidoc":     return <FlowchartMultidocShape el={el} />;
@@ -3510,10 +3649,18 @@ function SymbolRendererInner({
           && typeof element.properties?.shapeKey === "string"
           && /(component|system-software)/.test(element.properties.shapeKey as string))
           ? Math.min(element.width * 0.16, 22) : 0;
+        // EPC names WRAP inside their shape. epcWrapLabel uses the same inset
+        // epcFitSize measured with, so the number of lines drawn is the number
+        // the box was grown for — the two must not disagree or a three-line
+        // name overflows a box sized for three lines.
+        const isEpcBox = element.type.startsWith("epc-")
+          && element.type !== "epc-xor" && element.type !== "epc-and" && element.type !== "epc-or";
         const labelLines = isArchi
           ? wrapText(element.label ?? "", Math.max(24, element.width - compInset - ARCHI_LABEL_PAD), fSize)
-          : (element.label ?? "").split('\n');
-        if ((isChevron || isArchi) && labelLines.length > 1) {
+          : isEpcBox
+            ? epcWrapLabel(element.type, element.label ?? "", element.width)
+            : (element.label ?? "").split('\n');
+        if ((isChevron || isArchi || isEpcBox) && labelLines.length > 1) {
           // For ArchiMate the labelInfo anchor is either the centre of
           // the box (leaf) or the header strip (container) or the figure
           // baseline (icon-only Actor). Stack tspans relative to that
@@ -3529,6 +3676,12 @@ function SymbolRendererInner({
             // top edge. Anchor the first line a fixed pad below the top instead.
             // (A single-line label is unchanged — it takes the non-wrapped branch.)
             topY = element.y + 8 + lineH / 2;
+          } else if (element.type === "epc-interface") {
+            // The marker owns the bottom of the box, so the text block is
+            // centred on what is LEFT rather than on the whole shape.
+            const usableH = element.height - EPC_LINK_MARKER_H;
+            const blockTop = element.y + usableH / 2 - ((labelLines.length - 1) * lineH) / 2;
+            topY = blockTop;
           } else {
             // Centre the block on the anchor (default + chevron behaviour)
             topY = labelInfo.y - ((labelLines.length - 1) * lineH) / 2;

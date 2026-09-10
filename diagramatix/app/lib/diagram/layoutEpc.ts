@@ -32,7 +32,7 @@ import type { DiagramData, DiagramElement, Connector, Point, SymbolType } from "
 import type { LayoutDiagnostic } from "./bpmnLayout";
 import { getSymbolDefinition } from "./symbols/definitions";
 import { computeWaypoints } from "./routing";
-import { wrapText } from "./textMetrics";
+import { epcFitSize } from "./textMetrics";
 
 export interface AiEpcElement {
   id: string;
@@ -47,7 +47,39 @@ export interface AiEpcElement {
   data?: string[];
   /** Functions only — application systems the work happens in. */
   system?: string[];
+  /**
+   * Functions only — the wider ARIS object set.
+   *
+   * One field per kind rather than a tagged list, for the same reason `org` is
+   * a single string: the SHAPE of the plan is where the rules live. A KPI can
+   * only ever be drawn as a KPI, and there is nowhere here to hang one off an
+   * event.
+   */
+  kpi?: string[];
+  risk?: string[];
+  product?: string[];
+  knowledge?: string[];
+  businessRule?: string[];
+  screen?: string[];
+  objective?: string[];
+  machine?: string[];
+  location?: string[];
+  requirement?: string[];
 }
+
+/** Plan field → the symbol it is drawn as. The single place that pairing lives. */
+export const EPC_ANNOTATION_FIELDS: ReadonlyArray<readonly [keyof AiEpcElement, SymbolType]> = [
+  ["kpi", "epc-kpi"],
+  ["risk", "epc-risk"],
+  ["product", "epc-product"],
+  ["knowledge", "epc-knowledge"],
+  ["businessRule", "epc-business-rule"],
+  ["screen", "epc-screen"],
+  ["objective", "epc-objective"],
+  ["machine", "epc-machine"],
+  ["location", "epc-location"],
+  ["requirement", "epc-requirement"],
+];
 export interface AiEpcConnection {
   sourceId: string;
   targetId: string;
@@ -68,7 +100,16 @@ const SAT_STACK = 18;  // extra gap when a function has several of one kind
 const CONNECTOR_TYPES = new Set<SymbolType>(["epc-xor", "epc-and", "epc-or"]);
 const DECISION_TYPES = new Set<SymbolType>(["epc-xor", "epc-or"]);
 const ORG_TYPES = new Set<SymbolType>(["epc-org-unit", "epc-position"]);
-const DATA_TYPES = new Set<SymbolType>(["epc-data", "epc-application"]);
+/**
+ * The wider ARIS object set. Every one hangs off a function and is drawn beside
+ * it, exactly as an information object is — so it joins DATA_TYPES rather than
+ * getting a placement rule of its own.
+ */
+const ANNOTATION_TYPES = new Set<SymbolType>([
+  "epc-kpi", "epc-risk", "epc-product", "epc-knowledge", "epc-business-rule",
+  "epc-screen", "epc-objective", "epc-machine", "epc-location", "epc-requirement",
+]);
+const DATA_TYPES = new Set<SymbolType>(["epc-data", "epc-application", ...ANNOTATION_TYPES]);
 
 /** Map a free-form AI element type onto a concrete EPC symbol type. */
 export function mapEpcType(raw: string): SymbolType {
@@ -81,24 +122,32 @@ export function mapEpcType(raw: string): SymbolType {
   if (/(position|role|jobtitle|person)/.test(k)) return "epc-position";
   if (/(applicationsystem|application|system|itsystem|software)/.test(k)) return "epc-application";
   if (/(informationobject|information|data|document|record|dataobject)/.test(k)) return "epc-data";
+  // The wider ARIS set, before the function catch-all: "business rule" and
+  // "process interface" both contain words the function test would swallow.
+  if (/(businessrule|policy|rule)/.test(k)) return "epc-business-rule";
+  if (/(kpi|keyperformanceindicator|measure|metric)/.test(k)) return "epc-kpi";
+  if (/(risk|hazard|threat)/.test(k)) return "epc-risk";
+  if (/(productservice|product|service|deliverable)/.test(k)) return "epc-product";
+  if (/(knowledge|skill|competency)/.test(k)) return "epc-knowledge";
+  if (/(screen|form|userinterface|ui)/.test(k)) return "epc-screen";
+  if (/(objective|goal|target)/.test(k)) return "epc-objective";
+  if (/(machine|equipment|resource|plant)/.test(k)) return "epc-machine";
+  if (/(location|site|region|place)/.test(k)) return "epc-location";
+  if (/(requirement|obligation|compliance)/.test(k)) return "epc-requirement";
   if (/(function|activity|task|step|action|process)/.test(k)) return "epc-function";
   // event / state / trigger / anything else. An EPC is event-bounded, and an
   // unrecognised label is far more often a state than a step.
   return "epc-event";
 }
 
-function sizeFor(type: SymbolType, label: string): { w: number; h: number } {
-  const def = getSymbolDefinition(type);
-  // The three connectors are glyphs, not boxes: they carry no label, so the
-  // label-growth below must never inflate them.
-  if (CONNECTOR_TYPES.has(type)) return { w: def.defaultWidth, h: def.defaultHeight };
-  // A hexagon's flat top and bottom are narrower than its widest point, so an
-  // event gets less usable width than its box suggests.
-  const inset = type === "epc-event" ? 44 : 16;
-  const lines = wrapText(label || "", def.defaultWidth - inset, 12);
-  const neededH = Math.max(def.defaultHeight, lines.length * 16 + 22);
-  return { w: def.defaultWidth, h: neededH };
-}
+/**
+ * Wrap first, grow second — the rule lives in epcFitSize so the renderer can
+ * apply the same one. The WIDTH never changes: the three-column band below
+ * only holds if the middle column is a known size, so a long function name
+ * grows the box downward rather than shoving every branch's assignments out
+ * of column.
+ */
+const sizeFor = epcFitSize;
 
 /** One satellite to be placed beside a function, on a named side. */
 interface Satellite {
@@ -160,6 +209,13 @@ export function layoutEpcDiagram(
     if (e.org) push(e.org, "epc-org-unit", "right");
     for (const d of e.data ?? []) push(d, "epc-data", "left");
     for (const s of e.system ?? []) push(s, "epc-application", "left");
+    // The wider ARIS set goes on the RIGHT, beside the org unit. They say
+    // something ABOUT the function — who is measured, what can go wrong, what
+    // it delivers — which is the same side of the sentence the responsible
+    // party is on. The left stays for what the function reads and writes.
+    for (const [field, type] of EPC_ANNOTATION_FIELDS) {
+      for (const v of (e[field] as string[] | undefined) ?? []) push(v, type, "right");
+    }
   }
 
   // Explicitly-drawn satellites: anchor each to the function it connects to.
@@ -321,23 +377,62 @@ export function layoutEpcDiagram(
   for (const e of aiElements) sizeById.set(e.id, sizeFor(typeById.get(e.id)!, labelOf(e)));
   for (const s of satellites) if (!sizeById.has(s.id)) sizeById.set(s.id, sizeFor(s.type, s.label));
 
+  /**
+   * THREE COLUMNS PER BRANCH.
+   *
+   * A function has assignments on BOTH sides — data and systems left, org units
+   * right. Lay the branches out on their own widths and branch A's right-hand
+   * org unit lands on top of branch B's left-hand data object, because the two
+   * branches only know about their own boxes.
+   *
+   * So every element in the spine is given the SAME three-column band:
+   *
+   *     [  left gutter  ][  spine  ][  right gutter  ]
+   *
+   * sized from the widest assignment anywhere in the diagram. Uniform bands
+   * mean the columns line up down the page as well as across it, so nothing a
+   * branch hangs off itself can reach into the branch beside it — and it holds
+   * for a rank of events, which have no assignments at all and would otherwise
+   * be laid out to a different width from the functions above and below them.
+   *
+   * The cost is horizontal space on a diagram where only one function carries
+   * an assignment. That is the right trade: a wide diagram is readable, and an
+   * overlapping one is not.
+   */
+  const satExtent = (anchorId: string, side: "left" | "right") => {
+    const kin = satellites.filter((s) => s.anchorId === anchorId && s.side === side);
+    if (kin.length === 0) return 0;
+    const widest = Math.max(...kin.map((s) => sizeById.get(s.id)!.w));
+    return SAT_GAP + kin.length * widest + (kin.length - 1) * SAT_STACK;
+  };
+  let gutterLeft = 0, gutterRight = 0;
+  for (const e of spine) {
+    gutterLeft = Math.max(gutterLeft, satExtent(e.id, "left"));
+    gutterRight = Math.max(gutterRight, satExtent(e.id, "right"));
+  }
+  const spineW = Math.max(...spineIds.map((id) => sizeById.get(id)!.w), 0);
+  const bandW = gutterLeft + spineW + gutterRight;
+
   const elements: DiagramElement[] = [];
   let cursorY = START_Y;
   for (const r of ranks) {
     const rowIds = rankOrder.get(r)!;
     const sizes = rowIds.map((id) => sizeById.get(id)!);
     const rowH = Math.max(...sizes.map((s) => s.h));
-    const totalW = sizes.reduce((sum, s) => sum + s.w, 0) + COL_GAP * (rowIds.length - 1);
-    let x = START_X - totalW / 2;
+    const totalW = rowIds.length * bandW + COL_GAP * (rowIds.length - 1);
+    let bandX = START_X - totalW / 2;
     rowIds.forEach((id, i) => {
       const e = aiById.get(id)!, s = sizes[i];
+      // Centred in the band's MIDDLE column, so a 44px connector and a 160px
+      // event share an axis instead of both hugging the left gutter.
+      const cx = bandX + gutterLeft + spineW / 2;
       elements.push({
         id, type: typeById.get(id)!,
-        x: Math.round(x), y: Math.round(cursorY + (rowH - s.h) / 2),
+        x: Math.round(cx - s.w / 2), y: Math.round(cursorY + (rowH - s.h) / 2),
         width: s.w, height: s.h,
         label: labelOf(e), properties: {},
       });
-      x += s.w + COL_GAP;
+      bandX += bandW + COL_GAP;
     });
     cursorY += rowH + ROW_GAP;
   }
@@ -424,7 +519,11 @@ export function layoutEpcDiagram(
       sourceSide: srcSide as Connector["sourceSide"],
       targetSide: tgtSide as Connector["targetSide"],
       type: kind === "control" ? "epc-control-flow" : kind === "info" ? "epc-information-flow" : "epc-org-assignment",
-      directionType: kind === "control" ? "directed" : kind === "info" ? "open-directed" : "non-directed",
+      // Control flow and information flow both carry an OPEN head; only the
+      // assignment arc has none. They stay apart by ROUTING — control flow is
+      // rectilinear and runs down the spine, an information arc is direct and
+      // runs horizontally — which is how an EPC distinguishes them on paper too.
+      directionType: kind === "org" ? "non-directed" : "open-directed",
       routingType: kind === "control" ? "rectilinear" : "direct",
       sourceInvisibleLeader: false,
       targetInvisibleLeader: false,

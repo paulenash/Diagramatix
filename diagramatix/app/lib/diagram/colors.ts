@@ -79,6 +79,19 @@ export const DEFAULT_SYMBOL_COLORS: Record<SymbolType, string> = {
   "epc-data":        "#cce5ff",  // blue   — information
   "epc-application": "#e5ccff",  // purple — systems
   "epc-interface":   "#e5e5e5",  // grey   — a link out to another chain
+  // The wider ARIS set. Deliberately MUTED next to the core notation: these
+  // annotate a function, they do not carry the process, and a diagram where
+  // they shout as loudly as the events is a diagram you cannot read.
+  "epc-kpi":           "#dbeafe",  // pale blue   — a measure
+  "epc-risk":          "#fecaca",  // pale red    — the only warm one; a risk should catch the eye
+  "epc-product":       "#d9f2e6",  // pale green  — what comes out
+  "epc-knowledge":     "#ede9fe",  // pale violet — what you must know
+  "epc-business-rule": "#fef3c7",  // pale amber  — a policy
+  "epc-screen":        "#e0f2fe",  // pale cyan   — a front end
+  "epc-objective":     "#fae8ff",  // pale fuchsia— the goal it serves
+  "epc-machine":       "#e5e7eb",  // pale grey   — equipment
+  "epc-location":      "#dcfce7",  // pale mint   — where
+  "epc-requirement":   "#ffe4e6",  // pale rose   — what it must satisfy
 };
 
 /** Black & white colour scheme: fills → white, lines/strokes → black. */
@@ -145,6 +158,10 @@ export const BW_SYMBOL_COLORS: Record<SymbolType, string> = {
   "epc-xor": "#ffffff", "epc-and": "#ffffff", "epc-or": "#ffffff",
   "epc-org-unit": "#ffffff", "epc-position": "#ffffff",
   "epc-data": "#ffffff", "epc-application": "#ffffff", "epc-interface": "#ffffff",
+  "epc-kpi": "#ffffff", "epc-risk": "#ffffff", "epc-product": "#ffffff",
+  "epc-knowledge": "#ffffff", "epc-business-rule": "#ffffff", "epc-screen": "#ffffff",
+  "epc-objective": "#ffffff", "epc-machine": "#ffffff", "epc-location": "#ffffff",
+  "epc-requirement": "#ffffff",
 };
 
 /** Return the effective colour for a symbol type, preferring the project config over defaults. */

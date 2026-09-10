@@ -44,7 +44,7 @@ describe("the sample AML parses", () => {
     const kinds = new Set(o2c().objects.map((o) => o.kind));
     expect([...kinds].sort()).toEqual([
       "and", "application", "data", "event", "function",
-      "interface", "or", "org-unit", "position", "xor",
+      "interface", "kpi", "or", "org-unit", "position", "xor",
     ]);
   });
 
@@ -60,12 +60,19 @@ describe("the sample AML parses", () => {
     // A real ARIS repository is full of KPIs, risks, products and knowledge
     // categories. Discarding half a customer's model without saying so is the
     // failure that would lose the deal.
+    // The set we model can only ever be a subset of what ARIS can hold, so the
+    // REPORTING is the part that has to work. The sample carries an object we
+    // deliberately do not model to keep this honest — when the KPI became a
+    // real symbol, this assertion would otherwise have quietly stopped testing
+    // anything.
     const { report } = imported();
-    const kpi = report.unknownObjectTypes.find((u) => u.type === "OT_KPI_INST");
-    expect(kpi, "the sample's KPI must be reported").toBeTruthy();
-    expect(kpi!.examples).toContain("Order cycle time");
+    const unknown = report.unknownObjectTypes.find((u) => u.type === "OT_EVAL_STRUCTURE");
+    expect(unknown, "an unmodelled object must be reported").toBeTruthy();
+    expect(unknown!.examples).toContain("Order value banding");
     // …and its connection to a function is named too, not silently forgotten.
-    expect(report.dropped.some((d) => d.includes("ObjDef.K1"))).toBe(true);
+    expect(report.dropped.some((d) => d.includes("ObjDef.Z1"))).toBe(true);
+    // The KPI, by contrast, is now modelled and must NOT be in the unknown list.
+    expect(report.unknownObjectTypes.some((u) => u.type.includes("KPI"))).toBe(false);
   });
 });
 

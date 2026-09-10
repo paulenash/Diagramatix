@@ -244,8 +244,14 @@
     </ObjDef>
 
     <!-- An object type the importer is NOT expected to know. A real ARIS
-         repository is full of these (KPIs, risks, products, knowledge
-         categories). It must be REPORTED, not silently dropped. -->
+         repository is full of things outside the EPC notation, and the set we
+         model can only ever be a subset — so what matters is that the rest is
+         REPORTED rather than silently dropped. OT_EVAL_STRUCTURE is here to
+         keep that path honest: it is deliberately something we do not model. -->
+    <ObjDef ObjDef.ID="ObjDef.Z1" TypeNum="OT_EVAL_STRUCTURE" SymbolNum="ST_EVAL_STRUCTURE">
+      <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Order value banding</AttrValue></AttrDef>
+      <CxnDef CxnDef.ID="CxnDef.Z1F1" CxnDef.Type="CT_IS_EVAL_BY" ToObjDef.IdRef="ObjDef.F1"/>
+    </ObjDef>
     <ObjDef ObjDef.ID="ObjDef.K1" TypeNum="OT_KPI_INST" SymbolNum="ST_KPI_INST">
       <AttrDef AttrDef.Type="AT_NAME"><AttrValue LocaleId="1033">Order cycle time</AttrValue></AttrDef>
       <CxnDef CxnDef.ID="CxnDef.K1F1" CxnDef.Type="CT_IS_MEASURED_BY" ToObjDef.IdRef="ObjDef.F1"/>

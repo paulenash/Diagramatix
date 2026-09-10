@@ -4,7 +4,9 @@ import { useState, useMemo, useEffect } from "react";
 import type { DiagramType, SymbolType } from "@/app/lib/diagram/types";
 import {
   ALL_SYMBOLS,
+  EPC_EXTENDED_SYMBOLS,
   PALETTE_BY_DIAGRAM_TYPE,
+  getSymbolDefinition,
 } from "@/app/lib/diagram/symbols/definitions";
 import { resolveColor, type SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { painPointStarPoints } from "./SymbolRenderer";
@@ -319,6 +321,112 @@ export function PaletteSymbolPreview({ type, colorConfig }: { type: SymbolType; 
           <polygon points="0,0 38,0 48,14 38,28 0,28 10,14" fill="#fbd7bb" stroke="#374151" strokeWidth={1.5} />
         </svg>
       );
+    // ── EPC ────────────────────────────────────────────────────────────
+    // Each preview is the real outline at icon scale, because the palette is
+    // where a person LEARNS which shape means what. A fall-through to a plain
+    // rectangle would make ten distinct symbols look like one.
+    case "epc-event": {
+      const f = resolveColor("epc-event", colorConfig);
+      return (
+        <svg width={40} height={16} viewBox="0 0 48 19">
+          <polygon points="6,1 42,1 47,9.5 42,18 6,18 1,9.5" fill={f} stroke="#374151" strokeWidth={1.4} />
+        </svg>
+      );
+    }
+    case "epc-function": {
+      const f = resolveColor("epc-function", colorConfig);
+      return (
+        <svg width={40} height={20} viewBox="0 0 48 24">
+          <rect x={1} y={1} width={46} height={22} rx={6} fill={f} stroke="#374151" strokeWidth={1.4} />
+        </svg>
+      );
+    }
+    case "epc-xor":
+    case "epc-and":
+    case "epc-or": {
+      const f = resolveColor(type, colorConfig);
+      // The mark, not the circle, is what distinguishes these three — drawn as
+      // strokes here for the same reason the canvas draws them as strokes.
+      const marks = type === "epc-xor"
+        ? <><line x1={8} y1={8} x2={16} y2={16} /><line x1={16} y1={8} x2={8} y2={16} /></>
+        : type === "epc-and"
+          ? <polyline points="8,15 12,8 16,15" fill="none" />
+          : <polyline points="8,9 12,16 16,9" fill="none" />;
+      return (
+        <svg width={22} height={22} viewBox="0 0 24 24">
+          <circle cx={12} cy={12} r={10} fill={f} stroke="#374151" strokeWidth={1.4} />
+          <g stroke="#374151" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">{marks}</g>
+        </svg>
+      );
+    }
+    case "epc-org-unit":
+    case "epc-position": {
+      const f = resolveColor(type, colorConfig);
+      return (
+        <svg width={40} height={16} viewBox="0 0 48 19">
+          <path d="M 11 1 L 47 1 L 47 18 L 11 18 A 10 8.5 0 0 1 11 1 Z" fill={f} stroke="#374151" strokeWidth={1.4} />
+          <line x1={11} y1={1} x2={11} y2={18} stroke="#374151" strokeWidth={1.4} />
+          {type === "epc-position" && (
+            <g stroke="#374151" strokeWidth={1} fill="none">
+              <circle cx={5.5} cy={7} r={2} />
+              <path d="M 2.5 14 a 3 3 0 0 1 6 0" />
+            </g>
+          )}
+        </svg>
+      );
+    }
+    case "epc-data":
+    case "epc-application": {
+      const f = resolveColor(type, colorConfig);
+      return (
+        <svg width={40} height={16} viewBox="0 0 48 19">
+          <rect x={1} y={1} width={46} height={17} fill={f} stroke="#374151" strokeWidth={1.4} />
+          <line x1={7} y1={1} x2={7} y2={18} stroke="#374151" strokeWidth={1.4} />
+          {type === "epc-application" && <line x1={41} y1={1} x2={41} y2={18} stroke="#374151" strokeWidth={1.4} />}
+        </svg>
+      );
+    }
+    case "epc-interface": {
+      const f = resolveColor("epc-interface", colorConfig);
+      return (
+        <svg width={40} height={16} viewBox="0 0 48 19">
+          <polygon points="1,1 41,1 47,9.5 41,18 1,18 7,9.5" fill={f} stroke="#374151" strokeWidth={1.4} />
+        </svg>
+      );
+    }
+    case "epc-kpi":
+    case "epc-risk":
+    case "epc-product":
+    case "epc-knowledge":
+    case "epc-business-rule":
+    case "epc-screen":
+    case "epc-objective":
+    case "epc-machine":
+    case "epc-location":
+    case "epc-requirement": {
+      // The wider ARIS set shares an outline and differs by a corner glyph, on
+      // the canvas and here. The preview keeps that relationship: a person
+      // should read them as one family at a glance.
+      const f = resolveColor(type, colorConfig);
+      const st = { stroke: "#374151", strokeWidth: 1.1, fill: "none" as const, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+      const glyph =
+        type === "epc-kpi" ? <polyline points="33,15 36,11 38,13 42,6" {...st} />
+        : type === "epc-risk" ? <g {...st}><polygon points="37.5,5 42,15 33,15" /><line x1={37.5} y1={9} x2={37.5} y2={11.5} /><line x1={37.5} y1={13} x2={37.5} y2={13.4} /></g>
+        : type === "epc-product" ? <g {...st}><rect x={33} y={6} width={9} height={9} /><line x1={37.5} y1={6} x2={37.5} y2={15} /><line x1={33} y1={10} x2={42} y2={10} /></g>
+        : type === "epc-knowledge" ? <g {...st}><path d="M 33 7 q 2.2 -1.2 4.5 0 q 2.2 -1.2 4.5 0 v 7 q -2.2 -1.2 -4.5 0 q -2.2 -1.2 -4.5 0 Z" /><line x1={37.5} y1={7} x2={37.5} y2={14} /></g>
+        : type === "epc-business-rule" ? <g {...st}><rect x={34} y={5} width={7} height={10} /><polyline points="35.4,10.5 37,12.4 40,7.6" /></g>
+        : type === "epc-screen" ? <g {...st}><rect x={33} y={5} width={9} height={6.5} /><line x1={37.5} y1={11.5} x2={37.5} y2={13.5} /><line x1={35} y1={14} x2={40} y2={14} /></g>
+        : type === "epc-objective" ? <g {...st}><circle cx={37.5} cy={10} r={4.5} /><circle cx={37.5} cy={10} r={1.7} /></g>
+        : type === "epc-machine" ? <g {...st}><circle cx={37.5} cy={10} r={3} /><line x1={37.5} y1={5} x2={37.5} y2={6.5} /><line x1={37.5} y1={13.5} x2={37.5} y2={15} /><line x1={32.5} y1={10} x2={34} y2={10} /><line x1={41} y1={10} x2={42.5} y2={10} /></g>
+        : type === "epc-location" ? <g {...st}><path d="M 37.5 15 C 33.4 11 33.5 5 37.5 5 C 41.5 5 41.6 11 37.5 15 Z" /><circle cx={37.5} cy={8.6} r={1.3} /></g>
+        : <g {...st}><rect x={34} y={6} width={7} height={9} /><rect x={36} y={4.6} width={3} height={2.2} /><line x1={35.6} y1={10} x2={39.4} y2={10} /><line x1={35.6} y1={12.4} x2={39.4} y2={12.4} /></g>;
+      return (
+        <svg width={40} height={16} viewBox="0 0 48 19">
+          <rect x={1} y={1} width={46} height={17} rx={2.5} fill={f} stroke="#374151" strokeWidth={1.4} />
+          {glyph}
+        </svg>
+      );
+    }
     case "chevron-collapsed":
       return (
         <svg width={36} height={21} viewBox="0 0 48 28">
@@ -754,6 +862,18 @@ function ArchimatePalette({
 
 export function Palette({ diagramType, onDragStart, disabledSymbols = [], colorConfig, extraSymbols = [] }: Props) {
   const [collapsed, setCollapsed] = useState(false);
+  /**
+   * The wider ARIS object set, in a section of its own and CLOSED by default.
+   *
+   * A real EPC uses two or three of these; showing all ten beside the core ten
+   * would double the palette and bury the notation that carries the process.
+   * Closed-by-default is the whole point of the section — it is there when a
+   * migrated model needs it and invisible when it does not.
+   */
+  const [arisExtraOpen, setArisExtraOpen] = useState(false);
+  const extendedSymbols = diagramType === "epc"
+    ? EPC_EXTENDED_SYMBOLS.map((t) => getSymbolDefinition(t))
+    : [];
   // ArchiMate gets its own catalogue-driven accordion palette
   if (diagramType === "archimate") {
     return <ArchimatePalette onDragStart={onDragStart} collapsed={collapsed} setCollapsed={setCollapsed} />;
@@ -801,6 +921,25 @@ export function Palette({ diagramType, onDragStart, disabledSymbols = [], colorC
               </div>
             );
           })}
+          {extendedSymbols.length > 0 && (
+            <>
+              {/* The narrow rail has no room for a header, so a rule stands in
+                  for one — the extra shapes are still visibly a separate group. */}
+              <div className="border-t border-gray-200 my-1" />
+              {extendedSymbols.map((sym) => (
+                <div
+                  key={sym.type}
+                  draggable
+                  onDragStart={() => onDragStart(sym.type)}
+                  data-testid={`palette-item-${sym.type}`}
+                  title={sym.label}
+                  className="flex items-center justify-center px-1 py-1 rounded select-none hover:bg-gray-50 cursor-grab active:cursor-grabbing"
+                >
+                  <PaletteSymbolPreview type={sym.type} colorConfig={colorConfig} />
+                </div>
+              ))}
+            </>
+          )}
         </div>
       </div>
     );
@@ -839,6 +978,38 @@ export function Palette({ diagramType, onDragStart, disabledSymbols = [], colorC
             </div>
           );
         })}
+
+        {extendedSymbols.length > 0 && (
+          <div className="pt-1 mt-1 border-t border-gray-200">
+            <button
+              onClick={() => setArisExtraOpen((v) => !v)}
+              aria-expanded={arisExtraOpen}
+              data-testid="palette-section-aris-extended"
+              title="Objects an EPC can attach to a function — none of them carries control flow"
+              className="w-full flex items-center gap-1 px-2 py-1 rounded text-left hover:bg-gray-50"
+            >
+              <span className="text-[9px] text-gray-400 w-2 shrink-0">{arisExtraOpen ? "\u25BC" : "\u25B6"}</span>
+              <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
+                More ARIS objects
+              </span>
+            </button>
+            {arisExtraOpen && extendedSymbols.map((sym) => (
+              <div
+                key={sym.type}
+                draggable
+                onDragStart={() => onDragStart(sym.type)}
+                data-testid={`palette-item-${sym.type}`}
+                title={sym.description}
+                className="flex items-center gap-2 px-2 py-1 rounded select-none hover:bg-gray-50 cursor-grab active:cursor-grabbing"
+              >
+                <div className="flex items-center justify-center w-9 shrink-0">
+                  <PaletteSymbolPreview type={sym.type} colorConfig={colorConfig} />
+                </div>
+                <span className="text-xs text-gray-700 leading-tight">{sym.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

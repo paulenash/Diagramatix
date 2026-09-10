@@ -50,6 +50,12 @@ export interface EpcBpmnMapping {
   approx?: boolean;
   /** Extra note surfaced in the translation report. */
   note?: string;
+  /**
+   * Prefix for the converted label, e.g. "KPI". BPMN has no KPI or Risk, so the
+   * kind would be lost the moment the shape became a text annotation — the
+   * prefix is what keeps "Order cycle time" from reading as a stray note.
+   */
+  labelPrefix?: string;
   /** Shape→BPMN phrase for the AI image prompt, e.g. 'Green rounded box → "task"'. */
   promptText: string;
 }
@@ -128,6 +134,35 @@ export const EPC_TO_BPMN_MAP: Record<string, EpcBpmnMapping> = {
 };
 
 /** Safe fallback for any unrecognised EPC shape — a plain task. */
+// The wider ARIS object set. BPMN has no KPI, no Risk, no Objective — and
+// inventing a task or a data object for one would put a thing in the process
+// that is not a step in it. A text annotation is BPMN's own answer to "extra
+// information about an activity", so that is what they become, each keeping its
+// kind in the label and each reported as an approximation.
+const ANNOTATION_MAPPINGS: Array<[SymbolType, string]> = [
+  ["epc-kpi", "KPI"],
+  ["epc-risk", "Risk"],
+  ["epc-product", "Product"],
+  ["epc-knowledge", "Knowledge"],
+  ["epc-business-rule", "Rule"],
+  ["epc-screen", "Screen"],
+  ["epc-objective", "Objective"],
+  ["epc-machine", "Resource"],
+  ["epc-location", "Location"],
+  ["epc-requirement", "Requirement"],
+];
+for (const [type, prefix] of ANNOTATION_MAPPINGS) {
+  EPC_TO_BPMN_MAP[type] = {
+    epc: type,
+    bpmn: "text-annotation",
+    kind: "artifact",
+    approx: true,
+    labelPrefix: prefix,
+    note: `${prefix} kept as a text annotation — BPMN has no equivalent object`,
+    promptText: `A box carrying a ${prefix.toLowerCase()} beside a function → "text-annotation" attached to that task, prefixed "${prefix}: "`,
+  };
+}
+
 export const EPC_FALLBACK_MAPPING: EpcBpmnMapping = {
   epc: "epc-function",
   bpmn: "task",

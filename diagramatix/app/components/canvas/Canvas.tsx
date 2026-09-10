@@ -1697,7 +1697,16 @@ export function Canvas({
             // precisely because canConnect refuses the combinations that are not
             // legal anyway.
             const epcOrg = (t?: string) => t === "epc-org-unit" || t === "epc-position";
-            const epcData = (t?: string) => t === "epc-data" || t === "epc-application";
+            // Everything that hangs off a function on an information arc — the
+            // two core carriers plus the wider ARIS set, which behaves
+            // identically: a KPI measuring a function and an invoice being read
+            // by one are the same shape of statement.
+            const EPC_ATTACHABLE = new Set([
+              "epc-data", "epc-application",
+              "epc-kpi", "epc-risk", "epc-product", "epc-knowledge", "epc-business-rule",
+              "epc-screen", "epc-objective", "epc-machine", "epc-location", "epc-requirement",
+            ]);
+            const epcData = (t?: string) => !!t && EPC_ATTACHABLE.has(t);
             if (epcOrg(sourceEl?.type) || epcOrg(targetEl.type)) {
               // Responsibility is not a direction, so no arrowhead.
               connType = "epc-org-assignment"; connRouting = "direct"; connDirection = "non-directed";
@@ -1706,7 +1715,11 @@ export function Canvas({
               // function → data writes it. So it keeps its arrowhead.
               connType = "epc-information-flow"; connRouting = "direct"; connDirection = "open-directed";
             } else {
-              connType = "epc-control-flow"; connRouting = defaultRoutingType; connDirection = "directed";
+              // OPEN head, and the Properties panel does not offer to change
+              // it (see PropertiesPanel): an EPC's arrowheads are part of the
+              // notation, not a per-connector preference, and a chain where one
+              // arc is filled reads as though that step means something else.
+              connType = "epc-control-flow"; connRouting = defaultRoutingType; connDirection = "open-directed";
             }
           } else if (diagramType === "domain") {
             // A connector from/to a Note is a dashed direct note anchor (no
@@ -5540,7 +5553,7 @@ export function Canvas({
                   // Gateway shape double-click never opens the label editor —
                   // the label rect has its own dblclick handler for that.
                   if (el.type === "gateway") return;
-                  const linkedId = (el.type === "subprocess" || el.type === "submachine" || el.type === "chevron-collapsed" || el.type === "use-case" || el.type === "archimate-shape" || el.type === "uml-package") ? el.properties.linkedDiagramId as string | undefined : undefined;
+                  const linkedId = (el.type === "subprocess" || el.type === "submachine" || el.type === "chevron-collapsed" || el.type === "use-case" || el.type === "archimate-shape" || el.type === "uml-package" || el.type === "epc-interface") ? el.properties.linkedDiagramId as string | undefined : undefined;
                   if (linkedId && onDrillIntoSubprocess) {
                     onDrillIntoSubprocess(linkedId);
                   } else {
@@ -6025,7 +6038,7 @@ export function Canvas({
                   else startEditingLabel(el);
                   return;
                 }
-                const linkedId = (el.type === "subprocess" || el.type === "submachine" || el.type === "chevron-collapsed" || el.type === "use-case" || el.type === "archimate-shape" || el.type === "uml-package") ? el.properties.linkedDiagramId as string | undefined : undefined;
+                const linkedId = (el.type === "subprocess" || el.type === "submachine" || el.type === "chevron-collapsed" || el.type === "use-case" || el.type === "archimate-shape" || el.type === "uml-package" || el.type === "epc-interface") ? el.properties.linkedDiagramId as string | undefined : undefined;
                 if (linkedId && onDrillIntoSubprocess) {
                   onDrillIntoSubprocess(linkedId);
                 } else {

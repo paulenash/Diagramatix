@@ -30,6 +30,20 @@ const EPC_DECISIONS = new Set<string>(["epc-xor", "epc-or"]);
 const EPC_FLOW_TYPES = new Set<string>(["epc-event", "epc-function", "epc-xor", "epc-and", "epc-or", "epc-interface"]);
 const EPC_ORG_TYPES = new Set<string>(["epc-org-unit", "epc-position"]);
 const EPC_DATA_TYPES = new Set<string>(["epc-data", "epc-application"]);
+/**
+ * The wider ARIS object set. Every one of them attaches to a FUNCTION and says
+ * something about it, so they behave exactly as an information object does —
+ * which is why they join EPC_DATA_TYPES below rather than getting rules of
+ * their own. Note what that buys: E6 already refuses them on the control flow,
+ * because the flow whitelist names its six members rather than listing what is
+ * banned. Ten new symbols and the control-flow rule needed no change at all.
+ */
+const EPC_ANNOTATION_TYPES = new Set<string>([
+  "epc-kpi", "epc-risk", "epc-product", "epc-knowledge", "epc-business-rule",
+  "epc-screen", "epc-objective", "epc-machine", "epc-location", "epc-requirement",
+]);
+/** Everything that hangs off a function by an information arc. */
+const EPC_ATTACHABLE = new Set<string>([...EPC_DATA_TYPES, ...EPC_ANNOTATION_TYPES]);
 
 /**
  * EPC connector legality — rules E1, E3 and E6 of the notation.
@@ -71,8 +85,10 @@ function epcCanConnect(
   }
   if (connectorType === "epc-information-flow") {
     // Direction is the semantics: data → function reads, function → data writes.
-    return (EPC_DATA_TYPES.has(source.type) && target.type === "epc-function")
-      || (source.type === "epc-function" && EPC_DATA_TYPES.has(target.type));
+    // The wider ARIS objects ride the same arc — a KPI measuring a function and
+    // an invoice being read by one are the same shape of statement.
+    return (EPC_ATTACHABLE.has(source.type) && target.type === "epc-function")
+      || (source.type === "epc-function" && EPC_ATTACHABLE.has(target.type));
   }
   if (connectorType !== "epc-control-flow") return false;
 

@@ -53,6 +53,7 @@ WHO DOES IT, AND WITH WHAT — assignments belong to a function:
 - Set "data" on a function to the information objects it reads or writes ("Invoice", "Customer record").
 - Set "system" on a function to the application systems the work happens in ("SAP", "Salesforce").
 - Only a "function" may carry org / data / system. Never put them on an event, a connector or an interface. Do NOT emit organisational units, information objects or application systems as ELEMENTS — the layout draws them beside their function automatically.
+- ARIS models often record more about a function than who does it and what it touches. Where the description clearly supplies one, you MAY also set on a function: "kpi" (a measure it is judged by), "risk" (what can go wrong in this step), "product" (what it delivers), "knowledge" (what a person must know), "businessRule" (a policy it must obey), "screen" (the screen the work is done on), "objective" (the business goal it serves), "machine" (equipment it uses), "location" (where it happens), "requirement" (something it must satisfy). Each takes a list of short names. Do NOT invent any of these — leave them out unless the description says so, because a diagram covered in guessed annotations is worse than a clean one.
 
 IMAGE INPUT — when an image of an existing EPC is attached:
 - Treat the image as the source of truth. Reverse-engineer the chain from what is drawn, then express it in the JSON format below.
@@ -62,7 +63,7 @@ IMAGE INPUT — when an image of an existing EPC is attached:
 
 ${rules ? `USER RULES AND PREFERENCES (follow these strictly):\n${rules}\n\n` : ""}CRITICAL FORMAT RULES — follow exactly:
 - Output ONLY a JSON object with two arrays: "elements" and "connections".
-- Each element: { "id": string, "type": one of [${TYPE_LIST.map((t) => `"${t}"`).join(", ")}], "label": string, "org"?: string, "data"?: string[], "system"?: string[] }.
+- Each element: { "id": string, "type": one of [${TYPE_LIST.map((t) => `"${t}"`).join(", ")}], "label": string, "org"?: string, "data"?: string[], "system"?: string[], and optionally any of "kpi" | "risk" | "product" | "knowledge" | "businessRule" | "screen" | "objective" | "machine" | "location" | "requirement", each a string[] }.
 - Each connection: { "sourceId": string, "targetId": string, "label"?: string }.
 - Use "label" (not "name") everywhere. Give every element a unique short id (e.g. "n1", "n2").
 - Keep ids referentially consistent: every connection's sourceId and targetId must match an element id.
@@ -80,7 +81,9 @@ export function normaliseEpcPlan(parsed: { elements: AiEpcElement[]; connections
     if (typeof e.type === "string") e.type = e.type.trim();
     // Models routinely emit "data": "Invoice" where the format asks for a list.
     // Coercing is safe and lossless; rejecting would throw away a good plan.
-    for (const key of ["data", "system"] as const) {
+    for (const key of ["data", "system", "kpi", "risk", "product", "knowledge",
+                       "businessRule", "screen", "objective", "machine",
+                       "location", "requirement"] as const) {
       const v = e[key] as unknown;
       if (typeof v === "string") e[key] = v.trim() ? [v.trim()] : [];
       else if (Array.isArray(v)) e[key] = v.filter((x): x is string => typeof x === "string" && !!x.trim()).map((x) => x.trim());
