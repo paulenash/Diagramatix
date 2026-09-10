@@ -24,6 +24,7 @@ import { discoverProcess } from "@/app/lib/mining/discoverProcess";
 import { isTaskRun, collapseNavForDiscovery } from "@/app/lib/mining/taskMining/insights";
 import { badgeEdgeCounts } from "@/app/lib/mining/edgeBadges";
 import { annotateTransitions } from "@/app/lib/mining/handover";
+import { filterAnalytics, isFilterActive, describeFilter, type MiningFilter } from "@/app/lib/mining/filterAnalytics";
 import { formatDuration } from "@/app/lib/mining/analytics";
 import type { RunAnalytics } from "@/app/lib/mining/analytics";
 import { generateProcessViaAi } from "@/app/lib/mining/aiProcess";
@@ -58,9 +59,39 @@ export async function POST(req: Request, { params }: Params) {
   const body = await req.json().catch(() => ({}));
   const useAi = body?.ai === true;
   const edgeThreshold = typeof body.edgeThreshold === "number" ? Math.max(0, Math.min(1, body.edgeThreshold)) : 0;
-  const variants = (run.variants ?? []) as unknown as Variant[];
-  if (!Array.isArray(variants) || variants.length === 0) {
+  const allVariants = (run.variants ?? []) as unknown as Variant[];
+  if (!Array.isArray(allVariants) || allVariants.length === 0) {
     return NextResponse.json({ error: "This run has no variants to discover from." }, { status: 400 });
+  }
+
+  // DISCOVERY FROM A SLICE.
+  //
+  // Every other filtered view in the workbench is a live recalculation that
+  // disappears when the filter is cleared. Discovery cannot be: it emits a
+  // PERSISTED DIAGRAM that will sit in the project list long after the slice
+  // that produced it has been forgotten. So this is an explicit action rather
+  // than an overlay, and two things follow from that:
+  //
+  //  - the diagram is NAMED with its slice, because a model of the Northern
+  //    region indistinguishable from a model of the whole process is worse
+  //    than no model at all; and
+  //  - it does NOT become the run\u2019s `discoveredBpmnId`. The run\u2019s canonical
+  //    model is the whole log. A slice is a side artefact and replacing the
+  //    real one with it would silently narrow every view that reads it.
+  const filter = (body.filter ?? {}) as MiningFilter;
+  const sliced = isFilterActive(filter);
+  const filterNote = describeFilter(filter);
+  const analytics = run.analytics as unknown as RunAnalytics | null;
+
+  if (sliced && !analytics) {
+    return NextResponse.json({ error: "This run has no case index, so it cannot be sliced. Re-import the log." }, { status: 400 });
+  }
+  const slice = sliced ? filterAnalytics(analytics, allVariants, filter) : null;
+  // Only the variants somebody in the slice actually followed. Keeping the
+  // zero-count ones would draw paths the slice never took.
+  const variants = slice ? slice.variants.filter((v) => v.count > 0) : allVariants;
+  if (variants.length === 0) {
+    return NextResponse.json({ error: `No cases match ${filterNote ?? "that filter"}, so there is no process to discover from.` }, { status: 400 });
   }
   const userId = session?.user?.id;
 
@@ -117,13 +148,15 @@ export async function POST(req: Request, { params }: Params) {
     data = badgeEdgeCounts(layoutBpmnDiagram(plan.elements, plan.connections, { onDiagnostic: logLayoutDiagnostic("mining discover") }));
     // How often each path was taken is already a badge; how LONG it took is
     // the half that was mined, persisted since import and never shown.
-    const an = run.analytics as unknown as RunAnalytics | null;
+    // The SLICE\u2019s edges when there is one \u2014 labelling a filtered model with
+    // whole-run timings would be the mixed-provenance defect, persisted.
+    const an = (slice?.analytics ?? analytics) as RunAnalytics | null;
     if (an?.edges) data = annotateTransitions(data, an.edges, (ms) => formatDuration(ms, an.clockUnit));
   }
 
   const diagram = await prisma.diagram.create({
     data: {
-      name: `${run.name} — ${nameSuffix}`,
+      name: sliced ? `${run.name} — ${nameSuffix} (${filterNote})` : `${run.name} — ${nameSuffix}`,
       type: "bpmn",
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       data: data as any,
@@ -131,7 +164,8 @@ export async function POST(req: Request, { params }: Params) {
     },
     select: { id: true },
   });
-  await prisma.processMiningRun.update({ where: { id: runId }, data: { discoveredBpmnId: diagram.id } });
+  // A slice never becomes the run\u2019s model \u2014 see the note above.
+  if (!sliced) await prisma.processMiningRun.update({ where: { id: runId }, data: { discoveredBpmnId: diagram.id } });
 
-  return NextResponse.json({ diagramId: diagram.id, ai: useAi }, { status: 201 });
+  return NextResponse.json({ diagramId: diagram.id, ai: useAi, sliced, filter: filterNote, cases: slice?.estimatedCases ?? null }, { status: 201 });
 }

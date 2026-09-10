@@ -26,9 +26,13 @@ export interface FilterBarProps {
   filter: MiningFilter;
   onChange: (next: MiningFilter) => void;
   view: RunView;
+  /** Discover a NEW process model from just these cases. Absent when the run
+   *  has nothing to discover from. */
+  onDiscoverSlice?: () => void;
+  discovering?: boolean;
 }
 
-export function FilterBar({ analytics, filter, onChange, view }: FilterBarProps) {
+export function FilterBar({ analytics, filter, onChange, view, onDiscoverSlice, discovering }: FilterBarProps) {
   if (!analytics) return null;
 
   const attrs = analytics.attributes ?? [];
@@ -98,6 +102,23 @@ export function FilterBar({ analytics, filter, onChange, view }: FilterBarProps)
             {view.estimatedCases !== view.matched && <span className="text-stone-500"> (from {view.matched.toLocaleString()} stored)</span>}
           </span>
           {view.note && <span className="text-amber-300/90 basis-full leading-snug">⚠ {view.note}</span>}
+
+          {/* Every other filtered view here is a live recalculation that vanishes
+              when the filter clears. Discovery is not: it writes a diagram that
+              outlives the slice, so it is an explicit button rather than
+              something that happens to the model you are looking at. */}
+          {onDiscoverSlice && (
+            <div className="basis-full flex items-center gap-2 flex-wrap">
+              <button onClick={onDiscoverSlice} disabled={discovering}
+                className="text-[11px] rounded px-2.5 py-1 bg-amber-800 hover:bg-amber-700 disabled:opacity-40 text-white">
+                {discovering ? "Discovering…" : "⚙ Discover a process from this slice"}
+              </button>
+              <span className="text-[10px] text-stone-500 leading-snug">
+                Creates a <span className="text-stone-400">new</span> diagram named after the slice. The run keeps
+                its own model of the whole log &mdash; this is a side-by-side, not a replacement.
+              </span>
+            </div>
+          )}
         </div>
       )}
     </div>
