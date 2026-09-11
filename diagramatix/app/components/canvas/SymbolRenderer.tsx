@@ -2104,7 +2104,7 @@ function EpcInterfaceShape({ el }: { el: DiagramElement }) {
   );
 }
 /**
- * The wider ARIS object set — KPI, Risk, Product, Knowledge, Business Rule,
+ * The descriptive objects — KPI, Risk, Product, Knowledge, Business Rule,
  * Screen, Objective, Machine, Location, Requirement.
  *
  * ONE component with a glyph switch, not ten components. They share an outline

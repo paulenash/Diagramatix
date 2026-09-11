@@ -20,7 +20,7 @@ Canonical human-readable changelog for the export schema. Mirrors the inline his
 
 | Version | Title | Schema shape change? |
 |---|---|---|
-| **schema 48** | **The wider ARIS object set.** `SymbolTypeEnum` + ten more `epc-*` objects (KPI, risk, product / service, knowledge category, business rule, screen, objective, machine / resource, location, requirement). None carries control flow — every one hangs off a function — and the palette keeps them in a section of their own, collapsed by default. | **Yes** — 10 additive enumerations. Every v47 file is a valid v48 file and needs no migration; it bumps only because the enumerations are **closed**. |
+| **schema 48** | **The descriptive objects.** `SymbolTypeEnum` + ten more `epc-*` objects (KPI, risk, product / service, knowledge category, business rule, screen, objective, machine / resource, location, requirement). None carries control flow — every one hangs off a function — and the palette keeps them in a section of their own, collapsed by default. | **Yes** — 10 additive enumerations. Every v47 file is a valid v48 file and needs no migration; it bumps only because the enumerations are **closed**. |
 | **schema 47** | **Event-driven Process Chain (ARIS eEPC).** `DiagramTypeEnum` + `epc`; `SymbolTypeEnum` + the ten `epc-*` objects (event, function, the XOR/AND/OR connectors, organisational unit, position, information object, application system, process interface); `ConnectorTypeEnum` + the three `epc-*` arcs (control flow, information flow, organisation assignment). | **Yes** — 14 additive enumerations. Nothing existing changed shape, so every v46 file is a valid v47 file and needs no migration. It bumps because the enumerations are **closed**: without them an EPC export would not validate against its own schema. |
 | **schema 46** | **Enum catch-up — the schema now declares what the exporter already writes.** `SymbolTypeEnum` + `history-state` / `deep-history-state` and the twenty-one `flowchart-*` shapes; `ConnectorTypeEnum` + `flowline` / `flowchart-association`; `DiagramTypeEnum` + `flowchart`. Also formally records `Connector/@branchPercent` (added to the XSD 2026-08-14, bump deferred to this batch). | **Yes** — 24 additive enumerations. They were being **exported without being declared**, so every Standard Flowchart and every history-state State Machine was invalid against the published schema. |
 | **schema 45** (was 1.45) | **Version model split** — `schemaVersion` became a standalone integer (this changelog); the product version restarted at **2.1.1** and now carries DB/JSON structure changes (its middle bumps on any physical-DB change, logged in VERSION_HISTORY.md). The XSD integer stays **45** and moves only on an XSD-shape change. | **No** — pure renumbering; no XSD shape change. |
@@ -74,7 +74,7 @@ Canonical human-readable changelog for the export schema. Mirrors the inline his
 
 ## Details (newest first)
 
-### schema 48 — The wider ARIS object set
+### schema 48 — The descriptive objects
 
 Ten more `epc-*` symbols: **KPI, Risk, Product / Service, Knowledge Category,
 Business Rule, Screen, Objective, Machine / Resource, Location, Requirement.**

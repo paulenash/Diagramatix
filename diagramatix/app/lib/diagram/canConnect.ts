@@ -31,7 +31,7 @@ const EPC_FLOW_TYPES = new Set<string>(["epc-event", "epc-function", "epc-xor", 
 const EPC_ORG_TYPES = new Set<string>(["epc-org-unit", "epc-position"]);
 const EPC_DATA_TYPES = new Set<string>(["epc-data", "epc-application"]);
 /**
- * The wider ARIS object set. Every one of them attaches to a FUNCTION and says
+ * The descriptive objects. Every one of them attaches to a FUNCTION and says
  * something about it, so they behave exactly as an information object does —
  * which is why they join EPC_DATA_TYPES below rather than getting rules of
  * their own. Note what that buys: E6 already refuses them on the control flow,
@@ -85,7 +85,7 @@ function epcCanConnect(
   }
   if (connectorType === "epc-information-flow") {
     // Direction is the semantics: data → function reads, function → data writes.
-    // The wider ARIS objects ride the same arc — a KPI measuring a function and
+    // The descriptive objects ride the same arc — a KPI measuring a function and
     // an invoice being read by one are the same shape of statement.
     return (EPC_ATTACHABLE.has(source.type) && target.type === "epc-function")
       || (source.type === "epc-function" && EPC_ATTACHABLE.has(target.type));

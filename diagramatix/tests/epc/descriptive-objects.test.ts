@@ -10,7 +10,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
-import { EPC_EXTENDED_SYMBOLS, getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
+import { EPC_DESCRIPTIVE_SYMBOLS, getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { DEFAULT_SYMBOL_COLORS, BW_SYMBOL_COLORS } from "@/app/lib/diagram/colors";
 import { canConnect } from "@/app/lib/diagram/canConnect";
 import { epcFitSize, epcFreeLines, epcWrapLabel } from "@/app/lib/diagram/textMetrics";
@@ -23,13 +23,13 @@ const el = (id: string, type: string): DiagramElement => ({
   id, type: type as SymbolType, label: id, x: 0, y: 0, width: 150, height: 50, properties: {},
 });
 
-describe("item 6 — the wider ARIS object set is registered everywhere", () => {
+describe("item 6 — the descriptive objects are registered everywhere", () => {
   it("T4126 - all ten are declared, coloured and sized", () => {
     // Five places a symbol has to appear, and the compiler only catches three
     // of them. The two exhaustive Records DO fail to compile when one is
     // missing — this asserts the values are sane, not merely present.
-    expect(EPC_EXTENDED_SYMBOLS).toHaveLength(10);
-    for (const t of EPC_EXTENDED_SYMBOLS) {
+    expect(EPC_DESCRIPTIVE_SYMBOLS).toHaveLength(10);
+    for (const t of EPC_DESCRIPTIVE_SYMBOLS) {
       const def = getSymbolDefinition(t);
       expect(def.label, `${t} has no label`).toBeTruthy();
       expect(def.description, `${t} has no description`).toBeTruthy();
@@ -45,7 +45,7 @@ describe("item 6 — the wider ARIS object set is registered everywhere", () => 
     // wrongly. It compiles either way, which is why this is a tripwire.
     const renderer = read("app/components/canvas/SymbolRenderer.tsx");
     const palette = read("app/components/canvas/Palette.tsx");
-    for (const t of [...EPC_EXTENDED_SYMBOLS,
+    for (const t of [...EPC_DESCRIPTIVE_SYMBOLS,
       "epc-event", "epc-function", "epc-xor", "epc-and", "epc-or",
       "epc-org-unit", "epc-position", "epc-data", "epc-application", "epc-interface"] as SymbolType[]) {
       expect(renderer, `${t} has no canvas shape`).toContain(`case "${t}":`);
@@ -55,11 +55,11 @@ describe("item 6 — the wider ARIS object set is registered everywhere", () => 
 
   it("T4128 - the palette section exists and is CLOSED by default", () => {
     const palette = read("app/components/canvas/Palette.tsx");
-    expect(palette).toContain("More ARIS objects");
+    expect(palette).toContain("Descriptive Objects");
     // Closed by default is the whole point: a real EPC uses two or three of
     // these, and ten more shapes beside the core ten would bury the notation.
     expect(palette, "the section must start collapsed")
-      .toContain("const [arisExtraOpen, setArisExtraOpen] = useState(false)");
+      .toContain("const [descriptiveOpen, setDescriptiveOpen] = useState(false)");
     expect(palette, "the section must only appear on an EPC")
       .toContain('diagramType === "epc"');
   });
@@ -67,8 +67,9 @@ describe("item 6 — the wider ARIS object set is registered everywhere", () => 
   it("T4129 - none of them may sit on the control flow", () => {
     // E6, and the argument for whitelists: the control-flow rule names its six
     // members rather than listing what is banned, so ten new symbols were
-    // refused the moment they existed and canConnect needed no new line.
-    for (const t of EPC_EXTENDED_SYMBOLS) {
+    // refused the moment they existed and canConnect needed no new line. A
+    // DESCRIPTIVE object describes a function; it is never a step in the flow.
+    for (const t of EPC_DESCRIPTIVE_SYMBOLS) {
       expect(canConnect(el("a", t), el("b", "epc-function"), "epc-control-flow", []),
         `${t} was allowed on the control flow`).toBe(false);
       expect(canConnect(el("a", "epc-function"), el("b", t), "epc-control-flow", []),
@@ -77,7 +78,7 @@ describe("item 6 — the wider ARIS object set is registered everywhere", () => 
   });
 
   it("T4130 - each attaches to a FUNCTION by an information arc, and to nothing else", () => {
-    for (const t of EPC_EXTENDED_SYMBOLS) {
+    for (const t of EPC_DESCRIPTIVE_SYMBOLS) {
       expect(canConnect(el("a", t), el("b", "epc-function"), "epc-information-flow", [])).toBe(true);
       // Never to an event: nothing is measured, risked or delivered by a state.
       expect(canConnect(el("a", t), el("b", "epc-event"), "epc-information-flow", []),

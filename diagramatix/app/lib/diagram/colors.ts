@@ -79,7 +79,7 @@ export const DEFAULT_SYMBOL_COLORS: Record<SymbolType, string> = {
   "epc-data":        "#cce5ff",  // blue   — information
   "epc-application": "#e5ccff",  // purple — systems
   "epc-interface":   "#e5e5e5",  // grey   — a link out to another chain
-  // The wider ARIS set. Deliberately MUTED next to the core notation: these
+  // The descriptive objects. Deliberately MUTED next to the core notation: these
   // annotate a function, they do not carry the process, and a diagram where
   // they shout as loudly as the events is a diagram you cannot read.
   "epc-kpi":           "#dbeafe",  // pale blue   — a measure

@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import type { DiagramType, SymbolType } from "@/app/lib/diagram/types";
 import {
   ALL_SYMBOLS,
-  EPC_EXTENDED_SYMBOLS,
+  EPC_DESCRIPTIVE_SYMBOLS,
   PALETTE_BY_DIAGRAM_TYPE,
   getSymbolDefinition,
 } from "@/app/lib/diagram/symbols/definitions";
@@ -404,7 +404,7 @@ export function PaletteSymbolPreview({ type, colorConfig }: { type: SymbolType; 
     case "epc-machine":
     case "epc-location":
     case "epc-requirement": {
-      // The wider ARIS set shares an outline and differs by a corner glyph, on
+      // The descriptive objects shares an outline and differs by a corner glyph, on
       // the canvas and here. The preview keeps that relationship: a person
       // should read them as one family at a glance.
       const f = resolveColor(type, colorConfig);
@@ -863,16 +863,18 @@ function ArchimatePalette({
 export function Palette({ diagramType, onDragStart, disabledSymbols = [], colorConfig, extraSymbols = [] }: Props) {
   const [collapsed, setCollapsed] = useState(false);
   /**
-   * The wider ARIS object set, in a section of its own and CLOSED by default.
+   * The descriptive objects, in a section of their own and CLOSED by default.
    *
-   * A real EPC uses two or three of these; showing all ten beside the core ten
-   * would double the palette and bury the notation that carries the process.
-   * Closed-by-default is the whole point of the section — it is there when a
-   * migrated model needs it and invisible when it does not.
+   * What they have in common is that each attaches to a FUNCTION and says
+   * something ABOUT it — a measure, a risk, what it delivers — rather than
+   * carrying the flow. A real EPC uses two or three of them; showing all ten
+   * beside the core notation would double the palette and bury the symbols that
+   * actually carry the process. Closed-by-default is the whole point of the
+   * section: there when a model needs it, invisible when it does not.
    */
-  const [arisExtraOpen, setArisExtraOpen] = useState(false);
+  const [descriptiveOpen, setDescriptiveOpen] = useState(false);
   const extendedSymbols = diagramType === "epc"
-    ? EPC_EXTENDED_SYMBOLS.map((t) => getSymbolDefinition(t))
+    ? EPC_DESCRIPTIVE_SYMBOLS.map((t) => getSymbolDefinition(t))
     : [];
   // ArchiMate gets its own catalogue-driven accordion palette
   if (diagramType === "archimate") {
@@ -982,18 +984,18 @@ export function Palette({ diagramType, onDragStart, disabledSymbols = [], colorC
         {extendedSymbols.length > 0 && (
           <div className="pt-1 mt-1 border-t border-gray-200">
             <button
-              onClick={() => setArisExtraOpen((v) => !v)}
-              aria-expanded={arisExtraOpen}
-              data-testid="palette-section-aris-extended"
-              title="Objects an EPC can attach to a function — none of them carries control flow"
+              onClick={() => setDescriptiveOpen((v) => !v)}
+              aria-expanded={descriptiveOpen}
+              data-testid="palette-section-descriptive"
+              title="Objects that describe a function — a measure, a risk, what it delivers. None of them carries control flow."
               className="w-full flex items-center gap-1 px-2 py-1 rounded text-left hover:bg-gray-50"
             >
-              <span className="text-[9px] text-gray-400 w-2 shrink-0">{arisExtraOpen ? "\u25BC" : "\u25B6"}</span>
+              <span className="text-[9px] text-gray-400 w-2 shrink-0">{descriptiveOpen ? "\u25BC" : "\u25B6"}</span>
               <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
-                More ARIS objects
+                Descriptive Objects
               </span>
             </button>
-            {arisExtraOpen && extendedSymbols.map((sym) => (
+            {descriptiveOpen && extendedSymbols.map((sym) => (
               <div
                 key={sym.type}
                 draggable

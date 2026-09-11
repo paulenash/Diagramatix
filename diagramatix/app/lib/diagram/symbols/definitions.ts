@@ -344,10 +344,10 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
   { type: "epc-data",        label: "Information Object",  defaultWidth: 150, defaultHeight: 50, description: "Data a function reads or writes — \"Invoice\". Direction of the arc says which" },
   { type: "epc-application", label: "Application System",  defaultWidth: 150, defaultHeight: 50, description: "The system the work happens in — \"SAP\". Converts to a black-box system pool" },
   { type: "epc-interface",   label: "Process Interface",   defaultWidth: 160, defaultHeight: 50, description: "A link to another EPC, standing at the start or end of a chain (chevron)" },
-  // The wider ARIS object set. Every one of these hangs off a FUNCTION and says
-  // something about it; none carries control flow. They are kept in their own
-  // collapsed palette section because a real EPC uses two or three of them, not
-  // ten, and putting them beside the core notation would bury it.
+  // Descriptive objects. Every one hangs off a FUNCTION and says something
+  // about it; none carries control flow. They are kept in their own collapsed
+  // palette section because a real EPC uses two or three of them, not ten, and
+  // putting them beside the core notation would bury it.
   { type: "epc-kpi",           label: "KPI",                 defaultWidth: 150, defaultHeight: 50, description: "A measure the function is judged by — \"Order cycle time\"" },
   { type: "epc-risk",          label: "Risk",                defaultWidth: 150, defaultHeight: 50, description: "Something that can go wrong in this step — \"Credit assessed on stale data\"" },
   { type: "epc-product",       label: "Product / Service",   defaultWidth: 150, defaultHeight: 50, description: "What the function delivers — \"Approved credit limit\"" },
@@ -369,15 +369,17 @@ const PROBLEM_MARKERS: SymbolType[] = ["uml-pain-point", "uml-issue"];
 const REVIEW_MARKERS: SymbolType[] = ["review-comment"];
 
 /**
- * The wider ARIS object set — everything an eEPC can hang off a function beyond
- * the core notation.
+ * DESCRIPTIVE OBJECTS — everything an EPC can hang off a function beyond the
+ * core notation.
  *
- * Separate from PALETTE_BY_DIAGRAM_TYPE.epc on purpose: the palette renders
- * these in a section of their own, COLLAPSED by default. A real EPC uses two or
- * three of them; showing all ten beside the core ten would bury the notation
- * that actually carries the process.
+ * The name is the definition: each one describes a function rather than
+ * carrying the flow. That is also why they are separate from
+ * PALETTE_BY_DIAGRAM_TYPE.epc — the palette renders them in a section of their
+ * own, COLLAPSED by default, because a real EPC uses two or three of them and
+ * showing all ten beside the core ten would bury the symbols that carry the
+ * process.
  */
-export const EPC_EXTENDED_SYMBOLS: SymbolType[] = [
+export const EPC_DESCRIPTIVE_SYMBOLS: SymbolType[] = [
   "epc-kpi", "epc-risk", "epc-product", "epc-knowledge", "epc-business-rule",
   "epc-screen", "epc-objective", "epc-machine", "epc-location", "epc-requirement",
 ];

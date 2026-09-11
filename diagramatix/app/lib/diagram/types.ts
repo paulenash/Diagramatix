@@ -83,7 +83,7 @@ export type SymbolType =
   | "epc-data"
   | "epc-application"
   | "epc-interface"
-  // The wider ARIS object set. These carry NO control-flow meaning — every one
+  // The descriptive objects. These carry NO control-flow meaning — every one
   // of them hangs off a function and says something ABOUT it — which is why the
   // palette keeps them in a section of their own, collapsed by default. They
   // exist because a real ARIS repository is full of them, and an import that
@@ -1341,7 +1341,7 @@ export const SCHEMA_VERSION = "48";
  *   unaffected, and the XSD export shape is unchanged (a run is not part of a
  *   diagram export).
  *
- * 2.11 — The wider ARIS object set: ten more "epc-*" symbols. No DB change —
+ * 2.11 — The descriptive objects: ten more "epc-*" symbols. No DB change —
  *   the bump tracks SCHEMA_VERSION 48, because the XSD SymbolTypeEnum is a
  *   CLOSED enumeration and an export using one of them would not otherwise
  *   validate against its own schema.

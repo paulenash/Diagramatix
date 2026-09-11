@@ -134,7 +134,7 @@ export const EPC_TO_BPMN_MAP: Record<string, EpcBpmnMapping> = {
 };
 
 /** Safe fallback for any unrecognised EPC shape — a plain task. */
-// The wider ARIS object set. BPMN has no KPI, no Risk, no Objective — and
+// The descriptive objects. BPMN has no KPI, no Risk, no Objective — and
 // inventing a task or a data object for one would put a thing in the process
 // that is not a step in it. A text annotation is BPMN's own answer to "extra
 // information about an activity", so that is what they become, each keeping its

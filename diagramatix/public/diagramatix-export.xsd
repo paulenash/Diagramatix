@@ -494,7 +494,7 @@
     migration. The bump exists because the enumerations here are CLOSED: without
     it, an EPC export would not validate against its own schema.
 
-  v48 — The wider ARIS object set.
+  v48 — The descriptive objects.
     SymbolTypeEnum    + 10 "epc-*" objects (KPI, risk, product, knowledge
                         category, business rule, screen, objective, machine,
                         location, requirement)
@@ -883,7 +883,7 @@
       <xs:enumeration value="epc-data"/>
       <xs:enumeration value="epc-application"/>
       <xs:enumeration value="epc-interface"/>
-      <!-- schema 48 — the wider ARIS object set. None of these carries control
+      <!-- schema 48 — the descriptive objects. None of these carries control
            flow: every one hangs off a FUNCTION and says something about it, and
            the palette keeps them in a section of their own, collapsed by
            default. They exist because a real ARIS repository is full of them and

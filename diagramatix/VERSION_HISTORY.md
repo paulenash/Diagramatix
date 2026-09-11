@@ -15,7 +15,7 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
-## 2.11.2533 — 2026-09-11 — Six things about EPC, and the half of ARIS we had left out
+## 2.11.2533 — 2026-09-11 — Six things about EPC, and the objects that describe a function
 
 ### The palette teaches the notation, so it has to be right
 
@@ -24,7 +24,7 @@ preview switch had no EPC cases, so all twenty fell through to a plain
 rectangle: twenty distinct shapes looking like one, in the exact place a person
 goes to learn which is which.
 
-### The wider ARIS object set
+### The descriptive objects
 
 **KPI, Risk, Product / Service, Knowledge Category, Business Rule, Screen,
 Objective, Machine / Resource, Location, Requirement** — ten symbols the EPC

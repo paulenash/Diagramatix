@@ -3232,19 +3232,19 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 | T4123 | `tests/epc/import-aml.test.ts` | It posts to a route that exists, and the warnings reach a person. |
 | T4124 | `tests/epc/import-aml.test.ts` | The hand-written sample keeps its caveat that it is not a real ARIS export. |
 | T4125 | `tests/epc/layout.test.ts` | One branch’s assignments never reach into the branch beside it. |
-| T4126 | `tests/epc/aris-extended.test.ts` | All ten wider-ARIS symbols are declared, coloured and sized. |
-| T4127 | `tests/epc/aris-extended.test.ts` | Every EPC symbol draws its own shape, in the canvas AND the palette. |
-| T4128 | `tests/epc/aris-extended.test.ts` | The “More ARIS objects” palette section exists and is CLOSED by default. |
-| T4129 | `tests/epc/aris-extended.test.ts` | None of the wider set may sit on the control flow — the whitelist refused them for free. |
-| T4130 | `tests/epc/aris-extended.test.ts` | Each attaches to a FUNCTION by an information arc, and to nothing else. |
-| T4131 | `tests/epc/aris-extended.test.ts` | None becomes a BPMN object; each is a prefixed text annotation. |
-| T4132 | `tests/epc/aris-extended.test.ts` | A short EPC name does not change the shape at all. |
-| T4133 | `tests/epc/aris-extended.test.ts` | Two lines fit; three grow the box DOWNWARD, never sideways. |
-| T4134 | `tests/epc/aris-extended.test.ts` | A Process Interface holds ONE line — its bottom is the link marker. |
-| T4135 | `tests/epc/aris-extended.test.ts` | The renderer wraps to the same width the sizing measured. |
-| T4136 | `tests/epc/aris-extended.test.ts` | A control-flow arc is OPEN, and Properties offers no choice. |
-| T4137 | `tests/epc/aris-extended.test.ts` | A Process Interface links to another EPC, and BOTH drill gates work. |
-| T4138 | `tests/epc/aris-extended.test.ts` | A KPI on a function is drawn as a KPI, on the right. |
+| T4126 | `tests/epc/descriptive-objects.test.ts` | All ten descriptive-object symbols are declared, coloured and sized. |
+| T4127 | `tests/epc/descriptive-objects.test.ts` | Every EPC symbol draws its own shape, in the canvas AND the palette. |
+| T4128 | `tests/epc/descriptive-objects.test.ts` | The “Descriptive Objects” palette section exists and is CLOSED by default. |
+| T4129 | `tests/epc/descriptive-objects.test.ts` | No descriptive object may sit on the control flow — the whitelist refused them for free. |
+| T4130 | `tests/epc/descriptive-objects.test.ts` | Each attaches to a FUNCTION by an information arc, and to nothing else. |
+| T4131 | `tests/epc/descriptive-objects.test.ts` | None becomes a BPMN object; each is a prefixed text annotation. |
+| T4132 | `tests/epc/descriptive-objects.test.ts` | A short EPC name does not change the shape at all. |
+| T4133 | `tests/epc/descriptive-objects.test.ts` | Two lines fit; three grow the box DOWNWARD, never sideways. |
+| T4134 | `tests/epc/descriptive-objects.test.ts` | A Process Interface holds ONE line — its bottom is the link marker. |
+| T4135 | `tests/epc/descriptive-objects.test.ts` | The renderer wraps to the same width the sizing measured. |
+| T4136 | `tests/epc/descriptive-objects.test.ts` | A control-flow arc is OPEN, and Properties offers no choice. |
+| T4137 | `tests/epc/descriptive-objects.test.ts` | A Process Interface links to another EPC, and BOTH drill gates work. |
+| T4138 | `tests/epc/descriptive-objects.test.ts` | A KPI on a function is drawn as a KPI, on the right. |
 
 > **Keep this section in sync.** Whenever an e2e spec is added, removed, or changes what it asserts, update this section. It is hand-maintained, not generated.
 

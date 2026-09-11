@@ -2,7 +2,7 @@
  * Deterministic vertical layout for AI-generated Event-driven Process Chains.
  *
  * Phase 2 of the EPC AI pipeline: takes a validated (possibly hand-edited) plan
- * and lays it out top-to-bottom, ARIS-style. No model call happens here.
+ * and lays it out top-to-bottom, the way an EPC is conventionally drawn. No model call happens here.
  *
  * Two things make this different from `layoutFlowchartDiagram`, which it is
  * otherwise adapted from:
@@ -48,7 +48,7 @@ export interface AiEpcElement {
   /** Functions only — application systems the work happens in. */
   system?: string[];
   /**
-   * Functions only — the wider ARIS object set.
+   * Functions only — the descriptive objects.
    *
    * One field per kind rather than a tagged list, for the same reason `org` is
    * a single string: the SHAPE of the plan is where the rules live. A KPI can
@@ -101,7 +101,7 @@ const CONNECTOR_TYPES = new Set<SymbolType>(["epc-xor", "epc-and", "epc-or"]);
 const DECISION_TYPES = new Set<SymbolType>(["epc-xor", "epc-or"]);
 const ORG_TYPES = new Set<SymbolType>(["epc-org-unit", "epc-position"]);
 /**
- * The wider ARIS object set. Every one hangs off a function and is drawn beside
+ * The descriptive objects. Every one hangs off a function and is drawn beside
  * it, exactly as an information object is — so it joins DATA_TYPES rather than
  * getting a placement rule of its own.
  */
@@ -122,7 +122,7 @@ export function mapEpcType(raw: string): SymbolType {
   if (/(position|role|jobtitle|person)/.test(k)) return "epc-position";
   if (/(applicationsystem|application|system|itsystem|software)/.test(k)) return "epc-application";
   if (/(informationobject|information|data|document|record|dataobject)/.test(k)) return "epc-data";
-  // The wider ARIS set, before the function catch-all: "business rule" and
+  // The descriptive objects, before the function catch-all: "business rule" and
   // "process interface" both contain words the function test would swallow.
   if (/(businessrule|policy|rule)/.test(k)) return "epc-business-rule";
   if (/(kpi|keyperformanceindicator|measure|metric)/.test(k)) return "epc-kpi";
@@ -209,7 +209,7 @@ export function layoutEpcDiagram(
     if (e.org) push(e.org, "epc-org-unit", "right");
     for (const d of e.data ?? []) push(d, "epc-data", "left");
     for (const s of e.system ?? []) push(s, "epc-application", "left");
-    // The wider ARIS set goes on the RIGHT, beside the org unit. They say
+    // The descriptive objects goes on the RIGHT, beside the org unit. They say
     // something ABOUT the function — who is measured, what can go wrong, what
     // it delivers — which is the same side of the sentence the responsible
     // party is on. The left stays for what the function reads and writes.

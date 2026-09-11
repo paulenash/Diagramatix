@@ -46,7 +46,7 @@ export interface EpcModel {
 export type EpcObjectKind =
   | "event" | "function" | "xor" | "and" | "or"
   | "org-unit" | "position" | "data" | "application" | "interface"
-  // The wider ARIS set. These used to arrive as "unknown object types" and be
+  // The descriptive objects. These used to arrive as "unknown object types" and be
   // reported — which was honest, and still meant a customer's KPIs and risks
   // did not come across. Now they do.
   | "kpi" | "risk" | "product" | "knowledge" | "business-rule"
@@ -111,7 +111,7 @@ const OBJECT_TYPES: Record<string, EpcObjectKind> = {
   OT_APPL_SYS_TYPE: "application",
   OT_APPL_SYS: "application",
   OT_APPL_SYS_CLS: "application",
-  // The wider ARIS set. Several codes map to one symbol where ARIS
+  // The descriptive objects. Several codes map to one symbol where ARIS
   // distinguishes things an EPC draws identically — and the codes are listed
   // generously because the point of this table is to recognise a real export,
   // not to be minimal.
