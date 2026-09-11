@@ -27,7 +27,15 @@ export async function GET(req: Request) {
   const prompts = await prisma.prompt.findMany({
     where: { userId, orgId, ...(diagramType ? { diagramType } : {}) },
     orderBy: { updatedAt: "desc" },
-    select: { id: true, name: true, text: true, diagramType: true, createdAt: true, updatedAt: true },
+    select: {
+      id: true, name: true, text: true, diagramType: true,
+      createdAt: true, updatedAt: true,
+      source: true, refinedAt: true, fromImage: true,
+      modelUsed: true, lastUsedAt: true, useCount: true,
+      // Not the plan itself — it can be large, and the list only needs to know
+      // whether there IS one. A prompt that has one re-applies with no AI call.
+      planUpdatedAt: true,
+    },
   });
 
   return NextResponse.json(prompts);
@@ -52,13 +60,21 @@ export async function POST(req: Request) {
   }
   const userId = getEffectiveUserId(session, cookieStore) ?? session.user.id;
 
-  const { name, text, diagramType, planJson } = await req.json();
+  const { name, text, diagramType, planJson, source, fromImage, refined } = await req.json();
   if (!name?.trim() || !text?.trim()) {
     return NextResponse.json({ error: "Name and text are required" }, { status: 400 });
   }
 
   const prompt = await prisma.prompt.create({
-    data: { name: name.trim(), text: text.trim(), diagramType: diagramType ?? "bpmn", userId, orgId },
+    data: {
+      name: name.trim(), text: text.trim(), diagramType: diagramType ?? "bpmn", userId, orgId,
+      // How it came to exist. Anything the caller does not say stays NULL /
+      // false rather than being assumed: "not recorded" and "typed" are
+      // different facts, and only one of them is true of an old prompt.
+      ...(source === "typed" || source === "dictated" ? { source } : {}),
+      ...(fromImage === true ? { fromImage: true } : {}),
+      ...(refined === true ? { refinedAt: new Date() } : {}),
+    },
   });
 
   // planJson is a JSON column and Prisma 7 doesn't parameterise it in the update

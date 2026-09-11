@@ -162,6 +162,17 @@ export function PlanPanel({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialPrompt, initialModel]);
+  /**
+   * How the prompt in the box came to be.
+   *
+   * Refs rather than state: nothing renders from them, and a re-render must not
+   * reset them. Both are properties of the TEXT, not of the moment it is saved —
+   * somebody dictates, tidies by hand, then saves ten minutes later, and that
+   * prompt was still dictated.
+   */
+  const dictatedRef = useRef(false);
+  const refinedRef = useRef(false);
+
   const [clarifyOpen, setClarifyOpen] = useState(false);
   // "Refine" — AI-generated clarifying questions that enrich the prompt before Plan.
   const [refineQs, setRefineQs] = useState<RefineQuestion[] | null>(null);
@@ -456,6 +467,7 @@ export function PlanPanel({
     stopRequestedRef.current = false;
     setDictateMsg(null);
     setListening(true);
+    dictatedRef.current = true;
     const handle = await startDictation({
       onText: (text) => setPrompt(prev => {
         const base = prev && !prev.endsWith(" ") && !prev.endsWith("\n") ? prev + " " : prev;
@@ -719,6 +731,12 @@ export function PlanPanel({
         name: saveName.trim(),
         text: prompt.trim(),
         planJson: hasPlan ? plan : null,
+        // Recorded at the only moment it is knowable. Afterwards the text looks
+        // the same however it was made, which is why none of this can be
+        // reconstructed later for the prompts that already exist.
+        source: dictatedRef.current ? "dictated" : "typed",
+        fromImage: attachment?.type === "image",
+        refined: refinedRef.current,
       };
       let res: Response;
       if (editingPromptId) {
@@ -1068,6 +1086,7 @@ export function PlanPanel({
               questions={refineQs}
               onCancel={() => setRefineQs(null)}
               onSubmit={(answers) => {
+                refinedRef.current = true;
                 setPrompt((prev) => appendRefinements(prev, answers));
                 setRefineQs(null);
               }}

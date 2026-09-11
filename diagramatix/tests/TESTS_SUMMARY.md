@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-09-11  ·  **Document version:** 7.0  ·  **Suite:** 464 test files · 3,486 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T4163  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-09-11  ·  **Document version:** 7.0  ·  **Suite:** 466 test files · 3,515 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T4192  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
@@ -34,9 +34,9 @@ Each test file has its own section below, grouped into layers. Within each secti
 | **Protects you against** | In plain terms, the real-world problem that would occur if this behaviour regressed. |
 | **How it would break (go red)** | The kind of code or data change that would make this specific test fail — i.e. what the test is watching. |
 
-**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T4164**, the one after **T4165**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
+**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T4193**, the one after **T4194**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T4163`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
+> **Highest ref allocated: `T4192`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -3270,6 +3270,35 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 | T4161 | `tests/flowchart/label-fit.test.ts` | Shapes that hold no name — Parallel, Decision, Swimlane, Merge — are never grown. |
 | T4162 | `tests/flowchart/label-fit.test.ts` | A generated flowchart carries it end to end, and the drawn lines fit the box. |
 | T4163 | `tests/flowchart/label-fit.test.ts` | A hand-typed name resizes the box too, not only a generated one. |
+| T4164 | `tests/prompts/maintenance.test.ts` | The org-wide prompt endpoint requires OrgAdmin on BOTH verbs. |
+| T4165 | `tests/prompts/maintenance.test.ts` | The private prompt list was NOT widened when the org one was added. |
+| T4166 | `tests/prompts/maintenance.test.ts` | A posted id list is re-resolved against the org, not trusted. |
+| T4167 | `tests/prompts/maintenance.test.ts` | The personal bulk delete stays personal, and is impersonation-aware. |
+| T4168 | `tests/prompts/maintenance.test.ts` | Both bulk routes report what they did NOT delete. |
+| T4169 | `tests/prompts/maintenance.test.ts` | Only the prompt list scrolls — the top panel stays on screen. |
+| T4170 | `tests/prompts/maintenance.test.ts` | Prompts sit in a collapsible User / Org tree. |
+| T4171 | `tests/prompts/maintenance.test.ts` | The Org branch appears only when the API will serve it. |
+| T4172 | `tests/prompts/maintenance.test.ts` | The filter matches title OR contents. |
+| T4173 | `tests/prompts/maintenance.test.ts` | Bulk delete reaches only the diagram type on screen, and says so. |
+| T4174 | `tests/prompts/maintenance.test.ts` | Changing the filter or the type clears the selection. |
+| T4175 | `tests/prompts/maintenance.test.ts` | A group selects in one go; a colleague’s prompt cannot be edited. |
+| T4176 | `tests/prompts/maintenance.test.ts` | Deletion is confirmed in-app, never by a browser dialog. |
+| T4177 | `tests/prompts/attributes.test.ts` | The prompt attribute columns are on the model. |
+| T4178 | `tests/prompts/attributes.test.ts` | `source` is NULLABLE — “not recorded” is not the same as “typed”. |
+| T4179 | `tests/prompts/attributes.test.ts` | Recording a use does NOT touch updatedAt; using is not editing. |
+| T4180 | `tests/prompts/attributes.test.ts` | The usage backfill SETS rather than increments, and has a dry run. |
+| T4181 | `tests/prompts/attributes.test.ts` | Both read endpoints return the same attribute set. |
+| T4182 | `tests/prompts/attributes.test.ts` | Flags filter yes/no, timestamps by range, source with a third answer. |
+| T4183 | `tests/prompts/attributes.test.ts` | A date range includes the whole of its last day. |
+| T4184 | `tests/prompts/attributes.test.ts` | Never-used is filterable — that is the clear-out gesture. |
+| T4185 | `tests/prompts/attributes.test.ts` | Changing an attribute filter clears the selection too. |
+| T4186 | `tests/prompts/attributes.test.ts` | The bulk bar AND its delete-all button honour an attribute filter. |
+| T4187 | `tests/prompts/attributes.test.ts` | The usage summary leads with what is NOT earning its place. |
+| T4188 | `tests/prompts/attributes.test.ts` | Usage is bucketed, not averaged. |
+| T4189 | `tests/prompts/attributes.test.ts` | It keeps “not recorded” as its own bucket. |
+| T4190 | `tests/prompts/attributes.test.ts` | It states its scope, and that a count is a floor. |
+| T4191 | `tests/prompts/attributes.test.ts` | It summarises the whole library, not the filtered view. |
+| T4192 | `tests/prompts/attributes.test.ts` | It draws its own charts rather than pulling in a library. |
 
 > **Keep this section in sync.** Whenever an e2e spec is added, removed, or changes what it asserts, update this section. It is hand-maintained, not generated.
 

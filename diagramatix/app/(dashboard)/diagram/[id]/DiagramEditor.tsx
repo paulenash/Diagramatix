@@ -1543,6 +1543,14 @@ export function DiagramEditor({
     if (meta) {
       const linked = await ensureLinkedPrompt(meta);
       if (linked) {
+        // Every generable type funnels through here, from both the one-shot
+        // panel and the two-phase one — so this is the only place usage has to
+        // be recorded. Fire-and-forget: the diagram is already on screen, and
+        // losing a count must never cost somebody their work.
+        void fetch(`/api/prompts/${linked.id}/used`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ model: meta.model }),
+        }).catch(() => {});
         aiGeneration = {
           promptId: linked.id, promptName: linked.name, promptText: meta.promptText,
           model: meta.model, generatedAt: new Date().toISOString(), autoNamed: linked.autoNamed,

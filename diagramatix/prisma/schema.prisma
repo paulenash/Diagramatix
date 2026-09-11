@@ -737,9 +737,35 @@ model Prompt {
   orgId         String
   org           Org       @relation(fields: [orgId], references: [id], onDelete: Restrict)
   // Last edited 2-phase AI Plan for this prompt (AiElement[] + AiConnection[]).
-  // null until the user saves with a plan present.
+  // null until the user saves with a plan present. A prompt that HAS one can be
+  // re-applied with no AI call at all, which is the most useful thing about a
+  // saved prompt and was not surfaced anywhere until 2026-09-11.
   planJson      Json?
   planUpdatedAt DateTime?
+
+  // ── How the prompt came to exist ────────────────────────────────────────
+  // NULL means "not recorded", not "typed". Every prompt saved before this
+  // existed is genuinely unknown, and claiming they were typed would be
+  // inventing data about how somebody worked.
+  /// "typed" | "dictated"
+  source        String?
+  /// Set when the clarifying-questions Refine pass last contributed to the text.
+  /// Distinct from "has been edited", which falls out of createdAt != updatedAt.
+  refinedAt     DateTime?
+  /// True when the prompt was written against an IMAGE attachment (a photo of a
+  /// whiteboard, a screenshot, somebody else's diagram). The image itself is not
+  /// kept, so this records where the words came from, not a file you can open.
+  fromImage     Boolean   @default(false)
+
+  // ── What has been done WITH it ──────────────────────────────────────────
+  // Recorded at generation rather than scanned out of diagram JSON afterwards:
+  // a scan is expensive and answers slowly, and the generation path already
+  // knows. scripts/backfill-prompt-usage.ts fills in the history once.
+  /// Model id of the last generation from this prompt.
+  modelUsed     String?
+  lastUsedAt    DateTime?
+  useCount      Int       @default(0)
+
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
