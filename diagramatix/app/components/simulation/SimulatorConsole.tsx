@@ -376,7 +376,16 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId,
             {/* Centred, compact column of panels — the ambient Matrix rain shows
                 in the margins on either side rather than the panels filling the
                 whole width. */}
-            <div className="max-w-6xl mx-auto grid gap-3 md:grid-cols-3 content-start">
+            {/* Paul, 2026-09-11: "SIMULATION DATA too narrow for all its
+                possible contents, even with the horizontal scroll, which should
+                be removed."
+                It was capped at max-w-6xl (1152px) while the Tasks row alone
+                needs ~1310px of fixed columns — so it never fitted on any
+                display, however large, and the scrollbar was permanent. The cap
+                is raised to the widest section's real need plus room for the
+                element name to breathe; it stays capped (not w-full) so the
+                cards above do not sprawl across an ultrawide monitor. */}
+            <div className="max-w-[1560px] mx-auto grid gap-3 md:grid-cols-3 content-start">
               <MatrixPanel title="Resources — people &amp; automation" className="md:col-span-2">
                 <TeamLibraryManager key={`teams-${seedKey}`} projectId={projectId} onCapacities={publishCapacities} calendars={calendars} onTeamCalendars={setTeamCalMap} usedNames={usedTeams} />
               </MatrixPanel>

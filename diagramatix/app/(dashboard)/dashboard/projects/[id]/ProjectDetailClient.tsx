@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { UserGuideLink } from "@/app/components/UserGuideLink";
 import type { DiagramType, DiagramData } from "@/app/lib/diagram/types";
@@ -20,6 +20,8 @@ import { resolveNumberingConfig } from "@/app/lib/numbering/renumber";
 import { PcfCoveragePanel } from "./PcfCoveragePanel";
 import { APQC_ATTRIBUTION, anyDiagramHasPcf, dataHasPcf } from "@/app/lib/pcf/attribution";
 import { useFeatureColors } from "@/app/lib/theme/useFeatureColors";
+import { DiagramFeatureBadges } from "@/app/components/DiagramFeatureBadges";
+import { diagramFeatureBadges } from "@/app/lib/diagram/diagramFeatureBadges";
 import { tonesFor } from "@/app/lib/theme/featureColors";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { SharePointPicker } from "@/app/components/SharePointPicker";
@@ -432,6 +434,9 @@ interface Props {
   viewingAsEmail?: string;
   impersonationMode?: "view" | "edit";
   isAdmin?: boolean;
+  /** Diagram ids tied to a mining run in this project — resolved server-side
+   *  (the link lives on ProcessMiningRun, not on the diagram). */
+  minedDiagramIds?: string[];
   hasMicrosoft?: boolean;
   entitlements?: import("@/app/lib/subscription").Entitlements;
 }
@@ -448,7 +453,7 @@ const DIAGRAM_TYPES: { value: DiagramType; label: string; description: string }[
   { value: "epc", label: "EPC", description: "Event-driven Process Chain (ARIS eEPC) — alternating events and functions, XOR/AND/OR connectors, and organisational units that convert to BPMN lanes" },
 ];
 
-export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, version, readOnly, viewingAsName, viewingAsEmail, impersonationMode, isAdmin, hasMicrosoft, entitlements }: Props) {
+export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, version, readOnly, viewingAsName, viewingAsEmail, impersonationMode, isAdmin, minedDiagramIds, hasMicrosoft, entitlements }: Props) {
   const router = useRouter();
   // SuperAdmin "presentation mode" — double-click the logo to cycle view modes
   // (superadmin → orgadmin → expert → professional → introductory → back).
@@ -503,6 +508,19 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
   const [showNumbering, setShowNumbering] = useState(false);
   // "Show non-APQC" — highlight non-APQC diagrams/folders in the live APQC colour.
   const featureScheme = useFeatureColors();
+
+  // What each diagram carries beyond its shapes — AI prompt, simulation data,
+  // mining link, APQC classification, Risk & Control. Computed once per
+  // diagrams change rather than per render: every row walks its own elements,
+  // and the tree re-renders on every selection and hover.
+  const minedIdSet = useMemo(() => new Set(minedDiagramIds ?? []), [minedDiagramIds]);
+  const badgesByDiagram = useMemo(() => {
+    const map = new Map<string, ReturnType<typeof diagramFeatureBadges>>();
+    for (const d of diagrams) {
+      map.set(d.id, diagramFeatureBadges(d.data, { mined: minedIdSet.has(d.id) }));
+    }
+    return map;
+  }, [diagrams, minedIdSet]);
   const apqcTone = tonesFor(featureScheme, "apqc");
   const highlightNonApqc = numberingConfig.showNonApqc && numberingHasPcf;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -2547,6 +2565,14 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
                   // hover.
                   <div className="flex items-center gap-1 flex-1 min-w-0 group/dgname">
                     <span className="truncate flex-1" title={d.name}>{d.name}</span>
+                    {/* Right-justified on the name line: the name takes the
+                        slack (flex-1 + truncate above), so these sit hard
+                        against the row's right edge whatever the name's
+                        length. They stay visible while the rename/delete icons
+                        reveal on hover — those overlay the end of the row, and
+                        a badge that vanished when you reached for it would be
+                        worse than one that is always there. */}
+                    <DiagramFeatureBadges badges={badgesByDiagram.get(d.id) ?? []} />
                     <button onClick={(e) => { e.stopPropagation(); startRename(d.id, d.name); }}
                       className="opacity-0 group-hover/dgname:opacity-100 hover:!opacity-100 text-gray-400 hover:text-blue-500 px-0.5"
                       title="Rename diagram"

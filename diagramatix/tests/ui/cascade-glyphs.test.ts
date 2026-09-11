@@ -144,12 +144,20 @@ describe("the Simulator and Miner entries", () => {
   });
 
   it("T3339 a panel may shrink below its content, so fields cannot escape it", () => {
-    // Paul: "Task fields overflow past the right hand boundary." A grid child
-    // will not shrink below its content unless told it may, so the columns ran
-    // out over the border instead of scrolling inside it.
+    // Paul, 2026-09-07: "Task fields overflow past the right hand boundary." A
+    // grid child will not shrink below its content unless told it may, so the
+    // columns ran out over the border.
+    //
+    // The PROPERTY — fields stay inside the panel — is unchanged. The MECHANISM
+    // has moved: this used to require `overflow-x-auto`, i.e. scroll inside the
+    // panel. Paul, 2026-09-11: "the horizontal scroll... should be removed",
+    // because the console was capped narrower than the table's own minimum and
+    // the scrollbar was therefore permanent rather than a fallback. The panel
+    // now FITS (T4228 does that arithmetic) and clips as a last resort instead.
+    // So the overflow-x assertion is superseded, not dropped.
     expect(read("app/components/simulation/matrix/MatrixChrome.tsx")).toContain("min-w-0");
     const panel = read("app/components/simulation/SimDataPanel.tsx");
-    expect(panel).toContain("overflow-x-auto");
+    expect(panel, "a section must still be unable to push past the panel border").toContain("overflow-hidden");
     expect(panel, "the panel no longer sizes itself to its widest section").not.toContain("w-max min-w-full");
   });
 

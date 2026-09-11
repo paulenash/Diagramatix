@@ -55,7 +55,22 @@ function MatrixDist({ value, onChange, auto }: { value?: SimDist; onChange: (d: 
       >
         <option value="">—</option>
         {DISTRIBUTION_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}
+        {/* A value whose kind nobody may CHOOSE (empirical: measured samples,
+            written by calibration / BPSim import) still has to be visible here.
+            Without this the select falls back to "—" and the panel reports no
+            distribution at all for a task that has one — and the next click
+            replaces it. */}
+        {value && !DISTRIBUTION_KINDS.includes(value.kind) && (
+          <option value={value.kind} disabled>
+            {value.kind === "empirical" ? value.samples.length + " measured values" : value.kind}
+          </option>
+        )}
       </select>
+      {value?.kind === "empirical" && (
+        <span className="text-green-400/50 text-[10px]" title="Measured values, resampled — written by calibration or a BPSim import, not typed here">
+          resampled
+        </span>
+      )}
       {value && KIND_FIELDS[value.kind].map((f) => (
         <input
           key={f} type="number" title={f}
@@ -438,40 +453,54 @@ const inp = "bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-
  *  names sit left-justified directly over their column. Dist columns are wide
  *  enough for a triangular (select + 3 inputs) WITHOUT the last input bleeding
  *  into the next column; `team` fits the longest team / lane name. */
+/**
+ * Column widths. The CONTROL columns are fixed (an input that resizes per row
+ * is unreadable as a table); the NAME columns take whatever is left, because
+ * the name is the only column whose content nobody chose the length of.
+ *
+ * `flex-1 min-w-0` needs the section NOT to be min-w-max — a flex child in a
+ * max-content container sizes to its content and never grows. That pairing is
+ * why names were pinned at 160px and truncated while the row overflowed.
+ */
 const W = {
+  // Tiny fixed markers — never shrink, or they disappear entirely.
   flag: "w-4 shrink-0",
-  name: "w-40 shrink-0",
-  dist: "w-72 shrink-0",
-  team: "w-44 shrink-0",
   units: "w-12 shrink-0",
-  maxArr: "w-24 shrink-0",
-  cal: "w-32 shrink-0",
-  target: "w-52 shrink-0",
   pct: "w-16 shrink-0",
   def: "w-14 shrink-0",
-  cond: "w-40 shrink-0",
+  // Names absorb the slack.
+  name: "flex-1 min-w-0",
+  target: "flex-1 min-w-0",
+  // Control columns hold their width while there is room, and COMPRESS rather
+  // than push the row past the panel border when there is not. Below about
+  // 1150px seven columns of controls genuinely do not fit; compressing is the
+  // least-bad of clip / scroll / overflow, and the scroll is what Paul asked to
+  // be rid of. Header and rows share these classes, so both shrink together and
+  // the columns stay aligned.
+  dist: "w-72 min-w-0",
+  team: "w-44 min-w-0",
+  maxArr: "w-24 min-w-0",
+  cal: "w-32 min-w-0",
+  cond: "w-40 min-w-0",
 } as const;
 
 function Section({ title, cols, children }: { title: string; cols: { label: string; w: string }[]; children: React.ReactNode }) {
   return (
     <div>
       <p className="text-green-400/70 uppercase tracking-widest text-[10px] mb-1">{title}</p>
-      {/* Header + rows share one container at their natural (min-w-max) width,
-          centred while they fit.
+      {/* Rows fill the panel's width, and the name column absorbs the slack.
           Paul, 2026-09-07: "Task fields overflow past the right hand boundary."
-          They did: the panel sized itself to its WIDEST section and the columns
-          then ran out over the border, because a grid child will not shrink
-          below its content unless it is told it may (min-w-0). Now the section
-          scrolls INSIDE the panel instead of escaping it — a scrollbar only when
-          it genuinely does not fit, which is what the original intent was; it
-          was simply measured against the viewport rather than the panel. */}
-      <div className="flex justify-center overflow-x-auto">
-        <div className="min-w-max">
-          <div className="flex items-center gap-2 text-green-400/40 pb-0.5 border-b border-green-500/20">
-            {cols.map((c, i) => <span key={i} className={`${c.w} text-left`}>{c.label}</span>)}
-          </div>
-          {children}
+          Fixed then by scrolling inside the panel — which stopped the overflow
+          but made the scrollbar permanent, because the console was capped
+          narrower than the table's own minimum (see SimulatorConsole).
+          Paul, 2026-09-11: remove the scroll. So the cap moved and the name
+          column became flexible; there is no min-w-max and no overflow-x here,
+          which is what lets `flex-1` on the name actually grow. */}
+      <div className="w-full min-w-0 overflow-hidden">
+        <div className="flex items-center gap-2 text-green-400/40 pb-0.5 border-b border-green-500/20">
+          {cols.map((c, i) => <span key={i} className={`${c.w} text-left`}>{c.label}</span>)}
         </div>
+        {children}
       </div>
     </div>
   );

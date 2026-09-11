@@ -14,6 +14,16 @@ const KINDS: { value: SimDist["kind"]; label: string }[] = [
   { value: "triangular", label: "Triangular" },
   { value: "normal", label: "Normal" },
   { value: "exponential", label: "Exponential" },
+  // Most cases routine, a minority far longer — the shape most human process
+  // work actually has, and the one a symmetric distribution cannot produce.
+  { value: "lognormal", label: "Lognormal" },
+];
+
+// Measured values, written by calibration / BPSim import and never chosen by
+// hand. Listed separately so the select can still SHOW one it is holding: a
+// picker that cannot render its own value reports the wrong distribution.
+const READ_ONLY_KINDS: { value: SimDist["kind"]; label: string }[] = [
+  { value: "empirical", label: "Empirical (measured)" },
 ];
 
 // Explicit bg/text + light color-scheme so the value stays black-on-white even
@@ -55,6 +65,13 @@ export function DistributionInput({
       case "triangular": onChange({ kind, min: 0, mode: meanGuess(d), max: meanGuess(d) * 2 }); break;
       case "normal": onChange({ kind, mean: meanGuess(d), sd: Math.max(1, meanGuess(d) / 4) }); break;
       case "exponential": onChange({ kind, mean: meanGuess(d) }); break;
+      // sd from the mean keeps the spread plausible rather than resetting to 0,
+      // which would make a lognormal behave exactly like a fixed value.
+      case "lognormal": onChange({ kind, mean: meanGuess(d), sd: Math.max(1, meanGuess(d) / 4) }); break;
+      // Not reachable from the select (it is disabled there); a no-op rather
+      // than a throw, because discarding measured samples on a mis-click would
+      // be unrecoverable.
+      case "empirical": break;
     }
   }
 
@@ -68,6 +85,12 @@ export function DistributionInput({
         >
           {KINDS.map((k) => (
             <option key={k.value} value={k.value}>{k.label}</option>
+          ))}
+          {/* Only when it IS the current value — offered to nobody, hidden the
+              rest of the time, but never leaving the select showing a kind the
+              value is not. */}
+          {READ_ONLY_KINDS.filter((k) => k.value === d.kind).map((k) => (
+            <option key={k.value} value={k.value} disabled>{k.label}</option>
           ))}
         </select>
         {unitLabel && <span className="text-[10px] text-gray-400 whitespace-nowrap">{unitLabel}</span>}

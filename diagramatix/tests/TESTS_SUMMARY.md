@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-09-11  ·  **Document version:** 7.0  ·  **Suite:** 467 test files · 3,535 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T4219  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-09-11  ·  **Document version:** 7.0  ·  **Suite:** 467 test files · 3,535 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T4232  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
@@ -34,9 +34,9 @@ Each test file has its own section below, grouped into layers. Within each secti
 | **Protects you against** | In plain terms, the real-world problem that would occur if this behaviour regressed. |
 | **How it would break (go red)** | The kind of code or data change that would make this specific test fail — i.e. what the test is watching. |
 
-**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T4220**, the one after **T4221**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
+**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T4233**, the one after **T4234**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T4219`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
+> **Highest ref allocated: `T4232`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -3324,6 +3324,19 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 | T4217 | `tests/ai/pricing-completeness.test.ts` | **Every curated default model has a `PRICING` row** — an unpriced one is hidden from every non-SuperAdmin, not shown as "varies". |
 | T4218 | `tests/ai/pricing-completeness.test.ts` | No priced model is reachable by a SuperAdmin and by nobody else. |
 | T4219 | `tests/ai/byo-model-unlock.test.ts` | Routing (`providerForModel`) and billing (`providerOf`) agree about who serves a namespaced id. |
+| T4220 | `tests/simulation/distribution-kinds.test.ts` | **Lognormal is offered in the picker**, not merely implemented — and it genuinely samples. |
+| T4221 | `tests/simulation/distribution-kinds.test.ts` | Every kind the engine samples is either choosable or knowingly held back (empirical). |
+| T4222 | `tests/simulation/distribution-kinds.test.ts` | Both editors can render a kind they cannot offer, instead of misreporting it as "—". |
+| T4223 | `tests/diagram/feature-badges.test.ts` | A plain diagram carries no navigation badges at all. |
+| T4224 | `tests/diagram/feature-badges.test.ts` | Each badge (AI/SI/MN/AP/RC) appears only on its own evidence. |
+| T4225 | `tests/diagram/feature-badges.test.ts` | **The SI badge agrees with Clear-all in both directions** — a badge must not contradict the panel that owns the data. |
+| T4226 | `tests/diagram/feature-badges.test.ts` | Malformed diagram JSON yields no badges rather than blanking the tree. |
+| T4227 | `tests/diagram/feature-badges.test.ts` | Every badge names a real Feature Colour and a distinct two-letter code. |
+| T4228 | `tests/simulation/sim-data-panel-width.test.ts` | **The Tasks row's fixed columns fit inside the console's own width cap** — the arithmetic that made the scrollbar permanent. |
+| T4229 | `tests/simulation/sim-data-panel-width.test.ts` | The element-name column takes the leftover width instead of a fixed truncated one. |
+| T4230 | `tests/simulation/sim-data-panel-width.test.ts` | The permanent horizontal scrollbar is gone. |
+| T4231 | `tests/diagram/feature-badges.test.ts` | The project tree renders the badges on the diagram NAME line. |
+| T4232 | `tests/diagram/feature-badges.test.ts` | The mining link is resolved server-side and passed down (all four diagram columns). |
 
 > **Keep this section in sync.** Whenever an e2e spec is added, removed, or changes what it asserts, update this section. It is hand-maintained, not generated.
 

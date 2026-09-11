@@ -106,6 +106,26 @@ export default async function ProjectPage({ params }: Props) {
   // Risk-Control / APQC launch buttons on this screen.
   const entitlements = await getEntitlements(effectiveUserId);
 
+  // Which diagrams in this project are tied to a mining run — the one navigation
+  // badge that cannot be read from the diagram itself, because the link is held
+  // on ProcessMiningRun. Four columns, any of which counts: a model discovered
+  // FROM a log, a state machine discovered from it, a reference model checked
+  // AGAINST it, or the domain diagram behind an OCEL import.
+  //
+  // Best-effort: a badge is not worth failing a page load for, and a project
+  // with no mining simply has none.
+  let minedDiagramIds: string[] = [];
+  try {
+    const runs = await prisma.processMiningRun.findMany({
+      where: { projectId: id },
+      select: { discoveredBpmnId: true, discoveredSmId: true, referenceSmId: true, domainDiagramId: true },
+    });
+    minedDiagramIds = [...new Set(
+      runs.flatMap((r) => [r.discoveredBpmnId, r.discoveredSmId, r.referenceSmId, r.domainDiagramId])
+          .filter((v): v is string => !!v),
+    )];
+  } catch { /* no badge rather than no page */ }
+
   return (
     <ProjectDetailClient
       project={project}
@@ -118,6 +138,7 @@ export default async function ProjectPage({ params }: Props) {
       viewingAsEmail={viewingAsEmail}
       impersonationMode={impersonationMode}
       isAdmin={isSuperuser(session)}
+      minedDiagramIds={minedDiagramIds}
       hasMicrosoft={hasMicrosoft}
       entitlements={entitlements}
     />

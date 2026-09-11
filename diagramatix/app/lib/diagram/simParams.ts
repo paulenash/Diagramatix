@@ -116,8 +116,30 @@ export interface SimPropertyDef {
   initValue?: number | string | boolean;
 }
 
+/**
+ * The distributions a person may CHOOSE. Ordered roughly by how often they are
+ * the right answer for process work.
+ *
+ * `lognormal` was implemented everywhere — the engine samples it, the mean and
+ * p99 helpers handle it, BPSim import produces it, the shipped examples use it
+ * eight times — and then omitted from this one list, so it could not be picked
+ * and an existing one displayed as "—". See T4220.
+ *
+ * `empirical` is deliberately NOT here: it carries measured samples, and
+ * choosing it by hand would seed an empty set that samples 0. Calibration and
+ * BPSim import write it; the editors show it read-only.
+ */
 export const DISTRIBUTION_KINDS: SimDist["kind"][] = [
-  "fixed", "uniform", "triangular", "normal", "exponential",
+  "fixed", "uniform", "triangular", "normal", "exponential", "lognormal",
+];
+
+/**
+ * Every kind a stored value may legitimately BE, including the ones nobody can
+ * choose. A picker must be able to render its current value even when that value
+ * is not on offer, or it silently misreports what the simulation will run.
+ */
+export const ALL_DISTRIBUTION_KINDS: SimDist["kind"][] = [
+  ...DISTRIBUTION_KINDS, "empirical",
 ];
 
 /** A sensible default distribution for a freshly-added field. */
