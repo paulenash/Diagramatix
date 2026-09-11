@@ -131,6 +131,7 @@ model Org {
   processMiningRuns   ProcessMiningRun[]
   processDiffRuns     ProcessDiffRun[]
   apiKeys             ApiKey[]
+  skills           Skill[]
 }
 
 model OrgMember {
@@ -1307,6 +1308,46 @@ enum EntityNodeLevel {
 // (Participant) + IT Systems (System) + Documents + Data Stores. `orgId` IS the
 // allocation: SuperAdmin creates a structure for an org; that org's OrgAdmin may
 // edit it; projects in the org adopt a copy of it.
+// ── The master Skills list ───────────────────────────────────────────────────
+//
+// Paul, 2026-09-11, step 1: "Don't we need an extendible master list of skills
+// first." Yes — because before this, a skill was whatever string somebody typed.
+// `SimulationTeam.members[].skills` and a task's `requiredSkills` are both free
+// text, matched by exact string, so "Compliance Accreditation" and "Compliance
+// accreditation" were two different skills and nothing said so. A task requiring
+// the second could never start, and the readiness check could only report that
+// nobody held it — not that it was a typo.
+//
+// ORG-SCOPED, so one vocabulary serves every project and skills stay comparable
+// across them. Editable, seeded with defaults, like every other curated catalog
+// in the app (ScannerRule, IntentKeywordMap, the Risk & Control library).
+//
+// Skills are referenced BY NAME, not by id: `members[].skills` and
+// `requiredSkills` stay string arrays, so BPSim export/import, the ArchiMate
+// label match and every existing diagram keep working untouched. The catalog
+// constrains what can be CHOSEN; it does not become a foreign key.
+model Skill {
+  id          String   @id @default(cuid())
+  orgId       String
+  org         Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name        String
+  // Grouping for the picker once a catalog runs to dozens — "Compliance",
+  // "Technical", "Language". Free text; absent = ungrouped.
+  category    String?
+  description String?
+  // Retired rather than deleted: a skill already written onto a team member or a
+  // task must keep resolving, or existing models would silently lose their
+  // constraints. Inactive skills stay readable and stop being offered.
+  active      Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // One name per org — the whole point is that a skill means one thing.
+  @@unique([orgId, name])
+  @@index([orgId])
+}
+
 model EntityStructure {
   id        String       @id @default(cuid())
   name      String

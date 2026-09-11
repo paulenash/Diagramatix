@@ -127,6 +127,13 @@ const SCOPED_OMITTED = new Set<string>([
   // carry no structureId), never the masters, so EntityStructure is not carried
   // by the scoped backup. It IS carried by the SuperAdmin full backup (catalog-driven).
   "EntityStructure",
+  // The org's master Skills list — an org MASTER, like EntityStructure above,
+  // carried by the SuperAdmin full backup (catalog-driven) and not by the scoped
+  // org/user one. It degrades gracefully by design: skills are referenced BY
+  // NAME, so a restored diagram keeps every constraint it had even with no
+  // catalog present, and the Skills screen offers those names back as orphans to
+  // adopt. A missing vocabulary is recoverable; a silently changed one is not.
+  "Skill",
   // The DB-backed User Guide is SYSTEM/admin content, not per-user data — it's
   // deliberately not in the scoped org/user backup. It's carried by the
   // SuperAdmin full backup (catalog-driven) AND its own dedicated table-level

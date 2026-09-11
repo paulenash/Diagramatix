@@ -90,6 +90,13 @@ const CARDS: MenuCard[] = [
     feature: "ai",
   },
   {
+    href: "/dashboard/admin/skills?from=/dashboard/org-admin",
+    title: "Skills",
+    description:
+      "The master list of skills your people hold and your tasks require. Only someone on a task's team who holds every required skill can do the work.",
+    feature: "simulator",
+  },
+  {
     href: "/dashboard/admin/entity-lists?from=/dashboard/org-admin",
     title: "Entity Lists",
     description:
