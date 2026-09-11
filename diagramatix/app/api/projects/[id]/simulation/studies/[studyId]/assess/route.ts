@@ -99,5 +99,5 @@ export async function POST(req: Request, { params }: Params) {
   enterAiContext({ userId: session?.user?.id ?? null, orgId, invocationPoint: AI_INVOCATION_POINTS.SimulationAssess });
   const result = await generateSimAssessment({ apiKey: apiKey!, facts }, redactor);
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
-  return NextResponse.json({ assessment: result.assessment, model: result.model, facts });
+  return NextResponse.json({ assessment: result.assessment, model: result.model, truncated: result.truncated ?? false, facts });
 }

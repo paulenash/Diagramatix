@@ -47,7 +47,7 @@ function verdict(base: RunMetrics, tobe: RunMetrics, name: string): string {
 
 export function CompareView({ entries, assessFn, onRunMore }: {
   entries: CompareEntry[];
-  assessFn?: () => Promise<{ assessment?: string; error?: string }>;
+  assessFn?: () => Promise<{ assessment?: string; error?: string; truncated?: boolean }>;
   /** Offered when the difference is inside the noise: re-run both sides with
    *  enough replications to settle it. Absent = the verdict is stated without
    *  an offer to resolve it. */
@@ -55,6 +55,7 @@ export function CompareView({ entries, assessFn, onRunMore }: {
 }) {
   const aiAllowed = useAiAllowed();
   const [assessment, setAssessment] = useState<string | null>(null);
+  const [assessTruncated, setAssessTruncated] = useState(false);
   const [assessing, setAssessing] = useState(false);
   const [assessErr, setAssessErr] = useState<string | null>(null);
 
@@ -101,7 +102,8 @@ export function CompareView({ entries, assessFn, onRunMore }: {
     setAssessing(true); setAssessErr(null);
     try {
       const r = await assessFn();
-      if (r.error) setAssessErr(r.error); else setAssessment(r.assessment ?? null);
+      if (r.error) { setAssessErr(r.error); }
+      else { setAssessment(r.assessment ?? null); setAssessTruncated(r.truncated === true); }
     } catch { setAssessErr("Assessment failed — check the connection and try again."); }
     finally { setAssessing(false); }
   }
@@ -151,7 +153,12 @@ export function CompareView({ entries, assessFn, onRunMore }: {
                 <span className="text-green-400/60 uppercase tracking-widest text-[9px]">{aiAllowed ? "AI assessment" : "Comparison summary"}</span>
                 <button onClick={runAssessment} disabled={assessing} className="text-green-400/50 hover:text-green-200 text-[9px] disabled:opacity-50">{assessing ? "…" : "↻ regenerate"}</button>
               </div>
-              <p className="text-green-200/90 text-[11px] leading-relaxed whitespace-pre-line">{assessment}</p>
+              <AssessmentBody text={assessment} />
+              {assessTruncated && (
+                <p className="text-amber-400/80 text-[9px] mt-1">
+                  ⚠ This assessment was cut off before it finished — regenerate it.
+                </p>
+              )}
               <p className="text-green-400/40 text-[9px] mt-1">Generated from the computed figures above — the numbers are not AI-invented.</p>
             </div>
           )}
@@ -210,6 +217,56 @@ export function CompareView({ entries, assessFn, onRunMore }: {
           <tr><td colSpan={entries.length + 1} className="pt-1 text-green-400/40">◆ baseline · deltas vs baseline · ✦ p50 ▸ p95 on the flow-shape bars.</td></tr>
         </tfoot>
       </table>
+    </div>
+  );
+}
+
+/**
+ * The assessment, laid out so a person can read it.
+ *
+ * Paul, 2026-09-11: "Can we format the AI Assessment better. so that a human can
+ * more easily read it." It was one <p> of `whitespace-pre-line` — a paragraph
+ * carrying a dozen figures, which is the raw data handed back in prose.
+ *
+ * The shape is: a VERDICT line, then short bullets. Parsed rather than assumed,
+ * because two different producers write into this box — the AI (prompted for
+ * exactly this shape) and `summariseComparison`, the deterministic fallback that
+ * already emitted "- " lines. Both now render the same way.
+ *
+ * Anything that is neither (an older stored assessment, a model that ignored the
+ * format) falls through to a plain paragraph, so a format that drifts degrades
+ * to what was there before rather than to an empty box.
+ */
+function AssessmentBody({ text }: { text: string }) {
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const bullets = lines.filter((l) => l.startsWith("- ")).map((l) => l.slice(2).trim());
+  const rest = lines.filter((l) => !l.startsWith("- "));
+
+  // No structure at all: render it as it always was.
+  if (bullets.length === 0) {
+    return <p className="text-green-200/90 text-[11px] leading-relaxed whitespace-pre-line">{text}</p>;
+  }
+
+  const verdict = rest[0];
+  const trailing = rest.slice(1);
+
+  return (
+    <div className="text-[11px] leading-relaxed">
+      {verdict && (
+        // The headline, set apart — the one sentence somebody repeats.
+        <p className="text-green-100 font-medium mb-1">{verdict}</p>
+      )}
+      <ul className="space-y-0.5">
+        {bullets.map((b, i) => (
+          <li key={i} className="flex gap-1.5 text-green-200/90">
+            <span className="text-green-400/50 shrink-0" aria-hidden>▸</span>
+            <span className="min-w-0">{b}</span>
+          </li>
+        ))}
+      </ul>
+      {trailing.map((t, i) => (
+        <p key={i} className="text-green-300/70 mt-1">{t}</p>
+      ))}
     </div>
   );
 }

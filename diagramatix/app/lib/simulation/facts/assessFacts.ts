@@ -121,18 +121,48 @@ export function summariseComparison(f: ComparisonFacts): string {
 
 const ASSESS_SYSTEM = `You are a process-improvement analyst helping a business audience read a discrete-event simulation that compares two versions of the same process: a baseline ("as-is") and a proposed redesign ("to-be").
 
-You are given a JSON object of ALREADY-COMPUTED figures. Write a SHORT assessment — 2 to 4 sentences, plain English, no bullet points, no headings — that explains not just WHAT changed but WHY. Good causal explanations: lower bottleneck utilisation means work stops queueing, so both the typical time and its variability fall; a tighter spread (sd) or smaller typical→near-worst gap means the process is more predictable; cheaper cost-per-case comes from moving work to a lower-cost resource; equal throughput means both versions clear the same demand, so the win is speed/cost/predictability, not volume.
+You are given a JSON object of ALREADY-COMPUTED figures. Explain not just WHAT changed but WHY.
+
+FORMAT — follow it exactly; the screen renders these two parts differently:
+Line 1: THE VERDICT. One sentence, under 20 words, no bullet, no label. The
+sentence a manager would repeat in a meeting. Lead with the answer, not the
+setup — "Two more administrators buy nothing: the queue is not there." not
+"This scenario was compared against the baseline."
+Then: 2 to 4 bullet lines, each starting "- ", each ONE sentence of at most
+about 25 words, each carrying at most two or three figures. Cover, in this
+order and only where the facts support it: what moved (or did not), WHY it
+moved, and what it costs. One idea per bullet.
+
+Never put every number in one sentence. A reader who has to hold six figures at
+once has been handed the raw data again, which is what they came here to avoid. Good causal explanations: lower bottleneck utilisation means work stops queueing, so both the typical time and its variability fall; a tighter spread (sd) or smaller typical→near-worst gap means the process is more predictable; cheaper cost-per-case comes from moving work to a lower-cost resource; equal throughput means both versions clear the same demand, so the win is speed/cost/predictability, not volume.
 
 STRICT RULES
 - Use ONLY numbers present in the facts JSON. Never invent, recompute, or infer a figure that isn't there. You MAY round for readability ("about 4.5x faster", "~80% cheaper") and convert minutes to hours when it reads better.
 - Vocabulary: "typical" = per-case p50; "near-worst" = per-case p95; "spread" = sd. These describe individual cases, not run averages.
 - Be honest and specific. If throughput is essentially unchanged, say so and explain why. Don't oversell; if a metric barely moved, don't dwell on it.
 - Refer to the two versions by their given names (baseName, tobeName).
-- Output plain prose only. No preamble like "Here is". Start directly with the assessment.`;
+- No preamble like "Here is", no headings, no closing summary. Start directly with the verdict line.`;
 
 export type SimAssessmentResult =
-  | { ok: true; assessment: string; model: string }
+  | { ok: true; assessment: string; model: string; truncated?: boolean }
   | { ok: false; status: number; error: string };
+
+/**
+ * Output budget for the assessment.
+ *
+ * It was 512, which cut a normal reply off mid-word — Paul, 2026-09-11, quoting
+ * an assessment that ended "...because headcount is unchan". The prompt asks for
+ * 2 to 4 sentences, but they are sentences carrying half a dozen figures each,
+ * and a capable model writes them long. 512 was a guess that held only while the
+ * default model wrote tersely.
+ *
+ * 1500 is comfortably above any 4-sentence reply, and the cost of the headroom
+ * is nil: the model stops when it is finished, and only a runaway pays for the
+ * rest. The TRUNCATION CHECK below is the real fix — a budget can always be
+ * beaten, and serving a half-sentence as though it were the analysis is the part
+ * that actually misleads.
+ */
+const ASSESS_MAX_TOKENS = 1500;
 
 export async function generateSimAssessment(args: { apiKey: string; facts: ComparisonFacts }, redactor?: Redactor): Promise<SimAssessmentResult> {
   const model = await getAiGenerateModel();
@@ -143,13 +173,26 @@ export async function generateSimAssessment(args: { apiKey: string; facts: Compa
   try {
     const message = await client.messages.create({
       model,
-      max_tokens: 512,
+      max_tokens: ASSESS_MAX_TOKENS,
       system: ASSESS_SYSTEM,
       messages: [{ role: "user", content: redactor ? redactor.redact(payload) : payload }],
     });
     const block = message.content.find((b) => b.type === "text");
     if (!block || block.type !== "text") return { ok: false, status: 500, error: "No response from AI" };
-    return { ok: true, assessment: redactor ? redactor.restore(block.text.trim()) : block.text.trim(), model };
+
+    // Did the model FINISH, or did it run out of room? An assessment that stops
+    // mid-sentence still reads as an assessment — there is no visual difference
+    // — so the reader takes a half-formed judgement for a complete one. Say so
+    // instead. (The OpenAI-shaped adapter maps finish_reason "length" onto this
+    // same stop_reason, so the check holds for every provider.)
+    const truncated = message.stop_reason === "max_tokens";
+    const text = block.text.trim();
+    return {
+      ok: true,
+      assessment: redactor ? redactor.restore(text) : text,
+      model,
+      ...(truncated ? { truncated: true } : {}),
+    };
   } catch (err) {
     return { ok: false, status: 500, error: `Assessment failed: ${err instanceof Error ? err.message : String(err)}` };
   }

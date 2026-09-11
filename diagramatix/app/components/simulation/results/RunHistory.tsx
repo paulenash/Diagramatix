@@ -69,7 +69,7 @@ export function RunHistory({ historyUrl, runItemUrl, assessUrl, refreshKey }: {
           body: JSON.stringify({ baselineRunId: compareEntries[0].key, compareRunId: compareEntries[1].key }),
         });
         const json = await res.json().catch(() => ({}));
-        return res.ok ? { assessment: json.assessment } : { error: json.error || "Assessment failed" };
+        return res.ok ? { assessment: json.assessment, truncated: json.truncated === true } : { error: json.error || "Assessment failed" };
       }
     : undefined;
 

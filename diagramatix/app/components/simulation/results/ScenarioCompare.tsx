@@ -51,7 +51,7 @@ export function ScenarioCompare({ scenarios, runUrlFor, assessUrl }: { scenarios
           body: JSON.stringify({ baselineScenarioId: baseline.id, compareScenarioId: firstCompare.id }),
         });
         const json = await res.json().catch(() => ({}));
-        return res.ok ? { assessment: json.assessment } : { error: json.error || "Assessment failed" };
+        return res.ok ? { assessment: json.assessment, truncated: json.truncated === true } : { error: json.error || "Assessment failed" };
       }
     : undefined;
 
