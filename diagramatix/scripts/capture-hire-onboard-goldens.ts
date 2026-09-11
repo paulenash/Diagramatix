@@ -44,12 +44,14 @@ const waitAt = (s: AggregatedStats, suffix: string) => {
   return hit ? hit[1].wait.mean : NaN;
 };
 
-const WANTED = [
-  "As-is — today's team",
-  "More desks, no more people",
-  "Hire two more administrators",
-  "Train a third checker",
-];
+/**
+ * EVERY scenario the package ships, not a list kept alongside it.
+ *
+ * It was a hand-written list of four. Two scenarios were added and captured
+ * nothing — which is the quiet half of the failure, because a scenario with no
+ * golden is a scenario whose numbers nothing is watching.
+ */
+const WANTED = pkg.scenarios.map((s) => s.name);
 
 const scenarios: Record<string, Record<string, number>> = {};
 for (const name of WANTED) {

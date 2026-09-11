@@ -1,7 +1,7 @@
 {
   "seed": 20270705,
   "replications": 10,
-  "capturedAt": "2026-09-08",
+  "capturedAt": "2026-09-11",
   "scenarios": {
     "As-is — today's team": {
       "completed": 591.7,
@@ -33,6 +33,22 @@
       "flowP95": 1155.6,
       "costPerCase": 1424.8,
       "vettingWait": 3.94,
+      "hrOpsUtil": 0.6
+    },
+    "Advertise for one week, not two": {
+      "completed": 594.9,
+      "flowP50": 818.44,
+      "flowP95": 986.95,
+      "costPerCase": 1432.89,
+      "vettingWait": 9.89,
+      "hrOpsUtil": 0.6
+    },
+    "Advertise one week, start a week sooner": {
+      "completed": 593.1,
+      "flowP50": 648.94,
+      "flowP95": 799.93,
+      "costPerCase": 1436.92,
+      "vettingWait": 9.89,
       "hrOpsUtil": 0.6
     }
   }

@@ -12490,7 +12490,7 @@
       "slug": "hire-and-onboard",
       "title": "Hire & Onboard",
       "concept": "Four people in HR Operations, only two accredited to sign off a vetting review — the constraint is not headcount, it is who is allowed to do the work.",
-      "description": "A regulated employer hiring ~790 people a year. Every team sits under 60% utilisation, so nothing in the\nutilisation panel looks wrong — and yet every hire waits about two working days at one step.\n\nOnly 2 of HR Operations' 4 people are accredited to sign off a compliance & vetting review, and those two\nrun at 92%. Adding desks changes nothing. Hiring two more administrators changes almost nothing. Training\na third checker collapses the queue and buys ~50% more hiring volume.\n\nFill the skills matrix from the ArchiMate operating model rather than typing it: Actor →assignment→ Role\nmeans the person holds the skill, Role →assignment→ Business Process means the work requires it, and a\nRole that aggregates others is a bundle. Two things deliberately do NOT match — a contractor who is on no\nteam, and an 'Exit interview' with no BPMN task — because a fill that quietly matches nothing looks exactly\nlike a fill that worked.\n\nThen: sweep the arrival rate to find where the current accreditation cover falls over, run the tornado to\nsee HR Operations' headcount sit flat while the arrival rate runs the width of the chart, and build the\nbusiness case. The £120/hour cost of an unfilled role is an ASSUMPTION — replace it with yours.",
+      "description": "A regulated employer hiring ~790 people a year. Every team sits under 60% utilisation, so nothing in the\nutilisation panel looks wrong — and yet every hire waits about two working days at one step.\n\nOnly 2 of HR Operations' 4 people are accredited to sign off a compliance & vetting review. Adding desks\nchanges nothing — capacity is not people. Hiring two more administrators, at ~£176k a year, changes\nnothing either: they cannot do the accredited work. Training a third checker DOES collapse that queue,\nfrom about 9 hours to 4 — and still barely moves the total, which is the point of the example.\n\nBecause ~85% of the 988-hour elapsed time is two waiting periods nobody is working through: the\nadvertising window and the wait for a start date. Advertise for one week instead of two and the typical\nhire lands 17% sooner; bring the start date forward a week as well and it is 34%, for no money at all.\nFour staffing levers move the number by nothing and two calendar decisions take a third off it — which is\nthe whole argument for simulating before spending.\n\nFill the skills matrix from the ArchiMate operating model rather than typing it: Actor →assignment→ Role\nmeans the person holds the skill, Role →assignment→ Business Process means the work requires it, and a\nRole that aggregates others is a bundle. Two things deliberately do NOT match — a contractor who is on no\nteam, and an 'Exit interview' with no BPMN task — because a fill that quietly matches nothing looks exactly\nlike a fill that worked.\n\nThen: sweep the arrival rate to find where the current accreditation cover falls over, run the tornado to\nsee HR Operations' headcount sit flat while the arrival rate runs the width of the chart, and build the\nbusiness case. The £120/hour cost of an unfilled role is an ASSUMPTION — replace it with yours.",
       "difficulty": "advanced",
       "package": {
         "version": 1,
@@ -16426,7 +16426,7 @@
             }
           },
           {
-            "name": "Train a third checker + triage critical roles",
+            "name": "Advertise for one week, not two",
             "runConfig": {
               "clockUnit": "hour",
               "horizon": 8760,
@@ -16436,18 +16436,39 @@
               "collectQueues": true
             },
             "overrides": {
-              "teams": {
-                "HR Operations": {
-                  "members": [
-                    {
-                      "name": "Marta Silva",
-                      "skills": [
-                        "Onboarding Administration",
-                        "Compliance Accreditation"
-                      ]
-                    }
-                  ],
-                  "discipline": "priority"
+              "elements": {
+                "hire-process::gather": {
+                  "delay": {
+                    "kind": "fixed",
+                    "value": 5
+                  }
+                }
+              }
+            }
+          },
+          {
+            "name": "Advertise one week, start a week sooner",
+            "runConfig": {
+              "clockUnit": "hour",
+              "horizon": 8760,
+              "warmUp": 2160,
+              "replications": 10,
+              "seed": 20270705,
+              "collectQueues": true
+            },
+            "overrides": {
+              "elements": {
+                "hire-process::gather": {
+                  "delay": {
+                    "kind": "fixed",
+                    "value": 5
+                  }
+                },
+                "hire-process::startDate": {
+                  "delay": {
+                    "kind": "fixed",
+                    "value": 10
+                  }
                 }
               }
             }

@@ -80,6 +80,8 @@ const AS_IS = "As-is — today's team";
 const DESKS = "More desks, no more people";
 const HIRE = "Hire two more administrators";
 const TRAIN = "Train a third checker";
+const ADVERT = "Advertise for one week, not two";
+const BOTH = "Advertise one week, start a week sooner";
 
 describe("Hire & Onboard — Tier 0: the design, without running anything", () => {
   it("T3589 - the example is in the catalog, at advanced level, with both diagrams", () => {
@@ -258,4 +260,39 @@ describe("Hire & Onboard — Tier 2: golden figures", () => {
   it("T3606 - more desks reproduces its goldens exactly", () => reproduces(DESKS));
   it("T3607 - hiring two more reproduces its goldens exactly", () => reproduces(HIRE));
   it("T3608 - training a third checker reproduces its goldens exactly", () => reproduces(TRAIN));
+  it("T4240 - advertising for one week reproduces its goldens exactly", () => reproduces(ADVERT));
+  it("T4241 - the two-lever scenario reproduces its goldens exactly", () => reproduces(BOTH));
+
+  it("T4242 - every scenario the package ships has goldens", () => {
+    // The capture list used to be written out by hand beside the package. Two
+    // scenarios were added and captured nothing — a scenario with no golden is
+    // one whose numbers nothing is watching, and it looks exactly like one that
+    // is fine.
+    const missing = pkg.scenarios.map((s) => s.name).filter((n) => !golden.scenarios[n]);
+    expect(missing, "re-run scripts/capture-hire-onboard-goldens.ts").toEqual([]);
+  });
+
+  it("T4243 - the example DEMONSTRATES something: a scenario visibly moves the headline", () => {
+    // Paul, 2026-09-11: "Too little difference in the example simulation runs to
+    // show that the feature can be successfully used." Every scenario then was a
+    // staffing lever, and ~85% of this process's elapsed time is two fixed
+    // timers, so all five landed within 3 hours of each other.
+    //
+    // The guard is on the OUTCOME, not on the presence of a named scenario: a
+    // flagship example whose scenarios all agree teaches that the simulator
+    // cannot tell things apart, whatever it is called.
+    const baseline = golden.scenarios[AS_IS].flowP50;
+    const shifts = Object.entries(golden.scenarios)
+      .map(([name, g]) => ({ name, pct: Math.abs((g.flowP50 - baseline) / baseline) * 100 }));
+
+    const best = shifts.reduce((a, b) => (b.pct > a.pct ? b : a));
+    expect(best.pct, `the widest scenario moves p50 by only ${best.pct.toFixed(1)}% — the example shows nothing`).toBeGreaterThan(10);
+
+    // ...and the staffing levers still legitimately move nothing. That contrast
+    // IS the lesson, so it is asserted rather than left to chance.
+    for (const n of [DESKS, HIRE]) {
+      const pct = shifts.find((x) => x.name === n)!.pct;
+      expect(pct, `"${n}" should change the elapsed time by ~nothing`).toBeLessThan(1);
+    }
+  });
 });

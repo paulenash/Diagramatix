@@ -405,6 +405,16 @@ const RUN = {
 const HR = "HR Operations";
 const trainMarta = { name: "Marta Silva", skills: [SK.onboarding, SK.compliance] };
 
+/**
+ * An element override is keyed by the ASSEMBLED node id — "<diagram key>::<element
+ * id>", not the bare element id. Keyed wrongly it matches nothing and applies
+ * nothing, and the scenario then runs identical to the baseline: no error, no
+ * warning, just a column of zeroes. Which is the exact symptom this whole change
+ * is fixing, so the id is built rather than typed.
+ */
+const node = (elementId: string) => `hire-process::${elementId}`;
+const days = (n: number) => ({ delay: { kind: "fixed" as const, value: n } });
+
 const scenarios = [
   { name: "As-is — today's team", isBaseline: true, runConfig: RUN, overrides: {} },
   {
@@ -427,9 +437,33 @@ const scenarios = [
     name: "Train a third checker",
     runConfig: RUN, overrides: { teams: { [HR]: { members: [trainMarta] } } },
   },
+  // ── The process levers ───────────────────────────────────────────────────
+  //
+  // Paul, 2026-09-11: "Too little difference in the example simulation runs to
+  // show that the feature can be successfully used."
+  //
+  // He was right, and for a reason worth stating: about 85% of the 988-hour
+  // flow time is these two timers — the advertising window (10 working days)
+  // and the wait for a start date (15). Most of the remaining 91 hours of
+  // waiting is not contention either; it is three parallel tasks each waiting
+  // ~16 hours for the office to reopen. So EVERY staffing lever above is
+  // pulling on 0.5% of the number, and four scenarios that each move it by
+  // nothing demonstrate only that the tool is insensitive.
+  //
+  // These two cost nobody anything and take a third off the elapsed time. They
+  // do not replace the staffing scenarios — they are what makes those land,
+  // because "£176k of hiring changes nothing and a calendar change halves it"
+  // is the actual lesson, and it cannot be told with one of the two halves.
   {
-    name: "Train a third checker + triage critical roles",
-    runConfig: RUN, overrides: { teams: { [HR]: { members: [trainMarta], discipline: "priority" as const } } },
+    // 10 → 5 working days. -17%.
+    name: "Advertise for one week, not two",
+    runConfig: RUN, overrides: { elements: { [node("gather")]: days(5) } },
+  },
+  {
+    // ...and 15 → 10 working days on the start date. -34%, together.
+    name: "Advertise one week, start a week sooner",
+    runConfig: RUN,
+    overrides: { elements: { [node("gather")]: days(5), [node("startDate")]: days(10) } },
   },
 ];
 
@@ -463,9 +497,16 @@ function main() {
       "A regulated employer hiring ~790 people a year. Every team sits under 60% utilisation, so nothing in the",
       "utilisation panel looks wrong — and yet every hire waits about two working days at one step.",
       "",
-      "Only 2 of HR Operations' 4 people are accredited to sign off a compliance & vetting review, and those two",
-      "run at 92%. Adding desks changes nothing. Hiring two more administrators changes almost nothing. Training",
-      "a third checker collapses the queue and buys ~50% more hiring volume.",
+      "Only 2 of HR Operations' 4 people are accredited to sign off a compliance & vetting review. Adding desks",
+      "changes nothing — capacity is not people. Hiring two more administrators, at ~£176k a year, changes",
+      "nothing either: they cannot do the accredited work. Training a third checker DOES collapse that queue,",
+      "from about 9 hours to 4 — and still barely moves the total, which is the point of the example.",
+      "",
+      "Because ~85% of the 988-hour elapsed time is two waiting periods nobody is working through: the",
+      "advertising window and the wait for a start date. Advertise for one week instead of two and the typical",
+      "hire lands 17% sooner; bring the start date forward a week as well and it is 34%, for no money at all.",
+      "Four staffing levers move the number by nothing and two calendar decisions take a third off it — which is",
+      "the whole argument for simulating before spending.",
       "",
       "Fill the skills matrix from the ArchiMate operating model rather than typing it: Actor →assignment→ Role",
       "means the person holds the skill, Role →assignment→ Business Process means the work requires it, and a",
