@@ -18,27 +18,27 @@ import "dotenv/config";
 import { prisma } from "../app/lib/db";
 
 /** name, category — deliberately generic and cross-industry. */
-const SEED: { name: string; category: string; description?: string }[] = [
-  // The ones a process model actually gates on: an approval somebody is
-  // mandated to give, a check somebody is accredited to sign.
+const SEED: { name: string; category: string; description?: string }[
+  // Where a shipped EXAMPLE already names a skill, the seed uses that exact
+  // name. It first shipped with a generic "Negotiation" beside the example's
+  // "Offer Negotiation" — two names for one competency, on day one, in the
+  // list whose whole purpose is to stop that.
   { name: "Approval Authority", category: "Authority", description: "Mandated to approve within a defined limit." },
   { name: "Compliance Accreditation", category: "Authority", description: "Accredited to sign off a regulated check." },
   { name: "Payment Authorisation", category: "Authority", description: "Permitted to release funds." },
   { name: "Contract Signing", category: "Authority", description: "Authorised to execute a contract." },
-
   { name: "Customer Contact", category: "Operational", description: "Trained to deal directly with customers." },
   { name: "Complaint Handling", category: "Operational" },
   { name: "Case Assessment", category: "Operational" },
   { name: "Quality Review", category: "Operational" },
   { name: "Onboarding Administration", category: "Operational" },
   { name: "Payroll Administration", category: "Operational" },
-  { name: "Negotiation", category: "Operational" },
-
+  { name: "Offer Negotiation", category: "Operational", description: "Authorised to negotiate terms with a candidate or supplier." },
+  { name: "Sourcing", category: "Operational", description: "Finding and attracting candidates or suppliers." },
   { name: "Device Provisioning", category: "Technical" },
   { name: "System Configuration", category: "Technical" },
   { name: "Data Analysis", category: "Technical" },
   { name: "Technical Support", category: "Technical" },
-
   { name: "Clinical Assessment", category: "Professional", description: "Registered clinician." },
   { name: "Legal Review", category: "Professional" },
   { name: "Financial Analysis", category: "Professional" },

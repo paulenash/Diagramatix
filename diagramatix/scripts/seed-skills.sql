@@ -27,25 +27,26 @@ BEGIN;
 -- ── The seed list ──────────────────────────────────────────────────────────
 CREATE TEMP TABLE _seed_skills (ord int, name text, category text, description text) ON COMMIT DROP;
 INSERT INTO _seed_skills (ord, name, category, description) VALUES
-  ( 0, 'Approval Authority',        'Authority',    'Mandated to approve within a defined limit.'),
-  ( 1, 'Compliance Accreditation',  'Authority',    'Accredited to sign off a regulated check.'),
-  ( 2, 'Payment Authorisation',     'Authority',    'Permitted to release funds.'),
-  ( 3, 'Contract Signing',          'Authority',    'Authorised to execute a contract.'),
-  ( 4, 'Customer Contact',          'Operational',  'Trained to deal directly with customers.'),
-  ( 5, 'Complaint Handling',        'Operational',  NULL),
-  ( 6, 'Case Assessment',           'Operational',  NULL),
-  ( 7, 'Quality Review',            'Operational',  NULL),
-  ( 8, 'Onboarding Administration', 'Operational',  NULL),
-  ( 9, 'Payroll Administration',    'Operational',  NULL),
-  (10, 'Negotiation',               'Operational',  NULL),
-  (11, 'Device Provisioning',       'Technical',    NULL),
-  (12, 'System Configuration',      'Technical',    NULL),
-  (13, 'Data Analysis',             'Technical',    NULL),
-  (14, 'Technical Support',         'Technical',    NULL),
-  (15, 'Clinical Assessment',       'Professional', 'Registered clinician.'),
-  (16, 'Legal Review',              'Professional', NULL),
-  (17, 'Financial Analysis',        'Professional', NULL),
-  (18, 'Underwriting',              'Professional', NULL);
+  ( 0, 'Approval Authority'         'Authority'      'Mandated to approve within a defined limit.'),
+  ( 1, 'Compliance Accreditation'   'Authority'      'Accredited to sign off a regulated check.'),
+  ( 2, 'Payment Authorisation'      'Authority'      'Permitted to release funds.'),
+  ( 3, 'Contract Signing'           'Authority'      'Authorised to execute a contract.'),
+  ( 4, 'Customer Contact'           'Operational'    'Trained to deal directly with customers.'),
+  ( 5, 'Complaint Handling'         'Operational'    NULL),
+  ( 6, 'Case Assessment'            'Operational'    NULL),
+  ( 7, 'Quality Review'             'Operational'    NULL),
+  ( 8, 'Onboarding Administration'  'Operational'    NULL),
+  ( 9, 'Payroll Administration'     'Operational'    NULL),
+  (10, 'Offer Negotiation'          'Operational'    'Authorised to negotiate terms with a candidate or supplier.'),
+  (11, 'Sourcing'                   'Operational'    'Finding and attracting candidates or suppliers.'),
+  (12, 'Device Provisioning'        'Technical'      NULL),
+  (13, 'System Configuration'       'Technical'      NULL),
+  (14, 'Data Analysis'              'Technical'      NULL),
+  (15, 'Technical Support'          'Technical'      NULL),
+  (16, 'Clinical Assessment'        'Professional'   'Registered clinician.'),
+  (17, 'Legal Review'               'Professional'   NULL),
+  (18, 'Financial Analysis'         'Professional'   NULL),
+  (19, 'Underwriting'               'Professional'   NULL);
 
 -- ── DRY RUN: what would happen, per org ────────────────────────────────────
 -- Read this BEFORE the insert below. "would seed" means the org has no skills

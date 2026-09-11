@@ -66,3 +66,41 @@ describe("the TS and SQL skill seeds agree", () => {
     expect(TS).toContain("skipDuplicates: true");
   });
 });
+
+describe("the seed covers what the shipped examples actually use", () => {
+  /** Every skill named by any example — on a person or on a task. */
+  function exampleSkills(): string[] {
+    const data = JSON.parse(fs.readFileSync(path.join(ROOT, "app/lib/simulation/exampleData.json"), "utf8")) as {
+      examples: { package?: {
+        teams?: { members?: { skills?: string[] }[] }[];
+        diagrams?: { data?: { elements?: { properties?: { sim?: { requiredSkills?: string[] } } }[] } }[];
+      } }[];
+    };
+    const all = new Set<string>();
+    for (const ex of data.examples) {
+      for (const t of ex.package?.teams ?? []) for (const m of t.members ?? []) for (const s of m.skills ?? []) all.add(s);
+      for (const d of ex.package?.diagrams ?? []) for (const el of d.data?.elements ?? []) {
+        for (const s of el.properties?.sim?.requiredSkills ?? []) all.add(s);
+      }
+    }
+    return [...all].sort();
+  }
+
+  it("T4258 — every skill a shipped example uses is in the seed, spelled the same way", () => {
+    // The seed first shipped with a generic "Negotiation" while the Hire &
+    // Onboard example had always said "Offer Negotiation". Four of its five task
+    // skills matched exactly and one missed by a word, so a freshly seeded org
+    // held two names for one competency — in the list whose entire purpose is to
+    // stop that — and the screen reported the example's own name as an orphan.
+    //
+    // Checked by NAME equality, not by fuzzy similarity: near-synonyms are
+    // exactly what went wrong, and a matcher loose enough to pair them would be
+    // loose enough to pair things that genuinely differ.
+    const used = exampleSkills();
+    expect(used.length, "no skills found in exampleData.json — the scan has gone stale").toBeGreaterThan(3);
+
+    const seeded = new Set(tsNames());
+    const missing = used.filter((s) => !seeded.has(s));
+    expect(missing, "seed these, or rename them in the example — do not ship both spellings").toEqual([]);
+  });
+});
