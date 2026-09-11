@@ -1,7 +1,12 @@
 /**
  * The AI-Generate default model, persisted as a global AppSetting so a SuperAdmin
- * can change it without a deploy. Reads fall back to DEFAULT_AI_MODEL (Kimi K3)
+ * can change it without a deploy. Reads fall back to DEFAULT_AI_MODEL (Opus 5)
  * when unset or pointing at a since-removed model.
+ *
+ * The ROW WINS. A comment here naming the constant is not evidence of what
+ * production uses — this docblock said "Kimi K3" for a week after Opus 5 became
+ * the default everywhere, which is how the wrong answer got repeated. Read the
+ * AppSetting, or the SuperAdmin AI Model screen.
  */
 import { prisma } from "@/app/lib/db";
 import { resolveAiModel, isKnownAiModel } from "./models";
