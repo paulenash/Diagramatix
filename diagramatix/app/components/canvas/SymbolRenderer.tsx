@@ -3334,7 +3334,10 @@ function SymbolRendererInner({
       })()}
 
       {/* Drill-back icon on start events when this diagram was navigated to from a subprocess/substate */}
-      {(element.type === "start-event" || element.type === "initial-state") && onDrillBack && !element.boundaryHostId && (
+      {/* Whether this element is the one that carries the marker is Canvas's
+          decision (drillBackAnchorId) — repeating a type test here is how the
+          EPC case came to have no way back while BPMN did. */}
+      {onDrillBack && !element.boundaryHostId && (
         <g
           transform={`translate(${element.x - 2},${element.y - 2})`}
           style={{ cursor: "pointer", pointerEvents: "all" }}

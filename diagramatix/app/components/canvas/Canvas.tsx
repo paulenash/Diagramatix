@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useRef, useState, useCallback, useEffect, useMemo } from "react";
+import { findDrillBackAnchor } from "@/app/lib/diagram/drillBackAnchor";
 import { nanoid } from "nanoid";
 import type {
   ArchimateConnectorType,
@@ -4358,6 +4359,17 @@ export function Canvas({
       return depthA - depthB;
     });
   // Compute sublane IDs: lanes whose parent is also a lane
+
+  /**
+   * Which element carries the "back" marker — see findDrillBackAnchor. The
+   * rule lives in a pure function because it is worth testing, and a rule you
+   * cannot call is a rule you can only assert the source text of.
+   */
+  const drillBackAnchorId = useMemo(
+    () => (onDrillBack ? findDrillBackAnchor(data.elements ?? [], data.connectors ?? [], diagramType) : null),
+    [onDrillBack, data.elements, data.connectors, diagramType],
+  );
+
   const sublaneIds = useMemo(() => {
     const laneIds = new Set(data.elements.filter(e => e.type === "lane").map(e => e.id));
     const result = new Set<string>();
@@ -5581,7 +5593,7 @@ export function Canvas({
                 onEnterConnectionMode={el.type !== "final-state" && diagramType !== "value-chain" ? () => setPendingConnSourceId(el.id) : undefined}
                 onCancelConnectionMode={() => setPendingConnSourceId(null)}
                 inConnectionMode={pendingConnSourceId === el.id}
-                onDrillBack={(el.type === "start-event" || el.type === "initial-state") ? onDrillBack : undefined}
+                onDrillBack={el.id === drillBackAnchorId ? onDrillBack : undefined}
                 showValueDisplay={showValueDisplay}
               />
             );
@@ -6084,7 +6096,7 @@ export function Canvas({
                 // below), not by reverting the user's drag.
                 return false;
               }}
-              onDrillBack={(el.type === "start-event" || el.type === "initial-state") ? onDrillBack : undefined}
+              onDrillBack={el.id === drillBackAnchorId ? onDrillBack : undefined}
               showValueDisplay={showValueDisplay}
             />
             );

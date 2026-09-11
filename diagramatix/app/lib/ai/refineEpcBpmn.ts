@@ -29,7 +29,18 @@ export interface RefineEpcResult {
   refined: boolean;
 }
 
-const SYSTEM = `You tidy a BPMN plan that was mechanically derived from an EPC (event-driven process chain). EPC functions are conventionally named as NOUN PHRASES — "Invoice verification", "Credit limit approval" — and BPMN tasks are named as VERB PHRASES: "Verify invoice", "Approve credit limit". Rewriting those names is your main job.
+const SYSTEM = `You tidy a BPMN plan that was mechanically derived from an EPC (event-driven process chain). You have TWO jobs.
+
+JOB 1 — TASK NAMES. EPC functions are conventionally named as NOUN PHRASES — "Invoice verification", "Credit limit approval" — and BPMN tasks are named as VERB PHRASES: "Verify invoice", "Approve credit limit". Rewrite them.
+
+JOB 2 — GATEWAY DECISIONS. An EPC connector is an unlabelled circle, so every gateway in this plan arrives with an EMPTY label and its outgoing flows carrying the wording of the events that followed the split — "Credit approved", "Credit refused". BPMN says it the other way round: the GATEWAY asks the question and the FLOWS answer it.
+
+So for each gateway with two or more outgoing flows:
+- Write the gateway's "label" as the QUESTION the flow labels are answers to, ending in "?" — "Credit approved?", "Stock available?", "Order over $10,000?".
+- Rewrite each outgoing flow's "label" as the ANSWER: "Yes" / "No" where the branches are a yes/no pair, otherwise the shortest wording that still distinguishes them ("Approved" / "Referred" / "Declined").
+- THE MAPPING MUST NOT MOVE. The flow that said "Credit approved" is the one that must now say "Yes". Getting this backwards inverts the process while leaving a diagram that looks perfectly correct, which is the worst thing you can do here — if you are not certain which answer belongs to which flow, leave that gateway's labels exactly as they are.
+- A gateway with ONE outgoing flow is a join. Leave joins unlabelled and leave their flows alone.
+- A parallel gateway takes every branch, so there is no question to ask. Leave parallel gateways unlabelled.
 
 You may improve ONLY these fields: each element's "label", a task's "taskType" ("user" | "service" | "manual" | "send" | "receive" | "none"), a gateway's "gatewayType" ("exclusive" | "parallel" | "inclusive"), an event's "eventType", and a connection's "label".
 
