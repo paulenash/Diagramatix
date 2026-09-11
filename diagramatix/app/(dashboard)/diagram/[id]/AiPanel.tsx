@@ -211,6 +211,11 @@ export function AiPanel({
   const [listening, setListening] = useState(false);
   const [dictEngine, setDictEngine] = useState<"deepgram" | "browser" | null>(null);
   const dictRef = useRef<DictationHandle | null>(null);
+  /** Whether the text in the box was spoken. A property of the TEXT, not of
+   *  the moment it is saved — somebody dictates, tidies by hand, then saves. A
+   *  ref because nothing renders from it and a re-render must not reset it. */
+  const dictatedRef = useRef(false);
+
   // startDictation is async (token fetch + getUserMedia permission prompt).
   // If the user clicks Stop DURING that window, dictRef is still null so the
   // stop is a no-op and the resolving handle would leave an orphaned live mic.
@@ -231,6 +236,7 @@ export function AiPanel({
     stopRequestedRef.current = false;
     setListening(true);
     setError(null);
+    dictatedRef.current = true;
     const handle = await startDictation({
       onText: (text) => setPrompt(prev => {
         const base = prev && !prev.endsWith(" ") && !prev.endsWith("\n") ? prev + " " : prev;
@@ -401,6 +407,8 @@ export function AiPanel({
           selectedPromptId: sel?.id,
           selectedPromptName: sel?.name,
           selectedPromptUnchanged: sel ? sel.text.trim() === effPrompt : undefined,
+          promptSource: dictatedRef.current ? "dictated" : "typed",
+          promptFromImage: attachment?.type === "image",
         });
       }
     } catch (err) {
@@ -442,6 +450,8 @@ export function AiPanel({
           selectedPromptId: sel?.id,
           selectedPromptName: sel?.name,
           selectedPromptUnchanged: sel ? sel.text.trim() === effPrompt : undefined,
+          promptSource: dictatedRef.current ? "dictated" : "typed",
+          promptFromImage: attachment?.type === "image",
         });
       }
       onComparison?.(result.comparison);
@@ -487,7 +497,11 @@ export function AiPanel({
         const res = await fetch("/api/prompts", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: saveName.trim(), text: prompt.trim(), diagramType }),
+          body: JSON.stringify({
+            name: saveName.trim(), text: prompt.trim(), diagramType,
+            source: dictatedRef.current ? "dictated" : "typed",
+            fromImage: attachment?.type === "image",
+          }),
         });
         if (res.ok) { setShowSave(false); setSaveName(""); loadPrompts(); }
       }

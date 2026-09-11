@@ -1527,7 +1527,15 @@ export function DiagramEditor({
       }
       const res = await fetch(`/api/prompts`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: autoName, text: meta.promptText, diagramType, ...planField }),
+        body: JSON.stringify({
+          name: autoName, text: meta.promptText, diagramType, ...planField,
+          // Whatever the panel knew. Omitted fields stay NULL rather than
+          // defaulting to "typed" — an auto-created prompt whose provenance
+          // nobody reported is genuinely unknown.
+          ...(meta.promptSource ? { source: meta.promptSource } : {}),
+          ...(meta.promptFromImage ? { fromImage: true } : {}),
+          ...(meta.promptRefined ? { refined: true } : {}),
+        }),
       });
       if (!res.ok) return null;
       const created = await res.json();

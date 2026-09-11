@@ -536,6 +536,18 @@ export interface AiApplyMeta {
    *  the model. Absent for one-shot generators (AiPanel) that have no separate
    *  plan step. */
   planJson?: { elements: unknown[]; connections: unknown[] };
+  /**
+   * How the prompt text came to be, for the Prompt row this generation links
+   * or auto-creates.
+   *
+   * It has to travel with the meta because the prompt is created in
+   * DiagramEditor, which can see neither the panel's microphone nor its
+   * attachment. Absent means NOT RECORDED, which is a different fact from
+   * "typed" and is stored as such.
+   */
+  promptSource?: "typed" | "dictated";
+  promptFromImage?: boolean;
+  promptRefined?: boolean;
 }
 
 export interface ProcessOwner {

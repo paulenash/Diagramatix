@@ -181,7 +181,11 @@ export function PromptMaintenance() {
       const res = await fetch(url, {
         method: editingId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: editName.trim(), text: editText.trim(), diagramType: activeType }),
+        body: JSON.stringify({
+          name: editName.trim(), text: editText.trim(), diagramType: activeType,
+          // Typed by definition: this is a form, not a microphone.
+          ...(editingId ? {} : { source: "typed" }),
+        }),
       });
       if (res.ok) {
         setMessage({ text: editingId ? "Prompt saved" : "Prompt created", type: "success" });

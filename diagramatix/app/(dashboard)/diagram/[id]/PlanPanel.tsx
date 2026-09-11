@@ -285,6 +285,9 @@ export function PlanPanel({
           selectedPromptId: sel?.id,
           selectedPromptName: sel?.name,
           selectedPromptUnchanged: sel ? sel.text.trim() === effPrompt : undefined,
+          promptSource: dictatedRef.current ? "dictated" : "typed",
+          promptFromImage: attachment?.type === "image",
+          promptRefined: refinedRef.current,
         });
       }
       onComparison?.(result.comparison);
@@ -731,9 +734,17 @@ export function PlanPanel({
         name: saveName.trim(),
         text: prompt.trim(),
         planJson: hasPlan ? plan : null,
-        // Recorded at the only moment it is knowable. Afterwards the text looks
-        // the same however it was made, which is why none of this can be
-        // reconstructed later for the prompts that already exist.
+      };
+      /**
+       * How the prompt came to be — sent on CREATE only.
+       *
+       * Recorded at the only moment it is knowable: afterwards the text looks
+       * the same however it was made, which is why none of it can be
+       * reconstructed for the prompts that already exist. And deliberately NOT
+       * sent on the update — tidying the wording of something you dictated does
+       * not make it typed.
+       */
+      const provenance = {
         source: dictatedRef.current ? "dictated" : "typed",
         fromImage: attachment?.type === "image",
         refined: refinedRef.current,
@@ -749,7 +760,7 @@ export function PlanPanel({
         res = await fetch("/api/prompts", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...body, diagramType }),
+          body: JSON.stringify({ ...body, ...provenance, diagramType }),
         });
       }
       if (!res.ok) throw new Error("Save failed");
@@ -935,6 +946,9 @@ export function PlanPanel({
           selectedPromptId: sel?.id,
           selectedPromptName: sel?.name,
           selectedPromptUnchanged: sel ? sel.text.trim() === effPrompt : undefined,
+          promptSource: dictatedRef.current ? "dictated" : "typed",
+          promptFromImage: attachment?.type === "image",
+          promptRefined: refinedRef.current,
           // Retain the generated plan on the linked Prompt (Prompt.planJson) so
           // the diagram keeps its plan for re-layout / inspection.
           planJson: plan,
