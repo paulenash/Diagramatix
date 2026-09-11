@@ -13,22 +13,39 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { tryGetCurrentOrgId, requireOrgAdminFor } from "@/app/lib/auth/orgContext";
+import { isActingSuperuser } from "@/app/lib/auth/orgPolicy";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import {
   listSkills, createSkill, updateSkill, deleteSkill, orphanSkillNames,
 } from "@/app/lib/simulation/skillCatalog";
 
-async function ctx() {
+/**
+ * Who is asking, and about WHICH org.
+ *
+ * A SuperAdmin may target any org with `?orgId=` (or an `orgId` in the body),
+ * because they maintain every org's vocabulary. For anyone else the parameter is
+ * IGNORED rather than refused: a URL is not a permission, and honouring one
+ * would make the query string the access-control surface. They always get their
+ * own active org, whatever they ask for.
+ */
+async function ctx(req: Request, bodyOrgId?: unknown) {
   const session = await auth();
   if (!session?.user?.id) return null;
   const cookieStore = await cookies();
-  const orgId = await tryGetCurrentOrgId(session, cookieStore);
+
+  const activeOrgId = await tryGetCurrentOrgId(session, cookieStore);
+  const su = await isActingSuperuser(session);
+  const asked = typeof bodyOrgId === "string" && bodyOrgId
+    ? bodyOrgId
+    : new URL(req.url).searchParams.get("orgId");
+  const orgId = su && asked ? asked : activeOrgId;
   if (!orgId) return null;
-  return { session, cookieStore, orgId, readOnly: isReadOnlyImpersonation(session, cookieStore) };
+
+  return { session, cookieStore, orgId, su, readOnly: isReadOnlyImpersonation(session, cookieStore) };
 }
 
 export async function GET(req: Request) {
-  const c = await ctx();
+  const c = await ctx(req);
   if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const url = new URL(req.url);
@@ -54,12 +71,12 @@ async function gateWrite(c: NonNullable<Awaited<ReturnType<typeof ctx>>>) {
 }
 
 export async function POST(req: Request) {
-  const c = await ctx();
+  const body = await req.json().catch(() => null) as { name?: unknown; category?: unknown; description?: unknown; orgId?: unknown } | null;
+  const c = await ctx(req, body?.orgId);
   if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const blocked = await gateWrite(c);
   if (blocked) return blocked;
 
-  const body = await req.json().catch(() => null) as { name?: unknown; category?: unknown; description?: unknown } | null;
   if (typeof body?.name !== "string") return NextResponse.json({ error: "name is required" }, { status: 400 });
 
   const r = await createSkill(c.orgId, {
@@ -72,13 +89,13 @@ export async function POST(req: Request) {
 }
 
 export async function PATCH(req: Request) {
-  const c = await ctx();
+  const body = await req.json().catch(() => null) as
+    | { id?: unknown; category?: unknown; description?: unknown; active?: unknown; sortOrder?: unknown; orgId?: unknown } | null;
+  const c = await ctx(req, body?.orgId);
   if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const blocked = await gateWrite(c);
   if (blocked) return blocked;
 
-  const body = await req.json().catch(() => null) as
-    | { id?: unknown; category?: unknown; description?: unknown; active?: unknown; sortOrder?: unknown } | null;
   if (typeof body?.id !== "string") return NextResponse.json({ error: "id is required" }, { status: 400 });
 
   const r = await updateSkill(c.orgId, body.id, {
@@ -92,7 +109,7 @@ export async function PATCH(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const c = await ctx();
+  const c = await ctx(req);
   if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const blocked = await gateWrite(c);
   if (blocked) return blocked;

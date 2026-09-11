@@ -137,3 +137,34 @@ describe("the Skills list is reachable and gated", () => {
       .toMatch(/a hidden button is not a permission check/i);
   });
 });
+
+describe("a SuperAdmin maintains any org's list", () => {
+  const ROOT = path.resolve(__dirname, "..", "..");
+  const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), "utf8");
+
+  it("T4255 — the target org is honoured for a SuperAdmin and IGNORED for everyone else", () => {
+    // A URL is not a permission. Honouring ?orgId= for a non-SuperAdmin would
+    // make the address bar the access-control surface — and the failure would be
+    // silent, because the screen would look exactly the same.
+    const route = read("app/api/skills/route.ts");
+    expect(route).toContain("isActingSuperuser");
+    expect(route).toMatch(/const orgId = su && asked \? asked : activeOrgId;/);
+  });
+
+  it("T4256 — every write carries the org, so the wrong list cannot be edited", () => {
+    // The heading can say one org while the request goes to another; that is
+    // indistinguishable on screen from working correctly.
+    const client = read("app/(dashboard)/dashboard/admin/skills/SkillsClient.tsx");
+    for (const call of ["orphans=1&orgId=", "category: category || null, orgId }", "{ id, ...body, orgId }"]) {
+      expect(client, call).toContain(call);
+    }
+    // Both delete paths, not just the plain one.
+    expect((client.match(/&orgId=\$\{encodeURIComponent\(orgId\)\}/g) ?? []).length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("T4257 — the screen names the org whose list is shown", () => {
+    const client = read("app/(dashboard)/dashboard/admin/skills/SkillsClient.tsx");
+    expect(client).toContain("{orgName}");
+    expect(client).toMatch(/isSuperAdmin && orgs\.length > 1/);
+  });
+});

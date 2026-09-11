@@ -828,6 +828,7 @@ const ADMIN_TILES: AdminTile[] = [
   { id: "groups", title: "Collaboration Groups", description: "Every Collaboration Group in the system.", href: "/dashboard/admin/groups" },
   { id: "ai-plan", title: "AI Plan Formats", description: "Saved AI two-phase plan format templates.", href: "/dashboard/admin/ai-plan-format", feature: "ai" },
   { id: "org-settings", title: "Org Settings", description: "Manage Orgs, OrgAdmins, and cross-Org sharing.", href: "/dashboard/admin/org-settings" },
+  { id: "skills", title: "Skills", description: "The master list of skills people hold and tasks require; only someone on a task's team who holds every required skill can do the work.", href: "/dashboard/admin/skills?from=/dashboard/admin", feature: "simulator" },
   { id: "entity-lists", title: "Entity Lists", description: "Org structures, external participants and IT systems for BPMN pool/lane naming.", href: "/dashboard/admin/entity-lists", feature: "entityLists" },
   { id: "team-membership", title: "Team Membership", description: "Assign Org members to teams / roles (Org-Structure Entity List) — powers the Process Portal's “Involving me” view. Applies to the currently-active Org.", href: "/dashboard/org-admin/team-membership", feature: "entityLists" },
   { id: "risk-controls", title: "Risk & Control Catalog", description: "Master library of Risks and Controls; projects adopt a copy, attach them to steps and export a Risk-Control Matrix.", href: "/dashboard/admin/risk-controls", feature: "riskControl" },

@@ -18,6 +18,7 @@
  *    there is shown, and can be pulled in.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 
 interface Skill {
@@ -27,7 +28,14 @@ interface Skill {
 
 const input = "text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500";
 
-export function SkillsClient({ canEdit }: { canEdit: boolean }) {
+export function SkillsClient({
+  orgId, orgName, isSuperAdmin, orgs, canEdit, backHref,
+}: {
+  orgId: string; orgName: string; isSuperAdmin: boolean;
+  orgs: { id: string; name: string }[];
+  canEdit: boolean; backHref: string;
+}) {
+  const router = useRouter();
   const [skills, setSkills] = useState<Skill[]>([]);
   const [orphans, setOrphans] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,7 +52,7 @@ export function SkillsClient({ canEdit }: { canEdit: boolean }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await fetch("/api/skills?includeInactive=1&orphans=1");
+      const r = await fetch(`/api/skills?includeInactive=1&orphans=1&orgId=${encodeURIComponent(orgId)}`);
       if (!r.ok) { setErr("Could not load the Skills list."); return; }
       const d = await r.json();
       setSkills(d.skills ?? []);
@@ -52,7 +60,7 @@ export function SkillsClient({ canEdit }: { canEdit: boolean }) {
       setErr(null);
     } catch { setErr("Could not reach the server."); }
     finally { setLoading(false); }
-  }, []);
+  }, [orgId]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -62,7 +70,7 @@ export function SkillsClient({ canEdit }: { canEdit: boolean }) {
     try {
       const r = await fetch("/api/skills", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, category: category || null }),
+        body: JSON.stringify({ name, category: category || null, orgId }),
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { setErr(d.error ?? "Could not add that skill."); return; }
@@ -77,7 +85,7 @@ export function SkillsClient({ canEdit }: { canEdit: boolean }) {
     try {
       const r = await fetch("/api/skills", {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, ...body }),
+        body: JSON.stringify({ id, ...body, orgId }),
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { setErr(d.error ?? "Could not save that change."); return; }
@@ -89,7 +97,7 @@ export function SkillsClient({ canEdit }: { canEdit: boolean }) {
   const tryDelete = async (skill: Skill) => {
     setBusy(true); setErr(null); setMsg(null);
     try {
-      const r = await fetch(`/api/skills?id=${encodeURIComponent(skill.id)}`, { method: "DELETE" });
+      const r = await fetch(`/api/skills?id=${encodeURIComponent(skill.id)}&orgId=${encodeURIComponent(orgId)}`, { method: "DELETE" });
       if (r.ok) { setMsg(`Deleted "${skill.name}".`); await load(); return; }
       const d = await r.json().catch(() => ({}));
       if (r.status === 409) { setConfirmDelete({ skill, inUse: d.inUse ?? 0 }); return; }
@@ -100,7 +108,7 @@ export function SkillsClient({ canEdit }: { canEdit: boolean }) {
   const forceDelete = async (skill: Skill) => {
     setBusy(true);
     try {
-      const r = await fetch(`/api/skills?id=${encodeURIComponent(skill.id)}&force=1`, { method: "DELETE" });
+      const r = await fetch(`/api/skills?id=${encodeURIComponent(skill.id)}&force=1&orgId=${encodeURIComponent(orgId)}`, { method: "DELETE" });
       if (r.ok) { setMsg(`Deleted "${skill.name}" — references to it are now unresolved.`); await load(); }
       else setErr("Could not delete that skill.");
     } finally { setBusy(false); setConfirmDelete(null); }
@@ -126,7 +134,25 @@ export function SkillsClient({ canEdit }: { canEdit: boolean }) {
   return (
     <div className="min-h-screen dgx-dashboard-bg">
       <div className="max-w-4xl mx-auto px-4 py-6">
-        <h1 className="text-lg font-semibold text-gray-900 mb-1">Skills</h1>
+        <button onClick={() => router.push(backHref)} className="text-xs text-gray-500 hover:text-gray-800 mb-2">&larr; Back</button>
+        <div className="flex items-center justify-between gap-3 mb-1">
+          <h1 className="text-lg font-semibold text-gray-900">
+            Skills <span className="font-normal text-gray-500 text-sm">&middot; {orgName}</span>
+          </h1>
+          {isSuperAdmin && orgs.length > 1 && (
+            // Naming the org in the heading as well as the picker is deliberate:
+            // a SuperAdmin editing the wrong org's vocabulary would look exactly
+            // like editing the right one.
+            <select
+              value={orgId}
+              onChange={(e) => router.push(`/dashboard/admin/skills?orgId=${encodeURIComponent(e.target.value)}&from=${encodeURIComponent(backHref)}`)}
+              className={`${input} w-56`}
+              title="Maintain another organisation's Skills list"
+            >
+              {orgs.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+            </select>
+          )}
+        </div>
         <p className="text-xs text-gray-600 mb-4 max-w-2xl">
           The master list your organisation draws on. A person on a team holds skills from this list;
           a task requires them. Only someone on the task&rsquo;s team who holds every required skill can do the work,
