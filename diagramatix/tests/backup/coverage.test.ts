@@ -162,6 +162,13 @@ const SCOPED_OMITTED = new Set<string>([
   // Deliberately never backed up or restored — copying it elsewhere would be wrong
   // (and useless: it re-obtains itself when the user clicks "Connect SharePoint").
   "MicrosoftConnection",
+  // A user's own AI key: encrypted under the MS_TOKEN_ENC_KEY of THIS deployment,
+  // exactly like MicrosoftConnection above, and omitted for the same two reasons.
+  // Restoring it somewhere else would carry a live third-party credential the
+  // person never agreed to move; restoring it here after a key rotation would
+  // carry a row nothing can decrypt. A key belongs to the environment it was
+  // entered into, and re-entering one takes a user ten seconds.
+  "UserAiKey",
   ...SIMULATOR_CONFIG_TABLES,
   ...SIMULATOR_RESULT_TABLES,
   ...MINING_TABLES,

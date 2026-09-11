@@ -9,7 +9,7 @@
  *  default, and how every built-in Claude model is treated). Moonshot/Kimi is
  *  reached via its Anthropic-compatible endpoint, so it reuses the same SDK +
  *  Messages-API shape — only the base URL + key differ (see anthropicClient.ts). */
-export type AiProvider = "anthropic" | "moonshot" | "google" | "microsoft" | "ollama" | "deepseek";
+export type AiProvider = "anthropic" | "moonshot" | "google" | "microsoft" | "ollama" | "deepseek" | "openrouter";
 
 export interface AiModel {
   id: string;
@@ -50,14 +50,22 @@ export const AI_MODELS: AiModel[] = [
  * Production default for AI Generate — what an environment uses when the
  * `ai.generate.model` setting is unset or names a model that no longer exists.
  *
- * Kimi K3 (Paul, 2026-09-04). It was Haiku 4.5, chosen when Haiku looked like the
- * best BPMN generator; regenerating V22 on it measured otherwise — roughly a
- * third of the content, with V22.07 losing about 40% of its process, and
- * duplicate names throughout ("30 days" four times on one diagram). A SILENT
- * fallback has to be a model whose output would be accepted, because by
- * definition nobody chose it and nobody is told it was used.
+ * **Opus 5** (Paul, 2026-09-11) — the default everywhere.
+ *
+ * The history is worth keeping, because it is the argument for what a fallback
+ * has to be. It was Haiku 4.5, chosen when Haiku looked like the best BPMN
+ * generator; regenerating V22 measured otherwise — roughly a third of the
+ * content, V22.07 losing about 40% of its process, and duplicate names
+ * throughout ("30 days" four times on one diagram). It was then Kimi K3 for a
+ * week. A SILENT fallback has to be a model whose output would be accepted,
+ * because by definition nobody chose it and nobody is told it was used.
+ *
+ * NOTE: this constant is only what a deployment falls back to. The LIVE default
+ * is the `ai.generate.model` AppSetting row, and a row that exists OVERRIDES
+ * this — so changing the constant alone does not change the default anywhere
+ * the row has been set. See scripts/set-default-ai-model.sql.
  */
-export const DEFAULT_AI_MODEL = "kimi-k3";
+export const DEFAULT_AI_MODEL = "claude-opus-5";
 
 /**
  * What to use when even the default is unavailable HERE.
@@ -112,8 +120,8 @@ const DEFAULT_MOONSHOT_MODELS: AiModel[] = [
   { id: "kimi-k2.7-code", label: "Kimi K2.7 Code", provider: "moonshot" },
 ];
 
-export function moonshotModels(): AiModel[] {
-  if (!resolvedEnvSecret(process.env.MOONSHOT_API_KEY)) return [];
+export function moonshotModels(unlocked?: ReadonlySet<string>): AiModel[] {
+  if (!resolvedEnvSecret(process.env.MOONSHOT_API_KEY) && !unlocked?.has("moonshot")) return [];
   const raw = process.env.MOONSHOT_MODELS?.trim();
   if (!raw) return DEFAULT_MOONSHOT_MODELS;
   return raw
@@ -145,8 +153,8 @@ const DEFAULT_DEEPSEEK_MODELS: AiModel[] = [
   { id: "deepseek-v4-pro", label: "DeepSeek V4 Pro", provider: "deepseek", vision: false },
 ];
 
-export function deepseekModels(): AiModel[] {
-  if (!resolvedEnvSecret(process.env.DEEPSEEK_API_KEY)) return [];
+export function deepseekModels(unlocked?: ReadonlySet<string>): AiModel[] {
+  if (!resolvedEnvSecret(process.env.DEEPSEEK_API_KEY) && !unlocked?.has("deepseek")) return [];
   const raw = process.env.DEEPSEEK_MODELS?.trim();
   if (!raw) return DEFAULT_DEEPSEEK_MODELS;
   return raw
@@ -247,6 +255,47 @@ const DEFAULT_OLLAMA_MODELS: AiModel[] = [
   { id: "ollama/llama3.1", label: "Llama 3.1 (local)", provider: "ollama", vision: false },
 ];
 
+/**
+ * OpenRouter — ONE key in front of hundreds of models.
+ *
+ * Unlike every other provider here it speaks **OpenAI Chat Completions**, not
+ * the Anthropic Messages API, so it goes through the openAiShape adapter rather
+ * than the SDK directly. That is the whole reason it needs no gateway: the
+ * adapter is the gateway, in-process.
+ *
+ * Model ids are namespaced `vendor/model` (`anthropic/claude-sonnet-4.6`,
+ * `openai/gpt-5.2`), which is also what keeps them apart from every other
+ * provider's ids when routing.
+ *
+ * The default list is deliberately SHORT and the env var is the real interface:
+ * OpenRouter's catalogue changes weekly, and a hardcoded list is a list that is
+ * wrong by the time anyone reads it. Set `OPENROUTER_MODELS` to exactly what
+ * this deployment should offer.
+ */
+const DEFAULT_OPENROUTER_MODELS: AiModel[] = [
+  { id: "anthropic/claude-sonnet-4.6", label: "Claude Sonnet 4.6 (OpenRouter)", provider: "openrouter", vision: true },
+  { id: "openai/gpt-5.2", label: "GPT-5.2 (OpenRouter)", provider: "openrouter", vision: true },
+];
+
+export function openrouterModels(unlocked?: ReadonlySet<string>): AiModel[] {
+  if (!resolvedEnvSecret(process.env.OPENROUTER_API_KEY) && !unlocked?.has("openrouter")) return [];
+  const raw = process.env.OPENROUTER_MODELS?.trim();
+  if (!raw) return DEFAULT_OPENROUTER_MODELS;
+  return raw
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const [id, ...rest] = entry.split("|");
+      const label = rest.join("|").trim() || id.trim();
+      // Vision is UNKNOWN for an id somebody typed into an env var, and unknown
+      // is stored as unknown — claiming true would offer it for image work it
+      // may not do, and claiming false would hide a model that can.
+      return { id: id.trim(), label: `${label} (OpenRouter)`, provider: "openrouter" as const };
+    })
+    .filter((m) => m.id.length > 0);
+}
+
 export function ollamaModels(): AiModel[] {
   if (!process.env.OLLAMA_BASE_URL?.trim()) return [];
   const raw = process.env.OLLAMA_MODELS?.trim();
@@ -265,8 +314,20 @@ export function ollamaModels(): AiModel[] {
 
 /** Claude models, plus Moonshot/Kimi, Google/Gemini, Microsoft/Azure and local
  *  Ollama (each when configured), plus any local/custom models. */
-export const allModels = (): AiModel[] => [
-  ...AI_MODELS, ...moonshotModels(), ...googleModels(), ...microsoftModels(), ...deepseekModels(), ...ollamaModels(), ...customModels(),
+/**
+ * Every model this deployment can call.
+ *
+ * `unlocked` names providers the CURRENT USER has supplied their own key for.
+ * Their models are then listed even though the deployment has no key of its own
+ * — otherwise storing a key unlocks nothing, because the picker is built from
+ * the deployment's environment and has never heard of the provider.
+ *
+ * Omitted everywhere except the model-picker route, so every other caller keeps
+ * the deployment-only view it has always had.
+ */
+export const allModels = (unlocked?: ReadonlySet<string>): AiModel[] => [
+  ...AI_MODELS, ...moonshotModels(unlocked), ...googleModels(), ...microsoftModels(),
+  ...deepseekModels(unlocked), ...openrouterModels(unlocked), ...ollamaModels(), ...customModels(),
 ];
 
 export const isKnownAiModel = (id: string | null | undefined): boolean =>
@@ -275,9 +336,31 @@ export const isKnownAiModel = (id: string | null | undefined): boolean =>
 export const aiModelLabel = (id: string | null | undefined): string =>
   allModels().find((m) => m.id === id)?.label ?? id ?? "(unknown)";
 
+/**
+ * The provider for a NAMESPACED id, from its shape alone.
+ *
+ * OpenRouter ids are `vendor/model`, and the slash is the tell. This matters
+ * when the registry cannot answer: `openrouterModels()` returns nothing unless
+ * the DEPLOYMENT has a key, so a user running on their OWN OpenRouter key asks
+ * about an id the registry has never heard of. Falling through to "anthropic"
+ * there would post an OpenRouter model name to Anthropic — a guaranteed failure,
+ * and one whose error message points at the wrong vendor.
+ *
+ * `aiRates.providerOf` carries the fuller prefix table for BILLING, where every
+ * id must be attributed to something. This is deliberately narrower: it only
+ * answers where the id shape is unambiguous, so an unknown bare name still
+ * defaults to Anthropic exactly as it always has.
+ */
+export function providerFromIdShape(id: string): AiProvider | undefined {
+  if (id.includes("/") && !/^ollama[/:]/i.test(id)) return "openrouter";
+  return undefined;
+}
+
 /** The provider serving a model id. Unknown / untagged ids ⇒ "anthropic". */
 export const providerForModel = (id: string | null | undefined): AiProvider =>
-  allModels().find((m) => m.id === id)?.provider ?? "anthropic";
+  allModels().find((m) => m.id === id)?.provider
+    ?? (id ? providerFromIdShape(id) : undefined)
+    ?? "anthropic";
 
 /** A model's vision capability: true / false / undefined (unknown). */
 export const modelVision = (id: string | null | undefined): boolean | undefined =>

@@ -1,5 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { makeOpenAiShapeClient } from "./openAiShape";
 import { providerForModel, resolvedEnvSecret } from "./models";
+import { currentUserAiKey } from "./aiKeyContext";
 import { recordAiInvocation } from "./aiTelemetry";
 
 /**
@@ -62,6 +64,10 @@ const MOONSHOT_DEFAULT_BASE_URL = "https://api.moonshot.ai/anthropic";
 /** DeepSeek's Anthropic-compatible endpoint. Override with `DEEPSEEK_BASE_URL`. */
 const DEEPSEEK_DEFAULT_BASE_URL = "https://api.deepseek.com/anthropic";
 
+/** OpenRouter's OpenAI-shaped endpoint. It has no Anthropic Messages API, which
+ *  is why this provider goes through the openAiShape adapter. */
+const OPENROUTER_DEFAULT_BASE_URL = "https://openrouter.ai/api/v1";
+
 /** The key env var that serves a given model's provider. */
 export function aiApiKey(model: string | null | undefined): string | undefined {
   switch (providerForModel(model)) {
@@ -69,6 +75,7 @@ export function aiApiKey(model: string | null | undefined): string | undefined {
     case "google":    return resolvedEnvSecret(process.env.GOOGLE_API_KEY);
     case "microsoft": return resolvedEnvSecret(process.env.MICROSOFT_API_KEY);
     case "deepseek":  return resolvedEnvSecret(process.env.DEEPSEEK_API_KEY);
+    case "openrouter": return resolvedEnvSecret(process.env.OPENROUTER_API_KEY);
     default:          return resolvedEnvSecret(process.env.ANTHROPIC_API_KEY);
   }
 }
@@ -81,6 +88,43 @@ export function aiApiKey(model: string | null | undefined): string | undefined {
  * branch reuse the key a caller already resolved (preserves existing plumbing).
  */
 export function aiClientConfig(
+  model: string | null | undefined,
+  fallbackApiKey?: string,
+  /**
+   * An explicit key (and optional endpoint) that OVERRIDES the deployment's env
+   * for every provider — the user's own key, resolved per request.
+   *
+   * It has to come in as an argument rather than be read here, because this
+   * function is deliberately synchronous and pure w.r.t. its args (it is unit
+   * tested without a database), and a user's key lives in one.
+   */
+  override?: { apiKey: string; baseUrl?: string },
+): { apiKey: string; baseURL?: string } {
+  const provider = providerForModel(model);
+  // The user's own key, when this request carries one FOR THIS PROVIDER. It is
+  // consulted here rather than threaded through ~16 call sites, because the one
+  // site that forgot would bill the deployment and look entirely successful.
+  const key = override ?? currentUserAiKey(provider);
+  if (key?.apiKey) {
+    // The endpoint still falls back to the provider's default when the user
+    // supplied only a key — which is the normal case, and the reason a key on
+    // its own is enough for OpenRouter, Anthropic, Moonshot and DeepSeek.
+    return {
+      apiKey: key.apiKey,
+      baseURL: key.baseUrl?.trim() || envClientConfig(model, fallbackApiKey).baseURL,
+    };
+  }
+  return envClientConfig(model, fallbackApiKey);
+}
+
+/**
+ * The provider's endpoint + key AS CONFIGURED BY THE DEPLOYMENT.
+ *
+ * Separate from `aiClientConfig` so the override path can ask for the default
+ * endpoint without re-entering the override path — which, when these were one
+ * self-calling function, recursed until the stack gave out.
+ */
+function envClientConfig(
   model: string | null | undefined,
   fallbackApiKey?: string,
 ): { apiKey: string; baseURL?: string } {
@@ -114,6 +158,14 @@ export function aiClientConfig(
       baseURL: process.env.DEEPSEEK_BASE_URL?.trim() || DEEPSEEK_DEFAULT_BASE_URL,
     };
   }
+  if (provider === "openrouter") {
+    // OpenAI-shaped; the adapter, not the SDK, talks to it. A public default
+    // endpoint exists, so a key on its own is enough.
+    return {
+      apiKey: resolvedEnvSecret(process.env.OPENROUTER_API_KEY) ?? "",
+      baseURL: process.env.OPENROUTER_BASE_URL?.trim() || OPENROUTER_DEFAULT_BASE_URL,
+    };
+  }
   if (provider === "ollama") {
     // Local Ollama via a required Anthropic-compatible gateway (LiteLLM) — the key
     // is the gateway's master key, optional if it has no auth. See gateway/OLLAMA-SETUP.md.
@@ -136,8 +188,13 @@ export function aiClientConfig(
  * identical `.messages.create(...)` interface + response shape. This is the single
  * seam where the choose-your-provider routing lives.
  */
-export function makeAiClient(model: string | null | undefined, fallbackApiKey?: string): Anthropic {
-  const { apiKey, baseURL } = aiClientConfig(model, fallbackApiKey);
+export function makeAiClient(
+  model: string | null | undefined,
+  fallbackApiKey?: string,
+  /** The caller's own key, when they have supplied one. See userAiKey.ts. */
+  override?: { apiKey: string; baseUrl?: string },
+): Anthropic {
+  const { apiKey, baseURL } = aiClientConfig(model, fallbackApiKey, override);
   const provider = providerForModel(model);
 
   // Per-invocation HTTP-attempt counter, so we can observe SDK retries (429 / 5xx /
@@ -160,6 +217,21 @@ export function makeAiClient(model: string | null | undefined, fallbackApiKey?: 
   // without anyone re-clicking. It costs nothing when the provider is healthy.
   const telemetry = { fetch: countingFetch, maxRetries: 4, timeout: 15 * 60 * 1000 };
 
+  if (provider === "openrouter") {
+    // OpenRouter speaks OpenAI Chat Completions and has NO Anthropic Messages
+    // endpoint, so the SDK cannot talk to it at all. The adapter presents the
+    // same `.messages.create()` surface, which is why none of the ~21 call
+    // sites know the difference — and why every OTHER OpenAI-compatible
+    // endpoint is now one config entry away rather than a gateway away.
+    const shaped = makeOpenAiShapeClient({
+      apiKey, baseURL: baseURL ?? "https://openrouter.ai/api/v1",
+      referer: process.env.APP_BASE_URL?.trim() || undefined,
+      title: "Diagramatix",
+      fetchImpl: countingFetch,
+    });
+    return instrumentClient(shaped as unknown as Anthropic, provider, model ?? "(unknown)", () => attempts);
+  }
+
   let client: Anthropic;
   if (provider === "moonshot" || provider === "google" || provider === "microsoft" || provider === "ollama" || provider === "deepseek") {
     // All reached via an Anthropic-compatible endpoint that authenticates with
@@ -174,6 +246,21 @@ export function makeAiClient(model: string | null | undefined, fallbackApiKey?: 
       : new Anthropic({ apiKey, ...telemetry });
   }
   return instrumentClient(client, provider, model ?? "(unknown)", () => attempts);
+}
+
+/**
+ * Best-effort `lastUsedAt` on the user's stored key. Imported lazily so this
+ * module — which is unit-tested without a database — does not pull Prisma in at
+ * load time, and never throws: a timestamp must not be able to fail a
+ * generation that has already happened.
+ */
+async function noteUserKeyUsed(provider: string): Promise<void> {
+  const ctx = currentUserAiKey(provider);
+  if (!ctx?.userId) return;
+  try {
+    const { markUserAiKeyUsed } = await import("./userAiKey");
+    await markUserAiKeyUsed(ctx.userId, provider);
+  } catch { /* never break a generation over a timestamp */ }
 }
 
 /** HTTP status (number) or error name, for the failure row's errorCode. */
@@ -231,6 +318,11 @@ function instrumentClient(
         retries,
         latencyMs: Date.now() - t0,
       });
+      // If the caller's OWN key paid for this, stamp it. Done here rather than
+      // in the routes because here is the only place that knows the call
+      // actually succeeded — and a key that has stopped working needs to be
+      // distinguishable from one that was never tried.
+      void noteUserKeyUsed(provider);
       return resp;
     } catch (err) {
       const retries = Math.max(0, getAttempts() - before - 1);

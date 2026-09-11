@@ -21,6 +21,11 @@ export interface EffectiveRate {
  * models.ts returns "anthropic" for kimi/gemini ids when the provider key isn't set).
  */
 export function providerOf(model: string): string {
+  // OpenRouter ids are namespaced `vendor/model`, so the slash is the tell —
+  // and it must be checked BEFORE the vendor prefixes below, or
+  // "anthropic/claude-sonnet-4.6" would be billed as Anthropic at Anthropic's
+  // own rates rather than OpenRouter's.
+  if (model.includes("/") && !model.startsWith("ollama/")) return "openrouter";
   if (/^ollama[/:]/i.test(model)) return "ollama"; // local Ollama (free) — check first
   if (/^(kimi|moonshot)/i.test(model)) return "moonshot";
   if (/^deepseek/i.test(model)) return "deepseek";

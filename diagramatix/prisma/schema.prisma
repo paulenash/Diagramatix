@@ -297,6 +297,7 @@ model User {
   // Microsoft 365. See MicrosoftConnection.
   microsoftConnection           MicrosoftConnection?
   apiKeysAsService              ApiKey[]                   @relation("ApiKeyServiceUser")
+  aiKeys        UserAiKey[]
 }
 
 // A single web user's delegated Microsoft 365 connection for SharePoint/OneDrive.
@@ -725,6 +726,40 @@ model DiagramTemplate {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+}
+
+// ── Bring your own AI key ────────────────────────────────────────────────────
+// A key a USER supplies for a provider Diagramatix already speaks, so their AI
+// usage is billed to their own account rather than the deployment's.
+//
+// The key is stored ENCRYPTED (AES-256-GCM, app/lib/crypto/tokenCrypto.ts) and
+// is never returned to the browser — not on read, not on edit. The UI shows the
+// last four characters and nothing else, which is enough to recognise a key and
+// not enough to use one.
+model UserAiKey {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Which provider this key is for — must be one Diagramatix can already call.
+  provider   String
+  /// AES-256-GCM ciphertext ("v1.<iv>.<tag>.<ct>"). NEVER the key itself.
+  keyCipher  String
+  /// Last four characters, so a person can tell two keys apart without seeing
+  /// either. Four is what every provider's own console shows.
+  keyHint    String
+  /// Optional endpoint, for an OpenAI-compatible provider that is not the
+  /// default one (a self-hosted gateway, a regional endpoint).
+  baseUrl    String?
+  /// Set when a generation last used this key, so a key that stopped working is
+  /// visible as one that stopped being used.
+  lastUsedAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // One key per provider per person: two would mean choosing between them on
+  // every call, with no basis for the choice.
+  @@unique([userId, provider])
+  @@index([userId])
 }
 
 model Prompt {

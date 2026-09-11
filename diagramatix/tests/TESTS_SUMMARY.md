@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-09-11  ·  **Document version:** 7.0  ·  **Suite:** 467 test files · 3,519 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T4196  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-09-11  ·  **Document version:** 7.0  ·  **Suite:** 467 test files · 3,535 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T4219  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
@@ -34,9 +34,9 @@ Each test file has its own section below, grouped into layers. Within each secti
 | **Protects you against** | In plain terms, the real-world problem that would occur if this behaviour regressed. |
 | **How it would break (go red)** | The kind of code or data change that would make this specific test fail — i.e. what the test is watching. |
 
-**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T4197**, the one after **T4198**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
+**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T4220**, the one after **T4221**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T4196`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
+> **Highest ref allocated: `T4219`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -1928,7 +1928,6 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 | T2961 | `tests/partner/logging.test.ts` | A handler that throws still produces a row and a clean 500 that tells the caller nothing about our internals. |
 | T2962 | `tests/partner/logging.test.ts` | Source-text tripwire: no route under `app/api/public/**` may skip `authenticatePartner` or `withPartnerLogging`. A route added later cannot be reachable without a key, or leave no trace of a call. |
 | T2963 | `tests/partner/logging.test.ts` | The ONE open route — the self-describing contract at `/api/public/v1` — cannot become a data leak: it reads no database and no request body. Requiring a key to read documentation produces support emails instead of integrations, so the exception exists; it is NAMED rather than pattern-matched, and widening it means editing two tests on purpose. |
-| T2963 | `tests/partner/attachment.test.ts` | A PDF becomes a `pdf` attachment and reaches the model whole. |
 | T2964 | `tests/partner/attachment.test.ts` | A DOCX becomes TEXT containing its words, and NOT its ZIP bytes. `.docx` has been in the editor's accept list while falling through to `file.text()`, so a Word SOP arrived at the model as stringified ZIP and produced a diagram built from noise — silently. |
 | T2965 | `tests/partner/attachment.test.ts` | The BYTES win over a wrong declared type: a PDF announced as `text/plain` is still read as a PDF. A machine caller mislabels things, and the old path stringified them. |
 | T2966 | `tests/partner/attachment.test.ts` | What we cannot read is REFUSED by name — a .zip, a legacy .doc, arbitrary binary. Turning a spreadsheet into gibberish and drawing it is worse than declining it. |
@@ -2106,7 +2105,6 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 | T3144 | `tests/bpmn/emie-subpath-rows.test.ts` | It sits between its host's path and the next path down, so the stack order stays readable. |
 | T3145 | `tests/valueChain/prompt-branches.test.ts` | A branch whose every nested path ENDS, with nothing after, is itself closed — it has no continuation to state. |
 | T3146 | `tests/valueChain/prompt-branches.test.ts` | A lone surviving branch continues the main line and owes no merge — unless it claims a destination and names a lane. |
-| T2941 | `tests/valueChain/prompt-templates.test.ts` | Control for T2939 narrowing — a Data Store DECLARATION is still caught, while the words inside a task label are allowed. |
 | T3147 | `tests/ai/technical-description-branches.test.ts` | BOTH edge-mounted events on one path are described — the second was lost when its host was read as a merge. |
 | T3148 | `tests/ai/technical-description-branches.test.ts` | A task an exception rejoins keeps its branch: the tail is not hoisted to the trunk. |
 | T3149 | `tests/ai/technical-description-branches.test.ts` | A GATEWAY merge still moves its tail to the outer level — the fix is not "never promote". |
@@ -3303,6 +3301,29 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 | T4194 | `tests/prompts/provenance-complete.test.ts` | The panels that can see an image or a microphone report both. |
 | T4195 | `tests/prompts/provenance-complete.test.ts` | An auto-created prompt inherits what the panel reported. |
 | T4196 | `tests/prompts/provenance-complete.test.ts` | Editing a prompt does not rewrite how it was originally written. |
+| T4197 | `tests/ai/openai-shape.test.ts` | The system prompt becomes the first message, not a dropped field. |
+| T4198 | `tests/ai/openai-shape.test.ts` | An image becomes an `image_url` data URL. |
+| T4199 | `tests/ai/openai-shape.test.ts` | A PDF is dropped loudly rather than sent as something the endpoint cannot read. |
+| T4200 | `tests/ai/openai-shape.test.ts` | `prompt_tokens`/`completion_tokens` map onto the Anthropic usage names telemetry reads. |
+| T4201 | `tests/ai/openai-shape.test.ts` | `finish_reason: "length"` becomes `stop_reason: "max_tokens"`, so truncation is still detected. |
+| T4202 | `tests/ai/openai-shape.test.ts` | The provider's own error text reaches the caller instead of a generic failure. |
+| T4203 | `tests/ai/openai-shape.test.ts` | The OpenRouter attribution headers are sent. |
+| T4204 | `tests/ai/openai-shape.test.ts` | A text-only response parses. |
+| T4205 | `tests/ai/openai-shape.test.ts` | The adapter presents the same `.messages.create()` surface the SDK does. |
+| T4206 | `tests/ai/user-ai-key.test.ts` | A user's key is used for that provider instead of the deployment's, and does not leak past its scope. |
+| T4207 | `tests/ai/user-ai-key.test.ts` | **A key for one provider is never sent to another** — the regression that made an Anthropic key reachable from the Moonshot branch. |
+| T4208 | `tests/ai/user-ai-key.test.ts` | An explicit override argument still beats the request context. |
+| T4209 | `tests/ai/user-ai-key.test.ts` | `currentUserAiKey` answers only for the provider the key belongs to. |
+| T4210 | `tests/ai/user-ai-key.test.ts` | Only providers reachable with a key ALONE are offered for BYO. |
+| T4211 | `tests/ai/user-ai-key.test.ts` | The stored hint is the last four characters and never the key. |
+| T4212 | `tests/ai/aiModel.test.ts` | The DB setting overrides the constant — why reading `DEFAULT_AI_MODEL` alone proves nothing about production. |
+| T4213 | `tests/ai/byo-model-unlock.test.ts` | A provider's models appear for a user who supplied their own key, and only for them. |
+| T4214 | `tests/ai/byo-model-unlock.test.ts` | A model the user's key unlocks survives `chooseModel` instead of being silently swapped for the default. |
+| T4215 | `tests/ai/byo-model-unlock.test.ts` | The unlock adds that provider's models and does not loosen the cost ceiling. |
+| T4216 | `tests/ai/byo-model-unlock.test.ts` | A namespaced id resolves to OpenRouter even when the registry has never heard of it. |
+| T4217 | `tests/ai/pricing-completeness.test.ts` | **Every curated default model has a `PRICING` row** — an unpriced one is hidden from every non-SuperAdmin, not shown as "varies". |
+| T4218 | `tests/ai/pricing-completeness.test.ts` | No priced model is reachable by a SuperAdmin and by nobody else. |
+| T4219 | `tests/ai/byo-model-unlock.test.ts` | Routing (`providerForModel`) and billing (`providerOf`) agree about who serves a namespaced id. |
 
 > **Keep this section in sync.** Whenever an e2e spec is added, removed, or changes what it asserts, update this section. It is hand-maintained, not generated.
 

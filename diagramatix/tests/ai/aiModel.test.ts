@@ -2,44 +2,74 @@
  * The AI-Generate model list + the setting resolver. `resolveAiModel` turns a
  * stored AppSetting value into a usable model id, so a blank/removed setting can
  * never leave generation pointing at a non-existent model — it falls back to the
- * production default (Haiku 4.5).
+ * production default (Opus 5).
  */
 import { describe, it, expect, afterEach } from "vitest";
 import { AI_MODELS, DEFAULT_AI_MODEL, isKnownAiModel, resolveAiModel, aiModelLabel, allModels, moonshotModels, googleModels, microsoftModels, providerForModel, modelVision } from "@/app/lib/ai/models";
 
 describe("AI model list + resolver", () => {
-  it("T0577 — the production default is Kimi K3", () => {
-    // Paul, 2026-09-04. It was Haiku 4.5 until regenerating V22 on it measured
-    // about a third of the content and duplicate names throughout. A SILENT
-    // fallback has to be a model whose output would be accepted: by definition
-    // nobody chose it and nobody is told it was used.
-    expect(DEFAULT_AI_MODEL).toBe("kimi-k3");
+  it("T0577 — the production default is Opus 5, and is reachable with no provider env at all", () => {
+    // Paul, 2026-09-11: "Opus 5 is now the default everywhere." It was Kimi K3
+    // from 2026-09-04, and Haiku 4.5 before that — regenerating V22 on Haiku
+    // measured about a third of the content and duplicate names throughout.
+    //
+    // A SILENT fallback has to be a model whose output would be accepted: by
+    // definition nobody chose it and nobody is told it was used. It also has to
+    // be one this deployment can actually CALL, which the Kimi default was not
+    // without MOONSHOT_API_KEY — see T3202.
+    expect(DEFAULT_AI_MODEL).toBe("claude-opus-5");
+
+    // Reachable with no third-party credentials configured — a built-in, not a
+    // model that appears only once some provider env var is set.
+    delete process.env.MOONSHOT_API_KEY;
+    expect(AI_MODELS.some((m) => m.id === DEFAULT_AI_MODEL)).toBe(true);
+    expect(isKnownAiModel(DEFAULT_AI_MODEL)).toBe(true);
+  });
+
+  it("T4212 — the DB setting overrides the constant, which is why the constant alone proves nothing", () => {
+    // `ai.generate.model` (AppSetting, per environment) is what production
+    // actually reads; DEFAULT_AI_MODEL is only the fallback when that row is
+    // missing or names something unresolvable. Reading the constant and calling
+    // it "the production default" is how this file came to assert Kimi K3 after
+    // production had already moved — so state the relationship here, in a test,
+    // rather than in a comment nobody re-reads.
+    expect(resolveAiModel("claude-sonnet-5")).toBe("claude-sonnet-5");
+    expect(resolveAiModel("claude-sonnet-5")).not.toBe(DEFAULT_AI_MODEL);
   });
 
   it("T0578 — resolveAiModel keeps a known id, else the default, else something callable", () => {
     expect(resolveAiModel("claude-fable-5")).toBe("claude-fable-5"); // known → kept
     expect(resolveAiModel("claude-sonnet-5")).toBe("claude-sonnet-5");
 
-    // With Moonshot configured, the default is reachable and is what you get.
-    process.env.MOONSHOT_API_KEY = "sk-test-kimi";
+    // The default is a built-in, so it is reachable with NO provider env set.
+    delete process.env.MOONSHOT_API_KEY;
     expect(isKnownAiModel(DEFAULT_AI_MODEL)).toBe(true);
-    expect(aiModelLabel(DEFAULT_AI_MODEL)).toBe("Kimi K3");
+    expect(aiModelLabel(DEFAULT_AI_MODEL)).toBe("Opus 5");
     expect(resolveAiModel(null)).toBe(DEFAULT_AI_MODEL);               // unset
     expect(resolveAiModel("")).toBe(DEFAULT_AI_MODEL);                // blank
     expect(resolveAiModel("claude-retired-9")).toBe(DEFAULT_AI_MODEL); // since-removed
-    delete process.env.MOONSHOT_API_KEY;
   });
 
-  it("T3202 — without Moonshot credentials it resolves to a model this deployment can reach", () => {
-    // moonshotModels() returns nothing without MOONSHOT_API_KEY, so kimi-k3 is
-    // not a KNOWN model there. Returning it anyway would hand the caller an id
-    // nothing can call, turning a quality problem into a 503 — so the resolver
-    // drops to a Claude model rather than to an unreachable default.
+  it("T3202 — a SETTING naming an unreachable model resolves to one this deployment can call", () => {
+    // moonshotModels() returns nothing without MOONSHOT_API_KEY, so `kimi-k3`
+    // is not a KNOWN model there. Returning it anyway would hand the caller an
+    // id nothing can call, turning a quality problem into a 503.
+    //
+    // This used to be tested through the DEFAULT, back when the default itself
+    // was kimi-k3. The default is now a built-in and always reachable, so the
+    // property is tested where it can still bite: a stored `ai.generate.model`
+    // row naming a model whose provider env was later removed.
     delete process.env.MOONSHOT_API_KEY;
-    expect(isKnownAiModel(DEFAULT_AI_MODEL)).toBe(false);
-    const got = resolveAiModel(null);
-    expect(got).not.toBe(DEFAULT_AI_MODEL);
+    expect(isKnownAiModel("kimi-k3")).toBe(false);      // the offender is genuinely unreachable
+    const got = resolveAiModel("kimi-k3");
+    expect(got).not.toBe("kimi-k3");
     expect(isKnownAiModel(got)).toBe(true);
+
+    // ...and it IS kept once the provider is configured, so the test above is
+    // about reachability and not about rejecting Moonshot ids.
+    process.env.MOONSHOT_API_KEY = "sk-test-kimi";
+    expect(resolveAiModel("kimi-k3")).toBe("kimi-k3");
+    delete process.env.MOONSHOT_API_KEY;
   });
 
   it("T0579 — every model has an id + label and unknown ids are rejected", () => {

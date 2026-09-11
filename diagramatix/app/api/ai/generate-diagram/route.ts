@@ -4,6 +4,8 @@ import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
 import { prisma } from "@/app/lib/db";
 import Anthropic from "@anthropic-ai/sdk";
 import { makeAiClient, aiApiKey } from "@/app/lib/ai/anthropicClient";
+import { resolveUserAiKey, listUserAiKeys } from "@/app/lib/ai/userAiKey";
+import { enterUserAiKey } from "@/app/lib/ai/aiKeyContext";
 import { resolveAiRouteContext } from "@/app/lib/ai/aiTelemetryRoute";
 import { AI_INVOCATION_POINTS, enterAiContext, recordDiagramGenerated } from "@/app/lib/ai/aiTelemetry";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
@@ -32,8 +34,24 @@ export async function POST(req: Request) {
   // set; the selected model then decides the key/endpoint (Claude vs Kimi). A caller
   // may override with a cost-gated model (SuperAdmin → any); disallowed → default.
   const defaultModel = await resolveGenerateModel(attachment?.type === "image");
-  const model = chooseModel(requestedModel, defaultModel, isSuperuser(session));
-  const apiKey = aiApiKey(model);
+  // Models the caller's OWN key unlocks count as available to them. The
+  // picker offers those, so rejecting one here would swap it for the
+  // default and generate something nobody asked for, without saying so.
+  let byoProviders = new Set<string>();
+  try {
+    byoProviders = new Set((await listUserAiKeys(session.user.id)).map((k) => k.provider));
+  } catch { /* no own keys is the normal case */ }
+  const model = chooseModel(requestedModel, defaultModel, isSuperuser(session), byoProviders);
+  // The caller's OWN key wins when they have supplied one for this
+  // provider — otherwise somebody who set one up is still billed to the
+  // deployment, which is a failure with no symptom at all.
+  const ownKey = await resolveUserAiKey(session.user.id, model);
+  // Put it in scope for the whole request. `apiKey` below still carries it
+  // for the Anthropic path, but every OTHER provider re-reads its own env
+  // inside aiClientConfig — by design — so without this line a user's
+  // OpenRouter or Kimi key is resolved, passed in, and silently ignored.
+  enterUserAiKey(ownKey ? { ...ownKey, userId: session.user.id } : null);
+  const apiKey = ownKey?.apiKey ?? aiApiKey(model);
   if (!apiKey) return NextResponse.json({ error: "AI not configured for the selected model. Set ANTHROPIC_API_KEY or MOONSHOT_API_KEY." }, { status: 503 });
 
   // Subscription cap: AI attempts. Check before the model call.

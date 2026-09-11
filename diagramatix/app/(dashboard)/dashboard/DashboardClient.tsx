@@ -9,6 +9,7 @@ import { PRODUCT_VERSION, checkSchemaCompatibility } from "@/app/lib/diagram/typ
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { SharePointPicker } from "@/app/components/SharePointPicker";
 import { MicrosoftConnectionSettings } from "@/app/components/MicrosoftConnectionSettings";
+import { AiKeySettings } from "@/app/components/AiKeySettings";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { PromptDialog } from "@/app/components/PromptDialog";
 import { UsagePopover } from "@/app/components/UsagePopover";
@@ -2601,6 +2602,9 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
 
               {/* SharePoint / Microsoft 365 — bring-your-own connection */}
               <MicrosoftConnectionSettings />
+
+              {/* AI providers — bring-your-own key */}
+              <AiKeySettings />
 
               {/* Change Password */}
               <div className="border-t border-gray-100 pt-3">

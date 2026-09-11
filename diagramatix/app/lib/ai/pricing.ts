@@ -7,6 +7,7 @@
  *   Kimi / Moonshot — platform.kimi.ai (international USD)
  *   Gemini / Google — ai.google.dev/pricing (your gateway may bill differently)
  *   GPT / Phi (Microsoft) — azure.microsoft.com/pricing (Azure OpenAI + Foundry)
+ *   OpenRouter — openrouter.ai/models (a reseller: vendor rate + its margin)
  *
  * Pure data + helpers, safe to import on the client.
  */
@@ -60,6 +61,18 @@ export const PRICING: Record<string, ModelPrice> = {
   // isn't "varies".
   "deepseek-chat": { in: 0.28, out: 0.42 },
   "deepseek-reasoner": { in: 0.28, out: 0.42 },
+
+  // OpenRouter — it RESELLS other vendors' models, so the rate is the
+  // underlying vendor's plus OpenRouter's margin. Priced at the vendor list
+  // rate here, which is the floor rather than the exact figure.
+  //
+  // These rows are not cosmetic. An UNPRICED model is excluded from
+  // `allowedGenerateModels` for every non-SuperAdmin, because the cost ceiling
+  // cannot compare it — so without them a user who supplies an OpenRouter key
+  // sees no OpenRouter models at all. Any id added to OPENROUTER_MODELS that is
+  // not listed here behaves the same way.
+  "anthropic/claude-sonnet-4.6": { in: 3, out: 15, note: "resold; OpenRouter adds a margin" },
+  "openai/gpt-5.2": { in: 1.25, out: 10, note: "resold; OpenRouter adds a margin" },
 };
 
 /** The reference price for a model id, or undefined when unknown / floating. */
