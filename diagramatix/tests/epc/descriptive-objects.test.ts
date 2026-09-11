@@ -13,7 +13,7 @@ import { readFileSync } from "node:fs";
 import { EPC_DESCRIPTIVE_SYMBOLS, getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { DEFAULT_SYMBOL_COLORS, BW_SYMBOL_COLORS } from "@/app/lib/diagram/colors";
 import { canConnect } from "@/app/lib/diagram/canConnect";
-import { epcFitSize, epcFreeLines, epcWrapLabel } from "@/app/lib/diagram/textMetrics";
+import { fitShapeToLabel, freeLinesFor, wrapShapeLabel } from "@/app/lib/diagram/shapeFit";
 import { layoutEpcDiagram } from "@/app/lib/diagram/layoutEpc";
 import { translateEpcToBpmn } from "@/app/lib/diagram/translate/epcToBpmn";
 import type { DiagramElement, SymbolType } from "@/app/lib/diagram/types";
@@ -113,10 +113,12 @@ describe("item 6 — the descriptive objects are registered everywhere", () => {
   });
 });
 
-describe("item 5 — wrap to two lines, then grow downward", () => {
+describe("item 5 — wrap first, grow second", () => {
+  // The rule is shared with the Standard Flowchart shapes (shapeFit.ts) — these
+  // assert the EPC end of it, and tests/flowchart/label-fit.test.ts the other.
   it("T4132 - a short name does not change the shape at all", () => {
     const def = getSymbolDefinition("epc-function");
-    expect(epcFitSize("epc-function", "Verify invoice"))
+    expect(fitShapeToLabel("epc-function", "Verify invoice"))
       .toEqual({ w: def.defaultWidth, h: def.defaultHeight });
   });
 
@@ -124,11 +126,11 @@ describe("item 5 — wrap to two lines, then grow downward", () => {
     const def = getSymbolDefinition("epc-function");
     const two = "Verify the supplier invoice";
     const many = "Verify the supplier invoice against the purchase order and the goods receipt note before posting";
-    expect(epcWrapLabel("epc-function", two, def.defaultWidth).length).toBeLessThanOrEqual(2);
-    expect(epcFitSize("epc-function", two).h).toBe(def.defaultHeight);
+    expect(wrapShapeLabel("epc-function", two, def.defaultWidth).length).toBeLessThanOrEqual(2);
+    expect(fitShapeToLabel("epc-function", two).h).toBe(def.defaultHeight);
 
-    const grown = epcFitSize("epc-function", many);
-    expect(epcWrapLabel("epc-function", many, def.defaultWidth).length).toBeGreaterThan(2);
+    const grown = fitShapeToLabel("epc-function", many);
+    expect(wrapShapeLabel("epc-function", many, def.defaultWidth).length).toBeGreaterThan(2);
     expect(grown.h).toBeGreaterThan(def.defaultHeight);
     // WIDTH never changes. Growing it sideways would move the assignment
     // gutters layoutEpc reserves either side of the spine, so one long name
@@ -137,14 +139,14 @@ describe("item 5 — wrap to two lines, then grow downward", () => {
   });
 
   it("T4134 - a Process Interface holds ONE line, because its bottom is the link marker", () => {
-    expect(epcFreeLines("epc-interface")).toBe(1);
-    expect(epcFreeLines("epc-function")).toBe(2);
-    expect(epcFreeLines("epc-event")).toBe(2);
+    expect(freeLinesFor("epc-interface")).toBe(1);
+    expect(freeLinesFor("epc-function")).toBe(2);
+    expect(freeLinesFor("epc-event")).toBe(2);
     const def = getSymbolDefinition("epc-interface");
     const twoLines = "Accounts Receivable and Collections";
-    expect(epcWrapLabel("epc-interface", twoLines, def.defaultWidth).length).toBeGreaterThan(1);
+    expect(wrapShapeLabel("epc-interface", twoLines, def.defaultWidth).length).toBeGreaterThan(1);
     expect(
-      epcFitSize("epc-interface", twoLines).h,
+      fitShapeToLabel("epc-interface", twoLines).h,
       "a two-line interface name must grow the box",
     ).toBeGreaterThan(def.defaultHeight);
   });
@@ -153,10 +155,10 @@ describe("item 5 — wrap to two lines, then grow downward", () => {
     // If they disagree, a box grown for three lines renders four and the text
     // hangs out of the shape it was grown to fit.
     const renderer = read("app/components/canvas/SymbolRenderer.tsx");
-    expect(renderer, "the renderer must use the shared wrap").toContain("epcWrapLabel(");
+    expect(renderer, "the renderer must use the shared wrap").toContain("wrapShapeLabel(");
     expect(renderer, "the interface's text must clear its marker").toContain("EPC_LINK_MARKER_H");
     // …and typing a name by hand must resize the box too, not only generation.
-    expect(read("app/hooks/useDiagram.ts"), "hand-typed names must autosize").toContain("epcFitSize(");
+    expect(read("app/hooks/useDiagram.ts"), "hand-typed names must autosize").toContain("fitShapeToLabel(");
   });
 });
 

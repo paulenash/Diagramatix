@@ -255,6 +255,13 @@ jobs:
           tsx scripts/add-features-pcf.ts || echo "add-features-pcf skipped"
           tsx scripts/add-guide-pcf.ts || echo "add-guide-pcf skipped"
           tsx scripts/add-guide-risk-controls.ts || echo "add-guide-risk-controls skipped"
+          # EPC: the notation, the ARIS import and Convert to BPMN.
+          tsx scripts/add-guide-epc.ts || echo "add-guide-epc skipped"
+          # The default DiagramRules per diagram type. INSERT-ONLY: it skips any
+          # category that already has a default row, so live edits are never
+          # clobbered (see the 2026 rules-seed incident). It was never in the
+          # deploy before, which is why the "epc" rules had no way to reach prod.
+          node scripts/seed-diagram-rules.cjs || echo "seed-diagram-rules skipped"
           tsx scripts/seed-risk-controls-o2c.ts || echo "seed-risk-controls-o2c skipped"
           tsx scripts/seed-risk-control-examples.ts || echo "seed-risk-control-examples skipped"
           # NOTE: seed-o2c-demo.ts (which pre-created the "Order-to-Cash — GRC Demo"

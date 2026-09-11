@@ -5,7 +5,8 @@ import { canvasMemoEqual } from "./memoEqual";
 import type { BpmnTaskType, GatewayType, EventType, DiagramElement, Point, Side, SymbolType } from "@/app/lib/diagram/types";
 import { type SymbolColorConfig, resolveColor } from "@/app/lib/diagram/colors";
 import { DisplayModeCtx, FontScaleCtx, PoolFontSizeCtx, LaneFontSizeCtx, ProcessFontSizeCtx, ValueChainFontSizeCtx, DescriptionFontSizeCtx, sketchyFilter } from "@/app/lib/diagram/displayMode";
-import { epcWrapLabel, EPC_LINK_MARKER_H, wrapText, computePackageTab } from "@/app/lib/diagram/textMetrics";
+import { wrapText, computePackageTab } from "@/app/lib/diagram/textMetrics";
+import { holdsInternalLabel, wrapShapeLabel } from "@/app/lib/diagram/shapeFit";
 import { archiNodeDepth } from "@/app/lib/diagram/nodeGeometry";
 import { readableTextOn } from "@/app/lib/diagram/chevronThemes";
 import { isRichText, sanitizeRichText, plainToHtml } from "@/app/lib/diagram/richText";
@@ -2074,6 +2075,11 @@ function EpcApplicationShape({ el }: { el: DiagramElement }) {
   );
 }
 
+/** Vertical space a Process Interface spends on its drill-down marker. Kept
+ *  beside the shape that draws it; shapeFit's chromeY for `epc-interface`
+ *  accounts for the same band when it decides the box holds ONE line. */
+export const EPC_LINK_MARKER_H = 14;
+
 /** Process interface — a chevron: pointed right, notched left, so a chain of
  *  them reads as "continues from" and "continues into". */
 function EpcInterfaceShape({ el }: { el: DiagramElement }) {
@@ -3652,18 +3658,27 @@ function SymbolRendererInner({
           && typeof element.properties?.shapeKey === "string"
           && /(component|system-software)/.test(element.properties.shapeKey as string))
           ? Math.min(element.width * 0.16, 22) : 0;
-        // EPC names WRAP inside their shape. epcWrapLabel uses the same inset
-        // epcFitSize measured with, so the number of lines drawn is the number
-        // the box was grown for — the two must not disagree or a three-line
-        // name overflows a box sized for three lines.
-        const isEpcBox = element.type.startsWith("epc-")
-          && element.type !== "epc-xor" && element.type !== "epc-and" && element.type !== "epc-or";
+        // EPC and Standard Flowchart names WRAP inside their shape, at the
+        // shape's own usable width — which is not its bounding box: a
+        // parallelogram loses 40% to the taper, a cylinder loses its ellipses.
+        // wrapShapeLabel is the SAME function fitShapeToLabel measured with, so
+        // the number of lines drawn is the number the box was grown for. When
+        // those two disagree, a box sized for three lines renders four and the
+        // text hangs out of the shape it was grown to fit.
+        //
+        // Without this a name rendered as one unwrapped line running straight
+        // through the sides of the shape. It showed up worst on diagrams built
+        // from an IMAGE, because those carry somebody's real wording rather
+        // than a short generated phrase.
+        const isFittedBox =
+          (element.type.startsWith("epc-") || element.type.startsWith("flowchart-"))
+          && holdsInternalLabel(element.type);
         const labelLines = isArchi
           ? wrapText(element.label ?? "", Math.max(24, element.width - compInset - ARCHI_LABEL_PAD), fSize)
-          : isEpcBox
-            ? epcWrapLabel(element.type, element.label ?? "", element.width)
+          : isFittedBox
+            ? wrapShapeLabel(element.type, element.label ?? "", element.width)
             : (element.label ?? "").split('\n');
-        if ((isChevron || isArchi || isEpcBox) && labelLines.length > 1) {
+        if ((isChevron || isArchi || isFittedBox) && labelLines.length > 1) {
           // For ArchiMate the labelInfo anchor is either the centre of
           // the box (leaf) or the header strip (container) or the figure
           // baseline (icon-only Actor). Stack tspans relative to that
@@ -3683,8 +3698,7 @@ function SymbolRendererInner({
             // The marker owns the bottom of the box, so the text block is
             // centred on what is LEFT rather than on the whole shape.
             const usableH = element.height - EPC_LINK_MARKER_H;
-            const blockTop = element.y + usableH / 2 - ((labelLines.length - 1) * lineH) / 2;
-            topY = blockTop;
+            topY = element.y + usableH / 2 - ((labelLines.length - 1) * lineH) / 2;
           } else {
             // Centre the block on the anchor (default + chevron behaviour)
             topY = labelInfo.y - ((labelLines.length - 1) * lineH) / 2;

@@ -32,7 +32,7 @@ import type { DiagramData, DiagramElement, Connector, Point, SymbolType } from "
 import type { LayoutDiagnostic } from "./bpmnLayout";
 import { getSymbolDefinition } from "./symbols/definitions";
 import { computeWaypoints } from "./routing";
-import { epcFitSize } from "./textMetrics";
+import { fitShapeToLabel } from "./shapeFit";
 
 export interface AiEpcElement {
   id: string;
@@ -141,13 +141,13 @@ export function mapEpcType(raw: string): SymbolType {
 }
 
 /**
- * Wrap first, grow second — the rule lives in epcFitSize so the renderer can
+ * Wrap first, grow second — the rule lives in fitShapeToLabel so the renderer can
  * apply the same one. The WIDTH never changes: the three-column band below
  * only holds if the middle column is a known size, so a long function name
  * grows the box downward rather than shoving every branch's assignments out
  * of column.
  */
-const sizeFor = epcFitSize;
+const sizeFor = fitShapeToLabel;
 
 /** One satellite to be placed beside a function, on a named side. */
 interface Satellite {

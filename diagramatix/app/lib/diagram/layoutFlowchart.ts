@@ -12,6 +12,7 @@ import type { DiagramData, DiagramElement, Connector, Point } from "./types";
 import { getSymbolDefinition } from "./symbols/definitions";
 import { computeWaypoints } from "./routing";
 import { wrapText } from "./textMetrics";
+import { fitShapeToLabel } from "./shapeFit";
 
 export interface AiFcElement {
   id: string;
@@ -79,15 +80,16 @@ function decisionSize(label: string): { w: number; h: number } {
 }
 
 function sizeFor(type: DiagramElement["type"], label: string): { w: number; h: number } {
+  // A Decision draws and wraps its OWN text, and grows on both axes to keep the
+  // diamond's aspect — its inscribed text box is half the bounding box, so the
+  // shared rule (which never changes width) cannot express it.
   if (type === "flowchart-decision") return decisionSize(label);
-  const def = getSymbolDefinition(type);
-  // F4.06 — the Parallel (fork/join) bar keeps its creation thickness; it has
-  // no label so the label-growth below must not inflate it.
-  if (type === "flowchart-parallel") return { w: def.defaultWidth, h: def.defaultHeight };
-  // Grow process-like boxes a little for long labels so text isn't clipped.
-  const lines = wrapText(label || "", def.defaultWidth - 16, 12);
-  const neededH = Math.max(def.defaultHeight, lines.length * 16 + 20);
-  return { w: def.defaultWidth, h: neededH };
+  // Everything else: wrap first, grow second, same width — the shared rule, and
+  // the SAME function the renderer wraps with, so the number of lines drawn is
+  // the number the box was grown for. It used to measure against
+  // defaultWidth - 16 for every shape, which is roughly half the truth for a
+  // parallelogram and nowhere near it for a cylinder.
+  return fitShapeToLabel(type, label);
 }
 
 export function layoutFlowchartDiagram(plan: AiFcPlan): DiagramData {

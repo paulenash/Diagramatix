@@ -27,7 +27,8 @@ import { autoResizeUmlElement, sizeUmlNote } from "@/app/lib/diagram/umlAutoSize
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { getElementPoolId } from "@/app/lib/diagram/poolUtil";
 import { CHEVRON_THEMES, chevronReadingOrder } from "@/app/lib/diagram/chevronThemes";
-import { autoSizeForType, epcFitSize, getDefaultSize, wrapText, type AutosizeType } from "@/app/lib/diagram/textMetrics";
+import { autoSizeForType, getDefaultSize, wrapText, type AutosizeType } from "@/app/lib/diagram/textMetrics";
+import { fitShapeToLabel, holdsInternalLabel } from "@/app/lib/diagram/shapeFit";
 import { archiFitSize } from "@/app/lib/diagram/genericLayout";
 import { isArchiNodeIcon, archiNodeFrontRect } from "@/app/lib/diagram/nodeGeometry";
 
@@ -48,12 +49,13 @@ function autoSizeForElement(el: DiagramElement): { w: number; h: number } {
     }
     return archiFitSize(el.label || "");
   }
-  // EPC: wrap to the shape's own width, keep that width, grow DOWNWARD past
-  // two lines (one for a Process Interface, whose bottom belongs to its link
-  // marker). Same function the layout and the renderer use, so a hand-typed
-  // name and a generated one size identically.
-  if (el.type.startsWith("epc-")) {
-    return epcFitSize(el.type, el.label || "");
+  // EPC and Standard Flowchart: wrap to the shape's own width, keep that
+  // width, and grow DOWNWARD when the wrapped block no longer fits. The same
+  // function the layout and the renderer use, so a hand-typed name and a
+  // generated one size identically — and a name typed into a box created from
+  // an image behaves like one the layout produced.
+  if ((el.type.startsWith("epc-") || el.type.startsWith("flowchart-")) && holdsInternalLabel(el.type)) {
+    return fitShapeToLabel(el.type, el.label || "");
   }
   if (el.type !== "task" && el.type !== "subprocess") {
     return { w: el.width, h: el.height };
