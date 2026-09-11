@@ -27,26 +27,26 @@ BEGIN;
 -- ── The seed list ──────────────────────────────────────────────────────────
 CREATE TEMP TABLE _seed_skills (ord int, name text, category text, description text) ON COMMIT DROP;
 INSERT INTO _seed_skills (ord, name, category, description) VALUES
-  ( 0, 'Approval Authority'         'Authority'      'Mandated to approve within a defined limit.'),
-  ( 1, 'Compliance Accreditation'   'Authority'      'Accredited to sign off a regulated check.'),
-  ( 2, 'Payment Authorisation'      'Authority'      'Permitted to release funds.'),
-  ( 3, 'Contract Signing'           'Authority'      'Authorised to execute a contract.'),
-  ( 4, 'Customer Contact'           'Operational'    'Trained to deal directly with customers.'),
-  ( 5, 'Complaint Handling'         'Operational'    NULL),
-  ( 6, 'Case Assessment'            'Operational'    NULL),
-  ( 7, 'Quality Review'             'Operational'    NULL),
-  ( 8, 'Onboarding Administration'  'Operational'    NULL),
-  ( 9, 'Payroll Administration'     'Operational'    NULL),
-  (10, 'Offer Negotiation'          'Operational'    'Authorised to negotiate terms with a candidate or supplier.'),
-  (11, 'Sourcing'                   'Operational'    'Finding and attracting candidates or suppliers.'),
-  (12, 'Device Provisioning'        'Technical'      NULL),
-  (13, 'System Configuration'       'Technical'      NULL),
-  (14, 'Data Analysis'              'Technical'      NULL),
-  (15, 'Technical Support'          'Technical'      NULL),
-  (16, 'Clinical Assessment'        'Professional'   'Registered clinician.'),
-  (17, 'Legal Review'               'Professional'   NULL),
-  (18, 'Financial Analysis'         'Professional'   NULL),
-  (19, 'Underwriting'               'Professional'   NULL);
+  ( 0, 'Approval Authority', 'Authority', 'Mandated to approve within a defined limit — not merely able to review.'),
+  ( 1, 'Compliance Accreditation', 'Authority', 'Formally accredited to sign off a regulated check.'),
+  ( 2, 'Payment Authorisation', 'Authority', 'Permitted to release funds.'),
+  ( 3, 'Contract Signing', 'Authority', 'Authorised to execute a contract on the organisation''s behalf.'),
+  ( 4, 'Customer Contact', 'Operational', 'Trained and permitted to deal directly with customers.'),
+  ( 5, 'Complaint Handling', 'Operational', 'Trained to take and resolve a complaint, including escalation.'),
+  ( 6, 'Case Assessment', 'Operational', 'Competent to assess a case on its merits and decide the outcome.'),
+  ( 7, 'Quality Review', 'Operational', 'Checks another person''s work; normally excludes the original author.'),
+  ( 8, 'Onboarding Administration', 'Operational', 'Runs the administrative steps of bringing a new joiner on.'),
+  ( 9, 'Payroll Administration', 'Operational', 'Creates and amends payroll records.'),
+  (10, 'Offer Negotiation', 'Operational', 'Authorised to negotiate terms with a candidate or supplier.'),
+  (11, 'Sourcing', 'Operational', 'Finds and attracts candidates or suppliers.'),
+  (12, 'Device Provisioning', 'Technical', 'Issues and configures laptops, phones and accounts.'),
+  (13, 'System Configuration', 'Technical', 'Changes system settings in a controlled environment.'),
+  (14, 'Data Analysis', 'Technical', 'Extracts and interprets data to answer a defined question.'),
+  (15, 'Technical Support', 'Technical', 'Diagnoses and resolves technical faults for users.'),
+  (16, 'Clinical Assessment', 'Professional', 'Registered clinician, practising within their scope.'),
+  (17, 'Legal Review', 'Professional', 'Legally qualified to advise on the matter in hand.'),
+  (18, 'Financial Analysis', 'Professional', 'Qualified to analyse financial position and give an opinion.'),
+  (19, 'Underwriting', 'Professional', 'Authorised to accept risk within a stated mandate.');
 
 -- ── DRY RUN: what would happen, per org ────────────────────────────────────
 -- Read this BEFORE the insert below. "would seed" means the org has no skills

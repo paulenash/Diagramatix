@@ -46,6 +46,10 @@ export function SkillsClient({
 
   const [newName, setNewName] = useState("");
   const [newCategory, setNewCategory] = useState("");
+  const [newDescription, setNewDescription] = useState("");
+  // Which row is open for editing, and the draft being typed into it.
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draft, setDraft] = useState<{ category: string; description: string }>({ category: "", description: "" });
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<{ skill: Skill; inUse: number } | null>(null);
 
@@ -64,17 +68,17 @@ export function SkillsClient({
 
   useEffect(() => { void load(); }, [load]);
 
-  const add = async (name: string, category?: string) => {
+  const add = async (name: string, category?: string, description?: string) => {
     if (!name.trim()) return;
     setBusy(true); setErr(null); setMsg(null);
     try {
       const r = await fetch("/api/skills", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, category: category || null, orgId }),
+        body: JSON.stringify({ name, category: category || null, description: description || null, orgId }),
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { setErr(d.error ?? "Could not add that skill."); return; }
-      setNewName(""); setNewCategory("");
+      setNewName(""); setNewCategory(""); setNewDescription("");
       setMsg(`Added "${d.skill.name}".`);
       await load();
     } finally { setBusy(false); }
@@ -170,23 +174,39 @@ export function SkillsClient({
 
         {/* Add */}
         {canEdit && (
-          <div className="flex items-end gap-2 mb-4 bg-white border border-gray-200 rounded p-3">
-            <div className="flex-1 min-w-0">
-              <label className="block text-[11px] font-medium text-gray-700 mb-0.5">New skill</label>
-              <input className={`${input} w-full`} value={newName} placeholder="e.g. Compliance Accreditation"
-                onChange={(e) => setNewName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") void add(newName, newCategory); }} />
+          <div className="mb-4 bg-white border border-gray-200 rounded p-3">
+            <div className="flex items-end gap-2">
+              <div className="flex-1 min-w-0">
+                <label className="block text-[11px] font-medium text-gray-700 mb-0.5">New skill</label>
+                <input className={`${input} w-full`} value={newName} placeholder="e.g. Compliance Accreditation"
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") void add(newName, newCategory, newDescription); }} />
+              </div>
+              <div className="w-44">
+                <label className="block text-[11px] font-medium text-gray-700 mb-0.5">Category <span className="font-normal text-gray-400">(optional)</span></label>
+                <input className={`${input} w-full`} value={newCategory} placeholder="Authority"
+                  onChange={(e) => setNewCategory(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") void add(newName, newCategory, newDescription); }} />
+              </div>
+              <button onClick={() => void add(newName, newCategory, newDescription)} disabled={busy || !newName.trim()}
+                className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50">
+                Add
+              </button>
             </div>
-            <div className="w-44">
-              <label className="block text-[11px] font-medium text-gray-700 mb-0.5">Category <span className="font-normal text-gray-400">(optional)</span></label>
-              <input className={`${input} w-full`} value={newCategory} placeholder="Authority"
-                onChange={(e) => setNewCategory(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") void add(newName, newCategory); }} />
+            {/* Full width, and prompted with the question a description has to
+                answer. "Who qualifies" is the only thing a skill is ever asked —
+                the engine uses it to decide who may take a task — so a name
+                whose holder is ambiguous is one two people will apply
+                differently. */}
+            <div className="mt-2">
+              <label className="block text-[11px] font-medium text-gray-700 mb-0.5">
+                Description <span className="font-normal text-gray-400">&mdash; who qualifies?</span>
+              </label>
+              <input className={`${input} w-full`} value={newDescription}
+                placeholder="e.g. Formally accredited to sign off a regulated check."
+                onChange={(e) => setNewDescription(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") void add(newName, newCategory, newDescription); }} />
             </div>
-            <button onClick={() => void add(newName, newCategory)} disabled={busy || !newName.trim()}
-              className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50">
-              Add
-            </button>
           </div>
         )}
 
@@ -234,26 +254,79 @@ export function SkillsClient({
               <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-1">{category}</p>
               <div className="bg-white border border-gray-200 rounded divide-y divide-gray-100">
                 {rows.map((s) => (
-                  <div key={s.id} className="flex items-center gap-2 px-3 py-1.5">
-                    <span className={`text-xs flex-1 min-w-0 truncate ${s.active ? "text-gray-900" : "text-gray-400 line-through"}`}
-                      title={s.description ?? undefined}>
-                      {s.name}
-                      {s.description && <span className="text-gray-400 font-normal"> — {s.description}</span>}
-                    </span>
-                    {!s.active && <span className="text-[10px] text-gray-400 shrink-0">retired</span>}
-                    {canEdit && (
-                      <>
-                        <button onClick={() => void patch(s.id, { active: !s.active })} disabled={busy}
-                          title={s.active ? "Retire: stops being offered, but still resolves where it is already used" : "Offer this skill again"}
-                          className="text-[11px] text-gray-500 hover:text-blue-600 disabled:opacity-50 shrink-0">
-                          {s.active ? "Retire" : "Restore"}
+                  <div key={s.id} className="px-3 py-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs flex-1 min-w-0 truncate ${s.active ? "text-gray-900" : "text-gray-400 line-through"}`}
+                        title={s.description ?? undefined}>
+                        {s.name}
+                        {s.description
+                          ? <span className="text-gray-400 font-normal"> — {s.description}</span>
+                          : <span className="text-amber-500/70 font-normal italic"> — no description</span>}
+                      </span>
+                      {!s.active && <span className="text-[10px] text-gray-400 shrink-0">retired</span>}
+                      {canEdit && (
+                        <>
+                          <button
+                            onClick={() => {
+                              if (editing === s.id) { setEditing(null); return; }
+                              setEditing(s.id);
+                              setDraft({ category: s.category ?? "", description: s.description ?? "" });
+                            }}
+                            disabled={busy}
+                            title="Edit the category and description"
+                            className="text-[11px] text-gray-500 hover:text-blue-600 disabled:opacity-50 shrink-0">
+                            {editing === s.id ? "Close" : "Edit"}
+                          </button>
+                          <button onClick={() => void patch(s.id, { active: !s.active })} disabled={busy}
+                            title={s.active ? "Retire: stops being offered, but still resolves where it is already used" : "Offer this skill again"}
+                            className="text-[11px] text-gray-500 hover:text-blue-600 disabled:opacity-50 shrink-0">
+                            {s.active ? "Retire" : "Restore"}
+                          </button>
+                          <button onClick={() => void tryDelete(s)} disabled={busy}
+                            title="Delete permanently"
+                            className="text-[11px] text-gray-400 hover:text-red-600 disabled:opacity-50 shrink-0">
+                            Delete
+                          </button>
+                        </>
+                      )}
+                    </div>
+
+                    {editing === s.id && canEdit && (
+                      // The NAME is not editable here on purpose. Skills are
+                      // referenced by name from team members and task
+                      // requirements, so renaming one would strand every place
+                      // that uses it — silently, because a task requiring a name
+                      // nothing holds simply never starts. Retire it and add the
+                      // replacement instead.
+                      <div className="mt-1.5 flex items-end gap-2 bg-gray-50 border border-gray-200 rounded p-2">
+                        <div className="w-44">
+                          <label className="block text-[10px] font-medium text-gray-600 mb-0.5">Category</label>
+                          <input className={`${input} w-full`} value={draft.category}
+                            onChange={(e) => setDraft((d) => ({ ...d, category: e.target.value }))} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <label className="block text-[10px] font-medium text-gray-600 mb-0.5">
+                            Description <span className="font-normal text-gray-400">&mdash; who qualifies?</span>
+                          </label>
+                          <input className={`${input} w-full`} value={draft.description}
+                            placeholder="e.g. Formally accredited to sign off a regulated check."
+                            onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") { void patch(s.id, { category: draft.category, description: draft.description }).then(() => setEditing(null)); }
+                              if (e.key === "Escape") setEditing(null);
+                            }} />
+                        </div>
+                        <button
+                          onClick={() => void patch(s.id, { category: draft.category, description: draft.description }).then(() => setEditing(null))}
+                          disabled={busy}
+                          className="px-2.5 py-1 text-[11px] font-medium text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50">
+                          Save
                         </button>
-                        <button onClick={() => void tryDelete(s)} disabled={busy}
-                          title="Delete permanently"
-                          className="text-[11px] text-gray-400 hover:text-red-600 disabled:opacity-50 shrink-0">
-                          Delete
+                        <button onClick={() => setEditing(null)}
+                          className="px-2.5 py-1 text-[11px] font-medium text-gray-700 border border-gray-300 rounded hover:bg-gray-100">
+                          Cancel
                         </button>
-                      </>
+                      </div>
                     )}
                   </div>
                 ))}

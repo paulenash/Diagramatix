@@ -25,11 +25,17 @@ function tsNames(): string[] {
   return [...block.matchAll(/\{\s*name:\s*"([^"]+)"/g)].map((m) => m[1]);
 }
 
-/** Skill names from the SQL seed's VALUES rows. */
+/**
+ * Skill names from the SQL seed's VALUES rows.
+ *
+ * Matched on the ROW SHAPE, line-anchored, rather than by slicing the statement
+ * to its first semicolon — a description may legitimately contain one ("Checks
+ * another person's work; normally excludes the original author"), and slicing
+ * there silently truncated the list to the first eight rows. The quoted-string
+ * pattern also has to allow a doubled '' escape, for the same reason.
+ */
 function sqlNames(): string[] {
-  const start = SQL.indexOf("INSERT INTO _seed_skills");
-  const block = SQL.slice(start, SQL.indexOf(";", start));
-  return [...block.matchAll(/\(\s*\d+,\s*'([^']+)'/g)].map((m) => m[1]);
+  return [...SQL.matchAll(/^\s*\(\s*\d+,\s*'((?:[^']|'')*)',/gm)].map((m) => m[1].replace(/''/g, "'"));
 }
 
 describe("the TS and SQL skill seeds agree", () => {

@@ -17,32 +17,45 @@
 import "dotenv/config";
 import { prisma } from "../app/lib/db";
 
-/** name, category — deliberately generic and cross-industry. */
-const SEED: { name: string; category: string; description?: string }[
+/**
+ * The starting vocabulary — deliberately generic and cross-industry.
+ *
+ * `description` is REQUIRED here, not optional. Paul, 2026-09-12: "Why do some
+ * skill have descriptions and other not?" Because they were written
+ * inconsistently, and the type let them be. Making it required is what stops
+ * that recurring; T4260 checks the SQL seed the same way.
+ */
+const SEED: { name: string; category: string; description: string }[] = [
+  // EVERY entry is described, and every description answers the same
+  // question: who qualifies. That is the only thing a skill is ever asked —
+  // the engine uses it to decide who may take a task — so a name whose
+  // holder is ambiguous ("Legal Review": a lawyer, or anyone checking?) is a
+  // name two people will apply differently. Half-described was worse than
+  // either: the screen shows the description inline, so it read as missing
+  // data rather than as a choice.
+  //
   // Where a shipped EXAMPLE already names a skill, the seed uses that exact
-  // name. It first shipped with a generic "Negotiation" beside the example's
-  // "Offer Negotiation" — two names for one competency, on day one, in the
-  // list whose whole purpose is to stop that.
-  { name: "Approval Authority", category: "Authority", description: "Mandated to approve within a defined limit." },
-  { name: "Compliance Accreditation", category: "Authority", description: "Accredited to sign off a regulated check." },
+  // name — see T4258.
+  { name: "Approval Authority", category: "Authority", description: "Mandated to approve within a defined limit — not merely able to review." },
+  { name: "Compliance Accreditation", category: "Authority", description: "Formally accredited to sign off a regulated check." },
   { name: "Payment Authorisation", category: "Authority", description: "Permitted to release funds." },
-  { name: "Contract Signing", category: "Authority", description: "Authorised to execute a contract." },
-  { name: "Customer Contact", category: "Operational", description: "Trained to deal directly with customers." },
-  { name: "Complaint Handling", category: "Operational" },
-  { name: "Case Assessment", category: "Operational" },
-  { name: "Quality Review", category: "Operational" },
-  { name: "Onboarding Administration", category: "Operational" },
-  { name: "Payroll Administration", category: "Operational" },
+  { name: "Contract Signing", category: "Authority", description: "Authorised to execute a contract on the organisation's behalf." },
+  { name: "Customer Contact", category: "Operational", description: "Trained and permitted to deal directly with customers." },
+  { name: "Complaint Handling", category: "Operational", description: "Trained to take and resolve a complaint, including escalation." },
+  { name: "Case Assessment", category: "Operational", description: "Competent to assess a case on its merits and decide the outcome." },
+  { name: "Quality Review", category: "Operational", description: "Checks another person's work; normally excludes the original author." },
+  { name: "Onboarding Administration", category: "Operational", description: "Runs the administrative steps of bringing a new joiner on." },
+  { name: "Payroll Administration", category: "Operational", description: "Creates and amends payroll records." },
   { name: "Offer Negotiation", category: "Operational", description: "Authorised to negotiate terms with a candidate or supplier." },
-  { name: "Sourcing", category: "Operational", description: "Finding and attracting candidates or suppliers." },
-  { name: "Device Provisioning", category: "Technical" },
-  { name: "System Configuration", category: "Technical" },
-  { name: "Data Analysis", category: "Technical" },
-  { name: "Technical Support", category: "Technical" },
-  { name: "Clinical Assessment", category: "Professional", description: "Registered clinician." },
-  { name: "Legal Review", category: "Professional" },
-  { name: "Financial Analysis", category: "Professional" },
-  { name: "Underwriting", category: "Professional" },
+  { name: "Sourcing", category: "Operational", description: "Finds and attracts candidates or suppliers." },
+  { name: "Device Provisioning", category: "Technical", description: "Issues and configures laptops, phones and accounts." },
+  { name: "System Configuration", category: "Technical", description: "Changes system settings in a controlled environment." },
+  { name: "Data Analysis", category: "Technical", description: "Extracts and interprets data to answer a defined question." },
+  { name: "Technical Support", category: "Technical", description: "Diagnoses and resolves technical faults for users." },
+  { name: "Clinical Assessment", category: "Professional", description: "Registered clinician, practising within their scope." },
+  { name: "Legal Review", category: "Professional", description: "Legally qualified to advise on the matter in hand." },
+  { name: "Financial Analysis", category: "Professional", description: "Qualified to analyse financial position and give an opinion." },
+  { name: "Underwriting", category: "Professional", description: "Authorised to accept risk within a stated mandate." },
 ];
 
 async function main() {

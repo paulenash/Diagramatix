@@ -155,7 +155,7 @@ describe("a SuperAdmin maintains any org's list", () => {
     // The heading can say one org while the request goes to another; that is
     // indistinguishable on screen from working correctly.
     const client = read("app/(dashboard)/dashboard/admin/skills/SkillsClient.tsx");
-    for (const call of ["orphans=1&orgId=", "category: category || null, orgId }", "{ id, ...body, orgId }"]) {
+    for (const call of ["orphans=1&orgId=", "description: description || null, orgId }", "{ id, ...body, orgId }"]) {
       expect(client, call).toContain(call);
     }
     // Both delete paths, not just the plain one.
@@ -166,5 +166,44 @@ describe("a SuperAdmin maintains any org's list", () => {
     const client = read("app/(dashboard)/dashboard/admin/skills/SkillsClient.tsx");
     expect(client).toContain("{orgName}");
     expect(client).toMatch(/isSuperAdmin && orgs\.length > 1/);
+  });
+});
+
+describe("descriptions are enterable, not just seedable", () => {
+  const ROOT2 = path.resolve(__dirname, "..", "..");
+  const client = fs.readFileSync(path.join(ROOT2, "app/(dashboard)/dashboard/admin/skills/SkillsClient.tsx"), "utf8");
+
+  it("T4261 — a new skill can be given a description", async () => {
+    // Paul, 2026-09-12: "The Skill screen does not allow description entry."
+    // It didn't — the add form took a name and a category only, so the seeded
+    // descriptions were the only ones that could ever exist.
+    expect(client).toContain("newDescription");
+    expect(client).toMatch(/description: description \|\| null, orgId/);
+
+    // ...and the API stores it.
+    const made = await createSkill(ORG, { name: "Bench Testing", description: "Certified to run bench tests unsupervised." });
+    expect(made.ok).toBe(true);
+    if (made.ok) expect(made.skill.description).toBe("Certified to run bench tests unsupervised.");
+  });
+
+  it("T4262 — an existing skill's description can be edited", async () => {
+    const made = await createSkill(ORG, { name: "Site Inspection" });
+    if (!made.ok) throw new Error("setup failed");
+    expect(made.skill.description).toBeNull();
+
+    const edited = await updateSkill(ORG, made.skill.id, { description: "Holds a current site-safety ticket." });
+    expect(edited.ok).toBe(true);
+    if (edited.ok) expect(edited.skill.description).toBe("Holds a current site-safety ticket.");
+
+    // The screen offers it, and does NOT offer a rename — skills are referenced
+    // by name, so renaming would strand every place that uses one.
+    expect(client).toMatch(/Edit the category and description/);
+    expect(client, "a rename would strand every reference").not.toMatch(/setDraft\(\(d\) => \(\{ \.\.\.d, name:/);
+  });
+
+  it("T4263 — a skill with no description is flagged rather than looking complete", () => {
+    // A blank tail reads as a short entry, not a missing one — which is how the
+    // seeded list came to be half-described without anyone noticing.
+    expect(client).toContain("no description");
   });
 });
