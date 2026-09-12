@@ -24,6 +24,8 @@ interface Option {
   /** Which reading answered — see skillsFromArchimate. */
   pattern?: "capability" | "role-legacy" | "none";
   teams?: number;
+  /** Capabilities that aggregate others — see the note where this is shown. */
+  bundles?: string[];
 }
 interface FillResult {
   filledFrom: { diagramName: string; at: string };
@@ -126,6 +128,13 @@ export function SkillsFillPanel({ baseUrl, onFilled }: {
           Read as <span className="text-amber-300/80">Business Roles</span> — the older convention, where a Role
           stands in for a skill. Still supported. For the current pattern, model each skill as a Capability
           associated with the person who holds it.
+        </p>
+      )}
+      {picked && !result && (picked.bundles?.length ?? 0) > 0 && (
+        <p className="text-green-400/40 text-[10px]">
+          Bundle{picked.bundles!.length === 1 ? "" : "s"}: <span className="text-green-300/80">{picked.bundles!.join(", ")}</span> —
+          {" "}aggregates other skills, so people are recorded as holding its PARTS, not the bundle itself.
+          Do not require a bundle on a task: nobody holds that name, and the work would never start.
         </p>
       )}
       {picked && !result && picked.pattern === "none" && (

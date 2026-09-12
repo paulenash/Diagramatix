@@ -55,12 +55,28 @@ export function useSkillCatalog(orgId?: string): CatalogSkill[] {
 
 export function SkillPicker({
   value, onChange, orgId, disabled, placeholder = "+ skill", dark = false, emptyHint,
+  holders, holderScope,
 }: {
   value: string[];
   onChange: (next: string[]) => void;
   orgId?: string;
   disabled?: boolean;
   placeholder?: string;
+  /**
+   * How many people on the RELEVANT team hold each skill.
+   *
+   * A requirement nobody can satisfy is the failure this exists to surface, and
+   * it has several causes that look identical on screen: a bundle (nobody ever
+   * holds the bundle NAME, only its leaves), a typo, a retired skill, a skill
+   * held only by people on another team, or the last holder having left. Until
+   * now all of them were discoverable only by running readiness.
+   *
+   * Omitted where there is no team to count against — on a PERSON, the question
+   * is meaningless.
+   */
+  holders?: Record<string, number>;
+  /** Whose roster the counts are for, so "0" says 0 OF WHAT. */
+  holderScope?: string;
   /** Matrix-themed surfaces (the Simulator console) vs the light admin screens. */
   dark?: boolean;
   /** Shown when the catalog is empty — otherwise the control looks broken. */
@@ -85,14 +101,26 @@ export function SkillPicker({
     <span className="inline-flex flex-wrap items-center gap-1">
       {chosen.map((name) => {
         const unknown = !known.has(name);
+        const held = holders?.[name];
+        const nobody = holders !== undefined && (held ?? 0) === 0;
         return (
           <span key={name}
             title={unknown
               ? `"${name}" is not in the Skills list — it still works, but it cannot be picked elsewhere until it is added`
               : catalog.find((s) => s.name === name)?.description ?? name}
-            className={`inline-flex items-center gap-1 border rounded-full px-1.5 text-[10px] leading-4 ${unknown ? chipUnknown : chip}`}>
-            {unknown && <span aria-hidden>⚠</span>}
+            className={`inline-flex items-center gap-1 border rounded-full px-1.5 text-[10px] leading-4 ${unknown || nobody ? chipUnknown : chip}`}>
+            {(unknown || nobody) && <span aria-hidden>⚠</span>}
             {name}
+            {holders !== undefined && (
+              <span
+                className={nobody ? "font-semibold" : "opacity-60"}
+                title={nobody
+                  ? `Nobody${holderScope ? " on " + holderScope : ""} holds this, so the work can never start`
+                  : `${held} ${held === 1 ? "person" : "people"}${holderScope ? " on " + holderScope : ""} hold${held === 1 ? "s" : ""} this`}
+              >
+                {nobody ? "0" : held}
+              </span>
+            )}
             {!disabled && (
               <button onClick={() => onChange(chosen.filter((s) => s !== name))}
                 className="opacity-60 hover:opacity-100" title={`Remove "${name}"`}>×</button>
@@ -106,9 +134,19 @@ export function SkillPicker({
           <select value="" className={sel}
             onChange={(e) => { if (e.target.value) onChange([...chosen, e.target.value]); }}>
             <option value="">{placeholder}</option>
-            {available.map((s) => (
-              <option key={s.id} value={s.name}>{s.category ? `${s.category} · ${s.name}` : s.name}</option>
-            ))}
+            {/* The count is in the OPTION as well as the chip, so an
+                unsatisfiable requirement is visible BEFORE it is chosen rather
+                than after. "(0)" beside a name is the cheapest possible way to
+                say "picking this stops the work". */}
+            {available.map((s) => {
+              const n = holders?.[s.name];
+              const suffix = holders === undefined ? "" : n ? ` (${n})` : " (0 — nobody)";
+              return (
+                <option key={s.id} value={s.name}>
+                  {(s.category ? `${s.category} · ${s.name}` : s.name) + suffix}
+                </option>
+              );
+            })}
           </select>
         ) : catalog.length === 0 ? (
           <span className={dark ? "text-green-400/40 text-[10px]" : "text-gray-400 text-[11px]"}>

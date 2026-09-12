@@ -43,6 +43,8 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId,
   // whether it did, so the header's back climbs the hierarchy before leaving.
   const replayBackRef = useRef<(() => boolean) | null>(null);
   const [teamCapacities, setTeamCapacities] = useState<Record<string, number>>({});
+  /** team → skill → holder count, for the task panel's "can anyone actually do this?" */
+  const [teamSkills, setTeamSkills] = useState<Record<string, Record<string, number>>>({});
   // Whether the Resources library has actually been read. A run built before it
   // arrives uses NO capacities — every activity would look unresourced and the
   // results would show no contention at all, which is worse than useless because
@@ -387,7 +389,7 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId,
                 cards above do not sprawl across an ultrawide monitor. */}
             <div className="max-w-[1560px] mx-auto grid gap-3 md:grid-cols-3 content-start">
               <MatrixPanel title="Resources — people &amp; automation" className="md:col-span-2">
-                <TeamLibraryManager key={`teams-${seedKey}`} projectId={projectId} onCapacities={publishCapacities} calendars={calendars} onTeamCalendars={setTeamCalMap} usedNames={usedTeams} />
+                <TeamLibraryManager key={`teams-${seedKey}`} projectId={projectId} onCapacities={publishCapacities} onTeamSkills={setTeamSkills} calendars={calendars} onTeamCalendars={setTeamCalMap} usedNames={usedTeams} />
               </MatrixPanel>
               <MatrixPanel title="Run / Replay">
                 <p className="text-xs text-green-400/60 mb-3">
@@ -419,7 +421,7 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId,
                   </p>
                 )}
                 {canEditActive
-                  ? <SimDataPanel data={activeData} onApplyData={applyActive} onFillMissing={fillActive} onUnfillMissing={unfillActive} onOpenDiagram={openDiagramFromData} calendars={calendars} teams={Object.keys(teamCapacities)} teamCapacities={teamCapacities} />
+                  ? <SimDataPanel data={activeData} onApplyData={applyActive} onFillMissing={fillActive} onUnfillMissing={unfillActive} onOpenDiagram={openDiagramFromData} calendars={calendars} teams={Object.keys(teamCapacities)} teamCapacities={teamCapacities} teamSkills={teamSkills} />
                   : <p className="text-xs text-green-400/60">{loadingVariant ? "Loading variant…" : "Open this diagram from its editor to edit simulation data here."}</p>}
               </MatrixPanel>
               <MatrixPanel title="Interchange — BPSim export / import" className="md:col-span-3">

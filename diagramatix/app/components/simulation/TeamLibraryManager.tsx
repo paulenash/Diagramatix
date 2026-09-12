@@ -45,12 +45,15 @@ interface OrgTeam {
 export function TeamLibraryManager({
   projectId,
   onCapacities,
+  onTeamSkills,
   calendars = [],
   onTeamCalendars,
   usedNames,
 }: {
   projectId: string | null;
   onCapacities?: (caps: Record<string, number>) => void;
+  /** team name → skill name → how many of its people hold it. */
+  onTeamSkills?: (m: Record<string, Record<string, number>>) => void;
   /** Available working calendars (for the per-team picker). */
   calendars?: CalendarRow[];
   /** Publishes team name → assigned calendarId so the console can resolve hours. */
@@ -78,11 +81,30 @@ export function TeamLibraryManager({
   const [adoptBusy, setAdoptBusy] = useState(false);
   const [adoptMsg, setAdoptMsg] = useState<string | null>(null);
 
+  /**
+   * team name → skill name → how many of its people hold it.
+   *
+   * Published alongside the capacities so the task panel can say, at the moment
+   * somebody picks a required skill, how many people on that task's team could
+   * actually do it. Nought is the answer that matters.
+   */
+  const skillCounts = (list: Team[]) => {
+    const out: Record<string, Record<string, number>> = {};
+    for (const t of list) {
+      const counts: Record<string, number> = {};
+      for (const m of t.members ?? []) for (const sk of m.skills ?? []) counts[sk] = (counts[sk] ?? 0) + 1;
+      out[t.name] = counts;
+    }
+    return out;
+  };
+
   const publish = useCallback((list: Team[]) => {
     // Keyed by NAME: tasks reference a team by the name typed in sim.teamId.
     onCapacities?.(Object.fromEntries(list.map((t) => [t.name, t.capacity])));
+    onTeamSkills?.(skillCounts(list));
     onTeamCalendars?.(Object.fromEntries(list.filter((t) => t.calendarId).map((t) => [t.name, t.calendarId as string])));
-  }, [onCapacities, onTeamCalendars]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onCapacities, onTeamCalendars, onTeamSkills]);
 
   const load = useCallback(async () => {
     if (!projectId) return;

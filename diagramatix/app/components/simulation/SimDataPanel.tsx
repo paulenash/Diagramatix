@@ -88,7 +88,7 @@ function MatrixDist({ value, onChange, auto }: { value?: SimDist; onChange: (d: 
 
 const num = (v: string) => (v === "" ? undefined : Math.max(0, Number(v) || 0));
 
-export function SimDataPanel({ data, onApplyData, onFillMissing, onUnfillMissing, onOpenDiagram, calendars = [], teams = [], teamCapacities = {}, clockUnit = "minute" }: {
+export function SimDataPanel({ data, onApplyData, onFillMissing, onUnfillMissing, onOpenDiagram, calendars = [], teams = [], teamCapacities = {}, teamSkills = {}, clockUnit = "minute" }: {
   data: DiagramData;
   onApplyData: (next: DiagramData) => void;
   onFillMissing?: () => number;
@@ -104,6 +104,15 @@ export function SimDataPanel({ data, onApplyData, onFillMissing, onUnfillMissing
   /** Team name → capacity, so a parallel multi-instance activity can be checked
    *  against the team that would have to supply the concurrency. */
   teamCapacities?: Record<string, number>;
+  /**
+   * team name → skill name → how many of its people hold it.
+   *
+   * So a required skill can say, where it is CHOSEN, whether anybody on that
+   * task's team could do it. Nought has several causes that look identical —
+   * a bundle name nobody holds, a typo, a retired skill, the last holder having
+   * left — and until now every one of them surfaced only at readiness.
+   */
+  teamSkills?: Record<string, Record<string, number>>;
   /** The run's base time unit, so diagram CT/WT authored in hours/days converts
    *  correctly when taken into the simulation model. */
   clockUnit?: ClockUnit;
@@ -122,6 +131,24 @@ export function SimDataPanel({ data, onApplyData, onFillMissing, onUnfillMissing
   };
 
   const elById = new Map(data.elements.map((e) => [e.id, e]));
+
+  /**
+   * The team a task would actually draw on: its own teamId, else the one on the
+   * lane it sits in. THE SAME RULE ASSEMBLY USES — "a task with no team of its
+   * own inherits its lane's" — because a holder count taken against a different
+   * team than the engine will use is worse than no count at all.
+   */
+  const teamOf = (el: DiagramElement): string | undefined => {
+    const own = getSimParams(el).teamId;
+    if (own) return own;
+    let parent = el.parentId ? elById.get(el.parentId) : undefined;
+    while (parent) {
+      const lane = getSimParams(parent).teamId;
+      if (lane) return lane;
+      parent = parent.parentId ? elById.get(parent.parentId) : undefined;
+    }
+    return undefined;
+  };
   // Arrival sources per the shared rule (see arrivalSources.ts): boundary events
   // are triggered rather than fed by a rate, and a start event inside an EP is a
   // pass-through delay in the run — neither is an arrival, so listing them here
@@ -393,13 +420,24 @@ export function SimDataPanel({ data, onApplyData, onFillMissing, onUnfillMissing
                     Empty = anyone on the team, which is how every task behaved
                     before this column existed. */}
                 <Cell w={W.skills}>
-                  <SkillPicker
-                    dark
-                    value={sim.requiredSkills ?? []}
-                    onChange={(requiredSkills) => patchEl(t.id, { requiredSkills: requiredSkills.length ? requiredSkills : undefined })}
-                    placeholder="+ needs"
-                    emptyHint="no Skills list"
-                  />
+                  {(() => {
+                    const tm = teamOf(t);
+                    // No team resolved → no roster to count against, and a
+                    // count of nought would then read as "nobody can do this"
+                    // when the truth is "nobody has said who would".
+                    const counts = tm ? teamSkills[tm] : undefined;
+                    return (
+                      <SkillPicker
+                        dark
+                        value={sim.requiredSkills ?? []}
+                        onChange={(requiredSkills) => patchEl(t.id, { requiredSkills: requiredSkills.length ? requiredSkills : undefined })}
+                        placeholder="+ needs"
+                        emptyHint="no Skills list"
+                        holders={counts}
+                        holderScope={tm}
+                      />
+                    );
+                  })()}
                 </Cell>
               </Row>
             );

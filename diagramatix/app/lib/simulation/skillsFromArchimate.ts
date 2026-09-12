@@ -126,6 +126,16 @@ export interface SkillsModel {
   warnings: string[];
   /** How the diagram was read — see SkillsPattern. */
   pattern: SkillsPattern;
+  /**
+   * Capabilities (or legacy Roles) that AGGREGATE others.
+   *
+   * A bundle resolves to its leaves and is then discarded — nobody is ever
+   * recorded as holding the bundle NAME. That is useful at authoring time
+   * (define "Senior Assessor" once, hang it on twelve people) and a trap
+   * afterwards: require the bundle on a task and nobody qualifies, so the work
+   * never starts. Reported so the flattening is visible rather than silent.
+   */
+  bundles: string[];
   /** Teams, when the diagram models them (capability pattern only). */
   teams: ArchimateTeam[];
 }
@@ -277,6 +287,7 @@ function skillsFromArchimateLegacy(data: DiagramData): SkillsModel {
     people: people.sort((a, b) => a.name.localeCompare(b.name)),
     work: work.sort((a, b) => a.label.localeCompare(b.label)),
     pattern: people.length || work.length ? "role-legacy" : "none",
+    bundles: uniqSorted([...children.keys()].map((id) => labelOf.get(id) ?? "").filter(Boolean)),
     teams: [],
     skills: uniqSorted([...skillsOfRole.values()].flat()),
     warnings,
@@ -522,6 +533,7 @@ function readCapabilityPattern(data: DiagramData): SkillsModel | null {
     skills: uniqSorted(people.flatMap((p) => p.skills)),
     warnings,
     pattern: "capability",
+    bundles: uniqSorted([...capChildren.keys()].map((id) => labelOf.get(id) ?? "").filter(Boolean)),
     teams,
   };
 }

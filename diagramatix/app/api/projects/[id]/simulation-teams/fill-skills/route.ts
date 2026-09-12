@@ -80,6 +80,10 @@ export async function GET(_req: Request, { params }: Params) {
       // you that happened — so the pattern is reported alongside them.
       pattern: model.pattern,
       teams: model.teams.length,
+      // Bundles flatten to their leaves and the bundle NAME is then held by
+      // nobody. Silent flattening is the trap: require the bundle on a task and
+      // the work can never start. Named here so the concept is visible.
+      bundles: model.bundles,
     };
   });
   return NextResponse.json({ options, memberNames, taskCount: taskLabels.length });
