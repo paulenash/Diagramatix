@@ -2489,8 +2489,16 @@ export function PropertiesPanel({
             </div>
           );
         })()}
-        {/* Label for non-transition connectors */}
+        {/* Label for non-transition connectors.
+
+            ArchiMate relationships are included because a relationship LABEL is
+            how the notation carries meaning an Association does not have on its
+            own: "has skill" between a person and a Capability is the difference
+            between a line that states something and a line that states nothing.
+            archi-influence is excluded — it has its own strength control above,
+            and two editors writing one field would fight. */}
         {(connector.type === "flow" || connector.type === "messageBPMN"
+          || (String(connector.type).startsWith("archi-") && connector.type !== "archi-influence")
           || (connector.type === "sequence" && connector.label !== undefined)) && onUpdateConnectorLabel && (
           <div>
             <p className="text-xs font-medium text-gray-700 mb-1">Label</p>
@@ -3885,8 +3893,16 @@ export function PropertiesPanel({
         );
       })()}
 
-      {/* Stereotype for UML Class, Enumeration, Package and Composite */}
-      {(element.type === "uml-class" || element.type === "uml-enumeration" || element.type === "uml-package") && onUpdateProperties && (
+      {/* Stereotype for UML Class, Enumeration, Package and Composite —
+          and for ArchiMate, where the Skills feature uses it.
+
+          ArchiMate 3.x has no Skill element, so a Capability stands in; the
+          stereotype is what separates a competency a PERSON holds from a
+          capability the ORGANISATION has. Paul, 2026-09-12: if the convention
+          is part of the implementation, a user has to be able to set it — a
+          marker only our own generator can write is not a convention, it is a
+          private detail. */}
+      {(element.type === "uml-class" || element.type === "uml-enumeration" || element.type === "uml-package" || element.type === "archimate-shape") && onUpdateProperties && (
         <div className="space-y-1">
           <div className="flex items-center gap-1.5">
             <label className="text-[10px] text-gray-500 w-16 shrink-0">Stereotype</label>
@@ -3896,7 +3912,17 @@ export function PropertiesPanel({
               key={`stereo-${element.id}`}
               onBlur={e => onUpdateProperties(element.id, { stereotype: e.target.value })}
               onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+              list={element.type === "archimate-shape" ? "archi-stereotypes" : undefined}
             />
+            {/* SUGGESTED, not enforced: a stereotype is an open extension point,
+                and a closed list would make every other legitimate use
+                impossible. These two are the ones the Skills feature reads. */}
+            {element.type === "archimate-shape" && (
+              <datalist id="archi-stereotypes">
+                <option value="Individual Skill" />
+                <option value="Business Capability" />
+              </datalist>
+            )}
           </div>
           {element.type === "uml-class" && (
             <div className="flex items-center gap-1.5">

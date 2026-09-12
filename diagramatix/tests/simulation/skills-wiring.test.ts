@@ -10,7 +10,12 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { ResourcePool } from "@/app/lib/simulation/resourcePool";
+import { ResourcePool, type PoolUnit } from "@/app/lib/simulation/resourcePool";
+import { STARTER_EXAMPLES } from "@/app/lib/simulation/exampleSeeds";
+import { assemblePortfolio } from "@/app/lib/simulation/network";
+import { runMonteCarlo } from "@/app/lib/simulation/runner";
+import type { DiagramData } from "@/app/lib/diagram/types";
+import type { WorkCalendar, SimRunConfig } from "@/app/lib/simulation/types";
 
 const ROOT = path.resolve(__dirname, "..", "..");
 const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), "utf8");
@@ -167,5 +172,72 @@ describe("step 5 — only a qualified person on the task's team can do the work"
       { id: "y", name: "y", skills: ["Onboarding"] },
     ]);
     expect(pool.request(0, 1, "impossible", { requiredSkills: ["Compliance"] })).toBe(false);
+  });
+});
+
+describe("one person is the only one who can do the work", () => {
+  // Paul, 2026-09-12: a team where ONE member is the only person who can perform
+  // a task in that team's lane must be modellable, markable, and must actually
+  // bite in the simulator. Run against the SHIPPED example rather than a
+  // fixture, so what is proven is the product and not a mock of it.
+  const pkg = STARTER_EXAMPLES.find((e) => e.slug === "hire-and-onboard")!.package;
+  const root = pkg.diagrams.find((d) => d.key === pkg.study.rootKeys[0])!;
+  const SKILL = "Compliance Accreditation";
+  const TEAM = "HR Operations";
+
+  const teamCapacities = Object.fromEntries(pkg.teams.map((t) => [t.name, t.capacity]));
+  const teamCosts = Object.fromEntries(pkg.teams.filter((t) => t.costPerHour != null).map((t) => [t.name, t.costPerHour as number]));
+  const calById = Object.fromEntries((pkg.calendars ?? []).map((c) => [c.name, c.pattern as WorkCalendar]));
+  const teamCalendars: Record<string, WorkCalendar> = {};
+  for (const t of pkg.teams) if (t.calendarName && calById[t.calendarName]) teamCalendars[t.name] = calById[t.calendarName];
+
+  /** The example's teams, with HR Operations' roster swapped for `members`. */
+  function runWith(members: { name: string; skills: string[] }[]) {
+    const units: Record<string, PoolUnit[]> = {};
+    for (const t of pkg.teams) {
+      const roster = t.name === TEAM ? members : (t.members ?? []);
+      if (roster.length) units[t.name] = roster.map((m) => ({ id: m.name, name: m.name, skills: m.skills }));
+    }
+    const net = assemblePortfolio([{ id: root.key, data: root.data as DiagramData }], {
+      teamCapacities, strictTeams: true, teamCalendars, calendarsById: calById, teamUnits: units,
+    });
+    const stats = runMonteCarlo(net, pkg.scenarios[0].runConfig as SimRunConfig, undefined, teamCosts).stats;
+    const hit = Object.entries(stats.perNode).find(([k]) => k.endsWith("vetting"));
+    return { wait: hit ? hit[1].wait.mean : NaN, util: stats.perTeam[TEAM]?.utilization.mean ?? 0 };
+  }
+
+  const ONB = "Onboarding Administration";
+  const two = [
+    { name: "Grace Oduya", skills: [ONB, SKILL] },
+    { name: "Ruth Ellis", skills: [ONB, SKILL] },
+    { name: "Ben Carter", skills: [ONB] },
+    { name: "Marta Silva", skills: [ONB] },
+  ];
+  const one = two.map((m) => (m.name === "Ruth Ellis" ? { name: m.name, skills: [ONB] } : m));
+
+  it("T4292 - taking the team from TWO holders to ONE makes the queue worse, not the headcount", () => {
+    // The team still has four people and the same capacity. Only the number of
+    // people ALLOWED to do this step changed — which is the entire claim the
+    // skills feature makes, and the thing a headcount model cannot express.
+    const withTwo = runWith(two);
+    const withOne = runWith(one);
+
+    expect(withOne.wait, "one accredited person must queue worse than two")
+      .toBeGreaterThan(withTwo.wait * 1.5);
+
+    // ...and the TEAM is not the thing under strain in either case. A reader
+    // looking at utilisation alone would conclude there is spare capacity.
+    expect(withTwo.util).toBeLessThan(0.8);
+    expect(withOne.util).toBeLessThan(0.8);
+  });
+
+  it("T4293 - if the last holder loses the skill, the work can never start", () => {
+    // Not "it gets slow": nobody on the team qualifies, so the step never runs.
+    // The alternative — granting it anyway — would complete the run and report
+    // no queue at all, which is wrong in the flattering direction.
+    const none = two.map((m) => ({ name: m.name, skills: [ONB] }));
+    const r = runWith(none);
+    // Nothing completes the vetting step, so no wait is ever recorded there.
+    expect(Number.isNaN(r.wait) || r.wait === 0).toBe(true);
   });
 });

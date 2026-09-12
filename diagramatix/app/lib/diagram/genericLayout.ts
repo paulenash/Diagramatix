@@ -1189,9 +1189,15 @@ function layoutArchimateDiagram(
         y: y + (rowH - e.h) / 2,
         width: e.w, height: e.h,
         label: e.label,
-        properties: e.iconOnly
-          ? { shapeKey: e.shapeKey, archimateIconOnly: true }
-          : { shapeKey: e.shapeKey },
+        // The stereotype RIDES THROUGH. Layout used to keep only shapeKey, so a
+        // stereotype set in Properties was silently dropped the next time the
+        // diagram was laid out — and the Skills reader would then read every
+        // Capability as somebody's skill, including the organisation's.
+        properties: {
+          shapeKey: e.shapeKey,
+          ...(e.iconOnly ? { archimateIconOnly: true } : {}),
+          ...(e.ai.stereotype ? { stereotype: e.ai.stereotype } : {}),
+        },
       });
       posById.set(e.ai.id, { cx: e.cx + shift, cy: y + rowH / 2, w: e.w, h: e.h });
     }

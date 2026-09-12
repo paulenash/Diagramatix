@@ -243,6 +243,27 @@ describe("Hire & Onboard — Tier 1: the skills matrix is READ, not typed", () =
     expect(model.people.map((p) => p.name)).not.toContain("HR Operations");
   });
 
+  it("T4287 - every has-skill association is LABELLED", () => {
+    // Paul specified the label — "relationship label = has skill or possesses.
+    // That makes the semantic meaning very clear to a reader" — and it was
+    // omitted on the first redraw, because the READER does not need it: the
+    // relationship is identified by what it connects. That is exactly why it
+    // needed pinning. A bare line between a person and a capability says
+    // nothing to the human looking at the picture, and Association is the one
+    // ArchiMate relationship with no inherent meaning of its own.
+    const conns = (companion.data as DiagramData).connectors;
+    const assoc = conns.filter((c) => c.type === "archi-association");
+    expect(assoc.length).toBeGreaterThan(20);
+    const unlabelled = assoc.filter((c) => !(c.label ?? "").trim());
+    expect(unlabelled, "an association with no label states nothing").toEqual([]);
+
+    // The team's capability is labelled differently on purpose: it is the
+    // organisation's, not a person's, and the picture should say so without
+    // the reader having to know the stereotype convention.
+    const kinds = new Set(assoc.map((c) => (c.label ?? "").trim()));
+    expect([...kinds].sort()).toEqual(["has capability", "has skill"]);
+  });
+
   it("T4286 - an organisational capability is not somebody's skill", () => {
     // "Workforce Onboarding" hangs off the HR Operations TEAM. Both it and a
     // personal skill are Capability elements; only the stereotype — and the

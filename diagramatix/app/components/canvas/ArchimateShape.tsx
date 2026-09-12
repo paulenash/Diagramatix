@@ -106,6 +106,7 @@ function drawOutline(
 
 export function ArchimateShape({ el }: { el: DiagramElement }) {
   const shapeKey = el.properties?.shapeKey as string | undefined;
+  const stereotype = (el.properties?.stereotype as string | undefined)?.trim();
   const [, forceRender] = useState(0);
   const iconOverrides = useArchimateIconLayout();
   const categoryBuffers = useArchimateIconBuffers();
@@ -350,6 +351,24 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
         </>
       )}
       {drawIcon ? renderGlyph(drawIcon, el, layout, isGrouping ? "#555555" : glyphColour) : null}
+      {stereotype && (
+        // ArchiMate 3.x has no Skill element, so a Capability stands in and the
+        // stereotype is what separates a competency a PERSON holds from a
+        // capability the ORGANISATION has. A marker that is stored but not DRAWN
+        // is a marker nobody can check, so it is shown the way the notation
+        // shows a specialised concept: guillemets, above the name.
+        <text
+          x={el.x + el.width / 2}
+          y={el.y + 11}
+          textAnchor="middle"
+          fontSize={9}
+          fill={stroke}
+          opacity={0.75}
+          style={{ pointerEvents: "none", userSelect: "none" }}
+        >
+          &#171;{stereotype}&#187;
+        </text>
+      )}
     </g>
   );
 }

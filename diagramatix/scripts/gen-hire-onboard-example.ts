@@ -397,12 +397,19 @@ function buildArchimate(): DiagramData {
     ...archiPeople.flatMap((p) => (p.jobs ?? []).map((j) => ({ sourceId: p.id, targetId: j, type: "assignment" }))),
     // Person —— Skill. Association: ArchiMate has no "possesses a capability"
     // relationship, and the competency-modelling research recommends this one.
-    ...archiPeople.flatMap((p) => p.caps.map((c) => ({ sourceId: p.id, targetId: c, type: "association" }))),
+    //
+    // LABELLED, per Paul: "relationship label = has skill or possesses. That
+    // makes the semantic meaning very clear to a reader." The READER does not
+    // need it — it identifies the relationship from what it connects, Actor to
+    // Capability — but a bare line between a person and a capability says
+    // nothing to the human looking at the picture, and an Association is the
+    // one ArchiMate relationship with no inherent meaning of its own.
+    ...archiPeople.flatMap((p) => p.caps.map((c) => ({ sourceId: p.id, targetId: c, type: "association", label: "has skill" }))),
     // The bundle: holding "Accredited Vetting" holds both leaves.
     { sourceId: CAP_VETTING, targetId: CAP.onboarding, type: "aggregation" },
     { sourceId: CAP_VETTING, targetId: CAP.compliance, type: "aggregation" },
     // The organisational capability belongs to the TEAM, not to a person.
-    { sourceId: "t-hr", targetId: CAP_ORG, type: "association" },
+    { sourceId: "t-hr", targetId: CAP_ORG, type: "association", label: "has capability" },
   ];
 
   const data = layoutGenericDiagram({ elements, connections }, "archimate");
