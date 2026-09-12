@@ -203,14 +203,52 @@ describe("Hire & Onboard — Tier 1: the skills matrix is READ, not typed", () =
   const taskLabels = [...new Set((root.data as DiagramData).elements.filter((e) => e.type === "task").map((e) => (e.label ?? "").trim()))];
   const match = matchSkills(model, memberNames, taskLabels);
 
-  it("T3601 - the fill reaches every named person and every skilled task", () => {
+  it("T3601 - the fill reaches every named person the architecture knows", () => {
     // Zero here is this feature's failure mode, and it looked exactly like
-    // success until an example was built: the reader matched a element type no
+    // success until an example was built: the reader matched an element type no
     // real diagram carries, so a real operating model filled nothing.
-    expect(match.units).toHaveLength(20);
-    expect(Object.keys(match.taskSkills)).toHaveLength(5);
+    //
+    // 19 of 20, not 20: Isla Fraser is on the team and absent from the
+    // architecture, on purpose — see T3603.
+    expect(model.pattern).toBe("capability");
+    expect(match.units).toHaveLength(19);
     expect(match.units.filter((u) => u.skills.includes(SKILL)).map((u) => u.name).sort())
       .toEqual(["Grace Oduya", "Ruth Ellis"]);
+  });
+
+  it("T4283 - the diagram supplies WHO CAN DO WHAT, and never what the work requires", () => {
+    // Paul, step 5: a task's required skills are the user's choice from the
+    // master Skills list. The operating model must therefore fill nobody's
+    // task, or a fill would silently overwrite a deliberate decision.
+    expect(Object.keys(match.taskSkills)).toHaveLength(0);
+    expect(model.work).toEqual([]);
+  });
+
+  it("T4284 - a POST is not a skill", () => {
+    // The whole point of the redraw. "Accredited Vetting Officer" is a post
+    // Grace holds; "Compliance Accreditation" is something she can do. Under
+    // the old drawing these were one element, so the model could not say that
+    // Dev Nair holds the accreditation while filling no post.
+    expect(model.skills).not.toContain("Accredited Vetting Officer");
+    expect(model.skills).not.toContain("Senior Recruiter");
+    const grace = model.people.find((p) => p.name === "Grace Oduya")!;
+    expect(grace.roles).toEqual(["Accredited Vetting Officer"]);
+    expect(grace.skills).not.toContain("Accredited Vetting Officer");
+  });
+
+  it("T4285 - the teams are READ from the model, not matched by name alone", () => {
+    expect(model.teams.map((t) => t.name).sort()).toEqual(
+      ["HR Operations", "IT Provisioning", "Onboarding Services", "Payroll", "Talent Acquisition"]);
+    // A team is an Actor too, and must never be offered as a person.
+    expect(model.people.map((p) => p.name)).not.toContain("HR Operations");
+  });
+
+  it("T4286 - an organisational capability is not somebody's skill", () => {
+    // "Workforce Onboarding" hangs off the HR Operations TEAM. Both it and a
+    // personal skill are Capability elements; only the stereotype — and the
+    // fact that it is held by a team — tells them apart.
+    expect(model.skills).not.toContain("Workforce Onboarding");
+    expect(model.people.flatMap((p) => p.skills)).not.toContain("Workforce Onboarding");
   });
 
   it("T3602 - a role that AGGREGATES others resolves to the skills it is made of", () => {
@@ -218,12 +256,17 @@ describe("Hire & Onboard — Tier 1: the skills matrix is READ, not typed", () =
     expect(grace.skills.sort()).toEqual(["Compliance Accreditation", "Onboarding Administration"]);
   });
 
-  it("T3603 - exactly two things deliberately do not match, and both are reported", () => {
+  it("T3603 - things deliberately do not match, in BOTH directions, and are reported", () => {
     // An example whose unmatched report comes back empty teaches the reader to
-    // ignore it.
+    // ignore it. The two directions are different failures and a real operating
+    // model has both:
+    //   • modelled but not on the team  — the architecture is ahead
+    //   • on the team but not modelled  — the architecture is behind
     expect(match.unmatchedActors).toEqual(["Dev Nair (Contractor)"]);
-    expect(match.unmatchedWork).toEqual(["Exit interview"]);
-    expect(match.unmatchedMembers).toEqual([]);
+    expect(match.unmatchedMembers).toEqual(["Isla Fraser"]);
+    // Work is no longer read at all under the capability pattern, so there is
+    // nothing to report as unmatched — see T4283.
+    expect(match.unmatchedWork).toEqual([]);
   });
 });
 

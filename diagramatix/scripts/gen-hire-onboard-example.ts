@@ -281,83 +281,147 @@ const BRANCH: Record<string, number> = {
 };
 
 // ═════════════════════════════════════════════════════════════════════════
-// The ArchiMate operating model. Actors (band 2) above roles (band 3) above the
-// work (band 7), which the layout does on its own.
+// The ArchiMate operating model — the CAPABILITY pattern (Paul, 2026-09-11).
+//
+//   Team    Business Actor   "HR Operations"      Team ◇— Person (aggregation)
+//   Person  Business Actor   "Grace Oduya"
+//   Job     Business Role    "Accredited Vetting Officer"   Person —▶ Role
+//   Skill   Capability       "Compliance Accreditation"     Person —— Capability
+//
+// This replaces the earlier drawing, where a Business Role STOOD IN for a skill.
+// The distinction it buys is the one the example is about: "Accredited Vetting
+// Officer" is a POST Grace holds, and "Compliance Accreditation" is something
+// she can DO. Under the old reading those were the same element, so the model
+// could not say that Dev Nair holds the accreditation while holding no post, or
+// that a post might exist with nobody accredited to fill it.
+//
+// Aggregation, not composition, between team and person: people exist
+// independently of a team and may belong to several.
 // ═════════════════════════════════════════════════════════════════════════
-const ROLE_SENIOR = "role-senior-recruiter";
-const ROLE_VETTING = "role-vetting-officer";
 
-const archiActors: { id: string; label: string; roles: string[] }[] = [
-  { id: "a-priya", label: "Priya Raman", roles: [ROLE_SENIOR] },
-  { id: "a-aisha", label: "Aisha Khan", roles: [ROLE_SENIOR] },
-  { id: "a-ravi", label: "Ravi Menon", roles: [ROLE_SENIOR] },
-  { id: "a-tom", label: "Tom Fletcher", roles: ["role-sourcing"] },
-  { id: "a-ellie", label: "Ellie Shaw", roles: ["role-sourcing"] },
-  { id: "a-jack", label: "Jack Oduya", roles: ["role-sourcing"] },
-  { id: "a-nadia", label: "Nadia Rahman", roles: ["role-sourcing"] },
-  { id: "a-chris", label: "Chris Bell", roles: ["role-sourcing"] },
-  { id: "a-owen", label: "Owen Pryce", roles: ["role-sourcing"] },
-  { id: "a-isla", label: "Isla Fraser", roles: ["role-sourcing"] },
-  { id: "a-grace", label: "Grace Oduya", roles: [ROLE_VETTING] },
-  { id: "a-ruth", label: "Ruth Ellis", roles: [ROLE_VETTING] },
-  { id: "a-ben", label: "Ben Carter", roles: ["role-onboarding"] },
-  { id: "a-marta", label: "Marta Silva", roles: ["role-onboarding"] },
-  { id: "a-leah", label: "Leah Nowak", roles: ["role-onboarding"] },
-  { id: "a-femi", label: "Femi Adeyemi", roles: ["role-onboarding"] },
-  { id: "a-dan", label: "Dan Russo", roles: ["role-onboarding"] },
-  { id: "a-sam", label: "Sam Doyle", roles: ["role-device"] },
-  { id: "a-nina", label: "Nina Petrov", roles: ["role-device"] },
-  { id: "a-jo", label: "Jo Mensah", roles: ["role-payroll"] },
-  // DELIBERATE non-match #1: fully modelled and accredited, but on no team. He
-  // is given a role on purpose — an actor with NO role would also trip the
-  // "holds nothing" warning, and one honest report is worth more than two. He
-  // also makes a quiet point: the architecture says a third accredited person
-  // exists; the team library says he is not available.
-  { id: "a-dev", label: "Dev Nair (Contractor)", roles: [ROLE_VETTING] },
+/** Skills — Capability elements, stereotyped so they are read as a PERSON's. */
+const CAP = {
+  sourcing: "cap-sourcing", negotiation: "cap-negotiation", compliance: "cap-compliance",
+  payroll: "cap-payroll", onboarding: "cap-onboarding", device: "cap-device",
+} as const;
+
+/** A capability that AGGREGATES others is a bundle: holding it holds its leaves.
+ *  Grace, Ruth and Dev are given this rather than the two leaves, so the shipped
+ *  example exercises the bundle path a real operating model would use. */
+const CAP_VETTING = "cap-accredited-vetting";
+
+/** An ORGANISATIONAL capability, hung off a team. Not anybody's skill — the
+ *  distinction the stereotypes exist to draw, and the second deliberate
+ *  teaching point in this model. */
+const CAP_ORG = "cap-workforce-onboarding";
+
+const JOB_SENIOR = "job-senior-recruiter";
+const JOB_VETTING = "job-accredited-vetting-officer";
+
+const archiCapabilities = [
+  { id: CAP.sourcing, label: SK.sourcing },
+  { id: CAP.negotiation, label: SK.negotiation },
+  { id: CAP.compliance, label: SK.compliance },
+  { id: CAP.payroll, label: SK.payroll },
+  { id: CAP.onboarding, label: SK.onboarding },
+  { id: CAP.device, label: SK.device },
+  { id: CAP_VETTING, label: "Accredited Vetting" },
 ];
 
-const archiRoles = [
-  { id: "role-sourcing", label: SK.sourcing },
-  { id: "role-negotiation", label: SK.negotiation },
-  { id: "role-compliance", label: SK.compliance },
-  { id: "role-payroll", label: SK.payroll },
-  { id: "role-onboarding", label: SK.onboarding },
-  { id: "role-device", label: SK.device },
-  { id: ROLE_SENIOR, label: "Senior Recruiter" },
-  { id: ROLE_VETTING, label: "Accredited Vetting Officer" },
+const archiJobs = [
+  { id: JOB_SENIOR, label: "Senior Recruiter" },
+  { id: JOB_VETTING, label: "Accredited Vetting Officer" },
 ];
 
-/** Role bundles — a role that aggregates others IS those skills. */
-const BUNDLES: [string, string][] = [
-  [ROLE_SENIOR, "role-sourcing"], [ROLE_SENIOR, "role-negotiation"],
-  [ROLE_VETTING, "role-onboarding"], [ROLE_VETTING, "role-compliance"],
+/** People: the capabilities they hold, the post they occupy, the team they are in. */
+const archiPeople: { id: string; label: string; caps: string[]; jobs?: string[]; team?: string }[] = [
+  { id: "a-priya", label: "Priya Raman", caps: [CAP.sourcing, CAP.negotiation], jobs: [JOB_SENIOR], team: "t-ta" },
+  { id: "a-aisha", label: "Aisha Khan", caps: [CAP.sourcing, CAP.negotiation], jobs: [JOB_SENIOR], team: "t-ta" },
+  { id: "a-ravi", label: "Ravi Menon", caps: [CAP.sourcing, CAP.negotiation], jobs: [JOB_SENIOR], team: "t-ta" },
+  { id: "a-tom", label: "Tom Fletcher", caps: [CAP.sourcing], team: "t-ta" },
+  { id: "a-ellie", label: "Ellie Shaw", caps: [CAP.sourcing], team: "t-ta" },
+  { id: "a-jack", label: "Jack Oduya", caps: [CAP.sourcing], team: "t-ta" },
+  { id: "a-nadia", label: "Nadia Rahman", caps: [CAP.sourcing], team: "t-ta" },
+  { id: "a-chris", label: "Chris Bell", caps: [CAP.sourcing], team: "t-ta" },
+  { id: "a-owen", label: "Owen Pryce", caps: [CAP.sourcing], team: "t-ta" },
+  // DELIBERATE non-match #2: Isla Fraser is on the team in the library and does
+  // NOT appear here. The architecture has not caught up with the roster, which
+  // is the commonest state of a real operating model — and it is reported as an
+  // unmatched MEMBER, the opposite direction to Dev Nair below. Two directions,
+  // two reports; a fill that quietly matched nothing looks exactly like one that
+  // worked.
+  { id: "a-grace", label: "Grace Oduya", caps: [CAP_VETTING], jobs: [JOB_VETTING], team: "t-hr" },
+  { id: "a-ruth", label: "Ruth Ellis", caps: [CAP_VETTING], jobs: [JOB_VETTING], team: "t-hr" },
+  { id: "a-ben", label: "Ben Carter", caps: [CAP.onboarding], team: "t-hr" },
+  { id: "a-marta", label: "Marta Silva", caps: [CAP.onboarding], team: "t-hr" },
+  { id: "a-leah", label: "Leah Nowak", caps: [CAP.onboarding], team: "t-ob" },
+  { id: "a-femi", label: "Femi Adeyemi", caps: [CAP.onboarding], team: "t-ob" },
+  { id: "a-dan", label: "Dan Russo", caps: [CAP.onboarding], team: "t-ob" },
+  { id: "a-sam", label: "Sam Doyle", caps: [CAP.device], team: "t-it" },
+  { id: "a-nina", label: "Nina Petrov", caps: [CAP.device], team: "t-it" },
+  { id: "a-jo", label: "Jo Mensah", caps: [CAP.payroll], team: "t-pay" },
+  // DELIBERATE non-match #1: fully modelled, holds the accreditation AND the
+  // post, and belongs to no team. The architecture says a third accredited
+  // person exists; the team library says he is not available to the process.
+  { id: "a-dev", label: "Dev Nair (Contractor)", caps: [CAP_VETTING], jobs: [JOB_VETTING] },
 ];
 
-/** Role → the work that requires it. Labels must match the BPMN task labels. */
-const REQUIRES: [string, string, string][] = [
-  ["role-negotiation", "w-negotiate", "Negotiate offer"],
-  ["role-compliance", "w-vetting", "Compliance & vetting review"],
-  ["role-payroll", "w-payroll", "Create payroll record"],
-  ["role-device", "w-provision", "Provision laptop & accounts"],
-  ["role-onboarding", "w-pack", "Prepare onboarding pack"],
-  // DELIBERATE non-match #2: a business process with a role assigned and no
-  // matching BPMN task. An example whose unmatched report comes back empty
-  // teaches the reader to ignore it.
-  ["role-onboarding", "w-exit", "Exit interview"],
+/** Teams. Labels match the Team library, which is how the fill finds them. */
+const archiTeams = [
+  { id: "t-ta", label: "Talent Acquisition" },
+  { id: "t-hr", label: "HR Operations" },
+  { id: "t-ob", label: "Onboarding Services" },
+  { id: "t-it", label: "IT Provisioning" },
+  { id: "t-pay", label: "Payroll" },
 ];
+
+/** Stereotypes, applied AFTER layout by element id — layoutGenericDiagram keeps
+ *  only `shapeKey`, so anything handed to it in `properties` is dropped. */
+const ARCHI_STEREOTYPE: Record<string, string> = {
+  ...Object.fromEntries(archiCapabilities.map((c) => [c.id, "Individual Skill"])),
+  [CAP_ORG]: "Business Capability",
+};
 
 function buildArchimate(): DiagramData {
   const elements = [
-    ...archiActors.map((a) => ({ id: a.id, type: "business-actor", label: a.label })),
-    ...archiRoles.map((r) => ({ id: r.id, type: "business-role", label: r.label })),
-    ...REQUIRES.map(([, id, label]) => ({ id, type: "business-process", label })),
+    ...archiTeams.map((t) => ({ id: t.id, type: "business-actor", label: t.label })),
+    ...archiPeople.map((p) => ({ id: p.id, type: "business-actor", label: p.label })),
+    ...archiJobs.map((j) => ({ id: j.id, type: "business-role", label: j.label })),
+    ...archiCapabilities.map((c) => ({ id: c.id, type: "strategy-capability", label: c.label })),
+    { id: CAP_ORG, type: "strategy-capability", label: "Workforce Onboarding" },
   ];
   const connections = [
-    ...archiActors.flatMap((a) => a.roles.map((r) => ({ sourceId: a.id, targetId: r, type: "assignment" }))),
-    ...BUNDLES.map(([parent, child]) => ({ sourceId: parent, targetId: child, type: "aggregation" })),
-    ...REQUIRES.map(([role, work]) => ({ sourceId: role, targetId: work, type: "assignment" })),
+    // Team ◇— Person.
+    ...archiPeople.filter((p) => p.team).map((p) => ({ sourceId: p.team!, targetId: p.id, type: "aggregation" })),
+    // Person —▶ Post.
+    ...archiPeople.flatMap((p) => (p.jobs ?? []).map((j) => ({ sourceId: p.id, targetId: j, type: "assignment" }))),
+    // Person —— Skill. Association: ArchiMate has no "possesses a capability"
+    // relationship, and the competency-modelling research recommends this one.
+    ...archiPeople.flatMap((p) => p.caps.map((c) => ({ sourceId: p.id, targetId: c, type: "association" }))),
+    // The bundle: holding "Accredited Vetting" holds both leaves.
+    { sourceId: CAP_VETTING, targetId: CAP.onboarding, type: "aggregation" },
+    { sourceId: CAP_VETTING, targetId: CAP.compliance, type: "aggregation" },
+    // The organisational capability belongs to the TEAM, not to a person.
+    { sourceId: "t-hr", targetId: CAP_ORG, type: "association" },
   ];
-  return layoutGenericDiagram({ elements, connections }, "archimate");
+
+  const data = layoutGenericDiagram({ elements, connections }, "archimate");
+
+  // Attach stereotypes by id, the same way buildBpmn attaches sim params — and
+  // proven, not assumed: an id that stopped matching would silently un-mark a
+  // capability, and an unmarked model reads EVERY capability as a skill, so the
+  // organisational one would quietly become somebody's competency.
+  let marked = 0;
+  data.elements = data.elements.map((el: DiagramElement) => {
+    const stereotype = ARCHI_STEREOTYPE[el.id];
+    if (!stereotype) return el;
+    marked++;
+    return { ...el, properties: { ...(el.properties ?? {}), stereotype } };
+  }) as DiagramElement[];
+  if (marked !== Object.keys(ARCHI_STEREOTYPE).length) {
+    throw new Error(`Stereotyped ${marked} of ${Object.keys(ARCHI_STEREOTYPE).length} capabilities — an id did not survive layout.`);
+  }
+  return data;
 }
 
 // ═════════════════════════════════════════════════════════════════════════
@@ -508,11 +572,14 @@ function main() {
       "Four staffing levers move the number by nothing and two calendar decisions take a third off it — which is",
       "the whole argument for simulating before spending.",
       "",
-      "Fill the skills matrix from the ArchiMate operating model rather than typing it: Actor →assignment→ Role",
-      "means the person holds the skill, Role →assignment→ Business Process means the work requires it, and a",
-      "Role that aggregates others is a bundle. Two things deliberately do NOT match — a contractor who is on no",
-      "team, and an 'Exit interview' with no BPMN task — because a fill that quietly matches nothing looks exactly",
-      "like a fill that worked.",
+      "Fill the skills matrix from the ArchiMate operating model rather than typing it. A person is a Business",
+      "Actor; the Capabilities associated with them are what they can DO; a Business Role is the POST they hold,",
+      "not a skill; and a team aggregates its people. So the model can say that Dev Nair holds the accreditation",
+      "and no post, which a model that confused the two could not.",
+      "",
+      "Three things deliberately do not line up, because a fill that quietly matches nothing looks exactly like",
+      "one that worked: a contractor modelled and accredited but on no team; a team member the architecture has",
+      "never heard of; and an organisational capability hung off a team, which is not anybody's skill.",
       "",
       "Then: sweep the arrival rate to find where the current accreditation cover falls over, run the tornado to",
       "see HR Operations' headcount sit flat while the arrival rate runs the width of the chart, and build the",

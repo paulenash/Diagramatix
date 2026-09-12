@@ -12674,7 +12674,7 @@
       "slug": "hire-and-onboard",
       "title": "Hire & Onboard",
       "concept": "Four people in HR Operations, only two accredited to sign off a vetting review — the constraint is not headcount, it is who is allowed to do the work.",
-      "description": "A regulated employer hiring ~790 people a year. Every team sits under 60% utilisation, so nothing in the\nutilisation panel looks wrong — and yet every hire waits about two working days at one step.\n\nOnly 2 of HR Operations' 4 people are accredited to sign off a compliance & vetting review. Adding desks\nchanges nothing — capacity is not people. Hiring two more administrators, at ~£176k a year, changes\nnothing either: they cannot do the accredited work. Training a third checker DOES collapse that queue,\nfrom about 9 hours to 4 — and still barely moves the total, which is the point of the example.\n\nBecause ~85% of the 988-hour elapsed time is two waiting periods nobody is working through: the\nadvertising window and the wait for a start date. Advertise for one week instead of two and the typical\nhire lands 17% sooner; bring the start date forward a week as well and it is 34%, for no money at all.\nFour staffing levers move the number by nothing and two calendar decisions take a third off it — which is\nthe whole argument for simulating before spending.\n\nFill the skills matrix from the ArchiMate operating model rather than typing it: Actor →assignment→ Role\nmeans the person holds the skill, Role →assignment→ Business Process means the work requires it, and a\nRole that aggregates others is a bundle. Two things deliberately do NOT match — a contractor who is on no\nteam, and an 'Exit interview' with no BPMN task — because a fill that quietly matches nothing looks exactly\nlike a fill that worked.\n\nThen: sweep the arrival rate to find where the current accreditation cover falls over, run the tornado to\nsee HR Operations' headcount sit flat while the arrival rate runs the width of the chart, and build the\nbusiness case. The £120/hour cost of an unfilled role is an ASSUMPTION — replace it with yours.",
+      "description": "A regulated employer hiring ~790 people a year. Every team sits under 60% utilisation, so nothing in the\nutilisation panel looks wrong — and yet every hire waits about two working days at one step.\n\nOnly 2 of HR Operations' 4 people are accredited to sign off a compliance & vetting review. Adding desks\nchanges nothing — capacity is not people. Hiring two more administrators, at ~£176k a year, changes\nnothing either: they cannot do the accredited work. Training a third checker DOES collapse that queue,\nfrom about 9 hours to 4 — and still barely moves the total, which is the point of the example.\n\nBecause ~85% of the 988-hour elapsed time is two waiting periods nobody is working through: the\nadvertising window and the wait for a start date. Advertise for one week instead of two and the typical\nhire lands 17% sooner; bring the start date forward a week as well and it is 34%, for no money at all.\nFour staffing levers move the number by nothing and two calendar decisions take a third off it — which is\nthe whole argument for simulating before spending.\n\nFill the skills matrix from the ArchiMate operating model rather than typing it. A person is a Business\nActor; the Capabilities associated with them are what they can DO; a Business Role is the POST they hold,\nnot a skill; and a team aggregates its people. So the model can say that Dev Nair holds the accreditation\nand no post, which a model that confused the two could not.\n\nThree things deliberately do not line up, because a fill that quietly matches nothing looks exactly like\none that worked: a contractor modelled and accredited but on no team; a team member the architecture has\nnever heard of; and an organisational capability hung off a team, which is not anybody's skill.\n\nThen: sweep the arrival rate to find where the current accreditation cover falls over, run the tornado to\nsee HR Operations' headcount sit flat while the arrival rate runs the width of the chart, and build the\nbusiness case. The £120/hour cost of an unfilled role is an ASSUMPTION — replace it with yours.",
       "difficulty": "advanced",
       "package": {
         "version": 1,
@@ -14652,10 +14652,182 @@
             "data": {
               "elements": [
                 {
-                  "id": "a-priya",
+                  "id": "cap-workforce-onboarding",
+                  "type": "archimate-shape",
+                  "x": 268,
+                  "y": 100,
+                  "width": 128,
+                  "height": 76,
+                  "label": "Workforce Onboarding",
+                  "properties": {
+                    "shapeKey": "strategy-capability-icon",
+                    "archimateIconOnly": true,
+                    "stereotype": "Business Capability"
+                  }
+                },
+                {
+                  "id": "cap-negotiation",
+                  "type": "archimate-shape",
+                  "x": 1108,
+                  "y": 100,
+                  "width": 128,
+                  "height": 76,
+                  "label": "Offer Negotiation",
+                  "properties": {
+                    "shapeKey": "strategy-capability-icon",
+                    "archimateIconOnly": true,
+                    "stereotype": "Individual Skill"
+                  }
+                },
+                {
+                  "id": "cap-sourcing",
+                  "type": "archimate-shape",
+                  "x": 1612,
+                  "y": 100,
+                  "width": 128,
+                  "height": 76,
+                  "label": "Sourcing",
+                  "properties": {
+                    "shapeKey": "strategy-capability-icon",
+                    "archimateIconOnly": true,
+                    "stereotype": "Individual Skill"
+                  }
+                },
+                {
+                  "id": "cap-compliance",
+                  "type": "archimate-shape",
+                  "x": 2408.02,
+                  "y": 100,
+                  "width": 128,
+                  "height": 76,
+                  "label": "Compliance Accreditation",
+                  "properties": {
+                    "shapeKey": "strategy-capability-icon",
+                    "archimateIconOnly": true,
+                    "stereotype": "Individual Skill"
+                  }
+                },
+                {
+                  "id": "cap-accredited-vetting",
+                  "type": "archimate-shape",
+                  "x": 3068,
+                  "y": 100,
+                  "width": 128,
+                  "height": 76,
+                  "label": "Accredited Vetting",
+                  "properties": {
+                    "shapeKey": "strategy-capability-icon",
+                    "archimateIconOnly": true,
+                    "stereotype": "Individual Skill"
+                  }
+                },
+                {
+                  "id": "cap-onboarding",
+                  "type": "archimate-shape",
+                  "x": 3236,
+                  "y": 100,
+                  "width": 128,
+                  "height": 76,
+                  "label": "Onboarding Administration",
+                  "properties": {
+                    "shapeKey": "strategy-capability-icon",
+                    "archimateIconOnly": true,
+                    "stereotype": "Individual Skill"
+                  }
+                },
+                {
+                  "id": "cap-device",
+                  "type": "archimate-shape",
+                  "x": 3712,
+                  "y": 100,
+                  "width": 128,
+                  "height": 76,
+                  "label": "Device Provisioning",
+                  "properties": {
+                    "shapeKey": "strategy-capability-icon",
+                    "archimateIconOnly": true,
+                    "stereotype": "Individual Skill"
+                  }
+                },
+                {
+                  "id": "cap-payroll",
+                  "type": "archimate-shape",
+                  "x": 3964,
+                  "y": 100,
+                  "width": 128,
+                  "height": 76,
+                  "label": "Payroll Administration",
+                  "properties": {
+                    "shapeKey": "strategy-capability-icon",
+                    "archimateIconOnly": true,
+                    "stereotype": "Individual Skill"
+                  }
+                },
+                {
+                  "id": "t-ta",
                   "type": "archimate-shape",
                   "x": 100,
-                  "y": 100,
+                  "y": 256,
+                  "width": 128,
+                  "height": 76,
+                  "label": "Talent Acquisition",
+                  "properties": {
+                    "shapeKey": "business-business-actor-box"
+                  }
+                },
+                {
+                  "id": "t-hr",
+                  "type": "archimate-shape",
+                  "x": 268,
+                  "y": 256,
+                  "width": 128,
+                  "height": 76,
+                  "label": "HR Operations",
+                  "properties": {
+                    "shapeKey": "business-business-actor-box"
+                  }
+                },
+                {
+                  "id": "t-ob",
+                  "type": "archimate-shape",
+                  "x": 436,
+                  "y": 256,
+                  "width": 128,
+                  "height": 76,
+                  "label": "Onboarding Services",
+                  "properties": {
+                    "shapeKey": "business-business-actor-box"
+                  }
+                },
+                {
+                  "id": "t-it",
+                  "type": "archimate-shape",
+                  "x": 604,
+                  "y": 256,
+                  "width": 128,
+                  "height": 76,
+                  "label": "IT Provisioning",
+                  "properties": {
+                    "shapeKey": "business-business-actor-box"
+                  }
+                },
+                {
+                  "id": "t-pay",
+                  "type": "archimate-shape",
+                  "x": 772,
+                  "y": 256,
+                  "width": 128,
+                  "height": 76,
+                  "label": "Payroll",
+                  "properties": {
+                    "shapeKey": "business-business-actor-box"
+                  }
+                },
+                {
+                  "id": "a-priya",
+                  "type": "archimate-shape",
+                  "x": 940,
+                  "y": 256,
                   "width": 128,
                   "height": 76,
                   "label": "Priya Raman",
@@ -14666,8 +14838,8 @@
                 {
                   "id": "a-aisha",
                   "type": "archimate-shape",
-                  "x": 268,
-                  "y": 100,
+                  "x": 1108,
+                  "y": 256,
                   "width": 128,
                   "height": 76,
                   "label": "Aisha Khan",
@@ -14678,8 +14850,8 @@
                 {
                   "id": "a-ravi",
                   "type": "archimate-shape",
-                  "x": 436,
-                  "y": 100,
+                  "x": 1276,
+                  "y": 256,
                   "width": 128,
                   "height": 76,
                   "label": "Ravi Menon",
@@ -14690,8 +14862,8 @@
                 {
                   "id": "a-tom",
                   "type": "archimate-shape",
-                  "x": 604,
-                  "y": 100,
+                  "x": 1444,
+                  "y": 256,
                   "width": 128,
                   "height": 76,
                   "label": "Tom Fletcher",
@@ -14702,8 +14874,8 @@
                 {
                   "id": "a-ellie",
                   "type": "archimate-shape",
-                  "x": 772,
-                  "y": 100,
+                  "x": 1612,
+                  "y": 256,
                   "width": 128,
                   "height": 76,
                   "label": "Ellie Shaw",
@@ -14714,8 +14886,8 @@
                 {
                   "id": "a-jack",
                   "type": "archimate-shape",
-                  "x": 940,
-                  "y": 100,
+                  "x": 1780,
+                  "y": 256,
                   "width": 128,
                   "height": 76,
                   "label": "Jack Oduya",
@@ -14726,8 +14898,8 @@
                 {
                   "id": "a-nadia",
                   "type": "archimate-shape",
-                  "x": 1108,
-                  "y": 100,
+                  "x": 1948,
+                  "y": 256,
                   "width": 128,
                   "height": 76,
                   "label": "Nadia Rahman",
@@ -14738,8 +14910,8 @@
                 {
                   "id": "a-chris",
                   "type": "archimate-shape",
-                  "x": 1276,
-                  "y": 100,
+                  "x": 2116,
+                  "y": 256,
                   "width": 128,
                   "height": 76,
                   "label": "Chris Bell",
@@ -14750,8 +14922,8 @@
                 {
                   "id": "a-owen",
                   "type": "archimate-shape",
-                  "x": 1444,
-                  "y": 100,
+                  "x": 2284,
+                  "y": 256,
                   "width": 128,
                   "height": 76,
                   "label": "Owen Pryce",
@@ -14760,22 +14932,10 @@
                   }
                 },
                 {
-                  "id": "a-isla",
-                  "type": "archimate-shape",
-                  "x": 1612,
-                  "y": 100,
-                  "width": 128,
-                  "height": 76,
-                  "label": "Isla Fraser",
-                  "properties": {
-                    "shapeKey": "business-business-actor-box"
-                  }
-                },
-                {
                   "id": "a-grace",
                   "type": "archimate-shape",
-                  "x": 1780,
-                  "y": 100,
+                  "x": 2452,
+                  "y": 256,
                   "width": 128,
                   "height": 76,
                   "label": "Grace Oduya",
@@ -14786,8 +14946,8 @@
                 {
                   "id": "a-ruth",
                   "type": "archimate-shape",
-                  "x": 1948,
-                  "y": 100,
+                  "x": 2620,
+                  "y": 256,
                   "width": 128,
                   "height": 76,
                   "label": "Ruth Ellis",
@@ -14798,8 +14958,8 @@
                 {
                   "id": "a-ben",
                   "type": "archimate-shape",
-                  "x": 2116,
-                  "y": 100,
+                  "x": 2788,
+                  "y": 256,
                   "width": 128,
                   "height": 76,
                   "label": "Ben Carter",
@@ -14810,8 +14970,8 @@
                 {
                   "id": "a-marta",
                   "type": "archimate-shape",
-                  "x": 2284,
-                  "y": 100,
+                  "x": 2956,
+                  "y": 256,
                   "width": 128,
                   "height": 76,
                   "label": "Marta Silva",
@@ -14822,8 +14982,8 @@
                 {
                   "id": "a-leah",
                   "type": "archimate-shape",
-                  "x": 2452,
-                  "y": 100,
+                  "x": 3124,
+                  "y": 256,
                   "width": 128,
                   "height": 76,
                   "label": "Leah Nowak",
@@ -14834,8 +14994,8 @@
                 {
                   "id": "a-femi",
                   "type": "archimate-shape",
-                  "x": 2620,
-                  "y": 100,
+                  "x": 3292,
+                  "y": 256,
                   "width": 128,
                   "height": 76,
                   "label": "Femi Adeyemi",
@@ -14846,8 +15006,8 @@
                 {
                   "id": "a-dan",
                   "type": "archimate-shape",
-                  "x": 2788,
-                  "y": 100,
+                  "x": 3460,
+                  "y": 256,
                   "width": 128,
                   "height": 76,
                   "label": "Dan Russo",
@@ -14858,8 +15018,8 @@
                 {
                   "id": "a-sam",
                   "type": "archimate-shape",
-                  "x": 2956,
-                  "y": 100,
+                  "x": 3628,
+                  "y": 256,
                   "width": 128,
                   "height": 76,
                   "label": "Sam Doyle",
@@ -14870,8 +15030,8 @@
                 {
                   "id": "a-nina",
                   "type": "archimate-shape",
-                  "x": 3124,
-                  "y": 100,
+                  "x": 3796,
+                  "y": 256,
                   "width": 128,
                   "height": 76,
                   "label": "Nina Petrov",
@@ -14882,8 +15042,8 @@
                 {
                   "id": "a-jo",
                   "type": "archimate-shape",
-                  "x": 3292,
-                  "y": 100,
+                  "x": 3964,
+                  "y": 256,
                   "width": 128,
                   "height": 76,
                   "label": "Jo Mensah",
@@ -14894,8 +15054,8 @@
                 {
                   "id": "a-dev",
                   "type": "archimate-shape",
-                  "x": 3460,
-                  "y": 100,
+                  "x": 4132,
+                  "y": 256,
                   "width": 128,
                   "height": 76,
                   "label": "Dev Nair (Contractor)",
@@ -14904,10 +15064,10 @@
                   }
                 },
                 {
-                  "id": "role-senior-recruiter",
+                  "id": "job-senior-recruiter",
                   "type": "archimate-shape",
-                  "x": 268,
-                  "y": 256,
+                  "x": 1108,
+                  "y": 412,
                   "width": 128,
                   "height": 76,
                   "label": "Senior Recruiter",
@@ -14917,49 +15077,10 @@
                   }
                 },
                 {
-                  "id": "role-sourcing",
+                  "id": "job-accredited-vetting-officer",
                   "type": "archimate-shape",
-                  "x": 1108,
-                  "y": 256,
-                  "width": 128,
-                  "height": 76,
-                  "label": "Sourcing",
-                  "properties": {
-                    "shapeKey": "business-business-role-icon",
-                    "archimateIconOnly": true
-                  }
-                },
-                {
-                  "id": "role-negotiation",
-                  "type": "archimate-shape",
-                  "x": 2092.6766666666667,
-                  "y": 256,
-                  "width": 128,
-                  "height": 76,
-                  "label": "Offer Negotiation",
-                  "properties": {
-                    "shapeKey": "business-business-role-icon",
-                    "archimateIconOnly": true
-                  }
-                },
-                {
-                  "id": "role-compliance",
-                  "type": "archimate-shape",
-                  "x": 2260.6766666666667,
-                  "y": 256,
-                  "width": 128,
-                  "height": 76,
-                  "label": "Compliance Accreditation",
-                  "properties": {
-                    "shapeKey": "business-business-role-icon",
-                    "archimateIconOnly": true
-                  }
-                },
-                {
-                  "id": "role-vetting-officer",
-                  "type": "archimate-shape",
-                  "x": 2428.6766666666667,
-                  "y": 256,
+                  "x": 3068,
+                  "y": 412,
                   "width": 128,
                   "height": 76,
                   "label": "Accredited Vetting Officer",
@@ -14967,127 +15088,16 @@
                     "shapeKey": "business-business-role-icon",
                     "archimateIconOnly": true
                   }
-                },
-                {
-                  "id": "role-onboarding",
-                  "type": "archimate-shape",
-                  "x": 2596.6766666666667,
-                  "y": 256,
-                  "width": 128,
-                  "height": 76,
-                  "label": "Onboarding Administration",
-                  "properties": {
-                    "shapeKey": "business-business-role-icon",
-                    "archimateIconOnly": true
-                  }
-                },
-                {
-                  "id": "role-device",
-                  "type": "archimate-shape",
-                  "x": 3040,
-                  "y": 256,
-                  "width": 128,
-                  "height": 76,
-                  "label": "Device Provisioning",
-                  "properties": {
-                    "shapeKey": "business-business-role-icon",
-                    "archimateIconOnly": true
-                  }
-                },
-                {
-                  "id": "role-payroll",
-                  "type": "archimate-shape",
-                  "x": 3292,
-                  "y": 256,
-                  "width": 128,
-                  "height": 76,
-                  "label": "Payroll Administration",
-                  "properties": {
-                    "shapeKey": "business-business-role-icon",
-                    "archimateIconOnly": true
-                  }
-                },
-                {
-                  "id": "w-negotiate",
-                  "type": "archimate-shape",
-                  "x": 2092.6766666666667,
-                  "y": 412,
-                  "width": 128,
-                  "height": 76,
-                  "label": "Negotiate offer",
-                  "properties": {
-                    "shapeKey": "business-business-process-box"
-                  }
-                },
-                {
-                  "id": "w-vetting",
-                  "type": "archimate-shape",
-                  "x": 2260.6766666666667,
-                  "y": 412,
-                  "width": 128,
-                  "height": 76,
-                  "label": "Compliance & vetting review",
-                  "properties": {
-                    "shapeKey": "business-business-process-box"
-                  }
-                },
-                {
-                  "id": "w-pack",
-                  "type": "archimate-shape",
-                  "x": 2596.6766666666667,
-                  "y": 412,
-                  "width": 128,
-                  "height": 76,
-                  "label": "Prepare onboarding pack",
-                  "properties": {
-                    "shapeKey": "business-business-process-box"
-                  }
-                },
-                {
-                  "id": "w-exit",
-                  "type": "archimate-shape",
-                  "x": 2764.6766666666667,
-                  "y": 412,
-                  "width": 128,
-                  "height": 76,
-                  "label": "Exit interview",
-                  "properties": {
-                    "shapeKey": "business-business-process-box"
-                  }
-                },
-                {
-                  "id": "w-provision",
-                  "type": "archimate-shape",
-                  "x": 3040,
-                  "y": 412,
-                  "width": 128,
-                  "height": 76,
-                  "label": "Provision laptop & accounts",
-                  "properties": {
-                    "shapeKey": "business-business-process-box"
-                  }
-                },
-                {
-                  "id": "w-payroll",
-                  "type": "archimate-shape",
-                  "x": 3292,
-                  "y": 412,
-                  "width": 128,
-                  "height": 76,
-                  "label": "Create payroll record",
-                  "properties": {
-                    "shapeKey": "business-business-process-box"
-                  }
                 }
               ],
               "connectors": [
                 {
-                  "id": "conn-a-priya-role-senior-recruiter",
-                  "sourceId": "a-priya",
-                  "targetId": "role-senior-recruiter",
+                  "id": "conn-t-ta-a-priya",
+                  "sourceId": "t-ta",
+                  "targetId": "a-priya",
                   "sourceSide": "right",
                   "targetSide": "left",
-                  "type": "archi-assignment",
+                  "type": "archi-aggregation",
                   "directionType": "directed",
                   "routingType": "rectilinear",
                   "sourceInvisibleLeader": true,
@@ -15095,75 +15105,190 @@
                   "waypoints": [
                     {
                       "x": 164,
-                      "y": 138
+                      "y": 294
                     },
                     {
                       "x": 228,
-                      "y": 138
+                      "y": 263.6
                     },
                     {
-                      "x": 246,
-                      "y": 138
+                      "x": 252,
+                      "y": 263.6
                     },
                     {
-                      "x": 248,
-                      "y": 138
+                      "x": 916,
+                      "y": 263.6
                     },
                     {
-                      "x": 248,
-                      "y": 262.08
+                      "x": 940,
+                      "y": 263.6
                     },
                     {
-                      "x": 250,
-                      "y": 262.08
-                    },
-                    {
-                      "x": 268,
-                      "y": 262.08
-                    },
-                    {
-                      "x": 332,
+                      "x": 1004,
                       "y": 294
                     }
                   ],
                   "label": "",
-                  "sourceOffsetAlong": 0.5,
-                  "targetOffsetAlong": 0.08
+                  "sourceOffsetAlong": 0.1,
+                  "targetOffsetAlong": 0.1000000000000003
                 },
                 {
-                  "id": "conn-a-aisha-role-senior-recruiter",
-                  "sourceId": "a-aisha",
-                  "targetId": "role-senior-recruiter",
-                  "sourceSide": "bottom",
-                  "targetSide": "top",
-                  "type": "archi-assignment",
+                  "id": "conn-t-ta-a-aisha",
+                  "sourceId": "t-ta",
+                  "targetId": "a-aisha",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "archi-aggregation",
                   "directionType": "directed",
                   "routingType": "rectilinear",
                   "sourceInvisibleLeader": true,
                   "targetInvisibleLeader": true,
                   "waypoints": [
                     {
-                      "x": 332,
-                      "y": 138
+                      "x": 164,
+                      "y": 294
                     },
                     {
-                      "x": 332,
-                      "y": 176
+                      "x": 228,
+                      "y": 271.2
                     },
                     {
-                      "x": 332,
-                      "y": 200
+                      "x": 252,
+                      "y": 271.2
                     },
                     {
-                      "x": 332,
-                      "y": 232
+                      "x": 1084,
+                      "y": 271.2
                     },
                     {
-                      "x": 332,
-                      "y": 256
+                      "x": 1108,
+                      "y": 271.2
                     },
                     {
-                      "x": 332,
+                      "x": 1172,
+                      "y": 294
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.2,
+                  "targetOffsetAlong": 0.19999999999999984
+                },
+                {
+                  "id": "conn-t-ta-a-ravi",
+                  "sourceId": "t-ta",
+                  "targetId": "a-ravi",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "archi-aggregation",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 164,
+                      "y": 294
+                    },
+                    {
+                      "x": 228,
+                      "y": 278.8
+                    },
+                    {
+                      "x": 252,
+                      "y": 278.8
+                    },
+                    {
+                      "x": 1252,
+                      "y": 278.8
+                    },
+                    {
+                      "x": 1276,
+                      "y": 278.8
+                    },
+                    {
+                      "x": 1340,
+                      "y": 294
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.3,
+                  "targetOffsetAlong": 0.30000000000000016
+                },
+                {
+                  "id": "conn-t-ta-a-tom",
+                  "sourceId": "t-ta",
+                  "targetId": "a-tom",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "archi-aggregation",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 164,
+                      "y": 294
+                    },
+                    {
+                      "x": 228,
+                      "y": 286.4
+                    },
+                    {
+                      "x": 252,
+                      "y": 286.4
+                    },
+                    {
+                      "x": 1420,
+                      "y": 286.4
+                    },
+                    {
+                      "x": 1444,
+                      "y": 286.4
+                    },
+                    {
+                      "x": 1508,
+                      "y": 294
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.4,
+                  "targetOffsetAlong": 0.3999999999999997
+                },
+                {
+                  "id": "conn-t-ta-a-ellie",
+                  "sourceId": "t-ta",
+                  "targetId": "a-ellie",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "archi-aggregation",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 164,
+                      "y": 294
+                    },
+                    {
+                      "x": 228,
+                      "y": 294
+                    },
+                    {
+                      "x": 252,
+                      "y": 294
+                    },
+                    {
+                      "x": 1588,
+                      "y": 294
+                    },
+                    {
+                      "x": 1612,
+                      "y": 294
+                    },
+                    {
+                      "x": 1676,
                       "y": 294
                     }
                   ],
@@ -15172,12 +15297,340 @@
                   "targetOffsetAlong": 0.5
                 },
                 {
-                  "id": "conn-a-ravi-role-senior-recruiter",
-                  "sourceId": "a-ravi",
-                  "targetId": "role-senior-recruiter",
-                  "sourceSide": "left",
-                  "targetSide": "right",
-                  "type": "archi-assignment",
+                  "id": "conn-t-ta-a-jack",
+                  "sourceId": "t-ta",
+                  "targetId": "a-jack",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "archi-aggregation",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 164,
+                      "y": 294
+                    },
+                    {
+                      "x": 228,
+                      "y": 301.6
+                    },
+                    {
+                      "x": 252,
+                      "y": 301.6
+                    },
+                    {
+                      "x": 1756,
+                      "y": 301.6
+                    },
+                    {
+                      "x": 1780,
+                      "y": 301.6
+                    },
+                    {
+                      "x": 1844,
+                      "y": 294
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.6,
+                  "targetOffsetAlong": 0.6000000000000003
+                },
+                {
+                  "id": "conn-t-ta-a-nadia",
+                  "sourceId": "t-ta",
+                  "targetId": "a-nadia",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "archi-aggregation",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 164,
+                      "y": 294
+                    },
+                    {
+                      "x": 228,
+                      "y": 309.2
+                    },
+                    {
+                      "x": 252,
+                      "y": 309.2
+                    },
+                    {
+                      "x": 1924,
+                      "y": 309.2
+                    },
+                    {
+                      "x": 1948,
+                      "y": 309.2
+                    },
+                    {
+                      "x": 2012,
+                      "y": 294
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.7,
+                  "targetOffsetAlong": 0.6999999999999998
+                },
+                {
+                  "id": "conn-t-ta-a-chris",
+                  "sourceId": "t-ta",
+                  "targetId": "a-chris",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "archi-aggregation",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 164,
+                      "y": 294
+                    },
+                    {
+                      "x": 228,
+                      "y": 316.8
+                    },
+                    {
+                      "x": 252,
+                      "y": 316.8
+                    },
+                    {
+                      "x": 2092,
+                      "y": 316.8
+                    },
+                    {
+                      "x": 2116,
+                      "y": 316.8
+                    },
+                    {
+                      "x": 2180,
+                      "y": 294
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.8,
+                  "targetOffsetAlong": 0.8000000000000002
+                },
+                {
+                  "id": "conn-t-ta-a-owen",
+                  "sourceId": "t-ta",
+                  "targetId": "a-owen",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "archi-aggregation",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 164,
+                      "y": 294
+                    },
+                    {
+                      "x": 228,
+                      "y": 324.4
+                    },
+                    {
+                      "x": 252,
+                      "y": 324.4
+                    },
+                    {
+                      "x": 2260,
+                      "y": 324.4
+                    },
+                    {
+                      "x": 2284,
+                      "y": 324.4
+                    },
+                    {
+                      "x": 2348,
+                      "y": 294
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.9,
+                  "targetOffsetAlong": 0.8999999999999997
+                },
+                {
+                  "id": "conn-t-hr-a-grace",
+                  "sourceId": "t-hr",
+                  "targetId": "a-grace",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "archi-aggregation",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 332,
+                      "y": 294
+                    },
+                    {
+                      "x": 396,
+                      "y": 271.2
+                    },
+                    {
+                      "x": 420,
+                      "y": 271.2
+                    },
+                    {
+                      "x": 2428,
+                      "y": 271.2
+                    },
+                    {
+                      "x": 2452,
+                      "y": 271.2
+                    },
+                    {
+                      "x": 2516,
+                      "y": 294
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.2,
+                  "targetOffsetAlong": 0.19999999999999984
+                },
+                {
+                  "id": "conn-t-hr-a-ruth",
+                  "sourceId": "t-hr",
+                  "targetId": "a-ruth",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "archi-aggregation",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 332,
+                      "y": 294
+                    },
+                    {
+                      "x": 396,
+                      "y": 286.4
+                    },
+                    {
+                      "x": 420,
+                      "y": 286.4
+                    },
+                    {
+                      "x": 2596,
+                      "y": 286.4
+                    },
+                    {
+                      "x": 2620,
+                      "y": 286.4
+                    },
+                    {
+                      "x": 2684,
+                      "y": 294
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.4,
+                  "targetOffsetAlong": 0.3999999999999997
+                },
+                {
+                  "id": "conn-t-hr-a-ben",
+                  "sourceId": "t-hr",
+                  "targetId": "a-ben",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "archi-aggregation",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 332,
+                      "y": 294
+                    },
+                    {
+                      "x": 396,
+                      "y": 301.6
+                    },
+                    {
+                      "x": 420,
+                      "y": 301.6
+                    },
+                    {
+                      "x": 2764,
+                      "y": 301.6
+                    },
+                    {
+                      "x": 2788,
+                      "y": 301.6
+                    },
+                    {
+                      "x": 2852,
+                      "y": 294
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.6,
+                  "targetOffsetAlong": 0.6000000000000003
+                },
+                {
+                  "id": "conn-t-hr-a-marta",
+                  "sourceId": "t-hr",
+                  "targetId": "a-marta",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "archi-aggregation",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 332,
+                      "y": 294
+                    },
+                    {
+                      "x": 396,
+                      "y": 316.8
+                    },
+                    {
+                      "x": 420,
+                      "y": 316.8
+                    },
+                    {
+                      "x": 2932,
+                      "y": 316.8
+                    },
+                    {
+                      "x": 2956,
+                      "y": 316.8
+                    },
+                    {
+                      "x": 3020,
+                      "y": 294
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.8,
+                  "targetOffsetAlong": 0.8000000000000002
+                },
+                {
+                  "id": "conn-t-ob-a-leah",
+                  "sourceId": "t-ob",
+                  "targetId": "a-leah",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "archi-aggregation",
                   "directionType": "directed",
                   "routingType": "rectilinear",
                   "sourceInvisibleLeader": true,
@@ -15185,840 +15638,64 @@
                   "waypoints": [
                     {
                       "x": 500,
-                      "y": 138
-                    },
-                    {
-                      "x": 436,
-                      "y": 138
-                    },
-                    {
-                      "x": 418,
-                      "y": 138
-                    },
-                    {
-                      "x": 416,
-                      "y": 138
-                    },
-                    {
-                      "x": 416,
-                      "y": 262.08
-                    },
-                    {
-                      "x": 414,
-                      "y": 262.08
-                    },
-                    {
-                      "x": 396,
-                      "y": 262.08
-                    },
-                    {
-                      "x": 332,
                       "y": 294
-                    }
-                  ],
-                  "label": "",
-                  "sourceOffsetAlong": 0.5,
-                  "targetOffsetAlong": 0.08
-                },
-                {
-                  "id": "conn-a-tom-role-sourcing",
-                  "sourceId": "a-tom",
-                  "targetId": "role-sourcing",
-                  "sourceSide": "right",
-                  "targetSide": "left",
-                  "type": "archi-assignment",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": true,
-                  "targetInvisibleLeader": true,
-                  "waypoints": [
-                    {
-                      "x": 668,
-                      "y": 138
-                    },
-                    {
-                      "x": 732,
-                      "y": 138
-                    },
-                    {
-                      "x": 756,
-                      "y": 138
-                    },
-                    {
-                      "x": 920,
-                      "y": 138
-                    },
-                    {
-                      "x": 920,
-                      "y": 262.08
-                    },
-                    {
-                      "x": 1084,
-                      "y": 262.08
-                    },
-                    {
-                      "x": 1108,
-                      "y": 262.08
-                    },
-                    {
-                      "x": 1172,
-                      "y": 294
-                    }
-                  ],
-                  "label": "",
-                  "sourceOffsetAlong": 0.5,
-                  "targetOffsetAlong": 0.08
-                },
-                {
-                  "id": "conn-a-ellie-role-sourcing",
-                  "sourceId": "a-ellie",
-                  "targetId": "role-sourcing",
-                  "sourceSide": "right",
-                  "targetSide": "left",
-                  "type": "archi-assignment",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": true,
-                  "targetInvisibleLeader": true,
-                  "waypoints": [
-                    {
-                      "x": 836,
-                      "y": 138
-                    },
-                    {
-                      "x": 900,
-                      "y": 138
-                    },
-                    {
-                      "x": 924,
-                      "y": 138
-                    },
-                    {
-                      "x": 1004,
-                      "y": 138
-                    },
-                    {
-                      "x": 1004,
-                      "y": 267.4
-                    },
-                    {
-                      "x": 1084,
-                      "y": 267.4
-                    },
-                    {
-                      "x": 1108,
-                      "y": 267.4
-                    },
-                    {
-                      "x": 1172,
-                      "y": 294
-                    }
-                  ],
-                  "label": "",
-                  "sourceOffsetAlong": 0.5,
-                  "targetOffsetAlong": 0.15000000000000002
-                },
-                {
-                  "id": "conn-a-jack-role-sourcing",
-                  "sourceId": "a-jack",
-                  "targetId": "role-sourcing",
-                  "sourceSide": "right",
-                  "targetSide": "left",
-                  "type": "archi-assignment",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": true,
-                  "targetInvisibleLeader": true,
-                  "waypoints": [
-                    {
-                      "x": 1004,
-                      "y": 138
-                    },
-                    {
-                      "x": 1068,
-                      "y": 138
-                    },
-                    {
-                      "x": 1086,
-                      "y": 138
-                    },
-                    {
-                      "x": 1088,
-                      "y": 138
-                    },
-                    {
-                      "x": 1088,
-                      "y": 272.72
-                    },
-                    {
-                      "x": 1090,
-                      "y": 272.72
-                    },
-                    {
-                      "x": 1108,
-                      "y": 272.72
-                    },
-                    {
-                      "x": 1172,
-                      "y": 294
-                    }
-                  ],
-                  "label": "",
-                  "sourceOffsetAlong": 0.5,
-                  "targetOffsetAlong": 0.22000000000000003
-                },
-                {
-                  "id": "conn-a-nadia-role-sourcing",
-                  "sourceId": "a-nadia",
-                  "targetId": "role-sourcing",
-                  "sourceSide": "bottom",
-                  "targetSide": "top",
-                  "type": "archi-assignment",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": true,
-                  "targetInvisibleLeader": true,
-                  "waypoints": [
-                    {
-                      "x": 1172,
-                      "y": 138
-                    },
-                    {
-                      "x": 1172,
-                      "y": 176
-                    },
-                    {
-                      "x": 1172,
-                      "y": 200
-                    },
-                    {
-                      "x": 1172,
-                      "y": 232
-                    },
-                    {
-                      "x": 1172,
-                      "y": 256
-                    },
-                    {
-                      "x": 1172,
-                      "y": 294
-                    }
-                  ],
-                  "label": "",
-                  "sourceOffsetAlong": 0.5,
-                  "targetOffsetAlong": 0.5
-                },
-                {
-                  "id": "conn-a-chris-role-sourcing",
-                  "sourceId": "a-chris",
-                  "targetId": "role-sourcing",
-                  "sourceSide": "left",
-                  "targetSide": "right",
-                  "type": "archi-assignment",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": true,
-                  "targetInvisibleLeader": true,
-                  "waypoints": [
-                    {
-                      "x": 1340,
-                      "y": 138
-                    },
-                    {
-                      "x": 1276,
-                      "y": 138
-                    },
-                    {
-                      "x": 1258,
-                      "y": 138
-                    },
-                    {
-                      "x": 1256,
-                      "y": 138
-                    },
-                    {
-                      "x": 1256,
-                      "y": 262.08
-                    },
-                    {
-                      "x": 1254,
-                      "y": 262.08
-                    },
-                    {
-                      "x": 1236,
-                      "y": 262.08
-                    },
-                    {
-                      "x": 1172,
-                      "y": 294
-                    }
-                  ],
-                  "label": "",
-                  "sourceOffsetAlong": 0.5,
-                  "targetOffsetAlong": 0.08
-                },
-                {
-                  "id": "conn-a-owen-role-sourcing",
-                  "sourceId": "a-owen",
-                  "targetId": "role-sourcing",
-                  "sourceSide": "left",
-                  "targetSide": "right",
-                  "type": "archi-assignment",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": true,
-                  "targetInvisibleLeader": true,
-                  "waypoints": [
-                    {
-                      "x": 1508,
-                      "y": 138
-                    },
-                    {
-                      "x": 1444,
-                      "y": 138
-                    },
-                    {
-                      "x": 1420,
-                      "y": 138
-                    },
-                    {
-                      "x": 1340,
-                      "y": 138
-                    },
-                    {
-                      "x": 1340,
-                      "y": 267.4
-                    },
-                    {
-                      "x": 1260,
-                      "y": 267.4
-                    },
-                    {
-                      "x": 1236,
-                      "y": 267.4
-                    },
-                    {
-                      "x": 1172,
-                      "y": 294
-                    }
-                  ],
-                  "label": "",
-                  "sourceOffsetAlong": 0.5,
-                  "targetOffsetAlong": 0.15000000000000002
-                },
-                {
-                  "id": "conn-a-isla-role-sourcing",
-                  "sourceId": "a-isla",
-                  "targetId": "role-sourcing",
-                  "sourceSide": "left",
-                  "targetSide": "right",
-                  "type": "archi-assignment",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": true,
-                  "targetInvisibleLeader": true,
-                  "waypoints": [
-                    {
-                      "x": 1676,
-                      "y": 138
-                    },
-                    {
-                      "x": 1612,
-                      "y": 138
-                    },
-                    {
-                      "x": 1588,
-                      "y": 138
-                    },
-                    {
-                      "x": 1424,
-                      "y": 138
-                    },
-                    {
-                      "x": 1424,
-                      "y": 272.72
-                    },
-                    {
-                      "x": 1260,
-                      "y": 272.72
-                    },
-                    {
-                      "x": 1236,
-                      "y": 272.72
-                    },
-                    {
-                      "x": 1172,
-                      "y": 294
-                    }
-                  ],
-                  "label": "",
-                  "sourceOffsetAlong": 0.5,
-                  "targetOffsetAlong": 0.22000000000000003
-                },
-                {
-                  "id": "conn-a-grace-role-vetting-officer",
-                  "sourceId": "a-grace",
-                  "targetId": "role-vetting-officer",
-                  "sourceSide": "right",
-                  "targetSide": "left",
-                  "type": "archi-assignment",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": true,
-                  "targetInvisibleLeader": true,
-                  "waypoints": [
-                    {
-                      "x": 1844,
-                      "y": 138
-                    },
-                    {
-                      "x": 1908,
-                      "y": 138
-                    },
-                    {
-                      "x": 1932,
-                      "y": 138
-                    },
-                    {
-                      "x": 2168.338333333333,
-                      "y": 138
-                    },
-                    {
-                      "x": 2168.338333333333,
-                      "y": 262.08
-                    },
-                    {
-                      "x": 2404.6766666666667,
-                      "y": 262.08
-                    },
-                    {
-                      "x": 2428.6766666666667,
-                      "y": 262.08
-                    },
-                    {
-                      "x": 2492.6766666666667,
-                      "y": 294
-                    }
-                  ],
-                  "label": "",
-                  "sourceOffsetAlong": 0.5,
-                  "targetOffsetAlong": 0.08
-                },
-                {
-                  "id": "conn-a-ruth-role-vetting-officer",
-                  "sourceId": "a-ruth",
-                  "targetId": "role-vetting-officer",
-                  "sourceSide": "right",
-                  "targetSide": "left",
-                  "type": "archi-assignment",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": true,
-                  "targetInvisibleLeader": true,
-                  "waypoints": [
-                    {
-                      "x": 2012,
-                      "y": 138
-                    },
-                    {
-                      "x": 2076,
-                      "y": 138
-                    },
-                    {
-                      "x": 2100,
-                      "y": 138
-                    },
-                    {
-                      "x": 2252.338333333333,
-                      "y": 138
-                    },
-                    {
-                      "x": 2252.338333333333,
-                      "y": 267.4
-                    },
-                    {
-                      "x": 2404.6766666666667,
-                      "y": 267.4
-                    },
-                    {
-                      "x": 2428.6766666666667,
-                      "y": 267.4
-                    },
-                    {
-                      "x": 2492.6766666666667,
-                      "y": 294
-                    }
-                  ],
-                  "label": "",
-                  "sourceOffsetAlong": 0.5,
-                  "targetOffsetAlong": 0.15000000000000002
-                },
-                {
-                  "id": "conn-a-ben-role-onboarding",
-                  "sourceId": "a-ben",
-                  "targetId": "role-onboarding",
-                  "sourceSide": "right",
-                  "targetSide": "left",
-                  "type": "archi-assignment",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": true,
-                  "targetInvisibleLeader": true,
-                  "waypoints": [
-                    {
-                      "x": 2180,
-                      "y": 138
-                    },
-                    {
-                      "x": 2244,
-                      "y": 138
-                    },
-                    {
-                      "x": 2268,
-                      "y": 138
-                    },
-                    {
-                      "x": 2420.338333333333,
-                      "y": 138
-                    },
-                    {
-                      "x": 2420.338333333333,
-                      "y": 262.08
-                    },
-                    {
-                      "x": 2572.6766666666667,
-                      "y": 262.08
-                    },
-                    {
-                      "x": 2596.6766666666667,
-                      "y": 262.08
-                    },
-                    {
-                      "x": 2660.6766666666667,
-                      "y": 294
-                    }
-                  ],
-                  "label": "",
-                  "sourceOffsetAlong": 0.5,
-                  "targetOffsetAlong": 0.08
-                },
-                {
-                  "id": "conn-a-marta-role-onboarding",
-                  "sourceId": "a-marta",
-                  "targetId": "role-onboarding",
-                  "sourceSide": "right",
-                  "targetSide": "left",
-                  "type": "archi-assignment",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": true,
-                  "targetInvisibleLeader": true,
-                  "waypoints": [
-                    {
-                      "x": 2348,
-                      "y": 138
-                    },
-                    {
-                      "x": 2412,
-                      "y": 138
-                    },
-                    {
-                      "x": 2436,
-                      "y": 138
-                    },
-                    {
-                      "x": 2504.338333333333,
-                      "y": 138
-                    },
-                    {
-                      "x": 2504.338333333333,
-                      "y": 267.4
-                    },
-                    {
-                      "x": 2572.6766666666667,
-                      "y": 267.4
                     },
                     {
-                      "x": 2596.6766666666667,
-                      "y": 267.4
+                      "x": 564,
+                      "y": 275
                     },
                     {
-                      "x": 2660.6766666666667,
-                      "y": 294
-                    }
-                  ],
-                  "label": "",
-                  "sourceOffsetAlong": 0.5,
-                  "targetOffsetAlong": 0.15000000000000002
-                },
-                {
-                  "id": "conn-a-leah-role-onboarding",
-                  "sourceId": "a-leah",
-                  "targetId": "role-onboarding",
-                  "sourceSide": "bottom",
-                  "targetSide": "top",
-                  "type": "archi-assignment",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": true,
-                  "targetInvisibleLeader": true,
-                  "waypoints": [
-                    {
-                      "x": 2516,
-                      "y": 138
-                    },
-                    {
-                      "x": 2516,
-                      "y": 176
-                    },
-                    {
-                      "x": 2516,
-                      "y": 200
-                    },
-                    {
-                      "x": 2516,
-                      "y": 216
-                    },
-                    {
-                      "x": 2606.9166666666665,
-                      "y": 216
-                    },
-                    {
-                      "x": 2606.9166666666665,
-                      "y": 232
-                    },
-                    {
-                      "x": 2606.9166666666665,
-                      "y": 256
-                    },
-                    {
-                      "x": 2660.6766666666667,
-                      "y": 294
-                    }
-                  ],
-                  "label": "",
-                  "sourceOffsetAlong": 0.5,
-                  "targetOffsetAlong": 0.08
-                },
-                {
-                  "id": "conn-a-femi-role-onboarding",
-                  "sourceId": "a-femi",
-                  "targetId": "role-onboarding",
-                  "sourceSide": "bottom",
-                  "targetSide": "top",
-                  "type": "archi-assignment",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": true,
-                  "targetInvisibleLeader": true,
-                  "waypoints": [
-                    {
-                      "x": 2684,
-                      "y": 138
-                    },
-                    {
-                      "x": 2684,
-                      "y": 176
-                    },
-                    {
-                      "x": 2684,
-                      "y": 200
-                    },
-                    {
-                      "x": 2684,
-                      "y": 232
-                    },
-                    {
-                      "x": 2684,
-                      "y": 256
-                    },
-                    {
-                      "x": 2660.6766666666667,
-                      "y": 294
-                    }
-                  ],
-                  "label": "",
-                  "sourceOffsetAlong": 0.5,
-                  "targetOffsetAlong": 0.6822135416666661
-                },
-                {
-                  "id": "conn-a-dan-role-onboarding",
-                  "sourceId": "a-dan",
-                  "targetId": "role-onboarding",
-                  "sourceSide": "left",
-                  "targetSide": "right",
-                  "type": "archi-assignment",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": true,
-                  "targetInvisibleLeader": true,
-                  "waypoints": [
-                    {
-                      "x": 2852,
-                      "y": 138
-                    },
-                    {
-                      "x": 2788,
-                      "y": 138
-                    },
-                    {
-                      "x": 2764,
-                      "y": 138
-                    },
-                    {
-                      "x": 2756.338333333333,
-                      "y": 138
-                    },
-                    {
-                      "x": 2756.338333333333,
-                      "y": 262.08
-                    },
-                    {
-                      "x": 2748.6766666666667,
-                      "y": 262.08
-                    },
-                    {
-                      "x": 2724.6766666666667,
-                      "y": 262.08
+                      "x": 588,
+                      "y": 275
                     },
                     {
-                      "x": 2660.6766666666667,
-                      "y": 294
-                    }
-                  ],
-                  "label": "",
-                  "sourceOffsetAlong": 0.5,
-                  "targetOffsetAlong": 0.08
-                },
-                {
-                  "id": "conn-a-sam-role-device",
-                  "sourceId": "a-sam",
-                  "targetId": "role-device",
-                  "sourceSide": "bottom",
-                  "targetSide": "top",
-                  "type": "archi-assignment",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": true,
-                  "targetInvisibleLeader": true,
-                  "waypoints": [
-                    {
-                      "x": 3020,
-                      "y": 138
-                    },
-                    {
-                      "x": 3020,
-                      "y": 176
-                    },
-                    {
-                      "x": 3020,
-                      "y": 200
-                    },
-                    {
-                      "x": 3020,
-                      "y": 216
+                      "x": 3100,
+                      "y": 275
                     },
-                    {
-                      "x": 3050.24,
-                      "y": 216
-                    },
-                    {
-                      "x": 3050.24,
-                      "y": 232
-                    },
-                    {
-                      "x": 3050.24,
-                      "y": 256
-                    },
-                    {
-                      "x": 3104,
-                      "y": 294
-                    }
-                  ],
-                  "label": "",
-                  "sourceOffsetAlong": 0.5,
-                  "targetOffsetAlong": 0.08
-                },
-                {
-                  "id": "conn-a-nina-role-device",
-                  "sourceId": "a-nina",
-                  "targetId": "role-device",
-                  "sourceSide": "bottom",
-                  "targetSide": "top",
-                  "type": "archi-assignment",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": true,
-                  "targetInvisibleLeader": true,
-                  "waypoints": [
                     {
-                      "x": 3188,
-                      "y": 138
+                      "x": 3124,
+                      "y": 275
                     },
                     {
                       "x": 3188,
-                      "y": 176
-                    },
-                    {
-                      "x": 3188,
-                      "y": 200
-                    },
-                    {
-                      "x": 3188,
-                      "y": 216
-                    },
-                    {
-                      "x": 3157.76,
-                      "y": 216
-                    },
-                    {
-                      "x": 3157.76,
-                      "y": 232
-                    },
-                    {
-                      "x": 3157.76,
-                      "y": 256
-                    },
-                    {
-                      "x": 3104,
                       "y": 294
                     }
                   ],
                   "label": "",
-                  "sourceOffsetAlong": 0.5,
-                  "targetOffsetAlong": 0.92
+                  "sourceOffsetAlong": 0.25,
+                  "targetOffsetAlong": 0.25
                 },
                 {
-                  "id": "conn-a-jo-role-payroll",
-                  "sourceId": "a-jo",
-                  "targetId": "role-payroll",
-                  "sourceSide": "bottom",
-                  "targetSide": "top",
-                  "type": "archi-assignment",
+                  "id": "conn-t-ob-a-femi",
+                  "sourceId": "t-ob",
+                  "targetId": "a-femi",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "archi-aggregation",
                   "directionType": "directed",
                   "routingType": "rectilinear",
                   "sourceInvisibleLeader": true,
                   "targetInvisibleLeader": true,
                   "waypoints": [
                     {
-                      "x": 3356,
-                      "y": 138
+                      "x": 500,
+                      "y": 294
                     },
                     {
-                      "x": 3356,
-                      "y": 176
+                      "x": 564,
+                      "y": 294
                     },
                     {
-                      "x": 3356,
-                      "y": 200
+                      "x": 588,
+                      "y": 294
                     },
                     {
-                      "x": 3356,
-                      "y": 232
+                      "x": 3268,
+                      "y": 294
                     },
                     {
-                      "x": 3356,
-                      "y": 256
+                      "x": 3292,
+                      "y": 294
                     },
                     {
                       "x": 3356,
@@ -16030,129 +15707,39 @@
                   "targetOffsetAlong": 0.5
                 },
                 {
-                  "id": "conn-a-dev-role-vetting-officer",
-                  "sourceId": "a-dev",
-                  "targetId": "role-vetting-officer",
-                  "sourceSide": "left",
-                  "targetSide": "right",
-                  "type": "archi-assignment",
+                  "id": "conn-t-ob-a-dan",
+                  "sourceId": "t-ob",
+                  "targetId": "a-dan",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "archi-aggregation",
                   "directionType": "directed",
                   "routingType": "rectilinear",
                   "sourceInvisibleLeader": true,
                   "targetInvisibleLeader": true,
                   "waypoints": [
                     {
-                      "x": 3524,
-                      "y": 138
+                      "x": 500,
+                      "y": 294
                     },
                     {
-                      "x": 3460,
-                      "y": 138
+                      "x": 564,
+                      "y": 313
+                    },
+                    {
+                      "x": 588,
+                      "y": 313
                     },
                     {
                       "x": 3436,
-                      "y": 138
-                    },
-                    {
-                      "x": 3008.338333333333,
-                      "y": 138
-                    },
-                    {
-                      "x": 3008.338333333333,
-                      "y": 262.08
-                    },
-                    {
-                      "x": 2580.6766666666667,
-                      "y": 262.08
-                    },
-                    {
-                      "x": 2556.6766666666667,
-                      "y": 262.08
-                    },
-                    {
-                      "x": 2492.6766666666667,
-                      "y": 294
-                    }
-                  ],
-                  "label": "",
-                  "sourceOffsetAlong": 0.5,
-                  "targetOffsetAlong": 0.08
-                },
-                {
-                  "id": "conn-role-senior-recruiter-role-sourcing",
-                  "sourceId": "role-senior-recruiter",
-                  "targetId": "role-sourcing",
-                  "sourceSide": "right",
-                  "targetSide": "left",
-                  "type": "archi-aggregation",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": true,
-                  "targetInvisibleLeader": true,
-                  "waypoints": [
-                    {
-                      "x": 332,
-                      "y": 294
-                    },
-                    {
-                      "x": 396,
-                      "y": 294
-                    },
-                    {
-                      "x": 420,
-                      "y": 294
-                    },
-                    {
-                      "x": 1084,
-                      "y": 294
-                    },
-                    {
-                      "x": 1108,
-                      "y": 294
-                    },
-                    {
-                      "x": 1172,
-                      "y": 294
-                    }
-                  ],
-                  "label": "",
-                  "sourceOffsetAlong": 0.5,
-                  "targetOffsetAlong": 0.5
-                },
-                {
-                  "id": "conn-role-senior-recruiter-role-negotiation",
-                  "sourceId": "role-senior-recruiter",
-                  "targetId": "role-negotiation",
-                  "sourceSide": "right",
-                  "targetSide": "left",
-                  "type": "archi-aggregation",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": true,
-                  "targetInvisibleLeader": true,
-                  "waypoints": [
-                    {
-                      "x": 332,
-                      "y": 294
-                    },
-                    {
-                      "x": 396,
                       "y": 313
                     },
                     {
-                      "x": 420,
+                      "x": 3460,
                       "y": 313
                     },
                     {
-                      "x": 2068.6766666666667,
-                      "y": 313
-                    },
-                    {
-                      "x": 2092.6766666666667,
-                      "y": 313
-                    },
-                    {
-                      "x": 2156.6766666666667,
+                      "x": 3524,
                       "y": 294
                     }
                   ],
@@ -16161,9 +15748,9 @@
                   "targetOffsetAlong": 0.75
                 },
                 {
-                  "id": "conn-role-vetting-officer-role-onboarding",
-                  "sourceId": "role-vetting-officer",
-                  "targetId": "role-onboarding",
+                  "id": "conn-t-it-a-sam",
+                  "sourceId": "t-it",
+                  "targetId": "a-sam",
                   "sourceSide": "right",
                   "targetSide": "left",
                   "type": "archi-aggregation",
@@ -16173,27 +15760,68 @@
                   "targetInvisibleLeader": true,
                   "waypoints": [
                     {
-                      "x": 2492.6766666666667,
+                      "x": 668,
                       "y": 294
                     },
                     {
-                      "x": 2556.6766666666667,
+                      "x": 732,
+                      "y": 281.3333333333333
+                    },
+                    {
+                      "x": 756,
+                      "y": 281.3333333333333
+                    },
+                    {
+                      "x": 3604,
+                      "y": 281.3333333333333
+                    },
+                    {
+                      "x": 3628,
+                      "y": 281.3333333333333
+                    },
+                    {
+                      "x": 3692,
+                      "y": 294
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.3333333333333333,
+                  "targetOffsetAlong": 0.3333333333333331
+                },
+                {
+                  "id": "conn-t-it-a-nina",
+                  "sourceId": "t-it",
+                  "targetId": "a-nina",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "archi-aggregation",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 668,
+                      "y": 294
+                    },
+                    {
+                      "x": 732,
                       "y": 306.6666666666667
                     },
                     {
-                      "x": 2574.6766666666667,
+                      "x": 756,
                       "y": 306.6666666666667
                     },
                     {
-                      "x": 2578.6766666666667,
+                      "x": 3772,
                       "y": 306.6666666666667
                     },
                     {
-                      "x": 2596.6766666666667,
+                      "x": 3796,
                       "y": 306.6666666666667
                     },
                     {
-                      "x": 2660.6766666666667,
+                      "x": 3860,
                       "y": 294
                     }
                   ],
@@ -16202,11 +15830,11 @@
                   "targetOffsetAlong": 0.666666666666667
                 },
                 {
-                  "id": "conn-role-vetting-officer-role-compliance",
-                  "sourceId": "role-vetting-officer",
-                  "targetId": "role-compliance",
-                  "sourceSide": "left",
-                  "targetSide": "right",
+                  "id": "conn-t-pay-a-jo",
+                  "sourceId": "t-pay",
+                  "targetId": "a-jo",
+                  "sourceSide": "right",
+                  "targetSide": "left",
                   "type": "archi-aggregation",
                   "directionType": "directed",
                   "routingType": "rectilinear",
@@ -16214,69 +15842,28 @@
                   "targetInvisibleLeader": true,
                   "waypoints": [
                     {
-                      "x": 2492.6766666666667,
+                      "x": 836,
                       "y": 294
                     },
                     {
-                      "x": 2428.6766666666667,
-                      "y": 313
-                    },
-                    {
-                      "x": 2410.6766666666667,
-                      "y": 313
-                    },
-                    {
-                      "x": 2406.6766666666667,
-                      "y": 313
-                    },
-                    {
-                      "x": 2388.6766666666667,
-                      "y": 313
-                    },
-                    {
-                      "x": 2324.6766666666667,
-                      "y": 294
-                    }
-                  ],
-                  "label": "",
-                  "sourceOffsetAlong": 0.75,
-                  "targetOffsetAlong": 0.75
-                },
-                {
-                  "id": "conn-role-negotiation-w-negotiate",
-                  "sourceId": "role-negotiation",
-                  "targetId": "w-negotiate",
-                  "sourceSide": "bottom",
-                  "targetSide": "top",
-                  "type": "archi-assignment",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": true,
-                  "targetInvisibleLeader": true,
-                  "waypoints": [
-                    {
-                      "x": 2156.6766666666667,
+                      "x": 900,
                       "y": 294
                     },
                     {
-                      "x": 2156.6766666666667,
-                      "y": 332
+                      "x": 924,
+                      "y": 294
                     },
                     {
-                      "x": 2156.6766666666667,
-                      "y": 356
+                      "x": 3940,
+                      "y": 294
                     },
                     {
-                      "x": 2156.6766666666667,
-                      "y": 388
+                      "x": 3964,
+                      "y": 294
                     },
                     {
-                      "x": 2156.6766666666667,
-                      "y": 412
-                    },
-                    {
-                      "x": 2156.6766666666667,
-                      "y": 450
+                      "x": 4028,
+                      "y": 294
                     }
                   ],
                   "label": "",
@@ -16284,173 +15871,9 @@
                   "targetOffsetAlong": 0.5
                 },
                 {
-                  "id": "conn-role-compliance-w-vetting",
-                  "sourceId": "role-compliance",
-                  "targetId": "w-vetting",
-                  "sourceSide": "bottom",
-                  "targetSide": "top",
-                  "type": "archi-assignment",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": true,
-                  "targetInvisibleLeader": true,
-                  "waypoints": [
-                    {
-                      "x": 2324.6766666666667,
-                      "y": 294
-                    },
-                    {
-                      "x": 2324.6766666666667,
-                      "y": 332
-                    },
-                    {
-                      "x": 2324.6766666666667,
-                      "y": 356
-                    },
-                    {
-                      "x": 2324.6766666666667,
-                      "y": 388
-                    },
-                    {
-                      "x": 2324.6766666666667,
-                      "y": 412
-                    },
-                    {
-                      "x": 2324.6766666666667,
-                      "y": 450
-                    }
-                  ],
-                  "label": "",
-                  "sourceOffsetAlong": 0.5,
-                  "targetOffsetAlong": 0.5
-                },
-                {
-                  "id": "conn-role-payroll-w-payroll",
-                  "sourceId": "role-payroll",
-                  "targetId": "w-payroll",
-                  "sourceSide": "bottom",
-                  "targetSide": "top",
-                  "type": "archi-assignment",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": true,
-                  "targetInvisibleLeader": true,
-                  "waypoints": [
-                    {
-                      "x": 3356,
-                      "y": 294
-                    },
-                    {
-                      "x": 3356,
-                      "y": 332
-                    },
-                    {
-                      "x": 3356,
-                      "y": 356
-                    },
-                    {
-                      "x": 3356,
-                      "y": 388
-                    },
-                    {
-                      "x": 3356,
-                      "y": 412
-                    },
-                    {
-                      "x": 3356,
-                      "y": 450
-                    }
-                  ],
-                  "label": "",
-                  "sourceOffsetAlong": 0.5,
-                  "targetOffsetAlong": 0.5
-                },
-                {
-                  "id": "conn-role-device-w-provision",
-                  "sourceId": "role-device",
-                  "targetId": "w-provision",
-                  "sourceSide": "bottom",
-                  "targetSide": "top",
-                  "type": "archi-assignment",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": true,
-                  "targetInvisibleLeader": true,
-                  "waypoints": [
-                    {
-                      "x": 3104,
-                      "y": 294
-                    },
-                    {
-                      "x": 3104,
-                      "y": 332
-                    },
-                    {
-                      "x": 3104,
-                      "y": 356
-                    },
-                    {
-                      "x": 3104,
-                      "y": 388
-                    },
-                    {
-                      "x": 3104,
-                      "y": 412
-                    },
-                    {
-                      "x": 3104,
-                      "y": 450
-                    }
-                  ],
-                  "label": "",
-                  "sourceOffsetAlong": 0.5,
-                  "targetOffsetAlong": 0.5
-                },
-                {
-                  "id": "conn-role-onboarding-w-pack",
-                  "sourceId": "role-onboarding",
-                  "targetId": "w-pack",
-                  "sourceSide": "bottom",
-                  "targetSide": "top",
-                  "type": "archi-assignment",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": true,
-                  "targetInvisibleLeader": true,
-                  "waypoints": [
-                    {
-                      "x": 2660.6766666666667,
-                      "y": 294
-                    },
-                    {
-                      "x": 2660.6766666666667,
-                      "y": 332
-                    },
-                    {
-                      "x": 2660.6766666666667,
-                      "y": 356
-                    },
-                    {
-                      "x": 2660.6766666666667,
-                      "y": 388
-                    },
-                    {
-                      "x": 2660.6766666666667,
-                      "y": 412
-                    },
-                    {
-                      "x": 2660.6766666666667,
-                      "y": 450
-                    }
-                  ],
-                  "label": "",
-                  "sourceOffsetAlong": 0.5,
-                  "targetOffsetAlong": 0.5
-                },
-                {
-                  "id": "conn-role-onboarding-w-exit",
-                  "sourceId": "role-onboarding",
-                  "targetId": "w-exit",
+                  "id": "conn-a-priya-job-senior-recruiter",
+                  "sourceId": "a-priya",
+                  "targetId": "job-senior-recruiter",
                   "sourceSide": "right",
                   "targetSide": "left",
                   "type": "archi-assignment",
@@ -16460,41 +15883,1504 @@
                   "targetInvisibleLeader": true,
                   "waypoints": [
                     {
-                      "x": 2660.6766666666667,
+                      "x": 1004,
                       "y": 294
                     },
                     {
-                      "x": 2724.6766666666667,
-                      "y": 306.6666666666667
+                      "x": 1068,
+                      "y": 313
                     },
                     {
-                      "x": 2742.6766666666667,
-                      "y": 306.6666666666667
+                      "x": 1086,
+                      "y": 313
                     },
                     {
-                      "x": 2744.6766666666667,
-                      "y": 306.6666666666667
+                      "x": 1088,
+                      "y": 313
                     },
                     {
-                      "x": 2744.6766666666667,
+                      "x": 1088,
                       "y": 418.08
                     },
                     {
-                      "x": 2746.6766666666667,
+                      "x": 1090,
                       "y": 418.08
                     },
                     {
-                      "x": 2764.6766666666667,
+                      "x": 1108,
                       "y": 418.08
                     },
                     {
-                      "x": 2828.6766666666667,
+                      "x": 1172,
+                      "y": 450
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.75,
+                  "targetOffsetAlong": 0.08
+                },
+                {
+                  "id": "conn-a-aisha-job-senior-recruiter",
+                  "sourceId": "a-aisha",
+                  "targetId": "job-senior-recruiter",
+                  "sourceSide": "bottom",
+                  "targetSide": "top",
+                  "type": "archi-assignment",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 1172,
+                      "y": 294
+                    },
+                    {
+                      "x": 1172,
+                      "y": 332
+                    },
+                    {
+                      "x": 1172,
+                      "y": 356
+                    },
+                    {
+                      "x": 1172,
+                      "y": 388
+                    },
+                    {
+                      "x": 1172,
+                      "y": 412
+                    },
+                    {
+                      "x": 1172,
+                      "y": 450
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.5,
+                  "targetOffsetAlong": 0.5
+                },
+                {
+                  "id": "conn-a-ravi-job-senior-recruiter",
+                  "sourceId": "a-ravi",
+                  "targetId": "job-senior-recruiter",
+                  "sourceSide": "left",
+                  "targetSide": "right",
+                  "type": "archi-assignment",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 1340,
+                      "y": 294
+                    },
+                    {
+                      "x": 1276,
+                      "y": 313
+                    },
+                    {
+                      "x": 1258,
+                      "y": 313
+                    },
+                    {
+                      "x": 1256,
+                      "y": 313
+                    },
+                    {
+                      "x": 1256,
+                      "y": 418.08
+                    },
+                    {
+                      "x": 1254,
+                      "y": 418.08
+                    },
+                    {
+                      "x": 1236,
+                      "y": 418.08
+                    },
+                    {
+                      "x": 1172,
+                      "y": 450
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.75,
+                  "targetOffsetAlong": 0.08
+                },
+                {
+                  "id": "conn-a-grace-job-accredited-vetting-officer",
+                  "sourceId": "a-grace",
+                  "targetId": "job-accredited-vetting-officer",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "archi-assignment",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 2516,
+                      "y": 294
+                    },
+                    {
+                      "x": 2580,
+                      "y": 306.6666666666667
+                    },
+                    {
+                      "x": 2604,
+                      "y": 306.6666666666667
+                    },
+                    {
+                      "x": 2824,
+                      "y": 306.6666666666667
+                    },
+                    {
+                      "x": 2824,
+                      "y": 418.08
+                    },
+                    {
+                      "x": 3044,
+                      "y": 418.08
+                    },
+                    {
+                      "x": 3068,
+                      "y": 418.08
+                    },
+                    {
+                      "x": 3132,
                       "y": 450
                     }
                   ],
                   "label": "",
                   "sourceOffsetAlong": 0.6666666666666666,
                   "targetOffsetAlong": 0.08
+                },
+                {
+                  "id": "conn-a-ruth-job-accredited-vetting-officer",
+                  "sourceId": "a-ruth",
+                  "targetId": "job-accredited-vetting-officer",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "archi-assignment",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 2684,
+                      "y": 294
+                    },
+                    {
+                      "x": 2748,
+                      "y": 306.6666666666667
+                    },
+                    {
+                      "x": 2772,
+                      "y": 306.6666666666667
+                    },
+                    {
+                      "x": 2908,
+                      "y": 306.6666666666667
+                    },
+                    {
+                      "x": 2908,
+                      "y": 423.4
+                    },
+                    {
+                      "x": 3044,
+                      "y": 423.4
+                    },
+                    {
+                      "x": 3068,
+                      "y": 423.4
+                    },
+                    {
+                      "x": 3132,
+                      "y": 450
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.6666666666666666,
+                  "targetOffsetAlong": 0.15000000000000002
+                },
+                {
+                  "id": "conn-a-dev-job-accredited-vetting-officer",
+                  "sourceId": "a-dev",
+                  "targetId": "job-accredited-vetting-officer",
+                  "sourceSide": "left",
+                  "targetSide": "right",
+                  "type": "archi-assignment",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 4196,
+                      "y": 294
+                    },
+                    {
+                      "x": 4132,
+                      "y": 306.6666666666667
+                    },
+                    {
+                      "x": 4108,
+                      "y": 306.6666666666667
+                    },
+                    {
+                      "x": 3664,
+                      "y": 306.6666666666667
+                    },
+                    {
+                      "x": 3664,
+                      "y": 418.08
+                    },
+                    {
+                      "x": 3220,
+                      "y": 418.08
+                    },
+                    {
+                      "x": 3196,
+                      "y": 418.08
+                    },
+                    {
+                      "x": 3132,
+                      "y": 450
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.6666666666666666,
+                  "targetOffsetAlong": 0.08
+                },
+                {
+                  "id": "conn-a-priya-cap-sourcing",
+                  "sourceId": "a-priya",
+                  "targetId": "cap-sourcing",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "archi-association",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 1004,
+                      "y": 294
+                    },
+                    {
+                      "x": 1068,
+                      "y": 275
+                    },
+                    {
+                      "x": 1092,
+                      "y": 275
+                    },
+                    {
+                      "x": 1340,
+                      "y": 275
+                    },
+                    {
+                      "x": 1340,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 1588,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 1612,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 1676,
+                      "y": 138
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.25,
+                  "targetOffsetAlong": 0.92
+                },
+                {
+                  "id": "conn-a-priya-cap-negotiation",
+                  "sourceId": "a-priya",
+                  "targetId": "cap-negotiation",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "archi-association",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 1004,
+                      "y": 294
+                    },
+                    {
+                      "x": 1068,
+                      "y": 294
+                    },
+                    {
+                      "x": 1086,
+                      "y": 294
+                    },
+                    {
+                      "x": 1088,
+                      "y": 294
+                    },
+                    {
+                      "x": 1088,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 1090,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 1108,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 1172,
+                      "y": 138
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.5,
+                  "targetOffsetAlong": 0.92
+                },
+                {
+                  "id": "conn-a-aisha-cap-sourcing",
+                  "sourceId": "a-aisha",
+                  "targetId": "cap-sourcing",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "archi-association",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 1172,
+                      "y": 294
+                    },
+                    {
+                      "x": 1236,
+                      "y": 294
+                    },
+                    {
+                      "x": 1260,
+                      "y": 294
+                    },
+                    {
+                      "x": 1424,
+                      "y": 294
+                    },
+                    {
+                      "x": 1424,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 1588,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 1612,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 1676,
+                      "y": 138
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.5,
+                  "targetOffsetAlong": 0.92
+                },
+                {
+                  "id": "conn-a-aisha-cap-negotiation",
+                  "sourceId": "a-aisha",
+                  "targetId": "cap-negotiation",
+                  "sourceSide": "top",
+                  "targetSide": "bottom",
+                  "type": "archi-association",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 1172,
+                      "y": 294
+                    },
+                    {
+                      "x": 1172,
+                      "y": 256
+                    },
+                    {
+                      "x": 1172,
+                      "y": 232
+                    },
+                    {
+                      "x": 1172,
+                      "y": 200
+                    },
+                    {
+                      "x": 1172,
+                      "y": 176
+                    },
+                    {
+                      "x": 1172,
+                      "y": 138
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.5,
+                  "targetOffsetAlong": 0.5
+                },
+                {
+                  "id": "conn-a-ravi-cap-sourcing",
+                  "sourceId": "a-ravi",
+                  "targetId": "cap-sourcing",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "archi-association",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 1340,
+                      "y": 294
+                    },
+                    {
+                      "x": 1404,
+                      "y": 294
+                    },
+                    {
+                      "x": 1428,
+                      "y": 294
+                    },
+                    {
+                      "x": 1508,
+                      "y": 294
+                    },
+                    {
+                      "x": 1508,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 1588,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 1612,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 1676,
+                      "y": 138
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.5,
+                  "targetOffsetAlong": 0.92
+                },
+                {
+                  "id": "conn-a-ravi-cap-negotiation",
+                  "sourceId": "a-ravi",
+                  "targetId": "cap-negotiation",
+                  "sourceSide": "left",
+                  "targetSide": "right",
+                  "type": "archi-association",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 1340,
+                      "y": 294
+                    },
+                    {
+                      "x": 1276,
+                      "y": 275
+                    },
+                    {
+                      "x": 1258,
+                      "y": 275
+                    },
+                    {
+                      "x": 1256,
+                      "y": 275
+                    },
+                    {
+                      "x": 1256,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 1254,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 1236,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 1172,
+                      "y": 138
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.25,
+                  "targetOffsetAlong": 0.92
+                },
+                {
+                  "id": "conn-a-tom-cap-sourcing",
+                  "sourceId": "a-tom",
+                  "targetId": "cap-sourcing",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "archi-association",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 1508,
+                      "y": 294
+                    },
+                    {
+                      "x": 1572,
+                      "y": 294
+                    },
+                    {
+                      "x": 1590,
+                      "y": 294
+                    },
+                    {
+                      "x": 1592,
+                      "y": 294
+                    },
+                    {
+                      "x": 1592,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 1594,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 1612,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 1676,
+                      "y": 138
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.5,
+                  "targetOffsetAlong": 0.92
+                },
+                {
+                  "id": "conn-a-ellie-cap-sourcing",
+                  "sourceId": "a-ellie",
+                  "targetId": "cap-sourcing",
+                  "sourceSide": "top",
+                  "targetSide": "bottom",
+                  "type": "archi-association",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 1676,
+                      "y": 294
+                    },
+                    {
+                      "x": 1676,
+                      "y": 256
+                    },
+                    {
+                      "x": 1676,
+                      "y": 232
+                    },
+                    {
+                      "x": 1676,
+                      "y": 200
+                    },
+                    {
+                      "x": 1676,
+                      "y": 176
+                    },
+                    {
+                      "x": 1676,
+                      "y": 138
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.5,
+                  "targetOffsetAlong": 0.5
+                },
+                {
+                  "id": "conn-a-jack-cap-sourcing",
+                  "sourceId": "a-jack",
+                  "targetId": "cap-sourcing",
+                  "sourceSide": "left",
+                  "targetSide": "right",
+                  "type": "archi-association",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 1844,
+                      "y": 294
+                    },
+                    {
+                      "x": 1780,
+                      "y": 281.3333333333333
+                    },
+                    {
+                      "x": 1762,
+                      "y": 281.3333333333333
+                    },
+                    {
+                      "x": 1760,
+                      "y": 281.3333333333333
+                    },
+                    {
+                      "x": 1760,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 1758,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 1740,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 1676,
+                      "y": 138
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.3333333333333333,
+                  "targetOffsetAlong": 0.92
+                },
+                {
+                  "id": "conn-a-nadia-cap-sourcing",
+                  "sourceId": "a-nadia",
+                  "targetId": "cap-sourcing",
+                  "sourceSide": "left",
+                  "targetSide": "right",
+                  "type": "archi-association",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 2012,
+                      "y": 294
+                    },
+                    {
+                      "x": 1948,
+                      "y": 281.3333333333333
+                    },
+                    {
+                      "x": 1924,
+                      "y": 281.3333333333333
+                    },
+                    {
+                      "x": 1844,
+                      "y": 281.3333333333333
+                    },
+                    {
+                      "x": 1844,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 1764,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 1740,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 1676,
+                      "y": 138
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.3333333333333333,
+                  "targetOffsetAlong": 0.92
+                },
+                {
+                  "id": "conn-a-chris-cap-sourcing",
+                  "sourceId": "a-chris",
+                  "targetId": "cap-sourcing",
+                  "sourceSide": "left",
+                  "targetSide": "right",
+                  "type": "archi-association",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 2180,
+                      "y": 294
+                    },
+                    {
+                      "x": 2116,
+                      "y": 281.3333333333333
+                    },
+                    {
+                      "x": 2092,
+                      "y": 281.3333333333333
+                    },
+                    {
+                      "x": 1928,
+                      "y": 281.3333333333333
+                    },
+                    {
+                      "x": 1928,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 1764,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 1740,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 1676,
+                      "y": 138
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.3333333333333333,
+                  "targetOffsetAlong": 0.92
+                },
+                {
+                  "id": "conn-a-owen-cap-sourcing",
+                  "sourceId": "a-owen",
+                  "targetId": "cap-sourcing",
+                  "sourceSide": "left",
+                  "targetSide": "right",
+                  "type": "archi-association",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 2348,
+                      "y": 294
+                    },
+                    {
+                      "x": 2284,
+                      "y": 281.3333333333333
+                    },
+                    {
+                      "x": 2260,
+                      "y": 281.3333333333333
+                    },
+                    {
+                      "x": 2012,
+                      "y": 281.3333333333333
+                    },
+                    {
+                      "x": 2012,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 1764,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 1740,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 1676,
+                      "y": 138
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.3333333333333333,
+                  "targetOffsetAlong": 0.92
+                },
+                {
+                  "id": "conn-a-grace-cap-accredited-vetting",
+                  "sourceId": "a-grace",
+                  "targetId": "cap-accredited-vetting",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "archi-association",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 2516,
+                      "y": 294
+                    },
+                    {
+                      "x": 2580,
+                      "y": 281.3333333333333
+                    },
+                    {
+                      "x": 2604,
+                      "y": 281.3333333333333
+                    },
+                    {
+                      "x": 2824,
+                      "y": 281.3333333333333
+                    },
+                    {
+                      "x": 2824,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 3044,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 3068,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 3132,
+                      "y": 138
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.3333333333333333,
+                  "targetOffsetAlong": 0.92
+                },
+                {
+                  "id": "conn-a-ruth-cap-accredited-vetting",
+                  "sourceId": "a-ruth",
+                  "targetId": "cap-accredited-vetting",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "archi-association",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 2684,
+                      "y": 294
+                    },
+                    {
+                      "x": 2748,
+                      "y": 281.3333333333333
+                    },
+                    {
+                      "x": 2772,
+                      "y": 281.3333333333333
+                    },
+                    {
+                      "x": 2908,
+                      "y": 281.3333333333333
+                    },
+                    {
+                      "x": 2908,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 3044,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 3068,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 3132,
+                      "y": 138
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.3333333333333333,
+                  "targetOffsetAlong": 0.92
+                },
+                {
+                  "id": "conn-a-ben-cap-onboarding",
+                  "sourceId": "a-ben",
+                  "targetId": "cap-onboarding",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "archi-association",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 2852,
+                      "y": 294
+                    },
+                    {
+                      "x": 2916,
+                      "y": 294
+                    },
+                    {
+                      "x": 2940,
+                      "y": 294
+                    },
+                    {
+                      "x": 3076,
+                      "y": 294
+                    },
+                    {
+                      "x": 3076,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 3212,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 3236,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 3300,
+                      "y": 138
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.5,
+                  "targetOffsetAlong": 0.92
+                },
+                {
+                  "id": "conn-a-marta-cap-onboarding",
+                  "sourceId": "a-marta",
+                  "targetId": "cap-onboarding",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "archi-association",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 3020,
+                      "y": 294
+                    },
+                    {
+                      "x": 3084,
+                      "y": 294
+                    },
+                    {
+                      "x": 3108,
+                      "y": 294
+                    },
+                    {
+                      "x": 3160,
+                      "y": 294
+                    },
+                    {
+                      "x": 3160,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 3212,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 3236,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 3300,
+                      "y": 138
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.5,
+                  "targetOffsetAlong": 0.92
+                },
+                {
+                  "id": "conn-a-leah-cap-onboarding",
+                  "sourceId": "a-leah",
+                  "targetId": "cap-onboarding",
+                  "sourceSide": "top",
+                  "targetSide": "bottom",
+                  "type": "archi-association",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 3188,
+                      "y": 294
+                    },
+                    {
+                      "x": 3188,
+                      "y": 256
+                    },
+                    {
+                      "x": 3188,
+                      "y": 232
+                    },
+                    {
+                      "x": 3188,
+                      "y": 216
+                    },
+                    {
+                      "x": 3246.24,
+                      "y": 216
+                    },
+                    {
+                      "x": 3246.24,
+                      "y": 200
+                    },
+                    {
+                      "x": 3246.24,
+                      "y": 176
+                    },
+                    {
+                      "x": 3300,
+                      "y": 138
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.5,
+                  "targetOffsetAlong": 0.08
+                },
+                {
+                  "id": "conn-a-femi-cap-onboarding",
+                  "sourceId": "a-femi",
+                  "targetId": "cap-onboarding",
+                  "sourceSide": "top",
+                  "targetSide": "bottom",
+                  "type": "archi-association",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 3356,
+                      "y": 294
+                    },
+                    {
+                      "x": 3356,
+                      "y": 256
+                    },
+                    {
+                      "x": 3356,
+                      "y": 232
+                    },
+                    {
+                      "x": 3356,
+                      "y": 216
+                    },
+                    {
+                      "x": 3353.76,
+                      "y": 216
+                    },
+                    {
+                      "x": 3353.76,
+                      "y": 200
+                    },
+                    {
+                      "x": 3353.76,
+                      "y": 176
+                    },
+                    {
+                      "x": 3300,
+                      "y": 138
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.5,
+                  "targetOffsetAlong": 0.92
+                },
+                {
+                  "id": "conn-a-dan-cap-onboarding",
+                  "sourceId": "a-dan",
+                  "targetId": "cap-onboarding",
+                  "sourceSide": "left",
+                  "targetSide": "right",
+                  "type": "archi-association",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 3524,
+                      "y": 294
+                    },
+                    {
+                      "x": 3460,
+                      "y": 281.3333333333333
+                    },
+                    {
+                      "x": 3436,
+                      "y": 281.3333333333333
+                    },
+                    {
+                      "x": 3412,
+                      "y": 281.3333333333333
+                    },
+                    {
+                      "x": 3412,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 3388,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 3364,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 3300,
+                      "y": 138
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.3333333333333333,
+                  "targetOffsetAlong": 0.92
+                },
+                {
+                  "id": "conn-a-sam-cap-device",
+                  "sourceId": "a-sam",
+                  "targetId": "cap-device",
+                  "sourceSide": "top",
+                  "targetSide": "bottom",
+                  "type": "archi-association",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 3692,
+                      "y": 294
+                    },
+                    {
+                      "x": 3692,
+                      "y": 256
+                    },
+                    {
+                      "x": 3692,
+                      "y": 232
+                    },
+                    {
+                      "x": 3692,
+                      "y": 216
+                    },
+                    {
+                      "x": 3722.24,
+                      "y": 216
+                    },
+                    {
+                      "x": 3722.24,
+                      "y": 200
+                    },
+                    {
+                      "x": 3722.24,
+                      "y": 176
+                    },
+                    {
+                      "x": 3776,
+                      "y": 138
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.5,
+                  "targetOffsetAlong": 0.08
+                },
+                {
+                  "id": "conn-a-nina-cap-device",
+                  "sourceId": "a-nina",
+                  "targetId": "cap-device",
+                  "sourceSide": "top",
+                  "targetSide": "bottom",
+                  "type": "archi-association",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 3860,
+                      "y": 294
+                    },
+                    {
+                      "x": 3860,
+                      "y": 256
+                    },
+                    {
+                      "x": 3860,
+                      "y": 232
+                    },
+                    {
+                      "x": 3860,
+                      "y": 216
+                    },
+                    {
+                      "x": 3829.76,
+                      "y": 216
+                    },
+                    {
+                      "x": 3829.76,
+                      "y": 200
+                    },
+                    {
+                      "x": 3829.76,
+                      "y": 176
+                    },
+                    {
+                      "x": 3776,
+                      "y": 138
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.5,
+                  "targetOffsetAlong": 0.92
+                },
+                {
+                  "id": "conn-a-jo-cap-payroll",
+                  "sourceId": "a-jo",
+                  "targetId": "cap-payroll",
+                  "sourceSide": "top",
+                  "targetSide": "bottom",
+                  "type": "archi-association",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 4028,
+                      "y": 294
+                    },
+                    {
+                      "x": 4028,
+                      "y": 256
+                    },
+                    {
+                      "x": 4028,
+                      "y": 232
+                    },
+                    {
+                      "x": 4028,
+                      "y": 200
+                    },
+                    {
+                      "x": 4028,
+                      "y": 176
+                    },
+                    {
+                      "x": 4028,
+                      "y": 138
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.5,
+                  "targetOffsetAlong": 0.5
+                },
+                {
+                  "id": "conn-a-dev-cap-accredited-vetting",
+                  "sourceId": "a-dev",
+                  "targetId": "cap-accredited-vetting",
+                  "sourceSide": "left",
+                  "targetSide": "right",
+                  "type": "archi-association",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 4196,
+                      "y": 294
+                    },
+                    {
+                      "x": 4132,
+                      "y": 281.3333333333333
+                    },
+                    {
+                      "x": 4108,
+                      "y": 281.3333333333333
+                    },
+                    {
+                      "x": 3664,
+                      "y": 281.3333333333333
+                    },
+                    {
+                      "x": 3664,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 3220,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 3196,
+                      "y": 169.92000000000002
+                    },
+                    {
+                      "x": 3132,
+                      "y": 138
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.3333333333333333,
+                  "targetOffsetAlong": 0.92
+                },
+                {
+                  "id": "conn-cap-accredited-vetting-cap-onboarding",
+                  "sourceId": "cap-accredited-vetting",
+                  "targetId": "cap-onboarding",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "archi-aggregation",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 3132,
+                      "y": 138
+                    },
+                    {
+                      "x": 3196,
+                      "y": 125.33333333333333
+                    },
+                    {
+                      "x": 3214,
+                      "y": 125.33333333333333
+                    },
+                    {
+                      "x": 3218,
+                      "y": 125.33333333333333
+                    },
+                    {
+                      "x": 3236,
+                      "y": 125.33333333333333
+                    },
+                    {
+                      "x": 3300,
+                      "y": 138
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.3333333333333333,
+                  "targetOffsetAlong": 0.33333333333333326
+                },
+                {
+                  "id": "conn-cap-accredited-vetting-cap-compliance",
+                  "sourceId": "cap-accredited-vetting",
+                  "targetId": "cap-compliance",
+                  "sourceSide": "left",
+                  "targetSide": "right",
+                  "type": "archi-aggregation",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 3132,
+                      "y": 138
+                    },
+                    {
+                      "x": 3068,
+                      "y": 119
+                    },
+                    {
+                      "x": 3044,
+                      "y": 119
+                    },
+                    {
+                      "x": 2560.02,
+                      "y": 119
+                    },
+                    {
+                      "x": 2536.02,
+                      "y": 119
+                    },
+                    {
+                      "x": 2472.02,
+                      "y": 138
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.25,
+                  "targetOffsetAlong": 0.25
+                },
+                {
+                  "id": "conn-t-hr-cap-workforce-onboarding",
+                  "sourceId": "t-hr",
+                  "targetId": "cap-workforce-onboarding",
+                  "sourceSide": "top",
+                  "targetSide": "bottom",
+                  "type": "archi-association",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 332,
+                      "y": 294
+                    },
+                    {
+                      "x": 332,
+                      "y": 256
+                    },
+                    {
+                      "x": 332,
+                      "y": 232
+                    },
+                    {
+                      "x": 332,
+                      "y": 200
+                    },
+                    {
+                      "x": 332,
+                      "y": 176
+                    },
+                    {
+                      "x": 332,
+                      "y": 138
+                    }
+                  ],
+                  "label": "",
+                  "sourceOffsetAlong": 0.5,
+                  "targetOffsetAlong": 0.5
                 }
               ],
               "viewport": {
