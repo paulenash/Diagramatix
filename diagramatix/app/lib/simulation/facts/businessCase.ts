@@ -63,6 +63,19 @@ export interface SideCosts {
   /** True when this run predates the wait measurement — the waiting figures are
    *  absent, not zero, and every reader must say so. */
   waitingUnmeasured: boolean;
+  /**
+   * NOTHING COMPLETED on this side.
+   *
+   * Every per-case figure divides by the case count, so a side that never ran —
+   * or ran and finished nothing — reports zero for doing, queueing and waiting
+   * alike. Compared against a real baseline that is a 100% saving, and the
+   * arithmetic is impeccable: it is the premise that is absent.
+   *
+   * Paul, 2026-09-12, was shown exactly that: "removes 1,437.76 hours per case —
+   * the entire as-is workload... a 100% reduction". Reported so no reader has to
+   * infer it from a suspiciously round result.
+   */
+  noResults: boolean;
 }
 
 export interface BusinessCaseFacts {
@@ -108,6 +121,7 @@ export function sideCosts(name: string, m: RunMetrics, inputs: BusinessCaseInput
 
   return {
     name,
+    noResults: cases <= 0,
     doingPerCase: r2(doingPerCase),
     queueHoursPerCase: r2(queueHoursPerCase),
     processHoursPerCase: r2(processHoursPerCase),
@@ -129,8 +143,14 @@ export function buildBusinessCaseFacts(
   const base = sideCosts(baseName, baseMetrics, inputs);
   const tobe = sideCosts(tobeName, tobeMetrics, inputs);
 
-  const perCaseSaving = r2(base.totalPerCase - tobe.totalPerCase);
-  const perCasePct = base.totalPerCase > 0 ? Math.round((perCaseSaving / base.totalPerCase) * 100) : 0;
+  // A saving computed against a side that completed nothing is not a saving.
+  // Left at zero and flagged, rather than reported as a total win — the numbers
+  // would be arithmetically correct and completely misleading.
+  const unusable = base.noResults || tobe.noResults;
+  const perCaseSaving = unusable ? 0 : r2(base.totalPerCase - tobe.totalPerCase);
+  const perCasePct = unusable || base.totalPerCase <= 0
+    ? 0
+    : Math.round((perCaseSaving / base.totalPerCase) * 100);
 
   const facts: BusinessCaseFacts = {
     studyName,
@@ -140,6 +160,27 @@ export function buildBusinessCaseFacts(
     assumptions: [],
     missing: [],
   };
+
+  // The blocker rides in `missing`, which every consumer already renders as
+  // "here is what this case cannot tell you" — the same channel as a blank
+  // input field, and for the same reason.
+  for (const side of [base, tobe]) {
+    if (side.noResults) {
+      facts.missing.push(
+        `"${side.name}" completed no cases, so every per-case figure for it is zero — not because the work is free, ` +
+        "but because there is nothing measured. Run that scenario before reading any saving here.",
+      );
+    }
+  }
+
+  if (unusable) {
+    // No annual figure, no payback. Both would be scaled from a saving that
+    // does not exist, and a payback of "immediate" is the most inviting wrong
+    // answer this screen could give.
+    if (typeof inputs.annualVolume === "number" && inputs.annualVolume > 0) facts.annualVolume = inputs.annualVolume;
+    if (typeof inputs.implementationCost === "number" && inputs.implementationCost >= 0) facts.implementationCost = inputs.implementationCost;
+    return facts;
+  }
 
   if (typeof inputs.annualVolume === "number" && inputs.annualVolume > 0) {
     facts.annualVolume = inputs.annualVolume;
@@ -229,14 +270,31 @@ export function summariseBusinessCase(f: BusinessCaseFacts): string {
   };
 
   out.push(`${f.tobe.name} vs ${f.base.name} — ${f.studyName}`, "");
+
+  // LEAD with the blocker. A side that completed nothing makes every figure
+  // below it zero, and a reader who meets the numbers first has already formed
+  // a view by the time the caveat arrives.
+  const dead = [f.base, f.tobe].filter((x) => x.noResults);
+  if (dead.length > 0) {
+    out.push(
+      `NO CASE CAN BE MADE YET: ${dead.map((d) => `"${d.name}"`).join(" and ")} completed no cases.`,
+      "Its per-case figures are zero because nothing was measured, not because the work is free —",
+      "so any saving, percentage or payback computed against it would be arithmetic on an absent premise.",
+      "Run that scenario, then come back.",
+      "",
+    );
+  }
+
   out.push(side(f.base));
   out.push(side(f.tobe));
   out.push("");
-  out.push(
-    f.perCaseSaving >= 0
-      ? `Saving: ${money(f.perCaseSaving)} per case (${f.perCasePct}%).`
-      : `This costs ${money(-f.perCaseSaving)} more per case (${-f.perCasePct}%).`,
-  );
+  if (dead.length === 0) {
+    out.push(
+      f.perCaseSaving >= 0
+        ? `Saving: ${money(f.perCaseSaving)} per case (${f.perCasePct}%).`
+        : `This costs ${money(-f.perCaseSaving)} more per case (${-f.perCasePct}%).`,
+    );
+  }
   if (f.annualSaving !== undefined) out.push(`Over ${f.annualVolume!.toLocaleString()} cases a year: ${money(f.annualSaving)}.`);
   if (f.implementationCost !== undefined) out.push(`One-off cost to get there: ${money(f.implementationCost)}.`);
   if (f.paybackMonths !== undefined) out.push(`Pays back in ${f.paybackMonths} month${f.paybackMonths === 1 ? "" : "s"}.`);
@@ -260,6 +318,17 @@ You are given a JSON object of ALREADY-COMPUTED figures. Write a SHORT case — 
 
 STRICT RULES
 - Use ONLY numbers present in the facts JSON. Never invent, recompute or infer a figure. You MAY round for readability and convert hours to days where it reads better.
+- UNITS ARE IN THE FIELD NAMES AND MUST BE OBEYED. Anything ending "CostPerCase",
+  and also "doingPerCase", "totalPerCase", "perCaseSaving", "annualSaving" and
+  "implementationCost", is MONEY. Only "queueHoursPerCase" and
+  "processHoursPerCase" are hours. Reporting a money figure as hours — "removes
+  1,437.76 hours per case" when 1437.76 was pounds — turns a cost saving into an
+  impossible time saving, and it reads perfectly plausibly.
+- IF "base.noResults" OR "tobe.noResults" IS TRUE, there is no case to make. Say
+  which side completed no cases and that its figures are absent rather than zero,
+  and STOP. Do not report a saving, a percentage or a payback: every one of them
+  would be computed from a side that never ran, and "100% reduction, payback
+  immediate" is the most inviting wrong answer this screen can give.
 - Lead with the money: saving per case, the annual figure, and the payback if there is one.
 - If there is no payback (paybackNote present), say so plainly and do not argue around it. A change that does not pay back may still be worth doing for speed — say that only if the figures support it.
 - The two kinds of waiting are NOT interchangeable. Queue waiting is shortened by more capacity; process waiting (a courier, an overnight batch) is not changed by staffing at all. Never suggest staffing as a remedy for process waiting.
@@ -268,8 +337,17 @@ STRICT RULES
 - Output plain prose only. No preamble like "Here is". Start directly.`;
 
 export type BusinessCaseAiResult =
-  | { ok: true; narrative: string; model: string }
+  | { ok: true; narrative: string; model: string; truncated?: boolean }
   | { ok: false; status: number; error: string };
+
+/**
+ * Output budget. It was 700, which cut a normal case off mid-sentence — Paul,
+ * 2026-09-12, quoting one that ended "...while 40.16". Same cause as the
+ * assessment budget, and the same fix: enough room for the reply the prompt asks
+ * for, plus a check that it FINISHED, because a budget can always be beaten and
+ * half a sentence reads exactly like a whole one.
+ */
+const CASE_MAX_TOKENS = 1500;
 
 export async function generateBusinessCaseNarrative(
   args: { apiKey: string; facts: BusinessCaseFacts },
@@ -281,13 +359,22 @@ export async function generateBusinessCaseNarrative(
   try {
     const message = await client.messages.create({
       model,
-      max_tokens: 700,
+      max_tokens: CASE_MAX_TOKENS,
       system: SYSTEM,
       messages: [{ role: "user", content: redactor ? redactor.redact(payload) : payload }],
     });
     const block = message.content.find((b) => b.type === "text");
     if (!block || block.type !== "text") return { ok: false, status: 500, error: "No response from AI" };
-    return { ok: true, narrative: redactor ? redactor.restore(block.text.trim()) : block.text.trim(), model };
+    // Did it FINISH? A case that stops mid-sentence still reads like a case, so
+    // the reader takes a half-formed argument for a complete one.
+    const truncated = message.stop_reason === "max_tokens";
+    const text = block.text.trim();
+    return {
+      ok: true,
+      narrative: redactor ? redactor.restore(text) : text,
+      model,
+      ...(truncated ? { truncated: true } : {}),
+    };
   } catch (err) {
     return { ok: false, status: 500, error: `Business case narration failed: ${err instanceof Error ? err.message : String(err)}` };
   }

@@ -37,6 +37,7 @@ export function BusinessCasePanel({ baseUrl, scenarios, savedInputs }: {
 
   const [facts, setFacts] = useState<BusinessCaseFacts | null>(null);
   const [narrative, setNarrative] = useState<string | null>(null);
+  const [truncated, setTruncated] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -63,6 +64,7 @@ export function BusinessCasePanel({ baseUrl, scenarios, savedInputs }: {
       if (!res.ok) { setErr(json.error ?? "Could not build the business case"); return; }
       setFacts(json.facts ?? null);
       setNarrative(json.narrative ?? null);
+      setTruncated(json.truncated === true);
     } catch {
       setErr("Could not build the business case");
     } finally { setBusy(false); }
@@ -133,6 +135,11 @@ export function BusinessCasePanel({ baseUrl, scenarios, savedInputs }: {
           {narrative && (
             <div className="rounded border border-green-500/30 bg-green-400/5 p-2 text-[11px] text-green-200/90 whitespace-pre-wrap leading-relaxed">
               {narrative}
+              {truncated && (
+                <p className="text-amber-400/80 text-[10px] mt-1">
+                  ⚠ This case was cut off before it finished — rebuild it.
+                </p>
+              )}
             </div>
           )}
 

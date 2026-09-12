@@ -115,7 +115,7 @@ export async function POST(req: Request, { params }: Params) {
     // Losing the narration must not lose the case.
     return NextResponse.json({ facts, narrative: summariseBusinessCase(facts), deterministic: true, aiError: result.error });
   }
-  return NextResponse.json({ facts, narrative: result.narrative, model: result.model });
+  return NextResponse.json({ facts, narrative: result.narrative, model: result.model, truncated: result.truncated ?? false });
 }
 
 /** GET ?format=docx|xlsx|pdf&baselineScenarioId=…&compareScenarioId=… */
