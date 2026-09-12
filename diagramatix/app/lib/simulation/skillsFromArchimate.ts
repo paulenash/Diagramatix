@@ -40,6 +40,16 @@ const WORK_TYPES = new Set([
 
 const ACTOR_TYPES = new Set(["business-actor"]);
 const ROLE_TYPES = new Set(["business-role"]);
+/** Skills, under the pattern Paul specified. ArchiMate has no Skill element and
+ *  Capability is defined as an ability an actor POSSESSES, which is the fit. */
+const CAPABILITY_TYPES = new Set(["strategy-capability"]);
+/** A standing team and an ad-hoc one. Paul's distinction: an Actor is an
+ *  organisational team, a Collaboration is a group assembled to do something. */
+const TEAM_TYPES = new Set(["business-actor", "business-collaboration"]);
+/** "has skill" is an Association — ArchiMate has no relationship meaning
+ *  "possesses a capability", and the research on competency modelling
+ *  recommends the general Association for exactly this. */
+const ASSOCIATION_TYPES = new Set(["archi-association", "archi-association-directed"]);
 /** Role → Role, meaning "this role is made up of those". */
 const BUNDLE_TYPES = new Set(["archi-aggregation", "archi-composition"]);
 
@@ -90,6 +100,23 @@ export interface ArchimateWork {
   requiredSkills: string[];
 }
 
+/**
+ * Which of the two readings produced this model.
+ *
+ * "capability" is the pattern Paul specified (2026-09-11): a person is a
+ * Business Actor, a skill is a Capability joined by Association, and a Business
+ * Role is the person's JOB rather than a competency.
+ *
+ * "role-legacy" is what this reader did first, where a Business Role stood in
+ * for a skill. Models drawn that way still work — a customer's operating model
+ * is not ours to invalidate — but which reading was used has to be SAID, or a
+ * diagram drawn half in each silently yields whichever half the code preferred.
+ */
+export type SkillsPattern = "capability" | "role-legacy" | "none";
+
+/** A team, and the people aggregated into it. */
+export interface ArchimateTeam { name: string; members: string[] }
+
 export interface SkillsModel {
   people: ArchimatePerson[];
   work: ArchimateWork[];
@@ -97,6 +124,10 @@ export interface SkillsModel {
   skills: string[];
   /** Things that are almost certainly mistakes in the diagram. */
   warnings: string[];
+  /** How the diagram was read — see SkillsPattern. */
+  pattern: SkillsPattern;
+  /** Teams, when the diagram models them (capability pattern only). */
+  teams: ArchimateTeam[];
 }
 
 /**
@@ -130,7 +161,28 @@ function expandRole(
 const uniqSorted = (xs: string[]) => [...new Set(xs)].sort((a, b) => a.localeCompare(b));
 
 /** Read the actors, roles and work out of an ArchiMate diagram. */
+/**
+ * Read a skills matrix out of an ArchiMate diagram.
+ *
+ * TWO PATTERNS, tried in order, and the model SAYS which one answered.
+ *
+ * The capability pattern is the specification (Paul, 2026-09-11). The
+ * role-legacy reading is what this did first, where a Business Role stood in
+ * for a skill — customers have models drawn that way and a customer's
+ * operating model is not ours to invalidate on an upgrade.
+ *
+ * Preferring the new one is not a guess: readCapabilityPattern returns null
+ * unless a person is actually associated with a capability, so a legacy
+ * diagram cannot be misread as an empty capability model.
+ */
 export function skillsFromArchimate(data: DiagramData): SkillsModel {
+  const viaCapability = readCapabilityPattern(data);
+  if (viaCapability) return viaCapability;
+  return skillsFromArchimateLegacy(data);
+}
+
+/** The original reading: Business Role AS a skill. See skillsFromArchimate. */
+function skillsFromArchimateLegacy(data: DiagramData): SkillsModel {
   const elements = data.elements ?? [];
   const connectors = data.connectors ?? [];
   const warnings: string[] = [];
@@ -224,6 +276,8 @@ export function skillsFromArchimate(data: DiagramData): SkillsModel {
   return {
     people: people.sort((a, b) => a.name.localeCompare(b.name)),
     work: work.sort((a, b) => a.label.localeCompare(b.label)),
+    pattern: people.length || work.length ? "role-legacy" : "none",
+    teams: [],
     skills: uniqSorted([...skillsOfRole.values()].flat()),
     warnings,
   };
@@ -292,4 +346,182 @@ export function matchSkills(model: SkillsModel, memberNames: string[], taskLabel
   }
 
   return { units, taskSkills, unmatchedActors, unmatchedMembers, unmatchedWork, warnings };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// The CAPABILITY pattern — Paul's specification, 2026-09-11.
+//
+//   Team       Business Actor            "Data & AI Team"
+//   Person     Business Actor            "Jane Smith"        Team ◇— Person
+//   Job        Business Role             "Data Architect"    Person —▶ Role
+//   Skill      Capability                "Data Modelling"    Person —— Capability
+//
+// Three things this gets right that the Role-as-skill reading did not:
+//
+//  1. A ROLE IS A JOB, NOT A COMPETENCY. "Do not use a Business Role to mean a
+//     particular employee" — and equally, a role is not a skill. Jane is
+//     assigned Enterprise Architect AND Review Board Member; neither is
+//     something she can DO, they are positions she holds. Roles are recorded
+//     here but never contribute skills.
+//  2. TEAMS ARE MODELLED, not inferred from a name match against the Team
+//     library. Aggregation rather than composition: a person exists
+//     independently of a team and may belong to several.
+//  3. CAPABILITY IS THE ARCHIMATE-SANCTIONED FIT. There is no Skill element;
+//     Capability is defined as an ability an active structure element
+//     possesses.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Individual skill vs organisational capability — Paul's stereotype convention,
+ * since both are Capability elements and only one of them is something a PERSON
+ * has.
+ *
+ * TOLERANT BY DESIGN. A model that stereotypes nothing is the common case, and
+ * demanding the marker would make such a model yield zero skills while looking
+ * perfectly correct. So: if ANY capability is marked as an individual skill,
+ * only the marked ones count (the author has clearly opted in); if none is,
+ * every capability counts except one explicitly marked as organisational. The
+ * report says which rule applied.
+ */
+const INDIVIDUAL_SKILL_RE = /individual\s*skill|personal\s*skill|competenc/i;
+const ORG_CAPABILITY_RE = /business\s*capabilit|organisational\s*capabilit|organizational\s*capabilit/i;
+
+const stereotypeOf = (el: Pick<DiagramElement, "properties">): string =>
+  String((el.properties as { stereotype?: unknown } | undefined)?.stereotype ?? "");
+
+/**
+ * Read the capability pattern. Returns null when the diagram plainly is not
+ * drawn this way — no person is associated with any capability — so the caller
+ * can fall back rather than report an empty model as a successful read.
+ */
+function readCapabilityPattern(data: DiagramData): SkillsModel | null {
+  const elements = data.elements ?? [];
+  const connectors = data.connectors ?? [];
+  const warnings: string[] = [];
+
+  const labelOf = new Map<string, string>();
+  for (const el of elements) labelOf.set(el.id, (el.label ?? "").replace(/\s+/g, " ").trim());
+  const typeOf = new Map(elements.map((e) => [e.id, archimateTypeOf(e)]));
+  const byId = new Map(elements.map((e) => [e.id, e]));
+
+  const isCapability = (id: string) => CAPABILITY_TYPES.has(typeOf.get(id) ?? "");
+  const isActor = (id: string) => ACTOR_TYPES.has(typeOf.get(id) ?? "");
+  const isRole = (id: string) => ROLE_TYPES.has(typeOf.get(id) ?? "");
+  const isTeamish = (id: string) => TEAM_TYPES.has(typeOf.get(id) ?? "");
+
+  const caps = elements.filter((e) => isCapability(e.id));
+  const anyMarked = caps.some((e) => INDIVIDUAL_SKILL_RE.test(stereotypeOf(e)));
+  const countsAsSkill = (id: string): boolean => {
+    const el = byId.get(id);
+    if (!el) return false;
+    const st = stereotypeOf(el);
+    return anyMarked ? INDIVIDUAL_SKILL_RE.test(st) : !ORG_CAPABILITY_RE.test(st);
+  };
+  if (anyMarked) {
+    const skipped = caps.filter((e) => !INDIVIDUAL_SKILL_RE.test(stereotypeOf(e))).length;
+    if (skipped > 0) {
+      warnings.push(`${skipped} capability element${skipped === 1 ? "" : "s"} not marked as an individual skill — read as organisational capabilities and skipped.`);
+    }
+  }
+
+  // A capability that aggregates others contributes their leaves instead of
+  // itself, so a bundle resolves to what it is actually made of.
+  const capChildren = new Map<string, string[]>();
+  for (const c of connectors) {
+    if (!BUNDLE_TYPES.has(c.type as string) || !c.sourceId || !c.targetId) continue;
+    if (!isCapability(c.sourceId) || !isCapability(c.targetId)) continue;
+    const list = capChildren.get(c.sourceId) ?? [];
+    list.push(c.targetId);
+    capChildren.set(c.sourceId, list);
+  }
+  const cycles = new Set<string>();
+  const leavesOf = (id: string): string[] =>
+    expandRole(id, capChildren, labelOf, new Set(), cycles).filter(Boolean);
+
+  // Person —— Capability. An Association carries no direction in meaning, so
+  // either end may be the actor; a model drawn the other way round is not wrong.
+  const skillsOfPerson = new Map<string, Set<string>>();
+  for (const c of connectors) {
+    if (!ASSOCIATION_TYPES.has(c.type as string) || !c.sourceId || !c.targetId) continue;
+    const pair: [string, string] | null =
+      isActor(c.sourceId) && isCapability(c.targetId) ? [c.sourceId, c.targetId] :
+      isActor(c.targetId) && isCapability(c.sourceId) ? [c.targetId, c.sourceId] : null;
+    if (!pair) continue;
+    const [person, cap] = pair;
+    if (!countsAsSkill(cap)) continue;
+    const set = skillsOfPerson.get(person) ?? new Set<string>();
+    for (const leaf of leavesOf(cap)) set.add(leaf);
+    skillsOfPerson.set(person, set);
+  }
+
+  // Not drawn this way at all — let the caller fall back to the legacy reading.
+  if (skillsOfPerson.size === 0) return null;
+
+  // Team ◇— Person.
+  const teams: ArchimateTeam[] = [];
+  const isMember = new Set<string>();
+  for (const c of connectors) {
+    if (!BUNDLE_TYPES.has(c.type as string) || !c.sourceId || !c.targetId) continue;
+    if (!isTeamish(c.sourceId) || !isActor(c.targetId)) continue;
+    isMember.add(c.targetId);
+    const name = labelOf.get(c.sourceId) ?? "";
+    const member = labelOf.get(c.targetId) ?? "";
+    const hit = teams.find((t) => t.name === name);
+    if (hit) hit.members.push(member);
+    else teams.push({ name, members: [member] });
+  }
+
+  // Roles are JOBS. Recorded so a reader can see them; never skills.
+  const rolesOfPerson = new Map<string, string[]>();
+  for (const c of connectors) {
+    if (c.type !== "archi-assignment" || !c.sourceId || !c.targetId) continue;
+    if (!isActor(c.sourceId) || !isRole(c.targetId)) continue;
+    const list = rolesOfPerson.get(c.sourceId) ?? [];
+    list.push(labelOf.get(c.targetId) ?? "");
+    rolesOfPerson.set(c.sourceId, list);
+  }
+
+  const teamNames = new Set(teams.map((t) => t.name));
+  const people: ArchimatePerson[] = [];
+  for (const el of elements) {
+    if (!isActor(el.id)) continue;
+    const skills = uniqSorted([...(skillsOfPerson.get(el.id) ?? [])]);
+    // A TEAM IS NEVER A PERSON, whatever it is connected to. Offering it as
+    // one would put "Data & AI Team" up for matching against the roster,
+    // where it matches nothing and is reported as an unmatched actor — noise
+    // that reads as a fault in the model.
+    //
+    // And a capability hung off a TEAM is an organisational capability by
+    // construction: that is the very distinction the stereotypes exist to
+    // draw, made here by structure instead, so an unstereotyped model gets it
+    // right too.
+    if (teamNames.has(labelOf.get(el.id) ?? "")) {
+      if (skills.length > 0) {
+        const who = labelOf.get(el.id) ?? "";
+        warnings.push(`"${who}" aggregates people, so it is a team — the ${skills.length} capabilit${skills.length === 1 ? "y" : "ies"} on it were read as organisational, not as somebody's skill.`);
+      }
+      continue;
+    }
+    if (skills.length === 0 && !isMember.has(el.id)) continue;
+    people.push({ name: labelOf.get(el.id) ?? "", roles: rolesOfPerson.get(el.id) ?? [], skills });
+  }
+
+  for (const cycle of cycles) {
+    warnings.push(`Capability "${cycle}" aggregates itself, directly or through others — the loop was broken.`);
+  }
+  const bare = people.filter((p) => p.skills.length === 0).map((p) => p.name);
+  if (bare.length > 0) {
+    warnings.push(`${bare.length} on a team but holding no skill: ${bare.slice(0, 4).join(", ")}${bare.length > 4 ? "…" : ""}. They can still take work that requires none.`);
+  }
+
+  return {
+    people,
+    // Task requirements are the USER'S choice from the master Skills list
+    // (Paul, step 5), so this pattern deliberately reads none from the diagram.
+    work: [],
+    skills: uniqSorted(people.flatMap((p) => p.skills)),
+    warnings,
+    pattern: "capability",
+    teams,
+  };
 }

@@ -75,6 +75,11 @@ export async function GET(_req: Request, { params }: Params) {
       skills: model.skills.length,
       wouldFillMembers: match.units.length,
       wouldFillTasks: Object.keys(match.taskSkills).length,
+      // WHICH READING answered. A diagram drawn half in each pattern yields
+      // whichever half the code preferred, and the counts alone cannot tell
+      // you that happened — so the pattern is reported alongside them.
+      pattern: model.pattern,
+      teams: model.teams.length,
     };
   });
   return NextResponse.json({ options, memberNames, taskCount: taskLabels.length });

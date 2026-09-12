@@ -21,6 +21,9 @@ interface Option {
   id: string; name: string;
   actors: number; skills: number;
   wouldFillMembers: number; wouldFillTasks: number;
+  /** Which reading answered — see skillsFromArchimate. */
+  pattern?: "capability" | "role-legacy" | "none";
+  teams?: number;
 }
 interface FillResult {
   filledFrom: { diagramName: string; at: string };
@@ -105,6 +108,29 @@ export function SkillsFillPanel({ baseUrl, onFilled }: {
           member{picked.wouldFillMembers === 1 ? "" : "s"} and <span className={picked.wouldFillTasks ? "text-green-300" : "text-amber-300"}>{picked.wouldFillTasks}</span> task{picked.wouldFillTasks === 1 ? "" : "s"}.
           {picked.wouldFillMembers === 0 && picked.wouldFillTasks === 0 &&
             " Nothing matches by name — check the actor and task labels are the same in both."}
+        </p>
+      )}
+
+      {/* WHICH READING answered. Two patterns are supported, and a diagram
+          drawn half in each yields whichever half the code preferred — the
+          counts above cannot show that, so it is said outright. */}
+      {picked && !result && picked.pattern === "capability" && (
+        <p className="text-green-400/40 text-[10px]">
+          Read as <span className="text-green-300/80">Capabilities</span> — each person&rsquo;s skills are the
+          Capabilities associated with them. Business Roles are read as jobs, not skills.
+          {picked.teams ? " " + picked.teams + " team(s) found." : ""}
+        </p>
+      )}
+      {picked && !result && picked.pattern === "role-legacy" && (
+        <p className="text-green-400/40 text-[10px]">
+          Read as <span className="text-amber-300/80">Business Roles</span> — the older convention, where a Role
+          stands in for a skill. Still supported. For the current pattern, model each skill as a Capability
+          associated with the person who holds it.
+        </p>
+      )}
+      {picked && !result && picked.pattern === "none" && (
+        <p className="text-amber-300/70 text-[10px]">
+          Neither pattern found: nobody is associated with a Capability, and no Role is assigned to anybody.
         </p>
       )}
 
