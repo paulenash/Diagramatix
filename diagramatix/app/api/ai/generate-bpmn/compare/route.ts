@@ -53,7 +53,7 @@ export async function POST(req: Request) {
   // set). Pass as long as AT LEAST ONE provider key exists; per-model keys are
   // resolved in the loop, and a model whose provider key is missing is skipped.
   const anyKey = !!resolvedEnvSecret(process.env.ANTHROPIC_API_KEY) || !!resolvedEnvSecret(process.env.MOONSHOT_API_KEY);
-  if (!anyKey) return NextResponse.json({ error: "No AI provider configured. Set ANTHROPIC_API_KEY and/or MOONSHOT_API_KEY." }, { status: 503 });
+  if (!anyKey) return NextResponse.json({ error: "No AI provider is configured on this deployment. An administrator can add one, or you can add your own key under Account Settings." }, { status: 503 });
   // Accept every input the two-phase "Plan" flow accepts, so Compare is a
   // complete alternative: a text prompt AND/OR an attachment (PDF / text / image),
   // with image geometry-capture for the "reproduce original layout" mode.

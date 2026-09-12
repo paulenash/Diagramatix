@@ -7,7 +7,7 @@
  *     graph → BPMN plan (edgeThreshold 0..1 trims rare paths).
  *   • `{ ai:true }` — Claude curates a clean, readable process via the app's AI
  *     BPMN pipeline (general + bpmn rules, the BPMN prompt, the configured model).
- *     Metered against the AI-attempts quota; needs ANTHROPIC_API_KEY.
+ *     Metered against the AI-attempts quota; needs a configured AI provider.
  */
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
@@ -102,7 +102,7 @@ export async function POST(req: Request, { params }: Params) {
     if (_pol) return _pol;
     const model = await getAiGenerateModel();
     const apiKey = aiApiKey(model);
-    if (!apiKey) return NextResponse.json({ error: "AI not configured for the selected model. Set ANTHROPIC_API_KEY or MOONSHOT_API_KEY." }, { status: 503 });
+    if (!apiKey) return NextResponse.json({ error: "AI is not configured for the selected model. An administrator can add a key for this provider, or you can add your own under Account Settings → Your own AI keys." }, { status: 503 });
     if (userId) { const block = await gateLimit(userId, "aiAttempts"); if (block) return block; }
     enterAiContext({ userId, orgId, invocationPoint: AI_INVOCATION_POINTS.MiningDiscover });
 

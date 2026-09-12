@@ -31,7 +31,7 @@ export async function POST(req: Request) {
   const model = await getAiGenerateModel();
   const apiKey = aiApiKey(model);
   if (!apiKey) {
-    return NextResponse.json({ error: "AI not configured for the selected model. Set ANTHROPIC_API_KEY or MOONSHOT_API_KEY." }, { status: 503 });
+    return NextResponse.json({ error: "AI is not configured for the selected model. An administrator can add a key for this provider, or you can add your own under Account Settings → Your own AI keys." }, { status: 503 });
   }
 
   const { prompt, pcfNodeId } = await req.json();

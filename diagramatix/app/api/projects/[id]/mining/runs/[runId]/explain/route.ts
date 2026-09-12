@@ -1,7 +1,7 @@
 /**
  * POST — an AI plain-language explanation of what a mining run revealed (process
  * shape, conformance findings, timing, and the twin). Text output; uses the
- * configured model. Metered against the AI-attempts quota; needs ANTHROPIC_API_KEY.
+ * configured model. Metered against the AI-attempts quota; needs a configured AI provider.
  */
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";

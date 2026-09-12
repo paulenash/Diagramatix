@@ -149,7 +149,7 @@ export function layoutStateMachine(aiElements: AiEl[], aiConnections: AiConn[]):
   const pairSet = new Set(edges.map((c) => ekey(c.sourceId, c.targetId)));
   type Endpoint = { conn: Connector; end: "s" | "t"; node: string; side: Side };
   const endpoints: Endpoint[] = [];
-  const connectors: Connector[] = edges.map((c) => {
+  const connectors: Connector[] = edges.map((c, ci) => {
     const s = pos.get(c.sourceId)!, t = pos.get(c.targetId)!;
     const rs = rank.get(c.sourceId)!, rt = rank.get(c.targetId)!;
     const reciprocal = pairSet.has(ekey(c.targetId, c.sourceId));
@@ -161,7 +161,7 @@ export function layoutStateMachine(aiElements: AiEl[], aiConnections: AiConn[]):
     // reciprocal forward pair: send the return leg under the bottom instead
     if (reciprocal && rt > rs) { /* forward leg keeps right→left */ }
     const conn: Connector = {
-      id: `conn-${c.sourceId}-${c.targetId}`, sourceId: c.sourceId, targetId: c.targetId,
+      id: `conn-${c.sourceId}-${c.targetId}-${ci}`, sourceId: c.sourceId, targetId: c.targetId,
       sourceSide: srcSide, targetSide: tgtSide, type: "transition",
       directionType: "open-directed", routingType: "curvilinear",
       sourceInvisibleLeader: false, targetInvisibleLeader: false, waypoints: [] as Point[], label: c.label ?? "",
@@ -345,13 +345,13 @@ export function layoutStateMachinePreserved(
   const edges = aiConnections.filter((c) => elMap.has(c.sourceId) && elMap.has(c.targetId));
   type Endpoint = { conn: Connector; end: "s" | "t"; node: string; side: Side };
   const endpoints: Endpoint[] = [];
-  const connectors: Connector[] = edges.map((c) => {
+  const connectors: Connector[] = edges.map((c, ci) => {
     const src = elMap.get(c.sourceId)!, tgt = elMap.get(c.targetId)!;
     let srcSide: Side = SIDES.has(c.sourceSide as Side) ? (c.sourceSide as Side) : facingSide(src, tgt);
     let tgtSide: Side = SIDES.has(c.targetSide as Side) ? (c.targetSide as Side) : facingSide(tgt, src);
     if (c.sourceId === c.targetId) { srcSide = "top"; tgtSide = "top"; }
     const conn: Connector = {
-      id: `conn-${c.sourceId}-${c.targetId}`, sourceId: c.sourceId, targetId: c.targetId,
+      id: `conn-${c.sourceId}-${c.targetId}-${ci}`, sourceId: c.sourceId, targetId: c.targetId,
       sourceSide: srcSide, targetSide: tgtSide, type: "transition",
       directionType: "open-directed", routingType: "curvilinear",
       sourceInvisibleLeader: false, targetInvisibleLeader: false, waypoints: [] as Point[], label: c.label ?? "",

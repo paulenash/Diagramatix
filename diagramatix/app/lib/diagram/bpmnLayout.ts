@@ -13,6 +13,23 @@ import { autoSizeForType, wrapText, externalLabelBox, externalLabelSize, connect
 import { snapImportedBounds, type Box } from "./importGeometry";
 import { buildTestConnectors } from "./bpmnTestConnectors";
 
+/**
+ * Connector ids carry the INDEX of the connector within its own array.
+ *
+ * `conn-<source>-<target>` collides whenever two connectors join the same pair —
+ * a gateway with two flows to one task, two message flows between two pools — and
+ * the second is then a GHOST: drawn, but every click resolving to the first, so it
+ * can be neither selected nor deleted. Paul hit it on a curated State Machine
+ * (2026-09-13); one BPMN diagram in the dev database already carried it. The same
+ * fault was fixed in the domain layout years ago and left standing here.
+ *
+ * PER-ARRAY, NOT A MODULE COUNTER. A counter at module scope would make two
+ * identical layout calls produce different ids, and layout has to be
+ * deterministic — T0968 compares two runs of it directly, and every golden in the
+ * suite assumes the same input gives the same output. That is how the first
+ * attempt at this fix was caught.
+ */
+
 /** Word-wrap a black-box pool name into multiple lines, then size the pool
  *  FROM the wrapped result: the rotated label runs along the pool HEIGHT, so
  *  the height comes from the LONGEST wrapped line, and the header strip width
@@ -428,7 +445,7 @@ function layoutBpmnPreserved(
     const defTgtSide = horiz ? (dx >= 0 ? "left" : "right") : (dy >= 0 ? "top" : "bottom");
 
     built.push({
-      id: `conn-${c.sourceId}-${c.targetId}`,
+      id: `conn-${c.sourceId}-${c.targetId}-${built.length}`,
       sourceId: c.sourceId, targetId: c.targetId,
       // Honour the drawn LOGICAL attachment side (middle of that boundary /
       // vertex of a gateway); the actual endpoint is computed on the real
@@ -4355,7 +4372,7 @@ export function layoutBpmnDiagram(
       connType === "associationBPMN" && !isCompensationAssoc ? "direct" : "rectilinear";
 
     connectors.push({
-      id: `conn-${c.sourceId}-${c.targetId}`,
+      id: `conn-${c.sourceId}-${c.targetId}-${connectors.length}`,
       sourceId: c.sourceId,
       targetId: c.targetId,
       sourceSide: srcSide as Connector["sourceSide"],
@@ -7182,7 +7199,7 @@ function layoutFlat(
     const tgt = elMap.get(c.targetId);
     if (!src || !tgt) continue;
     connectors.push({
-      id: `conn-${c.sourceId}-${c.targetId}`,
+      id: `conn-${c.sourceId}-${c.targetId}-${connectors.length}`,
       sourceId: c.sourceId, targetId: c.targetId,
       sourceSide: "right", targetSide: "left",
       type: "sequence", directionType: "directed", routingType: "rectilinear",

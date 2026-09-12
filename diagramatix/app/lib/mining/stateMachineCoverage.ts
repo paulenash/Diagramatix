@@ -100,7 +100,15 @@ export function reconcileStateMachineCoverage(plan: SmCoveragePlan, variants: Va
   };
   const pairs = new Set<string>();
   for (const c of connections) {
-    if (c.type !== "transition") continue;
+    // A MISSING type counts as a transition.
+    //
+    // In a state-machine plan every connection IS a transition, and the prompt
+    // never asks the model to say so. Requiring the field made this guard fail
+    // OPEN: none of the model's own connections were indexed, `pairs` came back
+    // empty, and every observed transition was then "added back" on top of the
+    // one already there. Paul's curated Order-to-Cash reference came out with 17
+    // duplicated connectors out of 37.
+    if (c.type != null && c.type !== "" && c.type !== "transition") continue;
     const s = endpoint(c.sourceId), t = endpoint(c.targetId);
     if (s != null && t != null) pairs.add(s + SEP + t);
   }

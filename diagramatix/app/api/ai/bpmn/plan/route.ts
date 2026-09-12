@@ -58,7 +58,7 @@ export async function POST(req: Request) {
   enterUserAiKey(ownKey ? { ...ownKey, userId: session.user.id } : null);
   const apiKey = ownKey?.apiKey ?? aiApiKey(selectedModel);
   if (!apiKey) {
-    return NextResponse.json({ error: "AI not configured for the selected model. Set ANTHROPIC_API_KEY or MOONSHOT_API_KEY." }, { status: 503 });
+    return NextResponse.json({ error: "AI is not configured for the selected model. An administrator can add a key for this provider, or you can add your own under Account Settings → Your own AI keys." }, { status: 503 });
   }
 
   // Subscription cap: AI attempts. Free is lifetime (5 total); paid

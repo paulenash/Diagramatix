@@ -52,7 +52,7 @@ export async function POST(req: Request) {
   // OpenRouter or Kimi key is resolved, passed in, and silently ignored.
   enterUserAiKey(ownKey ? { ...ownKey, userId: session.user.id } : null);
   const apiKey = ownKey?.apiKey ?? aiApiKey(model);
-  if (!apiKey) return NextResponse.json({ error: "AI not configured for the selected model. Set ANTHROPIC_API_KEY or MOONSHOT_API_KEY." }, { status: 503 });
+  if (!apiKey) return NextResponse.json({ error: "AI is not configured for the selected model. An administrator can add a key for this provider, or you can add your own under Account Settings → Your own AI keys." }, { status: 503 });
 
   // Subscription cap: AI attempts. Check before the model call.
   const aiBlock = await gateLimit(session.user.id, "aiAttempts");

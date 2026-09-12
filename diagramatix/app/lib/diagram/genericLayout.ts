@@ -1360,8 +1360,13 @@ function buildArchiConnectors(
       if (list[i].tgtOffset - list[i - 1].tgtOffset < EPS) list[i].tgtOffset = Math.min(0.92, list[i - 1].tgtOffset + EPS);
     }
   }
-  const connectors: Connector[] = prelim.map(p => ({
-    id: `conn-${p.src.id}-${p.tgt.id}`,
+  const connectors: Connector[] = prelim.map((p, pi) => ({
+    // The INDEX is what keeps two relationships between the same pair apart.
+    // ArchiMate permits them freely — serving and flow between two components,
+    // assignment and association between an actor and one element — and under
+    // `conn-<source>-<target>` the second was a ghost: drawn, but every click
+    // resolving to the first, so it could not be selected or deleted.
+    id: `conn-${p.src.id}-${p.tgt.id}-${pi}`,
     sourceId: p.src.id, targetId: p.tgt.id,
     sourceSide: p.srcSide as Connector["sourceSide"],
     targetSide: p.tgtSide as Connector["targetSide"],

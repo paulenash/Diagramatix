@@ -274,7 +274,7 @@ export function RunDetail({
           </button>
           {bpmnBusy && <DiagramatixThrobber size={20} tone="amber" />}
           {aiAllowed && (
-            <button onClick={() => discover(run.id, true)} disabled={discovering} className="text-xs bg-amber-900/60 hover:bg-amber-800 disabled:opacity-40 text-amber-100 rounded px-2.5 py-1.5" title="Use AI (rules + template + your configured model) to curate a cleaner process — needs ANTHROPIC_API_KEY + credits">
+            <button onClick={() => discover(run.id, true)} disabled={discovering} className="text-xs bg-amber-900/60 hover:bg-amber-800 disabled:opacity-40 text-amber-100 rounded px-2.5 py-1.5" title="Use AI (rules + template + your configured model) to curate a cleaner process">
               {aiBpmn ? "✨ Curating…" : "✨ AI-curate"}
             </button>
           )}

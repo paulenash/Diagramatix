@@ -5,7 +5,7 @@
  * `{ ai?: boolean, as?: "discovered" | "reference" }`:
  *   • ai:false — deterministic discoverStateMachine (mirrors the log 1:1).
  *   • ai:true  — Claude curates a clean, governable variant via the app's AI
- *                Generate pipeline. Metered against aiAttempts; needs ANTHROPIC_API_KEY.
+ *                Generate pipeline. Metered against aiAttempts; needs a configured AI provider.
  *   • as:"discovered" (default) — the DISCOVERED mirror, stored in discoveredSmId.
  *     Regenerated on refresh; treat as read-mostly.
  *   • as:"reference" — a SEPARATE governed rulebook, stored in referenceSmId. It
@@ -68,7 +68,7 @@ export async function POST(req: Request, { params }: Params) {
     if (_pol) return _pol;
     const model = await getAiGenerateModel();
     const apiKey = aiApiKey(model);
-    if (!apiKey) return NextResponse.json({ error: "AI not configured for the selected model. Set ANTHROPIC_API_KEY or MOONSHOT_API_KEY." }, { status: 503 });
+    if (!apiKey) return NextResponse.json({ error: "AI is not configured for the selected model. An administrator can add a key for this provider, or you can add your own under Account Settings → Your own AI keys." }, { status: 503 });
     if (userId) { const block = await gateLimit(userId, "aiAttempts"); if (block) return block; }
     enterAiContext({ userId, orgId, invocationPoint: AI_INVOCATION_POINTS.MiningDiscoverSm });
 
