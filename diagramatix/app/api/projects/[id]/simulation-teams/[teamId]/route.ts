@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
-import { prisma } from "@/app/lib/db";
+import { prisma, pgPool } from "@/app/lib/db";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 
@@ -56,7 +56,43 @@ export async function PUT(req: Request, { params }: Params) {
   }
   if (body.preemptive !== undefined) data.preemptive = body.preemptive === true;
   if (body.calendarId !== undefined) data.calendarId = typeof body.calendarId === "string" && body.calendarId ? body.calendarId : null;
-  const team = await prisma.simulationTeam.update({ where: { id: teamId }, data });
+
+  // ── People, and what each of them can do ─────────────────────────────────
+  //
+  // NAMING PEOPLE IS WHAT TURNS SKILLS ON. ResourcePool short-circuits on
+  // `if (!this.skilled)`: a team with no named members grants every skill
+  // requirement to anyone, so a task's requiredSkills are silently ignored and
+  // the run reports no queue where there should be one. That is why this is
+  // editable at all — before it, only an ArchiMate fill could name anybody.
+  //
+  // Written with raw SQL because `members` is a Json column and Prisma 7 omits
+  // Json fields from model update inputs.
+  let members: { name: string; skills: string[] }[] | null = null;
+  if (Array.isArray(body.members)) {
+    members = (body.members as unknown[])
+      .map((m) => {
+        const row = (m ?? {}) as { name?: unknown; skills?: unknown };
+        const name = typeof row.name === "string" ? row.name.replace(/s+/g, " ").trim() : "";
+        const skills = Array.isArray(row.skills)
+          ? [...new Set((row.skills as unknown[]).filter((x): x is string => typeof x === "string" && !!x.trim()).map((x) => x.trim()))]
+          : [];
+        return { name, skills };
+      })
+      // A nameless person is not a person. Dropping the row is right: the only
+      // thing a member's name does is identify them, so one without a name
+      // would be an anonymous unit — which is what CAPACITY already expresses.
+      .filter((m) => m.name.length > 0);
+  }
+
+  const team = Object.keys(data).length
+    ? await prisma.simulationTeam.update({ where: { id: teamId }, data })
+    : await prisma.simulationTeam.findUnique({ where: { id: teamId } });
+
+  if (members) {
+    await pgPool.query('UPDATE "SimulationTeam" SET members = $1::jsonb, "updatedAt" = NOW() WHERE id = $2',
+      [JSON.stringify(members), teamId]);
+    return NextResponse.json({ team: { ...team, members } });
+  }
   return NextResponse.json({ team });
 }
 

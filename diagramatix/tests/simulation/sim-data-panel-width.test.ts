@@ -60,6 +60,19 @@ function consoleCapPx(): number {
   return named;
 }
 
+/**
+ * The Tasks section's columns, in render order, read from its `cols` array.
+ *
+ * Derived so that adding a column changes the sum this test computes, instead
+ * of leaving it measuring yesterday's row.
+ */
+function tasksColumns(): string[] {
+  const at = PANEL.indexOf('<Section title="Tasks"');
+  if (at < 0) throw new Error("Tasks section not found");
+  const cols = PANEL.slice(at, PANEL.indexOf(">", PANEL.indexOf("cols={[", at)));
+  return [...cols.matchAll(/w:\s*W\.(\w+)/g)].map((m) => m[1]);
+}
+
 /** The width token declared for a column in the W map, e.g. dist: "w-72 min-w-0". */
 function columnPx(name: string): number {
   const m = PANEL.match(new RegExp(`\\n\\s*${name}:\\s*"([^"]+)"`));
@@ -75,8 +88,13 @@ describe("Simulation Data fits the console", () => {
   it("T4228 — the widest row's fixed columns fit inside the console's own cap", () => {
     const capPx = consoleCapPx();
 
-    // The Tasks row — the widest section — in the order it is rendered.
-    const TASKS = ["flag", "name", "dist", "dist", "dist", "team", "units"];
+    // The Tasks row — the widest section — READ OUT OF THE COMPONENT rather
+    // than written here. A hand-kept list goes stale the moment a column is
+    // added, and then this test passes by measuring a row that no longer
+    // exists: exactly what happened when "needs these skills" arrived.
+    const TASKS = tasksColumns();
+    expect(TASKS.length, "could not read the Tasks columns out of the component").toBeGreaterThanOrEqual(7);
+
     const GAP = 8;                                  // gap-2 between cells
     const PANEL_PADDING = 12 * 2;                   // MatrixPanel p-3
     const fixed = TASKS.reduce((sum, c) => sum + columnPx(c), 0) + GAP * (TASKS.length - 1);
@@ -84,9 +102,14 @@ describe("Simulation Data fits the console", () => {
     const available = capPx - PANEL_PADDING;
     expect(fixed, "Tasks' fixed columns exceed the console cap — the scrollbar is back").toBeLessThan(available);
 
-    // ...and with room to spare for the name, which is the column that was
-    // unreadable. A fit with 20px left over is not a fit anyone would call one.
-    expect(available - fixed, "no meaningful width left for the element name").toBeGreaterThanOrEqual(300);
+    // ...and with room to spare for the columns that TAKE the slack. A fit with
+    // 20px left over is not a fit anyone would call one, and the leftover is
+    // shared between every flexible column, so the bar scales with how many
+    // there are.
+    const flexCount = TASKS.filter((c) => columnPx(c) === 0).length;
+    expect(flexCount, "no flexible column — the element name is pinned again").toBeGreaterThanOrEqual(1);
+    expect(available - fixed, "not enough width left for the flexible columns")
+      .toBeGreaterThanOrEqual(150 * flexCount);
   });
 
   it("T4229 — the name column takes the leftover instead of a fixed truncated width", () => {

@@ -8,13 +8,27 @@
  */
 
 import { SkillsFillPanel } from "./SkillsFillPanel";
+import { SkillPicker } from "./SkillPicker";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { MatrixButton } from "./matrix/MatrixChrome";
 import type { CalendarRow } from "./CalendarLibraryManager";
 
 type Discipline = "fifo" | "priority" | "shortest-first";
+/** A named person on a team, and what they are able to do. */
+export interface TeamMember { name: string; skills: string[] }
+
 interface Team {
   id: string; name: string; capacity: number; costPerHour: number | null; efficiency: number; calendarId: string | null;
+  /**
+   * The people, where naming them does something.
+   *
+   * NAMING PEOPLE IS WHAT TURNS SKILLS ON. ResourcePool short-circuits on
+   * `if (!this.skilled)`, so a team with no named members grants every skill
+   * requirement to anyone — a task's requiredSkills are ignored and the run
+   * shows no queue where there should be one. A team that needs no skill
+   * distinctions is better left as a plain counted pool.
+   */
+  members?: TeamMember[];
   /** null = fifo. Stored as NULL rather than the string so the column has one
    *  meaning for "the default". */
   discipline?: Discipline | null;
@@ -132,6 +146,16 @@ export function TeamLibraryManager({
       setNewName(""); setNewCap(1);
       await load();
     } finally { setBusy(false); }
+  }
+
+  /** Which team's people are open for editing. */
+  const [peopleOpen, setPeopleOpen] = useState<string | null>(null);
+
+  async function setMembers(id: string, members: TeamMember[]) {
+    setTeams((ts) => { const next = ts.map((t) => t.id === id ? { ...t, members } : t); publish(next); return next; });
+    await fetch(`/api/projects/${projectId}/simulation-teams/${id}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ members }),
+    });
   }
 
   async function setCapacity(id: string, capacity: number) {
@@ -275,8 +299,24 @@ export function TeamLibraryManager({
               />
               interrupts
             </label>
+            <button
+              onClick={() => setPeopleOpen(peopleOpen === t.id ? null : t.id)}
+              className={`shrink-0 text-[10px] px-1 rounded border ${(t.members?.length ?? 0) > 0
+                ? "border-green-500/40 text-green-300"
+                : "border-green-500/20 text-green-400/40"}`}
+              title={(t.members?.length ?? 0) > 0
+                ? `${t.members!.length} named — only these people can take work that needs a skill`
+                : "No names: this is a counted pool, and any skill a task requires is granted to anyone on it"}
+            >
+              ♦ {(t.members?.length ?? 0) || "—"}
+            </button>
             <button onClick={() => remove(t.id)} className="text-red-400/70 hover:text-red-300 px-1" title="Delete">✕</button>
           </div>
+        ))}
+        {/* The people editor sits OUTSIDE the row's flex line so a long skill
+            list wraps instead of stretching the table. */}
+        {teams.filter((t) => t.id === peopleOpen).map((t) => (
+          <PeopleEditor key={`people-${t.id}`} team={t} onChange={(m) => void setMembers(t.id, m)} />
         ))}
       </div>
       <div className="flex items-center gap-2 pt-1 border-t border-green-500/20">
@@ -359,6 +399,101 @@ export function TeamLibraryManager({
       )}
 
       <p className="text-green-400/40 text-[10px]">Tasks reference a team by name in Properties → ◈ Simulation (or inherit their lane&rsquo;s team).</p>
+    </div>
+  );
+}
+
+/**
+ * The people on one team, and what each of them can do.
+ *
+ * Two things this has to make obvious, because both are invisible failures:
+ *
+ *  - **Naming nobody means skills are ignored.** ResourcePool short-circuits on
+ *    `if (!this.skilled)`, so a team with no members grants every requirement to
+ *    anyone. The empty state says so rather than looking merely empty.
+ *  - **A person who holds nothing can still take unskilled work.** They are not
+ *    broken; they are simply not eligible for anything a task gates on. Said
+ *    plainly, so an empty skill list is not read as an error.
+ */
+function PeopleEditor({ team, onChange }: {
+  team: { id: string; name: string; capacity: number; members?: TeamMember[] };
+  onChange: (members: TeamMember[]) => void;
+}) {
+  const members = team.members ?? [];
+  const [newName, setNewName] = useState("");
+
+  const add = () => {
+    const name = newName.replace(/\s+/g, " ").trim();
+    if (!name) return;
+    if (members.some((m) => m.name.toLowerCase() === name.toLowerCase())) return;
+    onChange([...members, { name, skills: [] }]);
+    setNewName("");
+  };
+
+  return (
+    <div className="ml-2 mb-1 border-l-2 border-green-500/20 pl-3 py-1.5">
+      <div className="flex items-baseline gap-2 mb-1">
+        <span className="text-green-400/70 text-[10px] uppercase tracking-widest">People in {team.name}</span>
+        {members.length > team.capacity && (
+          // Not an error — a roster can exceed the number who work at once — but
+          // it is worth saying, because capacity is what limits throughput and a
+          // reader naturally assumes the list is the capacity.
+          <span className="text-amber-300/80 text-[10px]">
+            {members.length} named but capacity is {team.capacity} — only {team.capacity} can work at once
+          </span>
+        )}
+      </div>
+
+      {members.length === 0 ? (
+        <p className="text-green-400/50 text-[10px] mb-1 max-w-xl">
+          Nobody is named, so this is a counted pool of {team.capacity}. Any skill a task requires from this
+          team is granted to <span className="text-amber-300/80">anyone on it</span> — name people here to make
+          skill requirements bite.
+        </p>
+      ) : (
+        <div className="space-y-1 mb-1">
+          {members.map((m, i) => (
+            <div key={`${m.name}-${i}`} className="flex items-start gap-2">
+              <input
+                value={m.name}
+                onChange={(e) => onChange(members.map((x, j) => j === i ? { ...x, name: e.target.value } : x))}
+                className="w-40 shrink-0 bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-200 text-[11px]"
+              />
+              <span className="flex-1 min-w-0 pt-0.5">
+                <SkillPicker
+                  dark
+                  value={m.skills}
+                  onChange={(skills) => onChange(members.map((x, j) => j === i ? { ...x, skills } : x))}
+                  emptyHint="add skills in OrgAdmin → Skills"
+                />
+                {m.skills.length === 0 && (
+                  <span className="text-green-400/40 text-[10px] ml-1">
+                    no skills — can only take work that requires none
+                  </span>
+                )}
+              </span>
+              <button
+                onClick={() => onChange(members.filter((_, j) => j !== i))}
+                className="text-red-400/70 hover:text-red-300 px-1 shrink-0" title={`Remove ${m.name}`}
+              >✕</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex items-center gap-2">
+        <input
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") add(); }}
+          placeholder="add a person"
+          className="w-40 bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-200 text-[11px]"
+        />
+        <button onClick={add} disabled={!newName.trim()}
+          className="text-[10px] px-2 py-0.5 rounded border border-green-500/40 text-green-200 hover:bg-green-400/10 disabled:opacity-40">
+          add
+        </button>
+      </div>
     </div>
   );
 }

@@ -20,6 +20,7 @@ import { useDiagramValues, hasDiagramValues } from "@/app/lib/simulation/useDiag
 import type { ClockUnit } from "@/app/lib/simulation/types";
 import { isArrivalSource } from "@/app/lib/simulation/arrivalSources";
 import { MatrixButton } from "./matrix/MatrixChrome";
+import { SkillPicker } from "./SkillPicker";
 const TASK_TYPES = new Set(["task", "subprocess", "subprocess-expanded"]);
 const isEventEP = (e: DiagramElement) => e.type === "subprocess-expanded" && e.properties?.subprocessType === "event";
 
@@ -331,7 +332,7 @@ export function SimDataPanel({ data, onApplyData, onFillMissing, onUnfillMissing
 
       {/* Tasks */}
       {tasks.length > 0 && (
-        <Section title="Tasks" cols={[{ label: "", w: W.flag }, { label: "element", w: W.name }, { label: "cycle time", w: W.dist }, { label: "wait", w: W.dist }, { label: "repeats", w: W.dist }, { label: "resource", w: W.team }, { label: "units", w: W.units }]}>
+        <Section title="Tasks" cols={[{ label: "", w: W.flag }, { label: "element", w: W.name }, { label: "cycle time", w: W.dist }, { label: "wait", w: W.dist }, { label: "repeats", w: W.dist }, { label: "resource", w: W.team }, { label: "units", w: W.units }, { label: "needs these skills", w: W.skills }]}>
           {tasks.map((t) => {
             const sim = getSimParams(t);
             // A sub-process that runs its own body takes its time from the steps
@@ -386,6 +387,20 @@ export function SimDataPanel({ data, onApplyData, onFillMissing, onUnfillMissing
                       : <input type="text" value={sim.teamId ?? ""} placeholder="resource" onChange={(e) => patchEl(t.id, { teamId: e.target.value || undefined })} className={`${inp} w-40`} />}
                 </Cell>
                 <Cell w={W.units}><input type="number" min={1} value={sim.resourceUnits ?? 1} onChange={(e) => patchEl(t.id, { resourceUnits: Math.max(1, parseInt(e.target.value, 10) || 1) })} className={`${inp} w-10`} /></Cell>
+                {/* WHO may do this work, within the team already assigned. The
+                    team decides the pool; the skills narrow it to the people on
+                    that team who hold every one of them. Paul, step 5.
+                    Empty = anyone on the team, which is how every task behaved
+                    before this column existed. */}
+                <Cell w={W.skills}>
+                  <SkillPicker
+                    dark
+                    value={sim.requiredSkills ?? []}
+                    onChange={(requiredSkills) => patchEl(t.id, { requiredSkills: requiredSkills.length ? requiredSkills : undefined })}
+                    placeholder="+ needs"
+                    emptyHint="no Skills list"
+                  />
+                </Cell>
               </Row>
             );
           })}
@@ -482,6 +497,7 @@ const W = {
   maxArr: "w-24 min-w-0",
   cal: "w-32 min-w-0",
   cond: "w-40 min-w-0",
+  skills: "flex-1 min-w-0",
 } as const;
 
 function Section({ title, cols, children }: { title: string; cols: { label: string; w: string }[]; children: React.ReactNode }) {

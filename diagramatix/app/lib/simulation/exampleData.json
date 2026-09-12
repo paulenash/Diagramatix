@@ -12,12 +12,28 @@
           {
             "name": "Front Office Team",
             "capacity": 1,
-            "calendarName": "Business hours"
+            "calendarName": "Business hours",
+            "members": [
+              {
+                "name": "Alex (Front Office Team)",
+                "skills": [
+                  "Customer Contact"
+                ]
+              }
+            ]
           },
           {
             "name": "Sales Team",
             "capacity": 1,
-            "calendarName": "Business hours"
+            "calendarName": "Business hours",
+            "members": [
+              {
+                "name": "Alex (Sales Team)",
+                "skills": [
+                  "Customer Contact"
+                ]
+              }
+            ]
           }
         ],
         "calendars": [
@@ -887,17 +903,41 @@
           {
             "name": "loan-officer",
             "capacity": 1,
-            "calendarName": "Business hours"
+            "calendarName": "Business hours",
+            "members": [
+              {
+                "name": "Alex (loan-officer)",
+                "skills": [
+                  "Case Assessment"
+                ]
+              }
+            ]
           },
           {
             "name": "title-researcher",
             "capacity": 1,
-            "calendarName": "Business hours"
+            "calendarName": "Business hours",
+            "members": [
+              {
+                "name": "Alex (title-researcher)",
+                "skills": [
+                  "Data Analysis"
+                ]
+              }
+            ]
           },
           {
             "name": "loan-underwriter",
             "capacity": 1,
-            "calendarName": "Business hours"
+            "calendarName": "Business hours",
+            "members": [
+              {
+                "name": "Alex (loan-underwriter)",
+                "skills": [
+                  "Underwriting"
+                ]
+              }
+            ]
           }
         ],
         "diagrams": [
@@ -2772,7 +2812,15 @@
           {
             "name": "team",
             "capacity": 1,
-            "calendarName": "Business hours"
+            "calendarName": "Business hours",
+            "members": [
+              {
+                "name": "Alex (team)",
+                "skills": [
+                  "Quality Review"
+                ]
+              }
+            ]
           }
         ],
         "diagrams": [
@@ -4947,7 +4995,27 @@
             "name": "Loan Assessment Team",
             "capacity": 3,
             "costPerHour": 45,
-            "calendarName": "Business hours"
+            "calendarName": "Business hours",
+            "members": [
+              {
+                "name": "Alex (Loan Assessment Team)",
+                "skills": [
+                  "Case Assessment"
+                ]
+              },
+              {
+                "name": "Sam (Loan Assessment Team)",
+                "skills": [
+                  "Case Assessment"
+                ]
+              },
+              {
+                "name": "Jo (Loan Assessment Team)",
+                "skills": [
+                  "Case Assessment"
+                ]
+              }
+            ]
           },
           {
             "name": "Loan Assessment AI Agent",
@@ -4958,25 +5026,93 @@
             "name": "Loan Assessment Specialist",
             "capacity": 2,
             "costPerHour": 60,
-            "calendarName": "Business hours"
+            "calendarName": "Business hours",
+            "members": [
+              {
+                "name": "Alex (Loan Assessment Specialist)",
+                "skills": [
+                  "Underwriting"
+                ]
+              },
+              {
+                "name": "Sam (Loan Assessment Specialist)",
+                "skills": [
+                  "Underwriting"
+                ]
+              }
+            ]
           },
           {
             "name": "Personal Loans Team",
             "capacity": 3,
             "costPerHour": 40,
-            "calendarName": "Business hours"
+            "calendarName": "Business hours",
+            "members": [
+              {
+                "name": "Alex (Personal Loans Team)",
+                "skills": [
+                  "Case Assessment"
+                ]
+              },
+              {
+                "name": "Sam (Personal Loans Team)",
+                "skills": [
+                  "Case Assessment"
+                ]
+              },
+              {
+                "name": "Jo (Personal Loans Team)",
+                "skills": [
+                  "Case Assessment"
+                ]
+              }
+            ]
           },
           {
             "name": "Home Loans Team",
             "capacity": 3,
             "costPerHour": 45,
-            "calendarName": "Business hours"
+            "calendarName": "Business hours",
+            "members": [
+              {
+                "name": "Alex (Home Loans Team)",
+                "skills": [
+                  "Case Assessment"
+                ]
+              },
+              {
+                "name": "Sam (Home Loans Team)",
+                "skills": [
+                  "Case Assessment"
+                ]
+              },
+              {
+                "name": "Jo (Home Loans Team)",
+                "skills": [
+                  "Case Assessment"
+                ]
+              }
+            ]
           },
           {
             "name": "Commercial Loans Team",
             "capacity": 2,
             "costPerHour": 55,
-            "calendarName": "Business hours"
+            "calendarName": "Business hours",
+            "members": [
+              {
+                "name": "Alex (Commercial Loans Team)",
+                "skills": [
+                  "Case Assessment"
+                ]
+              },
+              {
+                "name": "Sam (Commercial Loans Team)",
+                "skills": [
+                  "Case Assessment"
+                ]
+              }
+            ]
           }
         ],
         "diagrams": [
@@ -9806,19 +9942,67 @@
             "name": "Enquiry Team",
             "capacity": 2,
             "costPerHour": 45,
-            "calendarName": "Business hours"
+            "calendarName": "Business hours",
+            "members": [
+              {
+                "name": "Alex (Enquiry Team)",
+                "skills": [
+                  "Customer Contact"
+                ]
+              },
+              {
+                "name": "Sam (Enquiry Team)",
+                "skills": [
+                  "Customer Contact"
+                ]
+              }
+            ]
           },
           {
             "name": "Sales Team",
             "capacity": 3,
             "costPerHour": 55,
-            "calendarName": "Business hours"
+            "calendarName": "Business hours",
+            "members": [
+              {
+                "name": "Alex (Sales Team)",
+                "skills": [
+                  "Customer Contact"
+                ]
+              },
+              {
+                "name": "Sam (Sales Team)",
+                "skills": [
+                  "Customer Contact"
+                ]
+              },
+              {
+                "name": "Jo (Sales Team)",
+                "skills": [
+                  "Customer Contact"
+                ]
+              }
+            ]
           },
           {
             "name": "Marketing Team",
             "capacity": 2,
             "costPerHour": 50,
-            "calendarName": "Business hours"
+            "calendarName": "Business hours",
+            "members": [
+              {
+                "name": "Alex (Marketing Team)",
+                "skills": [
+                  "Data Analysis"
+                ]
+              },
+              {
+                "name": "Sam (Marketing Team)",
+                "skills": [
+                  "Data Analysis"
+                ]
+              }
+            ]
           }
         ],
         "diagrams": [
