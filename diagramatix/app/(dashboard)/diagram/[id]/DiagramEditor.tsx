@@ -5489,7 +5489,11 @@ export function DiagramEditor({
             first, deliberately: both are live so the same prompt can be run
             through each and the results compared. BPMN only while it is being
             judged. */}
-        {!readOnly && diagramType === "bpmn" && aiAllowedHere && (
+        {/* SuperAdmin-only while the replacement is being judged (Paul,
+            2026-09-14: "Make NEW AI Generation SuperAdmin only"). `isActingAdmin`
+            rather than `isAdmin`: a SuperAdmin presenting in a lower view mode
+            is showing what a customer sees, and a customer does not see this. */}
+        {!readOnly && diagramType === "bpmn" && aiAllowedHere && isActingAdmin && (
           <button
             onClick={() => {
               setShowAiGenerateScreen(true);

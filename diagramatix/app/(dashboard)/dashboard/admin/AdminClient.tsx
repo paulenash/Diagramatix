@@ -13,6 +13,7 @@ import { PRODUCT_VERSION } from "@/app/lib/diagram/types";
 import { safeInternalPath } from "@/app/lib/safeRedirect";
 import { useFeatureColors } from "@/app/lib/theme/useFeatureColors";
 import { tonesFor, readableTextOn, type FeatureColorKey } from "@/app/lib/theme/featureColors";
+import { tileVisibleTo, FUN_TILE_OWNERS } from "@/app/lib/admin/tileVisibility";
 
 interface UserRow {
   id: string;
@@ -49,6 +50,8 @@ interface UserRow {
 interface Props {
   users: UserRow[];
   currentUserId: string;
+  /** The signed-in person's email — some tiles are for named people only. */
+  currentUserEmail: string;
   /** Build commit count baked in via NEXT_PUBLIC_COMMIT_COUNT. Shown
    *  in the page header as `v{PRODUCT_VERSION} (build {commitCount})`. */
   commitCount: number;
@@ -86,7 +89,7 @@ function presence(lastSeenAt: string | null, isYou: boolean): { online: boolean;
   return { online: false, label: `${days} d ago` };
 }
 
-export function AdminClient({ users: initialUsers, currentUserId, commitCount, isSuperAdmin, activeOrgName }: Props) {
+export function AdminClient({ users: initialUsers, currentUserId, currentUserEmail, commitCount, isSuperAdmin, activeOrgName }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   // `?from=<url>` lets the SuperAdmin page return the user to wherever
@@ -284,7 +287,7 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount, i
           on the <th> stops the smaller numeric / date columns from
           starving the text-heavy ones. */}
       <div className="flex-1 min-h-0 overflow-y-auto max-w-none w-full mx-auto px-6 py-8">
-        {isSuperAdmin && !showUsers && <SuperAdminToolsGrid onShowUsers={() => setShowUsers(true)} />}
+        {isSuperAdmin && !showUsers && <SuperAdminToolsGrid onShowUsers={() => setShowUsers(true)} currentUserEmail={currentUserEmail} />}
         {showUsers && (
         <table className="w-full bg-white rounded-lg border border-gray-200 overflow-hidden table-fixed">
           <thead>
@@ -806,6 +809,8 @@ interface AdminTile {
   ddl?: boolean;     // the special "Generate DDL" tile renders GenerateDdlButton
   users?: boolean;   // the "Registered Users" tile reveals the user table
   feature?: FeatureColorKey; // Feature Colour; unset → the superAdmin (red) fallback
+  /** Exact emails this tile is for; unset = every SuperAdmin. See tileVisibility.ts. */
+  onlyFor?: readonly string[];
 }
 
 const ADMIN_TILES: AdminTile[] = [
@@ -860,16 +865,16 @@ const ADMIN_TILES: AdminTile[] = [
   { id: "value-chain-library", title: "Process Repository", description: "The value-chain library — 26 end-to-end chains, their processes and the diagram prompts generated from the master templates. Import or export the markdown, edit a narrative, add or remove a process, regenerate a prompt, publish. Only a PUBLISHED chain is offered to project generation.", href: "/dashboard/admin/value-chain-library", feature: "processRepository" },
   { id: "md-diagrams", title: "Create Project Diagrams from the Process Repository", description: "Pick a published value chain and generate a whole project of diagrams — Value Chain, Context, Process Context, ArchiMate + each BPMN process — via AI Generate + Auto Layout, with live progress. A .md file can still be uploaded instead for a chain that is not in the library yet.", href: "/dashboard/admin/md-diagrams", feature: "processRepository" },
   { id: "md-prompts", title: "Repository Master Template and .md Upload", description: "The other end of the .md batch tool: write the diagram prompts INTO a Process Repository markdown, from each chain's narrative and an editable master template per diagram type. Every block is parsed back with the batch tool's own reader before it is shown.", href: "/dashboard/admin/md-prompts", feature: "processRepository" },
-  { id: "nimb", title: "n × n Nimb", description: "A two-player misère placement game: fill 1..n consecutive squares in a row or column, no passing, and whoever places the LAST ✕ loses. Pick n (2–5) and every genuinely different move is listed and solved — green wins, red loses, rotations and reflections collapsed. Plus a catalogue of which leftover shapes lose for whoever faces them.", href: "/dashboard/admin/nimb", feature: "funExtensions" },
-  { id: "mastermind", title: "Mastermind", description: "Break a hidden code of 3–6 pegs from 6–10 colours, with Shannon's information theory shown alongside: the entropy of the guess you are building, the split it would produce, a ranking of the sharpest questions available, and a picture of every code still standing.", href: "/dashboard/admin/mastermind", feature: "funExtensions" },
-  { id: "life", title: "Life", description: "Conway's Game of Life on a sparse grid — a library of the famous patterns by category (still lifes, oscillators, spaceships, methuselahs, guns, puffers), a configurable grid, and the RULE itself as B/S notation, so the same engine runs HighLife, Seeds, Day & Night or anything you type. The rules that decide the next generation sit on the screen beside the grid.", href: "/dashboard/admin/life", feature: "funExtensions" },
-  { id: "life-3d", title: "Life in 3-D", description: "Conway-style Life on an infinite cubic lattice: 26 neighbours (6 by face, 12 by edge, 8 by corner), Carter Bays rules including B6/S567, and a rotatable, sliceable volume of cubes. Every pattern in the library was FOUND by searching rather than remembered, so its period and travel are measured - including the 3-D gliders that earn B6/S567 the name of Life.", href: "/dashboard/admin/life-3d", feature: "funExtensions" },
-  { id: "orbit-sim", title: "Orbit Simulator", description: "N-body point-mass gravity playground — configure 2–50 “stars” (colours + relative masses), Newtonian softened force, virial-bound 3D initial conditions, then Test to watch it run. Esc returns to config.", href: "/dashboard/admin/orbit-sim", feature: "funExtensions" },
+  { id: "nimb", title: "n × n Nimb", description: "A two-player misère placement game: fill 1..n consecutive squares in a row or column, no passing, and whoever places the LAST ✕ loses. Pick n (2–5) and every genuinely different move is listed and solved — green wins, red loses, rotations and reflections collapsed. Plus a catalogue of which leftover shapes lose for whoever faces them.", href: "/dashboard/admin/nimb", feature: "funExtensions", onlyFor: FUN_TILE_OWNERS },
+  { id: "mastermind", title: "Mastermind", description: "Break a hidden code of 3–6 pegs from 6–10 colours, with Shannon's information theory shown alongside: the entropy of the guess you are building, the split it would produce, a ranking of the sharpest questions available, and a picture of every code still standing.", href: "/dashboard/admin/mastermind", feature: "funExtensions", onlyFor: FUN_TILE_OWNERS },
+  { id: "life", title: "Life", description: "Conway's Game of Life on a sparse grid — a library of the famous patterns by category (still lifes, oscillators, spaceships, methuselahs, guns, puffers), a configurable grid, and the RULE itself as B/S notation, so the same engine runs HighLife, Seeds, Day & Night or anything you type. The rules that decide the next generation sit on the screen beside the grid.", href: "/dashboard/admin/life", feature: "funExtensions", onlyFor: FUN_TILE_OWNERS },
+  { id: "life-3d", title: "Life in 3-D", description: "Conway-style Life on an infinite cubic lattice: 26 neighbours (6 by face, 12 by edge, 8 by corner), Carter Bays rules including B6/S567, and a rotatable, sliceable volume of cubes. Every pattern in the library was FOUND by searching rather than remembered, so its period and travel are measured - including the 3-D gliders that earn B6/S567 the name of Life.", href: "/dashboard/admin/life-3d", feature: "funExtensions", onlyFor: FUN_TILE_OWNERS },
+  { id: "orbit-sim", title: "Orbit Simulator", description: "N-body point-mass gravity playground — configure 2–50 “stars” (colours + relative masses), Newtonian softened force, virial-bound 3D initial conditions, then Test to watch it run. Esc returns to config.", href: "/dashboard/admin/orbit-sim", feature: "funExtensions", onlyFor: FUN_TILE_OWNERS },
 ];
 
 const TILE_ORDER_KEY = "dgx.superadmin.tileOrder";
 
-function SuperAdminToolsGrid({ onShowUsers }: { onShowUsers: () => void }) {
+function SuperAdminToolsGrid({ onShowUsers, currentUserEmail }: { onShowUsers: () => void; currentUserEmail: string }) {
   const router = useRouter();
   const scheme = useFeatureColors();
   const [order, setOrder] = useState<string[]>(ADMIN_TILES.map(t => t.id));
@@ -904,7 +909,13 @@ function SuperAdminToolsGrid({ onShowUsers }: { onShowUsers: () => void }) {
   }
 
   const tileById = new Map(ADMIN_TILES.map(t => [t.id, t]));
-  const ordered = order.map(id => tileById.get(id)).filter((t): t is AdminTile => !!t);
+  // A tile naming the people it is for is hidden from everyone else — the Fun
+  // Extensions are Paul's (2026-09-14: "only visible to SuperAdmin
+  // paul@nashcc.com.au ONLY"). Applied once, here, so the search box, the
+  // drag order and the grid all agree on what exists.
+  const ordered = order.map(id => tileById.get(id))
+    .filter((t): t is AdminTile => !!t)
+    .filter(t => tileVisibleTo(t, currentUserEmail));
   const q = filter.trim().toLowerCase();
   const tiles = q ? ordered.filter(t => (`${t.title} ${t.description}`).toLowerCase().includes(q)) : ordered;
   const filtering = q.length > 0;

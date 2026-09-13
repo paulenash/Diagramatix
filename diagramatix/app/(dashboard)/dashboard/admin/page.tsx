@@ -172,6 +172,7 @@ export default async function AdminPage() {
     <AdminClient
       users={usersForClient}
       currentUserId={session.user.id}
+      currentUserEmail={session.user.email ?? ""}
       commitCount={commitCount}
       isSuperAdmin={su}
       activeOrgName={activeOrgName}

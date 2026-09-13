@@ -333,8 +333,8 @@ describe("the comparison baseline cannot regress", () => {
     // editing the button's body cannot make this pass or fail by accident.
     const block = src.slice(src.indexOf("NEW AI Generate — the full-screen console"));
     const gate = block.slice(0, block.indexOf("<button"));
-    expect(gate, "BPMN only while it is being judged")
-      .toMatch(/\{!readOnly && diagramType === "bpmn" && aiAllowedHere && \(/);
+    expect(gate, "BPMN only, and SuperAdmin only, while it is being judged")
+      .toMatch(/\{!readOnly && diagramType === "bpmn" && aiAllowedHere && isActingAdmin && \(/);
     expect(src, "the original button is still there").toMatch(/✨ AI Generate\s*\n\s*<\/button>/);
     expect(src, "and the original panel is still mounted").toMatch(/\{showPlanPanel && \(\s*<PlanPanel/);
   });
