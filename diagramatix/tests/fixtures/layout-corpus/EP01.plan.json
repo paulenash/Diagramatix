@@ -1,0 +1,609 @@
+{
+  "_provenance": "HAND-ADDED, not from scripts/build-layout-corpus.ts. Paul 2026-09-13: the first corpus fixture containing an Expanded Subprocess — 0 of the 30 generated fixtures had one, which is why the EP box defect was invisible to the corpus. Captured from his exported diagram; the replay is byte-identical to it.",
+  "diagrams": [
+    {
+      "name": "AI Generation - Warehouse Picking and Quality Process - Opus 5 (copy)",
+      "data": {
+        "aiGeneration": {
+          "plan": {
+            "elements": [
+              {
+                "id": "pCust",
+                "type": "pool",
+                "label": "Customer",
+                "poolType": "black-box",
+                "isSystem": false
+              },
+              {
+                "id": "p1",
+                "type": "pool",
+                "label": "Loan Services",
+                "poolType": "white-box"
+              },
+              {
+                "id": "lAssess",
+                "type": "lane",
+                "label": "Loan Assessment Team",
+                "parentPool": "p1",
+                "pool": "p1"
+              },
+              {
+                "id": "lPers",
+                "type": "lane",
+                "label": "Personal Loans Team",
+                "parentPool": "p1",
+                "pool": "p1"
+              },
+              {
+                "id": "lHome",
+                "type": "lane",
+                "label": "Home Loans Team",
+                "parentPool": "p1",
+                "pool": "p1"
+              },
+              {
+                "id": "lComm",
+                "type": "lane",
+                "label": "Commercial Loans Team",
+                "parentPool": "p1",
+                "pool": "p1"
+              },
+              {
+                "id": "pLR",
+                "type": "pool",
+                "label": "Loan\nRanger",
+                "poolType": "black-box",
+                "isSystem": true
+              },
+              {
+                "id": "pCB",
+                "type": "pool",
+                "label": "Credit\nBureau",
+                "poolType": "black-box",
+                "isSystem": true
+              },
+              {
+                "id": "startEv",
+                "type": "start-event",
+                "label": "Loan Application Submitted",
+                "eventType": "message",
+                "pool": "p1",
+                "lane": "lAssess"
+              },
+              {
+                "id": "tRegister",
+                "type": "task",
+                "label": "Register Application",
+                "taskType": "user",
+                "pool": "p1",
+                "lane": "lAssess"
+              },
+              {
+                "id": "spLoop",
+                "type": "subprocess-expanded",
+                "label": "Do Until Application Complete",
+                "repeatType": "loop",
+                "pool": "p1",
+                "lane": "lAssess"
+              },
+              {
+                "id": "loopStart",
+                "type": "start-event",
+                "label": "",
+                "parentSubprocess": "spLoop"
+              },
+              {
+                "id": "tCheck",
+                "type": "task",
+                "label": "Check Application\nCompleteness",
+                "taskType": "none",
+                "parentSubprocess": "spLoop"
+              },
+              {
+                "id": "tVerify",
+                "type": "task",
+                "label": "Verify Identity\nand Documents",
+                "taskType": "user",
+                "parentSubprocess": "spLoop"
+              },
+              {
+                "id": "gwComplete",
+                "type": "gateway",
+                "label": "Complete and Verified?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "decision",
+                "parentSubprocess": "spLoop"
+              },
+              {
+                "id": "tRequestInfo",
+                "type": "task",
+                "label": "Request Further\nInformation",
+                "taskType": "send",
+                "parentSubprocess": "spLoop"
+              },
+              {
+                "id": "tReceiveResp",
+                "type": "task",
+                "label": "Receive Customer\nResponse",
+                "taskType": "receive",
+                "parentSubprocess": "spLoop"
+              },
+              {
+                "id": "gwCompleteMerge",
+                "type": "gateway",
+                "label": "Merge",
+                "gatewayType": "exclusive",
+                "gatewayRole": "merge",
+                "parentSubprocess": "spLoop"
+              },
+              {
+                "id": "loopEnd",
+                "type": "end-event",
+                "label": "",
+                "parentSubprocess": "spLoop"
+              },
+              {
+                "id": "bTimer",
+                "type": "intermediate-event",
+                "label": "10 working days elapsed",
+                "eventType": "timer",
+                "boundaryHost": "spLoop",
+                "boundarySide": "bottom"
+              },
+              {
+                "id": "endLapse",
+                "type": "end-event",
+                "label": "Application Lapsed",
+                "pool": "p1",
+                "lane": "lAssess"
+              },
+              {
+                "id": "tCredit",
+                "type": "task",
+                "label": "Obtain Credit\nReport",
+                "taskType": "user",
+                "pool": "p1",
+                "lane": "lAssess"
+              },
+              {
+                "id": "tAssess",
+                "type": "task",
+                "label": "Assess Eligibility\nand Affordability",
+                "taskType": "user",
+                "pool": "p1",
+                "lane": "lAssess"
+              },
+              {
+                "id": "gwProceed",
+                "type": "gateway",
+                "label": "Proceed with Loan?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "decision",
+                "pool": "p1",
+                "lane": "lAssess"
+              },
+              {
+                "id": "tDecline",
+                "type": "task",
+                "label": "Send Decline\nLetter",
+                "taskType": "send",
+                "pool": "p1",
+                "lane": "lAssess"
+              },
+              {
+                "id": "endDeclined",
+                "type": "end-event",
+                "label": "Declined",
+                "pool": "p1",
+                "lane": "lAssess"
+              },
+              {
+                "id": "gwType",
+                "type": "gateway",
+                "label": "Determine Loan Type",
+                "gatewayType": "exclusive",
+                "gatewayRole": "decision",
+                "pool": "p1",
+                "lane": "lAssess"
+              },
+              {
+                "id": "spPersonal",
+                "type": "subprocess",
+                "label": "Draft and Approve\nPersonal Loan",
+                "pool": "p1",
+                "lane": "lPers"
+              },
+              {
+                "id": "spHome",
+                "type": "subprocess",
+                "label": "Draft and Approve\nHome Loan",
+                "pool": "p1",
+                "lane": "lHome"
+              },
+              {
+                "id": "spComm",
+                "type": "subprocess",
+                "label": "Draft and Approve\nCommercial Loan",
+                "pool": "p1",
+                "lane": "lComm"
+              },
+              {
+                "id": "gwTypeMerge",
+                "type": "gateway",
+                "label": "Merge",
+                "gatewayType": "exclusive",
+                "gatewayRole": "merge",
+                "pool": "p1",
+                "lane": "lAssess"
+              },
+              {
+                "id": "tSendOutcome",
+                "type": "task",
+                "label": "Send Loan\nOutcome",
+                "taskType": "send",
+                "pool": "p1",
+                "lane": "lAssess"
+              },
+              {
+                "id": "endClosed",
+                "type": "end-event",
+                "label": "Application Closed",
+                "pool": "p1",
+                "lane": "lAssess"
+              },
+              {
+                "id": "doForm",
+                "type": "data-object",
+                "label": "Loan Application Form",
+                "pool": "p1",
+                "lane": "lAssess"
+              },
+              {
+                "id": "doChecklist",
+                "type": "data-object",
+                "label": "Loan Assessment Checklist",
+                "pool": "p1",
+                "lane": "lAssess"
+              },
+              {
+                "id": "doRFI",
+                "type": "data-object",
+                "label": "Request for Information",
+                "pool": "p1",
+                "lane": "lAssess"
+              },
+              {
+                "id": "doCreditReport",
+                "type": "data-object",
+                "label": "Credit Report",
+                "pool": "p1",
+                "lane": "lAssess"
+              },
+              {
+                "id": "doSummary",
+                "type": "data-object",
+                "label": "Assessment Summary",
+                "pool": "p1",
+                "lane": "lAssess"
+              },
+              {
+                "id": "doDeclineLetter",
+                "type": "data-object",
+                "label": "Decline Letter",
+                "pool": "p1",
+                "lane": "lAssess"
+              },
+              {
+                "id": "doLoanOffer",
+                "type": "data-object",
+                "label": "Loan Offer",
+                "pool": "p1",
+                "lane": "lAssess"
+              },
+              {
+                "id": "doTmplPers",
+                "type": "data-object",
+                "label": "Personal Loan Agreement Template",
+                "pool": "p1",
+                "lane": "lPers"
+              },
+              {
+                "id": "doTmplHome",
+                "type": "data-object",
+                "label": "Home Loan Agreement Template",
+                "pool": "p1",
+                "lane": "lHome"
+              },
+              {
+                "id": "doTmplComm",
+                "type": "data-object",
+                "label": "Commercial Loan Agreement Template",
+                "pool": "p1",
+                "lane": "lComm"
+              },
+              {
+                "id": "dsPolicy",
+                "type": "data-store",
+                "label": "Lending Policy",
+                "pool": "p1",
+                "lane": "lAssess"
+              }
+            ],
+            "connections": [
+              {
+                "sourceId": "pCust",
+                "targetId": "startEv",
+                "type": "message",
+                "label": "Loan application and documents"
+              },
+              {
+                "sourceId": "startEv",
+                "targetId": "tRegister",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tRegister",
+                "targetId": "pLR",
+                "type": "message",
+                "label": "New application record"
+              },
+              {
+                "sourceId": "tRegister",
+                "targetId": "spLoop",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "loopStart",
+                "targetId": "tCheck",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tCheck",
+                "targetId": "tVerify",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tVerify",
+                "targetId": "pLR",
+                "type": "message",
+                "label": "Verification details"
+              },
+              {
+                "sourceId": "tVerify",
+                "targetId": "gwComplete",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gwComplete",
+                "targetId": "tRequestInfo",
+                "type": "sequence",
+                "label": "No"
+              },
+              {
+                "sourceId": "tRequestInfo",
+                "targetId": "pCust",
+                "type": "message",
+                "label": "Request for information"
+              },
+              {
+                "sourceId": "tRequestInfo",
+                "targetId": "tReceiveResp",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "pCust",
+                "targetId": "tReceiveResp",
+                "type": "message",
+                "label": "Customer response"
+              },
+              {
+                "sourceId": "tReceiveResp",
+                "targetId": "gwCompleteMerge",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gwComplete",
+                "targetId": "gwCompleteMerge",
+                "type": "sequence",
+                "label": "Yes"
+              },
+              {
+                "sourceId": "gwCompleteMerge",
+                "targetId": "loopEnd",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "bTimer",
+                "targetId": "endLapse",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "spLoop",
+                "targetId": "tCredit",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tCredit",
+                "targetId": "pCB",
+                "type": "message",
+                "label": "Credit report request"
+              },
+              {
+                "sourceId": "pCB",
+                "targetId": "tCredit",
+                "type": "message",
+                "label": "Credit report"
+              },
+              {
+                "sourceId": "tCredit",
+                "targetId": "tAssess",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tAssess",
+                "targetId": "pLR",
+                "type": "message",
+                "label": "Assessment result"
+              },
+              {
+                "sourceId": "tAssess",
+                "targetId": "gwProceed",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gwProceed",
+                "targetId": "tDecline",
+                "type": "sequence",
+                "label": "No - Declined"
+              },
+              {
+                "sourceId": "tDecline",
+                "targetId": "pCust",
+                "type": "message",
+                "label": "Decline letter"
+              },
+              {
+                "sourceId": "tDecline",
+                "targetId": "endDeclined",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gwProceed",
+                "targetId": "gwType",
+                "type": "sequence",
+                "label": "Yes - Proceed"
+              },
+              {
+                "sourceId": "gwType",
+                "targetId": "spPersonal",
+                "type": "sequence",
+                "label": "Personal loan"
+              },
+              {
+                "sourceId": "gwType",
+                "targetId": "spHome",
+                "type": "sequence",
+                "label": "Home loan"
+              },
+              {
+                "sourceId": "gwType",
+                "targetId": "spComm",
+                "type": "sequence",
+                "label": "Commercial loan"
+              },
+              {
+                "sourceId": "spPersonal",
+                "targetId": "pLR",
+                "type": "message",
+                "label": "Personal loan decision"
+              },
+              {
+                "sourceId": "spHome",
+                "targetId": "pLR",
+                "type": "message",
+                "label": "Home loan decision"
+              },
+              {
+                "sourceId": "spComm",
+                "targetId": "pLR",
+                "type": "message",
+                "label": "Commercial loan decision"
+              },
+              {
+                "sourceId": "spPersonal",
+                "targetId": "gwTypeMerge",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "spHome",
+                "targetId": "gwTypeMerge",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "spComm",
+                "targetId": "gwTypeMerge",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gwTypeMerge",
+                "targetId": "tSendOutcome",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tSendOutcome",
+                "targetId": "pCust",
+                "type": "message",
+                "label": "Loan offer or decline letter"
+              },
+              {
+                "sourceId": "tSendOutcome",
+                "targetId": "endClosed",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "doForm",
+                "targetId": "tRegister",
+                "type": "association"
+              },
+              {
+                "sourceId": "doChecklist",
+                "targetId": "tCheck",
+                "type": "association"
+              },
+              {
+                "sourceId": "dsPolicy",
+                "targetId": "tVerify",
+                "type": "association"
+              },
+              {
+                "sourceId": "dsPolicy",
+                "targetId": "tAssess",
+                "type": "association"
+              },
+              {
+                "sourceId": "tRequestInfo",
+                "targetId": "doRFI",
+                "type": "association"
+              },
+              {
+                "sourceId": "tCredit",
+                "targetId": "doCreditReport",
+                "type": "association"
+              },
+              {
+                "sourceId": "tAssess",
+                "targetId": "doSummary",
+                "type": "association"
+              },
+              {
+                "sourceId": "tDecline",
+                "targetId": "doDeclineLetter",
+                "type": "association"
+              },
+              {
+                "sourceId": "tSendOutcome",
+                "targetId": "doLoanOffer",
+                "type": "association"
+              },
+              {
+                "sourceId": "doTmplPers",
+                "targetId": "spPersonal",
+                "type": "association"
+              },
+              {
+                "sourceId": "doTmplHome",
+                "targetId": "spHome",
+                "type": "association"
+              },
+              {
+                "sourceId": "doTmplComm",
+                "targetId": "spComm",
+                "type": "association"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

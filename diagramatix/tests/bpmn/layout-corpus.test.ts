@@ -58,6 +58,19 @@ const files = fs.existsSync(DIR) ? fs.readdirSync(DIR).filter((f) => f.endsWith(
  * for the next regression.
  */
 const KNOWN: Record<string, number> = {
+  /**
+   * HAND-ADDED 2026-09-13, and the first fixture in the corpus containing an
+   * Expanded Subprocess — 0 of the 30 generated fixtures had one, which is why
+   * the EP box defect Paul reported was invisible here.
+   *
+   * It arrived at 6 and the R55.2 container-scoping fix took it to 3; the three
+   * that went were the EP's own "Yes"/"No" branch labels drawn over a box that
+   * had stretched to 653px around them (it is 156px now). The remaining three
+   * are two separate jobs, neither about EP height:
+   *   • two gateway LABELS inside the EP drawn over its box
+   *   • two subprocess connectors sharing one attachment point on pLR
+   */
+  "EP01.plan.json": 3,
   "V04.01.plan.json": 2,
   // 3 -> 1 when R55.7 gave the exception path a row clear of the main line.
   "V22.01.plan.json": 1,

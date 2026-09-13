@@ -3407,10 +3407,49 @@ export function layoutBpmnDiagram(
       if (decisionAnchors.some(a => a.parentId === e.parentId)) continue;
       decisionAnchors.push(e);
     }
+    /**
+     * An Expanded Subprocess is a CLOSED graph, and the analysis has to respect
+     * that. A BPMN sequence flow cannot cross a subprocess boundary, so an EP's
+     * internal flow is not a path of the outer process — yet the rows were
+     * computed over the WHOLE diagram and only the MOVE was scoped per
+     * container. Scoping the move cannot repair a row that was wrong when it was
+     * allocated.
+     *
+     * Paul, 2026-09-13: "EPs seem to be generating way too large in vertical
+     * height." The engine's own row debug on his diagram:
+     *
+     *     Do Until Application Complete   h=123 -> row 1036   <- the BOX
+     *     Check Application Completeness  h= 65 -> row 1556   <- its CHILD
+     *
+     * 520px apart: the box and its contents were each given a row in the same
+     * outer stack, as though they were siblings. The EP was a snug 123px and had
+     * to stretch across the gap to 653px.
+     *
+     * So each anchor now analyses ONLY its own graph — an EP anchor sees the EP's
+     * contents, an outer anchor sees everything that is not inside an EP. The EP
+     * box itself stays in the outer scope, because that is where its flow really
+     * runs. Lanes are deliberately NOT separated from each other: a branch
+     * crossing between lanes is a real path of one process, which is why the
+     * placement filter (not the walk) is what scopes those.
+     */
+    const epIds = new Set(elements.filter(e => e.type === "subprocess-expanded").map(e => e.id));
+    /** The innermost EP an element sits inside, or null when it is not in one. */
+    const epScopeOf = (el: DiagramElement | undefined): string | null => {
+      let cur = el, guard = 0;
+      while (cur?.parentId && guard++ < 16) {
+        if (epIds.has(cur.parentId)) return cur.parentId;
+        cur = elMap.get(cur.parentId);
+      }
+      return null;
+    };
     for (const firstDecision of decisionAnchors) {
+      const scope = epScopeOf(firstDecision);
+      const inScope = (id: string) => epScopeOf(elMap.get(id)) === scope;
       const analysis = analysePaths({
-        elements: elements.map(e => ({ id: e.id, height: e.height, type: e.type, parentId: e.parentId })),
-        edges,
+        elements: elements
+          .filter(e => epScopeOf(e) === scope)
+          .map(e => ({ id: e.id, height: e.height, type: e.type, parentId: e.parentId })),
+        edges: edges.filter(e => inScope(e.sourceId) && inScope(e.targetId)),
         isDecision: (id) => { const e = elMap.get(id); return !!e && isDecisionGateway(e); },
         mergeFor: (id) => findPairedMerge(id),
         trunkRow: firstDecision.y + firstDecision.height / 2,
