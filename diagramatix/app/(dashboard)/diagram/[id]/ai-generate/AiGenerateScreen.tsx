@@ -123,6 +123,33 @@ export function AiGenerateScreen({
 
   const [busy, setBusy] = useState<Busy>(null);
   useEffect(() => { onBusyChange?.(busy); }, [busy, onBusyChange]);
+  /**
+   * Report "not busy" on unmount — for BOTH signals this console feeds up.
+   *
+   * Paul, 2026-09-13: "Invoking Apply Layout from the new AI Generate seems to
+   * be in an infinite loop? It also displays the spinning logo with message
+   * Running the layout engine???"
+   *
+   * The spinning LOGO is the editor's canvas overlay, which sits behind this
+   * console and is driven by the editor's copy of `busy`. Apply succeeds,
+   * `onClose()` unmounts this component, and `finally { setBusy(null) }` then
+   * runs on a component that no longer exists — so the effect above never
+   * fires for null, the editor's flag stays "apply", and the overlay shows the
+   * layout engine running for as long as the tab is open. Not a loop: an
+   * orphaned flag, made deterministic by closing on apply. The same would
+   * happen to anyone pressing Exit mid-plan, or mid-transcription.
+   *
+   * Refs, so this cleanup keys on nothing and runs exactly once, at unmount,
+   * with whatever callbacks the parent last handed us.
+   */
+  const onBusyChangeRef = useRef(onBusyChange);
+  onBusyChangeRef.current = onBusyChange;
+  const onAudioPhaseChangeRef = useRef(onAudioPhaseChange);
+  onAudioPhaseChangeRef.current = onAudioPhaseChange;
+  useEffect(() => () => {
+    onBusyChangeRef.current?.(null);
+    onAudioPhaseChangeRef.current?.(null);
+  }, []);
   const [error, setError] = useState<string | null>(null);
   const [issues, setIssues] = useState<string[] | null>(null);
   const [status, setStatus] = useState<string | null>(null);
@@ -403,7 +430,16 @@ export function AiGenerateScreen({
        * unsaved work being discarded, and applying is precisely how that work
        * stops being unsaved. Failure paths above all `return` before here, so a
        * console that could not apply stays put with its error on screen.
+       *
+       * Tell the editor we are done BEFORE closing, synchronously. The `finally`
+       * below would set busy to null, but by then this component is unmounted
+       * and the effect that reports it never runs — which left the editor's
+       * canvas overlay showing "Running the layout engine…" indefinitely. The
+       * unmount cleanup above also covers this; saying it here as well makes the
+       * ordering visible where it matters.
        */
+      setBusy(null);
+      onBusyChange?.(null);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Network error");

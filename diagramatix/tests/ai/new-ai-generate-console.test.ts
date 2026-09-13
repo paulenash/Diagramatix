@@ -215,6 +215,46 @@ describe("Apply Layout hands the screen back", () => {
   });
 });
 
+describe("closing the console cannot strand the editor's busy overlay", () => {
+  // Paul, 2026-09-13: "Invoking Apply Layout from the new AI Generate seems to
+  // be in an infinite loop? It also displays the spinning logo with message
+  // Running the layout engine???"
+  //
+  // The spinning LOGO is the editor's canvas overlay, behind the console,
+  // driven by the editor's copy of `busy`. Apply succeeded, onClose() unmounted
+  // the console, and `finally { setBusy(null) }` ran on a dead component — so
+  // the effect that reports busy upward never fired for null. Not a loop: an
+  // orphaned flag. Three guards, because the same thing happens to an Exit
+  // pressed mid-plan or mid-transcription, and to the next panel someone writes.
+
+  it("T4356 — the console reports NOT busy, for both signals, when it unmounts", () => {
+    const src = screen();
+    // A cleanup-only effect keyed on nothing: runs once, at unmount.
+    expect(src).toMatch(/useEffect\(\(\) => \(\) => \{\s*onBusyChangeRef\.current\?\.\(null\);\s*onAudioPhaseChangeRef\.current\?\.\(null\);\s*\}, \[\]\);/);
+    // …through refs, so it uses whatever callbacks the parent last supplied
+    // rather than the ones captured on first render.
+    expect(src).toMatch(/onBusyChangeRef\.current = onBusyChange;/);
+    expect(src).toMatch(/onAudioPhaseChangeRef\.current = onAudioPhaseChange;/);
+  });
+
+  it("T4357 — a successful apply clears busy BEFORE it closes", () => {
+    // Belt and braces with the cleanup above, and the ordering made visible:
+    // the report must precede onClose(), synchronously, while still mounted.
+    const src = screen();
+    const apply = src.slice(src.indexOf("const callApplyLayout"));
+    const body = apply.slice(0, apply.indexOf("} catch (err)"));
+    expect(body).toMatch(/setBusy\(null\);\s*onBusyChange\?\.\(null\);\s*onClose\(\);/);
+  });
+
+  it("T4358 — the editor's overlay fails closed: it needs a mounted AI panel", () => {
+    // Every busy state originates in a panel. If no panel is mounted, a busy
+    // flag is an orphan by definition, and drawing a throbber for it tells the
+    // user the engine is running when nothing is.
+    const src = editor();
+    expect(src).toMatch(/\{\(showPlanPanel \|\| showAiPanel \|\| showAiGenerateScreen\)\s*&& \(aiBusy === "plan"/);
+  });
+});
+
 describe("behaviour that was easy to lose in the rewrite", () => {
   it("T4319 — prompt provenance is sent on CREATE only", () => {
     const src = screen();

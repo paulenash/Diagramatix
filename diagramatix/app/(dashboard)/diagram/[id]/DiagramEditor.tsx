@@ -6430,7 +6430,14 @@ export function DiagramEditor({
             just a tiny sidebar banner they might miss. Pointer events
             pass through (style.pointerEvents = "none") so the user can
             still pan / zoom underneath if they want. */}
-        {(aiBusy === "plan" || aiBusy === "apply" || aiBusy === "narrative" || aiBusy === "compare" || aiPanelGenerating || aiPanelNarrativeGenerating || audioPhase) && (
+        {/* Fails CLOSED: the overlay needs a mounted AI panel behind it. Every busy
+            state originates in one, and a panel that unmounts mid-work can leave
+            its last report behind — the NEW AI Generate console did exactly that
+            on Apply Layout (Paul, 2026-09-13: the spinning logo and "Running the
+            layout engine" that never went away). The console now clears on
+            unmount; this is the guard for the next panel that forgets to. */}
+        {(showPlanPanel || showAiPanel || showAiGenerateScreen)
+          && (aiBusy === "plan" || aiBusy === "apply" || aiBusy === "narrative" || aiBusy === "compare" || aiPanelGenerating || aiPanelNarrativeGenerating || audioPhase) && (
           <div
             className="fixed inset-0 z-40 flex flex-col items-center justify-center"
             style={{ pointerEvents: "none" }}
