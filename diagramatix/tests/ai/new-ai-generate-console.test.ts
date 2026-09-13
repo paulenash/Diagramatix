@@ -63,6 +63,43 @@ describe("the console is themed by the configured AI colour", () => {
       "a tone kept a previous colour — it is not derived").toBe(false);
   });
 
+  it("T4329 — the toolbar button is coloured AT REST, not only when active", () => {
+    // Paul, 2026-09-13: "The New AI Generate option does not use any changes to
+    // the Feature Colours?"
+    //
+    // It did not. The button was copied from the sidebar's, which greys until
+    // its panel is open — fine there, because the panel is a sidebar and you can
+    // still see the button beside it. This console is a full-screen overlay, so
+    // the moment the button becomes active it is covered by the thing it opened.
+    // `active ? featureVars(...) : undefined` therefore rendered grey every time
+    // it was ever on screen: a conditional whose true branch is unobservable.
+    const src = editor();
+    const btn = src.slice(src.indexOf("NEW AI Generate — the full-screen console"));
+    const decl = btn.slice(0, btn.indexOf("✨ NEW AI Generate"));
+    expect(decl, "the AI feature vars are applied unconditionally")
+      .toMatch(/style=\{featureVars\(featureScheme, "ai"\)\}/);
+    expect(decl, "no active-only gate on the colour").not.toMatch(/showAiGenerateScreen \? featureVars/);
+    expect(decl, "and it wears the feature-tile skin").toMatch(/className="[^"]*feature-tile"/);
+  });
+
+  it("T4330 — the accent stays SATURATED, not washed to near-white", () => {
+    // Legible is not the bar. Mixed far enough towards white, every accent
+    // converges on the same pale tone and the console looks identical whatever
+    // the org configured — which is how "does it use the Feature Colours at all?"
+    // becomes a fair question about code that technically does.
+    //
+    // Measured as distance from white: two very different accents must still
+    // produce visibly different bright tones.
+    const violet = aiTones("#6d28d9").bright;
+    const teal = aiTones("#0f766e").bright;
+    expect(violet).not.toBe(teal);
+    // The mix must keep at least half the accent. `lighten(c, pct)` writes the
+    // RETAINED share as `${100 - pct}%`, so that share is what to assert on.
+    const share = (tone: string) => Number(/ (\d+)%/.exec(tone)?.[1] ?? "0");
+    expect(share(violet), "bright keeps at least half the accent").toBeGreaterThanOrEqual(50);
+    expect(share(aiTones("#6d28d9").line), "line keeps more still").toBeGreaterThanOrEqual(50);
+  });
+
   it("T4313 — the accent is read from the feature-colour scheme, not named in the file", () => {
     const src = screen();
     expect(src, "accent must come from the AI feature colour")
@@ -208,8 +245,12 @@ describe("the comparison baseline cannot regress", () => {
   it("T4326 — the new console is mounted beside PlanPanel, for BPMN, behind its own button", () => {
     const src = editor();
     expect(src, "a second button").toContain("✨ NEW AI Generate");
-    expect(src, "BPMN only while it is being judged")
-      .toMatch(/\{!readOnly && diagramType === "bpmn" && aiAllowedHere && \([\s\S]{0,900}NEW AI Generate/);
+    // Anchored on the block's own comment rather than a character distance, so
+    // editing the button's body cannot make this pass or fail by accident.
+    const block = src.slice(src.indexOf("NEW AI Generate — the full-screen console"));
+    const gate = block.slice(0, block.indexOf("<button"));
+    expect(gate, "BPMN only while it is being judged")
+      .toMatch(/\{!readOnly && diagramType === "bpmn" && aiAllowedHere && \(/);
     expect(src, "the original button is still there").toMatch(/✨ AI Generate\s*\n\s*<\/button>/);
     expect(src, "and the original panel is still mounted").toMatch(/\{showPlanPanel && \(\s*<PlanPanel/);
   });

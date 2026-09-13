@@ -33,12 +33,19 @@ export interface AiTones {
 const lighten = (colour: string, pct: number) =>
   `color-mix(in srgb, ${colour} ${100 - pct}%, white)`;
 
+/**
+ * The mix ratios are tuned to stay COLOURED, not merely legible. An earlier pass
+ * lightened `bright` to 38% of the accent, which reads on black but is so close
+ * to white that changing the configured colour barely showed — the console
+ * looked the same whatever the org had set, which defeats the point of theming
+ * it. 55% keeps a saturated tone that is still comfortably readable.
+ */
 export function aiTones(accent: string): AiTones {
   return {
     accent,
-    bright: lighten(accent, 62),
+    bright: lighten(accent, 45),
     line: lighten(accent, 34),
-    wash: `color-mix(in srgb, ${accent} 22%, transparent)`,
+    wash: `color-mix(in srgb, ${accent} 28%, transparent)`,
   };
 }
 

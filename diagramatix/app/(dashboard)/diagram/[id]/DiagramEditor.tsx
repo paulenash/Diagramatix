@@ -5491,10 +5491,13 @@ export function DiagramEditor({
               setShowAiPanel(false);
               setShowHistoryPanel(false);
             }}
-            style={showAiGenerateScreen ? featureVars(featureScheme, "ai") : undefined}
-            className={`px-2 py-0.5 text-[11px] rounded border ${showAiGenerateScreen
-              ? "feature-tile-active"
-              : "text-gray-700 border-gray-300 hover:bg-gray-50"}`}
+            /* Coloured AT REST, unlike the sidebar's button beside it. That one
+               greys until active because you can see it while its panel is open;
+               this console is a full-screen overlay, so its "active" state is
+               behind the console and never visible — a button that only takes the
+               feature colour when active would be permanently grey. */
+            style={featureVars(featureScheme, "ai")}
+            className="px-2 py-0.5 text-[11px] rounded border feature-tile"
             title="The new full-screen AI Generate console — same two-phase generation, given a screen instead of a sidebar"
           >
             ✨ NEW AI Generate
