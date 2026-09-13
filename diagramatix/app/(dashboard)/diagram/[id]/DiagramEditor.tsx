@@ -79,6 +79,7 @@ import { AiComparisonModal, type AiComparison } from "@/app/components/AiCompari
 import { toSuggestions, type ProjectEntityStructure, type EntityListDTO, type EntityNodeLevel } from "@/app/lib/entityLists/types";
 import { computeEntityDrift } from "@/app/lib/entityLists/entityDrift";
 import { PlanPanel } from "./PlanPanel";
+import { AiGenerateScreen } from "./ai-generate/AiGenerateScreen";
 import { SendForReviewDialog } from "./SendForReviewDialog";
 import { PublishVersionDialog } from "./PublishVersionDialog";
 import { PublishBundleDialog } from "./PublishBundleDialog";
@@ -1420,6 +1421,13 @@ export function DiagramEditor({
   const [aiPanelGenerating, setAiPanelGenerating] = useState(false);
   const [aiPanelNarrativeGenerating, setAiPanelNarrativeGenerating] = useState(false);
   const [showPlanPanel, setShowPlanPanel] = useState(false);
+  /**
+   * The NEW AI Generate console — the same feature on a full screen instead of
+   * in the 384px sidebar. It runs BESIDE the sidebar panel, not instead of it,
+   * so the two can be compared on the same diagram while the replacement is
+   * judged. BPMN only for now (see `ai-generate/AiGenerateScreen.tsx`).
+   */
+  const [showAiGenerateScreen, setShowAiGenerateScreen] = useState(false);
   // Tier-1 assist (ghost next-step suggestions) is OPT-IN — off until the user
   // turns it on. Remembered per-diagram in localStorage.
   const [assistEnabled, setAssistEnabled] = useState(false);
@@ -5470,6 +5478,28 @@ export function DiagramEditor({
             ✨ AI Generate
           </button>
         )}
+
+        {/* NEW AI Generate — the full-screen console. A SECOND button beside the
+            first, deliberately: both are live so the same prompt can be run
+            through each and the results compared. BPMN only while it is being
+            judged. */}
+        {!readOnly && diagramType === "bpmn" && aiAllowedHere && (
+          <button
+            onClick={() => {
+              setShowAiGenerateScreen(true);
+              setShowPlanPanel(false);
+              setShowAiPanel(false);
+              setShowHistoryPanel(false);
+            }}
+            style={showAiGenerateScreen ? featureVars(featureScheme, "ai") : undefined}
+            className={`px-2 py-0.5 text-[11px] rounded border ${showAiGenerateScreen
+              ? "feature-tile-active"
+              : "text-gray-700 border-gray-300 hover:bg-gray-50"}`}
+            title="The new full-screen AI Generate console — same two-phase generation, given a screen instead of a sidebar"
+          >
+            ✨ NEW AI Generate
+          </button>
+        )}
         {/* Tier-1 Assist toggle (BPMN only) — OPT-IN. When on, selecting a single
             element shows translucent ghost next-step suggestions (Tab / click to
             accept). Remembered per-diagram. */}
@@ -6155,6 +6185,30 @@ export function DiagramEditor({
             aiModels={aiModels}
             currentAiModelId={currentAiModel?.id}
             onClose={() => { setShowPlanPanel(false); setAiPrefill(null); if (data.aiFeedback) setAiFeedback(undefined); }}
+            onBusyChange={setAiBusy}
+            onAudioPhaseChange={setAudioPhase}
+            aiFeedback={data.aiFeedback}
+            onAiFeedback={setAiFeedback}
+            diagramId={diagramId}
+            onComparison={setAiComparison}
+          />
+        )}
+
+        {showAiGenerateScreen && (
+          <AiGenerateScreen
+            diagramType={diagramType}
+            diagramName={diagramName}
+            pcf={data.pcf}
+            isAdmin={isAdmin}
+            currentElements={data.elements}
+            currentConnectors={data.connectors}
+            onApplyDiagram={(aiData: DiagramData, meta?: AiApplyMeta) => { void applyAiResult(aiData, meta); }}
+            initialPrompt={aiPrefill?.prompt}
+            initialModel={aiPrefill?.model}
+            onPrefillConsumed={() => setAiPrefill(null)}
+            aiModels={aiModels}
+            currentAiModelId={currentAiModel?.id}
+            onClose={() => { setShowAiGenerateScreen(false); setAiPrefill(null); if (data.aiFeedback) setAiFeedback(undefined); }}
             onBusyChange={setAiBusy}
             onAudioPhaseChange={setAudioPhase}
             aiFeedback={data.aiFeedback}

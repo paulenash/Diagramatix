@@ -31,6 +31,18 @@ interface Props {
   setPlan: (next: Plan) => void;
   onApply: () => void;
   onClose: () => void;
+  /** Override the accent. Absent = the diagram-type colour, as before. */
+  accent?: string;
+  /**
+   * A model reply that could not be parsed into a plan.
+   *
+   * When the plan call fails, the raw text is the only record of what the model
+   * actually said — the error message alone tells you nothing about why. Passing
+   * it here opens the JSON view on Raw edit showing that text, so it can be
+   * corrected by hand and applied. Absent, the JSON view behaves as it always
+   * has (a viewer over the current plan).
+   */
+  initialRawJson?: string;
 }
 
 function Panel({ title, accent, hint, children }: { title: string; accent: string; hint?: string; children: React.ReactNode }) {
@@ -48,13 +60,19 @@ function Panel({ title, accent, hint, children }: { title: string; accent: strin
 export function PlanStructureModal(props: Props) {
   const { plan, diagramType, flatPlan, applying, updateElement, deleteElement, updateConnection, deleteConnection, moveElementRelativeTo, setPlan, onApply, onClose } = props;
   const getTypeStyle = useDiagramTypeStyles();
-  const accent = getTypeStyle(diagramType)?.bgColor || "#93c5fd";
+  // The caller may impose an accent. The AI Generate console does, so the plan
+  // editor it opens stays in the AI feature colour rather than switching to the
+  // diagram-type colour halfway through one flow. Absent, it keeps the
+  // diagram-type lookup it has always used — PlanPanel's use is unchanged.
+  const accent = props.accent ?? getTypeStyle(diagramType)?.bgColor ?? "#93c5fd";
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const asJson = useMemo(() => JSON.stringify(plan, null, 2), [plan]);
-  const [jsonDraft, setJsonDraft] = useState(asJson);
+  const [jsonDraft, setJsonDraft] = useState(props.initialRawJson ?? asJson);
   const [jsonErr, setJsonErr] = useState<string | null>(null);
-  const [jsonMode, setJsonMode] = useState<"tree" | "raw">("tree");
+  // An unparseable reply is only inspectable as text, so open on Raw edit when
+  // one was handed in.
+  const [jsonMode, setJsonMode] = useState<"tree" | "raw">(props.initialRawJson ? "raw" : "tree");
 
   const commitJson = () => {
     try {
@@ -128,8 +146,16 @@ export function PlanStructureModal(props: Props) {
         )}
         <Panel title="JSON" accent={accent} hint={jsonMode === "tree" ? "click ▸/▾ to fold" : "edit + Apply"}>
           <div className="flex items-center gap-1 mb-2">
+            {/* Switching back to Raw reloads the draft from the plan — except
+                when there is no plan and an unparseable reply was handed in,
+                which is then the only copy of what the model said. */}
             {(["tree", "raw"] as const).map((m) => (
-              <button key={m} onClick={() => { setJsonMode(m); if (m === "raw") setJsonDraft(asJson); }}
+              <button key={m} onClick={() => {
+                setJsonMode(m);
+                if (m !== "raw") return;
+                const empty = plan.elements.length === 0 && plan.connections.length === 0;
+                setJsonDraft(empty && props.initialRawJson ? props.initialRawJson : asJson);
+              }}
                 className={`text-[10px] px-2 py-0.5 rounded border ${jsonMode === m ? "bg-gray-800 text-white border-gray-800" : "text-gray-600 border-gray-300"}`}>
                 {m === "tree" ? "Viewer" : "Raw edit"}
               </button>

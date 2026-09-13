@@ -19,6 +19,13 @@ interface Props {
   /** Target notation, passed to the AI tidy pass for better phrasing. */
   diagramType?: string;
   disabled?: boolean;
+  /** Idle label for the upload button. Default "Audio / VTT". */
+  uploadIdleLabel?: string;
+  /** Extra classes for the two buttons, so a dark console can re-skin them
+   *  without this component learning about consoles. */
+  buttonClassName?: string;
+  /** Extra classes for the "AI tidy" label, same reason. */
+  checkboxClassName?: string;
 }
 
 /**
@@ -28,7 +35,7 @@ interface Props {
  * raw transcript is cleaned into an ordered process description first (and any
  * open questions are surfaced). The result is handed back via onTranscript.
  */
-export function AudioToProcessButton({ onTranscript, onError, onNote, onFeedback, onBusyChange, onPhaseChange, diagramType, disabled }: Props) {
+export function AudioToProcessButton({ onTranscript, onError, onNote, onFeedback, onBusyChange, onPhaseChange, diagramType, disabled, uploadIdleLabel, buttonClassName, checkboxClassName }: Props) {
   const [recording, setRecording] = useState(false);
   const [phase, setPhase] = useState<null | "transcribing" | "reading" | "tidying">(null);
   const [tidy, setTidy] = useState(true);
@@ -108,10 +115,14 @@ export function AudioToProcessButton({ onTranscript, onError, onNote, onFeedback
 
   const mmss = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
   const btn = "flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border disabled:opacity-50";
+  // The IDLE label is the caller's to name — the AI Generate console calls this
+  // "Transcript", which is what the thing actually is. The three busy labels are
+  // not overridable: they report what the component is doing, and a caller that
+  // renamed them could describe a phase that is not happening.
   const uploadLabel = phase === "transcribing" ? "Transcribing…"
     : phase === "reading" ? "Reading…"
     : phase === "tidying" ? "Tidying…"
-    : "Audio / VTT";
+    : (uploadIdleLabel ?? "Audio / VTT");
 
   return (
     <>
@@ -126,7 +137,7 @@ export function AudioToProcessButton({ onTranscript, onError, onNote, onFeedback
         <button
           onClick={recording ? stopRecording : startRecording}
           disabled={disabled || busy}
-          className={`${btn} ${recording ? "text-red-600 border-red-300 bg-red-50 hover:bg-red-100" : "text-gray-500 border-gray-300 hover:bg-gray-50"}`}
+          className={`${btn} ${recording ? "text-red-600 border-red-300 bg-red-50 hover:bg-red-100" : (buttonClassName ?? "text-gray-500 border-gray-300 hover:bg-gray-50")}`}
           title="Record a process discussion, then turn it into a diagram"
         >
           <svg width={10} height={10} viewBox="0 0 16 16" fill="currentColor">
@@ -139,12 +150,12 @@ export function AudioToProcessButton({ onTranscript, onError, onNote, onFeedback
       <button
         onClick={() => fileRef.current?.click()}
         disabled={disabled || busy || recording}
-        className={`${btn} text-gray-500 border-gray-300 hover:bg-gray-50`}
+        className={`${btn} ${buttonClassName ?? "text-gray-500 border-gray-300 hover:bg-gray-50"}`}
         title="Upload an audio file or a Microsoft Teams / Zoom .vtt transcript to turn into a diagram"
       >
         {uploadLabel}
       </button>
-      <label className="flex items-center gap-0.5 text-[10px] text-gray-500 select-none cursor-pointer"
+      <label className={`flex items-center gap-0.5 text-[10px] select-none cursor-pointer ${checkboxClassName ?? "text-gray-500"}`}
         title="Clean the transcript into an ordered process description before generating (recommended for meeting recordings)">
         <input type="checkbox" checked={tidy} onChange={(e) => setTidy(e.target.checked)} disabled={busy} className="w-3 h-3" />
         AI tidy
