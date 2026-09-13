@@ -94,6 +94,16 @@ const KNOWN: Record<string, number> = {
    * count went up because the box is finally where the label was.
    */
   "EP02.plan.json": 3,
+  /**
+   * HAND-ADDED 2026-09-13: Paul's "New vtt Process", generated from a Teams
+   * transcript. The first fixture with a lane-less white-box pool beside a laned
+   * one — the engine drew that pool's five elements TWICE with the same ids
+   * (the "unassigned" fallback plus the no-lane pool path). Fixed in the lane
+   * assignment; T4359–T4361. The two left are existing classes, not this bug:
+   *   • two connectors sharing one attachment point on gw_split
+   *   • a branch label lying along its own horizontal run (the K/L family)
+   */
+  "VTT01.plan.json": 2,
   "V04.01.plan.json": 2,
   // 3 -> 1 when R55.7 gave the exception path a row clear of the main line.
   "V22.01.plan.json": 1,

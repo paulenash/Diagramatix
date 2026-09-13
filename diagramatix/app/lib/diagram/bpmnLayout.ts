@@ -1523,7 +1523,23 @@ export function layoutBpmnDiagram(
         const firstLane = pLanes[0].id;
         if (!laneElements.has(firstLane)) laneElements.set(firstLane, []);
         laneElements.get(firstLane)!.push(el);
+      } else if (whiteBoxPools.some(p => p.id === el.pool)) {
+        // A white-box pool with NO lanes still owns its elements: the pool
+        // loop below places them directly in it (it gathers
+        // `e.pool === pool.id && !e.lane` for itself). Filing them here as
+        // "unassigned" as well is how Paul's transcript-generated diagram
+        // (2026-09-13, "New vtt Process") drew its second process — a timer
+        // start, three tasks and an end in a lane-less "Intake Compounder"
+        // pool — TWICE with the same ids: once in the main pool's first lane
+        // via the fallback below, once in their own pool. Moving either copy
+        // "duplicated" it, and the connectors resolved to one copy only, so
+        // the other stood stranded at the far corner of the diagram.
+        //
+        // "Unassigned" means no pool. A pool that merely has no lanes is a
+        // home, not an absence of one.
       } else {
+        // The pool named is not a white-box pool the loop below will draw
+        // (a black-box, or an id that names nothing) — genuinely homeless.
         unassigned.push(el);
       }
     } else {

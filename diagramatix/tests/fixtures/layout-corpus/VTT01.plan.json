@@ -1,0 +1,926 @@
+{
+  "_provenance": "HAND-ADDED 2026-09-13, not from scripts/build-layout-corpus.ts. Paul, \"New vtt Process\" (generated from a Teams transcript): a white-box pool with NO lanes (Intake Compounder) alongside a laned white-box pool. The engine placed the lane-less pool’s five elements TWICE with the same ids — once in the other pool’s first lane (the \"unassigned\" fallback), once in their own pool (the no-lane path). Duplicate ids: moving one copy \"duplicates\" it, connectors resolve to one copy only. Replay reproduces it.",
+  "diagrams": [
+    {
+      "name": "New vtt Process",
+      "data": {
+        "aiGeneration": {
+          "plan": {
+            "elements": [
+              {
+                "id": "p_sub",
+                "type": "pool",
+                "label": "Idea\nSubmitter",
+                "poolType": "black-box",
+                "isSystem": false
+              },
+              {
+                "id": "p_coe",
+                "type": "pool",
+                "label": "Centre of\nExcellence",
+                "poolType": "black-box",
+                "isSystem": false
+              },
+              {
+                "id": "p_main",
+                "type": "pool",
+                "label": "Intake Agent Superpower Platform",
+                "poolType": "white-box"
+              },
+              {
+                "id": "l_intake",
+                "type": "lane",
+                "label": "Intake Agent",
+                "parentPool": "p_main",
+                "pool": "p_main"
+              },
+              {
+                "id": "l_triage",
+                "type": "lane",
+                "label": "Triage Agent",
+                "parentPool": "p_main",
+                "pool": "p_main"
+              },
+              {
+                "id": "l_brain",
+                "type": "lane",
+                "label": "Brainstorming Agent",
+                "parentPool": "p_main",
+                "pool": "p_main"
+              },
+              {
+                "id": "l_session",
+                "type": "lane",
+                "label": "Session Profile Agent",
+                "parentPool": "p_main",
+                "pool": "p_main"
+              },
+              {
+                "id": "l_minime",
+                "type": "lane",
+                "label": "Mini Me Agent",
+                "parentPool": "p_main",
+                "pool": "p_main"
+              },
+              {
+                "id": "l_coding",
+                "type": "lane",
+                "label": "Coding Agent",
+                "parentPool": "p_main",
+                "pool": "p_main"
+              },
+              {
+                "id": "l_supervisor",
+                "type": "lane",
+                "label": "Supervisor Agent",
+                "parentPool": "p_main",
+                "pool": "p_main"
+              },
+              {
+                "id": "p_comp",
+                "type": "pool",
+                "label": "Intake Compounder",
+                "poolType": "white-box"
+              },
+              {
+                "id": "p_teams",
+                "type": "pool",
+                "label": "Microsoft\nTeams",
+                "poolType": "black-box",
+                "isSystem": true
+              },
+              {
+                "id": "p_pa",
+                "type": "pool",
+                "label": "Power\nAutomate",
+                "poolType": "black-box",
+                "isSystem": true
+              },
+              {
+                "id": "p_fa",
+                "type": "pool",
+                "label": "Azure\nFunction\nApp",
+                "poolType": "black-box",
+                "isSystem": true
+              },
+              {
+                "id": "p_blob",
+                "type": "pool",
+                "label": "Azure Blob\nStorage",
+                "poolType": "black-box",
+                "isSystem": true
+              },
+              {
+                "id": "p_foundry",
+                "type": "pool",
+                "label": "Azure AI\nFoundry /\nAI Search",
+                "poolType": "black-box",
+                "isSystem": true
+              },
+              {
+                "id": "s1",
+                "type": "start-event",
+                "label": "Idea Conversation Started",
+                "pool": "p_main",
+                "lane": "l_intake"
+              },
+              {
+                "id": "t_open",
+                "type": "task",
+                "label": "Open Intake\nConversation",
+                "taskType": "service",
+                "pool": "p_main",
+                "lane": "l_intake"
+              },
+              {
+                "id": "t_invoke",
+                "type": "task",
+                "label": "Hand Idea to\nTriage Agent",
+                "taskType": "service",
+                "pool": "p_main",
+                "lane": "l_intake"
+              },
+              {
+                "id": "ep_triage",
+                "type": "subprocess-expanded",
+                "label": "Do Until Idea Understood",
+                "repeatType": "loop",
+                "pool": "p_main",
+                "lane": "l_triage"
+              },
+              {
+                "id": "st_tr",
+                "type": "start-event",
+                "label": "",
+                "parentSubprocess": "ep_triage"
+              },
+              {
+                "id": "t_ask",
+                "type": "task",
+                "label": "Ask Targeted\nQuestions",
+                "taskType": "service",
+                "parentSubprocess": "ep_triage"
+              },
+              {
+                "id": "t_assess",
+                "type": "task",
+                "label": "Assess Information\nSufficiency",
+                "taskType": "service",
+                "parentSubprocess": "ep_triage"
+              },
+              {
+                "id": "en_tr",
+                "type": "end-event",
+                "label": "",
+                "parentSubprocess": "ep_triage"
+              },
+              {
+                "id": "t_handoff",
+                "type": "task",
+                "label": "Produce Handoff\nContext File",
+                "taskType": "service",
+                "pool": "p_main",
+                "lane": "l_triage"
+              },
+              {
+                "id": "do_ctx",
+                "type": "data-object",
+                "label": "Idea Context File (JSON)",
+                "pool": "p_main",
+                "lane": "l_triage"
+              },
+              {
+                "id": "gw_split",
+                "type": "gateway",
+                "label": "Concurrent Session Activities",
+                "gatewayType": "inclusive",
+                "gatewayRole": "decision",
+                "pool": "p_main",
+                "lane": "l_intake"
+              },
+              {
+                "id": "t_brain",
+                "type": "task",
+                "label": "Run Brainstorming\nExchange",
+                "taskType": "service",
+                "pool": "p_main",
+                "lane": "l_brain"
+              },
+              {
+                "id": "t_record",
+                "type": "task",
+                "label": "Record and Store\nFull Session",
+                "taskType": "service",
+                "pool": "p_main",
+                "lane": "l_session"
+              },
+              {
+                "id": "ds_dataverse",
+                "type": "data-store",
+                "label": "Dataverse Audit Records",
+                "pool": "p_main",
+                "lane": "l_session"
+              },
+              {
+                "id": "t_profile",
+                "type": "task",
+                "label": "Build Submitter\nBehaviour Profile",
+                "taskType": "service",
+                "pool": "p_main",
+                "lane": "l_minime"
+              },
+              {
+                "id": "do_profile",
+                "type": "data-object",
+                "label": "Submitter Profile Rubrics",
+                "pool": "p_main",
+                "lane": "l_minime"
+              },
+              {
+                "id": "t_d1",
+                "type": "task",
+                "label": "Receive Attached\nDocuments",
+                "taskType": "service",
+                "pool": "p_main",
+                "lane": "l_intake"
+              },
+              {
+                "id": "t_d2",
+                "type": "task",
+                "label": "Trigger Document\nExtraction Flow",
+                "taskType": "service",
+                "pool": "p_main",
+                "lane": "l_intake"
+              },
+              {
+                "id": "t_d3",
+                "type": "task",
+                "label": "Call Content\nUnderstanding Service",
+                "taskType": "service",
+                "pool": "p_main",
+                "lane": "l_intake"
+              },
+              {
+                "id": "t_d4",
+                "type": "task",
+                "label": "Clean and Stage\nExtracted Content",
+                "taskType": "service",
+                "pool": "p_main",
+                "lane": "l_intake"
+              },
+              {
+                "id": "t_d5",
+                "type": "task",
+                "label": "Refresh Knowledge\nBase Index",
+                "taskType": "service",
+                "pool": "p_main",
+                "lane": "l_intake"
+              },
+              {
+                "id": "gw_join",
+                "type": "gateway",
+                "label": "Session Activities Complete",
+                "gatewayType": "inclusive",
+                "gatewayRole": "merge",
+                "pool": "p_main",
+                "lane": "l_intake"
+              },
+              {
+                "id": "gw_loop",
+                "type": "gateway",
+                "label": "Resume Assessment",
+                "gatewayType": "exclusive",
+                "gatewayRole": "merge",
+                "pool": "p_main",
+                "lane": "l_intake"
+              },
+              {
+                "id": "t_roi",
+                "type": "task",
+                "label": "Run Business\nValue Assessment",
+                "taskType": "service",
+                "pool": "p_main",
+                "lane": "l_intake"
+              },
+              {
+                "id": "t_rank",
+                "type": "task",
+                "label": "Rank and\nPrioritise Idea",
+                "taskType": "service",
+                "pool": "p_main",
+                "lane": "l_intake"
+              },
+              {
+                "id": "t_verify",
+                "type": "task",
+                "label": "Verify and\nPrepare Submission",
+                "taskType": "service",
+                "pool": "p_main",
+                "lane": "l_intake"
+              },
+              {
+                "id": "t_confirm",
+                "type": "task",
+                "label": "Request Submission\nConfirmation",
+                "taskType": "service",
+                "pool": "p_main",
+                "lane": "l_intake"
+              },
+              {
+                "id": "gw_confirm",
+                "type": "gateway",
+                "label": "Submission Confirmed?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "decision",
+                "pool": "p_main",
+                "lane": "l_intake"
+              },
+              {
+                "id": "t_refine",
+                "type": "task",
+                "label": "Refine Idea\nwith Submitter",
+                "taskType": "service",
+                "pool": "p_main",
+                "lane": "l_brain"
+              },
+              {
+                "id": "t_submit",
+                "type": "task",
+                "label": "Submit Idea\nPackage",
+                "taskType": "service",
+                "pool": "p_main",
+                "lane": "l_intake"
+              },
+              {
+                "id": "gw_out",
+                "type": "gateway",
+                "label": "Notify and Generate Outputs",
+                "gatewayType": "parallel",
+                "gatewayRole": "decision",
+                "pool": "p_main",
+                "lane": "l_intake"
+              },
+              {
+                "id": "t_email",
+                "type": "task",
+                "label": "Send Submission\nNotification Emails",
+                "taskType": "service",
+                "pool": "p_main",
+                "lane": "l_intake"
+              },
+              {
+                "id": "t_brief",
+                "type": "task",
+                "label": "Generate Solution\nBrief",
+                "taskType": "service",
+                "pool": "p_main",
+                "lane": "l_intake"
+              },
+              {
+                "id": "t_tech",
+                "type": "task",
+                "label": "Generate Technical\nCoding Brief",
+                "taskType": "service",
+                "pool": "p_main",
+                "lane": "l_intake"
+              },
+              {
+                "id": "t_arch",
+                "type": "task",
+                "label": "Generate Architecture\nDiagram",
+                "taskType": "service",
+                "pool": "p_main",
+                "lane": "l_intake"
+              },
+              {
+                "id": "do_brief",
+                "type": "data-object",
+                "label": "Solution Brief (Markdown)",
+                "pool": "p_main",
+                "lane": "l_intake"
+              },
+              {
+                "id": "do_tech",
+                "type": "data-object",
+                "label": "Technical Coding Brief",
+                "pool": "p_main",
+                "lane": "l_intake"
+              },
+              {
+                "id": "do_arch",
+                "type": "data-object",
+                "label": "Architecture Diagram",
+                "pool": "p_main",
+                "lane": "l_intake"
+              },
+              {
+                "id": "gw_out_m",
+                "type": "gateway",
+                "label": "Outputs Ready",
+                "gatewayType": "parallel",
+                "gatewayRole": "merge",
+                "pool": "p_main",
+                "lane": "l_intake"
+              },
+              {
+                "id": "t_build",
+                "type": "task",
+                "label": "Generate Clickable\nPrototype",
+                "taskType": "service",
+                "pool": "p_main",
+                "lane": "l_coding"
+              },
+              {
+                "id": "t_notify",
+                "type": "task",
+                "label": "Notify Supervisor\nof Completion",
+                "taskType": "service",
+                "pool": "p_main",
+                "lane": "l_coding"
+              },
+              {
+                "id": "t_super",
+                "type": "task",
+                "label": "Confirm Process\nCompletion",
+                "taskType": "service",
+                "pool": "p_main",
+                "lane": "l_supervisor"
+              },
+              {
+                "id": "e_end",
+                "type": "end-event",
+                "label": "Prototype Delivered",
+                "pool": "p_main",
+                "lane": "l_supervisor"
+              },
+              {
+                "id": "s_c",
+                "type": "start-event",
+                "label": "Every 12 Hours",
+                "eventType": "timer",
+                "pool": "p_comp"
+              },
+              {
+                "id": "t_c1",
+                "type": "task",
+                "label": "Review Stored Sessions\nand Profiles",
+                "taskType": "service",
+                "pool": "p_comp"
+              },
+              {
+                "id": "t_c2",
+                "type": "task",
+                "label": "Compile Knowledge\nBase Content",
+                "taskType": "service",
+                "pool": "p_comp"
+              },
+              {
+                "id": "t_c3",
+                "type": "task",
+                "label": "Regenerate Submitter\nProfile",
+                "taskType": "service",
+                "pool": "p_comp"
+              },
+              {
+                "id": "e_c",
+                "type": "end-event",
+                "label": "Knowledge Base Updated",
+                "pool": "p_comp"
+              },
+              {
+                "id": "ann1",
+                "type": "text-annotation",
+                "label": "Knowledge: Adaptive Socratic questioning minimises questions",
+                "pool": "p_main",
+                "lane": "l_triage"
+              },
+              {
+                "id": "ann2",
+                "type": "text-annotation",
+                "label": "Authenticated via Microsoft Entra ID",
+                "pool": "p_main",
+                "lane": "l_intake"
+              },
+              {
+                "id": "ann3",
+                "type": "text-annotation",
+                "label": "Runs Claude Code in Azure Container Instance (15-20 minutes)",
+                "pool": "p_main",
+                "lane": "l_coding"
+              },
+              {
+                "id": "ann4",
+                "type": "text-annotation",
+                "label": "Blob folders map 1:1 to Foundry knowledge bases",
+                "pool": "p_main",
+                "lane": "l_intake"
+              }
+            ],
+            "connections": [
+              {
+                "sourceId": "s1",
+                "targetId": "t_open",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "p_sub",
+                "targetId": "t_open",
+                "type": "message",
+                "label": "Rough idea description"
+              },
+              {
+                "sourceId": "t_open",
+                "targetId": "p_teams",
+                "type": "message",
+                "label": "Agent conversation surface"
+              },
+              {
+                "sourceId": "t_open",
+                "targetId": "t_invoke",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t_invoke",
+                "targetId": "ep_triage",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "st_tr",
+                "targetId": "t_ask",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t_ask",
+                "targetId": "t_assess",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t_assess",
+                "targetId": "en_tr",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t_ask",
+                "targetId": "p_sub",
+                "type": "message",
+                "label": "Triage questions"
+              },
+              {
+                "sourceId": "p_sub",
+                "targetId": "t_ask",
+                "type": "message",
+                "label": "Answers to questions"
+              },
+              {
+                "sourceId": "ep_triage",
+                "targetId": "t_handoff",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t_handoff",
+                "targetId": "do_ctx"
+              },
+              {
+                "sourceId": "t_handoff",
+                "targetId": "gw_split",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gw_split",
+                "targetId": "t_brain",
+                "type": "sequence",
+                "label": "Brainstorm idea detail"
+              },
+              {
+                "sourceId": "t_brain",
+                "targetId": "p_sub",
+                "type": "message",
+                "label": "Brainstorming prompts"
+              },
+              {
+                "sourceId": "p_sub",
+                "targetId": "t_brain",
+                "type": "message",
+                "label": "Idea detail"
+              },
+              {
+                "sourceId": "t_brain",
+                "targetId": "gw_join",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gw_split",
+                "targetId": "t_record",
+                "type": "sequence",
+                "label": "Record session"
+              },
+              {
+                "sourceId": "t_record",
+                "targetId": "ds_dataverse"
+              },
+              {
+                "sourceId": "t_record",
+                "targetId": "gw_join",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gw_split",
+                "targetId": "t_profile",
+                "type": "sequence",
+                "label": "Build submitter profile"
+              },
+              {
+                "sourceId": "t_profile",
+                "targetId": "do_profile"
+              },
+              {
+                "sourceId": "t_profile",
+                "targetId": "gw_join",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gw_split",
+                "targetId": "t_d1",
+                "type": "sequence",
+                "label": "Documents attached"
+              },
+              {
+                "sourceId": "p_sub",
+                "targetId": "t_d1",
+                "type": "message",
+                "label": "Documents, decks, videos"
+              },
+              {
+                "sourceId": "t_d1",
+                "targetId": "t_d2",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t_d2",
+                "targetId": "p_pa",
+                "type": "message",
+                "label": "Extraction flow request"
+              },
+              {
+                "sourceId": "t_d2",
+                "targetId": "t_d3",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t_d3",
+                "targetId": "p_fa",
+                "type": "message",
+                "label": "Content understanding call"
+              },
+              {
+                "sourceId": "p_fa",
+                "targetId": "t_d3",
+                "type": "message",
+                "label": "Extracted text and transcripts"
+              },
+              {
+                "sourceId": "t_d3",
+                "targetId": "t_d4",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t_d4",
+                "targetId": "p_blob",
+                "type": "message",
+                "label": "Cleaned content staged"
+              },
+              {
+                "sourceId": "t_d4",
+                "targetId": "t_d5",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t_d5",
+                "targetId": "p_foundry",
+                "type": "message",
+                "label": "Index refresh on push"
+              },
+              {
+                "sourceId": "p_foundry",
+                "targetId": "t_d5",
+                "type": "message",
+                "label": "Queryable knowledge"
+              },
+              {
+                "sourceId": "t_d5",
+                "targetId": "gw_join",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gw_join",
+                "targetId": "gw_loop",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gw_loop",
+                "targetId": "t_roi",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t_roi",
+                "targetId": "t_rank",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t_rank",
+                "targetId": "ds_dataverse"
+              },
+              {
+                "sourceId": "t_rank",
+                "targetId": "t_verify",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t_verify",
+                "targetId": "t_confirm",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t_confirm",
+                "targetId": "p_sub",
+                "type": "message",
+                "label": "Confirmation request"
+              },
+              {
+                "sourceId": "p_sub",
+                "targetId": "t_confirm",
+                "type": "message",
+                "label": "Confirmation response"
+              },
+              {
+                "sourceId": "t_confirm",
+                "targetId": "gw_confirm",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gw_confirm",
+                "targetId": "t_refine",
+                "type": "sequence",
+                "label": "No"
+              },
+              {
+                "sourceId": "t_refine",
+                "targetId": "p_sub",
+                "type": "message",
+                "label": "Further brainstorming"
+              },
+              {
+                "sourceId": "t_refine",
+                "targetId": "gw_loop",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gw_confirm",
+                "targetId": "t_submit",
+                "type": "sequence",
+                "label": "Yes"
+              },
+              {
+                "sourceId": "t_submit",
+                "targetId": "gw_out",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gw_out",
+                "targetId": "t_email",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t_email",
+                "targetId": "p_coe",
+                "type": "message",
+                "label": "Idea submission notification"
+              },
+              {
+                "sourceId": "t_email",
+                "targetId": "p_sub",
+                "type": "message",
+                "label": "Submission confirmation email"
+              },
+              {
+                "sourceId": "t_email",
+                "targetId": "gw_out_m",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gw_out",
+                "targetId": "t_brief",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t_brief",
+                "targetId": "do_brief"
+              },
+              {
+                "sourceId": "t_brief",
+                "targetId": "t_tech",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t_tech",
+                "targetId": "do_tech"
+              },
+              {
+                "sourceId": "t_tech",
+                "targetId": "t_arch",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t_arch",
+                "targetId": "do_arch"
+              },
+              {
+                "sourceId": "t_arch",
+                "targetId": "gw_out_m",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gw_out_m",
+                "targetId": "t_build",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "do_tech",
+                "targetId": "t_build"
+              },
+              {
+                "sourceId": "t_build",
+                "targetId": "p_sub",
+                "type": "message",
+                "label": "Clickable prototype"
+              },
+              {
+                "sourceId": "t_build",
+                "targetId": "t_notify",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t_notify",
+                "targetId": "t_super",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t_super",
+                "targetId": "e_end",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "s_c",
+                "targetId": "t_c1",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t_c1",
+                "targetId": "t_c2",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t_c2",
+                "targetId": "p_blob",
+                "type": "message",
+                "label": "Compiled session knowledge"
+              },
+              {
+                "sourceId": "t_c2",
+                "targetId": "p_foundry",
+                "type": "message",
+                "label": "Knowledge base update"
+              },
+              {
+                "sourceId": "t_c2",
+                "targetId": "t_c3",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t_c3",
+                "targetId": "e_c",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "ann1",
+                "targetId": "ep_triage"
+              },
+              {
+                "sourceId": "ann2",
+                "targetId": "t_open"
+              },
+              {
+                "sourceId": "ann3",
+                "targetId": "t_build"
+              },
+              {
+                "sourceId": "ann4",
+                "targetId": "t_d4"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}
