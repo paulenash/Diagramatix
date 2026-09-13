@@ -5140,12 +5140,15 @@ export function DiagramEditor({
         {/* Highlight Entity List Changes — rings any element whose name isn't in
             the project's adopted Entity Structure. Only when a structure with
             entries has been adopted into this project. */}
-        {/* Not on an EPC. Entity Drift rings pool / lane, participant, IT
-            system, document and data-store names against the project's adopted
-            Entity Structure — and an EPC has none of those. The button would
-            offer to check a diagram against a vocabulary it cannot contain, and
-            answer "no drift" every time, which reads as a pass. */}
-        {entityHasNames && diagramType !== "epc" && (
+        {/* BPMN only (Paul, 2026-09-14: "Only show Entity Drift on BPMN Diagram
+            Screen"). Entity Drift rings pool / lane, participant, IT system,
+            document and data-store names against the project's adopted Entity
+            Structure — the vocabulary of a BPMN diagram. It was previously every
+            type except EPC, on the reasoning that an EPC has none of those names;
+            the same reasoning applies to the rest, and offering the check on a
+            diagram that cannot contain the vocabulary answers "no drift" every
+            time, which reads as a pass. */}
+        {entityHasNames && diagramType === "bpmn" && (
           <button
             onClick={() => setEntityDriftEnabled((v) => !v)}
             className={`px-2 py-0.5 text-[11px] rounded border ${

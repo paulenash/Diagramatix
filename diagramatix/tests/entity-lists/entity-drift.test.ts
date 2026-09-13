@@ -3,6 +3,8 @@
  * elements whose name is absent from the mapped list of the adopted structure.
  */
 import { describe, it, expect } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
 import { computeEntityDrift } from "@/app/lib/entityLists/entityDrift";
 import type { ProjectEntityStructure } from "@/app/lib/entityLists/types";
 import type { DiagramElement } from "@/app/lib/diagram/types";
@@ -44,5 +46,20 @@ describe("entity drift", () => {
   it("matching is case-insensitive + trimmed", () => {
     const drift = computeEntityDrift([el("x", "lane", "  finance  ")], structure);
     expect(drift.size).toBe(0);
+  });
+});
+
+describe("the Entity Drift button is offered on BPMN only", () => {
+  it("T4381 — the toolbar gate is diagramType === \"bpmn\", not merely !== \"epc\"", () => {
+    // Paul, 2026-09-14: "Only show Entity Drift on BPMN Diagram Screen." Drift
+    // rings pool/lane, participant, IT-system, document and data-store names —
+    // a BPMN vocabulary. On any other type the check can only ever answer
+    // "no drift", which reads as a pass. The gate used to exclude EPC alone.
+    const src = fs.readFileSync(path.resolve(__dirname, "..", "..", "app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx"), "utf8");
+    const i = src.indexOf("Entity Drift{entityDriftEnabled");
+    expect(i, "the Entity Drift button").toBeGreaterThan(-1);
+    const gate = src.slice(Math.max(0, i - 1200), i);
+    expect(gate).toMatch(/\{entityHasNames && diagramType === "bpmn" && \(/);
+    expect(gate, "the old exclude-EPC gate is gone").not.toMatch(/diagramType !== "epc" && \(/);
   });
 });

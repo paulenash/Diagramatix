@@ -85,7 +85,11 @@ describe("item 2 — Entity Drift does not apply to an EPC", () => {
     // names against the project's Entity Structure. An EPC has none of those,
     // so the check would answer "no drift" every time — which reads as a pass.
     const editor = read("app/(dashboard)/diagram/[id]/DiagramEditor.tsx");
-    expect(editor).toContain('{entityHasNames && diagramType !== "epc" && (');
+    // 2026-09-14: the gate became BPMN-only ("Only show Entity Drift on BPMN
+    // Diagram Screen") — the same reasoning as this item, applied to every
+    // type that lacks the vocabulary. An EPC is still hidden, by a stricter rule.
+    expect(editor).toContain('{entityHasNames && diagramType === "bpmn" && (');
+    expect(editor, "the exclude-only gate is gone").not.toContain('diagramType !== "epc" && (');
   });
 });
 
