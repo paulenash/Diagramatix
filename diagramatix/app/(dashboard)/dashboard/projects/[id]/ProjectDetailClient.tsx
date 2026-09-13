@@ -21,8 +21,9 @@ import { PcfCoveragePanel } from "./PcfCoveragePanel";
 import { APQC_ATTRIBUTION, anyDiagramHasPcf, dataHasPcf } from "@/app/lib/pcf/attribution";
 import { useFeatureColors } from "@/app/lib/theme/useFeatureColors";
 import { DiagramFeatureBadges } from "@/app/components/DiagramFeatureBadges";
-import { diagramFeatureBadges } from "@/app/lib/diagram/diagramFeatureBadges";
-import { tonesFor } from "@/app/lib/theme/featureColors";
+import { diagramFeatureBadges, type DiagramBadgeKey } from "@/app/lib/diagram/diagramFeatureBadges";
+import { matchesTreeFilter, isTreeFilterActive, EMPTY_TREE_FILTER, type TreeFilter } from "@/app/lib/diagram/treeFilter";
+import { tonesFor, featureVars } from "@/app/lib/theme/featureColors";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { SharePointPicker } from "@/app/components/SharePointPicker";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
@@ -978,6 +979,18 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
     || v === "modified-asc" || v === "modified-desc" || v === "type";
   const [diagramSort, setDiagramSort] = useState<DiagramSort>(
     isDiagramSort(project.diagramSort) ? project.diagramSort : "manual");
+  // Navigation-tree filter (Paul, 2026-09-14: "By Diagram Type, By name, By has
+  // AI, By Has SI, etc."). Component state only: Sort persists per project
+  // because a generated project's order is a property of the project; a filter
+  // is a question being asked right now. Applied in getOrderedDiagramsInFolder,
+  // the one function every folder's list passes through.
+  const [treeFilter, setTreeFilter] = useState<TreeFilter>(EMPTY_TREE_FILTER);
+  const toggleBadgeFilter = (key: DiagramBadgeKey) => setTreeFilter((f) => ({
+    ...f, badges: f.badges.includes(key) ? f.badges.filter((k) => k !== key) : [...f.badges, key],
+  }));
+  const treeFilterOn = isTreeFilterActive(treeFilter);
+  // Types present in this project, for the type facet — not the whole registry.
+  const projectDiagramTypes = useMemo(() => [...new Set(diagrams.map((d) => d.type))].sort(), [diagrams]);
   // One-time migration off the old per-browser key. A project saved before the
   // field existed has none, so adopt whatever THIS browser remembered and write
   // it to the project — after which the localStorage copy is never read again.
@@ -1053,7 +1066,9 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
   //   modified-desc  — newest first by updatedAt
   //   modified-asc   — oldest first by updatedAt
   function getOrderedDiagramsInFolder(folderId: string): DiagramSummary[] {
-    const direct = diagrams.filter(d => (folderTree.diagramFolderMap[d.id] ?? ROOT_ID) === folderId);
+    const direct = diagrams
+      .filter(d => (folderTree.diagramFolderMap[d.id] ?? ROOT_ID) === folderId)
+      .filter(d => matchesTreeFilter(d, badgesByDiagram.get(d.id) ?? [], treeFilter));
     if (diagramSort === "manual") {
       const order = folderTree.diagramOrder?.[folderId];
       if (!order) return direct;
@@ -2372,6 +2387,11 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
     const childFolders = getOrderedChildFolders(folderId);
     const directDiagrams = getOrderedDiagramsInFolder(folderId);
     const hasChildren = childFolders.length > 0 || directDiagrams.length > 0;
+    // Diagrams this folder holds before the filter — so an emptied folder can say
+    // "filtered out" rather than look empty by accident.
+    const unfilteredCount = treeFilterOn
+      ? diagrams.filter(d => (folderTree.diagramFolderMap[d.id] ?? ROOT_ID) === folderId).length
+      : directDiagrams.length;
     // APQC colour coding: a seeded folder ("1.1.1 … (10017)") gets its PCF
     // level's main colour on the folder icon; non-PCF folders stay amber.
     const pcfLvl = folder ? pcfLevelFromCode(folderCode(folder.name)) : 0;
@@ -2517,6 +2537,11 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
         {!isCollapsed && (
           <>
             {childFolders.map(cf => renderFolder(cf.id, depth + 1))}
+            {treeFilterOn && directDiagrams.length === 0 && unfilteredCount > 0 && (
+              <div className="px-1 py-0.5 text-[10px] text-gray-400 italic" style={{ paddingLeft: depth * 12 + 20 }}>
+                {unfilteredCount} diagram{unfilteredCount === 1 ? "" : "s"} filtered out
+              </div>
+            )}
             {directDiagrams.map(d => (
               <div key={d.id}
                 draggable={editingId !== d.id}
@@ -3064,6 +3089,61 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
                 <path d="M21 3v6h-6" />
               </svg>
             </button>
+          </div>
+          {/* Filter — by type, by name, by feature badge. The badges are the
+              same AI / SI / MN / AP / RC chips drawn beside each diagram, so
+              "has SI" means exactly what the chip means. Ticking two narrows. */}
+          <div className="border-b border-gray-100 px-2 py-1.5 flex items-center gap-1.5 text-[10px] text-gray-600 flex-wrap">
+            <label htmlFor="diagram-filter-name" className="text-gray-500 shrink-0">Filter:</label>
+            <input
+              id="diagram-filter-name"
+              type="search"
+              value={treeFilter.name}
+              onChange={(e) => setTreeFilter((f) => ({ ...f, name: e.target.value }))}
+              placeholder="name…"
+              aria-label="Filter diagrams by name"
+              className="flex-1 min-w-[70px] text-[10px] border border-gray-300 rounded px-1 py-0.5 bg-white text-gray-700"
+            />
+            <select
+              id="diagram-filter-type"
+              value={treeFilter.type}
+              onChange={(e) => setTreeFilter((f) => ({ ...f, type: e.target.value }))}
+              aria-label="Filter diagrams by type"
+              title="Only diagrams of this type"
+              className="text-[10px] border border-gray-300 rounded px-1 py-0.5 bg-white text-gray-700 max-w-[110px]"
+            >
+              <option value="">Any type</option>
+              {projectDiagramTypes.map((t) => <option key={t} value={t}>{diagramTypeStyle(t).code || t}</option>)}
+            </select>
+            {([
+              ["ai", "AI", "Has an AI prompt"],
+              ["simulator", "SI", "Has simulation data"],
+              ["mining", "MN", "Has mining data"],
+              ["apqc", "AP", "Classified against APQC"],
+              ["riskControl", "RC", "Has risks & controls"],
+            ] as [DiagramBadgeKey, string, string][]).map(([key, code, title]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => toggleBadgeFilter(key)}
+                title={title}
+                aria-pressed={treeFilter.badges.includes(key)}
+                style={treeFilter.badges.includes(key) ? featureVars(featureScheme, key) : undefined}
+                className={`w-6 h-5 rounded-full border text-[9px] font-semibold leading-none ${treeFilter.badges.includes(key) ? "feature-tile-active" : "border-gray-300 text-gray-500 hover:bg-gray-50"}`}
+              >
+                {code}
+              </button>
+            ))}
+            {treeFilterOn && (
+              <button
+                type="button"
+                onClick={() => setTreeFilter(EMPTY_TREE_FILTER)}
+                className="text-[10px] text-blue-600 hover:underline shrink-0"
+                title="Show every diagram again"
+              >
+                clear
+              </button>
+            )}
           </div>
           <div className="overflow-y-auto p-2 flex-1">
             {renderFolder(ROOT_ID, 0)}
