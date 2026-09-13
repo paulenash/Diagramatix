@@ -80,6 +80,7 @@ import { toSuggestions, type ProjectEntityStructure, type EntityListDTO, type En
 import { computeEntityDrift } from "@/app/lib/entityLists/entityDrift";
 import { PlanPanel } from "./PlanPanel";
 import { AiGenerateScreen } from "./ai-generate/AiGenerateScreen";
+import { useReopenFromGuide } from "@/app/hooks/useReopenFromGuide";
 import { SendForReviewDialog } from "./SendForReviewDialog";
 import { PublishVersionDialog } from "./PublishVersionDialog";
 import { PublishBundleDialog } from "./PublishBundleDialog";
@@ -1441,6 +1442,11 @@ export function DiagramEditor({
   // apply deterministic layout). Other types use the legacy one-shot AI panel.
   // Registry, not a chain of ||: see app/lib/ai/planTypes.ts.
   const usesPlanPanel = usesPlanFlow(diagramType);
+  // Coming back from the User Guide: re-open the console the reader left, so
+  // "return" means the screen AND the state they invoked from, not just the
+  // page with the console shut (Paul, 2026-09-13).
+  useReopenFromGuide("ai-generate", () => setShowAiGenerateScreen(true));
+  useReopenFromGuide("simulator", () => setShowSimulator(true));
   // Regenerate prefill: when the user hits "Regenerate" in Diagram Properties we
   // open the AI/Plan panel with the linked prompt's CURRENT text + a chosen model.
   /**

@@ -139,7 +139,11 @@ describe("the twelve requirements are present as controls", () => {
 
   it("T4316 — close is at the right of the header, after the User Guide chip", () => {
     const src = screen();
-    const guide = src.indexOf("📖 User Guide");
+    // The chip's LABEL moved into the shared `ConsoleUserGuideLink` when all
+    // four consoles were given a working return trip, so this looks for the
+    // component rather than the emoji it renders. The ordering is the point,
+    // and that is still asserted.
+    const guide = src.indexOf("<ConsoleUserGuideLink");
     const exit = src.indexOf("✕ EXIT");
     expect(guide, "the User Guide chip").toBeGreaterThan(-1);
     expect(exit, "the exit button").toBeGreaterThan(guide);

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import { guideHref } from "@/app/lib/help/guideReturn";
 
 /**
  * A "User Guide" link that carries the CURRENT page path as `?from=` so the
@@ -18,15 +19,25 @@ export function UserGuideLink({
   className,
   children,
   title,
+  chapter,
 }: {
   className?: string;
   children: ReactNode;
   title?: string;
+  /**
+   * Open the guide AT a chapter rather than at its first one. A link from a
+   * screen about projects that lands on "Getting started" makes the reader do
+   * the finding — the caller already knows what they are looking at.
+   */
+  chapter?: string;
 }) {
   const pathname = usePathname();
-  const href = `/help?from=${encodeURIComponent(pathname || "/dashboard")}`;
   return (
-    <Link href={href} className={className} title={title}>
+    <Link
+      href={guideHref({ chapter, pathname: pathname || "/dashboard" })}
+      className={className}
+      title={title}
+    >
       {children}
     </Link>
   );

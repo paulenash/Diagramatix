@@ -39,6 +39,7 @@ import { useMicTest } from "@/app/lib/dictation/useMicTest";
 import { useFeatureColors } from "@/app/lib/theme/useFeatureColors";
 import { tonesFor } from "@/app/lib/theme/featureColors";
 import { MatrixRain } from "@/app/components/simulation/matrix/MatrixRain";
+import { ConsoleUserGuideLink } from "@/app/components/ConsoleUserGuideLink";
 import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { SaveChangesDialog } from "@/app/components/SaveChangesDialog";
@@ -755,10 +756,10 @@ export function AiGenerateScreen({
                 ⚙ SuperAdmin Options
               </AiButton>
             )}
-            <a href="/help?c=ai-generate" target="_blank" rel="noopener noreferrer"
+            <ConsoleUserGuideLink chapter="ai-generate" reopen="ai-generate"
               title="Open the AI Generate section of the User Guide"
               className="text-xs border rounded px-3 py-1.5 hover:bg-white/10"
-              style={{ color: tones.bright, borderColor: tones.line }}>📖 User Guide</a>
+              style={{ color: tones.bright, borderColor: tones.line }} />
             <AiButton tones={tones} variant="danger" onClick={requestClose}>✕ EXIT</AiButton>
           </div>
         </header>

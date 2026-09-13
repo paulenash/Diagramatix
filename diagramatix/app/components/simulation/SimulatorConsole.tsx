@@ -26,6 +26,7 @@ import { usedTeamNames } from "@/app/lib/simulation/harvestTeams";
 import { autofillSimulation, unfillSimulation } from "@/app/lib/simulation/autofill";
 import { autofillProject, reachableDiagramIds } from "@/app/lib/simulation/autofillProject";
 import type { ScenarioRunConfig, WorkCalendar } from "@/app/lib/simulation/types";
+import { ConsoleUserGuideLink } from "@/app/components/ConsoleUserGuideLink";
 
 const EMPTY_DIAGRAM: DiagramData = { elements: [], connectors: [], viewport: { x: 0, y: 0, zoom: 1 } };
 
@@ -340,9 +341,10 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId,
             )}
           </div>
           <div className="flex items-center gap-2">
-            <a href="/help?c=simulation" target="_blank" rel="noopener noreferrer"
+            <ConsoleUserGuideLink chapter="simulation" reopen="simulator"
+              returnParams={projectId ? { rpid: projectId, rpname: projectName ?? "" } : undefined}
               title="Open the Simulator section of the User Guide"
-              className="text-green-300/80 hover:text-green-200 text-xs border border-green-500/40 rounded px-3 py-1.5">📖 User Guide</a>
+              className="text-green-300/80 hover:text-green-200 text-xs border border-green-500/40 rounded px-3 py-1.5" />
             <MatrixButton variant="danger" onClick={onClose}>✕ EXIT</MatrixButton>
           </div>
         </header>

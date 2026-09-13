@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-09-11  ·  **Document version:** 7.0  ·  **Suite:** 467 test files · 3,535 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T4332  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-09-11  ·  **Document version:** 7.0  ·  **Suite:** 467 test files · 3,535 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T4349  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
@@ -34,9 +34,9 @@ Each test file has its own section below, grouped into layers. Within each secti
 | **Protects you against** | In plain terms, the real-world problem that would occur if this behaviour regressed. |
 | **How it would break (go red)** | The kind of code or data change that would make this specific test fail — i.e. what the test is watching. |
 
-**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T4333**, the one after **T4334**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
+**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T4350**, the one after **T4351**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T4332`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
+> **Highest ref allocated: `T4349`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -3437,6 +3437,23 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 | T4330 | `tests/ai/new-ai-generate-console.test.ts` | The console accent stays SATURATED — mixed far enough towards white, every configured colour converges on the same pale tone. |
 | T4331 | `tests/ai/new-ai-generate-console.test.ts` | **A successful Apply Layout closes the console** — it covers the canvas, so staying open hides the diagram the button was pressed to produce. |
 | T4332 | `tests/ai/new-ai-generate-console.test.ts` | A FAILED apply leaves it open with its error — every failure path returns before the close. |
+| T4333 | `tests/bpmn/ep-box-fits-children.test.ts` | **An Expanded Subprocess contains its own children** — Paul&#39;s real generated plan; the box sat 335px above its content. |
+| T4334 | `tests/bpmn/ep-box-fits-children.test.ts` | ...and is not grossly oversized — 653.5px for content needing 434 (R55.2 scoping). |
+| T4335 | `tests/bpmn/ep-box-fits-children.test.ts` | A decision INSIDE an EP does not spread it across lane-sized rows — the mechanism, isolated. |
+| T4336 | `tests/bpmn/ep-box-fits-children.test.ts` | An EP with NO decision inside is unaffected — the case R55.2 never touches must keep working. |
+| T4337 | `tests/bpmn/ep-box-fits-children.test.ts` | A decision in the LANE still gets its rows — scoping R55.2 must not switch it off. |
+| T4338 | `tests/help/guide-return.test.ts` | **The User Guide link carries the way back** — invoking page plus the overlay to re-open. |
+| T4339 | `tests/help/guide-return.test.ts` | An ordinary page needs no token: the path alone is the state. |
+| T4340 | `tests/help/guide-return.test.ts` | A host that needs more than a path gets it — the Dashboard holds the Simulator as a PROJECT. |
+| T4341 | `tests/help/guide-return.test.ts` | An unknown reopen key opens nothing rather than guessing. |
+| T4342 | `tests/help/guide-return.test.ts` | SEC-15 on the way OUT — the builder cannot manufacture `//evil.test`. |
+| T4343 | `tests/help/guide-return.test.ts` | Acting on the token strips it AND its return params; unrelated params survive. |
+| T4344 | `tests/help/guide-return.test.ts` | A URL with no token is left alone — no router.replace on every render. |
+| T4345 | `tests/help/guide-return.test.ts` | Stripping the only params leaves a bare path, not a dangling `?`. |
+| T4346 | `tests/help/guide-return.test.ts` | **No console still hand-rolls a /help link without a way back** — all four had the same defect. |
+| T4347 | `tests/help/guide-return.test.ts` | Every host claims the overlays it renders — a token nobody listens for is the bug wearing a badge. |
+| T4348 | `tests/help/guide-return.test.ts` | The Dashboard has a User Guide button opening at Projects &amp; Folders. |
+| T4349 | `tests/help/guide-return.test.ts` | Returning to a console skips the intro it already played. |
 
 > **Keep this section in sync.** Whenever an e2e spec is added, removed, or changes what it asserts, update this section. It is hand-maintained, not generated.
 

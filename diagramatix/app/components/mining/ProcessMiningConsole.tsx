@@ -27,6 +27,7 @@ import { RunList } from "./console/RunList";
 import { RunDetail } from "./console/RunDetail";
 import type { RunRow } from "./console/shared";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
+import { ConsoleUserGuideLink } from "@/app/components/ConsoleUserGuideLink";
 
 export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose, onOpenSimulator }: { projectId: string; projectName?: string; isAdmin?: boolean; onClose: () => void; onOpenSimulator?: (studyId?: string | null) => void }) {
   const [runs, setRuns] = useState<RunRow[]>([]);
@@ -94,9 +95,10 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
           {projectName && <span className="text-stone-400 text-xs">{projectName}</span>}
         </div>
         <div className="flex items-center gap-2">
-          <a href="/help?c=process-mining" target="_blank" rel="noopener noreferrer"
+          <ConsoleUserGuideLink chapter="process-mining" reopen="miner"
+            returnParams={{ rpid: projectId, rpname: projectName ?? "" }}
             title="Open the Process Mining section of the User Guide"
-            className="px-3 py-1.5 text-xs text-amber-200 border border-amber-500/40 hover:bg-amber-500/10 rounded">📖 User Guide</a>
+            className="px-3 py-1.5 text-xs text-amber-200 border border-amber-500/40 hover:bg-amber-500/10 rounded" />
           <button onClick={onClose} className="px-3 py-1.5 text-xs text-white bg-stone-700 hover:bg-stone-600 rounded">✕ Exit</button>
         </div>
       </header>

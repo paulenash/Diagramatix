@@ -27,6 +27,9 @@ import { lightenHex } from "@/app/lib/diagram/diagramTypeStyles";
 import { BackupProgressModal } from "@/app/components/BackupProgressModal";
 import { SimulatorOverlay } from "@/app/components/simulation/SimulatorOverlay";
 import { ProcessMiningOverlay } from "@/app/components/mining/ProcessMiningOverlay";
+import { useReopenFromGuide } from "@/app/hooks/useReopenFromGuide";
+import { UserGuideLink } from "@/app/components/UserGuideLink";
+import { returnProjectOf } from "@/app/lib/help/guideReturn";
 import { useSuperAdminChrome, effectiveEntitlements, VIEW_MODE_TIER } from "@/app/hooks/useSuperAdminChrome";
 import { useFeatureColors } from "@/app/lib/theme/useFeatureColors";
 import { featureVars } from "@/app/lib/theme/featureColors";
@@ -358,6 +361,11 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const [simProject, setSimProject] = useState<{ id: string; name: string } | null>(null);
   // Project-level Process Mining — opened from a project's menu.
   const [miningProject, setMiningProject] = useState<{ id: string; name: string } | null>(null);
+  // Returning from the User Guide. Unlike the Project screen, the Dashboard holds
+  // these as a PROJECT rather than a boolean, so the return path carries the
+  // project identity too — a path alone cannot say which project you were in.
+  useReopenFromGuide("simulator", () => { const p = returnProjectOf((k) => searchParams.get(k)); if (p) setSimProject(p); });
+  useReopenFromGuide("miner", () => { const p = returnProjectOf((k) => searchParams.get(k)); if (p) { setSkipMiningIntro(true); setMiningProject(p); } });
   // The auto-collected "Support" project is SuperAdmin-only chrome: highlighted
   // red when shown, and hidden along with the rest of the SuperAdmin chrome when
   // the logo is double-clicked (presentation mode).
@@ -1846,6 +1854,16 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           >
             Features
           </a>
+          {/* Opens AT the Projects & Folders chapter — this screen IS projects and
+              folders, and a guide that lands on "Getting started" makes the reader
+              do the finding. Carries ?from so its back link returns here. */}
+          <UserGuideLink
+            chapter="projects-folders"
+            className="text-xs font-medium text-gray-600 border border-gray-300 rounded px-2 py-1 hover:bg-gray-50"
+            title="Open the User Guide at Projects &amp; Folders"
+          >
+            📖 User Guide
+          </UserGuideLink>
           {orgName && (
             <div
               className="text-xs text-gray-600 border border-gray-200 rounded px-2 py-1 bg-gray-50"

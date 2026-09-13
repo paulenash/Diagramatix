@@ -6,6 +6,7 @@ import { RiskControlAnalytics } from "./RiskControlAnalytics";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import type { RiskControlLibraryDTO, RcAttachment } from "@/app/lib/riskControls/types";
 import type { ObservedDeviation, ControlEffectiveness } from "@/app/lib/riskControls/controlEffectiveness";
+import { ConsoleUserGuideLink } from "@/app/components/ConsoleUserGuideLink";
 
 /**
  * Full-screen Risk & Control console for a project — its own screen (like the
@@ -97,9 +98,10 @@ export function RiskControlConsole({
           )}
         </div>
         <div className="flex items-center gap-2">
-          <a href="/help?c=risk-controls" target="_blank" rel="noopener noreferrer"
+          <ConsoleUserGuideLink chapter="risk-controls" reopen="risk-control"
+            returnParams={{ rpid: projectId, rpname: projectName ?? "" }}
             title="Open the Risk &amp; Controls section of the User Guide"
-            className="text-xs bg-blue-700 hover:bg-blue-600 rounded px-3 py-1.5">📖 User Guide</a>
+            className="text-xs bg-blue-700 hover:bg-blue-600 rounded px-3 py-1.5" />
           {library && <a href={`${basePath}/export`} className="text-xs bg-blue-700 hover:bg-blue-600 rounded px-3 py-1.5">⭳ Export Risk-Control Matrix</a>}
           <button onClick={onClose} className="text-xs bg-blue-900/60 hover:bg-blue-900 rounded px-3 py-1.5">✕ Close</button>
         </div>

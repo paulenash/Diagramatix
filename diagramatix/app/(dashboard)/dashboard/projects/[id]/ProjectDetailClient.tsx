@@ -31,6 +31,7 @@ import { TranslateToBpmnDialog } from "@/app/components/TranslateToBpmnDialog";
 import { ProjectStructureSection } from "@/app/components/entityLists/ProjectStructureSection";
 import { ProjectSopsSection } from "@/app/components/sop/ProjectSopsSection";
 import { RiskControlConsole } from "@/app/components/riskControls/RiskControlConsole";
+import { useReopenFromGuide } from "@/app/hooks/useReopenFromGuide";
 import { SimulatorOverlay } from "@/app/components/simulation/SimulatorOverlay";
 import { TeamLibraryManager } from "@/app/components/simulation/TeamLibraryManager";
 import { CalendarLibraryManager } from "@/app/components/simulation/CalendarLibraryManager";
@@ -594,6 +595,11 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
   const [showResources, setShowResources] = useState(false);
   const [resourceCalendars, setResourceCalendars] = useState<{ id: string; name: string; pattern: WorkCalendar }[]>([]);
   const [showRcm, setShowRcm] = useState(false);
+  // Returning from the User Guide re-opens the console the reader left. The
+  // intro is skipped: they were in the console, not watching it start up.
+  useReopenFromGuide("simulator", () => setShowSim(true));
+  useReopenFromGuide("miner", () => { setMiningSkipIntro(true); setShowMining(true); });
+  useReopenFromGuide("risk-control", () => setShowRcm(true));
   // Deep-link (?rcm=1) — e.g. adopting a Risk & Control example lands here and
   // opens the Risk & Control console straight away rather than the bare project.
   useEffect(() => {
