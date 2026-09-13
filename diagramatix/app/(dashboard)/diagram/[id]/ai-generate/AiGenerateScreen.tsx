@@ -391,6 +391,19 @@ export function AiGenerateScreen({
         const poolCount = plan.elements.filter((e) => e.type === "pool").length;
         setStatus(`Applied: ${poolCount} pool${poolCount === 1 ? "" : "s"}, ${json.elementCount} elements, ${json.connectionCount} connections`);
       }
+      /**
+       * Apply succeeded → leave. The sidebar stays open after an apply because
+       * it sits BESIDE the canvas: you see the diagram it just produced. This
+       * console covers the canvas completely, so staying open hides the one
+       * thing the user pressed the button to see, and leaves a full-screen
+       * animated backdrop running over a freshly re-rendered diagram.
+       *
+       * `onClose` directly, not `requestClose` — the dirty guard exists to stop
+       * unsaved work being discarded, and applying is precisely how that work
+       * stops being unsaved. Failure paths above all `return` before here, so a
+       * console that could not apply stays put with its error on screen.
+       */
+      onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Network error");
       setStatus(null);
@@ -398,7 +411,7 @@ export function AiGenerateScreen({
       setBusy(null);
     }
   }, [plan, hasPlan, busy, onApplyDiagram, apiBase, flatPlan, preserveLayout, prompt, editingPromptId,
-    savedPrompts, model, attachment, planCfg.connectorNoun]);
+    savedPrompts, model, attachment, planCfg.connectorNoun, onClose]);
 
   // ── Refine + clarifications ───────────────────────────────────────────────
   const handleRefine = useCallback(async () => {

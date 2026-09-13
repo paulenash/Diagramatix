@@ -171,6 +171,46 @@ describe("the twelve requirements are present as controls", () => {
   });
 });
 
+describe("Apply Layout hands the screen back", () => {
+  it("T4331 — a successful Apply closes the console", () => {
+    // Paul, 2026-09-13: "After Apply Layout return hide the New AI Generate
+    // screen."
+    //
+    // The sidebar stays open after an apply, correctly: it sits beside the
+    // canvas, so you watch the diagram appear next to it. This console covers
+    // the canvas, so staying open hides the only thing the button was pressed
+    // to produce — and leaves a full-screen animated backdrop running over a
+    // diagram that has just re-rendered.
+    const src = screen();
+    const apply = src.slice(src.indexOf("const callApplyLayout"));
+    const body = apply.slice(0, apply.indexOf("// ── Refine"));
+    expect(body, "the success path closes").toMatch(/onClose\(\);\s*\}\s*catch/);
+    // Straight to onClose, NOT requestClose: the dirty guard stops unsaved work
+    // being discarded, and applying is how the work stops being unsaved. Routing
+    // this through the guard would ask "discard your prompt?" immediately after
+    // succeeding.
+    expect(body, "not through the dirty guard").not.toContain("requestClose()");
+  });
+
+  it("T4332 — a FAILED apply leaves the console open with its error", () => {
+    // Every failure path has to return before the close. A console that closed
+    // on failure would drop the error, the issues list and the diagnostics on
+    // the floor, and look identical to success.
+    const src = screen();
+    const apply = src.slice(src.indexOf("const callApplyLayout"));
+    const body = apply.slice(0, apply.indexOf("onClose();"));
+    for (const failure of [
+      /setError\(json\.error \?\? "Layout failed"\);[\s\S]{0,120}return;/,
+      /setError\("Layout returned unexpected format\."\);[\s\S]{0,80}return;/,
+    ]) {
+      expect(body, "a failure path that does not return would fall through to the close")
+        .toMatch(failure);
+    }
+    // And the network-error catch sets the error rather than closing.
+    expect(apply).toMatch(/catch \(err\) \{\s*setError\(/);
+  });
+});
+
 describe("behaviour that was easy to lose in the rewrite", () => {
   it("T4319 — prompt provenance is sent on CREATE only", () => {
     const src = screen();
