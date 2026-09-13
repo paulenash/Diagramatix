@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { requireOrgAdminFor, OrgContextError } from "@/app/lib/auth/orgContext";
 import { isSuperuser } from "@/app/lib/superuser";
+import { frameworkPatchData } from "@/app/lib/pcf/frameworkEdit";
 
 type Params = { params: Promise<{ id: string; frameworkId: string }> };
 
@@ -40,12 +41,24 @@ async function requireTailored(orgId: string, frameworkId: string) {
 }
 
 /**
- * PATCH /api/orgs/[id]/pcf/[frameworkId]  { name?, division? }
- * Rename / re-scope a framework.
- *   • Tailored (this org's) — any Owner/Admin (or SuperAdmin). name + division.
+ * PATCH /api/orgs/[id]/pcf/[frameworkId]  { name?, variant?, version?, division? }
+ * Edit a framework's identity.
+ *   • Tailored (this org's) — any Owner/Admin (or SuperAdmin). All four.
  *   • Reference (global APQC) — SuperAdmin ONLY, since it's shared across every
- *     org. name only (division is a tailored concept). Durable: the seed skips
- *     existing frameworks, so a rename survives re-seeds.
+ *     org. name, variant, version (division is a tailored concept). Durable: the
+ *     seed skips existing frameworks, so an edit survives re-seeds.
+ *
+ * Paul, 2026-09-14: "Allow the whole APQC Framework Name to be edited and saved
+ * not just the Name. Include the Version number as well." Until now `name` was
+ * the only field, and the route silently wrote it to `variant` too — which is
+ * the part every picker actually shows (`variant vversion`). The three are
+ * separate fields now and each is written only when sent.
+ *
+ * One consequence of an editable version, stated rather than hidden: the
+ * import de-duplicates on { familyKey, version, kind, orgId }. Change "8.0" to
+ * "8.1" and a later re-import of the 8.0 workbook lands as a SECOND framework
+ * instead of being skipped. Upgrade pairing keys on familyKey, not version, so
+ * that is unaffected.
  */
 export async function PATCH(req: Request, { params }: Params) {
   const session = await auth();
@@ -70,10 +83,10 @@ export async function PATCH(req: Request, { params }: Params) {
   if (!isTailored && !isReference) return NextResponse.json({ error: "Not editable" }, { status: 403 });
 
   const body = await req.json().catch(() => ({}));
-  const data: { name?: string; variant?: string; division?: string | null } = {};
-  if (typeof body?.name === "string" && body.name.trim()) { data.name = body.name.trim(); data.variant = body.name.trim(); }
-  if (isTailored && body?.division !== undefined) data.division = typeof body.division === "string" && body.division.trim() ? body.division.trim() : null;
-  if (Object.keys(data).length === 0) return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
+  // What may change and how lives in app/lib/pcf/frameworkEdit.ts (pure, tested).
+  const patch = frameworkPatchData(body, { isTailored });
+  if (!patch.ok) return NextResponse.json({ error: patch.error }, { status: 400 });
+  const data = patch.data;
 
   const framework = await prisma.pcfFramework.update({ where: { id: frameworkId }, data, select: { id: true, name: true, variant: true, version: true, kind: true, division: true } });
   return NextResponse.json({ framework });

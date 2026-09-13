@@ -47,24 +47,43 @@ export function PcfClient({
   const [creating, setCreating] = useState(false);
   const [confirmDeleteFw, setConfirmDeleteFw] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
-  const [showRename, setShowRename] = useState(false);
-  const [renameValue, setRenameValue] = useState("");
-  const [renaming, setRenaming] = useState(false);
-  const [renameErr, setRenameErr] = useState<string | null>(null);
+  // Edit framework — name, variant and version together (Paul, 2026-09-14:
+  // "Allow the whole APQC Framework Name to be edited … Include the Version
+  // number as well"). The pickers show `variant vversion` for a reference
+  // framework and `name` for a tailored one, so all three are on the form and
+  // the form says which is shown where.
+  const [showEdit, setShowEdit] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editVariant, setEditVariant] = useState("");
+  const [editVersion, setEditVersion] = useState("");
+  const [editDivision, setEditDivision] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [editErr, setEditErr] = useState<string | null>(null);
 
-  async function renameFramework() {
-    if (!renameValue.trim() || !selectedId) return;
-    setRenaming(true); setRenameErr(null);
+  function openEdit(f: FrameworkSummary) {
+    setEditName(f.name); setEditVariant(f.variant); setEditVersion(f.version); setEditDivision(f.division ?? "");
+    setEditErr(null); setShowEdit(true);
+  }
+
+  async function saveFramework() {
+    if (!selected || !editName.trim() || !editVariant.trim() || !editVersion.trim()) return;
+    setSaving(true); setEditErr(null);
     try {
+      // Send only what changed, so an untouched field is never rewritten.
+      const body: Record<string, string | null> = {};
+      if (editName.trim() !== selected.name) body.name = editName.trim();
+      if (editVariant.trim() !== selected.variant) body.variant = editVariant.trim();
+      if (editVersion.trim() !== selected.version) body.version = editVersion.trim();
+      if (selected.kind === "tailored" && (editDivision.trim() || "") !== (selected.division ?? "")) body.division = editDivision.trim() || null;
+      if (Object.keys(body).length === 0) { setShowEdit(false); return; }
       const res = await fetch(`/api/orgs/${orgId}/pcf/${selectedId}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: renameValue.trim() }),
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
       });
       const j = await res.json().catch(() => ({}));
-      if (!res.ok) { setRenameErr(j.error ?? "Rename failed"); return; }
-      setShowRename(false);
+      if (!res.ok) { setEditErr(j.error ?? "Save failed"); return; }
+      setShowEdit(false);
       await loadFrameworks();
-    } finally { setRenaming(false); }
+    } finally { setSaving(false); }
   }
 
   async function createTailored() {
@@ -247,9 +266,9 @@ export function PcfClient({
             {selected && <span className="text-[11px] text-gray-400">{selected._count.nodes} elements · {selected.kind}</span>}
             <div className="ml-auto flex items-center gap-2">
               {selected && (selected.kind === "tailored" || isSuperAdmin) && (
-                <button onClick={() => { setRenameValue(selected.kind === "tailored" ? selected.name : selected.variant); setShowRename(true); }}
+                <button onClick={() => openEdit(selected)}
                   className="text-[11px] px-2 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
-                  title={selected.kind === "reference" ? "Rename this global reference framework (SuperAdmin)" : "Rename this tailored framework"}>✎ Rename</button>
+                  title={selected.kind === "reference" ? "Edit this global reference framework's name, variant and version (SuperAdmin)" : "Edit this tailored framework's name, variant, version and division"}>✎ Edit</button>
               )}
               {selected?.kind === "reference" && (
                 <button onClick={() => setShowUpgrade(true)} className="text-[11px] px-2 py-1 rounded border border-emerald-300 text-emerald-700 hover:bg-emerald-50" title="Diff vs the previous version + re-point your usage">⭫ Version upgrade…</button>
@@ -313,23 +332,56 @@ export function PcfClient({
         </div>
       )}
 
-      {showRename && selected && (
-        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50" onClick={() => !renaming && setShowRename(false)}>
-          <div className="bg-white rounded-lg shadow-xl border border-gray-200 p-5 w-[400px]" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-sm font-semibold text-gray-900 mb-1">Rename framework</h2>
+      {showEdit && selected && (
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50" onClick={() => !saving && setShowEdit(false)}>
+          <div className="bg-white rounded-lg shadow-xl border border-gray-200 p-5 w-[440px]" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-sm font-semibold text-gray-900 mb-1">Edit framework</h2>
             <p className="text-[11px] text-gray-500 mb-4">
               {selected.kind === "reference"
-                ? "Renames this global reference framework's label (shown in pickers and APQC project names). Applies to every org — SuperAdmin only."
-                : "Renames this tailored framework."}
+                ? "Pickers and APQC project names show the variant and version (e.g. “Cross-Industry v8.0”). Applies to every org — SuperAdmin only."
+                : "Tailored frameworks are shown by name. The variant and version are kept for reference."}
             </p>
-            <label className="block text-[10px] uppercase tracking-wide text-gray-400 mb-1">Name</label>
-            <input autoFocus value={renameValue} onChange={(e) => setRenameValue(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") renameFramework(); if (e.key === "Escape") setShowRename(false); }}
-              className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 mb-2 bg-white text-gray-800" />
-            {renameErr && <p className="text-[11px] text-red-600 mb-2">{renameErr}</p>}
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setShowRename(false)} disabled={renaming} className="px-3 py-1 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-50">Cancel</button>
-              <button onClick={renameFramework} disabled={renaming || !renameValue.trim()} className="px-3 py-1 text-xs text-white bg-indigo-600 rounded hover:bg-indigo-700 disabled:opacity-50">{renaming ? "Renaming…" : "Rename"}</button>
+            <div className="space-y-2.5">
+              <div>
+                <label className="block text-[10px] uppercase tracking-wide text-gray-400 mb-1">Name</label>
+                <input autoFocus value={editName} onChange={(e) => setEditName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") saveFramework(); if (e.key === "Escape") setShowEdit(false); }}
+                  className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white text-gray-800" />
+              </div>
+              <div className="grid grid-cols-[1fr_120px] gap-2">
+                <div>
+                  <label className="block text-[10px] uppercase tracking-wide text-gray-400 mb-1">Variant</label>
+                  <input value={editVariant} onChange={(e) => setEditVariant(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") saveFramework(); if (e.key === "Escape") setShowEdit(false); }}
+                    placeholder="e.g. Cross-Industry"
+                    className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white text-gray-800" />
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase tracking-wide text-gray-400 mb-1">Version</label>
+                  <input value={editVersion} onChange={(e) => setEditVersion(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") saveFramework(); if (e.key === "Escape") setShowEdit(false); }}
+                    placeholder="e.g. 8.0"
+                    className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white text-gray-800" />
+                </div>
+              </div>
+              {selected.kind === "tailored" && (
+                <div>
+                  <label className="block text-[10px] uppercase tracking-wide text-gray-400 mb-1">Division <span className="normal-case text-gray-300">(optional)</span></label>
+                  <input value={editDivision} onChange={(e) => setEditDivision(e.target.value)}
+                    placeholder="Business unit this tailoring is scoped to"
+                    className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white text-gray-800" />
+                </div>
+              )}
+            </div>
+            {selected.kind === "reference" && (
+              <p className="text-[10px] text-amber-700 mt-3">
+                Changing the version changes what a re-import of the same workbook is compared against: it would land as a second framework rather than be skipped.
+              </p>
+            )}
+            {editErr && <p className="text-[11px] text-red-600 mt-2">{editErr}</p>}
+            <div className="flex justify-end gap-2 mt-4">
+              <button onClick={() => setShowEdit(false)} disabled={saving} className="px-3 py-1 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-50">Cancel</button>
+              <button onClick={saveFramework} disabled={saving || !editName.trim() || !editVariant.trim() || !editVersion.trim()} className="px-3 py-1 text-xs text-white bg-indigo-600 rounded hover:bg-indigo-700 disabled:opacity-50">{saving ? "Saving…" : "Save"}</button>
             </div>
           </div>
         </div>
