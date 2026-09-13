@@ -17,12 +17,14 @@ import { ConsoleUserGuideLink } from "@/app/components/ConsoleUserGuideLink";
  * identity throughout.
  */
 export function RiskControlConsole({
-  projectId, projectName, canEdit, onClose,
+  projectId, projectName, canEdit, onClose, initialTab = "editor",
 }: {
   projectId: string;
   projectName?: string;
   canEdit: boolean;
   onClose: () => void;
+  /** Which tab to open on — the Project-menu launcher offers both. */
+  initialTab?: "editor" | "analytics";
 }) {
   const basePath = `/api/projects/${projectId}/risk-controls`;
   const [library, setLibrary] = useState<RiskControlLibraryDTO | null>(null);
@@ -37,7 +39,7 @@ export function RiskControlConsole({
   const [effectiveness, setEffectiveness] = useState<Record<string, ControlEffectiveness>>({});
   const [runName, setRunName] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<Record<string, RcAttachment[]>>({});
-  const [tab, setTab] = useState<"editor" | "analytics">("editor");
+  const [tab, setTab] = useState<"editor" | "analytics">(initialTab);
 
   const refresh = useCallback(async () => {
     const res = await fetch(basePath);

@@ -462,7 +462,14 @@ export const COLOR_PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = 
   // EPC's colours ARE the notation — green functions, pink events, yellow org
   // units — so recolouring is offered per symbol like BPMN, not withheld like
   // flowchart. The connectors stay white: a coloured XOR reads as a state.
-  epc: ["epc-event", "epc-function", "epc-org-unit", "epc-position", "epc-data", "epc-application", "epc-interface"],
+  // The three junctions (xor / and / or) are deliberately absent: they stay
+  // white, because a coloured one reads as a state rather than a junction.
+  // The extended objects (KPI, risk, product, …) are here so their colours are
+  // editable in Project → Configuration alongside the seven core symbols.
+  epc: [
+    "epc-event", "epc-function", "epc-org-unit", "epc-position", "epc-data", "epc-application", "epc-interface",
+    "epc-kpi", "epc-risk", "epc-product", "epc-knowledge", "epc-business-rule", "epc-screen", "epc-objective", "epc-machine",
+  ],
 };
 
 export function getSymbolDefinition(type: SymbolType): SymbolDefinition {

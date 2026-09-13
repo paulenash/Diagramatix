@@ -28,9 +28,10 @@ import { SharePointPicker } from "@/app/components/SharePointPicker";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { AlertDialog } from "@/app/components/AlertDialog";
 import { TranslateToBpmnDialog } from "@/app/components/TranslateToBpmnDialog";
-import { ProjectStructureSection } from "@/app/components/entityLists/ProjectStructureSection";
-import { ProjectSopsSection } from "@/app/components/sop/ProjectSopsSection";
+import { ProjectStructureDialog } from "@/app/components/entityLists/ProjectStructureSection";
+import { ProjectSopsDialog } from "@/app/components/sop/ProjectSopsSection";
 import { RiskControlConsole } from "@/app/components/riskControls/RiskControlConsole";
+import { RiskControlDialog } from "@/app/components/riskControls/RiskControlDialog";
 import { useReopenFromGuide } from "@/app/hooks/useReopenFromGuide";
 import { SimulatorOverlay } from "@/app/components/simulation/SimulatorOverlay";
 import { TeamLibraryManager } from "@/app/components/simulation/TeamLibraryManager";
@@ -636,6 +637,13 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
   const fileMenuRef = useRef<HTMLDivElement>(null);
   // "Project ▾" dropdown: groups Project Configuration + Scan together.
   const [showProjectMenu, setShowProjectMenu] = useState(false);
+  // Project-menu popups (Paul, 2026-09-14): the SOP list, the Entity Structure
+  // and the Risk & Controls launcher moved out of the header and sidebar into
+  // small dialogs opened from the Project menu.
+  const [showSops, setShowSops] = useState(false);
+  const [showStructure, setShowStructure] = useState(false);
+  const [showRcmLauncher, setShowRcmLauncher] = useState(false);
+  const [rcmInitialTab, setRcmInitialTab] = useState<"editor" | "analytics">("editor");
   const [showLinkScan, setShowLinkScan] = useState(false);
   const projectMenuRef = useRef<HTMLDivElement>(null);
 
@@ -2647,12 +2655,6 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
           {/* Org Owner — the owning Org drives org-wide RCM code numbering + the
               compliance roll-up. Read-only chip; re-homing moved to the SuperAdmin
               "Project Org Maintenance" tile (it also renumbers both Orgs). */}
-          {orgOwnerName && (
-            <span className="shrink-0 inline-flex items-center gap-1 text-[11px]" title="Org Owner — drives org-wide Risk & Control numbering + compliance roll-up (re-home via SuperAdmin → Project Org Maintenance)">
-              <span className="text-gray-400">Org&nbsp;Owner:</span>
-              <span className="font-medium text-gray-600">{orgOwnerName}</span>
-            </span>
-          )}
           {/* SuperAdmin shortcut — leftmost item in the header menu
               cluster, SuperAdmin-only. `?from=` carries this project's
               URL so the admin's Back link returns here. Mirrors the
@@ -2666,7 +2668,14 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
               SuperAdmin
             </a>
           )}
-          {!readOnly && (
+          {/* Project ▾ — the home for everything project-scoped (Paul, 2026-09-14:
+              SOP Templates, Resources, Org Owner, Standard Operating Procedures,
+              the renamed Entity Structure and Risk & Controls all moved in here
+              from the header and the sidebar). Rendered for EVERYONE: a viewer
+              could always open the SOP list and see the Org Owner, so the menu
+              cannot be editor-only — the write actions are gated one by one
+              inside it instead. */}
+          {(
             <div className="relative" ref={projectMenuRef}>
               <button
                 onClick={() => setShowProjectMenu((v) => !v)}
@@ -2675,13 +2684,56 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
                 Project ▾
               </button>
               {showProjectMenu && (
-                <div className="absolute left-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded shadow-lg z-50 py-1">
+                <div className="absolute left-0 top-full mt-1 w-64 bg-white border border-gray-200 rounded shadow-lg z-50 py-1">
+                  {!readOnly && (
                   <button
                     className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100"
                     onClick={() => { setShowProjectMenu(false); setShowMaintenance(true); }}
                   >
                     Configuration
                   </button>
+                  )}
+                  <button
+                    className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100"
+                    onClick={() => { setShowProjectMenu(false); setShowStructure(true); }}
+                    title="Names for pools, lanes, data objects & stores — adopt an org structure, maintain the lists, populate from BPMN"
+                  >
+                    Entity Structure…
+                  </button>
+                  <button
+                    className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100"
+                    onClick={() => { setShowProjectMenu(false); setShowSops(true); }}
+                    title="The Standard Operating Procedures generated in this project — open or delete"
+                  >
+                    Standard Operating Procedures…
+                  </button>
+                  <a
+                    href={`/dashboard/projects/${project.id}/sop-templates`}
+                    className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100"
+                    title="Upload a Word template for SOP exports in this project"
+                  >
+                    SOP Templates
+                  </a>
+                  {ent.riskControl && (
+                  <button
+                    className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100"
+                    onClick={() => { setShowProjectMenu(false); setShowRcmLauncher(true); }}
+                    title="Risk & Controls — the current risks and controls, the catalog, analytics and the Risk-Control Matrix"
+                  >
+                    {"◆"} Risk &amp; Controls…
+                  </button>
+                  )}
+                  {ent.simulator && (
+                  <button
+                    className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100"
+                    onClick={() => { setShowProjectMenu(false); setShowResources(true); }}
+                    title="Maintain this project's simulation resources (people + automation) and working calendars — shared by every process in the project"
+                  >
+                    {"⚙"} Resources
+                  </button>
+                  )}
+                  {!readOnly && <div className="my-1 border-t border-gray-100" />}
+                  {!readOnly && (<>
                   <button
                     className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 disabled:opacity-50"
                     disabled={scanBusy}
@@ -2700,6 +2752,21 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
                   >
                     Scan Diagrams for Links
                   </button>
+                  </>)}
+                  {/* Org Owner — information, not an action. The owning Org drives
+                      org-wide RCM numbering + the compliance roll-up; re-homing lives
+                      on the SuperAdmin "Project Org Maintenance" tile. */}
+                  {orgOwnerName && (
+                    <>
+                      <div className="my-1 border-t border-gray-100" />
+                      <div
+                        className="px-3 py-1.5 text-xs text-gray-500 cursor-default"
+                        title="Org Owner — drives org-wide Risk & Control numbering + compliance roll-up (re-home via SuperAdmin → Project Org Maintenance)"
+                      >
+                        Org Owner: <span className="font-medium text-gray-700">{orgOwnerName}</span>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -2932,15 +2999,6 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
                 {"◈"} Simulator
               </button>
               )}
-              {ent.simulator && (
-              <button
-                onClick={() => setShowResources(true)}
-                className="px-3 py-1 text-xs font-medium rounded-md border text-green-700 border-green-400 hover:bg-green-50"
-                title="Maintain this project's simulation resources (people + automation) and working calendars — shared by every process in the project"
-              >
-                {"⚙"} Resources
-              </button>
-              )}
               {ent.processMining && (
               <button
                 onClick={() => setShowMining(true)}
@@ -2950,18 +3008,8 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
                 {"⛏"} Process Mining
               </button>
               )}
-              {ent.riskControl && (
-              <button
-                onClick={() => setShowRcm(true)}
-                className="px-3 py-1 text-xs font-medium rounded-md border text-blue-700 border-blue-400 hover:bg-blue-50"
-                title="Risk & Controls - maintain the risk/control catalog + Risk-Control Matrix"
-              >
-                {"◆"} Risk & Controls
-              </button>
-              )}
             </>
           )}
-          <a href={`/dashboard/projects/${project.id}/sop-templates`} className="text-xs text-blue-600 hover:underline ml-1" title="Upload a Word template for SOP exports in this project">SOP Templates</a>
           <UserGuideLink className="text-xs text-blue-600 hover:underline ml-1" title="User Guide">User Guide</UserGuideLink>
         </div>
         {projectDescription && (
@@ -3017,15 +3065,6 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
               </svg>
             </button>
           </div>
-          <ProjectStructureSection projectId={project.id} canEdit={!readOnly} />
-          <ProjectSopsSection projectId={project.id} canEdit={!readOnly} />
-          {ent.riskControl && (
-          <button onClick={() => setShowRcm(true)}
-            className="w-full flex items-center justify-between px-3 py-2 text-[11px] font-medium text-blue-800 hover:bg-blue-50 border-b border-gray-100">
-            <span>◆ Risk &amp; Controls <span className="text-gray-400 ml-1">— catalog + Risk-Control Matrix</span></span>
-            <span className="text-blue-500">open ⤢</span>
-          </button>
-          )}
           <div className="overflow-y-auto p-2 flex-1">
             {renderFolder(ROOT_ID, 0)}
           </div>
@@ -3626,6 +3665,17 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
           inside the Simulator — the same managers, so there is one implementation
           and no chance of the two drifting. Kept on the Simulator's dark ground
           because these ARE its libraries. */}
+      {showSops && <ProjectSopsDialog projectId={project.id} canEdit={!readOnly} onClose={() => setShowSops(false)} />}
+      {showStructure && <ProjectStructureDialog projectId={project.id} canEdit={!readOnly} onClose={() => setShowStructure(false)} />}
+      {showRcmLauncher && (
+        <RiskControlDialog
+          projectId={project.id}
+          projectName={project.name}
+          onOpenConsole={(tab) => { setShowRcmLauncher(false); setRcmInitialTab(tab); setShowRcm(true); }}
+          onClose={() => setShowRcmLauncher(false)}
+        />
+      )}
+
       {showResources && (
         <div className="fixed inset-0 z-[70] bg-black/70 flex items-center justify-center p-6" onClick={() => setShowResources(false)}>
           <div className="bg-black border border-green-500/40 rounded-lg w-full max-w-5xl max-h-[85vh] overflow-auto p-4 font-mono" onClick={(e) => e.stopPropagation()}>
@@ -3718,6 +3768,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
           projectId={project.id}
           projectName={project.name}
           canEdit={!readOnly}
+          initialTab={rcmInitialTab}
           onClose={() => setShowRcm(false)}
         />
       )}

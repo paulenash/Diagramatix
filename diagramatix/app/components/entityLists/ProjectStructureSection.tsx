@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { EntityListEditor } from "@/app/components/entityLists/EntityListEditor";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { PromptDialog } from "@/app/components/PromptDialog";
+import { ListPopup } from "@/app/components/ListPopup";
 import {
   ENTITY_LIST_KIND_LABELS, STRUCTURE_LIST_KINDS,
   type EntityListDTO, type EntityListKind,
@@ -13,8 +14,13 @@ import {
  * Project-level Entity Structure: adopt a whole org structure (COPIES the project
  * edits independently), maintain the five lists, add your own entries, and pull
  * later master changes with "Sync updates" (keeps your additions). Owner-editable.
+ *
+ * Was a collapsible sidebar section called "Project Structure". Paul, 2026-09-14:
+ * moved into the Project menu as a popup, and renamed "Entity Structure" — the
+ * name the rest of the product already uses for the same thing. The body is
+ * unchanged; only the frame around it moved.
  */
-export function ProjectStructureSection({ projectId, canEdit }: { projectId: string; canEdit: boolean }) {
+export function ProjectStructureBody({ projectId, canEdit }: { projectId: string; canEdit: boolean }) {
   const projectBase = `/api/projects/${projectId}`;
   const basePath = `${projectBase}/entity-lists`;
   const [lists, setLists] = useState<EntityListDTO[]>([]);
@@ -28,7 +34,6 @@ export function ProjectStructureSection({ projectId, canEdit }: { projectId: str
   const [err, setErr] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [confirmReplace, setConfirmReplace] = useState<string | null>(null);
-  const [open, setOpen] = useState(false);
   const [namingBuild, setNamingBuild] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -106,13 +111,9 @@ export function ProjectStructureSection({ projectId, canEdit }: { projectId: str
   const byKind = (k: EntityListKind) => lists.find((l) => l.kind === k);
 
   return (
-    <div className="border-b border-gray-100">
-      <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between px-3 py-2 text-[11px] font-medium text-gray-700 hover:bg-gray-50">
-        <span>Project Structure <span className="text-gray-400 ml-1">— names for pools, lanes, data objects &amp; stores</span></span>
-        <span className="text-gray-400">{open ? "▾" : "▸"}</span>
-      </button>
-      {open && (
-        <div className="space-y-3 px-3 pb-3">
+    <div>
+      {(
+        <div className="space-y-3">
           {err && <p className="text-[11px] text-red-500">{err}</p>}
           {note && <p className="text-[11px] text-green-600">{note}</p>}
 
@@ -197,5 +198,20 @@ export function ProjectStructureSection({ projectId, canEdit }: { projectId: str
         </div>
       )}
     </div>
+  );
+}
+
+/** The Project-menu popup: the structure's lists and options, scrollable, with
+ *  Continue in a footer outside the scroll region. */
+export function ProjectStructureDialog({ projectId, canEdit, onClose }: { projectId: string; canEdit: boolean; onClose: () => void }) {
+  return (
+    <ListPopup
+      title="Entity Structure"
+      subtitle="Names for pools, lanes, data objects & stores — adopt an org structure, maintain the lists, populate from BPMN."
+      onContinue={onClose}
+      width="max-w-3xl"
+    >
+      <ProjectStructureBody projectId={projectId} canEdit={canEdit} />
+    </ListPopup>
   );
 }

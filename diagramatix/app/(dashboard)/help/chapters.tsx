@@ -4438,12 +4438,11 @@ export const CHAPTERS: HelpChapter[] = [
               changing the master.
             </p>
             <p className="mt-2">
-              Open the <strong>Project Structure</strong> panel (a collapsible
-              row at the top of the diagram-tree column on the project page) to
-              adopt an org structure, or build one directly with{" "}
-              <strong>“+ create empty”</strong>. Pool/lane naming only draws
-              from the project's <em>own</em> copy — the org master alone is not
-              enough.
+              Open <strong>Project ▾ → Entity Structure…</strong> on the
+              project page to adopt an org structure, or build one directly
+              with <strong>“+ create empty”</strong>. Pool/lane naming only
+              draws from the project's <em>own</em> copy — the org master alone
+              is not enough.
             </p>
           </>
         ),

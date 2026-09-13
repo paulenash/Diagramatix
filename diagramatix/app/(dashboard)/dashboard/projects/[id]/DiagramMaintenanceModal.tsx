@@ -55,6 +55,11 @@ const TABS: { type: DiagramType; label: string }[] = [
   { type: "context",           label: "Context" },
   { type: "domain",            label: "Domain" },
   { type: "flowchart",         label: "Standard Flowchart" },
+  // Paul, 2026-09-14: "Add EPC Diagram Colour and Typography setting feature to
+  // the Project → Configuration menu option." The colours were always in the
+  // palette map; the tab was the missing piece. Typography here is project-wide
+  // (no type has its own) and EPC picks it up — see the note on that section.
+  { type: "epc",               label: "EPC" },
 ];
 
 type Section = "colours" | "typography";
@@ -253,9 +258,10 @@ export function DiagramMaintenanceModal({
         {activeSection === "typography" && (
           <div className="flex-1 overflow-y-auto px-6 py-4">
             <p className="text-xs text-gray-500 mb-4">
-              These sizes (in pixels) are applied to NEW diagrams created in this project.
-              Existing diagrams keep their own font sizes. Leave a field blank to use the
-              system default.
+              These sizes (in pixels) are applied to NEW diagrams created in this project,
+              of every diagram type — including EPC, which uses the element, connector and
+              title sizes (it has no pools or lanes). Existing diagrams keep their own font
+              sizes. Leave a field blank to use the system default.
             </p>
             <div className="space-y-3">
               {FONT_ROWS.map((row) => {
