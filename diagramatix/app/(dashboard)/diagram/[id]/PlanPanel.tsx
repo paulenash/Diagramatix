@@ -1346,7 +1346,7 @@ export function PlanPanel({
         {isAdmin && !superAdminHidden && aiModels.length > 0 && (
           <div className="shrink-0 flex items-center gap-2 text-[10px] text-gray-600 mb-1.5">
             <span className="shrink-0">AI Model</span>
-            <ModelSelect value={model} onChange={setModel} models={aiModels} disabled={busy !== null}
+            <ModelSelect value={model} onChange={setModel} models={aiModels} disabled={busy !== null} showCost
               className="flex-1 text-[11px] border border-gray-300 rounded px-2 py-1 bg-white disabled:opacity-50" />
           </div>
         )}

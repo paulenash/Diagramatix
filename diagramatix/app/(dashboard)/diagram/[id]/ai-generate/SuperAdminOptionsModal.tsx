@@ -103,7 +103,7 @@ export function SuperAdminOptionsModal({
 
         {showAdmin && aiModels.length > 0 && (
           <AiPanel title="AI model" tones={tones} hint="used for Plan and Refine">
-            <ModelSelect value={model} onChange={onModelChange} models={aiModels} disabled={busy}
+            <ModelSelect value={model} onChange={onModelChange} models={aiModels} disabled={busy} showCost
               className="w-full text-xs rounded px-2 py-1 bg-black/50 text-white/90 border border-white/25 [color-scheme:dark] disabled:opacity-50" />
           </AiPanel>
         )}

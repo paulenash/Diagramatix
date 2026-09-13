@@ -27,15 +27,22 @@ export function useAllowedModels(saMode: boolean) {
   return { models, current, reload };
 }
 
-/** A compact model `<select>` showing each model's label + rough per-generation cost. */
+/**
+ * A compact model `<select>` showing each model's label. The rough per-generation
+ * cost is appended only when `showCost` is set — it is a SuperAdmin detail
+ * (Paul, 2026-09-14: "Don't include the cost on the AI Model dropdown lists
+ * available to the normal user"), so it is OFF unless the caller says otherwise.
+ */
 export function ModelSelect({
-  value, onChange, models, disabled, className,
+  value, onChange, models, disabled, className, showCost = false,
 }: {
   value: string;
   onChange: (id: string) => void;
   models: AllowedModel[];
   disabled?: boolean;
   className?: string;
+  /** Append "(~$0.123)" to each option. Only for SuperAdmin-mode pickers. */
+  showCost?: boolean;
 }) {
   return (
     <select
@@ -48,7 +55,7 @@ export function ModelSelect({
       {models.length === 0 && value ? <option value={value}>{value}</option> : null}
       {models.map((m) => (
         <option key={m.id} value={m.id}>
-          {m.label}{m.costUsd != null ? ` (~$${m.costUsd.toFixed(3)})` : ""}
+          {m.label}{showCost && m.costUsd != null ? ` (~$${m.costUsd.toFixed(3)})` : ""}
         </option>
       ))}
     </select>

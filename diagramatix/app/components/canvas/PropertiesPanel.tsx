@@ -56,13 +56,16 @@ const ARCHI_REL_META: Record<string, { type: string; group: ArchiRelGroup }> = {
 
 /** Diagram-Properties "Regenerate from prompt" control: pick a (cost-gated) model
  *  and re-run the linked prompt's CURRENT text over the current diagram. */
-function RegenerateControl({ models, initialModel, onRegenerate, canSeeModel }: {
+function RegenerateControl({ models, initialModel, onRegenerate, canSeeModel, showCost }: {
   models: AllowedModel[];
   initialModel: string;
   onRegenerate?: (model: string) => void;
   /** The AI model picker is a SuperAdmin-only detail; others regenerate with
    *  the recorded/default model (no dropdown shown). */
   canSeeModel?: boolean;
+  /** Per-model cost on the options — SuperAdmin MODE only, never in a
+   *  customer view mode (that view is what a normal user would see). */
+  showCost?: boolean;
 }) {
   const [model, setModel] = useState<string>(initialModel);
   // Re-sync when the diagram (and thus its recorded model) changes — so selecting
@@ -74,7 +77,7 @@ function RegenerateControl({ models, initialModel, onRegenerate, canSeeModel }: 
   return (
     <div className="mt-1 flex items-center gap-1">
       {canSeeModel && (
-        <ModelSelect value={model} onChange={setModel} models={models}
+        <ModelSelect value={model} onChange={setModel} models={models} showCost={showCost}
           className="flex-1 min-w-0 text-[9px] border border-gray-300 rounded px-1 py-0.5 bg-white" />
       )}
       <button
@@ -246,6 +249,10 @@ interface Props {
    *  (none today — the Bubble Help editor moved to
    *  /dashboard/admin/bubble-help). */
   isAdmin?: boolean;
+  /** Show the per-generation cost on the Regenerate model picker. The editor
+   *  passes its acting-SuperAdmin flag, so a SuperAdmin presenting in a customer
+   *  view mode sees the list a normal user would — without prices. */
+  showModelCost?: boolean;
 }
 
 // Min/max height for the task/subprocess Name textarea.
@@ -870,6 +877,7 @@ export function PropertiesPanel({
   diagramOwnerError,
   onSetDiagramOwner,
   isAdmin: _isAdmin,
+  showModelCost,
   riskCatalog,
   showRiskControls,
   showSimulation,
@@ -1171,6 +1179,7 @@ export function PropertiesPanel({
                   initialModel={aiGeneration.model || currentAiModelId || ""}
                   onRegenerate={onRegenerate}
                   canSeeModel={_isAdmin}
+                  showCost={showModelCost}
                 />
               </div>
             </div>

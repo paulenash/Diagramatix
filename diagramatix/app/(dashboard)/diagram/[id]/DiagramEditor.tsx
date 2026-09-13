@@ -6023,6 +6023,7 @@ export function DiagramEditor({
             diagramTitle={data.title}
             database={data.database}
             onSetDatabase={diagramType === "domain" && isAdmin && !superAdminHidden ? setDatabase : undefined}
+            showModelCost={isActingAdmin}
             purpose={data.purpose}
             description={data.description}
             onSetPurpose={setDiagramPurpose}
