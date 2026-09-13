@@ -5121,19 +5121,59 @@ export function layoutBpmnDiagram(
   // The EP clears the gateway's CENTRE LINE rather than the whole diamond: full
   // separation would throw a 131px box a long way off the row and stretch the
   // lane around it for no extra clarity.
+  //
+  // "Clears the centre line" assumed the line IS the boundary between branches.
+  // It is, when the branch leaving the RIGHT vertex ends in a task or an event:
+  // those are centred on the line and reach 20-32px above it, and the
+  // enlargement rule has already shoved them past the EP horizontally, so the
+  // vertical straddle never meets anything. It is not the boundary when that
+  // right-hand branch is ITSELF an Expanded Subprocess — a 137px box centred
+  // on the line reaches 69px above it, and both guards that would move it skip
+  // containers (the enlargement rule shifts only leaves; the EP de-overlap
+  // skips any sibling with children). Paul, 2026-09-13, Meeting Planner: "Plan
+  // Meetings" (top vertex) had its bottom set ON the line at 887 while "Plan
+  // Discussions Per Meeting" (right vertex) sat centred on it, top at 817 —
+  // overlapping by exactly 70px, with the second EP's start event, first task
+  // and event drawn inside the first's box.
+  //
+  // So the EP now clears the centre line OR any same-gateway sibling target it
+  // would overlap horizontally, whichever is further. Where no sibling
+  // straddles, `wantY` is what it always was and nothing below changes.
   {
+    const SIB_GAP = 20;
+    // Lifting an EP above the line can carry it past its lane's top, and
+    // nothing after this point re-fits lanes upward — `expandContainerToFit-
+    // Children` only ever grows right and bottom. Re-fit ONLY when the sibling
+    // clearance actually fired, so every other diagram stays byte-identical.
+    let cleared = false;
     for (const [key, side] of branchVertex) {
       if (side === "right") continue;
       const sep = key.indexOf("->");
-      const gw = elMap.get(key.slice(0, sep));
+      const gwId = key.slice(0, sep);
+      const gw = elMap.get(gwId);
       const ep = elMap.get(key.slice(sep + 2));
       if (!gw || !ep || ep.type !== "subprocess-expanded") continue;
       const gcy = gw.y + gw.height / 2;
-      const wantY = side === "top" ? gcy - ep.height : gcy;
+      const lineY = side === "top" ? gcy - ep.height : gcy;
+      let wantY = lineY;
+      for (const [k2] of branchVertex) {
+        if (k2 === key || !k2.startsWith(`${gwId}->`)) continue;
+        const sib = elMap.get(k2.slice(k2.indexOf("->") + 2));
+        if (!sib || sib.id === ep.id) continue;
+        if (sib.parentId !== ep.parentId) continue;                    // another lane's own stacking
+        if (sib.x >= ep.x + ep.width || sib.x + sib.width <= ep.x) continue; // no x overlap → no collision
+        if (side === "top" && sib.y < gcy) wantY = Math.min(wantY, sib.y - SIB_GAP - ep.height);
+        if (side === "bottom" && sib.y + sib.height > gcy) wantY = Math.max(wantY, sib.y + sib.height + SIB_GAP);
+      }
       const dy = wantY - ep.y;
       if (Math.abs(dy) < 1) continue;
+      if (wantY !== lineY) cleared = true;
       shiftSubtree(ep.id, dy);      // children and boundary events travel with it
       ep.y += dy;                   // shiftSubtree does not move the root
+    }
+    if (cleared) {
+      fitLanesToChildren();
+      restackPoolsR52();
     }
   }
 

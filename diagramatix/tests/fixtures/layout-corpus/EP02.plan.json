@@ -1,0 +1,514 @@
+{
+  "_provenance": "HAND-ADDED 2026-09-13, not from scripts/build-layout-corpus.ts. Paul: two sibling Expanded Subprocesses — parallel branches off one gateway — laid out overlapping by 439x70px. Captured from his exported diagram; the replay is byte-identical to it (0 geometry differences over 42 elements). Present on the engine BEFORE the R55.2 scoping fix as well, so it is not a regression of that change.",
+  "diagrams": [
+    {
+      "name": "AI Generation - Meeting Planner Test · Opus 5 (copy)",
+      "data": {
+        "aiGeneration": {
+          "plan": {
+            "elements": [
+              {
+                "id": "pCust",
+                "type": "pool",
+                "label": "Customer",
+                "poolType": "black-box",
+                "isSystem": false
+              },
+              {
+                "id": "pPart",
+                "type": "pool",
+                "label": "Participants",
+                "poolType": "black-box",
+                "isSystem": false
+              },
+              {
+                "id": "p1",
+                "type": "pool",
+                "label": "Conference\nManagement\nOffice",
+                "poolType": "white-box"
+              },
+              {
+                "id": "l1",
+                "type": "lane",
+                "label": "Meeting Planner",
+                "parentPool": "p1",
+                "pool": "p1"
+              },
+              {
+                "id": "l2",
+                "type": "lane",
+                "label": "Accountant",
+                "parentPool": "p1",
+                "pool": "p1"
+              },
+              {
+                "id": "pRoom",
+                "type": "pool",
+                "label": "Room\nBooking\nSystem",
+                "poolType": "black-box",
+                "isSystem": true
+              },
+              {
+                "id": "pAcct",
+                "type": "pool",
+                "label": "Accounting\nSystem",
+                "poolType": "black-box",
+                "isSystem": true
+              },
+              {
+                "id": "pCal",
+                "type": "pool",
+                "label": "Calendar\nOutlook",
+                "poolType": "black-box",
+                "isSystem": true
+              },
+              {
+                "id": "start1",
+                "type": "start-event",
+                "label": "Start of Week",
+                "eventType": "timer",
+                "pool": "p1",
+                "lane": "l1"
+              },
+              {
+                "id": "gwSplit",
+                "type": "gateway",
+                "label": "Start Weekly Activities",
+                "gatewayType": "parallel",
+                "pool": "p1",
+                "lane": "l1"
+              },
+              {
+                "id": "sp1",
+                "type": "subprocess-expanded",
+                "label": "Plan Meetings",
+                "pool": "p1",
+                "lane": "l1"
+              },
+              {
+                "id": "sp1s",
+                "type": "start-event",
+                "label": "",
+                "parentSubprocess": "sp1"
+              },
+              {
+                "id": "sp1loop",
+                "type": "subprocess-expanded",
+                "label": "Repeat Until Slot Agreed",
+                "repeatType": "loop",
+                "parentSubprocess": "sp1"
+              },
+              {
+                "id": "sp1ls",
+                "type": "start-event",
+                "label": "",
+                "parentSubprocess": "sp1loop"
+              },
+              {
+                "id": "t1",
+                "type": "task",
+                "label": "Find Available\nRoom",
+                "taskType": "user",
+                "parentSubprocess": "sp1loop"
+              },
+              {
+                "id": "t2",
+                "type": "task",
+                "label": "Check Participant\nAvailability",
+                "taskType": "user",
+                "parentSubprocess": "sp1loop"
+              },
+              {
+                "id": "sp1le",
+                "type": "end-event",
+                "label": "",
+                "parentSubprocess": "sp1loop"
+              },
+              {
+                "id": "t3",
+                "type": "task",
+                "label": "Settle Meeting Time\nAnd Room",
+                "taskType": "user",
+                "parentSubprocess": "sp1"
+              },
+              {
+                "id": "t4",
+                "type": "task",
+                "label": "Notify Participants\nOf Details",
+                "taskType": "send",
+                "parentSubprocess": "sp1"
+              },
+              {
+                "id": "sp1e",
+                "type": "end-event",
+                "label": "",
+                "parentSubprocess": "sp1"
+              },
+              {
+                "id": "bCancel",
+                "type": "intermediate-event",
+                "label": "Meetings Cancelled",
+                "eventType": "cancel",
+                "boundaryHost": "sp1",
+                "boundarySide": "bottom"
+              },
+              {
+                "id": "t5",
+                "type": "task",
+                "label": "Cancel The\nMeetings",
+                "taskType": "user",
+                "pool": "p1",
+                "lane": "l2"
+              },
+              {
+                "id": "t6",
+                "type": "task",
+                "label": "Send Cancellation\nAdvice",
+                "taskType": "send",
+                "pool": "p1",
+                "lane": "l2"
+              },
+              {
+                "id": "endCancel",
+                "type": "end-event",
+                "label": "Process Terminated",
+                "pool": "p1",
+                "lane": "l2"
+              },
+              {
+                "id": "sp2",
+                "type": "subprocess-expanded",
+                "label": "Plan Discussions Per Meeting",
+                "repeatType": "mi-parallel",
+                "pool": "p1",
+                "lane": "l1"
+              },
+              {
+                "id": "sp2s",
+                "type": "start-event",
+                "label": "",
+                "parentSubprocess": "sp2"
+              },
+              {
+                "id": "t7",
+                "type": "task",
+                "label": "Prepare Meeting\nAgenda",
+                "taskType": "user",
+                "parentSubprocess": "sp2"
+              },
+              {
+                "id": "ev1",
+                "type": "intermediate-event",
+                "label": "Agenda Ready",
+                "eventType": "conditional",
+                "parentSubprocess": "sp2"
+              },
+              {
+                "id": "t8",
+                "type": "task",
+                "label": "Attach Agenda\nTo Invitation",
+                "taskType": "user",
+                "parentSubprocess": "sp2"
+              },
+              {
+                "id": "sp2e",
+                "type": "end-event",
+                "label": "",
+                "parentSubprocess": "sp2"
+              },
+              {
+                "id": "sp3",
+                "type": "subprocess-expanded",
+                "label": "Invoice Customer",
+                "pool": "p1",
+                "lane": "l2"
+              },
+              {
+                "id": "sp3s",
+                "type": "start-event",
+                "label": "",
+                "parentSubprocess": "sp3"
+              },
+              {
+                "id": "t9",
+                "type": "task",
+                "label": "Prepare Meeting\nInvoice",
+                "taskType": "user",
+                "parentSubprocess": "sp3"
+              },
+              {
+                "id": "sp3a",
+                "type": "subprocess",
+                "label": "Send Invoice And\nCollect Payment",
+                "parentSubprocess": "sp3"
+              },
+              {
+                "id": "bTimer",
+                "type": "intermediate-event",
+                "label": "X Days Elapsed",
+                "eventType": "timer",
+                "boundaryHost": "sp3a",
+                "boundarySide": "bottom"
+              },
+              {
+                "id": "t10",
+                "type": "task",
+                "label": "Send Payment\nReminder",
+                "taskType": "send",
+                "parentSubprocess": "sp3"
+              },
+              {
+                "id": "gwRem",
+                "type": "gateway",
+                "label": "Payment Path Merge",
+                "gatewayType": "exclusive",
+                "parentSubprocess": "sp3"
+              },
+              {
+                "id": "sp3e",
+                "type": "end-event",
+                "label": "",
+                "parentSubprocess": "sp3"
+              },
+              {
+                "id": "gwJoin",
+                "type": "gateway",
+                "label": "All Activities Complete",
+                "gatewayType": "parallel",
+                "pool": "p1",
+                "lane": "l1"
+              },
+              {
+                "id": "end1",
+                "type": "end-event",
+                "label": "Week Completed",
+                "pool": "p1",
+                "lane": "l1"
+              },
+              {
+                "id": "do1",
+                "type": "data-object",
+                "label": "Meeting Agenda",
+                "pool": "p1",
+                "lane": "l1"
+              },
+              {
+                "id": "do2",
+                "type": "data-object",
+                "label": "Meeting Invoice",
+                "pool": "p1",
+                "lane": "l2"
+              }
+            ],
+            "connections": [
+              {
+                "sourceId": "start1",
+                "targetId": "gwSplit",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gwSplit",
+                "targetId": "sp1",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gwSplit",
+                "targetId": "sp2",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gwSplit",
+                "targetId": "sp3",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "sp1s",
+                "targetId": "sp1loop",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "sp1ls",
+                "targetId": "t1",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t1",
+                "targetId": "t2",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t2",
+                "targetId": "sp1le",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "sp1loop",
+                "targetId": "t3",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t3",
+                "targetId": "t4",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t4",
+                "targetId": "sp1e",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t1",
+                "targetId": "pRoom",
+                "type": "message",
+                "label": "Room availability query"
+              },
+              {
+                "sourceId": "t2",
+                "targetId": "pCal",
+                "type": "message",
+                "label": "Availability request"
+              },
+              {
+                "sourceId": "t4",
+                "targetId": "pPart",
+                "type": "message",
+                "label": "Meeting time and room"
+              },
+              {
+                "sourceId": "bCancel",
+                "targetId": "t5",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t5",
+                "targetId": "t6",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t6",
+                "targetId": "endCancel",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t6",
+                "targetId": "pCust",
+                "type": "message",
+                "label": "Cancellation advice"
+              },
+              {
+                "sourceId": "sp2s",
+                "targetId": "t7",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t7",
+                "targetId": "ev1",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "ev1",
+                "targetId": "t8",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t8",
+                "targetId": "sp2e",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t8",
+                "targetId": "pCal",
+                "type": "message",
+                "label": "Invitation with agenda"
+              },
+              {
+                "sourceId": "t7",
+                "targetId": "do1",
+                "type": "association"
+              },
+              {
+                "sourceId": "sp3s",
+                "targetId": "t9",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t9",
+                "targetId": "sp3a",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t9",
+                "targetId": "do2",
+                "type": "association"
+              },
+              {
+                "sourceId": "t9",
+                "targetId": "pAcct",
+                "type": "message",
+                "label": "Invoice details"
+              },
+              {
+                "sourceId": "sp3a",
+                "targetId": "gwRem",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "bTimer",
+                "targetId": "t10",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t10",
+                "targetId": "gwRem",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gwRem",
+                "targetId": "sp3e",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "sp3a",
+                "targetId": "pCust",
+                "type": "message",
+                "label": "Invoice sent"
+              },
+              {
+                "sourceId": "pCust",
+                "targetId": "sp3a",
+                "type": "message",
+                "label": "Payment received"
+              },
+              {
+                "sourceId": "t10",
+                "targetId": "pCust",
+                "type": "message",
+                "label": "Payment reminder"
+              },
+              {
+                "sourceId": "sp1",
+                "targetId": "gwJoin",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "sp2",
+                "targetId": "gwJoin",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "sp3",
+                "targetId": "gwJoin",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gwJoin",
+                "targetId": "end1",
+                "type": "sequence"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

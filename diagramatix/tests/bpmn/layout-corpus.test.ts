@@ -71,6 +71,21 @@ const KNOWN: Record<string, number> = {
    *   • two subprocess connectors sharing one attachment point on pLR
    */
   "EP01.plan.json": 3,
+  /**
+   * HAND-ADDED 2026-09-13. Two sibling EPs — parallel branches off one gateway
+   * — overlapped by 439×70px: R8.26 set the top-vertex EP's bottom ON the
+   * gateway's centre line while the right-vertex EP sat centred on it. Arrived
+   * at 7; the sibling-clearance fix took it to 2. The five that went were that
+   * body overlap, the three shapes of the second EP drawn inside the first, and
+   * the first EP's own cancel event that had been sitting inside the EP below.
+   * The two left are pre-existing and present on both engines:
+   *   • a gateway LABEL drawn over an EP box — the same job as EP01's
+   *   • "Invoice Customer overlaps X Days Elapsed" — a SCANNER false positive:
+   *     the timer is a boundary event on a collapsed subprocess INSIDE that EP,
+   *     so it is inside the box by construction. Its own job: teach the
+   *     BODY/BODY check that a descendant's boundary event is not an intruder.
+   */
+  "EP02.plan.json": 2,
   "V04.01.plan.json": 2,
   // 3 -> 1 when R55.7 gave the exception path a row clear of the main line.
   "V22.01.plan.json": 1,
