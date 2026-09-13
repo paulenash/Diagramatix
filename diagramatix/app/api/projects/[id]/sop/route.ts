@@ -36,13 +36,28 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   }
   const docs = await prisma.sopDocument.findMany({
     where: { projectId },
-    select: { id: true, diagramId: true, scope: true, scopeElementId: true, scopeLabel: true, title: true, status: true, generatedAt: true, updatedAt: true, diagram: { select: { name: true, updatedAt: true } } },
+    select: {
+      id: true, diagramId: true, scope: true, scopeElementId: true, scopeLabel: true, title: true, status: true,
+      generatedAt: true, updatedAt: true, createdAt: true, createdById: true, model: true,
+      diagram: { select: { name: true, updatedAt: true } },
+    },
     orderBy: { updatedAt: "desc" },
   });
+  // Provenance. Paul, 2026-09-14: "When are the SOPs created for Process
+  // Repository Diagrams? They seem to be there without me creating them?" The
+  // only writers are Generate SOP and an org-backup restore, but a list that
+  // shows neither who nor when leaves the reader guessing. `createdById` is a
+  // bare id on the model (no relation), so the names are looked up here.
+  const creatorIds = [...new Set(docs.map((d) => d.createdById).filter((x): x is string => !!x))];
+  const creators = creatorIds.length
+    ? await prisma.user.findMany({ where: { id: { in: creatorIds } }, select: { id: true, name: true, email: true } })
+    : [];
+  const creatorName = new Map(creators.map((u) => [u.id, u.name?.trim() || u.email]));
   return NextResponse.json({
     documents: docs.map((d) => ({
       ...d,
       diagramName: d.diagram?.name ?? null,
+      createdBy: d.createdById ? (creatorName.get(d.createdById) ?? null) : null,
       // Stale = the source diagram was changed after this SOP was last generated →
       // "SOP Regeneration required". generatedAt is (re)stamped on generate/regenerate.
       stale: !!(d.generatedAt && d.diagram && d.diagram.updatedAt > d.generatedAt),

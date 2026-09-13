@@ -159,6 +159,25 @@ describe("Project → Configuration covers EPC", () => {
   });
 });
 
+describe("an SOP says who made it and when", () => {
+  it("T4369 — the list carries provenance and the popup shows it", () => {
+    // Paul, 2026-09-14: "When are the SOPs created for Process Repository
+    // Diagrams? They seem to be there without me creating them?" The only
+    // writers are Generate SOP and an org-backup restore — but a list that shows
+    // neither who nor when leaves the reader guessing. Now it does not.
+    const route = read("app", "api", "projects", "[id]", "sop", "route.ts");
+    expect(route).toMatch(/createdAt: true, createdById: true, model: true/);
+    // createdById is a bare id on the model, so the name is looked up, and a
+    // missing user degrades to null rather than throwing.
+    expect(route).toMatch(/prisma\.user\.findMany\(\{ where: \{ id: \{ in: creatorIds \} \}/);
+    expect(route).toMatch(/createdBy: d\.createdById \? \(creatorName\.get\(d\.createdById\) \?\? null\) : null/);
+    const list = read("app", "components", "sop", "ProjectSopsSection.tsx");
+    expect(list).toMatch(/r\.createdBy \? `by \$\{r\.createdBy\}` : null/);
+    expect(list).toMatch(/when\(r\.createdAt\)/);
+    expect(list, "the model used is shown too").toMatch(/r\.model \? ` · \$\{r\.model\}` : ""/);
+  });
+});
+
 describe("the popup is the shape that was asked for", () => {
   it("T4365 — a scrollable list with Continue in a footer OUTSIDE the scroll region", () => {
     const src = popup();
