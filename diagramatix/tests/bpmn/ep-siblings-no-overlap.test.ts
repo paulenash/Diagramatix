@@ -92,6 +92,30 @@ function epsOutsideTheirLane(data: DiagramData): string[] {
   return out;
 }
 
+/**
+ * A lane is as tall as its content, not as tall as where its content USED to
+ * be. Paul, second generation: "something pushed the 2 leftmost EP downwards"
+ * — R8.26 pulled an EP 233px down from its row to touch the gateway line and
+ * the lane kept the top it had been sized for: a 267px empty band. The same
+ * rule, acting on a CROSS-lane branch, made the hug grow the neighbouring lane
+ * 114px taller than its content to cover the misplacement. The final hug
+ * allows about ±½ a task height; 80px is that with room, and a third of the
+ * defect.
+ */
+function laneSlack(data: DiagramData): string[] {
+  const out: string[] = [];
+  const MAX_SLACK = 80;
+  for (const lane of data.elements.filter((e) => e.type === "lane")) {
+    const kids = data.elements.filter((e) => e.parentId === lane.id && e.type !== "text-annotation");
+    if (!kids.length) continue;
+    const top = Math.min(...kids.map((k) => k.y)), bottom = Math.max(...kids.map((k) => k.y + k.height));
+    const above = top - lane.y, below = (lane.y + lane.height) - bottom;
+    if (above > MAX_SLACK) out.push(`lane "${lane.label}" has ${above.toFixed(0)}px empty above its content`);
+    if (below > MAX_SLACK) out.push(`lane "${lane.label}" has ${below.toFixed(0)}px empty below its content`);
+  }
+  return out;
+}
+
 describe("sibling Expanded Subprocesses do not overlap", () => {
   it("T4352 — Paul's real generated plan: no two sibling EPs intersect", () => {
     const file = path.join(process.cwd(), "tests", "fixtures", "layout-corpus", "EP02.plan.json");
@@ -101,6 +125,36 @@ describe("sibling Expanded Subprocesses do not overlap", () => {
     expect(siblingEpOverlaps(data)).toEqual([]);
     expect(foreignersInsideEps(data), "another branch's shapes drawn inside an EP").toEqual([]);
     expect(epsOutsideTheirLane(data), "an EP drawn in a lane other than its own").toEqual([]);
+  });
+
+  it("T4355 — a branch EP in ANOTHER lane is drawn in that lane, not on the gateway's line", () => {
+    // Paul's second generation, after the sibling fix shipped: "No joy". The
+    // overlap was gone, but "Invoice Customer" — the Accountant lane's branch
+    // off a gateway in the Meeting Planner lane — still sat 126px above its own
+    // lane. R8.26 had put its top on the gateway's centre line, which is in the
+    // gateway's lane. A cross-lane branch belongs to its OWN lane's stacking
+    // (the principle R55 already states); placing it relative to a gateway in
+    // another lane is not a placement, it is a lane violation with a rule name.
+    const file = path.join(process.cwd(), "tests", "fixtures", "layout-corpus", "EP03.plan.json");
+    const plan = JSON.parse(fs.readFileSync(file, "utf8")).diagrams[0].data.aiGeneration.plan;
+    const data = layout(plan.elements, plan.connections);
+    expect(siblingEpOverlaps(data)).toEqual([]);
+    expect(epsOutsideTheirLane(data), "an EP drawn in a lane other than its own").toEqual([]);
+    expect(foreignersInsideEps(data)).toEqual([]);
+    expect(laneSlack(data), "a lane sized for where its content used to be").toEqual([]);
+    // Without the cross-lane skip the EP lands in the right lane anyway — but
+    // the lane's OTHER work (two tasks and an end event that share its row) is
+    // pushed 190px down off that row and the lane grows 114px to fit. Slack
+    // above and below stays a tidy 65px either way, so the slack check cannot
+    // see it. What it IS: this lane is one row of work, and its content must
+    // span no more than its tallest child.
+    const invoice = data.elements.find((e) => e.type === "subprocess-expanded" && /Invoice Customer/.test(e.label ?? ""))!;
+    expect(invoice, "the fixture still has Invoice Customer").toBeDefined();
+    const laneKids = data.elements.filter((e) => e.parentId === invoice.parentId && e.type !== "text-annotation" && !e.boundaryHostId);
+    const span = Math.max(...laneKids.map((k) => k.y + k.height)) - Math.min(...laneKids.map((k) => k.y));
+    const tallest = Math.max(...laneKids.map((k) => k.height));
+    expect(span - tallest, `Invoice Customer's lane should be one row; its content spans ${span}px against a tallest child of ${tallest}px`)
+      .toBeLessThanOrEqual(40);
   });
 
   it("T4353 — three parallel EP branches off one gateway take separate rows", () => {

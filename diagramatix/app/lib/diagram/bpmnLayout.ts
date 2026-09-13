@@ -5139,13 +5139,28 @@ export function layoutBpmnDiagram(
   // So the EP now clears the centre line OR any same-gateway sibling target it
   // would overlap horizontally, whichever is further. Where no sibling
   // straddles, `wantY` is what it always was and nothing below changes.
+  //
+  // Second generation, same diagram, after the sibling clearance shipped (Paul:
+  // "No joy"; "something pushed the 2 leftmost EP downwards"). Two more things
+  // this rule got wrong, both visible in the trace of that file:
+  //
+  //   • "Invoice Customer" is the ACCOUNTANT lane's branch off a gateway in the
+  //     MEETING PLANNER lane. Its top was put on that gateway's centre line —
+  //     which is in the gateway's lane — 126px above its own. A cross-lane
+  //     branch belongs to its own lane's stacking, the principle R55 already
+  //     states; placing it relative to a gateway in another lane is not a
+  //     placement, it is a lane violation with a rule name. Skipped now.
+  //
+  //   • "Plan Meetings" was on its row at y=260, just under the lane top, when
+  //     this rule pulled it 233px down to touch the line — and the lane kept
+  //     the top it had been sized for. A 267px empty band, and every shape in
+  //     the lower half of a lane that looked twice the height it needed.
+  //     Whatever this rule moves, the lane has to be re-hugged afterwards; the
+  //     earlier "re-fit only when clearance fired" was too narrow by exactly
+  //     this case.
   {
     const SIB_GAP = 20;
-    // Lifting an EP above the line can carry it past its lane's top, and
-    // nothing after this point re-fits lanes upward — `expandContainerToFit-
-    // Children` only ever grows right and bottom. Re-fit ONLY when the sibling
-    // clearance actually fired, so every other diagram stays byte-identical.
-    let cleared = false;
+    let moved = false;
     for (const [key, side] of branchVertex) {
       if (side === "right") continue;
       const sep = key.indexOf("->");
@@ -5153,6 +5168,9 @@ export function layoutBpmnDiagram(
       const gw = elMap.get(gwId);
       const ep = elMap.get(key.slice(sep + 2));
       if (!gw || !ep || ep.type !== "subprocess-expanded") continue;
+      // A branch into another lane / pool is that container's business. Its EP
+      // already has the row its own lane gave it.
+      if (ep.parentId !== gw.parentId) continue;
       const gcy = gw.y + gw.height / 2;
       const lineY = side === "top" ? gcy - ep.height : gcy;
       let wantY = lineY;
@@ -5167,12 +5185,15 @@ export function layoutBpmnDiagram(
       }
       const dy = wantY - ep.y;
       if (Math.abs(dy) < 1) continue;
-      if (wantY !== lineY) cleared = true;
       shiftSubtree(ep.id, dy);      // children and boundary events travel with it
       ep.y += dy;                   // shiftSubtree does not move the root
+      moved = true;
     }
-    if (cleared) {
-      fitLanesToChildren();
+    // The hug, not the plain fit: the plain fit only GROWS a lane, and the
+    // defect this closes is a lane left too tall. Same pass as the final hug
+    // above, so a lane R8.26 touched ends up exactly as tight as one it did not.
+    if (moved) {
+      fitLanesToChildren(true);
       restackPoolsR52();
     }
   }

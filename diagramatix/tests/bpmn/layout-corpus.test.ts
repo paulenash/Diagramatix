@@ -84,8 +84,16 @@ const KNOWN: Record<string, number> = {
    *     the timer is a boundary event on a collapsed subprocess INSIDE that EP,
    *     so it is inside the box by construction. Its own job: teach the
    *     BODY/BODY check that a descendant's boundary event is not an intruder.
+   *
+   * 2 -> 3 when R8.26 stopped placing cross-lane branches and began re-hugging
+   * lanes it had moved things in (the second Meeting Planner generation, EP03).
+   * "Invoice Customer" is now drawn INSIDE the Accountant lane, where it
+   * belongs — and that timer's LABEL is therefore inside the EP box as well as
+   * its shape, which the LABEL/BODY check counts as a second overlap. Same
+   * false positive, second line; the job above covers both. Not headroom: the
+   * count went up because the box is finally where the label was.
    */
-  "EP02.plan.json": 2,
+  "EP02.plan.json": 3,
   "V04.01.plan.json": 2,
   // 3 -> 1 when R55.7 gave the exception path a row clear of the main line.
   "V22.01.plan.json": 1,
