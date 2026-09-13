@@ -26,6 +26,10 @@ export interface ModelPrice {
 // these as the defaults — this stays the single source of the default numbers.
 export const PRICING: Record<string, ModelPrice> = {
   // Claude — Anthropic list pricing
+  // Fable 5.1: claude.com/pricing + platform.claude.com models overview, both
+  // read 2026-09-13. Same list price as Fable 5, so it ties at the top of the
+  // cost gate rather than raising the ceiling.
+  "claude-fable-5-1": { in: 10, out: 50 },
   "claude-fable-5": { in: 10, out: 50 },
   "claude-opus-5": { in: 5, out: 25 },
   "claude-opus-4-8": { in: 5, out: 25 },

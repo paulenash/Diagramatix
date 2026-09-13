@@ -39,6 +39,13 @@ export function resolvedEnvSecret(raw: string | null | undefined): string | unde
 }
 
 export const AI_MODELS: AiModel[] = [
+  // Paul, 2026-09-13: "Is AI Generation using Fable 5.1 when it says Fable 5?"
+  // It was not. Checked against the API itself, not the docs: /v1/models lists
+  // `claude-fable-5-1` (2026-08-28) and `claude-fable-5` (2026-06-07) as two
+  // models, and a message sent to `claude-fable-5` comes back stamped
+  // `claude-fable-5`. Dateless ids from the 4.6 generation on are PINNED
+  // snapshots, not floating aliases — "Fable 5" will never quietly become 5.1.
+  { id: "claude-fable-5-1", label: "Fable 5.1", vision: true },
   { id: "claude-fable-5", label: "Fable 5", vision: true },
   { id: "claude-opus-5", label: "Opus 5", vision: true },
   { id: "claude-opus-4-8", label: "Opus 4.8", vision: true },
