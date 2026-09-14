@@ -1,0 +1,608 @@
+<title>The Diagramatix Simulator — technical edition</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Spectral:wght@500;600&display=swap">
+
+<style>
+  :root {
+    --ground: #fbfbf9;
+    --panel: #ffffff;
+    --ink: #1a1d1a;
+    --muted: #666c65;
+    --faint: #8e948c;
+    --rule: #e3e6e0;
+    --rule-strong: #cdd2c9;
+    --accent: #1f6f4a;
+    --accent-soft: #e8f2ec;
+    --shadow: 0 1px 2px rgba(26, 29, 26, .05);
+  }
+  :root:not([data-theme="light"]) { color-scheme: light dark; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #111310; --panel: #171a15; --ink: #e7eae3; --muted: #9ba196;
+      --faint: #767c72; --rule: #262a22; --rule-strong: #363b31;
+      --accent: #63c08d; --accent-soft: #16281e;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .3);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #111310; --panel: #171a15; --ink: #e7eae3; --muted: #9ba196;
+    --faint: #767c72; --rule: #262a22; --rule-strong: #363b31;
+    --accent: #63c08d; --accent-soft: #16281e;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 16px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1140px; margin: 0 auto; padding: 0 28px 96px; }
+  .col { max-width: 68ch; }
+
+  .masthead {
+    padding: 76px 0 40px;
+    border-bottom: 2px solid var(--ink);
+    display: flex; flex-direction: column; gap: 18px;
+  }
+  .kicker {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent);
+  }
+  h1 {
+    font-family: Spectral, Georgia, serif; font-weight: 600;
+    font-size: clamp(2.4rem, 6vw, 3.6rem); line-height: 1.05; letter-spacing: -.018em;
+    margin: 0; text-wrap: balance; max-width: 18ch;
+  }
+  .standfirst { font-size: 1.12rem; color: var(--muted); max-width: 58ch; margin: 0; }
+
+  section { padding: 60px 0 0; }
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--faint); display: block; margin-bottom: 10px;
+  }
+  h2 {
+    font-family: Spectral, Georgia, serif; font-weight: 600;
+    font-size: clamp(1.55rem, 3vw, 2.05rem); line-height: 1.18; letter-spacing: -.012em;
+    margin: 0 0 16px; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; }
+  .lede { font-size: 1.05rem; color: var(--muted); }
+  strong { font-weight: 600; }
+  em { font-style: italic; }
+
+  .caps {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(272px, 1fr));
+    gap: 1px; background: var(--rule); border: 1px solid var(--rule); margin-top: 10px;
+  }
+  .cap { background: var(--panel); padding: 22px 22px 24px; display: flex; flex-direction: column; gap: 10px; }
+  .cap h4 { font-size: .95rem; font-weight: 600; margin: 0; letter-spacing: -.005em; }
+  .cap ul { margin: 0; padding-left: 17px; }
+  .cap li { margin-bottom: 6px; font-size: .885rem; color: var(--muted); line-height: 1.55; }
+  .cap li strong { color: var(--ink); font-weight: 500; }
+
+  .scroller { overflow-x: auto; margin-top: 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: .92rem; min-width: 560px; }
+  thead th {
+    text-align: left; font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-weight: 500; font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--faint); border-bottom: 1px solid var(--rule-strong);
+    padding: 0 20px 9px 0; vertical-align: bottom;
+  }
+  tbody td { padding: 13px 20px 13px 0; border-bottom: 1px solid var(--rule); vertical-align: top; color: var(--muted); }
+  tbody td:first-child { color: var(--ink); font-weight: 500; width: 38%; }
+  tbody tr:last-child td { border-bottom: none; }
+
+  footer {
+    margin-top: 68px; padding-top: 22px; border-top: 1px solid var(--rule);
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11.5px; color: var(--faint);
+  }
+  a { color: var(--accent); }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  /* technical edition */
+  .guide { border: 1px solid var(--rule); border-radius: 10px; padding: 18px 20px 14px; margin: 0 0 16px; background: var(--panel); box-shadow: var(--shadow); }
+  .guide h3 { margin: 0 0 4px; font-size: 17px; }
+  .guide .aim { color: var(--muted); margin: 0 0 8px; font-size: 14px; }
+  .guide h5 { margin: 12px 0 4px; font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+  .guide ol { margin: 0; padding-left: 22px; }
+  .guide ol li { margin: 4px 0; line-height: 1.5; }
+  .kv { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .kv th, .kv td { text-align: left; padding: 7px 9px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  .kv th { color: var(--muted); font-weight: 600; font-size: 12px; letter-spacing: .04em; }
+  .kv code, .col code, .cap code { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 12.5px; background: var(--accent-soft); padding: 1px 5px; border-radius: 4px; }
+  .ui { font-weight: 600; }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <span class="kicker">Diagramatix &middot; technical edition</span>
+    <h1>The Simulator &mdash; what it does, and how it does it</h1>
+    <p class="standfirst">
+      The companion to &ldquo;The Simulator&rdquo;. Part one is the machinery: where the numbers live,
+      how a run is assembled and executed, what a Study and a Scenario actually are. Part two takes
+      every question on the summary&rsquo;s &ldquo;What people use it for&rdquo; table and answers it as
+      a procedure &mdash; what you need before you start, how to build the study and its scenarios,
+      what to press, and where the answer appears.
+    </p>
+    <p style="margin:10px 0 0; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11.5px; color: var(--faint);">Version 3 &middot; 14 September 2026 &middot; product 2.11 &middot; read from the shipped code</p>
+  </header>
+
+  <!-- ═══ PART ONE ═══════════════════════════════════════════════════ -->
+  <section>
+    <span class="eyebrow">Part one &middot; What it does</span>
+    <h2>The diagram is the model</h2>
+    <div class="col">
+      <p>
+        There is no second model to maintain. Every simulation parameter is a property of a BPMN
+        element, edited in the diagram&rsquo;s <span class="ui">Properties &rarr; &#9672; Simulation</span>
+        section or, for all of them at once, in the console&rsquo;s <span class="ui">Simulation Data</span>
+        panel. What each element carries:
+      </p>
+    </div>
+    <div class="scroller">
+      <table class="kv">
+        <thead><tr><th>Element</th><th>Parameters</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>Start / intermediate event (an <em>arrival source</em>)</td><td><code>inter-arrival</code> distribution, <code>max arrivals</code>, an operating-hours <code>calendar</code></td><td>The calendar can carry a &times; multiplier per window &mdash; time-varying demand. Demand and staffing are different calendars: a 9&ndash;5 team queues overnight work; a 24/7 source keeps arriving.</td></tr>
+          <tr><td>Task / sub-process</td><td><code>cycle time</code>, optional <code>setup</code> and <code>wait</code> time, <code>team</code>, <code>units</code> required, <code>needs these skills</code>, <code>repeats</code> (loop / multi-instance)</td><td>A task with no team inherits its swim-lane&rsquo;s. A task marked as system-performed models automation.</td></tr>
+          <tr><td>Decision gateway &rarr; outgoing flow</td><td><code>probability</code> % (must total 100) or a <code>condition</code> expression; one flow marked <code>default</code></td><td>Inclusive and parallel gateways take their semantics from the notation.</td></tr>
+          <tr><td>Timer / delay</td><td><code>delay</code> distribution; deadlines in <em>working</em> time</td><td>Two working days is not forty-eight hours.</td></tr>
+          <tr><td>Boundary event</td><td><code>fire prob</code> (chance it fires this execution), <code>trigger</code> (delay after scope start)</td><td>Races the host task; interrupting or not per the notation.</td></tr>
+          <tr><td>Activity cost</td><td>a per-run <code>activity charge</code></td><td>Reported separately from staff cost.</td></tr>
+          <tr><td>Expanded subprocess / linked subprocess</td><td>&mdash;</td><td>An expanded subprocess simulates its inline body; a subprocess that <em>links</em> to another diagram is spliced in and run as part of the whole.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="col">
+      <p>
+        A duration is a <strong>distribution</strong>: <code>fixed</code>, <code>uniform</code>,
+        <code>triangular</code> (min / mode / max), <code>normal</code> (truncated at zero),
+        <code>exponential</code>, <code>lognormal</code> (the right-skewed shape service times actually
+        have) or <code>empirical</code> &mdash; a list of observed values, resampled. Empirical values
+        are written by calibration from a mined log or by a BPSim import, never typed.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">The people</span>
+    <h2>Teams, calendars and skills</h2>
+    <div class="caps">
+      <div class="cap">
+        <h4>Teams (<span class="ui">Resources &mdash; people &amp; automation</span>)</h4>
+        <ul>
+          <li>A team is a shared resource pool: <code>capacity</code>, <code>cost/hour</code>, <code>efficiency</code>, a <code>calendar</code>, a <code>queue discipline</code> (<em>First-come</em>, <em>Urgent first</em>, <em>Shortest first</em>) and, for <em>Urgent first</em>, whether urgent work <strong>interrupts</strong> work in progress</li>
+          <li>Named <strong>members</strong>, each with the skills they hold; a task that <code>needs these skills</code> waits for someone who has them, and allocation prefers the least flexible person who qualifies</li>
+          <li>Org masters (<span class="ui">OrgAdmin &rarr; simulation teams</span>) are adopted into a project as its own copies; a team library can also be harvested from the diagrams&rsquo; lanes (<span class="ui">match lanes</span>)</li>
+          <li>Two tasks on two diagrams naming the same team compete for it &mdash; that is what a portfolio study measures</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Calendars (<span class="ui">Calendars &mdash; working hours</span>)</h4>
+        <ul>
+          <li>A weekly pattern of open windows &mdash; presets <em>Mon&ndash;Fri 9&ndash;5</em>, <em>9&ndash;5 w/ lunch</em>, <em>24/7</em>, <em>Demand: peak/off-peak</em> &mdash; plus dated exceptions: holidays, a shutdown, absence</li>
+          <li>A team on a calendar is staffed at full capacity in open windows and zero otherwise; work in progress at close finishes, new work waits for the next window</li>
+          <li>Simulation time <code>t = 0</code> is Monday 00:00. Utilisation is measured against <em>staffed</em> time</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Skills</h4>
+        <ul>
+          <li>An organisation-wide master Skills list; people hold skills, tasks require them</li>
+          <li><span class="ui">Fill skills from</span> an ArchiMate diagram reads the matrix a Business Architect already modelled &mdash; the same skills appear there as Capabilities</li>
+          <li>A scenario can give a person a skill or add a starter (<code>teams[].members</code>, merged by name) &mdash; the cross-training question</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">The engine</span>
+    <h2>How a run is executed</h2>
+    <div class="col">
+      <p>
+        <strong>Assemble.</strong> The study&rsquo;s root diagrams are assembled once into a
+        <code>SimNetwork</code> &mdash; hierarchy-aware (expanded subprocesses inline, event
+        subprocesses as engine event subs, linked subprocesses spliced), with the scenario&rsquo;s
+        overrides applied on top of the diagram&rsquo;s values and the team library resolved into
+        resource pools.
+      </p>
+      <p>
+        <strong>Run.</strong> A discrete-event engine drives a binary-heap event calendar: tokens
+        arrive per the source distributions, request units from resource pools, wait in queues ordered
+        by the pool&rsquo;s discipline, are pre-empted if the pool allows it, hold for working-time
+        deadlines, and complete. Each replication uses a seed derived from the master seed
+        (<code>deriveSeed(seed, r)</code>), so the same network and config give bit-identical results
+        every time. The <span class="ui">Warm-up</span> is excluded from the statistics; queue lengths are
+        sampled across the run when <code>collectQueues</code> is on.
+      </p>
+      <p>
+        <strong>Aggregate.</strong> N replications become mean / p5 / p50 / p95 ranges for throughput,
+        flow time, cost per case and per-team utilisation and queue, with the per-replication means
+        kept &mdash; that is what the significance test reads later. Run limits cap
+        <code>horizon &times; replications</code> so a malformed study cannot wedge a server core.
+      </p>
+      <p>
+        <strong>Planned interventions</strong> are scheduled events in the run config, applied
+        deterministically at time <code>t</code>: <code>arrival</code> (rate multiplier on a source),
+        <code>branchProb</code> (a new probability on a flow), <code>inject</code> (a surge of tokens at a
+        node), <code>outage</code> (a team&rsquo;s capacity for a duration). The live <strong>Operator</strong>
+        in the replay does the same thing by hand, forking the timeline from the current instant.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">The objects</span>
+    <h2>Study, Scenario, Run</h2>
+    <div class="scroller">
+      <table class="kv">
+        <thead><tr><th>Object</th><th>Holds</th><th>Where</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Study</strong></td><td>a name, one or more <span class="ui">Root diagrams</span> (a portfolio shares its team pools), its business-case inputs</td><td><span class="ui">Studies &amp; Scenarios</span> panel &middot; <code>/projects/:id/simulation/studies</code></td></tr>
+          <tr><td><strong>Scenario</strong></td><td><em>run config</em> &mdash; time unit, <span class="ui">Horizon</span>, <span class="ui">Warm-up</span>, <span class="ui">Replications</span>, <span class="ui">Seed</span>, planned interventions; a sparse <em>override set</em> &mdash; element times / team / units / skills, flow probabilities, team capacity / discipline / members; a <span class="ui">BASELINE</span> flag; for an As-is / To-be pair, which diagram variant it runs</td><td>one row per scenario under the study; <span class="ui">Duplicate</span> copies one; <span class="ui">Create pair</span> makes As-is and To-be</td></tr>
+          <tr><td><strong>Run</strong></td><td>the config and network snapshot it ran with, the metrics, an optional name, <em>pinned</em>, and whether it is the run-history <em>baseline</em></td><td><span class="ui">&#9654; Run</span> creates one; <span class="ui">Save run to history</span> / <span class="ui">Name this run</span> keep it; &#9873; pins the baseline the trend is measured from</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="col">
+      <p>
+        Everything analytical is a pure function over stored runs: <code>significance</code> (Welch
+        over per-replication means), <code>sweep</code> (a lever across a range, knee = maximum distance
+        from the chord), <code>sensitivity</code> (every parameter &plusmn;20%, 2N+1 runs, sorted into a
+        tornado), <code>validate</code> (simulated vs observed flow-time distributions), the
+        <code>facts/</code> modules behind the business case, the assessment and next steps, and
+        <code>runTrend</code>. Because they read stored metrics, they can be re-run without re-simulating.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">In and out</span>
+    <h2>Interchange</h2>
+    <div class="caps">
+      <div class="cap">
+        <h4>BPSim</h4>
+        <ul>
+          <li><span class="ui">Interchange &mdash; BPSim export / import</span>: the OMG/WfMC standard, both directions, cost included (<code>CostParameters/FixedCost</code>)</li>
+          <li>A BPSim import can carry batching and empirical distributions the editor does not type</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Packages</h4>
+        <ul>
+          <li><span class="ui">Export</span> a study as a <code>.dgxsim.json</code> bundle &mdash; diagrams, teams, calendars, scenarios &mdash; and adopt it elsewhere</li>
+          <li>The example gallery is the same package format; <span class="ui">Save as example (admin)</span> captures a study into it</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>From the Miner</h4>
+        <ul>
+          <li><span class="ui">&#9654; Calibrate &amp; simulate</span> writes fitted durations, arrivals, branch odds, teams and a mined calendar onto the discovered BPMN and creates a study with an <em>As-mined baseline</em></li>
+          <li>Diagram values already documented can be copied into the model (<span class="ui">use diagram values</span>) instead of invented</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ PART TWO ═══════════════════════════════════════════════════ -->
+  <section>
+    <span class="eyebrow">Part two &middot; How it does it</span>
+    <h2>Before any of them: the setup every study needs</h2>
+    <div class="col">
+      <p>Every guide below starts from this state. Do it once per process.</p>
+    </div>
+    <div class="guide">
+      <h5>Start with</h5>
+      <ol>
+        <li>A BPMN diagram of the process in a project: start event &rarr; tasks &rarr; gateways &rarr; end event, tasks in the lanes of the teams that do them.</li>
+        <li>Rough numbers &mdash; how long each step takes, how often work arrives, how decisions split &mdash; or a mined event log, which supplies them.</li>
+      </ol>
+      <h5>Build</h5>
+      <ol>
+        <li>Open the diagram and click <span class="ui">&#9672; Simulator</span> on the toolbar (also reachable from a Project or the Dashboard, which then asks which process).</li>
+        <li>Open <span class="ui">Simulation Data</span>. Every element&rsquo;s parameters are in one table; fill the gaps inline, or press <span class="ui">&#9881; Fill missing simulation data</span> for starting values (it never overwrites what you typed, and filled numbers look different from measured ones). If the diagram already documents effort and frequency, <span class="ui">use diagram values</span> instead.</li>
+        <li>Open <span class="ui">Teams</span>. Add each team (<em>New team</em>, e.g. <em>Assessors</em>) with its <span class="ui">Capacity</span>; set <span class="ui">Cost/hour</span> if cost matters. Or adopt the organisation&rsquo;s masters, or match the diagram&rsquo;s lanes.</li>
+        <li>Open <span class="ui">Calendars</span>. Add <em>Business hours</em> from a preset and assign it to each human team in the Teams panel&rsquo;s <span class="ui">Calendar</span> column. Leave automation and arrival sources on <em>24/7</em> unless demand itself has hours.</li>
+        <li>Open <span class="ui">Studies &amp; Scenarios</span>. Create a study (<em>new study (e.g. Q3 workload)</em>), add the diagram under <span class="ui">Root diagrams</span>, and create the first scenario. The first scenario is the <span class="ui">BASELINE</span>.</li>
+        <li>On the scenario set the run config: time unit, <span class="ui">Horizon</span> (long enough for several hundred cases), <span class="ui">Warm-up</span> (leave it &mdash; it is chosen for you), <span class="ui">Replications</span> (10&ndash;30), <span class="ui">Seed</span> (any fixed number).</li>
+        <li>Press <span class="ui">&#9654; Run</span>. The readiness check runs first and separates what would mislead you from what is merely assumed; <span class="ui">Run anyway</span> is available, <span class="ui">Complete the simulation setup</span> takes you to the gap.</li>
+      </ol>
+      <h5>Read</h5>
+      <ol>
+        <li>The compact summary: throughput, flow time p50 / p95, the top bottleneck team and its utilisation.</li>
+        <li><span class="ui">&#9656; full results</span> for the report; <span class="ui">Heatmap</span>, <span class="ui">Run / Replay</span>, the token trace, and &mdash; once there are two scenarios &mdash; <span class="ui">Compare</span>.</li>
+      </ol>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">The guides</span>
+    <h2>What people use it for, step by step</h2>
+
+    <div class="guide">
+      <h3>1 &middot; Where does it actually get stuck?</h3>
+      <p class="aim">Aim: the task where work waits longest &mdash; often not the one everybody blames.</p>
+      <h5>Start with</h5><ol><li>The setup above, with real or filled durations and a capacity per team.</li></ol>
+      <h5>Build</h5>
+      <ol>
+        <li>One study, one root, the baseline scenario. Replications 10 is enough for a first look.</li>
+        <li>Turn <code>collectQueues</code> on (it is the default) so queue lengths are sampled through the run, not only at the end.</li>
+      </ol>
+      <h5>Run and read</h5>
+      <ol>
+        <li><span class="ui">&#9654; Run</span>, then <span class="ui">Heatmap</span>: your own diagram with each task tinted by the wait before service; the brightest box is ringed. Waiting inside a collapsed subprocess shows on its box.</li>
+        <li><span class="ui">&#9656; full results</span> &rarr; <em>Busiest tasks &mdash; wait before service</em> and <em>Teams &mdash; utilisation &amp; queue</em>, ranked. A team near 100% of <em>staffed</em> time with a growing queue is the constraint.</li>
+        <li><span class="ui">Run / Replay</span> to show it: tokens pile up where the queue is. Pause at the pile-up and use the Operator to add a person &mdash; the timeline forks and you watch whether the pile clears.</li>
+      </ol>
+      <h5>Watch out for</h5><ol><li>A bottleneck that is a calendar, not a person: a 9&ndash;5 team looks saturated if the source runs 24/7. That is real, but the remedy is hours, not headcount.</li></ol>
+    </div>
+
+    <div class="guide">
+      <h3>2 &middot; How many people do we need?</h3>
+      <p class="aim">Aim: the headcount at which the promise you want to make starts holding &mdash; a curve, not a point.</p>
+      <h5>Start with</h5><ol><li>The setup, plus the promise stated as a number: &ldquo;p95 flow time under 3 days&rdquo; or &ldquo;utilisation under 85%&rdquo;.</li></ol>
+      <h5>Build</h5>
+      <ol>
+        <li>On the baseline scenario open <span class="ui">&#9656; Sweep a number</span>. Choose the lever &mdash; the team&rsquo;s capacity &mdash; and the range (from 1 to 12) and the number of points. Each point is a full Monte-Carlo run, bounded by the sweep limit.</li>
+        <li>Choose what the curve measures: <em>Near-worst case (p95)</em>, <em>Typical case (p50)</em>, <em>Cases completed</em> or <em>Cost per case</em>.</li>
+      </ol>
+      <h5>Run and read</h5>
+      <ol>
+        <li>Run the sweep. The response curve is drawn with the <strong>knee</strong> marked &mdash; the point of maximum distance from the chord, where one more person stops buying much. On a flat curve it says so rather than inventing an elbow.</li>
+        <li>Read across from your promise to the curve: the first capacity at which the objective is met is the answer; the knee tells you whether going further is worth it.</li>
+        <li>To keep the answer, <span class="ui">Duplicate</span> the baseline into a scenario at that capacity (override the team&rsquo;s <span class="ui">Capacity</span>) and run it, so <span class="ui">Compare</span> can show it against the baseline later. Or open <span class="ui">Suggested next steps</span> &mdash; it proposes that scenario and creates it for you.</li>
+      </ol>
+      <h5>Watch out for</h5><ol><li>Sweep one lever at a time. Two levers moving together give a curve nobody can read.</li></ol>
+    </div>
+
+    <div class="guide">
+      <h3>3 &middot; Is the redesign worth doing?</h3>
+      <p class="aim">Aim: both versions side by side, with the difference in time and in cost.</p>
+      <h5>Start with</h5><ol><li>The as-is diagram set up as above, and a to-be diagram &mdash; the redesign drawn as its own BPMN, with the same team names where the same people do the work.</li></ol>
+      <h5>Build</h5>
+      <ol>
+        <li>In <span class="ui">Studies &amp; Scenarios</span> use <span class="ui">Create pair</span>: it makes an <em>As-is</em> and a <em>To-be</em> scenario in one study, each pointing at its diagram variant, sharing the team library.</li>
+        <li>Give both the same run config &mdash; horizon, replications, seed &mdash; so the only difference is the design.</li>
+        <li>If the redesign also changes staffing, put that in the To-be scenario&rsquo;s overrides, not in the diagram.</li>
+      </ol>
+      <h5>Run and read</h5>
+      <ol>
+        <li>Run both. Open <span class="ui">Compare</span>: deltas vs the baseline for throughput, flow time p50 / p95, cost per case, FTE freed &mdash; and the plain-language verdict (&ldquo;% faster, $/case&rdquo;).</li>
+        <li>Then ask guide 11 &mdash; is the difference real? &mdash; before anyone quotes the percentage.</li>
+        <li>For the money, guide 13.</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>4 &middot; What if we changed the policy?</h3>
+      <p class="aim">Aim: what auto-approving, re-routing or re-prioritising would do, before anyone lives through it.</p>
+      <h5>Start with</h5><ol><li>The setup, and the policy expressed as one of three things: a decision that splits differently, a task that a system does instead of a person, or a queue that is served in a different order.</li></ol>
+      <h5>Build</h5>
+      <ol>
+        <li><span class="ui">Duplicate</span> the baseline scenario and name it for the policy (<em>new scenario (e.g. auto-approve under $5k)</em>).</li>
+        <li><em>Auto-approve</em>: override the gateway&rsquo;s outgoing flow probabilities (<span class="ui">gateway &rarr; target</span> rows) so more work takes the fast branch, or mark the approval task as system-performed &mdash; <em>&ldquo;what if we automated this task?&rdquo;</em> is one click on the task.</li>
+        <li><em>Re-route</em>: override the task&rsquo;s <span class="ui">team</span> to the team that would now do it.</li>
+        <li><em>Re-prioritise</em>: override the team&rsquo;s queue discipline to <em>Urgent first</em> (and tick interrupts if urgent work should pre-empt) or <em>Shortest first</em>.</li>
+      </ol>
+      <h5>Run and read</h5>
+      <ol>
+        <li>Run and <span class="ui">Compare</span> against the baseline. Watch the <em>per-segment</em> service level as well as the pooled one when the policy is a priority rule &mdash; the pooled figure can improve while the standard segment is starved.</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>5 &middot; Can we survive month-end?</h3>
+      <p class="aim">Aim: what a tripled volume does to the backlog, and how long it takes to clear.</p>
+      <h5>Start with</h5><ol><li>The setup, plus when the peak starts, how big it is, and how long it lasts.</li></ol>
+      <h5>Build</h5>
+      <ol>
+        <li><span class="ui">Duplicate</span> the baseline into <em>Month-end</em>.</li>
+        <li>Under <span class="ui">Planned interventions</span> add an <code>arrival</code> intervention: target the start event, value <code>3</code> (a rate multiplier), at time <code>t</code> of the peak, with the peak&rsquo;s duration. Or, for a backlog that lands at once, an <code>inject</code> of N tokens at <code>t</code>.</li>
+        <li>Alternatively model a recurring pattern with a <em>Demand: peak/off-peak</em> calendar on the source, its peak windows carrying a &times; multiplier.</li>
+        <li>Make the horizon long enough to see the queue clear after the peak.</li>
+      </ol>
+      <h5>Run and read</h5>
+      <ol>
+        <li>Run. In <span class="ui">Run / Replay</span> the surge visibly banks up and drains; the queue-length series in the report shows the peak and the time to return to normal.</li>
+        <li>Add a second scenario with <em>Surge staffing (peak week)</em>: a team-capacity override plus an <code>outage</code> intervention in reverse is not needed &mdash; simply raise <span class="ui">Capacity</span> for that scenario &mdash; and <span class="ui">Compare</span> the clearance time.</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>6 &middot; What happens if two people are off?</h3>
+      <p class="aim">Aim: how far behind you are by Friday.</p>
+      <h5>Start with</h5><ol><li>The setup with the team&rsquo;s true capacity and calendar.</li></ol>
+      <h5>Build</h5>
+      <ol>
+        <li><span class="ui">Duplicate</span> the baseline into <em>Two off</em>.</li>
+        <li>Either add an <code>outage</code> intervention on the team &mdash; value = capacity during the outage (capacity minus 2), at <code>t</code> = the start of the absence, duration = its length &mdash; or, for planned leave, add dated absence to the team&rsquo;s calendar.</li>
+        <li>For a whole-site closure &mdash; a bank holiday, a shutdown &mdash; put the dates on the calendar instead; arrivals keep landing and queue.</li>
+      </ol>
+      <h5>Run and read</h5>
+      <ol>
+        <li>Run and <span class="ui">Compare</span>: the queue at the end of the week and the flow-time p95 tell you how far behind; the replay shows the pile building by day.</li>
+        <li>Try a third scenario with cross-cover &mdash; give a named person from another team the missing skill (guide 14) &mdash; and see whether it holds.</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>7 &middot; What can we promise?</h3>
+      <p class="aim">Aim: the turnaround you would hit ninety-five times in a hundred &mdash; not the average, which you miss half the time.</p>
+      <h5>Start with</h5><ol><li>The setup with measured (or mined) durations. A promise built on filled-in guesses is a guess.</li></ol>
+      <h5>Build</h5>
+      <ol>
+        <li>The baseline scenario with <span class="ui">Replications</span> raised to 30 or more &mdash; the p95 is a tail figure and needs the samples.</li>
+        <li>A horizon long enough for the queues to reach steady state after the warm-up.</li>
+      </ol>
+      <h5>Run and read</h5>
+      <ol>
+        <li>Run. Read <em>Near worst (p95)</em> in the summary and the flow-time histogram in the full report; that is the promise, in working time.</li>
+        <li>If the promise is for a segment (urgent cases), read the per-segment service level &mdash; guide 15.</li>
+        <li>Keep the run: <span class="ui">Name this run</span> and pin it as the baseline so later runs report their drift from it.</li>
+      </ol>
+      <h5>Watch out for</h5><ol><li>Elapsed versus working time: a p95 of two working days is four calendar days over a weekend. Say which one you are promising.</li></ol>
+    </div>
+
+    <div class="guide">
+      <h3>8 &middot; What does a case cost us?</h3>
+      <p class="aim">Aim: staff time and cost per case, and where it goes.</p>
+      <h5>Start with</h5><ol><li>The setup plus <span class="ui">Cost/hour</span> on every team, and any per-run <span class="ui">activity charge</span> on tasks with a non-time cost (a credit check fee, a courier).</li></ol>
+      <h5>Build</h5>
+      <ol><li>The baseline scenario as is. Cost needs no separate configuration once the rates are on the teams.</li></ol>
+      <h5>Run and read</h5>
+      <ol>
+        <li>Run. <em>Cost / case</em> and <em>Total cost</em> are in the summary; the report&rsquo;s <em>Cost of doing the work</em> breaks it down by team and separates activity charges from staff cost, because the two have different remedies.</li>
+        <li>For rework, set the task&rsquo;s rework percentage and read the cost of rework as its own line.</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>9 &middot; Why does a two-hour job take two days?</h3>
+      <p class="aim">Aim: the gap between working time and elapsed time, measured.</p>
+      <h5>Start with</h5><ol><li>The setup with calendars on the human teams and the arrival source left on 24/7.</li></ol>
+      <h5>Build</h5>
+      <ol><li>The baseline scenario. If you suspect hand-offs, make sure each task&rsquo;s team is the team that really does it, not the lane&rsquo;s default.</li></ol>
+      <h5>Run and read</h5>
+      <ol>
+        <li>Run. The token trace (<span class="ui">&#9656; full results</span> &rarr; trace) lists every case with the time spent in each step &mdash; service time against wait. Sort by wait.</li>
+        <li>The gap is the waits: for a free person, for the next shift, for a batch cut-off. The heatmap shows which of the three it is by where the colour sits.</li>
+        <li>Export the trace to a spreadsheet for anyone who wants to check the arithmetic rather than take it.</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>10 &middot; Which process is starving the others?</h3>
+      <p class="aim">Aim: contention between processes drawing on the same team.</p>
+      <h5>Start with</h5><ol><li>Two or more BPMN diagrams whose tasks name the <em>same</em> team where the same people do the work, and one consistent time unit across them.</li></ol>
+      <h5>Build</h5>
+      <ol>
+        <li>One study with every diagram under <span class="ui">Root diagrams</span>. The engine assembles them into a single run sharing one capacity pool per team.</li>
+        <li>A baseline scenario, then one scenario per remedy: more capacity on the shared team; a priority discipline so one process&rsquo;s work goes first; a dedicated team for the starved process.</li>
+      </ol>
+      <h5>Run and read</h5>
+      <ol>
+        <li>Run the baseline. The team table shows the shared team&rsquo;s utilisation and queue; the per-process throughput shows who is starved.</li>
+        <li><span class="ui">Compare</span> the remedies. A priority rule moves the starvation rather than removing it &mdash; read both processes&rsquo; p95, not one.</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>11 &middot; Is the improvement real, or noise?</h3>
+      <p class="aim">Aim: a confidence interval on the difference, and how many more runs would settle it.</p>
+      <h5>Start with</h5><ol><li>Two scenarios in one study that have both been run &mdash; typically the baseline and the change from guides 2&ndash;6.</li></ol>
+      <h5>Build</h5>
+      <ol><li>Nothing new. The test reads the per-replication means every run already stores.</li></ol>
+      <h5>Run and read</h5>
+      <ol>
+        <li>Open <span class="ui">Compare</span>. The verdict line reports the difference in flow time as a confidence interval from a Welch test over the replications.</li>
+        <li>If the interval spans zero it says the difference is not (yet) real and offers <em>Run N replications</em> &mdash; the number that would settle it. Press it; both sides re-run with that many replications and the verdict updates to <em>&#10003; real</em> or stays honest.</li>
+        <li>Quote the interval, not the point: &ldquo;between 9% and 21% faster&rdquo; survives a meeting; &ldquo;17% faster&rdquo; does not.</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>12 &middot; Which assumption matters most?</h3>
+      <p class="aim">Aim: the tornado &mdash; every input pushed &plusmn;20% and ranked by how far the answer moves.</p>
+      <h5>Start with</h5><ol><li>A scenario that has been run, and a sense of which inputs were measured and which were guessed.</li></ol>
+      <h5>Build</h5>
+      <ol>
+        <li>On the scenario open <span class="ui">&#9656; Which assumption is load-bearing?</span> (the tornado). Choose what it measures. It enumerates every parameter &mdash; each duration, arrival rate, branch probability, capacity &mdash; and runs two full simulations per parameter, one at &minus;20% and one at +20%: this takes longer than a sweep.</li>
+      </ol>
+      <h5>Run and read</h5>
+      <ol>
+        <li>The bars are sorted widest first. The top bars are the load-bearing assumptions; if one of them was a guess, that is where better data is worth buying. A guess at the bottom is safe to leave.</li>
+        <li>Feed the top bar into guide 2 (sweep it properly) or into the Miner (measure it from a log).</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>13 &middot; When does it pay back?</h3>
+      <p class="aim">Aim: cost per case before and after, the one-off cost, and the payback month.</p>
+      <h5>Start with</h5><ol><li>An as-is and a to-be scenario both run (guide 3), and three business inputs: <span class="ui">Cases a year</span>, the <span class="ui">One-off cost</span> of the change, and any recurring <span class="ui">Per case</span> cost it adds.</li></ol>
+      <h5>Build</h5>
+      <ol>
+        <li>Open <span class="ui">Business case</span> on the study. Enter the three inputs; they are stored on the study, not on a scenario.</li>
+        <li>Pick the before and after scenarios (the baseline and the change).</li>
+      </ol>
+      <h5>Run and read</h5>
+      <ol>
+        <li>The panel narrates cost per case before and after, the annual saving, the one-off cost and the <strong>payback month</strong>. A missing input is reported as missing &mdash; it is never treated as zero.</li>
+        <li>Export it as <span class="ui">Word</span>, <span class="ui">Excel</span> or <span class="ui">PDF</span>; the document carries the significance verdict from guide 11 so the saving is stated with its interval.</li>
+      </ol>
+      <h5>Watch out for</h5><ol><li>A business case cannot be made from a scenario that never ran &mdash; the panel refuses rather than reporting a zero.</li></ol>
+    </div>
+
+    <div class="guide">
+      <h3>14 &middot; What if we trained someone?</h3>
+      <p class="aim">Aim: a scenario that gives a person a skill, or adds a new starter, and what it does to the queue.</p>
+      <h5>Start with</h5><ol><li>Teams with named members and their skills, and tasks that declare <span class="ui">needs these skills</span>. Fill the matrix by hand in the Teams panel, or <span class="ui">Fill skills from</span> the ArchiMate diagram where it is already modelled.</li></ol>
+      <h5>Build</h5>
+      <ol>
+        <li>Run the baseline first: with skills declared, a task waits for a qualified person, and the queue in front of the scarce skill is the finding.</li>
+        <li><span class="ui">Duplicate</span> into <em>Cross-train</em>. In the scenario&rsquo;s team override, <span class="ui">add a person</span> by name with the new skill (an existing name gains the skill; a new name is a starter). Members are merged by name, so naming one person never deletes the rest of the team.</li>
+        <li>Optionally a third scenario: the same relief by hiring &mdash; capacity +1 on the team that holds the skill &mdash; to compare training against hiring.</li>
+      </ol>
+      <h5>Run and read</h5>
+      <ol>
+        <li>Run and <span class="ui">Compare</span>. Read the scarce-skill task&rsquo;s wait and the p95 across the three. Allocation prefers the least flexible qualified person, so the cross-trained person is used only when the specialist is busy &mdash; which is what a manager would do.</li>
+        <li>Guide 13 for whether the training cost pays back.</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>15 &middot; Is the promise holding for the urgent ones?</h3>
+      <p class="aim">Aim: service level per segment, not just pooled &mdash; and a queue discipline that puts them first.</p>
+      <h5>Start with</h5><ol><li>Work that arrives in two classes &mdash; urgent and standard &mdash; modelled as two arrival sources or a gateway that splits by class, each class with its own promise.</li></ol>
+      <h5>Build</h5>
+      <ol>
+        <li>Baseline: the team on <em>First-come</em>. Run it and read the service level <em>per segment</em> in the report: a pooled p95 can look healthy while the urgent segment misses entirely.</li>
+        <li><span class="ui">Duplicate</span> into <em>Urgent first</em>: override the team&rsquo;s discipline. Tick interrupts if an urgent arrival should pre-empt standard work in progress (the interrupted case resumes with the work already done).</li>
+        <li>A third scenario with <em>Shortest first</em> if the classes differ mainly in size.</li>
+      </ol>
+      <h5>Run and read</h5>
+      <ol>
+        <li><span class="ui">Compare</span> the urgent and standard p95 side by side. The right discipline is the one under which both promises hold, not the one with the best pooled figure.</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>16 &middot; Does the model resemble reality?</h3>
+      <p class="aim">Aim: the simulated flow-time distribution against the real one, with an agreement figure &mdash; out-of-sample for a mined twin.</p>
+      <h5>Start with</h5><ol><li>A real event log of the process, in the Miner. This guide runs through the Miner console because the comparison needs the log.</li></ol>
+      <h5>Build</h5>
+      <ol>
+        <li>Import the log and, on the import screen, <span class="ui">Hold back the most recent</span> share of cases (say 20%) &mdash; the twin will be fitted on the earlier cases and tested on these.</li>
+        <li>Discover the process, then <span class="ui">&#9654; Calibrate &amp; simulate</span>: the study with its <em>As-mined baseline</em> scenario is created and the Simulator opens on it.</li>
+        <li>Run the baseline.</li>
+      </ol>
+      <h5>Run and read</h5>
+      <ol>
+        <li>Back in the Miner, open <span class="ui">Does the model match reality?</span> The simulated flow-time distribution is laid over the held-back cases&rsquo; real one, with a p50 / p90 / p95 table and an agreement figure. Out-of-sample, because those cases were never fitted on.</li>
+        <li>If the agreement is poor, the tornado (guide 12) says which fitted assumption to distrust; a re-mined log later re-tests the same twin. A refreshed live run marks the twin stale rather than silently re-calibrating it.</li>
+      </ol>
+    </div>
+
+    <div class="note" style="margin-top:8px">
+      <span class="eyebrow">After any of them</span>
+      <p>
+        Open <span class="ui">Suggested next steps</span> on the study. It reads the runs you have just
+        made, ranks what to try next with the evidence for each &mdash; where every improvement so far
+        came from, which lever never moved the answer, what has not been tried &mdash; and can create the
+        scenario for you. <em>What would sharpen this</em> lists the inputs worth measuring. Negative
+        results are reported as plainly as promising ones.
+      </p>
+    </div>
+  </section>
+
+  <footer>Diagramatix &middot; the Simulator, technical edition &middot; Version 3, 14 September 2026</footer>
+
+</div>

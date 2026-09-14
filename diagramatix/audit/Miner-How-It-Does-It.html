@@ -1,0 +1,643 @@
+<title>Diagramatix Miner — technical edition</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Spectral:wght@500;600&display=swap">
+
+<style>
+  :root {
+    --ground: #fbfaf7;
+    --panel: #ffffff;
+    --ink: #1d1a16;
+    --muted: #6a6459;
+    --faint: #948d80;
+    --rule: #e7e2d8;
+    --rule-strong: #d2cbbd;
+    --accent: #8a5a12;
+    --accent-soft: #f5eddf;
+    --shadow: 0 1px 2px rgba(29, 26, 22, .05);
+  }
+  :root:not([data-theme="light"]) { color-scheme: light dark; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #131110; --panel: #1a1714; --ink: #eae5dc; --muted: #a29a8d;
+      --faint: #7b7367; --rule: #2a2520; --rule-strong: #3a342c;
+      --accent: #d9a441; --accent-soft: #2b2113;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .3);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #131110; --panel: #1a1714; --ink: #eae5dc; --muted: #a29a8d;
+    --faint: #7b7367; --rule: #2a2520; --rule-strong: #3a342c;
+    --accent: #d9a441; --accent-soft: #2b2113;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 16px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1140px; margin: 0 auto; padding: 0 28px 96px; }
+  .col { max-width: 68ch; }
+
+  .masthead {
+    padding: 76px 0 40px;
+    border-bottom: 2px solid var(--ink);
+    display: flex; flex-direction: column; gap: 18px;
+  }
+  .kicker {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent);
+  }
+  h1 {
+    font-family: Spectral, Georgia, serif; font-weight: 600;
+    font-size: clamp(2.4rem, 6vw, 3.6rem); line-height: 1.05; letter-spacing: -.018em;
+    margin: 0; text-wrap: balance; max-width: 18ch;
+  }
+  .standfirst { font-size: 1.12rem; color: var(--muted); max-width: 58ch; margin: 0; }
+
+  section { padding: 60px 0 0; }
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--faint); display: block; margin-bottom: 10px;
+  }
+  h2 {
+    font-family: Spectral, Georgia, serif; font-weight: 600;
+    font-size: clamp(1.55rem, 3vw, 2.05rem); line-height: 1.18; letter-spacing: -.012em;
+    margin: 0 0 16px; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; }
+  .lede { font-size: 1.05rem; color: var(--muted); }
+  strong { font-weight: 600; }
+  em { font-style: italic; }
+
+  .caps {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(272px, 1fr));
+    gap: 1px; background: var(--rule); border: 1px solid var(--rule); margin-top: 10px;
+  }
+  .cap { background: var(--panel); padding: 22px 22px 24px; display: flex; flex-direction: column; gap: 10px; }
+  .cap h4 { font-size: .95rem; font-weight: 600; margin: 0; letter-spacing: -.005em; }
+  .cap ul { margin: 0; padding-left: 17px; }
+  .cap li { margin-bottom: 6px; font-size: .885rem; color: var(--muted); line-height: 1.55; }
+  .cap li strong { color: var(--ink); font-weight: 500; }
+
+  .scroller { overflow-x: auto; margin-top: 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: .92rem; min-width: 560px; }
+  thead th {
+    text-align: left; font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-weight: 500; font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--faint); border-bottom: 1px solid var(--rule-strong);
+    padding: 0 20px 9px 0; vertical-align: bottom;
+  }
+  tbody td { padding: 13px 20px 13px 0; border-bottom: 1px solid var(--rule); vertical-align: top; color: var(--muted); }
+  tbody td:first-child { color: var(--ink); font-weight: 500; width: 38%; }
+  tbody tr:last-child td { border-bottom: none; }
+
+  .note {
+    background: var(--panel); border: 1px solid var(--rule); border-left: 3px solid var(--accent);
+    padding: 18px 22px; margin: 26px 0 0; box-shadow: var(--shadow); max-width: 74ch;
+  }
+  .note p:last-child { margin-bottom: 0; }
+  .note .eyebrow { color: var(--accent); }
+
+  .steps { display: grid; gap: 1px; background: var(--rule); border: 1px solid var(--rule); margin-top: 12px; }
+  .step { background: var(--panel); padding: 16px 20px; display: flex; gap: 16px; align-items: baseline; }
+  .step .n {
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .78rem;
+    color: var(--accent); flex: 0 0 auto; width: 20px; font-variant-numeric: tabular-nums;
+  }
+  .step .t { font-size: .91rem; color: var(--muted); }
+  .step .t strong { color: var(--ink); font-weight: 600; }
+
+  footer {
+    margin-top: 68px; padding-top: 22px; border-top: 1px solid var(--rule);
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11.5px; color: var(--faint);
+  }
+  a { color: var(--accent); }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  /* technical edition */
+  .guide { border: 1px solid var(--rule); border-radius: 10px; padding: 18px 20px 14px; margin: 0 0 16px; background: var(--panel); box-shadow: var(--shadow); }
+  .guide h3 { margin: 0 0 4px; font-size: 17px; }
+  .guide .aim { color: var(--muted); margin: 0 0 8px; font-size: 14px; }
+  .guide h5 { margin: 12px 0 4px; font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+  .guide ol { margin: 0; padding-left: 22px; }
+  .guide ol li { margin: 4px 0; line-height: 1.5; }
+  .kv { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .kv th, .kv td { text-align: left; padding: 7px 9px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  .kv th { color: var(--muted); font-weight: 600; font-size: 12px; letter-spacing: .04em; }
+  .kv code, .col code, .cap code { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 12.5px; background: var(--accent-soft); padding: 1px 5px; border-radius: 4px; }
+  .ui { font-weight: 600; }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <span class="kicker">Diagramatix &middot; technical edition</span>
+    <h1>The Miner &mdash; what it does, and how it does it</h1>
+    <p class="standfirst">
+      The companion to &ldquo;The Miner&rdquo;. Part one is the machinery: how a log gets in and what
+      is kept, how discovery and conformance work, what a run, a series and a live source are. Part
+      two takes every question on the summary&rsquo;s &ldquo;What people use it for&rdquo; table and
+      answers it as a procedure &mdash; what you need before you start, what to import and map, which
+      reference or slice to build, what to press, and where the answer appears.
+    </p>
+    <p style="margin:10px 0 0; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11.5px; color: var(--faint);">Version 3 &middot; 14 September 2026 &middot; product 2.11 &middot; read from the shipped code</p>
+  </header>
+
+  <!-- ═══ PART ONE ═══════════════════════════════════════════════════ -->
+  <section>
+    <span class="eyebrow">Part one &middot; What it does</span>
+    <h2>Getting the log in, and what is kept</h2>
+    <div class="col">
+      <p>
+        The importer is the only moment the raw truth exists, so it keeps more than it used to.
+        <span class="ui">Import an event log</span> accepts <strong>CSV / TSV</strong>, <strong>Excel</strong>
+        workbooks, <strong>XES</strong> (IEEE 1849) and <strong>OCEL 2.0 / 1.0</strong>. A wide export
+        &mdash; one row per case, a column per milestone &mdash; is detected and offered for unpivoting
+        (&ldquo;No, it is already one row per event&rdquo; declines). Several systems&rsquo; extracts of the
+        same cases are merged into one lifecycle with <span class="ui">Add this export to a merge</span>,
+        an optional <span class="ui">Id crosswalk</span> file joining their case ids, and the cross-system
+        hand-off measured at the join.
+      </p>
+    </div>
+    <div class="scroller">
+      <table class="kv">
+        <thead><tr><th>Mapping</th><th>Meaning</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td><code>Case ID *</code></td><td>the thing that flows &mdash; invoice number, application id</td><td>can be <strong>masked</strong> when it is really a customer number</td></tr>
+          <tr><td><code>Activity *</code></td><td>what happened</td><td>&mdash;</td></tr>
+          <tr><td><code>Timestamp *</code></td><td>when &mdash; ISO or epoch; rows are ordered by it within a case</td><td>per-event timings are kept, so between-step gaps are exact</td></tr>
+          <tr><td><code>State</code></td><td>the entity&rsquo;s resulting state</td><td>what conformance replays; can be filled from a State Machine you drew (<em>enrich</em>)</td></tr>
+          <tr><td><code>Resource</code></td><td>who or what did the work</td><td>per-event resources are kept &mdash; the handover map needs them; can be filled from the BPMN&rsquo;s lanes</td></tr>
+          <tr><td><code>Control ID</code></td><td>Control / Risk / Policy ids carried on events</td><td>mined into governance aggregates for the Risk &amp; Control register</td></tr>
+          <tr><td>any other column</td><td>kept if you tick it</td><td>a kept column becomes a slice dimension; any column can be masked on import</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="col">
+      <p>
+        Before the import commits, a verification panel shows usable and dropped rows, the timestamp
+        format and range, and sample values; the whole parsed log opens full-screen and filterable.
+        <span class="ui">Hold back the most recent</span> share of cases sets aside an out-of-sample test
+        set for a twin. A run then stores the traces and variants, a per-case index (strided above fifty
+        thousand cases, and every figure built on it says <em>estimated</em>), the analytics &mdash;
+        activities, edges, team flow, handovers, outcomes, throughput &mdash; the governance aggregates,
+        and the raw events, which is what makes slicing exact and recompute honest.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">Discovery and conformance</span>
+    <h2>Two diagrams, one rulebook</h2>
+    <div class="caps">
+      <div class="cap">
+        <h4>Discover the process</h4>
+        <ul>
+          <li>A directly-follows graph becomes a real BPMN: tasks in a pool, an exclusive gateway where work fans out, merges where it rejoins, loops as they fall out, start and end added</li>
+          <li>A <span class="ui">Detail</span> slider drops the rarest paths (0 draws every path the log contains); connectors carry how often each step was taken, and the median gap</li>
+          <li><span class="ui">AI-curate</span> optionally produces a cleaner reading as a separate diagram; the faithful mirror is never overwritten</li>
+          <li>Discovery from a slice is named after the slice and never becomes the run&rsquo;s own model</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Discover the state machine</h4>
+        <ul>
+          <li>The entity&rsquo;s lifecycle from the state column: observed states as nodes, observed moves as transitions labelled with their activity, each with its case count</li>
+          <li>Coverage guaranteed: every state in the log appears, never a tidied subset</li>
+          <li>Promote it, edit it, or <span class="ui">Create draft reference</span> from it when the project has none</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Conformance vs the reference</h4>
+        <ul>
+          <li>Pick a reference State Machine (only ones describing the same entity are offered); every case&rsquo;s state sequence is replayed against it by label</li>
+          <li><strong>Fitness</strong> = the share of cases that replay cleanly; five deviation kinds &mdash; undocumented transition, unknown state, unexpected entry, unexpected exit, dead transition &mdash; each counted and severity-ranked</li>
+          <li>Disallowed transitions turn red on the discovered lifecycle; a deviation names the cases behind it; <span class="ui">Re-check now</span> re-runs it against a different reference without re-import</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Object-centric (OCEL)</h4>
+        <ul>
+          <li>One lifecycle per object type, kept together as one study; a Domain Diagram of the object model, associations weighted by interaction, dashed where two types work together undeclared</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">The workbench</span>
+    <h2>Insights, and the slice every panel reads</h2>
+    <div class="col">
+      <p>
+        The Insights workbench has eleven tabs &mdash; <span class="ui">&#128203; Activities</span>,
+        <span class="ui">&#128293; Insights</span> (the heat map), <span class="ui">&#128256; Variants</span>,
+        <span class="ui">&#127902; Cases</span>, <span class="ui">&#127919; Outcomes</span>,
+        <span class="ui">&#8987; Between steps</span>, <span class="ui">&#9878; Deviations</span>,
+        <span class="ui">&#128101; Teams</span>, <span class="ui">&#128200; Compare</span>,
+        <span class="ui">&#129302; Automation</span>, <span class="ui">&#11015; Export</span> &mdash; and one
+        filter bar above them all. Slice by date (drag across the throughput chart), by team, or by any
+        kept column; every tab re-reads the slice through one seam, the rebuild is exact, and every
+        figure declares whether it is the whole run, this slice, or an estimate. Any tab expands to full
+        screen. <span class="ui">Explain</span> narrates the computed figures &mdash; with AI, or
+        deterministically without it.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">Keeping it live</span>
+    <h2>Sources, series and alerts</h2>
+    <div class="caps">
+      <div class="cap">
+        <h4>Live sources</h4>
+        <ul>
+          <li><strong>Webhook (push)</strong>: your system POSTs events to the ingest URL with an <code>X-Api-Key</code> shown once at creation</li>
+          <li><strong>Blob (folder)</strong>: an Azure Blob container SAS URL, polled; <strong>SharePoint (folder)</strong>: picked from your tenant, refreshed manually</li>
+          <li><span class="ui">Refresh</span> rebuilds the run in place &mdash; discovery, lifecycle and conformance re-run on the diagrams you already have; polling can be switched on or off</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Series</h4>
+        <ul>
+          <li>Every refresh keeps a snapshot; a manual run can <span class="ui">Snapshot</span> too. Snapshots are linked as a series (<code>parentRunId</code>)</li>
+          <li><span class="ui">Compare</span> reads the series: which steps moved, deviations that appeared and went away, conformance over the series &mdash; and refuses two runs whose vocabularies do not overlap</li>
+          <li><span class="ui">Freeze a dated run for the Compliance trend</span> feeds the org-wide Compliance Monitoring console</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Alerts</h4>
+        <ul>
+          <li>Rules on fitness, volume and silence, judged against the series; the source that stopped sending is raised first, because silence otherwise reads as a clean bill of health</li>
+          <li>Sent by email on the schedule and shown in Compare as <em>What would be raised right now</em> &mdash; produced by the same functions, so they cannot disagree</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">Where it goes</span>
+    <h2>Twin, governance, automation, export</h2>
+    <div class="caps">
+      <div class="cap">
+        <h4>Simulate a digital twin</h4>
+        <ul>
+          <li><span class="ui">&#9654; Calibrate &amp; simulate</span>: durations fitted per activity (fixed, triangular or a right-skewed shape as the timings warrant), arrivals from case starts, gateway odds from observed frequencies, a team per resource sized by concurrent cases, a calendar from when work happened &mdash; written onto the discovered BPMN, a study with an <em>As-mined baseline</em> created, the Simulator opened</li>
+          <li><span class="ui">Does the model match reality?</span> compares the twin&rsquo;s flow-time distribution with the held-back cases; a refreshed run marks its twin stale</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Governance</h4>
+        <ul>
+          <li>Control ids on events become expected / applied / bypassed per control, shown against the control in Risk &amp; Controls; a control can also name the conformance deviation it guards</li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Automation (task logs)</h4>
+        <ul>
+          <li>A task log &mdash; UI steps inside one job &mdash; gets an automation score and verdict, ping-pong and rework counts, hours automatable (the seconds-per-step assumption is editable), ranked candidate routines, an <span class="ui">RPA spec .md</span> and an <span class="ui">SOP (.docx)</span> / <span class="ui">SOP (PDF)</span></li>
+        </ul>
+      </div>
+      <div class="cap">
+        <h4>Export</h4>
+        <ul>
+          <li>The analysis as <span class="ui">Word (.docx)</span>, <span class="ui">Excel (.xlsx)</span> or PDF; the log itself as XES or OCEL; a run captured as a catalog example (admin)</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ PART TWO ═══════════════════════════════════════════════════ -->
+  <section>
+    <span class="eyebrow">Part two &middot; How it does it</span>
+    <h2>Before any of them: getting a run</h2>
+    <div class="guide">
+      <h5>Start with</h5>
+      <ol>
+        <li>An export of events from the system that runs the process: at least a case id, an activity and a timestamp per row. A state column and a resource column make conformance and teams possible; keep them if you have them.</li>
+        <li>A project to hold the run. Open <span class="ui">&#9935; Diagramatix Miner</span> from the project.</li>
+      </ol>
+      <h5>Build</h5>
+      <ol>
+        <li><span class="ui">Import an event log</span> &rarr; upload the file. If it is a wide export, accept the offer to unpivot it. If several systems cover the same cases, import the first, <span class="ui">Add this export to a merge</span>, then load the next; add an <span class="ui">Id crosswalk</span> if their ids differ.</li>
+        <li>Map the columns: <span class="ui">Case ID</span>, <span class="ui">Activity</span>, <span class="ui">Timestamp</span> are required; add <span class="ui">State</span>, <span class="ui">Resource</span>, <span class="ui">Control ID</span> where present; tick any other column you will want to slice by; tick <em>mask</em> on anything sensitive.</li>
+        <li>Read the verification panel &mdash; usable rows, dropped rows, the parsed date range. Open the full log view if anything looks wrong.</li>
+        <li>If a twin is in prospect, set <span class="ui">Hold back the most recent</span> share now; it cannot be added later without re-importing.</li>
+        <li><span class="ui">Import</span>. The run appears under <span class="ui">Imports</span> with its cases, events, activities, states and variants.</li>
+        <li>If the log lacks a state or a team column, fill them from the project&rsquo;s own models: the activity&rarr;state table from a State Machine, the activity&rarr;team table from the BPMN&rsquo;s lanes.</li>
+      </ol>
+      <h5>Then</h5>
+      <ol>
+        <li><span class="ui">&#9881; Discover process</span> and <span class="ui">&#9881; Discover state machine</span> under the run, and the <span class="ui">&#128293; Insights</span> workbench is underneath. Every guide below assumes this state.</li>
+      </ol>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">The guides</span>
+    <h2>What people use it for, step by step</h2>
+
+    <div class="guide">
+      <h3>1 &middot; What does our process actually look like?</h3>
+      <p class="aim">Aim: a BPMN diagram of every path people really took &mdash; usually not the one on the wall.</p>
+      <ol>
+        <li>Under <span class="ui">Discover the process</span> leave <span class="ui">Detail</span> at every path and press <span class="ui">&#9881; Discover process</span>.</li>
+        <li><span class="ui">Open discovered diagram &rarr;</span>. It is an ordinary diagram: rename, tidy, export, simulate. Re-discover at any detail level and it refreshes the same diagram.</li>
+        <li>Drag <span class="ui">Detail</span> right to hide the rarest paths and see the dominant flow; the connector labels say how often each step was taken.</li>
+        <li>Want a cleaner reading for a slide? <span class="ui">AI-curate</span> produces one as a separate diagram; the faithful mirror stays.</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>2 &middot; How many different ways is it being run?</h3>
+      <p class="aim">Aim: the distinct variants, ranked, and how few of them cover most of the work.</p>
+      <ol>
+        <li><span class="ui">&#128256; Variants</span>: every distinct sequence, most common first, with its cumulative share. Read where the cumulative share passes 80% &mdash; that is how many paths matter.</li>
+        <li>Click a variant to light its path on the model; tick two to see exactly what differs between them.</li>
+        <li>Slice by a kept column (region, product) to see whether the long tail belongs to one part of the business.</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>3 &middot; Where does the time go?</h3>
+      <p class="aim">Aim: the heat map &mdash; the brightest box is where the hours are, not where the noise is.</p>
+      <ol>
+        <li><span class="ui">&#128293; Insights</span>. <span class="ui">Colour by</span> total time for where the hours are, by average time in step for where each case waits, by frequency for where the volume is.</li>
+        <li>Turn on the mined time and team under each task so the numbers sit on the picture; expand to full screen for the room.</li>
+        <li>Then <span class="ui">&#8987; Between steps</span> &mdash; usually more of the elapsed time is on the arrows than in the boxes (guide 24).</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>4 &middot; Which step is the bottleneck?</h3>
+      <p class="aim">Aim: steps ranked by total time consumed, with the median time in each.</p>
+      <ol>
+        <li><span class="ui">&#128203; Activities</span>: one row per step with cases, occurrences, median and total time. Sort by total time; the top row is the bottleneck by hours, the top by median is the slow step per case &mdash; they are often different.</li>
+        <li>An amber flag on a step means more than one team does it; open the split (guide 15).</li>
+        <li>To act on it, guide 29 (Next steps) or hand it to the Simulator (guide 14).</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>5 &middot; Are we doing it the way we said?</h3>
+      <p class="aim">Aim: a fitness percentage &mdash; the share of cases that replay cleanly against your reference.</p>
+      <h5>Start with</h5><ol><li>A log with a state column, and a reference State Machine of the entity&rsquo;s lifecycle. No reference yet? Under <span class="ui">Conformance vs the reference</span> press <span class="ui">Create draft reference</span>: it scaffolds one from the mined lifecycle; expect near-perfect fitness at first, then edit it into the rulebook you actually publish.</li></ol>
+      <h5>Build and read</h5>
+      <ol>
+        <li>Pick the reference from the list (only state machines describing this entity are offered) and press <span class="ui">&#10003; Check conformance</span>.</li>
+        <li>Read <strong>fitness</strong> and the deviation table beneath it, ranked by cases affected.</li>
+        <li>Swap in a stricter reference and check again: the fitness drop and the new top deviation are exactly which rule is broken, and how often.</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>6 &middot; What exactly is going wrong?</h3>
+      <p class="aim">Aim: each deviation named and counted &mdash; undocumented moves, unexpected entries and exits, states that should not exist.</p>
+      <ol>
+        <li>After guide 5, <span class="ui">&#9878; Deviations</span>: every deviation with its kind, count and severity.</li>
+        <li>Click one to see the cases behind it (guide 23). A run checked before attribution existed says <em>unattributed</em> rather than showing an empty list.</li>
+        <li>Slice the run (date, team) and the deviation counts restate themselves for the slice.</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>7 &middot; Which paths should not be possible?</h3>
+      <p class="aim">Aim: the discovered lifecycle with every disallowed transition drawn in red.</p>
+      <ol>
+        <li>After guide 5, <span class="ui">Open state machine &rarr;</span> under the discovered lifecycle: transitions the reference forbids are red; each carries its case count.</li>
+        <li>A red transition with many cases is a policy the business has quietly changed; one with few is an error path. Both go on the same list, but they are different conversations.</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>8 &middot; Do our controls actually operate?</h3>
+      <p class="aim">Aim: per control &mdash; expected, applied, bypassed &mdash; measured from the log, not asserted.</p>
+      <h5>Start with</h5><ol><li>A log whose events carry control ids (map the <span class="ui">Control ID</span> column), or controls in Risk &amp; Controls that each name the conformance deviation they guard.</li></ol>
+      <h5>Build and read</h5>
+      <ol>
+        <li>Import with <span class="ui">Control ID</span> mapped; the governance aggregates are mined on import.</li>
+        <li>Open the project&rsquo;s <span class="ui">Risk &amp; Controls</span> console: each control shows <em>applied &divide; expected</em>, or <em>bypassed in N of M cases</em> where it guards a deviation.</li>
+        <li>Export the Risk-Control Matrix &mdash; the Control Register sheet carries the operating effectiveness.</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>9 &middot; Is compliance improving or slipping?</h3>
+      <p class="aim">Aim: control effectiveness over time across every project, and by APQC category.</p>
+      <ol>
+        <li>Each period, import (or refresh) the log and press <span class="ui">Freeze a dated run for the Compliance trend</span> on the run. A throwaway run is left unfrozen so testing never pollutes the trend.</li>
+        <li>Open <span class="ui">Compliance Monitoring</span> from the organisation: the trend per control, per project, per APQC category.</li>
+        <li>For one process rather than the organisation, guide 26 (Compare) gives conformance over the series.</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>10 &middot; Are we meeting the SLA?</h3>
+      <p class="aim">Aim: the on-time / late split at whatever turnaround you promise.</p>
+      <ol>
+        <li><span class="ui">&#127919; Outcomes</span>. Set <span class="ui">Case SLA</span> &mdash; a case is late when its cycle time exceeds it. The late rate appears at once and is persisted with the run.</li>
+        <li>Slice by team or period to see who is missing it.</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>11 &middot; Why are cases late?</h3>
+      <p class="aim">Aim: the steps and the paths over-represented in late cases, with the size of the effect.</p>
+      <ol>
+        <li>After guide 10, the same tab: <em>What drives late cases</em> &mdash; steps by lift among late cases &mdash; and <em>Variants most over-represented in late cases</em>.</li>
+        <li>Click an over-represented variant to see its path; then <span class="ui">&#8987; Between steps</span> to find which gap on that path is the one.</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>12 &middot; Which cases were the worst?</h3>
+      <p class="aim">Aim: every case ranked by cycle time, down to the individual sequence of steps it took.</p>
+      <ol>
+        <li><span class="ui">&#127902; Cases</span>, sorted by cycle time. Filter to one variant if you want the worst of a kind.</li>
+        <li>Click a case: its path lights on the model and its timeline shows every step with the time between them.</li>
+        <li>Export the case index as CSV for anyone who wants to check it.</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>13 &middot; Can you show me rather than tell me?</h3>
+      <p class="aim">Aim: a replay of real work flowing through the discovered process, weighted by how often each path happened.</p>
+      <ol>
+        <li><span class="ui">&#127902; Cases</span> &rarr; the live replay: one runner per sampled variant over the discovered model, weighted by frequency. Expand it for the room.</li>
+        <li>For a what-if rather than a replay, calibrate a twin (guide 14) and use the Simulator&rsquo;s replay with the Operator.</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>14 &middot; What would fixing it be worth?</h3>
+      <p class="aim">Aim: a calibrated simulation &mdash; real durations, arrival rates, branch splits, teams and working hours, straight from the log.</p>
+      <h5>Start with</h5><ol><li>A discovered process (guide 1) and, for a testable twin, a hold-back set at import.</li></ol>
+      <h5>Build and read</h5>
+      <ol>
+        <li>Under <span class="ui">Simulate a digital twin</span> press <span class="ui">&#9654; Calibrate &amp; simulate</span>. The fitted numbers are written onto the discovered BPMN, a study with an <em>As-mined baseline</em> is created, and the Simulator opens on it.</li>
+        <li>Run the baseline; then follow the Simulator&rsquo;s technical guides &mdash; a to-be scenario, Compare, the significance verdict, the business case with its payback month.</li>
+        <li>Come back to <span class="ui">Does the model match reality?</span> to see the twin against the held-back cases before anyone quotes it.</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>15 &middot; Who is doing what?</h3>
+      <p class="aim">Aim: the team behind each step, and where a step is done by more than one team.</p>
+      <ol>
+        <li>Map <span class="ui">Resource</span> at import (or fill teams from the BPMN&rsquo;s lanes).</li>
+        <li><span class="ui">&#128203; Activities</span> shows the dominant team per step; an amber flag opens the split when more than one team does it. The dominant-team map says how many multi-team activities make it a guess.</li>
+        <li><span class="ui">&#128101; Teams</span> for the handover map (guide 27).</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>16 &middot; Is this job worth automating?</h3>
+      <p class="aim">Aim: an automation score, the hours it would save, and the ranked candidate routines behind it.</p>
+      <h5>Start with</h5><ol><li>A <em>task</em> log &mdash; the UI steps inside one job, one row per step with the application and the action &mdash; imported like any other log. The built-in <em>Enter Invoice</em> example shows the shape.</li></ol>
+      <h5>Build and read</h5>
+      <ol>
+        <li><span class="ui">&#129302; Automation</span>: the score and verdict, <em>Est. time automatable</em>, and <em>Candidate routines</em> ranked.</li>
+        <li>The seconds-per-step assumption behind the hours is editable; change it and the ROI restates.</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>17 &middot; How is this task actually performed?</h3>
+      <p class="aim">Aim: the real step-by-step routine as an RPA specification or an SOP &mdash; written from observed behaviour, not from memory.</p>
+      <ol>
+        <li>In <span class="ui">&#129302; Automation</span> pick the strongest candidate routine.</li>
+        <li><span class="ui">RPA spec .md</span> for the build team; <span class="ui">SOP (.docx)</span> or <span class="ui">SOP (PDF)</span> for the people &mdash; a styled Word document produced server-side like every other document in the product.</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>18 &middot; Where does the person waste effort?</h3>
+      <p class="aim">Aim: app ping-pong bounces and the steps that get redone.</p>
+      <ol>
+        <li>On a task log, <span class="ui">&#129302; Automation</span> &rarr; <em>Passed back and forth</em> (application ping-pong) and <em>Rework &mdash; repeated work steps</em>.</li>
+        <li>On an ordinary business log the same rework reading is under <span class="ui">&#128101; Teams</span> (guide 27) &mdash; ping-pong is a task-log measure and reads zero elsewhere, by design.</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>19 &middot; How do our entities relate?</h3>
+      <p class="aim">Aim: an object model mined from an OCEL log, with a lifecycle for every object type.</p>
+      <ol>
+        <li>Import an <span class="ui">OCEL 2.0</span> log. Each object type becomes its own entity run inside one study; select an object type to work on its lifecycle.</li>
+        <li><span class="ui">Open the object model (Domain Diagram) &rarr;</span>: associations weighted by how strongly the types interact, dashed where two types work together but nobody declared a relationship.</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>20 &middot; Is this still true today?</h3>
+      <p class="aim">Aim: a live source that keeps the run, the diagrams and the conformance check current on their own.</p>
+      <h5>Start with</h5><ol><li>A mined run, and one of: a system that can POST events; an Azure Blob container the system drops files into; a SharePoint folder.</li></ol>
+      <h5>Build and read</h5>
+      <ol>
+        <li><span class="ui">Live sources</span> &rarr; add a source: <span class="ui">Webhook (push)</span> gives an ingest URL and an <code>X-Api-Key</code> shown once (copy it now; <span class="ui">Copy curl example</span> shows the call); <span class="ui">Blob (folder)</span> takes a SAS URL; <span class="ui">SharePoint (folder)</span> opens the picker.</li>
+        <li>Attach the source to the run. New events rebuild it in place; polling can be toggled; SharePoint refreshes on <span class="ui">Refresh</span>.</li>
+        <li>Every refresh keeps a snapshot &mdash; that is the series guides 26 and 28 read.</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>21 &middot; Can I hand this to my manager?</h3>
+      <p class="aim">Aim: the full analysis as Word, Excel or PDF, and a plain-English summary of what it found.</p>
+      <ol>
+        <li><span class="ui">&#11015; Export</span> &rarr; <span class="ui">Word (.docx)</span>, <span class="ui">Excel (.xlsx)</span> or PDF: summary, bottlenecks, variant Pareto, outcomes. An active slice is exported as the slice, and the summary restates itself for it.</li>
+        <li><span class="ui">Explain</span> for the narrative &mdash; the computed figures in prose, never instead of them; it works without AI.</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>22 &middot; Can our own analysts check it?</h3>
+      <p class="aim">Aim: the log back out as XES or OCEL, for ProM, Celonis, Disco, Apromore or Signavio.</p>
+      <ol>
+        <li><span class="ui">&#11015; Export</span> &rarr; <em>Export log</em>: XES (IEEE 1849) or OCEL 2.0 JSON. Masked columns stay masked.</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>23 &middot; Which cases caused this deviation?</h3>
+      <p class="aim">Aim: the list behind every deviation, each with its own timeline; the whole index exports as CSV.</p>
+      <ol>
+        <li><span class="ui">&#9878; Deviations</span> &rarr; click the deviation. The cases that produced it are listed; click one for its timeline on the model.</li>
+        <li>Older run with no attribution? <span class="ui">Re-check now</span> &mdash; it gains the case list without a re-import, because the raw events were kept.</li>
+        <li>Export the index as CSV to hand the fourteen cases to the person who owns them.</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>24 &middot; Is the delay in the steps, or between them?</h3>
+      <p class="aim">Aim: transitions ranked by the elapsed time they account for, drawn on the arrows.</p>
+      <ol>
+        <li><span class="ui">&#8987; Between steps</span>: every transition with its median gap, share of the run, and total waiting; the arrows on the model carry the median and a thickness.</li>
+        <li>The table is not split into in-step and between-step time, on purpose: one timestamp per event means the same milliseconds would be counted twice.</li>
+        <li>The top row is the queue to fix; guide 14 to test the fix.</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>25 &middot; Just this team, just this quarter?</h3>
+      <p class="aim">Aim: slice the run &mdash; exactly &mdash; with every figure declaring what it covers.</p>
+      <ol>
+        <li>Above the tabs: drag across the throughput chart to narrow the dates (click once to clear); pick a team; pick a value of any column you kept at import.</li>
+        <li>Every tab re-reads the slice. A figure says <em>whole run</em>, <em>this slice</em> or <em>estimated</em> (a strided index above fifty thousand cases) &mdash; quote it with its label.</li>
+        <li>Discovery from a slice makes a diagram named after the slice; the run&rsquo;s own model is untouched.</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>26 &middot; What changed since last month?</h3>
+      <p class="aim">Aim: two runs of the same process side by side as a linked series &mdash; and a refusal when they are not the same process.</p>
+      <h5>Start with</h5><ol><li>Two runs of the same process: snapshots of a live run, or last month&rsquo;s manual run and this month&rsquo;s imported into the same series.</li></ol>
+      <h5>Build and read</h5>
+      <ol>
+        <li><span class="ui">&#128200; Compare</span> &rarr; <em>Compare this run against</em> an earlier one.</li>
+        <li>Read <em>Which steps moved</em>, <em>Deviations that appeared</em> and <em>went away</em>, <em>Conformance over the series</em>, and the volume.</li>
+        <li><em>These two runs are not comparable</em> means their activity vocabularies do not overlap &mdash; a different process, or a renamed one &mdash; and the refusal is the finding.</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>27 &middot; Who hands work to whom?</h3>
+      <p class="aim">Aim: the handover map, and who does the same thing three times.</p>
+      <ol>
+        <li>Map <span class="ui">Resource</span> at import; the per-event resources are what the map is built from.</li>
+        <li><span class="ui">&#128101; Teams</span>: the handover map between teams, the cross-system hand-off measured at a merge join, and <em>Done more than once</em> &mdash; rework by step and team on an ordinary business log.</li>
+        <li>A team that hands work to itself three times is a loop nobody drew; guide 1&rsquo;s discovered diagram will show it.</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>28 &middot; Has the feed gone quiet?</h3>
+      <p class="aim">Aim: alerts on fitness, volume and silence &mdash; the source that stopped sending, first.</p>
+      <h5>Start with</h5><ol><li>A live source (guide 20) with at least a few snapshots, so the rules have a series to judge against.</li></ol>
+      <h5>Build and read</h5>
+      <ol>
+        <li><span class="ui">&#128200; Compare</span> &rarr; <em>What would be raised right now</em>: the alert rules&rsquo; verdict on this run, asked now rather than on the schedule. <em>Nothing would be raised</em> is a real answer.</li>
+        <li>On the schedule the same rules send the alert email. Silence &mdash; a source that stopped sending &mdash; is raised first, because otherwise it reads as a clean bill of health.</li>
+      </ol>
+    </div>
+
+    <div class="guide">
+      <h3>29 &middot; What should we do first?</h3>
+      <p class="aim">Aim: ranked advice with its evidence and a button &mdash; or an honest &ldquo;nothing stands out&rdquo;.</p>
+      <ol>
+        <li><em>What to do next</em> under the run: findings ranked, each with the evidence and the action &mdash; open the step, slice to the cases, calibrate a twin.</li>
+        <li>It will not advise from an approximation (an estimated slice) and it can say <em>nothing stands out</em> &mdash; a perfectly even process is not a bottleneck.</li>
+        <li>The optional narration sees only the ranked findings, never the raw log.</li>
+      </ol>
+    </div>
+  </section>
+
+  <footer>Diagramatix &middot; the Miner, technical edition &middot; Version 3, 14 September 2026</footer>
+
+</div>
