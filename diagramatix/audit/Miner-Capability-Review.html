@@ -204,6 +204,8 @@
   }
   a { color: var(--accent); }
   a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .chip.shipped { background: rgba(31,111,74,.14); border-color: transparent; color: #2f9a63; font-weight: 600; }
+  .asbuilt { border-left: 3px solid #2f9a63; padding-left: 12px; }
 </style>
 
 <div class="wrap">
@@ -212,12 +214,13 @@
     <span class="kicker">Diagramatix &middot; internal review</span>
     <h1>What the Miner does, and what it should do next</h1>
     <p class="standfirst">
-      A read of DiagramatixMINER as it stands from the user&rsquo;s side of the screen &mdash; what it
+      A read of Diagramatix Miner as it stands from the user&rsquo;s side of the screen &mdash; what it
       can be asked to do, the questions it already answers, and the eight additions that would turn a
       good discovery tool into something an operations team keeps coming back to.
     </p>
     <div class="meta">
-      <span>7 September 2026</span>
+      <span>Version 3 &middot; 14 September 2026</span>
+      <span>First read 7 September; plan 9 September</span>
       <span>Read from the shipped code, not the roadmap</span>
       <span>Companion to &ldquo;The Miner&rdquo;, the external summary</span>
     </div>
@@ -496,11 +499,14 @@
     </div>
 
     <div class="note" style="margin-bottom:26px">
-      <span class="eyebrow">Now planned &middot; 9 September 2026</span>
+      <span class="eyebrow">Now shipped &middot; 14 September 2026</span>
       <p>
-        Every extension and smaller item below is scheduled in
-        <strong>Miner-Extensions-Plan.md</strong>, in the same folder. Nothing was dropped; two items
-        are re-specified rather than built as written, and each says so where it appears.
+        Every extension and smaller item below <strong>shipped on 9&ndash;10 September</strong> as Phases 0&ndash;11 of
+        <strong>Miner-Extensions-Plan.md</strong>, release 2.9.2517 &mdash; and the codename went with
+        it: DiagramatixMINER is <strong>Diagramatix Miner</strong> everywhere since 10 September. Two
+        items were re-specified rather than built as written (05 recompute, 06 append &rarr; a linked
+        run series) and one was declined with reasons (10, new connector types). Each extension carries
+        a green <em>Shipped</em> tag with what was actually built.
       </p>
       <p>
         Writing that plan meant reading the code a second time, which found <strong>four claims here
@@ -528,7 +534,9 @@
           are usually different places. This is the single biggest gap between the Miner&rsquo;s
           answers and the Simulator&rsquo;s, and the data for it is already in the database.
         </p>
+        <p class="why asbuilt"><strong>As built &middot; V3.</strong> <code>analytics.edges</code> reaches a screen: a ranked &ldquo;Between steps&rdquo; table, the discovered model&rsquo;s arrows carrying the median gap and a thickness, and the detail slider the User Guide had already described. The in-step versus between-step split was <em>refused</em> &mdash; one timestamp per event means the same milliseconds are already counted under the from-activity, so the split would have been fabricated and the two tables would have summed to twice the process.</p>
         <div class="ext-tags">
+          <span class="chip shipped">Shipped &middot; Phase 4</span>
           <span class="chip have">Data already stored</span>
           <span class="chip">Render only</span>
           <span class="chip">Small</span>
@@ -564,7 +572,9 @@
           conformance &mdash; becomes several times more useful the moment it can be pointed at a
           subset, and none of them need changing to gain it.
         </p>
+        <p class="why asbuilt"><strong>As built &middot; V3.</strong> The run slices by date, team and any column kept at import; the throughput chart is the date brush; the filtered rebuild is <em>exact</em> (proved equal to recomputing the slice from scratch); the report filters server-side and restates its own summary. Phase 1&rsquo;s seam &mdash; keep the raw events, read every panel through one place &mdash; reached eight panels by changing one line, and every figure now declares whether it is the whole run, this slice, or an estimate.</p>
         <div class="ext-tags">
+          <span class="chip shipped">Shipped &middot; Phase 5</span>
           <span class="chip new">Needs new data</span>
           <span class="chip">Import + every tab</span>
           <span class="chip">Largest</span>
@@ -587,7 +597,9 @@
           establishes the pattern with its as-is / to-be assessment; the Miner, which has a much better
           claim to it because both sides are measured rather than modelled, has nothing.
         </p>
+        <p class="why asbuilt"><strong>As built &middot; V3.</strong> A linked run series (<code>parentRunId</code> &mdash; the programme&rsquo;s only real column, 2.8 &rarr; 2.9) and <code>compareRuns</code>, which refuses two runs whose vocabularies do not overlap, because that failure looks exactly like a real regression. Phase 11 gave it the screen: <strong>Insights &rarr; Compare</strong>, which computes nothing in the browser so the panel and the alert email cannot disagree.</p>
         <div class="ext-tags">
+          <span class="chip shipped">Shipped &middot; Phase 9</span>
           <span class="chip have">Both runs persisted</span>
           <span class="chip">New view</span>
           <span class="chip">Medium</span>
@@ -609,7 +621,9 @@
           is the difference between a metric and evidence, and it is the same gap that makes the mined
           control-effectiveness figure hard to defend in a review.
         </p>
+        <p class="why asbuilt"><strong>As built &middot; V3.</strong> A deviation names the cases behind it, a case shows its own timeline, and the whole index exports as CSV. A third state the plan did not name &mdash; <em>unattributed</em>, for a run checked before attribution existed &mdash; because an empty list there would be a confident lie. The Re-check button settles the recompute debt: an existing run gains attribution with no re-import.</p>
         <div class="ext-tags">
+          <span class="chip shipped">Shipped &middot; Phase 6</span>
           <span class="chip have">Derivable today</span>
           <span class="chip">Drill-through</span>
           <span class="chip">Small</span>
@@ -633,7 +647,9 @@
           also the analysis business stakeholders recognise fastest, because it is about people
           rather than boxes.
         </p>
+        <p class="why asbuilt"><strong>As built &middot; V3.</strong> An exact handover map from the per-event resources Phase 1 now retains (the review&rsquo;s &ldquo;data already mined&rdquo; was the correction that mattered: only the dominant team survived import before). The dominant-team map says how many multi-team activities make it a guess.</p>
         <div class="ext-tags">
+          <span class="chip shipped">Shipped &middot; Phase 7</span>
           <span class="chip have">Data already mined</span>
           <span class="chip">New view</span>
           <span class="chip">Medium</span>
@@ -668,7 +684,9 @@
           is switched on. Generalising it costs little and gives every run a headline it currently
           lacks.
         </p>
+        <p class="why asbuilt"><strong>As built &middot; V3.</strong> Rework and loop detection on a business log. The correction was confirmed as a test: the task-mining ping-pong really does return zero on a business log, so the widening was a new reading rather than a wider trigger.</p>
         <div class="ext-tags">
+          <span class="chip shipped">Shipped &middot; Phase 7</span>
           <span class="chip have">Analysis exists</span>
           <span class="chip">Widen the trigger</span>
           <span class="chip">Small</span>
@@ -703,7 +721,9 @@
           that will break it next quarter &mdash; and the Miner has already measured exactly that and
           thrown the chart away.
         </p>
+        <p class="why asbuilt"><strong>As built &middot; V3.</strong> Arrivals and completions over time as the run&rsquo;s throughput chart &mdash; which is also the brush that slices it, so a growing backlog is one drag away from the cases that make it up.</p>
         <div class="ext-tags">
+          <span class="chip shipped">Shipped &middot; Phase 5</span>
           <span class="chip have">Data already stored</span>
           <span class="chip">Render only</span>
           <span class="chip">Small</span>
@@ -726,7 +746,9 @@
           your process changed. Compliance Monitoring already stores the trend that an alarm would
           watch &mdash; it just has no alarm.
         </p>
+        <p class="why asbuilt"><strong>As built &middot; V3.</strong> Alert rules on fitness, volume and silence. The flagged poll-loop detail turned out to be two bugs: SharePoint sources were never fetched, and <code>if (hasNew)</code> made silence the one state the watcher could not see. The alarm that leads is the one nobody else leads with &mdash; <em>the source stopped sending</em>. Surfaced in Insights &rarr; Compare and by email from the same functions.</p>
         <div class="ext-tags">
+          <span class="chip shipped">Shipped &middot; Phase 10</span>
           <span class="chip have">Trend already stored</span>
           <span class="chip new">Thresholds + notify</span>
           <span class="chip">Medium</span>
@@ -766,7 +788,9 @@
           &rarr; simulate &rarr; re-mine loop the product already claims, and which a user must
           currently know about and perform by hand.
         </p>
+        <p class="why asbuilt"><strong>As built &middot; V3.</strong> Advice with buttons. It refuses to advise from an approximation, and it can say <em>nothing stands out</em> &mdash; a test caught a threshold that called a perfectly even process a bottleneck. The narration route is guarded so the model sees only the ranked findings. Producing the task SOP server-side (smaller item 08) turned out to be the same work.</p>
         <div class="ext-tags">
+          <span class="chip shipped">Shipped &middot; Phase 8</span>
           <span class="chip have">Signals already computed</span>
           <span class="chip">Rank + hand off</span>
           <span class="chip">Medium</span>
@@ -813,7 +837,9 @@
           event &mdash; which is also the prize, because it makes cross-system handover visible, and
           that is where the worst delay in a real process usually sits.
         </p>
+        <p class="why asbuilt"><strong>As built &middot; V3.</strong> An <code>.xlsx</code> reader; a wide &ldquo;one row per case&rdquo; export read as the events it encodes; and several systems&rsquo; extracts of the same cases merged into one lifecycle, with the cross-system hand-off measured at the join. In the import screen, not an ETL project.</p>
         <div class="ext-tags">
+          <span class="chip shipped">Shipped &middot; Phase 2</span>
           <span class="chip new">Needs new parsing</span>
           <span class="chip">Import only</span>
           <span class="chip">Medium</span>
@@ -833,20 +859,20 @@
 
     <h3>Smaller things, still worth doing</h3>
     <ul class="smalls">
-      <li><span class="num">01</span><span class="body"><strong>The case list shows sixty rows and cannot be exported.</strong> The full per-case index is stored; a CSV of it would let anyone check the analysis in a spreadsheet, which is exactly what a sceptical stakeholder asks for first.</span></li>
-      <li><span class="num">02</span><span class="body"><strong>&ldquo;(sampled)&rdquo; is shown without saying what it means.</strong> Above fifty thousand cases the stored per-case index is strided down. The headline figures stay exact, but the label does not say so, and a reader cannot tell which numbers to trust.</span></li>
+      <li><span class="num">01</span><span class="body"><strong>The case list shows sixty rows and cannot be exported.</strong> <span class="chip shipped">Shipped &middot; Phase 6</span> The full per-case index is stored; a CSV of it would let anyone check the analysis in a spreadsheet, which is exactly what a sceptical stakeholder asks for first.</span></li>
+      <li><span class="num">02</span><span class="body"><strong>&ldquo;(sampled)&rdquo; is shown without saying what it means.</strong> <span class="chip shipped">Shipped &middot; Phase 5 &mdash; every figure declares its exactness</span> Above fifty thousand cases the stored per-case index is strided down. The headline figures stay exact, but the label does not say so, and a reader cannot tell which numbers to trust.</span></li>
       <li style="padding-left:0"><div class="corr" style="margin-top:10px"><span class="lab">Correction &middot; 9 Sep 2026</span><p>Under-rated here as a labelling nicety. It is a <strong>correctness precondition</strong> for extension 2: the moment a filter exists, the stride turns every filtered figure into an estimate, and a filter selecting a rare value may resolve to almost nothing. The rule this document sets &mdash; every figure visibly filtered or visibly not &mdash; needs a third state it does not name: <strong>visibly estimated</strong>.</p></div></li>
-      <li><span class="num">03</span><span class="body"><strong>The multi-team flag is a dead end.</strong> An activity performed by more than one team is highlighted amber &mdash; and cannot be clicked to see the split. That flag is often the most interesting row in the table.</span></li>
-      <li><span class="num">04</span><span class="body"><strong>Discovery has frequency filtering that is never exposed.</strong> The discovery API already accepts an edge threshold that trims rare paths, and the console never sends one. A &ldquo;simplify the map&rdquo; slider is the standard remedy for the first reaction most people have to a discovered model, and the engine behind it is done.</span></li>
-      <li><span class="num">05</span><span class="body"><strong>Older runs have to be re-imported to gain new analysis.</strong> The empty-state message says so out loud. A &ldquo;recompute&rdquo; action on the run would avoid asking the user to find the original file again &mdash; which, months later, they often cannot.</span></li>
+      <li><span class="num">03</span><span class="body"><strong>The multi-team flag is a dead end.</strong> <span class="chip shipped">Shipped &middot; Phase 7</span> An activity performed by more than one team is highlighted amber &mdash; and cannot be clicked to see the split. That flag is often the most interesting row in the table.</span></li>
+      <li><span class="num">04</span><span class="body"><strong>Discovery has frequency filtering that is never exposed.</strong> <span class="chip shipped">Shipped &middot; Phase 4</span> The discovery API already accepts an edge threshold that trims rare paths, and the console never sends one. A &ldquo;simplify the map&rdquo; slider is the standard remedy for the first reaction most people have to a discovered model, and the engine behind it is done.</span></li>
+      <li><span class="num">05</span><span class="body"><strong>Older runs have to be re-imported to gain new analysis.</strong> <span class="chip shipped">Re-specified &middot; Phase 0.3 + Re-check (Phase 6)</span> The empty-state message says so out loud. A &ldquo;recompute&rdquo; action on the run would avoid asking the user to find the original file again &mdash; which, months later, they often cannot.</span></li>
       <li style="padding-left:0"><div class="corr" style="margin-top:10px"><span class="lab">Correction &middot; 9 Sep 2026</span><p>A recompute action cannot fix this for a manual run, because <strong>there is nothing to recompute from</strong> &mdash; the importer aggregates the raw events and discards them, by design. There are two honest answers, not one: a <em>real</em> recompute for live-source runs, whose windowed buffer still holds up to 100,000 raw rows, and a <em>derived-only</em> recompute for manual runs, which refuses by name anything needing per-event data. That constraint is why the plan front-loads storage: a field not captured at import is unavailable to that run forever.</p></div></li>
-      <li><span class="num">06</span><span class="body"><strong>A manual run cannot be appended to.</strong> Only live sources accumulate. Importing next month&rsquo;s export means a whole new run, and therefore no continuity in a trend that only exists per run.</span></li>
+      <li><span class="num">06</span><span class="body"><strong>A manual run cannot be appended to.</strong> <span class="chip shipped">Re-specified &middot; a linked run series, Phase 9</span> Only live sources accumulate. Importing next month&rsquo;s export means a whole new run, and therefore no continuity in a trend that only exists per run.</span></li>
       <li style="padding-left:0"><div class="corr" style="margin-top:10px"><span class="lab">Correction &middot; 9 Sep 2026</span><p>Declined as written, and re-specified. Appending needs retained raw events, which do not exist and are not worth introducing for this. What the item actually asks for is <em>continuity of trend</em>, and a <strong>linked run series</strong> delivers that without the storage fork &mdash; the snapshot route already freezes a dated copy, it simply records no link back to the run it came from.</p></div></li>
-      <li><span class="num">07</span><span class="body"><strong>The automation ROI hard-codes its own key assumption.</strong> Hours saved is derived from a fixed seconds-per-step figure. Making it editable turns an illustrative number into one somebody is willing to sign.</span></li>
-      <li><span class="num">08</span><span class="body"><strong>The task SOP downloads as raw Markdown.</strong> The SOP generator already produces a styled Word document from a BPMN; the mined routine should go in the same door rather than out a second one.</span></li>
-      <li><span class="num">09</span><span class="body"><strong>Nothing masks values in an imported process log.</strong> The task-mining schema is explicit that values must be redacted, but a CSV import carries whatever is in the mapped columns &mdash; and case ids are frequently customer identifiers.</span></li>
-      <li><span class="num">10</span><span class="body"><strong>Connectors stop at webhook, Blob and SharePoint.</strong> A read-only database view or a REST endpoint is what most customers actually have, and asking them to build a webhook is asking for a project before they can see any value.</span></li>
-      <li><span class="num">11</span><span class="body"><strong>Conformance has no history of its own.</strong> Compliance Monitoring tracks controls over time across the org, but a single live run cannot show its own fitness moving &mdash; the one chart a process owner would check weekly.</span></li>
+      <li><span class="num">07</span><span class="body"><strong>The automation ROI hard-codes its own key assumption.</strong> <span class="chip shipped">Shipped &middot; Phase 7</span> Hours saved is derived from a fixed seconds-per-step figure. Making it editable turns an illustrative number into one somebody is willing to sign.</span></li>
+      <li><span class="num">08</span><span class="body"><strong>The task SOP downloads as raw Markdown.</strong> <span class="chip shipped">Shipped &middot; Phase 8 &mdash; a styled Word document, server-side</span> The SOP generator already produces a styled Word document from a BPMN; the mined routine should go in the same door rather than out a second one.</span></li>
+      <li><span class="num">09</span><span class="body"><strong>Nothing masks values in an imported process log.</strong> <span class="chip shipped">Shipped &middot; Phase 1</span> The task-mining schema is explicit that values must be redacted, but a CSV import carries whatever is in the mapped columns &mdash; and case ids are frequently customer identifiers.</span></li>
+      <li><span class="num">10</span><span class="body"><strong>Connectors stop at webhook, Blob and SharePoint.</strong> <span class="chip shipped">Declined with reasons &mdash; remains the connector Phase 2</span> A read-only database view or a REST endpoint is what most customers actually have, and asking them to build a webhook is asking for a project before they can see any value.</span></li>
+      <li><span class="num">11</span><span class="body"><strong>Conformance has no history of its own.</strong> <span class="chip shipped">Shipped &middot; Phases 9&ndash;10</span> Compliance Monitoring tracks controls over time across the org, but a single live run cannot show its own fitness moving &mdash; the one chart a process owner would check weekly.</span></li>
       <li style="padding-left:0"><div class="corr" style="margin-top:10px"><span class="lab">Correction &middot; 9 Sep 2026</span><p>Not a smaller thing: a <strong>prerequisite of extension 8</strong>. No history, no alarm &mdash; you cannot alert on &ldquo;fitness fell from 94% to 71%&rdquo; when each refresh overwrites the run and no prior value was ever kept.</p></div></li>
     </ul>
 
@@ -951,9 +977,20 @@
           number, and a number is not a course of action. See the ninth extension above.
         </p>
       </div>
+    
+      <div class="note" style="margin-top:18px">
+        <span class="eyebrow">Postscript &middot; 14 September 2026</span>
+        <p>
+          The second visit exists. <em>What changed</em> is Compare; <em>for which cases</em> is the list
+          behind every deviation; <em>tell me when it moves</em> is the run series and its alerts; and
+          the fourth question, <em>so what should I do</em>, is Next steps. The sharper sentence held:
+          the reading was ahead of the storing. Phase 1 kept the raw events, and nearly everything after
+          it was a render over data that finally survived the import.
+        </p>
+      </div>
     </div>
   </section>
 
-  <footer>Diagramatix &middot; DiagramatixMINER capability review</footer>
+  <footer>Diagramatix &middot; Diagramatix Miner capability review &middot; Version 3, 14 September 2026</footer>
 
 </div>

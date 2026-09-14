@@ -188,6 +188,8 @@
   }
   a { color: var(--accent); }
   a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .chip.shipped { background: rgba(31,111,74,.14); border-color: transparent; color: #2f9a63; font-weight: 600; }
+  .asbuilt { border-left: 3px solid #2f9a63; padding-left: 12px; }
 </style>
 
 <div class="wrap">
@@ -202,11 +204,30 @@
       model one.
     </p>
     <div class="meta">
-      <span>7 September 2026</span>
+      <span>Version 3 &middot; 14 September 2026</span>
+      <span>First read 7 September 2026</span>
       <span>Read from the shipped code, not the roadmap</span>
       <span>Companion to &ldquo;The Simulator&rdquo;, the external summary</span>
     </div>
   </header>
+
+  <div class="note" style="margin-bottom:26px">
+    <span class="eyebrow">Version 3 &middot; 14 September 2026</span>
+    <p>
+      Version 1 (7 September) argued for eight extensions and six smaller items. Version 2 was the plan
+      that built them, <strong>Simulator-Extensions-Plan.md</strong>. This version records that
+      <strong>all fourteen have shipped</strong>: releases 2.6.2479 to 2.8.2503 on 7&ndash;8 September, the
+      queue-discipline and preemption controls in 2.10.2530, and skills completed as a five-step
+      programme on 11&ndash;12 September. Each extension below carries a green <em>Shipped</em> tag and a
+      note of what was actually built where it differs from what was asked. The original arguments are
+      left as written: they are the record of why.
+    </p>
+    <p>
+      What remains is the teaching. The Hire &amp; Onboard capstone is in the example gallery; the six
+      single-capability examples and the Aardwolf business-case inputs are not yet authored, so every
+      capability from the business case onward is reachable but not yet shown.
+    </p>
+  </div>
 
   <!-- ═══ PART ONE ═══════════════════════════════════════════════════ -->
   <section>
@@ -429,7 +450,9 @@
           someone ask a better one — and it turns run history from an archive into an argument
           about where to look next.
         </p>
+        <p class="why asbuilt"><strong>As built &middot; V3.</strong> <code>nextSteps.ts</code> reads the study&rsquo;s run history and ranks what to try next, each with its evidence &mdash; negative results reported as plainly as promising ones. A &ldquo;Next steps&rdquo; card in the study, with optional AI narration over the ranked facts only. The named baseline and trend (smaller item 04) shipped with it.</p>
         <div class="ext-tags">
+          <span class="chip shipped">Shipped &middot; 2.6.2479</span>
           <span class="chip build">Extends what exists</span>
           <span class="chip">High value</span>
           <span class="chip">Feasible now</span>
@@ -449,7 +472,9 @@
           No department head approves a change because a team is at 94% utilisation. They approve it
           because of a number with a currency symbol and a date.
         </p>
+        <p class="why asbuilt"><strong>As built &middot; V3.</strong> Cost per case before and after, annual saving, one-off cost and the payback month, narrated and exported to Word, Excel or PDF. A missing input is reported as missing, never treated as zero. Rework as a named parameter (01) and &ldquo;what if we automate this task?&rdquo; in one click (05) landed in the same phase.</p>
         <div class="ext-tags">
+          <span class="chip shipped">Shipped &middot; 2.7.2482</span>
           <span class="chip build">Extends what exists</span>
           <span class="chip">High value</span>
         </div>
@@ -467,7 +492,9 @@
           Someone will otherwise present a 4% improvement that is entirely sampling noise, and be
           found out by the first person who reruns it.
         </p>
+        <p class="why asbuilt"><strong>As built &middot; V3.</strong> Per-replication means are persisted on every run (the blocker), and a Welch test over them reports the difference as a confidence interval. When it is not real the verdict says so and offers to run the replications that would settle it. Warm-up is chosen for the user (06).</p>
         <div class="ext-tags">
+          <span class="chip shipped">Shipped &middot; 2.7.2485</span>
           <span class="chip build">Extends what exists</span>
           <span class="chip">High value</span>
         </div>
@@ -485,7 +512,9 @@
           The answer to a staffing question is a curve, not a number, and the curve is what stops the
           conversation coming round again in six months.
         </p>
+        <p class="why asbuilt"><strong>As built &middot; V3.</strong> One lever swept across a range, the response curve drawn, and the knee marked as the point of maximum distance from the chord &mdash; it refuses to invent an elbow in a flat curve. Bounded by a dedicated sweep limit.</p>
         <div class="ext-tags">
+          <span class="chip shipped">Shipped &middot; 2.7.2488</span>
           <span class="chip build">Extends what exists</span>
           <span class="chip">High value</span>
         </div>
@@ -503,7 +532,9 @@
           A pooled p95 can look healthy while the segment that matters most misses its target
           entirely. This is the commonest way a simulation flatters a process.
         </p>
+        <p class="why asbuilt"><strong>As built &middot; V3.</strong> First-come, urgent-first (with or without interrupting work in progress) and shortest-first, with service level reported per segment as well as pooled. Holidays and absence (02) and batching with cut-off times (03) shipped alongside. A second read on 10 September found the discipline and preemption had <em>no door</em> &mdash; correct, tested and unreachable from the team editor &mdash; and 2.10.2530 gave them columns, controls and the three run routes.</p>
         <div class="ext-tags">
+          <span class="chip shipped">Shipped &middot; 2.7.2492 + 2.10.2530</span>
           <span class="chip new">New capability</span>
           <span class="chip">High value</span>
         </div>
@@ -522,7 +553,9 @@
           judgement. It could be a number — and for a department presenting to a finance director,
           that is the difference between a model and a spreadsheet with better graphics.
         </p>
+        <p class="why asbuilt"><strong>As built &middot; V3.</strong> The simulated flow-time distribution overlaid on the observed one, a p50 / p90 / p95 table and an agreement figure beside the twin. The hold-back is taken at <em>import</em>, not at calibration, so the test is out-of-sample; the Miner&rsquo;s own Phase 3 later made that hold-back reach a screen and stopped a live refresh from silently dropping it.</p>
         <div class="ext-tags">
+          <span class="chip shipped">Shipped &middot; 2.7.2496</span>
           <span class="chip build">Extends what exists</span>
           <span class="chip">High value</span>
         </div>
@@ -540,7 +573,9 @@
           Cross-skilling is one of the cheapest process improvements available, and the Simulator
           cannot currently represent it, let alone quantify what it is worth.
         </p>
+        <p class="why asbuilt"><strong>As built &middot; V3.</strong> Named people hold skills, tasks require them, and allocation prefers the least flexible person who qualifies. Then the programme the capstone example forced (11&ndash;12 September): an organisation-wide master Skills list, holders per skill, the two stereotypes user-maintainable, skills read as <strong>ArchiMate Capabilities</strong>, and Hire &amp; Onboard redrawn to the Capability pattern.</p>
         <div class="ext-tags">
+          <span class="chip shipped">Shipped &middot; 2.8.2500, then five steps</span>
           <span class="chip new">New capability</span>
           <span class="chip">Medium value</span>
         </div>
@@ -557,7 +592,9 @@
           It also disarms the meeting-room objection &ldquo;but you guessed that number&rdquo;: yes,
           and here is the evidence that it makes no difference.
         </p>
+        <p class="why asbuilt"><strong>As built &middot; V3.</strong> <code>sensitivity.ts</code> pushes every input &plusmn;20% in 2N+1 runs and sorts the result into a tornado. It says where better data is worth buying and where a guess is safe. Closed the programme&rsquo;s code.</p>
         <div class="ext-tags">
+          <span class="chip shipped">Shipped &middot; 2.8.2503</span>
           <span class="chip build">Extends what exists</span>
           <span class="chip">Medium value</span>
         </div>
@@ -570,7 +607,7 @@
       <li>
         <span class="num">01</span>
         <span class="body">
-          <strong>Rework and first-pass yield as a named parameter.</strong>
+          <strong>Rework and first-pass yield as a named parameter.</strong> <span class="chip shipped">Shipped &middot; Phase 2</span>
           Loops can already model rework, but nobody thinks of it that way. Ask for &ldquo;what
           proportion comes back?&rdquo; and report the cost of rework as its own line.
         </span>
@@ -578,7 +615,7 @@
       <li>
         <span class="num">02</span>
         <span class="body">
-          <strong>Holidays and absence.</strong>
+          <strong>Holidays and absence.</strong> <span class="chip shipped">Shipped &middot; Phase 5</span>
           Calendars repeat weekly. A department&rsquo;s year has bank holidays, a Christmas shutdown,
           and a summer when a third of the team is away.
         </span>
@@ -586,7 +623,7 @@
       <li>
         <span class="num">03</span>
         <span class="body">
-          <strong>Batching and cut-off times.</strong>
+          <strong>Batching and cut-off times.</strong> <span class="chip shipped">Shipped in the engine &middot; Phase 5 &mdash; set through BPSim import; no diagram control yet</span>
           Back-office work is full of &ldquo;posted at 4pm&rdquo; and &ldquo;processed in batches of
           50&rdquo;, and both change queueing behaviour completely.
         </span>
@@ -594,7 +631,7 @@
       <li>
         <span class="num">04</span>
         <span class="body">
-          <strong>A named baseline and a trend.</strong>
+          <strong>A named baseline and a trend.</strong> <span class="chip shipped">Shipped &middot; Phase 1</span>
           Pin one run as the baseline and chart the headline metrics across every run since, so
           improvement over months is visible rather than reconstructed from memory.
         </span>
@@ -602,7 +639,7 @@
       <li>
         <span class="num">05</span>
         <span class="body">
-          <strong>&ldquo;What if we automate this task?&rdquo; as one click.</strong>
+          <strong>&ldquo;What if we automate this task?&rdquo; as one click.</strong> <span class="chip shipped">Shipped &middot; Phase 2</span>
           Task Mining already scores tasks for automation potential. Wiring that to a scenario which
           sets the task&rsquo;s time near zero and drops its resource demand turns a score into a
           quantified saving.
@@ -611,7 +648,7 @@
       <li>
         <span class="num">06</span>
         <span class="body">
-          <strong>Warm-up chosen for the user.</strong>
+          <strong>Warm-up chosen for the user.</strong> <span class="chip shipped">Shipped &middot; Phase 3</span>
           The engine discards a warm-up period the user has to pick. Detect when the system reaches
           steady state and suggest it.
         </span>
@@ -697,13 +734,25 @@
         Three of those four extend machinery that already exists — and so does the fifth thing, the
         one that would tell someone what to try next. That is the work I would do first.
       </p>
+    
+      <div class="note" style="margin-top:18px">
+        <span class="eyebrow">Postscript &middot; 14 September 2026</span>
+        <p>
+          The argument caught up. The four things a person needs to walk into a meeting &mdash; the
+          cost with a date on it, the statement that the difference is real, the curve rather than the
+          point, the evidence that the model resembles reality &mdash; are on the screen, and the
+          fifth, what to try next, is the first card in the study. What the engine is still ahead of
+          is the teaching: the capabilities exist, and the worked examples that would show each one
+          are not yet written.
+        </p>
+      </div>
     </div>
   </section>
 
   <footer>
     Read from the shipped code &mdash;
     <span style="font-variant-numeric: tabular-nums;">7,200</span> lines of simulation library and
-    <span style="font-variant-numeric: tabular-nums;">4,800</span> of console, September 2026.
+    <span style="font-variant-numeric: tabular-nums;">4,800</span> of console, September 2026. Version 3, 14 September 2026.
   </footer>
 
 </div>
