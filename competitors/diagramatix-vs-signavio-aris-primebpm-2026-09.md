@@ -1,6 +1,6 @@
 # Diagramatix vs SAP Signavio, ARIS & PRIME BPM — Feature & AI Comparison
 
-*Diagramatix data read from the current codebase (product 2.11, export SCHEMA_VERSION 48). Competitor data from public product pages and documentation accessed May–June 2026 — **re-verify against live competitor pages before quoting externally**; their AI, mining and simulation features move fast and this document does not track them.*
+*Diagramatix data read from the current codebase **as at 14 September 2026** (product 2.11, export SCHEMA_VERSION 48). Competitor data from public product pages and documentation accessed May–June 2026 — **re-verify against live competitor pages before quoting externally**; their AI, mining and simulation features move fast and this document does not track them.*
 
 ---
 
@@ -19,13 +19,13 @@
 
 ## 2. AI Generation — detailed comparison
 
-All four products do "describe a process → get a BPMN diagram", but differ sharply in **how much control you get** and **what the AI is grounded in**. Diagramatix's AI has also broadened since July: **multiple LLM providers**, **usage metering/cost governance**, and an **AI SOP writer**.
+All four products do "describe a process → get a BPMN diagram", but differ sharply in **how much control you get** and **what the AI is grounded in**. Diagramatix's AI has also broadened since July: **seven LLM providers** (including **OpenRouter** and a fully **local Ollama / LM Studio** endpoint), **bring-your-own API keys**, **usage metering/cost governance**, and an **AI SOP writer**.
 
 | Capability | **Diagramatix** | **SAP Signavio** | **ARIS (AI Companion)** | **PRIME BPM (MapAI)** |
 |---|---|---|---|---|
 | Natural-language → BPMN | ✅ Two-phase: Plan → **editable plan** → Apply layout | ✅ "Text to Process" (V2: larger/more complex inputs) | ✅ Text → structured model | ✅ "BPMN map in minutes from text" |
 | Target notations from AI | ✅ **Text → 10 notations**: BPMN and **EPC** (both two-phase — edit the plan, then lay it out) + one-shot **ArchiMate**, Standard Flowchart, State Machine, Domain, Context, Process Context, Value Chain, Basic | BPMN only | **EPC or BPMN** | BPMN maps only |
-| **Choice of LLM provider** | ✅ **5 models live** — Anthropic **Claude**, Moonshot **Kimi**, Google **Gemini**, Microsoft **Azure OpenAI (GPT-5-mini class)** — admin-selectable; **self-hosted key or gateway** | ❌ SAP Business AI only | ❌ Software AG GenAI only | ❌ Not disclosed |
+| **Choice of LLM provider** | ✅ **7 providers live** — Anthropic **Claude** (Opus 5 default; Fable 5.1 catalogued), Moonshot **Kimi**, Google **Gemini**, Microsoft **Azure OpenAI**, **DeepSeek**, **OpenRouter** (any model it routes) and **Ollama / LM Studio** for a fully local LLM — admin-selectable per generation; **bring-your-own API key** per user, self-hosted key or gateway | ❌ SAP Business AI only | ❌ Software AG GenAI only | ❌ Not disclosed |
 | **AI usage metering + cost governance** | ✅ Per-org/user **invocation metering, token cost rates, usage dashboard**; per-org "allow AI" policy + optional prompt redaction | Enterprise-managed | Enterprise-managed | Add-on billing |
 | Other input modalities | PDF, text-file, **and image/screenshot** attachments | Text | Text | **Excel, text, audio, video, conversation** |
 | **Image / sketch → editable diagram** | ✅ **Vision + OCR rebuild a whiteboard photo, screenshot or someone else's flowchart as an editable diagram; translates a plain flowchart image into BPMN** | — | — | — (audio/video/Excel, not image→BPMN) |
@@ -55,7 +55,7 @@ All four products do "describe a process → get a BPMN diagram", but differ sha
 - **ARIS** — best if you need **EPC as well as BPMN** and AI over a **mining/repository** backend.
 - **PRIME BPM** — best if your input is **messy real-world capture** and you want AI-driven **improvement** analysis.
 
-Diagramatix is still the only one exposing an **editable intermediate plan** and a **user-editable layout rule set**, the only one generating **all its notations** (not just BPMN) and **image→BPMN** — and now the only one offering **LLM provider choice with per-org cost metering**.
+Diagramatix is still the only one exposing an **editable intermediate plan** and a **user-editable layout rule set**, the only one generating **all its notations** (not just BPMN) and **image→BPMN** — and now the only one offering **LLM provider choice — seven, including a local model — with bring-your-own keys and per-org cost metering**.
 
 **Assist-while-you-draw.** Canvas-native assistance, which the rivals answer with repository or mining NL chat rather than structural editing:
 
@@ -187,6 +187,7 @@ A new pillar since July. Diagramatix now models **risk and control alongside the
 | Role SOP **hand-offs** (received-from / handed-off-to) | ✅ both directions, with a cropped **lane figure** + green boundary labels | — | — | Partial |
 | Editable in-app, then **Word (.docx)** | ✅ full editor (reorder/lock/regenerate), **non-destructive regenerate** (keeps your edits/added sections) | — | — | ✅ |
 | Adopt an **org Word template** (fonts/heading styles) | ✅ per-org/per-project template **style adoption** | — | — | Varies |
+| **Provenance** — who generated each SOP, when, and with which model | ✅ recorded on every SOP and shown in the project's SOP list | — | — | — |
 
 **Verdict.** PRIME BPM's AI Procedure Writer is the nearest competitor; the key difference is **grounding** — Diagramatix's SOP is generated *from the model* (so it always matches the process and can be re-generated non-destructively when the diagram changes), and it can document a **single role's lane** with explicit hand-offs. The Word-template style adoption makes the output house-branded.
 
@@ -219,7 +220,7 @@ The engine is discrete-event and BPSim-aligned. What distinguishes it is the lay
 | **Is the difference real?** Welch's test over per-replication means, reported as a confidence interval | ✅ and when it is not real it says so and offers to run the replications that would settle it | — | — | — |
 | **Parameter sweep** with the **knee** marked — the point where one more person stops buying much | ✅ and it refuses to invent an elbow in a flat curve | — | Partial | — |
 | **Sensitivity / tornado** — every input pushed ±20% and ranked by how far the answer moves | ✅ says where better data is worth buying, and where a guess is safe | — | Partial | — |
-| **Skills and cross-skilling** — named people, per-task required skills | ✅ the middle ground between "nobody helps" and "everybody does everything" | — | ✅ | — |
+| **Skills and cross-skilling** — a per-org **master Skills list**; named people hold skills, tasks require them, and the same skills read as **ArchiMate Capabilities** in the operating-model view | ✅ the middle ground between "nobody helps" and "everybody does everything" | — | ✅ | — |
 | **Queue discipline** — FIFO, priority, shortest-job-first; service level reported **per segment** as well as pooled | ✅ a pooled p95 can look healthy while the segment that matters misses entirely | Partial | ✅ | — |
 | **Model validation against reality** — simulated flow-time distribution vs the one the business actually had, with a p50/p90/p95 table and a verdict | ✅ "how do we know it is right" stops being judgement and becomes a number | — | — | — |
 | **Suggested next steps** from the study's run history, each with its evidence — including **negative results** reported as plainly as promising ones | ✅ | — | AI Companion narrative | — |
@@ -280,7 +281,7 @@ Engine depth is not the whole contest. The rows nobody else has a column for —
 
 ## 11. Where Diagramatix wins
 
-1. **Editable-plan AI generation** with **provider choice** (5 LLMs) and **per-org cost metering** — inspect/edit the plan before layout; text → **all ten notations**; **image/sketch → editable BPMN or EPC**.
+1. **Editable-plan AI generation** with **provider choice** (7 providers, including a local model, bring-your-own keys) and **per-org cost metering** — inspect/edit the plan before layout; text → **all ten notations**; **image/sketch → editable BPMN or EPC**.
 2. **Rules-governed, publish-ready layout** (50+ rules) + **40+ live scan rules** (incl. SoD, coverage, boundary-event flow), with **readability as a measured property**: a corpus of stored AI plans is replayed offline on every test run and a ratchet fails the build if overlaps rise.
 3. **One self-hosted tool that authors → AI-generates → mines → simulates → documents (SOP) → governs (GRC)** — where the suites need multiple enterprise modules.
 4. **Process mining that reads the log you actually have** — Excel, wide "one row per case" exports, and **several systems merged into one lifecycle** with the cross-system hand-off measured at the join. In the import screen, not an ETL project.
@@ -290,7 +291,7 @@ Engine depth is not the whole contest. The rows nobody else has a column for —
 8. **Mine → model → simulate, with a hold-back** — mined data calibrates the twin, and the twin is tested against the most recent cases it was never fitted to. The loop the suites do not package, now with an out-of-sample check.
 9. **AI SOP generator** — diagram-grounded, per-lane role SOPs with hand-offs, non-destructive regenerate, **Word template style-adoption**.
 10. **GRC** — attach risks/controls, **RCM export**, SoD + coverage checks, and control operating-effectiveness mined **directly** from governance ids on events.
-11. **APQC PCF** classification + **governed naming** (Entity Lists) with drift detection, over a database-backed **Process Repository** (26 value chains, 277 processes, 381 editable prompts).
+11. **APQC PCF** classification + **governed naming** (Entity Lists) with drift detection, over a database-backed **Process Repository** (26 value chains, 277 processes, 381 editable prompts — each recording its provenance: typed, dictated, refined, or from an image).
 12. **A partner-facing Process API** — a third party posts a description or a document (SOP, PDF, image) plus volumetrics and receives pools, lanes, an ordered activity list, a **PDF**, and a real project someone can open. Async jobs, run history, two-run comparison and audit rows.
 13. **A way off ARIS** — import an **AML** export, get every EPC as a real diagram, and convert it to BPMN deterministically. The conversion **refuses** the four questions only a person can answer rather than guessing them, which is the difference between a migration you can sign off and one you have to re-check by hand.
 14. **Self-hosted, no ecosystem lock-in**, per-seat, **bring-your-own AI**, with **full-account portable backup**.
@@ -326,7 +327,7 @@ Where **not** to compete: **mining scale and connector breadth** (enterprise dat
 
 ## Sources
 
-- **Diagramatix codebase audit** — `c:\Git\Diagramatix\diagramatix\` (current branch, **September 2026**, product 2.11): `app/lib/mining/` (discovery, OCEL, XES, xlsx + wide-format + multi-source merge, `filterAnalytics`, `handover`, `teamFlow`, `caseEvidence`, `nextSteps`, `compareRuns`, `alerts`, mining→sim calibration), `app/lib/simulation/` (calendars, skills, queue discipline, significance, sweep, sensitivity, business case, BPSim), `app/lib/sop/`, `app/lib/riskControls/` (RCM), `app/lib/pcf/` (APQC), `app/lib/archimate/`, `app/lib/ai/` (multi-provider models, pricing, metering, readability ratchet), `app/lib/diagram/aris/` (AML import), `app/lib/diagram/translate/epcBpmnMap.ts` + `epcToBpmn.ts`, `docs/eEPC-specification.md`, and `VERSION_HISTORY.md` entries 2.4.2381 → 2.11.2533.
+- **Diagramatix codebase audit** — `c:\Git\Diagramatix\diagramatix\` (current branch, **14 September 2026**, product 2.11): `app/lib/mining/` (discovery, OCEL, XES, xlsx + wide-format + multi-source merge, `filterAnalytics`, `handover`, `teamFlow`, `caseEvidence`, `nextSteps`, `compareRuns`, `alerts`, mining→sim calibration), `app/lib/simulation/` (calendars, skills, queue discipline, significance, sweep, sensitivity, business case, BPSim), `app/lib/sop/`, `app/lib/riskControls/` (RCM), `app/lib/pcf/` (APQC), `app/lib/archimate/`, `app/lib/ai/` (multi-provider models, pricing, metering, readability ratchet), `app/lib/diagram/aris/` (AML import), `app/lib/diagram/translate/epcBpmnMap.ts` + `epcToBpmn.ts`, `docs/eEPC-specification.md`, and `VERSION_HISTORY.md` entries 2.4.2381 → 2.11.2533.
 - Competitor sources (May–June 2026, carried forward — **re-verify before external use**):
   - [SAP Signavio launches AI Process Modeler, Text-to-Process (Mar 2025)](https://news.sap.com/2025/03/sap-signavio-launches-ai-process-modeler-text-to-process/) · [Text-to-Process V2](https://community.sap.com/t5/technology-blog-posts-by-sap/ai-powered-modeling-gets-an-upgrade-text-to-process-v2-in-sap-signavio-lab/ba-p/14263094) · [Signavio Process Modeler](https://www.signavio.com/products/process-modeler/)
   - [ARIS AI Companion](https://aris.com/aris-ai-companion/) · [ARIS re-defines AI Process Intelligence (Nov 2024)](https://newscenter.softwareag.com/en/news-stories/press-releases/2024/1113-aris-redefines-ai-process-intelligence.html)
