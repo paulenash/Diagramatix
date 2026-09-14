@@ -115,7 +115,8 @@
     <h1>The Simulator</h1>
     <p class="standfirst">
       Run the process you have already drawn. Watch the work queue up, find where it waits, and test
-      a change before anyone has to live through it.
+      a change before anyone has to live through it. Then find out whether the improvement is real,
+      which assumption it hangs on, and what month it pays back.
     </p>
     <p style="margin:10px 0 0; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11.5px; color: var(--faint);">Version 3 &middot; 14 September 2026</p>
   </header>
@@ -149,10 +150,13 @@
       <div class="cap">
         <h4>The numbers on the process</h4>
         <ul>
-          <li>How long each task takes — a fixed time, or a <strong>range</strong>, because reality is not fixed</li>
+          <li>How long each task takes — fixed, a range, or a real <strong>distribution</strong>: triangular, truncated normal, exponential, <strong>lognormal</strong> (the right-skewed shape service times actually have) or <strong>empirical</strong>, the observed values themselves</li>
           <li>How often work arrives, and in what pattern</li>
           <li>Which way each decision goes, as a percentage or as a rule about the case itself</li>
+          <li><strong>Rework</strong> as a named percentage — what proportion comes back — with the cost of rework reported as its own line</li>
+          <li>A per-run <strong>activity charge</strong> for costs that do not scale with time, kept separate from staff cost because the two have different remedies</li>
           <li>One panel showing <strong>every number at once</strong>, editable in place, with the gaps visible</li>
+          <li>Values the diagram already documents — effort, frequency — copied straight into the model, so a process that arrives drawn arrives runnable</li>
         </ul>
       </div>
       <div class="cap">
@@ -160,17 +164,21 @@
         <ul>
           <li>Teams with a real <strong>headcount</strong>, so work has to wait for someone to be free</li>
           <li>Cost per hour, and an efficiency factor</li>
-          <li><strong>Working hours</strong> — a team that works nine to five processes nothing at midnight, and the simulation knows it</li>
+          <li><strong>Named people who hold skills</strong>, and tasks that require them — from an organisation-wide Skills list, or read straight off the ArchiMate diagram where a Business Architect already modelled who can do what. The middle ground between &ldquo;nobody helps&rdquo; and &ldquo;everybody does everything&rdquo;</li>
+          <li><strong>Queue discipline</strong> per team: first-come, urgent first — with or without <strong>interrupting</strong> work already in progress — or shortest first</li>
+          <li><strong>Working hours</strong> as reusable weekly shift calendars — a team that works nine to five processes nothing at midnight, and the simulation knows it</li>
+          <li><strong>Holidays, shutdowns and absence</strong> on top of the weekly pattern: a Christmas close-down, a bank holiday, a summer with a third of the team away, against arrivals that do not stop</li>
           <li>Standing team definitions kept once for the organisation, adopted by any project</li>
+          <li>Or harvested from the diagrams themselves — the lanes become the team library</li>
         </ul>
       </div>
       <div class="cap">
         <h4>Getting started quickly</h4>
         <ul>
-          <li><strong>Fill in what is missing</strong> — sensible starting values for anything not yet entered, and it never overwrites what you typed</li>
+          <li><strong>Fill in what is missing</strong> — sensible starting values for anything not yet entered, across the whole drill-down tree rather than just the diagram on screen, and it never overwrites what you typed</li>
           <li>Filled-in numbers look different from measured ones, so an estimate never passes for a fact</li>
           <li>A <strong>readiness check</strong> before every run, separating what would mislead you from what is merely assumed</li>
-          <li>A gallery of worked examples to open and take apart</li>
+          <li>A gallery of worked examples to open and take apart — including <strong>Hire &amp; Onboard</strong>, the capstone that uses all of it: calendars and holidays, named people with skills read from ArchiMate, priorities, a sweep, a tornado and a business case, in one process</li>
         </ul>
       </div>
     </div>
@@ -191,6 +199,7 @@
         <ul>
           <li>Work waits for a person, and the <strong>waiting is measured</strong> rather than assumed away — which is where most of the elapsed time in a real process goes</li>
           <li>Queue lengths reported across the run, not only at the end</li>
+          <li>Service level reported <strong>per segment</strong> as well as pooled — a pooled p95 can look healthy while the urgent segment misses entirely</li>
         </ul>
       </div>
       <div class="cap">
@@ -207,6 +216,9 @@
           <li><strong>Timeouts and escalations</strong> that race the task they are attached to</li>
           <li>Exception handling and compensation</li>
           <li>Deadlines counted in <strong>working</strong> time — two working days is not forty-eight hours</li>
+          <li>A subprocess that <strong>links to another diagram</strong> is rolled in and run as part of the whole — the drill-down tree simulates as one process</li>
+          <li>Tasks marked as performed by a <strong>system</strong> rather than a person, so automation is a property of the model</li>
+          <li>Batches and cut-off times — &ldquo;posted at 4pm&rdquo;, &ldquo;fifty at a time&rdquo; — in the engine, set through a BPSim file today</li>
         </ul>
       </div>
     </div>
@@ -268,8 +280,19 @@
         start. That is how you test a Monday morning rather than an average Tuesday.
       </p>
       <p>
+        Once there is a skills matrix, the question everyone asks becomes askable: <strong>what if we
+        trained someone?</strong> A scenario gives a named person a skill, or adds a new starter,
+        without rebuilding the team. And <strong>&ldquo;what if we automated this task?&rdquo;</strong>
+        is one click — the task becomes system-performed and the run shows what that buys.
+      </p>
+      <p>
         Every run is reproducible. The same starting point gives the same answer, which means a
         result can be checked, named, kept and compared against months later.
+      </p>
+      <p>
+        Pin one run as the <strong>baseline</strong> and every later run reports its trend against it,
+        so a month of tinkering has a line through it rather than a pile of results. The warm-up — the
+        stretch before the queues settle, which should not be counted — is chosen for you.
       </p>
     </div>
   </section>
@@ -281,7 +304,7 @@
     <div class="col">
       <p>
         A simulation that says &ldquo;17% faster&rdquo; invites one question: is that real, or is it
-        noise? The Simulator answers that itself now, and the four questions that follow it.
+        noise? The Simulator answers that itself, and the four questions that follow it.
       </p>
     </div>
 
@@ -327,14 +350,7 @@
           <li>A ranked list from the study&rsquo;s own runs &mdash; where every improvement so far came from, what never moved the answer, what has not been tried &mdash; each with its evidence, negative results included</li>
         </ul>
       </div>
-      <div class="cap">
-        <h4>People, skills and queues</h4>
-        <ul>
-          <li>Named people who <strong>hold skills</strong>, tasks that require them &mdash; the middle ground between &ldquo;nobody helps&rdquo; and &ldquo;everybody does everything&rdquo; &mdash; from the same skills the ArchiMate operating model shows as Capabilities</li>
-          <li>Queues that behave like real ones: first-come, urgent first (with or without interrupting work in progress), shortest first &mdash; and service level reported <strong>per segment</strong>, because a pooled p95 can look fine while the urgent segment misses</li>
-          <li>Holidays and absence, batches and cut-off times, and rework as a named percentage with its own cost line</li>
-        </ul>
-      </div>
+      
     </div>
   </section>
 
@@ -361,6 +377,9 @@
           <tr><td>Is the improvement real, or noise?</td><td>A confidence interval on the difference, and how many more runs would settle it</td></tr>
           <tr><td>Which assumption matters most?</td><td>The tornado: every input pushed &plusmn;20% and ranked by how far the answer moves</td></tr>
           <tr><td>When does it pay back?</td><td>Cost per case before and after, the one-off cost, and the payback month</td></tr>
+          <tr><td>What if we trained someone?</td><td>A scenario that gives a person a skill, or adds a new starter, and what it does to the queue</td></tr>
+          <tr><td>Is the promise holding for the urgent ones?</td><td>Service level per segment, not just pooled — and a queue discipline that puts them first</td></tr>
+          <tr><td>Does the model resemble reality?</td><td>Its flow-time distribution against the real one, with an agreement figure — out-of-sample for a mined twin</td></tr>
         </tbody>
       </table>
     </div>

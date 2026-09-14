@@ -1,4 +1,4 @@
-<title>DiagramatixMINER</title>
+<title>Diagramatix Miner</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Spectral:wght@500;600&display=swap">
@@ -145,7 +145,7 @@
         a description of the real process, and almost nobody reads it.
       </p>
       <p>
-        DiagramatixMINER reads it. Give it an export of events &mdash; a case, an activity, a timestamp
+        Diagramatix Miner reads it. Give it an export of events &mdash; a case, an activity, a timestamp
         &mdash; and it reconstructs the process as a <strong>BPMN diagram you can open and edit</strong>,
         plus the entity&rsquo;s lifecycle as a state machine. Not a report about the process. The process.
       </p>
@@ -162,8 +162,8 @@
 
     <div class="steps">
       <div class="step"><span class="n">1</span><span class="t"><strong>Drop in the log.</strong> CSV or TSV from any system, or the two interchange standards &mdash; XES (IEEE 1849) and OCEL 2.0, object-centric logs included. Excel workbooks too &mdash; including the wide &ldquo;one row per case&rdquo; shape most status reports come in &mdash; and several systems&rsquo; extracts of the same cases, merged into one lifecycle in the import screen. No log of your own yet? Start from a worked example instead &mdash; it arrives with a real sample log staged in the importer, so you see the same flow rather than a finished answer.</span></div>
-      <div class="step"><span class="n">2</span><span class="t"><strong>Say which column is which.</strong> Case, activity and timestamp are all that is required. The columns are guessed for you; you confirm.</span></div>
-      <div class="step"><span class="n">3</span><span class="t"><strong>Check before you commit.</strong> A panel shows how many rows are usable, how many would be dropped, how the dates parsed, and warns when a column looks wrong &mdash; before anything is imported.</span></div>
+      <div class="step"><span class="n">2</span><span class="t"><strong>Say which column is which.</strong> Case, activity and timestamp are all that is required. The columns are guessed for you; you confirm. Tick any column to <strong>mask</strong> its values on import — and the case id itself, for when it is really a customer number.</span></div>
+      <div class="step"><span class="n">3</span><span class="t"><strong>Check before you commit.</strong> A panel shows how many rows are usable, how many would be dropped, how the dates parsed, and warns when a column looks wrong &mdash; before anything is imported. The whole parsed log opens full-screen and filterable, so you can see exactly what is about to go in.</span></div>
       <div class="step"><span class="n">4</span><span class="t"><strong>Import, and the analysis is already done.</strong> Cases, events, activities, states, distinct variants, the span of the data &mdash; and the whole Insights workbench underneath.</span></div>
     </div>
 
@@ -253,6 +253,7 @@
         <ul>
           <li>The discovered diagram with each step <strong>tinted by where the time goes</strong></li>
           <li>Colour by total time, by frequency, or by average time in step</li>
+          <li>Any tab expands to full screen — the discovered process given the room, the tables beneath it</li>
           <li>The mined time and the owning team printed under each box, so the numbers sit on the picture</li>
         </ul>
       </div>
@@ -301,6 +302,7 @@
           <li>Once the run is fully mined, a <strong>plain-English account</strong> of what was found &mdash; the real shape, the deviations and what they probably mean, the timing</li>
           <li>Written from the computed figures, never instead of them</li>
           <li>Works without AI too: the same summary, computed deterministically</li>
+          <li>For a task log the explanation is framed as the task — the routine, the bounces, the redo — not as a process map</li>
         </ul>
       </div>
       <div class="cap">
@@ -313,7 +315,7 @@
       <div class="cap">
         <h4>Slice it</h4>
         <ul>
-          <li>By date (the throughput chart is the brush), by team, or by any column you kept at import</li>
+          <li>By date — the <strong>throughput chart</strong> of arrivals and completions over time, which shows whether the backlog is growing, is also the brush — by team, or by any column you kept at import</li>
           <li>Every panel re-reads the slice exactly, and <strong>every figure says what it is</strong>: the whole run, this slice, or an estimate</li>
         </ul>
       </div>
@@ -357,6 +359,12 @@
       </p>
       <p>
         And it says when something moved. Alert rules watch fitness, volume and silence, and the alarm that leads is the one nobody else leads with &mdash; <strong>the source stopped sending</strong>. Insights &rarr; Compare shows every delta and every alert, produced by the same functions that send the email, so the two cannot disagree.
+      </p>
+      <p>
+        A live run keeps its own history: every refresh is a snapshot in a linked series, which is
+        what Compare reads and what the alert rules are judged against. An older run gains new
+        analysis with <strong>Re-check</strong> rather than a re-import — and it is honest about what
+        can be rebuilt from what was kept, rather than approximating the rest.
       </p>
     </div>
   </section>
@@ -412,6 +420,13 @@
           <tr><td>Is this still true today?</td><td>A live source that keeps the run, the diagrams and the conformance check current on their own</td></tr>
           <tr><td>Can I hand this to my manager?</td><td>The full analysis as Word, Excel or PDF, and a plain-English summary of what it found</td></tr>
           <tr><td>Can our own analysts check it?</td><td>The log back out as XES or OCEL, for ProM, Celonis, Disco, Apromore or Signavio</td></tr>
+          <tr><td>What changed since last month?</td><td>Two runs of the same process side by side as a linked series &mdash; and a refusal when they are not the same process</td></tr>
+          <tr><td>Which cases caused this deviation?</td><td>The list behind every deviation, each with its own timeline; the whole index exports as CSV</td></tr>
+          <tr><td>Is the delay in the steps, or between them?</td><td>Transitions ranked by the elapsed time they account for, drawn on the arrows</td></tr>
+          <tr><td>Just this team, just this quarter?</td><td>Slice the run &mdash; exactly &mdash; with every figure declaring what it covers</td></tr>
+          <tr><td>Who hands work to whom?</td><td>The handover map, and who does the same thing three times</td></tr>
+          <tr><td>Has the feed gone quiet?</td><td>Alerts on fitness, volume and silence &mdash; the source that stopped sending, first</td></tr>
+          <tr><td>What should we do first?</td><td>Ranked advice with its evidence and a button &mdash; or an honest &ldquo;nothing stands out&rdquo;</td></tr>
         </tbody>
       </table>
     </div>
@@ -464,9 +479,7 @@
         and <strong>scale</strong> &mdash; the connector catalogue and conformance hardened at enterprise
         volumes are where the incumbent suites are still ahead.
       </p>
-      <p>
-        All three are scheduled. See <strong>Miner-Extensions-Plan.md</strong>.
-      </p>
+      
     </div>
 
     <h2>The argument you cannot have without it</h2>
