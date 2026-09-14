@@ -1,5 +1,7 @@
 # Diagramatix vs SAP Signavio, ARIS & PRIME BPM — Feature & AI Comparison
 
+**Date: 14 September 2026** · September 2026 edition · product 2.11
+
 *Diagramatix data read from the current codebase **as at 14 September 2026** (product 2.11, export SCHEMA_VERSION 48). Competitor data from public product pages and documentation accessed May–June 2026 — **re-verify against live competitor pages before quoting externally**; their AI, mining and simulation features move fast and this document does not track them.*
 
 ---
