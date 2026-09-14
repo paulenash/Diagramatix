@@ -95,6 +95,12 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
+# The commit this image was built from, reported by GET /api/health so the
+# deploy smoke test can prove the NEW container is the one answering (the old
+# one returns 200 just as happily). Pass from CI: --build-arg GIT_COMMIT_SHA=<sha>
+ARG GIT_COMMIT_SHA=
+ENV COMMIT_SHA=${GIT_COMMIT_SHA}
+
 # Next.js standalone output: ships server.js + minimal node_modules + the
 # traced files from app/. Static assets and public/ are NOT included in
 # the trace and must be copied separately.

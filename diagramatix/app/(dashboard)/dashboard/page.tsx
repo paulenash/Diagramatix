@@ -8,42 +8,40 @@ import { ARCHIVE_PROJECT_NAME } from "@/app/lib/archive";
 import { tryGetCurrentOrgId } from "@/app/lib/auth/orgContext";
 import { getUsageSnapshot } from "@/app/lib/subscription";
 import { isMicrosoftConnected } from "@/app/lib/microsoft/connection";
+import { loadDashboardUsers } from "@/app/lib/dashboard/loadUsers";
 
 export default async function DashboardPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  // SharePoint connection is now a per-user DB link (bring-your-own), no longer
-  // tied to logging in with Microsoft.
-  const hasMicrosoft = await isMicrosoftConnected(session.user.id);
-
   const cookieStore = await cookies();
-  let effectiveUserId = getEffectiveUserId(session, cookieStore);
-  let viewing = isImpersonating(session, cookieStore);
 
-  // Validate impersonation target exists — clear stale cookie if not
-  if (viewing) {
-    const target = await prisma.user.findUnique({ where: { id: effectiveUserId }, select: { id: true } });
-    if (!target) {
-      cookieStore.delete("dgx_view_as");
-      effectiveUserId = session.user.id;
-      viewing = false;
-    }
-  }
+  // One lookup per person involved (see loadDashboardUsers): validates the
+  // impersonation target (clearing a stale cookie), and supplies the header
+  // name/email — read from the DB because the session JWT may be stale after
+  // a profile edit — the banner, and the signed-in user's tier-picker flag.
+  const { effectiveUserId, viewing, effective: currentUser, realHasChosenTier } = await loadDashboardUsers(
+    (id) => prisma.user.findUnique({ where: { id }, select: { id: true, name: true, email: true, hasChosenTier: true } }),
+    session.user.id,
+    { effectiveUserId: getEffectiveUserId(session, cookieStore), viewing: isImpersonating(session, cookieStore) },
+    () => cookieStore.delete("dgx_view_as"),
+  );
 
-  // Landing on the dashboard means the real user is no longer on a
-  // specific diagram — clear so the admin Registered Users screen
-  // doesn't keep showing a stale "Working on: X".
-  if (!viewing && session.user.id) {
-    try {
-      await prisma.user.update({
-        where: { id: session.user.id },
-        data: { currentDiagramId: null, currentDiagramName: null },
-      });
-    } catch { /* best-effort */ }
-  }
-
-  const orgId = await tryGetCurrentOrgId(session, cookieStore);
+  // The remaining pre-org work is independent, so it runs as one round-trip:
+  // SharePoint link (a per-user DB link, bring-your-own — no longer tied to
+  // logging in with Microsoft), the active org, and clearing "Working on: X"
+  // — landing on the dashboard means the real user is no longer on a specific
+  // diagram, and the admin Registered Users screen must not keep showing one.
+  const [hasMicrosoft, orgId] = await Promise.all([
+    isMicrosoftConnected(session.user.id),
+    tryGetCurrentOrgId(session, cookieStore),
+    !viewing && session.user.id
+      ? prisma.user.update({
+          where: { id: session.user.id },
+          data: { currentDiagramId: null, currentDiagramName: null },
+        }).catch(() => { /* best-effort */ })
+      : Promise.resolve(),
+  ]);
   if (!orgId) {
     // Should never happen after Phase 0 backfill, but render an empty
     // dashboard rather than crashing.
@@ -67,13 +65,13 @@ export default async function DashboardPage() {
     );
   }
 
-  // Fetch current user name/email from DB (session JWT may be stale after profile edit)
-  const currentUser = await prisma.user.findUnique({
-    where: { id: effectiveUserId },
-    select: { name: true, email: true },
-  });
+  // Tier picker on first sign-in: the SIGNED-IN user's flag (not the
+  // impersonated one's — an admin viewing another user shouldn't see THEIR
+  // picker). If false AND no impersonation, the welcome modal renders, and
+  // the tier rows ship along so it needs no separate client-side fetch.
+  const showTierPicker = !viewing && !realHasChosenTier;
 
-  const [projects, unorganized, org, membership] = await Promise.all([
+  const [projects, unorganized, org, membership, usageSnapshot, tierCards] = await Promise.all([
     // Owned-or-shared, mirroring the Slice 3 API route. Each row
     // carries owner identity (for the "by …" line on shared tiles) and
     // the caller's share role (empty array when caller is owner) so
@@ -125,60 +123,40 @@ export default async function DashboardPage() {
       where: { userId: session.user.id, orgId },
       select: { role: true },
     }),
+    // Subscription snapshot for the chip + popover. Computed for the
+    // EFFECTIVE user so impersonation surfaces the impersonated user's
+    // tier and counts. Tolerate null (e.g. user not found mid-flight) —
+    // the chip just doesn't render in that case.
+    getUsageSnapshot(effectiveUserId),
+    showTierPicker
+      ? prisma.subscriptionLevel.findMany({
+          orderBy: { sortOrder: "asc" },
+          select: {
+            id: true,
+            name: true,
+            priceMonthly: true,
+            maxProjects: true,
+            maxDiagramsPerTypePerProject: true,
+            maxArchimateDiagramsTotal: true,
+            maxAiAttempts: true,
+            maxIndividualExports: true,
+            maxBulkExports: true,
+            trialDays: true,
+          },
+        })
+      : Promise.resolve([]),
   ]);
   const orgRole = membership?.role ?? "";
 
-  // If impersonating, fetch the target user's info for the banner
-  let viewingAsName = "";
-  let viewingAsEmail = "";
-  if (viewing) {
-    const target = await prisma.user.findUnique({
-      where: { id: effectiveUserId },
-      select: { name: true, email: true },
-    });
-    viewingAsName = target?.name ?? "";
-    viewingAsEmail = target?.email ?? "";
-  }
+  // If impersonating, the banner names the target — the same row as the header.
+  const viewingAsName = viewing ? currentUser?.name ?? "" : "";
+  const viewingAsEmail = viewing ? currentUser?.email ?? "" : "";
 
   // Commit count baked into the build via NEXT_PUBLIC_COMMIT_COUNT
   // (set from --build-arg GIT_COMMIT_COUNT in the Dockerfile).
   const commitCount = parseInt(process.env.NEXT_PUBLIC_COMMIT_COUNT ?? "0", 10) || 0;
 
   const impersonationMode = viewing ? getImpersonationMode(cookieStore) : undefined;
-
-  // Subscription snapshot for the chip + popover. Computed for the
-  // EFFECTIVE user so impersonation surfaces the impersonated user's
-  // tier and counts. Tolerate null (e.g. user not found mid-flight) —
-  // the chip just doesn't render in that case.
-  const usageSnapshot = await getUsageSnapshot(effectiveUserId);
-
-  // Tier picker on first sign-in: load hasChosenTier flag for the
-  // SIGNED-IN user (not the impersonated one — an admin viewing another
-  // user shouldn't see THEIR picker). If false AND no impersonation,
-  // we'll render the welcome modal. The four tier rows ship along so
-  // the picker can render without a separate client-side fetch.
-  const realUser = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { hasChosenTier: true },
-  });
-  const showTierPicker = !viewing && !realUser?.hasChosenTier;
-  const tierCards = showTierPicker
-    ? await prisma.subscriptionLevel.findMany({
-        orderBy: { sortOrder: "asc" },
-        select: {
-          id: true,
-          name: true,
-          priceMonthly: true,
-          maxProjects: true,
-          maxDiagramsPerTypePerProject: true,
-          maxArchimateDiagramsTotal: true,
-          maxAiAttempts: true,
-          maxIndividualExports: true,
-          maxBulkExports: true,
-          trialDays: true,
-        },
-      })
-    : [];
 
   return (
     <DashboardClient

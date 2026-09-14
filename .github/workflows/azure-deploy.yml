@@ -91,6 +91,7 @@ jobs:
           file: ./diagramatix/Dockerfile
           build-args: |
             GIT_COMMIT_COUNT=${{ steps.commit_count.outputs.count }}
+            GIT_COMMIT_SHA=${{ github.sha }}
           # Two tags every push: the immutable `:sha-<commit>` for
           # rollback targeting, and `:latest` so App Service settings
           # that reference `:latest` pick up the new image on restart.
@@ -333,44 +334,50 @@ jobs:
       - name: Update App Service container image
         # `az webapp config container set` rewrites the container
         # configuration to point at the new SHA tag. App Service detects
-        # the change, pulls the new image, runs the configured health
-        # probe, and rotates traffic when healthy.
+        # the change, stops the site, pulls the new image, runs the health
+        # probe, and rotates traffic when healthy. It is the ONLY restart:
+        # the explicit `az webapp restart` that used to follow it issued a
+        # second stop 21 s into the first one's start-up and reset the clock
+        # (docker log, 2026-09-13 — ~72 s of outage per deploy).
         run: |
-          az webapp config container set \
-            --resource-group "$RESOURCE_GROUP" \
-            --name "$APP_SERVICE_NAME" \
-            --container-image-name "${ACR_NAME}.azurecr.io/${IMAGE_REPO}:sha-${{ github.sha }}"
+          az webapp config container set --resource-group "$RESOURCE_GROUP" --name "$APP_SERVICE_NAME" --container-image-name "${ACR_NAME}.azurecr.io/${IMAGE_REPO}:sha-${{ github.sha }}"
 
-      - name: Restart App Service
-        # Belt-and-braces — App Service usually auto-restarts on image
-        # change, but an explicit restart ensures the new container is
-        # active before the post-deploy smoke check below.
+      - name: Ensure the App Service health check path
+        # With no health check path, App Service rotates traffic as soon as
+        # the container is RUNNING and the first real request pays Next's
+        # cold start plus the first DB connection. /api/health pings the DB
+        # (app/lib/health.ts), so with it set "healthy" means READY. Written
+        # only when it differs — a site-config write restarts the app, and
+        # this step must be a no-op on every ordinary deploy.
         run: |
-          az webapp restart \
-            --resource-group "$RESOURCE_GROUP" \
-            --name "$APP_SERVICE_NAME"
+          CURRENT=$(az webapp config show --resource-group "$RESOURCE_GROUP" --name "$APP_SERVICE_NAME" --query healthCheckPath -o tsv)
+          if [ "$CURRENT" != "/api/health" ]; then
+            echo "healthCheckPath is '${CURRENT}' - setting /api/health"
+            az webapp config set --resource-group "$RESOURCE_GROUP" --name "$APP_SERVICE_NAME" --generic-configurations '{"healthCheckPath": "/api/health"}' --query healthCheckPath -o tsv
+          else
+            echo "healthCheckPath already /api/health"
+          fi
 
       - name: Smoke test (health endpoint)
-        # Hit the public URL until it returns 200 or we time out. A
-        # /api/health endpoint that pings the DB is the right shape;
-        # falling back to / works while that route doesn't exist yet.
-        # 12 × 10s = 2 minutes total; raise if cold-start runs longer.
+        # Poll /api/health until it returns 200 AND reports THIS commit — the
+        # old container answers 200 too, so a status code alone proves
+        # nothing about the deploy. 18 × 10 s = 3 minutes; the measured
+        # stop-pull-start cycle is ~70 s.
         run: |
-          APP_URL=$(az webapp show \
-            --resource-group "$RESOURCE_GROUP" \
-            --name "$APP_SERVICE_NAME" \
-            --query defaultHostName -o tsv)
-          echo "Waiting for https://${APP_URL}/ to return 200…"
-          for i in $(seq 1 12); do
-            CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://${APP_URL}/" || echo "000")
-            echo "Attempt $i: HTTP $CODE"
-            if [ "$CODE" = "200" ] || [ "$CODE" = "302" ] || [ "$CODE" = "307" ]; then
-              echo "App is responding — deploy verified."
+          APP_URL=$(az webapp show --resource-group "$RESOURCE_GROUP" --name "$APP_SERVICE_NAME" --query defaultHostName -o tsv)
+          WANT='"commit":"${{ github.sha }}"'
+          echo "Waiting for https://${APP_URL}/api/health to report ${{ github.sha }} ..."
+          for i in $(seq 1 18); do
+            CODE=$(curl -s -m 15 -o /tmp/health.json -w '%{http_code}' "https://${APP_URL}/api/health" || echo "000")
+            BODY=$(cat /tmp/health.json 2>/dev/null || true)
+            echo "Attempt $i: HTTP $CODE $BODY"
+            if [ "$CODE" = "200" ] && printf '%s' "$BODY" | grep -qF "$WANT"; then
+              echo "New container is healthy and serving this commit - deploy verified."
               exit 0
             fi
             sleep 10
           done
-          echo "::error::Smoke test failed — app did not return 200 within 2 minutes."
+          echo "::error::Smoke test failed - /api/health did not report commit ${{ github.sha }} with HTTP 200 within 3 minutes."
           exit 1
 
       - name: Azure logout
