@@ -90,6 +90,14 @@ Examples: "rename the selected pool to Customer" · "delete these" · "connect t
   Say **"to 2 labelled Order Placed"** or **"from 2 labelled …"**.
 - "add a message to IT System" (one named end) still goes to the AI, as before.
 
+## The green numbers
+
+- **Where they sit:** below an activity; **above** an event; for a **pool or lane**, in the header
+  just before the start of the name — and they move as the name changes length.
+- **Selection protocol:** a rename or move by voice never leaves the item selected — after
+  "3 Approve Order" the badges renumber and nothing stays highlighted. (Only the moment between
+  saying a bare number and saying the name keeps the picked item selected, as the cue.)
+
 ## "stop" versus "done"
 
 - **stop** (also "stop listening", "that's enough", "abracadabra off") — **always stops the

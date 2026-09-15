@@ -16,7 +16,19 @@ export interface RenameTarget {
   kind: "element" | "connector";
   x: number;                       // badge anchor (world coords) — centre of the item
   y: number;
-  height: number;                  // item height (0 for connectors) — badge sits below elements
+  height: number;                  // item height (0 for connectors)
+  /** Where the badge sits relative to the item (Paul, 2026-09-15): activities
+   *  below, events ABOVE, pools and lanes in the header just before the start
+   *  of the name (the renderer measures the name so it tracks its length).
+   *  Undefined = below. */
+  place?: "below" | "above" | "header";
+}
+
+/** The badge position rule by element type. */
+export function badgePlaceFor(type: string): "below" | "above" | "header" {
+  if (type === "pool" || type === "lane") return "header";
+  if (EVENT_TYPES.has(type)) return "above";
+  return "below";
 }
 
 const EVENT_TYPES = new Set<string>(["start-event", "intermediate-event", "end-event"]);
@@ -62,7 +74,7 @@ export function collectRenameTargets(
       : itemType === "subprocess" ? SUBPROCESS_TYPES.has(e.type)
       : false;
     for (const e of elements) {
-      if (match(e)) raw.push({ id: e.id, x: e.x + e.width / 2, y: e.y + e.height / 2, height: e.height, kind: "element" });
+      if (match(e)) raw.push({ id: e.id, x: e.x + e.width / 2, y: e.y + e.height / 2, height: e.height, kind: "element", place: badgePlaceFor(e.type) });
     }
   }
   // Reading order: band the y into Task-height rows, then left-to-right in-row.

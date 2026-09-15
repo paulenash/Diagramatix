@@ -2880,6 +2880,7 @@ export function DiagramEditor({
         else dy = tgt ? (tgt.y - HALF_TASK_W - e.height) - e.y : -(op.count ?? 1) * SPAN;
         moveElements([e.id], dx, dy);
         elementsMoveEnd(); // commit: one undo entry, connectors re-routed (was missing — a voice move left no history)
+        setSelectedElementIds(new Set()); // selection protocol: a voice move leaves nothing selected
         results.push(`moved ${nameOf(e)} ${op.direction}`);
         continue;
       }
@@ -2966,6 +2967,7 @@ export function DiagramEditor({
         // rides with its lanes/contents; a black-box pool just moves itself.
         moveElements([target.id], 0, dy);
         elementsMoveEnd(); // commit the nudge as its own undo entry
+        setSelectedElementIds(new Set()); // selection protocol
         abraLastId.current = target.id;
         results.push(`nudged ${nameOf(target)} ${op.direction} ${dist}px`);
         continue;
@@ -2981,6 +2983,7 @@ export function DiagramEditor({
         if (!toward) { results.push(`${nameOf(r)} is against the pool edge — can't move it ${op.direction}`); anyFail = true; continue; }
         moveLane(r.id, op.direction, op.distance ?? 32);
         abraLastId.current = r.id;
+        setSelectedElementIds(new Set()); // selection protocol
         results.push(`moved ${nameOf(r)} ${op.direction}`);
         continue;
       }
@@ -3062,7 +3065,7 @@ export function DiagramEditor({
           const newLabel = parts.slice(k).join(" to ").trim();
           if (!leftRef || !newLabel) continue;
           const e = resolve1(leftRef);
-          if (!("err" in e)) { updateLabel(e.id, newLabel); els = withLabel(els, e.id, newLabel); results.push(`renamed ${nameOf(e)} → ${newLabel}`); done = true; break; }
+          if (!("err" in e)) { updateLabel(e.id, newLabel); els = withLabel(els, e.id, newLabel); setSelectedElementIds(new Set()); results.push(`renamed ${nameOf(e)} → ${newLabel}`); done = true; break; }
           const key = messageLabelKey(leftRef);
           const conn = data.connectors.find((c) => (c.label ?? "").trim().toLowerCase() === key);
           if (conn) { updateConnectorLabel(conn.id, newLabel); results.push(`renamed connector “${conn.label}” → ${newLabel}`); done = true; break; }
@@ -3128,6 +3131,10 @@ export function DiagramEditor({
     if (target.kind === "element") updateLabel(target.id, clean);
     else updateConnectorLabel(target.id, clean);
     cancelLabelEdit();
+    // Selection protocol (Paul, 2026-09-15): a rename by voice does not leave
+    // the item selected — the badges are the cue, not a highlight.
+    setSelectedElementIds(new Set());
+    setSelectedConnectorId(null);
     const targets = collectRenameTargets(data.elements, data.connectors, itemType);
     if (targets.length > 0) setRenameFlow({ phase: "pick", itemType, targets });
     else setRenameFlow(null);

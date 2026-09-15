@@ -10,7 +10,7 @@
  * Pure: the editor draws the badges and applies the resulting addMessage op.
  */
 import type { DiagramElement } from "../diagram/types";
-import type { RenameTarget } from "./renameTargets";
+import { badgePlaceFor, type RenameTarget } from "./renameTargets";
 
 const ACTIVITY_TYPES = new Set<string>(["task", "subprocess", "subprocess-collapsed"]);
 export const isMessageActivity = (e: DiagramElement) => ACTIVITY_TYPES.has(e.type);
@@ -25,7 +25,7 @@ function numbered(els: DiagramElement[]): RenameTarget[] {
   const band = (y: number) => Math.round(y / 64);
   return [...els]
     .sort((a, b) => band(a.y + a.height / 2) - band(b.y + b.height / 2) || (a.x + a.width / 2) - (b.x + b.width / 2))
-    .map((e, i) => ({ id: e.id, n: i + 1, kind: "element" as const, x: e.x + e.width / 2, y: e.y + e.height / 2, height: e.height }));
+    .map((e, i) => ({ id: e.id, n: i + 1, kind: "element" as const, x: e.x + e.width / 2, y: e.y + e.height / 2, height: e.height, place: badgePlaceFor(e.type) }));
 }
 
 /**
