@@ -2,7 +2,7 @@
 /**
  * Abracadabra Mode UI — a floating command bar. Shows the live-listening caption
  * (Stage 3 voice), a typed-command input, and a scrolling command log (heard →
- * did, per-entry undo). Presentational: all state + apply logic live in the
+ * did — one undo per command). Presentational: all state + apply logic live in the
  * editor.
  */
 import { useEffect, useRef, useState } from "react";

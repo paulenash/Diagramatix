@@ -27,6 +27,7 @@ import { autoResizeUmlElement, sizeUmlNote } from "@/app/lib/diagram/umlAutoSize
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { getElementPoolId } from "@/app/lib/diagram/poolUtil";
 import { CHEVRON_THEMES, chevronReadingOrder } from "@/app/lib/diagram/chevronThemes";
+import { createHistoryGroupGate } from "@/app/lib/diagram/historyGroup";
 import { autoSizeForType, getDefaultSize, wrapText, type AutosizeType } from "@/app/lib/diagram/textMetrics";
 import { fitShapeToLabel, holdsInternalLabel } from "@/app/lib/diagram/shapeFit";
 import { archiFitSize } from "@/app/lib/diagram/genericLayout";
@@ -9783,6 +9784,9 @@ export function useDiagram(initialData: DiagramData) {
   const resizingRef       = useRef<string | null>(null);
   const preGroupMoveRef   = useRef<Snapshot | null>(null);
   const groupDraggingRef  = useRef<boolean>(false);
+  // One spoken command, one undo: while a group is open only the FIRST
+  // pushHistory goes through (see app/lib/diagram/historyGroup.ts).
+  const historyGroupRef   = useRef(createHistoryGroupGate());
   const preLaneRef        = useRef<Snapshot | null>(null);
   const preWaypointRef    = useRef<Snapshot | null>(null);
   const waypointConnIdRef = useRef<string | null>(null);
@@ -9819,6 +9823,7 @@ export function useDiagram(initialData: DiagramData) {
   }
 
   function pushHistory(snap: Snapshot) {
+    if (!historyGroupRef.current.admit()) return; // inside a group: first push only
     const next = [...pastRef.current, snap];
     if (next.length > 100) next.shift();
     pastRef.current = next;
@@ -10379,6 +10384,12 @@ export function useDiagram(initialData: DiagramData) {
     setCanRedo(true);
   }, []);
 
+  // Bracket a run of helper calls so they leave ONE undo entry (a spoken
+  // command that fans out into add + label + connector + extend). Nesting is
+  // safe; a group in which nothing pushes leaves nothing behind.
+  const beginHistoryGroup = useCallback(() => { historyGroupRef.current.begin(); }, []);
+  const endHistoryGroup = useCallback(() => { historyGroupRef.current.end(); }, []);
+
   const redo = useCallback(() => {
     if (futureRef.current.length === 0) return;
     const snap = futureRef.current.pop()!;
@@ -10634,6 +10645,8 @@ export function useDiagram(initialData: DiagramData) {
     laneBoundaryMoveEnd,
     undo,
     redo,
+    beginHistoryGroup,
+    endHistoryGroup,
     canUndo,
     canRedo,
   };

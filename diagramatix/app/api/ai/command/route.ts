@@ -55,7 +55,9 @@ Canonical forms:
 
 **ops** (fallback, used only if canonical is ""): the same edit as structured ops.
 
-Op shapes (use element NAMES for refs — they are resolved against the diagram; you may also use "it"/"the last"/"the previous"/"the <type>"):
+Elements marked [selected] are the user's current mouse selection: "this", "these", "the selection" and "the selected <type>" refer to them — KEEP those words in canonical rather than substituting names.
+
+Op shapes (use element NAMES for refs — they are resolved against the diagram; you may also use "it"/"the last"/"the previous"/"the <type>"/"this"/"these"/"the selected <type>"):
   { "op":"add", "symbolType": <type>, "label"?: string, "gatewayType"?: "exclusive"|"parallel"|"inclusive"|"event-based", "eventType"?: "message"|"timer"|"error"|..., "afterRef"?: <name> }
   { "op":"connect", "fromRef": <name>, "toRef": <name> }
   { "op":"disconnect", "fromRef": <name>, "toRef": <name> }
@@ -97,10 +99,11 @@ export async function POST(req: Request) {
   if (pol) return pol;
   enterAiContext(await resolveAiRouteContext(session, AI_INVOCATION_POINTS.LiveCommand));
 
-  const body = await req.json().catch(() => null) as { instruction?: string; state?: DiagramData } | null;
+  const body = await req.json().catch(() => null) as { instruction?: string; state?: DiagramData; selectedIds?: string[] } | null;
   const instruction = body?.instruction?.trim();
   if (!instruction) return NextResponse.json({ error: "instruction is required" }, { status: 400 });
   const state = body?.state ?? { elements: [], connectors: [] } as unknown as DiagramData;
+  const selectedIds = Array.isArray(body?.selectedIds) ? body!.selectedIds!.filter((s) => typeof s === "string") : [];
 
   const model = await getAiGenerateModel();
   const apiKey = aiApiKey(model);
@@ -119,7 +122,7 @@ export async function POST(req: Request) {
       system,
       messages: [{
         role: "user",
-        content: `CURRENT DIAGRAM:\n${serializeDiagramForCommand(state)}\n\nINSTRUCTION:\n${instruction}\n\nReturn the JSON object { "canonical", "ops" }.`,
+        content: `CURRENT DIAGRAM:\n${serializeDiagramForCommand(state, selectedIds)}\n\nINSTRUCTION:\n${instruction}\n\nReturn the JSON object { "canonical", "ops" }.`,
       }],
     });
     const text = resp.content

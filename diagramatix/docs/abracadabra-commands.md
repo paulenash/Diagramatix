@@ -66,6 +66,32 @@ command (with variants) → if none, the **AI** interprets it → ops apply live
 
 ---
 
+## The selection as a reference (multi-modal — the mouse says *which*, the voice says *what*)
+
+Select something on the canvas, then refer to it instead of naming it — a selected element can't be
+mis-heard and is never ambiguous. Works with **every** command that takes a reference.
+
+| Say | Resolves to |
+|---|---|
+| "this", "that" | the selection when something is selected; otherwise the last element added (as before) |
+| "these", "those", "the selection", "the selected elements" | everything selected |
+| "the selected task" / "the selected pool" / "the selected lanes" | the selected elements of that kind |
+
+Examples: "rename the selected pool to Customer" · "delete these" · "connect this to Approve" ·
+"move the selected task right" · "add a boundary event called Timeout to this". A command that takes
+**one** target with several selected asks you to select just one; `delete` accepts many.
+
+## Confirmation and undo
+
+- Commands that would remove **more than one thing** ask first and wait for the next utterance:
+  "clear the diagram", deleting a pool or lane (and what is inside it), "delete these" with several
+  selected, and "delete X and compact". Say **"yes"** (or "go ahead", "ok") to run it, **"no"**
+  ("cancel", "never mind") to drop it; any other command drops it and runs instead. A single named
+  element still deletes immediately.
+- **One command is one undo.** However many changes a command makes (a task plus its label plus its
+  connector plus a pool that grew), "undo that" — or Ctrl+Z — reverts the whole command. Moves and
+  nudges are undoable like everything else.
+
 ## Variants the parser already accepts
 
 - **Verbs:** add · insert · create · put · make · draw · split (context‑dependent).

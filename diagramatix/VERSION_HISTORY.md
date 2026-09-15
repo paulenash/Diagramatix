@@ -15,6 +15,43 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.11.2583 — 2026-09-15 — Abracadabra: one command, one undo — and "the selected …"
+
+Abracadabra Mode — say or type "add a task called Approve after Review" and the
+BPMN diagram edits itself, live and undoably — shipped on 4–5 August, two days
+before this log began, so this is also its first entry. A code review on 14
+September found three undo defects and two gaps; this release closes them.
+
+- **One spoken command is one undo.** Every reducer helper pushed its own
+  snapshot, so "add a task called X after Y" left three to five history entries
+  and "undo that" reverted only the connector. A history-group gate
+  (`app/lib/diagram/historyGroup.ts`) admits the first push of a command and
+  drops the rest; every command runs inside a group. Ctrl+Z now matches what
+  was said.
+- **A voice move is committed.** `move X right` and `nudge <pool> down` staged a
+  drag and never ended it — no undo entry, connectors not re-routed, and the
+  next mouse drag's end committed a snapshot from before the voice move.
+  `elementsMoveEnd()` now follows every `moveElements`.
+- **A batch sees what it has already done.** The apply loop read the elements
+  once, so "add X and connect it to Y" could not find X and "it" fell back to
+  the previous element — a wrong link with a green tick. A working copy
+  (`app/lib/assist/workingSet.ts`) threads each op's effect into the next.
+- **Destructive commands ask first.** "Clear the diagram", deleting a pool or
+  lane (naming what is inside it), deleting several selected elements, and
+  "delete X and compact" now park and wait for "yes"; "no" or any other
+  command drops them. A single named element still deletes at once.
+- **The selection is a reference** (Paul: "Change the name of the selected Pool
+  to Customer"). "This", "these", "the selection" and "the selected <kind>"
+  resolve to the mouse selection — the mouse says *which*, the voice says
+  *what* — so the referent can no longer be mis-heard or ambiguous. `delete
+  these` removes every selected element in one undo. The selection travels to
+  the AI fallback as `[selected]` so its canonical rewrite keeps the words.
+
+T4388–T4393, each proven by planting the defect. Feature-only: `SCHEMA_VERSION`
+stays **48**. Reference: `docs/abracadabra-commands.md`.
+
+---
+
 ## 2.11.2533 — 2026-09-11 — Six things about EPC, and the objects that describe a function
 
 ### The palette teaches the notation, so it has to be right

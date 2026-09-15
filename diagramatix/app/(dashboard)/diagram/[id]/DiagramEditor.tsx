@@ -45,8 +45,10 @@ import { sizeOf, placeInline, placeGatewayBranch, placeBoundaryEvent, placeAfter
 import { matchIntent, matchAssistRules, type IntentRow } from "@/app/lib/diagram/intentMatch";
 import { canConnect } from "@/app/lib/diagram/canConnect";
 import { parseCommand } from "@/app/lib/assist/commandGrammar";
-import { resolveRef } from "@/app/lib/assist/resolveRef";
+import { resolveRef, resolveSelectionRefs, isSelectionRef } from "@/app/lib/assist/resolveRef";
 import { validateOps, type AssistOp } from "@/app/lib/assist/ops";
+import { syntheticElement, withAdded, withDeleted, withLabel } from "@/app/lib/assist/workingSet";
+import { needsConfirmation, parseConfirmation } from "@/app/lib/assist/confirm";
 import { collectRenameTargets, type RenameType, type RenameTarget } from "@/app/lib/assist/renameTargets";
 import { AbracadabraBar, type CommandLogEntry } from "@/app/components/canvas/AbracadabraBar";
 import { startDictation, type DictationHandle } from "@/app/lib/dictation";
@@ -1186,6 +1188,8 @@ export function DiagramEditor({
     laneBoundaryMoveEnd,
     moveElements,
     elementsMoveEnd,
+    beginHistoryGroup,
+    endHistoryGroup,
     swapLane,
     moveLane,
     undo,
@@ -1315,6 +1319,11 @@ export function DiagramEditor({
 
   const [pdfScale, setPdfScale] = useState(100);
   const [selectedElementIds, setSelectedElementIds] = useState<Set<string>>(new Set());
+  // The selection as the command interpreter sees it ("delete these", "rename
+  // the selected pool to Customer") — a ref, so the mic callback and an
+  // in-flight AI call read the selection at the moment they apply.
+  const selectedIdsRef = useRef<string[]>([]);
+  selectedIdsRef.current = [...selectedElementIds];
   const [selectedConnectorId, setSelectedConnectorId] = useState<string | null>(null);
 
   // ── Co-authoring presence (Phase 1b/1c) ──
@@ -2638,6 +2647,9 @@ export function DiagramEditor({
   const abraLastId = useRef<string | null>(null);
   // Remembers the last real command so "again" can repeat it (e.g. nudge again).
   const lastAbraOpsRef = useRef<AssistOp[]>([]);
+  // A destructive command waiting for "yes" (confirm.ts): the ops, what they
+  // would do in words, and whether the AI interpreted them (for the log badge).
+  const pendingConfirmRef = useRef<{ ops: AssistOp[]; what: string; viaAi: boolean } | null>(null);
   const abraDictRef = useRef<DictationHandle | null>(null);
 
   // ── Guided "rename by number" flow (voice) ──
@@ -2660,6 +2672,7 @@ export function DiagramEditor({
     abraDictRef.current?.stop();
     abraDictRef.current = null;
     setAbraListening(false);
+    pendingConfirmRef.current = null; // a parked "clear the diagram?" never outlives the diagram it was asked on
   }, [diagramId]);
 
   const elBox = (e: DiagramElement) => ({ x: e.x, y: e.y, width: e.width, height: e.height });
@@ -2677,11 +2690,18 @@ export function DiagramEditor({
     }
     const results: string[] = [];
     let anyFail = false;
-    const els = data.elements;
+    // Working copy: each op's effect is threaded back in (workingSet.ts) so a
+    // later op in the same batch can refer to what an earlier one created —
+    // "add X and connect it to Y". React has not re-rendered mid-loop, so
+    // `data.elements` alone would still be the pre-batch diagram.
+    let els: DiagramElement[] = data.elements;
+    // Multi-modal: "this" / "these" / "the selected task" resolve to the mouse
+    // selection — the mouse says WHICH, the voice says WHAT.
+    const selectedIds = selectedIdsRef.current;
     const resolve1 = (ref: string): DiagramElement | { err: string } => {
-      const r = resolveRef(ref, els, abraLastId.current);
-      if (!r) return { err: `couldn't find “${ref}”` };
-      if ("ambiguous" in r) return { err: `“${ref}” is ambiguous` };
+      const r = resolveRef(ref, els, abraLastId.current, selectedIds);
+      if (!r) return { err: isSelectionRef(ref) && selectedIds.length === 0 ? "nothing is selected" : `couldn't find “${ref}”` };
+      if ("ambiguous" in r) return { err: isSelectionRef(ref) ? `${r.ambiguous.length} elements are selected — select just one for that` : `“${ref}” is ambiguous` };
       return els.find((e) => e.id === r.id)!;
     };
     for (const op of ops) {
@@ -2745,6 +2765,7 @@ export function DiagramEditor({
         const addRight = center.x + w / 2;
         if (parentId && els.some((e) => e.type === "pool" && e.x + e.width < addRight + 40)) extendPools();
         abraLastId.current = newId;
+        els = withAdded(els, syntheticElement(newId, op.symbolType, center, w, h, { label: op.label, parentId, eventType: op.eventType }));
         setSelectedElementIds(new Set([newId]));
         results.push(`added ${op.label ?? op.symbolType}${anchor && op.afterRef ? ` after ${nameOf(anchor)}` : ""}`);
         continue;
@@ -2772,6 +2793,19 @@ export function DiagramEditor({
       }
 
       if (op.op === "delete") {
+        // "delete these" / "delete the selected tasks": every selected element
+        // of that kind, in one command (and one undo — the caller groups it).
+        const selIds = resolveSelectionRefs(op.ref, els, selectedIds);
+        if (selIds && selIds.length > 1) {
+          const targets = selIds.map((id) => els.find((x) => x.id === id)).filter((x): x is DiagramElement => !!x);
+          for (const t of targets) {
+            deleteElement(t.id);
+            els = withDeleted(els, t.id);
+            if (abraLastId.current === t.id) abraLastId.current = null;
+          }
+          results.push(`deleted ${targets.length} selected elements`);
+          continue;
+        }
         const e = resolve1(op.ref);
         if ("err" in e) {
           // Not an element — maybe a message/connector label.
@@ -2794,6 +2828,7 @@ export function DiagramEditor({
         }
         const foot = { x: e.x, y: e.y, width: e.width, height: e.height };
         deleteElement(e.id);
+        els = withDeleted(els, e.id);
         if (abraLastId.current === e.id) abraLastId.current = null;
         // Compact: close the horizontal gap the element left (vertical strip only).
         if (op.compact) removeSpace({ x: foot.x, y: foot.y, width: foot.width, height: 0 });
@@ -2819,6 +2854,7 @@ export function DiagramEditor({
         else if (op.direction === "down") dy = tgt ? (tgt.y + tgt.height + HALF_TASK_W) - e.y : (op.count ?? 1) * SPAN;
         else dy = tgt ? (tgt.y - HALF_TASK_W - e.height) - e.y : -(op.count ?? 1) * SPAN;
         moveElements([e.id], dx, dy);
+        elementsMoveEnd(); // commit: one undo entry, connectors re-routed (was missing — a voice move left no history)
         results.push(`moved ${nameOf(e)} ${op.direction}`);
         continue;
       }
@@ -2904,6 +2940,7 @@ export function DiagramEditor({
         // MOVE_ELEMENTS auto-includes container descendants, so a white-box pool
         // rides with its lanes/contents; a black-box pool just moves itself.
         moveElements([target.id], 0, dy);
+        elementsMoveEnd(); // commit the nudge as its own undo entry
         abraLastId.current = target.id;
         results.push(`nudged ${nameOf(target)} ${op.direction} ${dist}px`);
         continue;
@@ -2984,7 +3021,7 @@ export function DiagramEditor({
           const newLabel = parts.slice(k).join(" to ").trim();
           if (!leftRef || !newLabel) continue;
           const e = resolve1(leftRef);
-          if (!("err" in e)) { updateLabel(e.id, newLabel); results.push(`renamed ${nameOf(e)} → ${newLabel}`); done = true; break; }
+          if (!("err" in e)) { updateLabel(e.id, newLabel); els = withLabel(els, e.id, newLabel); results.push(`renamed ${nameOf(e)} → ${newLabel}`); done = true; break; }
           const key = messageLabelKey(leftRef);
           const conn = data.connectors.find((c) => (c.label ?? "").trim().toLowerCase() === key);
           if (conn) { updateConnectorLabel(conn.id, newLabel); results.push(`renamed connector “${conn.label}” → ${newLabel}`); done = true; break; }
@@ -3033,7 +3070,7 @@ export function DiagramEditor({
       }
     }
     return { ok: !anyFail, summary: results.join("; ") || "nothing to do" };
-  }, [data.elements, data.connectors, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, updateConnectorLabel, deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool, addPool, addLaneAt, compressPool, extendPools, swapLane, moveLane, moveElements, removeSpace, setRenameFlow]);
+  }, [data.elements, data.connectors, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, updateConnectorLabel, deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool, addPool, addLaneAt, compressPool, extendPools, swapLane, moveLane, moveElements, elementsMoveEnd, removeSpace, setRenameFlow]);
 
   // Cancel the guided rename flow and clear any badge/edit state.
   const cancelRenameFlow = useCallback((reason?: string) => {
@@ -3086,6 +3123,13 @@ export function DiagramEditor({
   const handleRenameUtteranceRef = useRef(handleRenameUtterance);
   handleRenameUtteranceRef.current = handleRenameUtterance;
 
+  // One spoken command = ONE undo entry, however many reducer helpers it fans
+  // out into (historyGroup.ts). "Undo that" used to revert only the last of them.
+  const applyGrouped = useCallback((ops: AssistOp[]) => {
+    beginHistoryGroup();
+    try { return applyAssistOps(ops); } finally { endHistoryGroup(); }
+  }, [applyAssistOps, beginHistoryGroup, endHistoryGroup]);
+
   // Interpret a raw command (deterministic first; AI fallback added in Stage 4).
   const runAbraCommand = useCallback(async (text: string) => {
     const heard = text.trim();
@@ -3093,42 +3137,63 @@ export function DiagramEditor({
     // While the guided rename flow is active, every utterance feeds it (a number,
     // the new name, or "cancel") — never the general command parser.
     if (renameFlowRef.current) { handleRenameUtteranceRef.current(heard); return; }
-    const entryId = nanoid();
-    const ops = parseCommand(heard);
-    if (ops) {
-      const res = applyAssistOps(ops);
-      setAbraLog((prev) => [...prev, { id: entryId, heard, summary: res.summary, ok: res.ok, viaAi: false }]);
-      return;
+    const log = (entry: Omit<CommandLogEntry, "id">) => setAbraLog((prev) => [...prev, { id: nanoid(), ...entry }]);
+
+    // A destructive command parked by the previous utterance — this one answers it.
+    if (pendingConfirmRef.current) {
+      const pending = pendingConfirmRef.current;
+      pendingConfirmRef.current = null;
+      const answer = parseConfirmation(heard);
+      if (answer === "yes") {
+        const r = applyGrouped(pending.ops);
+        log({ heard, summary: `confirmed → ${r.summary}`, ok: r.ok, viaAi: pending.viaAi });
+        return;
+      }
+      log({ heard, summary: `cancelled — did not ${pending.what}`, ok: true, viaAi: pending.viaAi });
+      if (answer === "no") return;
+      // Anything else is a new command: fall through with the old one dropped.
     }
+
+    // Apply now — or, when the command would remove more than one thing, park
+    // it and ask (confirm.ts). Undo would recover a mis-heard "clear the
+    // diagram", but nobody should have to know that.
+    const applyOrAsk = (ops: AssistOp[], viaAi: boolean, prefix = "") => {
+      const what = needsConfirmation(ops, data.elements, abraLastId.current, selectedIdsRef.current);
+      if (what) {
+        pendingConfirmRef.current = { ops, what, viaAi };
+        log({ heard, summary: `${prefix}${what}? — say “yes” to confirm`, ok: true, viaAi });
+        return;
+      }
+      const r = applyGrouped(ops);
+      log({ heard, summary: `${prefix}${r.summary}`, ok: r.ok, viaAi });
+    };
+
+    const ops = parseCommand(heard);
+    if (ops) { applyOrAsk(ops, false); return; }
     // Deterministic parser didn't recognise it → AI fallback (metered).
     setAbraBusy(true);
     try {
       const res = await fetch("/api/ai/command", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ instruction: heard, state: { elements: data.elements, connectors: data.connectors } }),
+        body: JSON.stringify({ instruction: heard, state: { elements: data.elements, connectors: data.connectors }, selectedIds: selectedIdsRef.current }),
       });
-      if (!res.ok) { setAbraLog((prev) => [...prev, { id: entryId, heard, summary: "didn’t understand that", ok: false, viaAi: true }]); return; }
+      if (!res.ok) { log({ heard, summary: "didn’t understand that", ok: false, viaAi: true }); return; }
       const j = await res.json();
       // Prefer the AI's CANONICAL rewrite re-parsed deterministically (fixes
       // mis-hears + guarantees a valid, documented command); fall back to ops.
       const canonical = typeof j.canonical === "string" ? j.canonical.trim() : "";
       const canonicalOps = canonical ? parseCommand(canonical) : null;
-      if (canonicalOps) {
-        const r = applyAssistOps(canonicalOps);
-        setAbraLog((prev) => [...prev, { id: entryId, heard, summary: `“${canonical}” → ${r.summary}`, ok: r.ok, viaAi: true }]);
-        return;
-      }
+      if (canonicalOps) { applyOrAsk(canonicalOps, true, `“${canonical}” → `); return; }
       const aiOps = validateOps(j.ops);
-      if (aiOps.length === 0) { setAbraLog((prev) => [...prev, { id: entryId, heard, summary: "didn’t understand that", ok: false, viaAi: true }]); return; }
-      const r = applyAssistOps(aiOps);
-      setAbraLog((prev) => [...prev, { id: entryId, heard, summary: r.summary, ok: r.ok, viaAi: true }]);
+      if (aiOps.length === 0) { log({ heard, summary: "didn’t understand that", ok: false, viaAi: true }); return; }
+      applyOrAsk(aiOps, true);
     } catch {
-      setAbraLog((prev) => [...prev, { id: entryId, heard, summary: "command service unavailable", ok: false, viaAi: true }]);
+      log({ heard, summary: "command service unavailable", ok: false, viaAi: true });
     } finally {
       setAbraBusy(false);
     }
-  }, [applyAssistOps, data.elements, data.connectors]);
+  }, [applyGrouped, data.elements, data.connectors]);
   // Keep a stable ref so the mic's onText callback always calls the latest.
   const runAbraCommandRef = useRef(runAbraCommand);
   runAbraCommandRef.current = runAbraCommand;

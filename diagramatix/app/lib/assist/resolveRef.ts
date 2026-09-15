@@ -102,9 +102,56 @@ function positional(spoken: string, elements: DiagramElement[]): RefResolution {
   return pick ? { id: pick.id } : null;
 }
 
-export function resolveRef(spoken: string, elements: DiagramElement[], lastAddedId?: string | null): RefResolution {
+// ── Multi-modal: the mouse says WHICH, the voice says WHAT ─────────────────
+// A selection reference resolves to the elements the user has selected on the
+// canvas — never mis-heard, never ambiguous by name. "the selected task" filters
+// the selection by kind; "these" / "the selection" is all of it; a bare "this" /
+// "that" prefers the selection and falls back to recency when nothing is selected.
+const SELECTION_ALL = /^(?:the\s+)?(?:selection|selected(?:\s+(?:elements?|ones?|items?|things?))?|these(?:\s+ones?)?|those(?:\s+ones?)?|highlighted(?:\s+(?:elements?|ones?))?)$/;
+const SELECTION_KIND = /^(?:the\s+)?(?:selected|highlighted|chosen)\s+(.+)$/;
+const DEMONSTRATIVE = /^(?:this|that|this one|that one)$/;
+
+/** Element type named by a kind word, singular or plural ("tasks", "pool", "sub-lanes"). */
+function kindToType(word: string, elements: DiagramElement[]): ((e: DiagramElement) => boolean) | null {
+  const w = word.trim().toLowerCase();
+  const parentType = (e: DiagramElement) => elements.find((p) => p.id === e.parentId)?.type;
+  if (/^pools?$/.test(w)) return (e) => e.type === "pool";
+  if (/^sub-?lanes?$/.test(w)) return (e) => e.type === "lane" && parentType(e) === "lane";
+  if (/^lanes?$/.test(w)) return (e) => e.type === "lane";
+  const t = typeNoun(w) ?? typeNoun(w.replace(/(?:es|s)$/, ""));
+  return t ? (e) => e.type === t : null;
+}
+
+/** Is this phrase a reference to the selection at all (regardless of whether anything is selected)? */
+export function isSelectionRef(spoken: string): boolean {
+  const s = stripArticle(norm(spoken));
+  return SELECTION_ALL.test(s) || SELECTION_KIND.test(s);
+}
+
+/**
+ * Every selected id the phrase refers to — all of them for "these", the ones of
+ * that kind for "the selected task(s)". `null` when the phrase is not a selection
+ * reference, or when it is a bare "this"/"that" with nothing selected (so the
+ * caller can fall back to "the last one").
+ */
+export function resolveSelectionRefs(spoken: string, elements: DiagramElement[], selectedIds?: readonly string[]): string[] | null {
+  const s = stripArticle(norm(spoken));
+  const sel = (selectedIds ?? []).filter((id) => elements.some((e) => e.id === id));
+  if (DEMONSTRATIVE.test(s)) return sel.length ? sel : null;
+  if (SELECTION_ALL.test(s)) return sel;
+  const m = s.match(SELECTION_KIND);
+  if (!m) return null;
+  const ofKind = kindToType(m[1], elements);
+  if (!ofKind) return null;
+  return sel.filter((id) => { const e = elements.find((x) => x.id === id); return !!e && ofKind(e); });
+}
+
+export function resolveRef(spoken: string, elements: DiagramElement[], lastAddedId?: string | null, selectedIds?: readonly string[]): RefResolution {
   const s = norm(spoken);
   if (!s) return null;
+
+  const sel = resolveSelectionRefs(s, elements, selectedIds);
+  if (sel) return pick(sel);
 
   const pos = positional(s, elements);
   if (pos) return pos;
