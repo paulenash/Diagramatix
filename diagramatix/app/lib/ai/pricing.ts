@@ -13,6 +13,14 @@
  */
 export const PRICING_SNAPSHOT_DATE = "2026-07-27";
 
+/**
+ * Streaming speech-to-text, USD per minute of open microphone — Deepgram Nova-2
+ * streaming, pay-as-you-go list rate (read 2026-09-15). An ESTIMATE for the
+ * "cost so far" readout only: Deepgram bills on its own dashboard, by the
+ * minute, whether or not anything was said.
+ */
+export const DEEPGRAM_USD_PER_MINUTE = 0.0059;
+
 export interface ModelPrice {
   in: number; // USD per 1M input tokens
   out: number; // USD per 1M output tokens

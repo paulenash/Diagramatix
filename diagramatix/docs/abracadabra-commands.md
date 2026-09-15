@@ -81,6 +81,15 @@ Examples: "rename the selected pool to Customer" · "delete these" · "connect t
 "move the selected task right" · "add a boundary event called Timeout to this". A command that takes
 **one** target with several selected asks you to select just one; `delete` accepts many.
 
+## The bar's buttons
+
+- **Commands** — a movable, scrollable reminder card of everything on this page, grouped by family
+  (`app/lib/assist/commandCatalog.ts`; every example on it is tested to parse). Drag it by its title.
+- **Cost** — what this session has cost so far: AI fallback calls at the rate catalogue's list prices,
+  plus microphone minutes at a per-minute Deepgram estimate (the open mic session is counted live; a
+  closed one is counted from its usage row). An **estimate** — the provider's invoice is the truth, and
+  browser-engine voice is free.
+
 ## Confirmation and undo
 
 - Commands that would remove **more than one thing** ask first and wait for the next utterance:

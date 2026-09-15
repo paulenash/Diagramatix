@@ -2650,6 +2650,18 @@ export function DiagramEditor({
   // A destructive command waiting for "yes" (confirm.ts): the ops, what they
   // would do in words, and whether the AI interpreted them (for the log badge).
   const pendingConfirmRef = useRef<{ ops: AssistOp[]; what: string; viaAi: boolean } | null>(null);
+  // "Cost so far": the session starts when the bar opens; the microphone's open
+  // stretch is added live because its usage row is only written when it stops.
+  const abraSessionStart = useRef<Date>(new Date());
+  const abraMicOpenedAt = useRef<number | null>(null);
+  useEffect(() => { if (abracadabraOn) abraSessionStart.current = new Date(); }, [abracadabraOn]);
+  const fetchAbraCost = useCallback(async () => {
+    const live = abraListening && abraMicOpenedAt.current ? Math.round((Date.now() - abraMicOpenedAt.current) / 1000) : 0;
+    const q = new URLSearchParams({ since: abraSessionStart.current.toISOString(), live: String(live) });
+    const res = await fetch(`/api/ai/command/usage?${q}`);
+    if (!res.ok) return null;
+    return (await res.json()) as import("@/app/lib/assist/usageCost").CostReport;
+  }, [abracadabraOn, abraListening]);
   const abraDictRef = useRef<DictationHandle | null>(null);
 
   // ── Guided "rename by number" flow (voice) ──
@@ -3251,6 +3263,7 @@ export function DiagramEditor({
     if (abraListening || abraDictRef.current) { stopAbraListening(); return; }
     abraStopRequested.current = false;
     abraBuffer.current = "";
+    abraMicOpenedAt.current = Date.now(); // the open session has no usage row yet — Cost adds its seconds live
     setAbraListening(true);
     const handle = await startDictation({
       onEngine: (e) => setAbraEngine(e),
@@ -5983,6 +5996,7 @@ export function DiagramEditor({
             onToggleListen={() => { void toggleAbraListening(); }}
             onClear={() => setAbraLog([])}
             onClose={() => { stopAbraListening(); setAbracadabraOn(false); try { localStorage.setItem(`abracadabra-${diagramId}`, "false"); } catch {} }}
+            onCost={fetchAbraCost}
           />
         )}
 
