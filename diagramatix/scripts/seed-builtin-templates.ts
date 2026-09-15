@@ -27,7 +27,7 @@ import type { DiagramElement, Connector, TemplateData, SymbolType, ConnectorType
 // ── Fragment spec → laid-out TemplateData ──────────────────────────────────
 type Step = {
   k: string; type: SymbolType; label?: string; col: number; row?: number;
-  gatewayType?: string; eventType?: string; repeatType?: string; subprocessType?: string;
+  gatewayType?: string; eventType?: string; repeatType?: string; subprocessType?: string; taskType?: string;
   boundaryOf?: string; props?: Record<string, unknown>;
 };
 type Conn = { from: string; to: string; type?: ConnectorType; label?: string };
@@ -58,6 +58,7 @@ function buildFragment(f: Fragment): TemplateData {
       ...(s.gatewayType ? { gatewayType: s.gatewayType as DiagramElement["gatewayType"] } : {}),
       ...(s.eventType ? { eventType: s.eventType as DiagramElement["eventType"] } : {}),
       ...(s.repeatType ? { repeatType: s.repeatType as DiagramElement["repeatType"] } : {}),
+      ...(s.taskType ? { taskType: s.taskType as DiagramElement["taskType"] } : {}),
     } as DiagramElement;
     byKey.set(s.k, el);
     return el;
@@ -164,6 +165,11 @@ const FRAGMENTS: Fragment[] = [
   { name: "Link (off-page) Pair", group: "Events", description: "A throwing link and a catching link to split a long diagram across the page.",
     steps: [T("a", "…earlier", 0), { k: "lt", type: "intermediate-event", eventType: "link", col: 1, props: { flowType: "throwing" } }, { k: "lc", type: "intermediate-event", eventType: "link", col: 0, row: 1, props: { flowType: "catching" } }, T("b", "…continues", 1, 1)],
     conns: [{ from: "a", to: "lt" }, { from: "lc", to: "b" }] },
+  // The target of the Assist "Suggestion" chip (notify / email / alert / remind).
+  // Paul, 2026-09-15: the chip used to open the Events picker; now it attaches this.
+  { name: "Send Notification", group: "Events", description: "A send task that notifies a party, then a message catch that waits for their acknowledgement — delete the catch if no reply is expected.",
+    steps: [{ k: "n", type: "task", label: "Send notification", col: 0, taskType: "send" }, { k: "ack", type: "intermediate-event", eventType: "message", label: "Acknowledged", col: 1, props: { flowType: "catching" } }, T("c", "Continue", 2)],
+    conns: [{ from: "n", to: "ack" }, { from: "ack", to: "c" }] },
 
   // ── Data ──
   { name: "Data Input / Output", group: "Data", description: "A task reading a data-object input and producing a data-object output.",

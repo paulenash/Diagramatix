@@ -3,7 +3,7 @@ import { matchIntent, keywordHits, type IntentRow } from "@/app/lib/diagram/inte
 
 const CATALOG: IntentRow[] = [
   { label: "Approval", keywords: ["approve", "sign-off", "authorise"], targetCategory: "Approvals" },
-  { label: "Notification", keywords: ["notify", "email"], targetTemplateName: "Send Notification" },
+  { label: "Suggestion", keywords: ["notify", "email"], targetTemplateName: "Send Notification" },
 ];
 
 describe("keywordHits", () => {
@@ -27,7 +27,7 @@ describe("matchIntent", () => {
   });
   it("carries a direct template name when set", () => {
     const m = matchIntent("Notify the customer", CATALOG);
-    expect(m?.label).toBe("Notification");
+    expect(m?.label).toBe("Suggestion");
     expect(m?.templateName).toBe("Send Notification");
   });
   it("returns null on no match or empty label", () => {
