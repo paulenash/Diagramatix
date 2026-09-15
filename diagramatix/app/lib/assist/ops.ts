@@ -7,6 +7,10 @@ import type { SymbolType, GatewayType, EventType, ConnectorType } from "../diagr
 
 export type Ref = string;
 
+/** A connection point on a gateway: "middle" is the flow side (right for outgoing, left for incoming). */
+export type GatewayPoint = "top" | "middle" | "bottom" | "left" | "right";
+export const GATEWAY_POINTS: readonly GatewayPoint[] = ["top", "middle", "bottom", "left", "right"];
+
 export type AssistOp =
   | { op: "add"; symbolType: SymbolType; label?: string; eventType?: EventType; gatewayType?: GatewayType; afterRef?: Ref }
   | { op: "connect"; fromRef: Ref; toRef: Ref; connectorType?: ConnectorType }
@@ -24,7 +28,12 @@ export type AssistOp =
   | { op: "swapLanes"; laneA: Ref; laneB: Ref }
   | { op: "compressPool"; poolRef: Ref }
   | { op: "extendPools" }
-  | { op: "nudgePool"; ref?: Ref; direction: "up" | "down"; distance?: number }
+  /** A 20px step in any direction — any element, or the whole selection ("nudge these left"). */
+  | { op: "nudgePool"; ref?: Ref; direction: "up" | "down" | "left" | "right"; distance?: number }
+  /** "label selected <text>" — the selected connector; no text → wait for it. */
+  | { op: "labelSelected"; label?: string }
+  /** "swap top and bottom" on the SELECTED gateway — outgoing points of a decision, incoming of a merge. */
+  | { op: "swapGatewayPoints"; a: GatewayPoint; b: GatewayPoint }
   | { op: "moveLane"; ref: Ref; direction: "up" | "down"; distance?: number }
   | { op: "again" }
   | { op: "addMessage"; fromRef: Ref; toRef: Ref; label?: string }
@@ -168,6 +177,13 @@ export function validateOp(raw: unknown): AssistOp | null {
       return { op: "again" };
     case "addMessageByNumber":
       return { op: "addMessageByNumber", ...(o.fromSelection === true ? { fromSelection: true } : {}) };
+    case "labelSelected":
+      return { op: "labelSelected", ...(isRef(o.label) ? { label: (o.label as string).trim() } : {}) };
+    case "swapGatewayPoints": {
+      const pts = new Set<string>(GATEWAY_POINTS);
+      if (!pts.has(o.a as string) || !pts.has(o.b as string) || o.a === o.b) return null;
+      return { op: "swapGatewayPoints", a: o.a as GatewayPoint, b: o.b as GatewayPoint };
+    }
     case "addMessage": {
       if (!isRef(o.fromRef) || !isRef(o.toRef)) return null;
       const op: AssistOp = { op: "addMessage", fromRef: (o.fromRef as string).trim(), toRef: (o.toRef as string).trim() };

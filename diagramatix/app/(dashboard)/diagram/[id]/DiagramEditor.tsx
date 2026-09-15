@@ -1327,6 +1327,9 @@ export function DiagramEditor({
   const selectedIdsRef = useRef<string[]>([]);
   selectedIdsRef.current = [...selectedElementIds];
   const [selectedConnectorId, setSelectedConnectorId] = useState<string | null>(null);
+  // The selected connector as the command interpreter sees it ("label selected Yes").
+  const selectedConnectorIdRef = useRef<string | null>(null);
+  selectedConnectorIdRef.current = selectedConnectorId;
 
   // ── Co-authoring presence (Phase 1b/1c) ──
   // Selected element(s) double as an advisory soft-lock signal for other editors.
@@ -2677,7 +2680,7 @@ export function DiagramEditor({
   //   name: an item is selected/editing; user dictates the new name.
   type RenameFlow =
     | { phase: "pick"; itemType: RenameType; targets: RenameTarget[] }
-    | { phase: "name"; itemType: RenameType; targetId: string; kind: "element" | "connector" };
+    | { phase: "name"; itemType: RenameType; targetId: string; kind: "element" | "connector"; /** "label selected" — one item, no pick loop after */ single?: boolean };
   const [renameFlow, setRenameFlowState] = useState<RenameFlow | null>(null);
   const renameFlowRef = useRef<RenameFlow | null>(null);
   const setRenameFlow = useCallback((f: RenameFlow | null) => { renameFlowRef.current = f; setRenameFlowState(f); }, []);
@@ -2862,6 +2865,20 @@ export function DiagramEditor({
       }
 
       if (op.op === "move") {
+        // A selection moves as a group, 100 px per step (Paul, 2026-09-15):
+        // "move these right", "move the selected task up two".
+        const selIds = resolveSelectionRefs(op.ref, els, selectedIds);
+        if (selIds && selIds.length > 0) {
+          const step = 100 * (op.count ?? 1);
+          const gdx = op.direction === "right" ? step : op.direction === "left" ? -step : 0;
+          const gdy = op.direction === "down" ? step : op.direction === "up" ? -step : 0;
+          moveElements(selIds, gdx, gdy);
+          elementsMoveEnd();
+          setSelectedElementIds(new Set()); // selection protocol
+          const what = selIds.length === 1 ? nameOf(els.find((x) => x.id === selIds[0])!) : `${selIds.length} selected elements`;
+          results.push(`moved ${what} ${op.direction} ${step}px`);
+          continue;
+        }
         const e = resolve1(op.ref);
         if ("err" in e) { results.push(e.err); anyFail = true; continue; }
         const horiz = op.direction === "left" || op.direction === "right";
@@ -2950,7 +2967,18 @@ export function DiagramEditor({
 
       if (op.op === "nudgePool") {
         const dist = op.distance ?? 20;
-        const dy = op.direction === "up" ? -dist : dist;
+        const dx = op.direction === "left" ? -dist : op.direction === "right" ? dist : 0;
+        const dy = op.direction === "up" ? -dist : op.direction === "down" ? dist : 0;
+        // A selection nudges as a group ("nudge these left") — the reducer only
+        // adds each element's own boundary events and container descendants.
+        const selIds = op.ref ? resolveSelectionRefs(op.ref, els, selectedIds) : null;
+        if (selIds && selIds.length > 1) {
+          moveElements(selIds, dx, dy);
+          elementsMoveEnd();
+          setSelectedElementIds(new Set()); // selection protocol
+          results.push(`nudged ${selIds.length} selected elements ${op.direction} ${dist}px`);
+          continue;
+        }
         let target: DiagramElement | undefined;
         if (op.ref) {
           const r = resolve1(op.ref);
@@ -2965,7 +2993,7 @@ export function DiagramEditor({
         }
         // MOVE_ELEMENTS auto-includes container descendants, so a white-box pool
         // rides with its lanes/contents; a black-box pool just moves itself.
-        moveElements([target.id], 0, dy);
+        moveElements([target.id], dx, dy);
         elementsMoveEnd(); // commit the nudge as its own undo entry
         setSelectedElementIds(new Set()); // selection protocol
         abraLastId.current = target.id;
@@ -3033,6 +3061,50 @@ export function DiagramEditor({
         setMessageFlow(null);
         setRenameFlow({ phase: "pick", itemType, targets });
         results.push(`pick a ${itemType} by number, then say the new name — say “done” to finish`);
+        continue;
+      }
+
+      if (op.op === "labelSelected") {
+        // The selected CONNECTOR gets the label; with no text, wait for it
+        // (a single-item name phase — no pick loop afterwards).
+        const cid = selectedConnectorIdRef.current;
+        if (!cid || !data.connectors.some((c) => c.id === cid)) { results.push("select a connector first"); anyFail = true; continue; }
+        if (op.label) {
+          updateConnectorLabel(cid, op.label);
+          setSelectedConnectorId(null); // selection protocol
+          results.push(`labelled the connector “${op.label}”`);
+          continue;
+        }
+        setMessageFlow(null);
+        setRenameFlow({ phase: "name", itemType: "connector", targetId: cid, kind: "connector", single: true });
+        results.push("say the label for the selected connector (or “done”)");
+        continue;
+      }
+
+      if (op.op === "swapGatewayPoints") {
+        // Swap two connection points of the SELECTED gateway: the outgoing
+        // points of a decision, the incoming points of a merge. "middle" is the
+        // side in the flow direction (right for outgoing, left for incoming).
+        const gid = selectedIds.length === 1 ? selectedIds[0] : null;
+        const g = gid ? els.find((x) => x.id === gid) : undefined;
+        if (!g || g.type !== "gateway") { results.push(selectedIds.length > 1 ? "select just the one gateway" : "select a gateway first"); anyFail = true; continue; }
+        const outs = data.connectors.filter((c) => c.sourceId === g.id && c.type === "sequence");
+        const ins = data.connectors.filter((c) => c.targetId === g.id && c.type === "sequence");
+        const isMerge = (g.properties?.gatewayRole as string | undefined) === "merge" || (ins.length > 1 && outs.length <= 1);
+        const endpoint: "source" | "target" = isMerge ? "target" : "source";
+        const conns = isMerge ? ins : outs;
+        const middle: Side = isMerge ? "left" : "right";
+        // "middle" is the flow side; top/bottom/left/right are literal — a point with
+        // no connector on it is reported, never guessed.
+        const sideOf = (p: typeof op.a): Side => (p === "middle" ? middle : p);
+        const sideAt = (c: (typeof conns)[number]) => (endpoint === "source" ? c.sourceSide : c.targetSide);
+        const sa = sideOf(op.a), sb = sideOf(op.b);
+        const ca = conns.find((c) => sideAt(c) === sa);
+        const cb = conns.find((c) => sideAt(c) === sb);
+        if (!ca || !cb) { results.push(`no ${isMerge ? "incoming" : "outgoing"} connector at the ${!ca ? op.a : op.b} of ${nameOf(g)}`); anyFail = true; continue; }
+        updateConnectorEndpoint(ca.id, endpoint, g.id, sb, 0.5);
+        updateConnectorEndpoint(cb.id, endpoint, g.id, sa, 0.5);
+        results.push(`swapped the ${op.a} and ${op.b} ${isMerge ? "incoming" : "outgoing"} points of ${nameOf(g)}`);
         continue;
       }
 
@@ -3114,7 +3186,7 @@ export function DiagramEditor({
       }
     }
     return { ok: !anyFail, summary: results.join("; ") || "nothing to do" };
-  }, [data.elements, data.connectors, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, updateConnectorLabel, deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool, addPool, addLaneAt, compressPool, extendPools, swapLane, moveLane, moveElements, elementsMoveEnd, removeSpace, setRenameFlow, setMessageFlow]);
+  }, [data.elements, data.connectors, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, updateConnectorLabel, deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool, addPool, addLaneAt, compressPool, extendPools, swapLane, moveLane, moveElements, elementsMoveEnd, removeSpace, setRenameFlow, setMessageFlow, updateConnectorEndpoint]);
 
   // Cancel the guided rename flow and clear any badge/edit state.
   const cancelRenameFlow = useCallback((reason?: string) => {
@@ -3125,7 +3197,7 @@ export function DiagramEditor({
 
   // Apply a dictated name to the picked element/connector, then STAY in the loop
   // (#3): re-number the same type so the user can keep renaming until "stop"/Esc.
-  const applyRenameName = useCallback((target: { id: string; kind: "element" | "connector" }, name: string, itemType: RenameType) => {
+  const applyRenameName = useCallback((target: { id: string; kind: "element" | "connector" }, name: string, itemType: RenameType, single = false) => {
     const clean = name.trim().replace(/[.,!?;:]+$/g, "").trim();
     if (!clean) { cancelRenameFlow("rename cancelled (empty name)"); return; }
     if (target.kind === "element") updateLabel(target.id, clean);
@@ -3135,6 +3207,12 @@ export function DiagramEditor({
     // the item selected — the badges are the cue, not a highlight.
     setSelectedElementIds(new Set());
     setSelectedConnectorId(null);
+    if (single) {
+      // "label selected": one item, no pick loop afterwards.
+      setRenameFlow(null);
+      setAbraLog((prev) => [...prev, { id: nanoid(), heard: clean, summary: `labelled the connector “${clean}”`, ok: true }]);
+      return;
+    }
     const targets = collectRenameTargets(data.elements, data.connectors, itemType);
     if (targets.length > 0) setRenameFlow({ phase: "pick", itemType, targets });
     else setRenameFlow(null);
@@ -3167,7 +3245,7 @@ export function DiagramEditor({
       return;
     }
     // phase "name" — the whole utterance is the new name.
-    applyRenameName({ id: flow.targetId, kind: flow.kind }, t, flow.itemType);
+    applyRenameName({ id: flow.targetId, kind: flow.kind }, t, flow.itemType, flow.single === true);
   }, [applyRenameName, cancelRenameFlow, setRenameFlow, beginLabelEdit]);
   const handleRenameUtteranceRef = useRef(handleRenameUtterance);
   handleRenameUtteranceRef.current = handleRenameUtterance;

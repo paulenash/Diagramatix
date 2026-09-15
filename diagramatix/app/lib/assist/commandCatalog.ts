@@ -22,7 +22,8 @@ export const COMMAND_CATALOG: CatalogFamily[] = [
     { does: "Connect / disconnect", say: ["connect Send Invoice to Receive Payment", "connect them", "disconnect Review from Approve"] },
     { does: "Rename", say: ["rename the gateway to Approved?", "rename Lane 2 to Sales", "rename connector Email Details to Send Invoice"] },
     { does: "Rename by number (say a type, pick a green number, say the name)", say: ["rename tasks", "rename lanes"] },
-    { does: "Move", say: ["move the gateway two elements to the right", "move Approve up"] },
+    { does: "Move — one element-span; a selection moves together, 100 px per step", say: ["move the gateway two elements to the right", "move Approve up", "move these right", "move the selected task two steps up"] },
+    { does: "Nudge — 20 px in any direction, any element; a selection nudges together", say: ["nudge the selected task left", "nudge these down", "bump Approve right", "nudge Customer down by 40"] },
     { does: "Delete (and close the gap)", say: ["delete Prepare", "remove Prepare and compact"] },
     { does: "Boundary event on a task or subprocess", say: ["add a boundary event called Cancel to the Review subprocess", "add a boundary event to Approve called Timeout"] },
   ] },
@@ -44,8 +45,13 @@ export const COMMAND_CATALOG: CatalogFamily[] = [
   { family: "Messages", items: [
     { does: "Message flow between an activity and a pool", say: ["add message from Task 1 to IT System labelled Email Details", "send a message from Approve to Customer", "add a message to IT System from Task 1 saying Get Approval"] },
     { does: "Rename / delete a message by its label", say: ["rename connector Email Details to Send Invoice", "delete connector Email Details", "remove message Email Details"] },
+    { does: "Label the selected connector (no text → it waits for it)", say: ["label selected Yes", "label the selected connector Approved", "label selected"] },
+    { does: "Label connectors by number — numbers every sequence flow (or message), then say “3 No”", say: ["label connectors", "label messages", "label flows"] },
     { does: "Message by number — numbers the tasks, collapsed subprocesses and black-box pools, then say “3 to 7 labelled Order Placed”", say: ["add a message", "send a message"] },
     { does: "Message from/to the selected element — numbers its valid counterparts, then say “to 2 labelled Order Placed” or “from 2 labelled …”", say: ["add a message to the selected", "add a message from this"] },
+  ] },
+  { family: "Gateways (select the gateway first)", items: [
+    { does: "Swap two connection points, any pair of top / bottom / middle / left / right — the outgoing points of a decision, the incoming points of a merge; “middle” is the side in the flow direction", say: ["swap top and bottom", "swap bottom and middle", "swap top with centre", "swap middle and top", "swap top and right"] },
   ] },
   { family: "Diagram", items: [
     { does: "Undo, repeat, clear, export", say: ["undo that", "again", "clear the diagram", "export the diagram to JSON"] },

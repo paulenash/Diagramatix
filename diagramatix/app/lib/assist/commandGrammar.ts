@@ -83,7 +83,13 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   // Guided rename: "rename <type>" (a bare element/connector TYPE, no "to <name>")
   // starts the numbered-badge pick flow. Types: pool · lane/sub-lane · message ·
   // task · subprocess · gateway/decision · event · connector/sequence.
-  m = raw.match(/^(?:rename|relabel|edit)\s+(?:a\s+|an\s+|the\s+|all\s+)?(pools?|sub-?lanes?|lanes?|messages?|tasks?|activit(?:y|ies)|steps?|subprocess(?:es)?|sub-?process(?:es)?|gateways?|decisions?|events?|connectors?|sequence(?:\s+flows?)?|flows?)\s*$/i);
+  // "label selected <text>" — the selected CONNECTOR (Paul, 2026-09-15); with no
+  // text the editor waits for it. Checked before the by-type rule so "selected"
+  // is never read as a type word.
+  m = raw.match(/^label\s+(?:the\s+)?(?:selected|selection|this|that)(?:\s+(?:connector|flow|arrow|line|link))?(?:\s+(?:as|with|to))?(?:\s+(.+))?$/i);
+  if (m) return [{ op: "labelSelected", ...(m[1] ? { label: clean(m[1]) } : {}) }];
+
+  m = raw.match(/^(?:rename|relabel|edit|label)\s+(?:a\s+|an\s+|the\s+|all\s+)?(pools?|sub-?lanes?|lanes?|messages?|tasks?|activit(?:y|ies)|steps?|subprocess(?:es)?|sub-?process(?:es)?|gateways?|decisions?|events?|connectors?|sequence(?:\s+flows?)?|flows?)\s*$/i);
   if (m) {
     const rt = parseRenameType(m[1]);
     if (rt) return [{ op: "renameByType", itemType: rt }];
@@ -103,6 +109,19 @@ export function parseCommand(utterance: string): AssistOp[] | null {
 
     // Swap two named lanes: "swap lane A with lane B" / "swap A and B".
     // (resolveRef strips a leading "lane"/"pool" kind word, so keep the raw ref.)
+    // Swap a SELECTED gateway's connection points: "swap top and bottom", "swap
+    // bottom and middle" (Paul, 2026-09-15). Before the lane swap, which would
+    // otherwise take "top" and "bottom" as lane names.
+    // Every combination: top / bottom / middle (centre) / left / right, in either
+    // order. "middle" is resolved at apply time to the flow side; left and right
+    // are literal sides for people who say them.
+    const sp = raw.match(/^swap\s+(?:the\s+)?(top|bottom|middle|centre|center|left|right)\s+(?:and|with|&)\s+(?:the\s+)?(top|bottom|middle|centre|center|left|right)(?:\s+(?:points?|connectors?|connections?|sides?))?$/i);
+    if (sp) {
+      type Pt = "top" | "middle" | "bottom" | "left" | "right";
+      const pt = (w: string): Pt => (/^cent/i.test(w) ? "middle" : (w.toLowerCase() as Pt));
+      const a = pt(sp[1]), b = pt(sp[2]);
+      if (a !== b) return [{ op: "swapGatewayPoints", a, b }];
+    }
     let mm = raw.match(new RegExp(`^swap\\s+(.+?)\\s+(?:with|and|for|<->|<>)\\s+(.+)$`, "i"));
     if (mm) return [{ op: "swapLanes", laneA: clean(mm[1]), laneB: clean(mm[2]) }];
 
@@ -177,15 +196,16 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     // Nudge a pool up / down by a small step (default 20px). "nudge"/"bump"
     // always mean this; "move/slide <…> up|down" only counts as a pool-nudge
     // when a pool is named (so "move Task 1 up" stays the generic element move).
-    let mnudge = raw.match(new RegExp(`^(?:nudge|bump|inch|shift)\\s+(?:the\\s+)?(.*?)\\s*(up|down)(?:\\s+by\\s+(\\d+)\\s*(?:px|pixels?)?)?$`, "i"));
+    // Any direction, any element, 20 px (Paul, 2026-09-15); a selection nudges as a group.
+    let mnudge = raw.match(new RegExp(`^(?:nudge|bump|inch|shift)\\s+(?:the\\s+)?(.*?)\\s*(?:to\\s+the\\s+)?(up|down|left|right)(?:\\s+by\\s+(\\d+)\\s*(?:px|pixels?)?)?$`, "i"));
     if (!mnudge) {
-      const mv = raw.match(new RegExp(`^(?:move|slide)\\s+(?:the\\s+)?(.*?)\\s*(up|down)(?:\\s+by\\s+(\\d+)\\s*(?:px|pixels?)?)?$`, "i"));
+      const mv = raw.match(new RegExp(`^(?:move|slide)\\s+(?:the\\s+)?(.*?)\\s*(?:to\\s+the\\s+)?(up|down|left|right)(?:\\s+by\\s+(\\d+)\\s*(?:px|pixels?)?)?$`, "i"));
       if (mv && new RegExp(`\\b${P}\\b`, "i").test(mv[1] || "")) mnudge = mv;
     }
     if (mnudge) {
       const rawRef = clean(mnudge[1] || "");
       const ref = rawRef && !new RegExp(`^${P}$`, "i").test(rawRef) ? rawRef : undefined; // bare "pool" → default target
-      return [{ op: "nudgePool", ...(ref ? { ref } : {}), direction: mnudge[2].toLowerCase() as "up" | "down", ...(mnudge[3] ? { distance: Number(mnudge[3]) } : {}) }];
+      return [{ op: "nudgePool", ...(ref ? { ref } : {}), direction: mnudge[2].toLowerCase() as "up" | "down" | "left" | "right", ...(mnudge[3] ? { distance: Number(mnudge[3]) } : {}) }];
     }
   }
 

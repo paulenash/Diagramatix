@@ -90,6 +90,21 @@ Examples: "rename the selected pool to Customer" · "delete these" · "connect t
   Say **"to 2 labelled Order Placed"** or **"from 2 labelled …"**.
 - "add a message to IT System" (one named end) still goes to the AI, as before.
 
+## Nudge, move, label, swap (15 September 2026)
+
+- **Nudge** — "nudge the selected task left", "bump Approve right", "nudge these down": **20 px** in
+  any direction, only the element named (plus its own boundary events; a pool brings its lanes). A
+  selection nudges together.
+- **Move** — a selection moves together, **100 px per step**: "move these right", "move the selected
+  task two steps up". A named single element still moves past the next element as before.
+- **Label selected** — "label selected Yes" labels the selected **connector**; bare "label selected"
+  waits for the text. **Label connectors** / "label messages" numbers them, then "3 No".
+- **Swap** connection points on the **selected gateway** — "swap top and bottom", "swap bottom and
+  middle": the outgoing points of a decision gateway, the incoming points of a merge. Any pair of
+  **top / bottom / middle / left / right**, in either order ("centre" = middle). "Middle" is the side
+  in the flow direction (right for outgoing, left for incoming); left and right are literal sides.
+  Both points must have a connector; the two connectors trade sides and re-route.
+
 ## The green numbers
 
 - **Where they sit:** below an activity; **above** an event; for a **pool or lane**, in the header
