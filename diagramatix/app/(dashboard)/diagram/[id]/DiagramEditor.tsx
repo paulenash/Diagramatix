@@ -47,6 +47,7 @@ import { canConnect } from "@/app/lib/diagram/canConnect";
 import { parseCommand } from "@/app/lib/assist/commandGrammar";
 import { resolveRef, resolveSelectionRefs, isSelectionRef, ID_REF_PREFIX } from "@/app/lib/assist/resolveRef";
 import { isMicStopWord, isFlowEndWord } from "@/app/lib/assist/stopWords";
+import { isIncompleteCommand } from "@/app/lib/assist/incompleteCommand";
 import { collectMessageTargets, parseMessageAnswer, type MessagePick } from "@/app/lib/assist/messageTargets";
 import { validateOps, type AssistOp } from "@/app/lib/assist/ops";
 import { syntheticElement, withAdded, withDeleted, withLabel } from "@/app/lib/assist/workingSet";
@@ -469,23 +470,8 @@ function getDiagramBounds(data: DiagramData, padding = 20) {
   };
 }
 
-/** A spoken command that clearly isn't finished yet — Deepgram split it at a
- *  pause. We hold the buffer and wait for the rest instead of running a half
- *  command like "rename Task 8 to" (which would just fail). */
-function isIncompleteCommand(text: string): boolean {
-  const t = text.trim().toLowerCase().replace(/[.?!,]+$/g, "").trim();
-  if (!t) return false;
-  // Ends on a dangling connective / preposition → more is coming.
-  if (/\b(to|as|from|and|with|into|onto|labell?ed|called|named|saying|by|above|below|over|under(?:neath)?|of|for|around|the|a|an)$/.test(t)) return true;
-  // rename / relabel / change / call / set — missing its "to <target>".
-  if (/^(rename|relabel|change|set|call)\b/.test(t) && !/\b(to|as)\b\s+\S+/.test(t)) return true;
-  // connect / disconnect — missing the second operand.
-  if (/^(connect|link|join|disconnect|unlink)\b/.test(t) && !/\b(to|and|with|from)\b\s+\S+/.test(t)) return true;
-  // "add message …" without BOTH a from and a to — wait for the rest instead of
-  // running it (which would create a stray task called "Message").
-  if (/^(add|create|send|draw|put)\b.*\bmessage\b/.test(t) && !(/\bfrom\b\s+\S+/.test(t) && /\bto\b\s+\S+/.test(t))) return true;
-  return false;
-}
+// isIncompleteCommand — "did Deepgram split this at a pause?" — lives in
+// app/lib/assist/incompleteCommand.ts (pure, tested) since 2026-09-15.
 
 /** Normalise a spoken connector/message reference to match against a connector
  *  label: drop a leading "connector/message/msg/flow/arrow" noun and any
@@ -3082,29 +3068,37 @@ export function DiagramEditor({
       }
 
       if (op.op === "swapGatewayPoints") {
-        // Swap two connection points of the SELECTED gateway: the outgoing
-        // points of a decision, the incoming points of a merge. "middle" is the
-        // side in the flow direction (right for outgoing, left for incoming).
-        const gid = selectedIds.length === 1 ? selectedIds[0] : null;
-        const g = gid ? els.find((x) => x.id === gid) : undefined;
-        if (!g || g.type !== "gateway") { results.push(selectedIds.length > 1 ? "select just the one gateway" : "select a gateway first"); anyFail = true; continue; }
-        const outs = data.connectors.filter((c) => c.sourceId === g.id && c.type === "sequence");
-        const ins = data.connectors.filter((c) => c.targetId === g.id && c.type === "sequence");
-        const isMerge = (g.properties?.gatewayRole as string | undefined) === "merge" || (ins.length > 1 && outs.length <= 1);
-        const endpoint: "source" | "target" = isMerge ? "target" : "source";
-        const conns = isMerge ? ins : outs;
-        const middle: Side = isMerge ? "left" : "right";
-        // "middle" is the flow side; top/bottom/left/right are literal — a point with
-        // no connector on it is reported, never guessed.
-        const sideOf = (p: typeof op.a): Side => (p === "middle" ? middle : p);
-        const sideAt = (c: (typeof conns)[number]) => (endpoint === "source" ? c.sourceSide : c.targetSide);
-        const sa = sideOf(op.a), sb = sideOf(op.b);
-        const ca = conns.find((c) => sideAt(c) === sa);
-        const cb = conns.find((c) => sideAt(c) === sb);
-        if (!ca || !cb) { results.push(`no ${isMerge ? "incoming" : "outgoing"} connector at the ${!ca ? op.a : op.b} of ${nameOf(g)}`); anyFail = true; continue; }
-        updateConnectorEndpoint(ca.id, endpoint, g.id, sb, 0.5);
-        updateConnectorEndpoint(cb.id, endpoint, g.id, sa, 0.5);
-        results.push(`swapped the ${op.a} and ${op.b} ${isMerge ? "incoming" : "outgoing"} points of ${nameOf(g)}`);
+        // Swap two connection points on EVERY selected gateway (Paul, 2026-09-15):
+        // the outgoing points of a decision, the incoming points of a merge.
+        // "middle" is the side in the flow direction (right for outgoing, left
+        // for incoming); top/bottom/left/right are literal. A gateway with no
+        // connector at one of the points is reported by name; the others still swap.
+        const gws = selectedIds.map((id) => els.find((x) => x.id === id)).filter((g): g is DiagramElement => !!g && g.type === "gateway");
+        if (gws.length === 0) { results.push("select a gateway first"); anyFail = true; continue; }
+        const swapped: string[] = [];
+        const missed: string[] = [];
+        for (const g of gws) {
+          const outs = data.connectors.filter((c) => c.sourceId === g.id && c.type === "sequence");
+          const ins = data.connectors.filter((c) => c.targetId === g.id && c.type === "sequence");
+          const isMerge = (g.properties?.gatewayRole as string | undefined) === "merge" || (ins.length > 1 && outs.length <= 1);
+          const endpoint: "source" | "target" = isMerge ? "target" : "source";
+          const conns = isMerge ? ins : outs;
+          const middle: Side = isMerge ? "left" : "right";
+          const sideOf = (p: typeof op.a): Side => (p === "middle" ? middle : p);
+          const sideAt = (c: (typeof conns)[number]) => (endpoint === "source" ? c.sourceSide : c.targetSide);
+          const sa = sideOf(op.a), sb = sideOf(op.b);
+          const ca = conns.find((c) => sideAt(c) === sa);
+          const cb = conns.find((c) => sideAt(c) === sb);
+          if (!ca || !cb) { missed.push(`${nameOf(g)}: no ${isMerge ? "incoming" : "outgoing"} connector at the ${!ca ? op.a : op.b}`); continue; }
+          updateConnectorEndpoint(ca.id, endpoint, g.id, sb, 0.5);
+          updateConnectorEndpoint(cb.id, endpoint, g.id, sa, 0.5);
+          swapped.push(nameOf(g));
+        }
+        if (swapped.length === 0) anyFail = true;
+        results.push(
+          (swapped.length ? `swapped the ${op.a} and ${op.b} points of ${swapped.length === 1 ? swapped[0] : `${swapped.length} gateways`}` : "") +
+          (missed.length ? `${swapped.length ? " — " : ""}${missed.join("; ")}` : ""),
+        );
         continue;
       }
 

@@ -99,11 +99,19 @@ Examples: "rename the selected pool to Customer" · "delete these" · "connect t
   task two steps up". A named single element still moves past the next element as before.
 - **Label selected** — "label selected Yes" labels the selected **connector**; bare "label selected"
   waits for the text. **Label connectors** / "label messages" numbers them, then "3 No".
-- **Swap** connection points on the **selected gateway** — "swap top and bottom", "swap bottom and
+- **Swap** connection points on the **selected gateway(s)** — every selected gateway is swapped — "swap top and bottom", "swap bottom and
   middle": the outgoing points of a decision gateway, the incoming points of a merge. Any pair of
   **top / bottom / middle / left / right**, in either order ("centre" = middle). "Middle" is the side
   in the flow direction (right for outgoing, left for incoming); left and right are literal sides.
   Both points must have a connector; the two connectors trade sides and re-route.
+
+## Pausing mid-command
+
+Deepgram finalises a segment after ~0.8 s of silence, so "Swap … top and bottom" can arrive as two
+pieces. The bar holds a piece that is clearly unfinished — a lone verb ("Swap."), a dangling "to" /
+"and" / "called", a rename without its "to" — and waits up to three grace periods for the rest. A
+comma straight after the verb ("Swap, top and bottom.") is ignored. Speaking the whole command in
+one breath is still the surest way; the hold is the safety net.
 
 ## The green numbers
 

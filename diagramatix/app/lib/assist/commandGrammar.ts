@@ -31,7 +31,11 @@ function matchSymbol(text: string): { symbolType: SymbolType; eventType?: EventT
 
 /** Parse a single utterance into ops, or null if unrecognised. */
 export function parseCommand(utterance: string): AssistOp[] | null {
-  const raw = clean(utterance);
+  // Speech punctuation: "Swap, top and bottom." — a comma straight after the
+  // verb is a breath, not syntax (Paul's log, 2026-09-15). Only that comma is
+  // dropped; commas inside a name list ("called Sales, Marketing and Support")
+  // still separate the names.
+  const raw = clean(utterance).replace(/^([A-Za-z]+),\s+/, "$1 ");
   if (!raw) return null;
   const lower = raw.toLowerCase();
 

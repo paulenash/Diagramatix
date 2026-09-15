@@ -49,7 +49,9 @@ Canonical forms:
   delete <name>   ·   delete <name> and compact   ·   add a boundary event called <name> to <name>
   add a pool   ·   add a black-box pool above|below existing pools   ·   put a pool around everything (wraps loose elements)
   add <n> lanes to <pool> called <A, B and C>   ·   add a lane above|below <lane>   ·   add <n> sublanes to <lane> called <A, B and C>   ·   swap <lane> with <lane>
-  compress <pool>   ·   extend the pools to include all elements   ·   nudge <pool> up|down   ·   again
+  compress <pool>   ·   extend the pools to include all elements   ·   nudge <name> up|down|left|right (20px; "nudge these left" for the selection)   ·   move these right (the selection, 100px per step)   ·   again
+  swap top and bottom (the SELECTED gateway's connection points — any pair of top|bottom|middle|left|right; NOT a lane swap unless two lane NAMES are given)
+  label selected <text> (the selected connector)   ·   label connectors (numbers them)   ·   rename tasks|lanes|events… (numbers them)
   add a message from <name> to <name> labelled <text>   ·   add a message (numbers the candidates, then "n to m labelled <text>")   ·   add a message to the selected   ·   rename connector <text> to <text>   ·   delete connector <text>
   clear the diagram   ·   export the diagram to JSON   ·   undo that
 
@@ -78,6 +80,9 @@ Op shapes (use element NAMES for refs — they are resolved against the diagram;
   { "op":"again" }                                                  // repeat the last command (e.g. another nudge)
   { "op":"addMessage", "fromRef": <name>, "toRef": <name>, "label"?: string }  // message flow between an activity and a pool/participant
   { "op":"addMessageByNumber", "fromSelection"?: true }  // no ends given: number the candidates and let the user pick
+  { "op":"labelSelected", "label"?: string }  // the selected connector
+  { "op":"swapGatewayPoints", "a": "top"|"middle"|"bottom"|"left"|"right", "b": same }  // the selected gateway's points
+  { "op":"renameByType", "itemType": "pool"|"lane"|"message"|"task"|"subprocess"|"gateway"|"event"|"connector" }  // numbers them for a pick
   { "op":"clear" }                    // empty the whole diagram
   { "op":"export", "format":"json" }  // download the diagram as JSON
   { "op":"undo" }

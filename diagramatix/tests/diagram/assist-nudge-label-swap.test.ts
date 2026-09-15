@@ -93,10 +93,14 @@ describe("5 — swap a selected gateway's connection points", () => {
     expect(parseCommand("swap center with top")).toEqual([{ op: "swapGatewayPoints", a: "middle", b: "top" }]);
   });
 
-  it("T4415 — the editor requires ONE selected gateway, swaps outgoing points on a decision and incoming on a merge, via updateConnectorEndpoint", () => {
+  it("T4415 — the editor swaps on EVERY selected gateway (outgoing on a decision, incoming on a merge) via updateConnectorEndpoint, reporting each miss by name", () => {
     const ed = editor();
     expect(ed).toContain('if (op.op === "swapGatewayPoints") {');
-    expect(ed).toContain('if (!g || g.type !== "gateway") { results.push(selectedIds.length > 1 ? "select just the one gateway" : "select a gateway first"); anyFail = true; continue; }');
+    expect(ed, "all selected gateways, not just one").toContain('const gws = selectedIds.map((id) => els.find((x) => x.id === id)).filter((g): g is DiagramElement => !!g && g.type === "gateway");');
+    expect(ed).toContain('if (gws.length === 0) { results.push("select a gateway first"); anyFail = true; continue; }');
+    expect(ed).toContain("for (const g of gws) {");
+    expect(ed, "a miss is named and the loop continues").toMatch(/missed\.push\(`\$\{nameOf\(g\)\}: no \$\{isMerge \? "incoming" : "outgoing"\} connector at the/);
+    expect(ed, "only a total miss is a failure").toContain("if (swapped.length === 0) anyFail = true;");
     expect(ed).toContain('const endpoint: "source" | "target" = isMerge ? "target" : "source";');
     expect(ed, "middle = the side in the flow direction").toContain('const middle: Side = isMerge ? "left" : "right";');
     expect(ed).toMatch(/updateConnectorEndpoint\(ca\.id, endpoint, g\.id, sb, 0\.5\);\s*updateConnectorEndpoint\(cb\.id, endpoint, g\.id, sa, 0\.5\);/);

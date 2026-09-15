@@ -50,7 +50,7 @@ export const COMMAND_CATALOG: CatalogFamily[] = [
     { does: "Message by number — numbers the tasks, collapsed subprocesses and black-box pools, then say “3 to 7 labelled Order Placed”", say: ["add a message", "send a message"] },
     { does: "Message from/to the selected element — numbers its valid counterparts, then say “to 2 labelled Order Placed” or “from 2 labelled …”", say: ["add a message to the selected", "add a message from this"] },
   ] },
-  { family: "Gateways (select the gateway first)", items: [
+  { family: "Gateways (select one or more gateways first)", items: [
     { does: "Swap two connection points, any pair of top / bottom / middle / left / right — the outgoing points of a decision, the incoming points of a merge; “middle” is the side in the flow direction", say: ["swap top and bottom", "swap bottom and middle", "swap top with centre", "swap middle and top", "swap top and right"] },
   ] },
   { family: "Diagram", items: [
