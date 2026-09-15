@@ -211,9 +211,15 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   if (m) return [{ op: "addMessage", fromRef: clean(m[1]), toRef: clean(m[2]), ...(m[3] ? { label: clean(m[3]) } : {}) }];
   m = raw.match(new RegExp(`^(?:add|create|draw|put|send)\\s+(?:a\\s+)?message(?:\\s+flow)?\\s+to\\s+(.+?)\\s+from\\s+(.+?)${MSGLABEL}$`, "i"));
   if (m) return [{ op: "addMessage", fromRef: clean(m[2]), toRef: clean(m[1]), ...(m[3] ? { label: clean(m[3]) } : {}) }];
-  // A "message" command that DIDN'T match the from/to forms must NOT fall through
-  // to the generic add (which would make a task called "Message"). Bail to null
-  // so it goes to the AI interpreter instead of the add rule below.
+  // Message by number (Paul, 2026-09-15). A bare "add a message" numbers every
+  // task, collapsed subprocess and black-box pool and waits for "n to m labelled
+  // X"; "add a message to the selected" numbers the selection's valid
+  // counterparts and waits for "to/from n labelled X".
+  if (/^(?:add|create|draw|put|send)\s+(?:a\s+|new\s+)?(?:message|msg)(?:\s+flow)?\s*$/i.test(raw)) return [{ op: "addMessageByNumber" }];
+  if (/^(?:add|create|draw|put|send)\s+(?:a\s+|new\s+)?(?:message|msg)(?:\s+flow)?\s+(?:to|from|for|with|on)\s+(?:the\s+)?(?:selected(?:\s+\w+)?|selection|this|that|these|it)\s*$/i.test(raw)) return [{ op: "addMessageByNumber", fromSelection: true }];
+  // Any OTHER "message" phrasing must NOT fall through to the generic add
+  // (which would make a task called "Message"). Bail to null so it goes to
+  // the AI interpreter instead of the add rule below.
   if (/^(?:add|create|draw|put|send)\s+(?:a\s+)?(?:message|msg)(?:\s+flow)?\b/i.test(raw)) return null;
 
   // ── Boundary event (before the generic add) ──

@@ -44,12 +44,15 @@ export const COMMAND_CATALOG: CatalogFamily[] = [
   { family: "Messages", items: [
     { does: "Message flow between an activity and a pool", say: ["add message from Task 1 to IT System labelled Email Details", "send a message from Approve to Customer", "add a message to IT System from Task 1 saying Get Approval"] },
     { does: "Rename / delete a message by its label", say: ["rename connector Email Details to Send Invoice", "delete connector Email Details", "remove message Email Details"] },
+    { does: "Message by number — numbers the tasks, collapsed subprocesses and black-box pools, then say “3 to 7 labelled Order Placed”", say: ["add a message", "send a message"] },
+    { does: "Message from/to the selected element — numbers its valid counterparts, then say “to 2 labelled Order Placed” or “from 2 labelled …”", say: ["add a message to the selected", "add a message from this"] },
   ] },
   { family: "Diagram", items: [
     { does: "Undo, repeat, clear, export", say: ["undo that", "again", "clear the diagram", "export the diagram to JSON"] },
   ] },
   { family: "Voice", items: [
-    { does: "Stop listening", say: ["stop", "that's enough"], voice: true },
+    { does: "Stop listening — always; a numbered pick or a parked question ends with it", say: ["stop", "stop listening", "that's enough"], voice: true },
+    { does: "Finish a numbered pick (rename by number, message by number) — the mic stays on", say: ["done", "cancel"], voice: true },
     { does: "Answer a confirmation (clear, delete a pool or lane, delete several)", say: ["yes", "no"], voice: true },
   ] },
 ];

@@ -45,7 +45,9 @@ import { sizeOf, placeInline, placeGatewayBranch, placeBoundaryEvent, placeAfter
 import { matchIntent, matchAssistRules, type IntentRow } from "@/app/lib/diagram/intentMatch";
 import { canConnect } from "@/app/lib/diagram/canConnect";
 import { parseCommand } from "@/app/lib/assist/commandGrammar";
-import { resolveRef, resolveSelectionRefs, isSelectionRef } from "@/app/lib/assist/resolveRef";
+import { resolveRef, resolveSelectionRefs, isSelectionRef, ID_REF_PREFIX } from "@/app/lib/assist/resolveRef";
+import { isMicStopWord, isFlowEndWord } from "@/app/lib/assist/stopWords";
+import { collectMessageTargets, parseMessageAnswer, type MessagePick } from "@/app/lib/assist/messageTargets";
 import { validateOps, type AssistOp } from "@/app/lib/assist/ops";
 import { syntheticElement, withAdded, withDeleted, withLabel } from "@/app/lib/assist/workingSet";
 import { needsConfirmation, parseConfirmation } from "@/app/lib/assist/confirm";
@@ -2642,9 +2644,15 @@ export function DiagramEditor({
   const [abraLog, setAbraLog] = useState<CommandLogEntry[]>([]);
   const [abraListening, setAbraListening] = useState(false);
   const [abraEngine, setAbraEngine] = useState<"deepgram" | "browser" | null>(null);
+  // Mic pressed but the recogniser not yet live (token + permission + socket):
+  // the bar says "connecting…" so nobody talks into the gap.
+  const [abraConnecting, setAbraConnecting] = useState(false);
   const [abraInterim, setAbraInterim] = useState("");
   const [abraBusy, setAbraBusy] = useState(false);
   const abraLastId = useRef<string | null>(null);
+  // stopAbraListening is defined after the command runner (it needs the buffer
+  // flush); the runner reaches it through this ref.
+  const stopAbraListeningRef = useRef<() => void>(() => {});
   // Remembers the last real command so "again" can repeat it (e.g. nudge again).
   const lastAbraOpsRef = useRef<AssistOp[]>([]);
   // A destructive command waiting for "yes" (confirm.ts): the ops, what they
@@ -2673,6 +2681,11 @@ export function DiagramEditor({
   const [renameFlow, setRenameFlowState] = useState<RenameFlow | null>(null);
   const renameFlowRef = useRef<RenameFlow | null>(null);
   const setRenameFlow = useCallback((f: RenameFlow | null) => { renameFlowRef.current = f; setRenameFlowState(f); }, []);
+  // ── Guided "message by number" flow (messageTargets.ts): badges on the
+  //    candidates; the user says "n to m labelled X" or "to/from n labelled X".
+  const [messageFlow, setMessageFlowState] = useState<MessagePick | null>(null);
+  const messageFlowRef = useRef<MessagePick | null>(null);
+  const setMessageFlow = useCallback((f: MessagePick | null) => { messageFlowRef.current = f; setMessageFlowState(f); }, []);
   const abraStopRequested = useRef(false);
   // Stable ref to the JSON export (a plain function redefined each render) so
   // the memoised apply layer can call it without churning its deps.
@@ -3014,8 +3027,24 @@ export function DiagramEditor({
         const itemType = op.itemType as RenameType;
         const targets = collectRenameTargets(els, data.connectors, itemType);
         if (targets.length === 0) { results.push(`there are no ${itemType}s to rename`); anyFail = true; continue; }
+        setMessageFlow(null);
         setRenameFlow({ phase: "pick", itemType, targets });
-        results.push(`pick a ${itemType} by number, then say the new name (or “cancel”)`);
+        results.push(`pick a ${itemType} by number, then say the new name — say “done” to finish`);
+        continue;
+      }
+
+      if (op.op === "addMessageByNumber") {
+        // Number the candidates and wait for the pick (messageTargets.ts). The
+        // answer arrives as the next utterance, handled by handleMessageUtterance.
+        if (op.fromSelection && selectedIds.length === 0) { results.push("select a task, a collapsed subprocess or a black-box pool first"); anyFail = true; continue; }
+        if (op.fromSelection && selectedIds.length > 1) { results.push("select just one element for that"); anyFail = true; continue; }
+        const pick = collectMessageTargets(els, op.fromSelection ? selectedIds[0] : null);
+        if ("error" in pick) { results.push(pick.error); anyFail = true; continue; }
+        setRenameFlow(null);
+        setMessageFlow(pick);
+        results.push(pick.mode === "pair"
+          ? "numbers on every task, collapsed subprocess and black-box pool — say “<n> to <m> labelled <text>” (or “done”)"
+          : `numbers on the ${pick.anchorIsPool ? "tasks and collapsed subprocesses" : "black-box pools"} — say “to <n> labelled <text>” or “from <n> labelled <text>” (or “done”)`);
         continue;
       }
 
@@ -3082,7 +3111,7 @@ export function DiagramEditor({
       }
     }
     return { ok: !anyFail, summary: results.join("; ") || "nothing to do" };
-  }, [data.elements, data.connectors, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, updateConnectorLabel, deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool, addPool, addLaneAt, compressPool, extendPools, swapLane, moveLane, moveElements, elementsMoveEnd, removeSpace, setRenameFlow]);
+  }, [data.elements, data.connectors, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, updateConnectorLabel, deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool, addPool, addLaneAt, compressPool, extendPools, swapLane, moveLane, moveElements, elementsMoveEnd, removeSpace, setRenameFlow, setMessageFlow]);
 
   // Cancel the guided rename flow and clear any badge/edit state.
   const cancelRenameFlow = useCallback((reason?: string) => {
@@ -3102,7 +3131,7 @@ export function DiagramEditor({
     const targets = collectRenameTargets(data.elements, data.connectors, itemType);
     if (targets.length > 0) setRenameFlow({ phase: "pick", itemType, targets });
     else setRenameFlow(null);
-    setAbraLog((prev) => [...prev, { id: nanoid(), heard: clean, summary: `renamed to “${clean}” — pick another or say “stop”`, ok: true }]);
+    setAbraLog((prev) => [...prev, { id: nanoid(), heard: clean, summary: `renamed to “${clean}” — pick another or say “done”`, ok: true }]);
   }, [updateLabel, updateConnectorLabel, cancelLabelEdit, setRenameFlow, cancelRenameFlow, data.elements, data.connectors]);
 
   // Handle one utterance while the guided rename flow is active.
@@ -3111,8 +3140,9 @@ export function DiagramEditor({
     if (!flow) return;
     const t = text.trim();
     const low = t.toLowerCase().replace(/[.,!?;:]+$/g, "").trim();
-    // "stop"/"done"/Esc-words end the rename loop (mic stays on).
-    if (/^(stop|done|finished|that'?s all|all done|enough|escape|cancel|never ?mind|stop rename|quit|exit|forget it|abort)\b/.test(low)) { cancelRenameFlow("rename finished"); return; }
+    // "done"/"cancel"/Esc-words end the rename loop (mic stays on); a bare
+    // "stop" never reaches here — it stops the mic (stopWords.ts).
+    if (isFlowEndWord(low)) { cancelRenameFlow("rename finished"); return; }
     if (flow.phase === "pick") {
       // Leading number (digit or number-word) selects a badge; trailing text is the name.
       const digits = low.replace(/\b(zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty)\b/g, (m) => String(["zero","one","two","three","four","five","six","seven","eight","nine","ten","eleven","twelve","thirteen","fourteen","fifteen","sixteen","seventeen","eighteen","nineteen","twenty"].indexOf(m)));
@@ -3142,14 +3172,42 @@ export function DiagramEditor({
     try { return applyAssistOps(ops); } finally { endHistoryGroup(); }
   }, [applyAssistOps, beginHistoryGroup, endHistoryGroup]);
 
+  // The answer to a numbered message pick: "3 to 7 labelled Order Placed" /
+  // "to 2 labelled X" / "from 2 labelled X" — or "done" to walk away.
+  const handleMessageUtterance = useCallback((text: string) => {
+    const flow = messageFlowRef.current;
+    if (!flow) return;
+    const t = text.trim();
+    const log = (summary: string, ok: boolean) => setAbraLog((prev) => [...prev, { id: nanoid(), heard: t, summary, ok }]);
+    if (isFlowEndWord(t)) { setMessageFlow(null); log("message cancelled", true); return; }
+    const a = parseMessageAnswer(t, flow.mode);
+    if (!a) {
+      log(flow.mode === "pair" ? "say “<n> to <m> labelled <text>” — or “done”" : "say “to <n> labelled <text>” or “from <n> labelled <text>” — or “done”", false);
+      return;
+    }
+    const byN = (n: number) => flow.targets.find((x) => x.n === n)?.id;
+    let fromId: string | undefined, toId: string | undefined;
+    if (a.kind === "pair") { fromId = byN(a.from); toId = byN(a.to); }
+    else if (flow.mode === "one") { const other = byN(a.n); fromId = a.dir === "to" ? flow.anchorId : other; toId = a.dir === "to" ? other : flow.anchorId; }
+    if (!fromId || !toId) { log("there’s no badge with that number", false); return; }
+    setMessageFlow(null);
+    const r = applyGrouped([{ op: "addMessage", fromRef: ID_REF_PREFIX + fromId, toRef: ID_REF_PREFIX + toId, ...(a.label ? { label: a.label } : {}) }]);
+    log(r.summary, r.ok);
+  }, [applyGrouped, setMessageFlow]);
+  const handleMessageUtteranceRef = useRef(handleMessageUtterance);
+  handleMessageUtteranceRef.current = handleMessageUtterance;
+
   // Interpret a raw command (deterministic first; AI fallback added in Stage 4).
   const runAbraCommand = useCallback(async (text: string) => {
     const heard = text.trim();
     if (!heard) return;
-    // While the guided rename flow is active, every utterance feeds it (a number,
-    // the new name, or "cancel") — never the general command parser.
-    if (renameFlowRef.current) { handleRenameUtteranceRef.current(heard); return; }
     const log = (entry: Omit<CommandLogEntry, "id">) => setAbraLog((prev) => [...prev, { id: nanoid(), ...entry }]);
+    // A typed "stop" means the same as a spoken one: the mic, and anything parked, ends.
+    if (isMicStopWord(heard)) { stopAbraListeningRef.current(); log({ heard, summary: "stopped listening", ok: true }); return; }
+    // While a guided pick is active, every utterance feeds it (a number, a
+    // name, or "done") — never the general command parser.
+    if (renameFlowRef.current) { handleRenameUtteranceRef.current(heard); return; }
+    if (messageFlowRef.current) { handleMessageUtteranceRef.current(heard); return; }
 
     // A destructive command parked by the previous utterance — this one answers it.
     if (pendingConfirmRef.current) {
@@ -3247,8 +3305,14 @@ export function DiagramEditor({
     abraDictRef.current?.stop();
     abraDictRef.current = null;
     setAbraListening(false);
+    setAbraConnecting(false);
+    // "stop" ends everything: a numbered pick or a parked confirmation dies with the mic.
+    setRenameFlow(null);
+    setMessageFlow(null);
+    pendingConfirmRef.current = null;
     flushAbraBuffer(true); // apply anything still buffered (force — no more is coming)
-  }, [flushAbraBuffer]);
+  }, [flushAbraBuffer, setRenameFlow, setMessageFlow]);
+  stopAbraListeningRef.current = stopAbraListening;
 
   // (Re)arm the 2-minute idle auto-close; called on every voice fragment.
   const bumpAbraIdle = useCallback(() => {
@@ -3265,17 +3329,19 @@ export function DiagramEditor({
     abraBuffer.current = "";
     abraMicOpenedAt.current = Date.now(); // the open session has no usage row yet — Cost adds its seconds live
     setAbraListening(true);
+    setAbraConnecting(true);
     const handle = await startDictation({
       onEngine: (e) => setAbraEngine(e),
+      onReady: () => setAbraConnecting(false),
       // Show the command building: buffered fragments + the in-progress words.
       onInterim: (t) => { bumpAbraIdle(); setAbraInterim((abraBuffer.current ? abraBuffer.current + " " : "") + t); },
       onText: (t) => {
         bumpAbraIdle();
         const txt = t.trim();
         if (!txt) return;
-        // Spoken "stop" ends the session — UNLESS we're mid-rename, where "stop"
-        // just ends the rename loop (handled by the flow, mic stays on).
-        if (!renameFlowRef.current && /^(stop|stop listening|stop it|that'?s enough|pause|abracadabra off|thank you gort)\b/i.test(txt)) {
+        // Spoken "stop" ALWAYS ends the session (stopWords.ts) — a numbered pick
+        // ends with "done", so the two can no longer be confused.
+        if (isMicStopWord(txt)) {
           abraBuffer.current = "";
           stopAbraListening();
           return;
@@ -3302,13 +3368,17 @@ export function DiagramEditor({
     bumpAbraIdle(); // start the idle clock even if no voice ever arrives
   }, [abraListening, stopAbraListening, flushAbraBuffer, bumpAbraIdle]);
 
-  // Escape cancels the guided rename flow at any phase.
+  // Escape cancels a guided pick (rename or message) at any phase.
   useEffect(() => {
-    if (!renameFlow) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") cancelRenameFlow("rename cancelled"); };
+    if (!renameFlow && !messageFlow) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (renameFlow) cancelRenameFlow("rename cancelled");
+      if (messageFlow) { setMessageFlow(null); setAbraLog((prev) => [...prev, { id: nanoid(), heard: "", summary: "message cancelled", ok: true }]); }
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [renameFlow, cancelRenameFlow]);
+  }, [renameFlow, messageFlow, cancelRenameFlow, setMessageFlow]);
 
   // Stop the mic when the mode is turned off or the editor unmounts.
   useEffect(() => {
@@ -5861,6 +5931,7 @@ export function DiagramEditor({
             disabledSymbols={disabledSymbols}
             colorConfig={effectiveColorConfig}
             extraSymbols={reviewMode ? ["review-comment"] : []}
+            forceCollapsed={abracadabraOn}
           />
         )}
 
@@ -5888,7 +5959,7 @@ export function DiagramEditor({
         <Canvas
           data={displayData}
           diagramType={diagramType}
-          renameBadges={renameFlow?.phase === "pick" ? renameFlow.targets : undefined}
+          renameBadges={renameFlow?.phase === "pick" ? renameFlow.targets : messageFlow?.targets}
           onAddElement={addElementGated}
           onMoveElement={(id, x, y, uc) => { if (feedbackMode && !isFeedbackNote(id)) return; if (!isCoLocked(id)) moveElement(id, x, y, uc); }}
           onResizeElement={(id, x, y, w, h) => { if (feedbackMode && !isFeedbackNote(id)) return; if (!isCoLocked(id)) resizeElement(id, x, y, w, h); }}
@@ -5988,6 +6059,7 @@ export function DiagramEditor({
         {abracadabraOn && !readOnly && isActingAdmin && (
           <AbracadabraBar
             listening={abraListening}
+            connecting={abraConnecting}
             engine={abraEngine}
             interim={abraInterim}
             busy={abraBusy}
@@ -6159,6 +6231,7 @@ export function DiagramEditor({
             onConvertProcessCollapsed={convertProcessCollapsed}
             onConvertEventType={convertEventType}
             forceCollapseTitle={showAiPanel || showPlanPanel || showHistoryPanel}
+            forceCollapsePanel={abracadabraOn}
           />
         )}
 

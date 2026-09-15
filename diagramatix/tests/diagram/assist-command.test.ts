@@ -289,9 +289,11 @@ describe("guided rename (rename by type → numbered badges)", () => {
     expect(parseCommand("rename subprocess")).toEqual([{ op: "renameByType", itemType: "subprocess" }]);
   });
   it("'add message' without from AND to does NOT fall through to a task", () => {
+    // A message to a NAMED end with no other end still goes to the AI…
     expect(parseCommand("add message to IT System")).toBeNull();
-    expect(parseCommand("add a message")).toBeNull();
-    expect(parseCommand("send a message flow")).toBeNull();
+    // …while the bare forms now open the numbered pick (Paul, 2026-09-15 — T4406).
+    expect(parseCommand("add a message")).toEqual([{ op: "addMessageByNumber" }]);
+    expect(parseCommand("send a message flow")).toEqual([{ op: "addMessageByNumber" }]);
     // a complete message still parses
     expect(parseCommand("add message from Task 1 to IT System")).toEqual([{ op: "addMessage", fromRef: "Task 1", toRef: "IT System" }]);
   });

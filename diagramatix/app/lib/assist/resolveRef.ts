@@ -146,7 +146,14 @@ export function resolveSelectionRefs(spoken: string, elements: DiagramElement[],
   return sel.filter((id) => { const e = elements.find((x) => x.id === id); return !!e && ofKind(e); });
 }
 
+/** An exact-id reference the editor's guided flows hand to the apply layer ("#id:abc"). Never spoken. */
+export const ID_REF_PREFIX = "#id:";
+
 export function resolveRef(spoken: string, elements: DiagramElement[], lastAddedId?: string | null, selectedIds?: readonly string[]): RefResolution {
+  if (spoken.startsWith(ID_REF_PREFIX)) {
+    const id = spoken.slice(ID_REF_PREFIX.length);
+    return elements.some((e) => e.id === id) ? { id } : null;
+  }
   const s = norm(spoken);
   if (!s) return null;
 

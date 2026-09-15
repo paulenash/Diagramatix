@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import type { DiagramType, SymbolType } from "@/app/lib/diagram/types";
 import {
   ALL_SYMBOLS,
@@ -26,6 +26,9 @@ interface Props {
   /** Appended to the diagram's normal palette — used to surface the
    *  review-comment symbol only while in Review Mode. */
   extraSymbols?: SymbolType[];
+  /** Collapse the palette while true (Abracadabra open) and restore the user's
+   *  own state when it goes false again. */
+  forceCollapsed?: boolean;
 }
 
 export function PaletteSymbolPreview({ type, colorConfig }: { type: SymbolType; colorConfig?: SymbolColorConfig }) {
@@ -860,8 +863,16 @@ function ArchimatePalette({
   );
 }
 
-export function Palette({ diagramType, onDragStart, disabledSymbols = [], colorConfig, extraSymbols = [] }: Props) {
+export function Palette({ diagramType, onDragStart, disabledSymbols = [], colorConfig, extraSymbols = [], forceCollapsed = false }: Props) {
   const [collapsed, setCollapsed] = useState(false);
+  // Abracadabra needs the canvas: fold the palette away while it is open and
+  // put back whatever the user had when it closes (Paul, 2026-09-15).
+  const beforeForceRef = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (forceCollapsed) { beforeForceRef.current = collapsed; setCollapsed(true); }
+    else if (beforeForceRef.current !== null) { setCollapsed(beforeForceRef.current); beforeForceRef.current = null; }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [forceCollapsed]);
   /**
    * The descriptive objects, in a section of their own and CLOSED by default.
    *

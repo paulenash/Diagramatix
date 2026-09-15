@@ -28,6 +28,9 @@ export type AssistOp =
   | { op: "moveLane"; ref: Ref; direction: "up" | "down"; distance?: number }
   | { op: "again" }
   | { op: "addMessage"; fromRef: Ref; toRef: Ref; label?: string }
+  /** "add a message" with no ends → number the candidates and wait for "n to m labelled X";
+   *  with `fromSelection` → number the selection's valid counterparts, wait for "to/from n labelled X". */
+  | { op: "addMessageByNumber"; fromSelection?: boolean }
   | { op: "clear" }
   | { op: "export"; format?: "json" }
   | { op: "undo" };
@@ -163,6 +166,8 @@ export function validateOp(raw: unknown): AssistOp | null {
     }
     case "again":
       return { op: "again" };
+    case "addMessageByNumber":
+      return { op: "addMessageByNumber", ...(o.fromSelection === true ? { fromSelection: true } : {}) };
     case "addMessage": {
       if (!isRef(o.fromRef) || !isRef(o.toRef)) return null;
       const op: AssistOp = { op: "addMessage", fromRef: (o.fromRef as string).trim(), toRef: (o.toRef as string).trim() };

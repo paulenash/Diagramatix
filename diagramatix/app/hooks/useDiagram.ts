@@ -9039,14 +9039,17 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         return { ...state, elements: ensureContainersEncloseChildren(adopted), connectors: state.connectors };
       }
 
-      // No pool yet → create one + a single lane sized to contain the loose set.
+      // No pool yet → create ONE pool sized to contain the loose set, and adopt
+      // the elements into it directly. No lane: "add a pool" makes no lane
+      // either, and a lane is a decision the modeller makes by naming a role
+      // (Paul, 2026-09-15 — "adding a pool around everything should not add a
+      // lane as well").
       const minX = Math.min(...targets.map((e) => e.x));
       const minY = Math.min(...targets.map((e) => e.y));
       const maxX = Math.max(...targets.map((e) => e.x + e.width));
       const maxY = Math.max(...targets.map((e) => e.y + e.height));
       const PAD = 40, HEADER_W = 36;
       const poolId = nanoid();
-      const laneId = nanoid();
       const poolLabel = uniqueContainerLabel(state.elements, action.payload.label, "Pool");
       const pool: DiagramElement = {
         id: poolId, type: "pool",
@@ -9054,14 +9057,8 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         width: (maxX - minX) + 2 * PAD + HEADER_W, height: (maxY - minY) + 2 * PAD,
         label: poolLabel, properties: { poolType: "white-box" },
       };
-      const lane: DiagramElement = {
-        id: laneId, type: "lane",
-        x: pool.x + HEADER_W, y: pool.y,
-        width: pool.width - HEADER_W, height: pool.height,
-        label: uniqueContainerLabel([...state.elements, pool], undefined, "Lane"), properties: {}, parentId: poolId,
-      };
-      const elements = state.elements.map((e) => (targetIds.has(e.id) && !e.parentId ? { ...e, parentId: laneId } : e));
-      return { ...state, elements: ensureContainersEncloseChildren(updatePoolTypes([pool, lane, ...elements])), connectors: state.connectors };
+      const elements = state.elements.map((e) => (targetIds.has(e.id) && !e.parentId ? { ...e, parentId: poolId } : e));
+      return { ...state, elements: ensureContainersEncloseChildren(updatePoolTypes([pool, ...elements])), connectors: state.connectors };
     }
 
     // Create a NEW empty pool sized to just fit its name (NO auto lane). It

@@ -81,6 +81,33 @@ Examples: "rename the selected pool to Customer" · "delete these" · "connect t
 "move the selected task right" · "add a boundary event called Timeout to this". A command that takes
 **one** target with several selected asks you to select just one; `delete` accepts many.
 
+## Messages by number (15 September 2026)
+
+- **"add a message"** (no ends) — green numbers appear on every task, collapsed subprocess and
+  black-box pool. Say **"3 to 7 labelled Order Placed"** (or "from 3 to 7"). "done" walks away.
+- **"add a message to the selected"** / "from this" — select a task or collapsed subprocess and the
+  black-box pools are numbered; select a black-box pool and the tasks / collapsed subprocesses are.
+  Say **"to 2 labelled Order Placed"** or **"from 2 labelled …"**.
+- "add a message to IT System" (one named end) still goes to the AI, as before.
+
+## "stop" versus "done"
+
+- **stop** (also "stop listening", "that's enough", "abracadabra off") — **always stops the
+  microphone**, and drops any numbered pick or parked confirmation with it. Typed or spoken.
+- **done** (also "cancel", "finished", "stop rename") — ends a numbered pick (rename by number,
+  message by number) and **keeps listening**. Escape does the same.
+
+## While Abracadabra is open
+
+- The bar can be **dragged by its header**; the Symbols palette and the Properties panel fold away
+  when Abracadabra opens and come back as they were when it closes.
+- The mic header says **connecting…** until the recogniser is live, then **listening…** — speech
+  during the handshake is captured and sent once the connection opens, so the first word is no
+  longer lost.
+- **"put a pool around everything"** creates one pool and adopts the elements into it — no lane.
+- **"nudge X up"** moves 20 px (any element); **"move X up"** moves one element-span. The log line
+  says which was heard.
+
 ## The bar's buttons
 
 - **Commands** — a movable, scrollable reminder card of everything on this page, grouped by family

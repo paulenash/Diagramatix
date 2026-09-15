@@ -63,8 +63,12 @@ export function AbracadabraBar({
   onClear,
   onClose,
   onCost,
+  connecting = false,
 }: {
   listening: boolean;
+  /** Mic pressed but the recogniser not yet live — shown as "connecting…" so
+   *  nobody starts talking into a gap. */
+  connecting?: boolean;
   engine: "deepgram" | "browser" | null;
   interim: string;
   busy: boolean;
@@ -78,6 +82,25 @@ export function AbracadabraBar({
 }) {
   const [text, setText] = useState("");
   const [showCommands, setShowCommands] = useState(false);
+  // The bar itself can be dragged by its header (Paul, 2026-09-15); until it is,
+  // it sits bottom-centre as before.
+  const [barPos, setBarPos] = useState<{ x: number; y: number } | null>(null);
+  const barDrag = useRef<{ dx: number; dy: number } | null>(null);
+  const barRef = useRef<HTMLDivElement | null>(null);
+  const onBarDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const r = barRef.current?.getBoundingClientRect();
+    if (!r) return;
+    barDrag.current = { dx: e.clientX - r.left, dy: e.clientY - r.top };
+    (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
+  };
+  const onBarMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!barDrag.current) return;
+    setBarPos({
+      x: Math.max(0, Math.min(window.innerWidth - 120, e.clientX - barDrag.current.dx)),
+      y: Math.max(0, Math.min(window.innerHeight - 40, e.clientY - barDrag.current.dy)),
+    });
+  };
+  const onBarUp = () => { barDrag.current = null; };
   const [cost, setCost] = useState<{ state: "idle" | "loading" | "error"; report: CostReport | null }>({ state: "idle", report: null });
   const logEnd = useRef<HTMLDivElement | null>(null);
   useEffect(() => { logEnd.current?.scrollIntoView({ block: "end" }); }, [log.length]);
@@ -102,7 +125,7 @@ export function AbracadabraBar({
     <>
       {showCommands && (
         <FloatingPanel title="What you can say" onClose={() => setShowCommands(false)}>
-          <p className="text-[11px] text-gray-500 mb-2">Say it or type it. Green <span className="px-1 rounded bg-emerald-100 text-emerald-700 text-[9px] uppercase">rule</span> commands are instant and free; anything else goes to the AI.</p>
+          <p className="text-[11px] text-gray-500 mb-2">Say it or type it. <strong>Everything on this card is instant and free</strong> — the log tags it <span className="px-1 rounded bg-emerald-100 text-emerald-700 text-[9px] uppercase">rule</span>. A phrase that is not here goes to the AI (<span className="px-1 rounded bg-fuchsia-100 text-fuchsia-700 text-[9px] uppercase">✨ AI</span>), which rewrites it into one of these.</p>
           {COMMAND_CATALOG.map((fam) => (
             <div key={fam.family} className="mb-3">
               <div className="text-[10px] font-semibold uppercase tracking-wide text-purple-700 mb-1">{fam.family}</div>
@@ -117,15 +140,21 @@ export function AbracadabraBar({
         </FloatingPanel>
       )}
 
-      <div className="fixed left-1/2 -translate-x-1/2 bottom-4 z-40 w-[440px] max-w-[92vw] bg-white rounded-xl shadow-2xl border border-purple-200"
+      <div ref={barRef}
+        className={`fixed z-40 w-[440px] max-w-[92vw] bg-white rounded-xl shadow-2xl border border-purple-200 ${barPos ? "" : "left-1/2 -translate-x-1/2 bottom-4"}`}
+        style={barPos ? { left: barPos.x, top: barPos.y } : undefined}
         onMouseDown={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100">
+        <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 cursor-move select-none touch-none"
+          onPointerDown={onBarDown} onPointerMove={onBarMove} onPointerUp={onBarUp} onPointerCancel={onBarUp}
+          title="Drag to move">
           <div className="flex items-center gap-2 text-sm font-semibold text-purple-800">
             <span>🪄 Abracadabra</span>
-            {listening && <span className="text-[10px] font-normal text-red-500 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />listening{engine === "browser" ? " (browser)" : ""}…</span>}
+            {listening && (connecting
+              ? <span className="text-[10px] font-normal text-amber-600 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />connecting…</span>
+              : <span className="text-[10px] font-normal text-red-500 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />listening{engine === "browser" ? " (browser)" : ""}…</span>)}
             {busy && <span className="text-[10px] font-normal text-gray-400">thinking…</span>}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2" onPointerDown={(e) => e.stopPropagation()}>
             <button onClick={() => setShowCommands((v) => !v)}
               className={`text-[10px] px-1.5 py-0.5 rounded border ${showCommands ? "bg-purple-600 text-white border-purple-600" : "text-purple-700 border-purple-300 hover:bg-purple-50"}`}
               title="What you can say — a movable reminder card">Commands</button>

@@ -17,7 +17,11 @@ export interface DictationCallbacks {
   onEnd?: () => void;
   /** Which engine actually started — for an optional UI hint. */
   onEngine?: (engine: "deepgram" | "browser") => void;
+  /** The recogniser is live — audio from now on is heard. Before this the UI
+   *  should say "connecting…", not "listening…". */
+  onReady?: () => void;
 }
+import { createPcmQueue, PCM_QUEUE_MAX_CHUNKS } from "./pcmQueue";
 
 export interface DictationHandle {
   stop(): void;
@@ -88,6 +92,15 @@ export async function startDictation(cb: DictationCallbacks): Promise<DictationH
     return null;
   }
 
+  // Open the microphone NOW, in parallel with the token fetch, so the capture
+  // is running before the handshake — speech during the handshake is queued
+  // and sent once the socket opens (pcmQueue.ts). The first word used to go
+  // into that gap.
+  const micPromise: Promise<MediaStream | null> =
+    typeof navigator !== "undefined" && navigator.mediaDevices?.getUserMedia
+      ? navigator.mediaDevices.getUserMedia({ audio: true }).catch(() => null)
+      : Promise.resolve(null);
+
   let token: string | null = null;
   let scheme = "token";   // "bearer" for grant tokens, "token" for API keys
   try {
@@ -111,21 +124,28 @@ export async function startDictation(cb: DictationCallbacks): Promise<DictationH
   const metered: DictationCallbacks = { ...cb, onEnd: () => { report(); cb.onEnd?.(); } };
 
   cb.onEngine?.(engine);
-  const handle = token ? await startDeepgram(token, scheme, metered) : startBrowserSpeech(metered);
+  let handle: DictationHandle | null;
+  if (token) {
+    handle = await startDeepgram(token, scheme, metered, micPromise);
+  } else {
+    // The browser engine opens its own microphone; release the early one.
+    (await micPromise)?.getTracks().forEach((t) => t.stop());
+    handle = startBrowserSpeech(metered);
+    if (handle) cb.onReady?.();
+  }
   if (!handle) { report(); return null; }
   return { stop: () => { report(); handle.stop(); } };
 }
 
 // ── Deepgram streaming ──────────────────────────────────────────────────────
-async function startDeepgram(token: string, scheme: string, cb: DictationCallbacks): Promise<DictationHandle | null> {
-  let stream: MediaStream;
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  } catch {
+async function startDeepgram(token: string, scheme: string, cb: DictationCallbacks, micPromise: Promise<MediaStream | null>): Promise<DictationHandle | null> {
+  const early = await micPromise;
+  if (!early) {
     cb.onError?.("Microphone unavailable or blocked. Allow mic access and try again.");
     cb.onEnd?.();
     return null;
   }
+  const stream: MediaStream = early;
 
   const AC: typeof AudioContext = (window as any).AudioContext || (window as any).webkitAudioContext;
   const ctx = new AC();
@@ -176,20 +196,25 @@ async function startDeepgram(token: string, scheme: string, cb: DictationCallbac
     cb.onEnd?.();
   }
 
+  // Capture from the first moment; queue until the socket is open, then drain
+  // in order so nothing said during the handshake is lost.
+  const queue = createPcmQueue(PCM_QUEUE_MAX_CHUNKS);
+  source.connect(processor);
+  processor.connect(mute);
+  mute.connect(ctx.destination);
   ws.onopen = () => {
-    source.connect(processor);
-    processor.connect(mute);
-    mute.connect(ctx.destination);
+    queue.drain((chunk) => ws.send(chunk));
+    cb.onReady?.();
   };
   processor.onaudioprocess = (e) => {
-    if (ws.readyState !== WebSocket.OPEN) return;
     const input = e.inputBuffer.getChannelData(0);
     const pcm = new Int16Array(input.length);
     for (let i = 0; i < input.length; i++) {
       const s = Math.max(-1, Math.min(1, input[i]));
       pcm[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
     }
-    ws.send(pcm.buffer);
+    if (ws.readyState === WebSocket.OPEN) ws.send(pcm.buffer);
+    else if (ws.readyState === WebSocket.CONNECTING) queue.push(pcm.buffer);
   };
   ws.onmessage = (ev) => {
     try {

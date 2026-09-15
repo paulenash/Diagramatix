@@ -206,6 +206,9 @@ interface Props {
   /** Collapse or expand EVERY review comment at once (panel button). */
   onSetAllReviewCollapsed?: (collapsed: boolean) => void;
   forceCollapseTitle?: boolean;
+  /** Collapse the whole panel while true (Abracadabra open); restore the
+   *  user's own state when it goes false again. */
+  forceCollapsePanel?: boolean;
   /** Per-diagram process owner — surfaced in the new Process Owner
    *  sub-section. Both name + email are optional free-text. */
   processOwner?: { name?: string; email?: string };
@@ -862,6 +865,7 @@ export function PropertiesPanel({
   onSetShowReviewComments,
   onSetAllReviewCollapsed,
   forceCollapseTitle,
+  forceCollapsePanel = false,
   processOwner,
   onSetProcessOwner,
   procedureDoc,
@@ -984,6 +988,14 @@ export function PropertiesPanel({
       setTitleOpen(true);
     }
   }, [forceCollapseTitle]);
+
+  // Abracadabra open → fold the panel away; closed → put back what the user had.
+  const beforeForceRef = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (forceCollapsePanel) { beforeForceRef.current = panelCollapsed; setPanelCollapsed(true); }
+    else if (beforeForceRef.current !== null) { setPanelCollapsed(beforeForceRef.current); beforeForceRef.current = null; }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [forceCollapsePanel]);
 
   // Auto-collapse title when element/connector selected, auto-open when deselected
   useEffect(() => {
