@@ -105,6 +105,26 @@ Examples: "rename the selected pool to Customer" · "delete these" · "connect t
   in the flow direction (right for outgoing, left for incoming); left and right are literal sides.
   Both points must have a connector; the two connectors trade sides and re-route.
 
+## Surround the selection with an expanded subprocess (16 September 2026)
+
+- **"surround selected with an expanded subprocess called Check Stock"** (also "wrap these in a
+  subprocess", "put an expanded subprocess around the selected elements called …"). Select the
+  elements first; they must sit in the one lane (or pool) and have **exactly one flow in and one
+  flow out** — otherwise the log says how many it found and nothing changes.
+- What happens: room is made **in that lane only** — the selection moves 90 px right and everything
+  to its right in the same lane moves 180 px; the neighbouring lanes are untouched and the pools
+  widen to fit (all to one width). The subprocess is drawn around the elements **exactly as they
+  were** with their internal flows; the flow in now enters the subprocess and the flow out leaves it;
+  a **Start** faces the entry element and an **End** faces the exit element inside it, on short
+  straight flows. An unselected element that would end up inside the area is refused by name, never
+  adopted silently.
+- **"delete selected"** on an expanded subprocess (or "unwrap / dissolve the selected subprocess")
+  is the reverse: the shell and its Start/End go, the contents stay and are spliced back into the
+  flow, and the room is given back — the elements return to exactly where they were. Works on any
+  expanded subprocess, not only one made this way (the flow re-enters at the leftmost element and
+  leaves from the rightmost when there is no Start/End). The two round-trip without undo, and not
+  necessarily straight after one another. An empty subprocess is deleted as before.
+
 ## Pausing mid-command
 
 Deepgram finalises a segment after ~0.8 s of silence, so "Swap … top and bottom" can arrive as two

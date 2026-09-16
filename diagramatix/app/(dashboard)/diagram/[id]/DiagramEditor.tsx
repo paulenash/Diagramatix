@@ -42,6 +42,7 @@ import { CollabFlushOnLeave } from "@/app/components/canvas/CollabFlushOnLeave";
 import { CollabDebug } from "@/app/components/canvas/CollabDebug";
 import { suggestNextSteps, type NextStepCandidate } from "@/app/lib/diagram/nextSteps";
 import { sizeOf, placeInline, placeGatewayBranch, placeBoundaryEvent, placeAfterBoundaryEvent, boundaryOuterSide, findFreeSlot, HALF_TASK_W, HALF_TASK_H } from "@/app/lib/diagram/assistPlacement";
+import { planWrapInSubprocess, planUnwrapSubprocess } from "@/app/lib/diagram/subprocessWrap";
 import { matchIntent, matchAssistRules, type IntentRow } from "@/app/lib/diagram/intentMatch";
 import { canConnect } from "@/app/lib/diagram/canConnect";
 import { parseCommand } from "@/app/lib/assist/commandGrammar";
@@ -1166,6 +1167,8 @@ export function DiagramEditor({
     splitPoolEven,
     splitLaneEven,
     wrapInPool,
+    wrapInSubprocess,
+    unwrapSubprocess,
     addPool,
     addLaneAt,
     compressPool,
@@ -2718,6 +2721,20 @@ export function DiagramEditor({
       if ("ambiguous" in r) return { err: isSelectionRef(ref) ? `${r.ambiguous.length} elements are selected — select just one for that` : `“${ref}” is ambiguous` };
       return els.find((e) => e.id === r.id)!;
     };
+    // "delete selected" on an expanded subprocess DISSOLVES it: the shell and
+    // its Start/End go, the contents are spliced back into the flow and the
+    // room the shell used is given back — the reverse of "surround selected"
+    // (Paul, 2026-09-16). Planned by subprocessWrap.ts, applied by the reducer.
+    const unwrapEp = (ep: DiagramElement): boolean => {
+      const plan = planUnwrapSubprocess({ elements: els, connectors: data.connectors }, ep.id);
+      if ("error" in plan) { results.push(plan.error); return false; }
+      unwrapSubprocess(ep.id);
+      els = plan.elements;
+      if (abraLastId.current === ep.id) abraLastId.current = null;
+      setSelectedElementIds(new Set()); // selection protocol: nothing stays selected
+      results.push(plan.summary);
+      return true;
+    };
     for (const op of ops) {
       if (op.op === "undo") { undo(); results.push("undid the last change"); continue; }
       if (op.op === "clear") { clearDiagram(); abraLastId.current = null; results.push("cleared the diagram"); continue; }
@@ -2840,6 +2857,8 @@ export function DiagramEditor({
             anyFail = true; continue;
           }
         }
+        // An expanded subprocess with contents is dissolved, not emptied.
+        if (e.type === "subprocess-expanded" && els.some((k) => k.parentId === e.id)) { if (!unwrapEp(e)) anyFail = true; continue; }
         const foot = { x: e.x, y: e.y, width: e.width, height: e.height };
         deleteElement(e.id);
         els = withDeleted(els, e.id);
@@ -2888,6 +2907,31 @@ export function DiagramEditor({
         continue;
       }
 
+      if (op.op === "wrapInSubprocess") {
+        // Surround the SELECTION with an expanded subprocess (Paul, 2026-09-16).
+        // The plan is computed here first so the guard message ("needs one
+        // flow in and one out", "X sits in that area") comes from the same
+        // code the reducer applies; the ids are minted here so the working
+        // set and the reducer agree on them.
+        const label = op.label?.trim() || "Subprocess";
+        const ids = { epId: nanoid(), startId: nanoid(), endId: nanoid(), startConnId: nanoid(), endConnId: nanoid() };
+        const plan = planWrapInSubprocess({ elements: els, connectors: data.connectors }, selectedIds, label, ids);
+        if ("error" in plan) { results.push(plan.error); anyFail = true; continue; }
+        wrapInSubprocess([...selectedIds], label, ids);
+        // The room came out of the lane's right-hand side: widen the pools to fit (they stay one width).
+        if (els.some((e) => e.type === "pool" && e.x + e.width < plan.contentRight + 40)) extendPools();
+        els = plan.elements;
+        abraLastId.current = ids.epId;
+        setSelectedElementIds(new Set()); // selection protocol: nothing stays selected
+        results.push(plan.summary);
+        continue;
+      }
+      if (op.op === "unwrapSubprocess") {
+        const eps = selectedIds.map((id) => els.find((x) => x.id === id)).filter((x): x is DiagramElement => !!x && x.type === "subprocess-expanded");
+        if (eps.length !== 1) { results.push(eps.length ? "select just the one expanded subprocess" : "select the expanded subprocess first"); anyFail = true; continue; }
+        if (!unwrapEp(eps[0])) anyFail = true;
+        continue;
+      }
       if (op.op === "wrapInPool") {
         wrapInPool(op.label);
         results.push("wrapped everything in a pool");
@@ -3180,7 +3224,7 @@ export function DiagramEditor({
       }
     }
     return { ok: !anyFail, summary: results.join("; ") || "nothing to do" };
-  }, [data.elements, data.connectors, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, updateConnectorLabel, deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool, addPool, addLaneAt, compressPool, extendPools, swapLane, moveLane, moveElements, elementsMoveEnd, removeSpace, setRenameFlow, setMessageFlow, updateConnectorEndpoint]);
+  }, [data.elements, data.connectors, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, updateConnectorLabel, deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool, wrapInSubprocess, unwrapSubprocess, addPool, addLaneAt, compressPool, extendPools, swapLane, moveLane, moveElements, elementsMoveEnd, removeSpace, setRenameFlow, setMessageFlow, updateConnectorEndpoint]);
 
   // Cancel the guided rename flow and clear any badge/edit state.
   const cancelRenameFlow = useCallback((reason?: string) => {

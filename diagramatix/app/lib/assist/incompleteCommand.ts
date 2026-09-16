@@ -10,7 +10,7 @@
  *
  * Pure, so every rule here is tested; the editor only imports it.
  */
-const VERBS = /^(?:swap|rename|relabel|label|edit|move|slide|nudge|bump|shift|connect|link|join|disconnect|unlink|delete|remove|add|insert|create|put|send|draw|attach|place|compress|shrink|extend|widen|wrap|call|change|set)$/;
+const VERBS = /^(?:swap|rename|relabel|label|edit|move|slide|nudge|bump|shift|connect|link|join|disconnect|unlink|delete|remove|add|insert|create|put|send|draw|attach|place|compress|shrink|extend|widen|wrap|surround|enclose|unwrap|dissolve|call|change|set)$/;
 
 export function isIncompleteCommand(text: string): boolean {
   const t = text.trim().toLowerCase().replace(/[.?!,]+$/g, "").trim();
@@ -22,6 +22,9 @@ export function isIncompleteCommand(text: string): boolean {
   // rename / relabel / change / call / set — missing its "to <target>". ("rename
   // tasks" — the by-number form — and "label selected" are complete as they are.)
   if (/^(rename|relabel|change|set|call)\b/.test(t) && !/\b(to|as)\b\s+\S+/.test(t) && !/^(rename|relabel)\s+(?:a\s+|an\s+|the\s+|all\s+)?\w+s?$/.test(t)) return true;
+  // surround / enclose / wrap — "surround selected" is the start of "… with an
+  // expanded subprocess called X"; without the "with/in …" part it is held.
+  if (/^(surround|enclose|wrap)\b/.test(t) && !/\b(with|in|inside|into|within|using)\b\s+\S+/.test(t)) return true;
   // connect / disconnect — missing the second operand ("connect them" is complete).
   if (/^(connect|link|join|disconnect|unlink)\b/.test(t) && !/\b(to|and|with|from)\b\s+\S+/.test(t) && !/^(connect|link|join)\s+(them|these|those|it up|the last two|the previous two)$/.test(t)) return true;
   // "add message …": the by-number forms are complete — a bare "add a message" or

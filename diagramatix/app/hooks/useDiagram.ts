@@ -22,6 +22,7 @@ import type {
   SymbolType,
 } from "@/app/lib/diagram/types";
 import { gatewayVertex, nudgeGatewayEndpoint, computeWaypoints, recomputeAllConnectors, consolidateWaypoints, rectifyWaypoints, constrainControlPoint, safeSidePair, selfLoopWaypoints, measureSelfLoopBulge, SELF_LOOP_BULGE, fuseCollinearWaypoints } from "@/app/lib/diagram/routing";
+import { planWrapInSubprocess, planUnwrapSubprocess, type WrapIds } from "@/app/lib/diagram/subprocessWrap";
 import { isUmlConnType } from "@/app/lib/diagram/types";
 import { autoResizeUmlElement, sizeUmlNote } from "@/app/lib/diagram/umlAutoSize";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
@@ -451,6 +452,10 @@ export type Action =
   | { type: "SPLIT_POOL_EVEN"; payload: { poolId: string; labels: string[] } }
   | { type: "SPLIT_LANE_EVEN"; payload: { laneId: string; labels: string[] } }
   | { type: "WRAP_IN_POOL"; payload: { label?: string } }
+  /** Surround the SELECTION with an expanded subprocess (subprocessWrap.ts). */
+  | { type: "WRAP_IN_SUBPROCESS"; payload: { selectedIds: string[]; label: string; ids: WrapIds } }
+  /** Dissolve an expanded subprocess: shell + Start/End go, contents rejoin the flow. */
+  | { type: "UNWRAP_SUBPROCESS"; payload: { epId: string } }
   | { type: "ADD_POOL"; payload: { label?: string; poolType?: string; position?: "above" | "below"; relativeToId?: string } }
   | { type: "ADD_LANE_AT"; payload: { poolId: string; label?: string; position: "above" | "below"; refLaneId: string } }
   | { type: "COMPRESS_POOL"; payload: { poolId: string } }
@@ -9011,6 +9016,20 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
     // Wrap all loose (un-pooled) flow elements in a new pool + single lane sized
     // to contain them (assist "put a pool around everything"). Existing pools/
     // lanes and anything already inside one are left untouched.
+    // Surround the selection with an expanded subprocess / dissolve one — both
+    // planned as whole-state transforms in subprocessWrap.ts; a plan that
+    // fails leaves the state untouched (the editor has already shown why).
+    case "WRAP_IN_SUBPROCESS": {
+      const plan = planWrapInSubprocess(state, action.payload.selectedIds, action.payload.label, action.payload.ids);
+      if ("error" in plan) return state;
+      return { ...state, elements: plan.elements, connectors: plan.connectors };
+    }
+    case "UNWRAP_SUBPROCESS": {
+      const plan = planUnwrapSubprocess(state, action.payload.epId);
+      if ("error" in plan) return state;
+      return { ...state, elements: plan.elements, connectors: plan.connectors };
+    }
+
     case "WRAP_IN_POOL": {
       const CONTAINER = new Set<string>(["pool", "lane", "sublane"]);
       const byId = new Map(state.elements.map((e) => [e.id, e] as const));
@@ -10314,6 +10333,16 @@ export function useDiagram(initialData: DiagramData) {
     dispatch({ type: "WRAP_IN_POOL", payload: { label } });
   }, []);
 
+  const wrapInSubprocess = useCallback((selectedIds: string[], label: string, ids: WrapIds) => {
+    pushHistory(snapshotData());
+    dispatch({ type: "WRAP_IN_SUBPROCESS", payload: { selectedIds, label, ids } });
+  }, []);
+
+  const unwrapSubprocess = useCallback((epId: string) => {
+    pushHistory(snapshotData());
+    dispatch({ type: "UNWRAP_SUBPROCESS", payload: { epId } });
+  }, []);
+
   const addPool = useCallback((opts?: { label?: string; poolType?: string; position?: "above" | "below"; relativeToId?: string }) => {
     pushHistory(snapshotData());
     dispatch({ type: "ADD_POOL", payload: { label: opts?.label, poolType: opts?.poolType, position: opts?.position, relativeToId: opts?.relativeToId } });
@@ -10631,6 +10660,8 @@ export function useDiagram(initialData: DiagramData) {
     splitPoolEven,
     splitLaneEven,
     wrapInPool,
+    wrapInSubprocess,
+    unwrapSubprocess,
     addPool,
     addLaneAt,
     compressPool,

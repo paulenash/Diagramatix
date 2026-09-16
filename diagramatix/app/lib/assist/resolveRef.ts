@@ -118,6 +118,11 @@ function kindToType(word: string, elements: DiagramElement[]): ((e: DiagramEleme
   if (/^pools?$/.test(w)) return (e) => e.type === "pool";
   if (/^sub-?lanes?$/.test(w)) return (e) => e.type === "lane" && parentType(e) === "lane";
   if (/^lanes?$/.test(w)) return (e) => e.type === "lane";
+  // "the selected subprocess" is either kind; "the selected expanded subprocess" / "EP" only the expanded one.
+  if (/^(?:expanded\s+)?(?:sub-?\s?process(?:es)?|eps?)$/.test(w)) {
+    const expandedOnly = /^(?:expanded|eps?$)/.test(w);
+    return (e) => e.type === "subprocess-expanded" || (!expandedOnly && e.type === "subprocess");
+  }
   const t = typeNoun(w) ?? typeNoun(w.replace(/(?:es|s)$/, ""));
   return t ? (e) => e.type === t : null;
 }

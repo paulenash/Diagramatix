@@ -20,6 +20,10 @@ export type AssistOp =
   | { op: "renameByType"; itemType: string }
   | { op: "move"; ref: Ref; direction: "left" | "right" | "up" | "down"; count?: number }
   | { op: "wrapInPool"; label?: string }
+  /** "surround selected with an expanded subprocess called X" — the SELECTION, one flow in, one out. */
+  | { op: "wrapInSubprocess"; label?: string }
+  /** "unwrap the selected subprocess" — the reverse; "delete selected" on an EP does the same. */
+  | { op: "unwrapSubprocess" }
   | { op: "addBoundary"; hostRef: Ref; label?: string; eventType?: EventType }
   | { op: "addPool"; label?: string; poolType?: "black-box" | "white-box"; position?: "above" | "below"; relativeTo?: Ref }
   | { op: "addLanes"; poolRef: Ref; labels: string[] }
@@ -59,6 +63,10 @@ export const SYMBOL_SYNONYMS: Record<string, { symbolType: SymbolType; eventType
   "subprocess": { symbolType: "subprocess" },
   "sub process": { symbolType: "subprocess" },
   "sub-process": { symbolType: "subprocess" },
+  "expanded subprocess": { symbolType: "subprocess-expanded" },
+  "expanded sub process": { symbolType: "subprocess-expanded" },
+  "expanded sub-process": { symbolType: "subprocess-expanded" },
+  "ep": { symbolType: "subprocess-expanded" },
   "gateway": { symbolType: "gateway", gatewayType: "exclusive" },
   "decision": { symbolType: "gateway", gatewayType: "exclusive" },
   "exclusive gateway": { symbolType: "gateway", gatewayType: "exclusive" },
@@ -129,6 +137,10 @@ export function validateOp(raw: unknown): AssistOp | null {
     }
     case "wrapInPool":
       return { op: "wrapInPool", ...(isRef(o.label) ? { label: (o.label as string).trim() } : {}) };
+    case "wrapInSubprocess":
+      return { op: "wrapInSubprocess", ...(isRef(o.label) ? { label: (o.label as string).trim() } : {}) };
+    case "unwrapSubprocess":
+      return { op: "unwrapSubprocess" };
     case "addBoundary": {
       if (!isRef(o.hostRef)) return null;
       const op: AssistOp = { op: "addBoundary", hostRef: (o.hostRef as string).trim() };

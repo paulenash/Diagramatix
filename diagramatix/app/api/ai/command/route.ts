@@ -51,6 +51,8 @@ Canonical forms:
   add <n> lanes to <pool> called <A, B and C>   ·   add a lane above|below <lane>   ·   add <n> sublanes to <lane> called <A, B and C>   ·   swap <lane> with <lane>
   compress <pool>   ·   extend the pools to include all elements   ·   nudge <name> up|down|left|right (20px; "nudge these left" for the selection)   ·   move these right (the selection, 100px per step)   ·   again
   swap top and bottom (the SELECTED gateway's connection points — any pair of top|bottom|middle|left|right; NOT a lane swap unless two lane NAMES are given)
+  surround selected with an expanded subprocess called <name>   (the SELECTED elements become the contents of a new expanded subprocess; needs one flow in and one out)
+  unwrap the selected subprocess   ·   delete selected (on an expanded subprocess: dissolves it, the contents stay in the flow)
   label selected <text> (the selected connector)   ·   label connectors (numbers them)   ·   rename tasks|lanes|events… (numbers them)
   add a message from <name> to <name> labelled <text>   ·   add a message (numbers the candidates, then "n to m labelled <text>")   ·   add a message to the selected   ·   rename connector <text> to <text>   ·   delete connector <text>
   clear the diagram   ·   export the diagram to JSON   ·   undo that
@@ -82,6 +84,8 @@ Op shapes (use element NAMES for refs — they are resolved against the diagram;
   { "op":"addMessageByNumber", "fromSelection"?: true }  // no ends given: number the candidates and let the user pick
   { "op":"labelSelected", "label"?: string }  // the selected connector
   { "op":"swapGatewayPoints", "a": "top"|"middle"|"bottom"|"left"|"right", "b": same }  // the selected gateway's points
+  { "op":"wrapInSubprocess", "label"?: string }           // surround the SELECTED elements with an expanded subprocess
+  { "op":"unwrapSubprocess" }                              // dissolve the SELECTED expanded subprocess back into the flow
   { "op":"renameByType", "itemType": "pool"|"lane"|"message"|"task"|"subprocess"|"gateway"|"event"|"connector" }  // numbers them for a pick
   { "op":"clear" }                    // empty the whole diagram
   { "op":"export", "format":"json" }  // download the diagram as JSON

@@ -136,6 +136,23 @@ export function parseCommand(utterance: string): AssistOp[] | null {
       return [{ op: "addLaneAt", poolRef: mm[1] ? clean(mm[1]) : "the pool", position: pos, refLane: clean(mm[3]), ...(mm[4] ? { label: clean(mm[4]) } : {}) }];
     }
 
+    // Surround the SELECTION with an expanded subprocess (Paul, 2026-09-16):
+    // "surround selected with an expanded subprocess called Check Stock",
+    // "wrap these in a subprocess", "put an expanded subprocess around the
+    // selected elements called Check Stock". Before the pool wrap, which
+    // also answers to "wrap … in …".
+    {
+      const SEL = "(?:the\\s+)?(?:selected|selection|these|those|highlighted)(?:\\s+(?:elements?|items?|ones?|tasks?|things?))?";
+      const EP = "(?:an?\\s+)?(?:new\\s+)?(?:expanded\\s+)?(?:sub-?\\s?process|subprocess|ep)";
+      const NAME = "(?:\\s+(?:called|named|labell?ed|titled)\\s+(.+?))?";
+      const s = raw.match(new RegExp(`^(?:surround|wrap|enclose|put|place)\\s+${SEL}\\s+(?:with|in|inside|into|within|using)\\s+${EP}${NAME}$`, "i"))
+        ?? raw.match(new RegExp(`^(?:put|add|create|draw|make|insert|place)\\s+${EP}${NAME}\\s+(?:around|round|over|containing|enclosing)\\s+${SEL}${NAME}$`, "i"));
+      if (s) {
+        const name = clean(s[1] ?? s[2] ?? "");
+        return [{ op: "wrapInSubprocess", ...(name ? { label: name } : {}) }];
+      }
+    }
+
     // Wrap all loose (un-pooled) elements INTO a pool (a qualifier is REQUIRED
     // here, so a bare "add a pool" falls through to the create-pool rule below).
     if (
@@ -217,6 +234,15 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   m = raw.match(/^move\s+(.+?)\s+(?:(\d+|a|an|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:elements?|steps?|places?|spaces?|cells?)\s+)?(?:to\s+the\s+)?(left|right|up|down)\b/i);
   if (m) {
     return [{ op: "move", ref: clean(m[1]), direction: m[3].toLowerCase() as "left" | "right" | "up" | "down", count: toCount(m[2]) }];
+  }
+
+  // ── Dissolve an expanded subprocess back into the flow (the reverse of
+  // "surround selected"). "delete selected" on an EP does the same — the
+  // editor routes it — so only the explicit verbs need a rule; it sits above
+  // the delete catch-all, which would otherwise swallow "unwrap …". ──
+  {
+    const u = raw.match(/^(?:unwrap|dissolve|unpack|flatten|explode|open\s+up)\s+(?:the\s+)?(?:selected\s+|this\s+|that\s+)?(?:expanded\s+)?(?:sub-?\s?process|subprocess|ep)(?:\s+(?:selected|shell))?$/i);
+    if (u) return [{ op: "unwrapSubprocess" }];
   }
 
   // ── Delete (+ optional compact) ──
