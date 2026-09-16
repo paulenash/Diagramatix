@@ -17,8 +17,10 @@ on:
 #   1. AAD app registration with federated credentials matching:
 #        repo:<owner>/<repo>:ref:refs/heads/main           (push to main)
 #        repo:<owner>/<repo>:environment:production         (env-gated)
-#      Plus role assignments: AcrPush on `dgxprodacr`, Website Contributor
-#      on `dgx-prod-app`, Key Vault Secrets User on `dgx-kv`.
+#      Plus role assignments: AcrPush AND Container Registry Tasks
+#      Contributor on `dgxprodacr` (the second runs the image purge),
+#      Website Contributor on `dgx-prod-app`, Key Vault Secrets User on
+#      `dgx-kv`.
 #   2. GitHub repo secrets:
 #        AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
 #   3. GitHub repo variables (or hard-coded here — variables make
@@ -379,6 +381,21 @@ jobs:
           done
           echo "::error::Smoke test failed - /api/health did not report commit ${{ github.sha }} with HTTP 200 within 3 minutes."
           exit 1
+
+      - name: Purge old images from the registry
+        # Every push leaves an immutable `:sha-<commit>` image behind and
+        # nothing removed them: by 2026-09-16 the Basic registry (10 GB
+        # included) held 277 GB across 6,681 manifests and its storage
+        # overage was the largest line on the Azure bill. This keeps the
+        # ten newest tags per repository (the live image is always among
+        # them) and drops every untagged manifest. Runs server-side as an
+        # ACR quick task, so the runner does not page through manifests.
+        # Never fails the deploy: the image is already live by now and a
+        # missed purge just runs next time.
+        if: success()
+        run: |
+          az acr run --registry "$ACR_NAME" --timeout 1800 --cmd "acr purge --filter 'diagramatix:.*' --filter 'litellm-gateway:.*' --ago 0d --keep 10 --untagged" /dev/null \
+            || echo "::warning::Registry purge did not complete (needs Container Registry Tasks Contributor on ${ACR_NAME}); the deploy itself is fine."
 
       - name: Azure logout
         # Always run — even if the deploy failed, the OIDC token has a
