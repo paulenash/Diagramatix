@@ -9,17 +9,20 @@
  * carrying the actual test name is squeezed into a tall, thin ribbon while a
  * five-character column sits half empty (Paul, 2026-09-16).
  *
- * WHAT IT DOES. Rewrites each separator row with dash counts proportional to
- * that table's OWN measured content, so widths follow the writing rather than a
- * template — the allocation that minimises total row height. A naturally narrow
- * column (a ref, an id, a number) is floored so it never wraps, and the rest of
- * the width is shared out by 90th-percentile cell length. The source file is
- * never touched; the rewrite happens on a copy on its way to pandoc.
- *
- * It also renders LANDSCAPE A4 with 1 cm margins, because four columns of prose
- * do not fit a portrait page at any column ratio. Pandoc takes page setup from a
- * reference document, so this builds one by patching the section properties of
- * pandoc's own default.
+ * WHAT IT DOES.
+ *  1. Rewrites each separator row with dash counts proportional to that table's
+ *     OWN measured content, so widths follow the writing rather than a template
+ *     — the allocation that minimises total row height. The source file is never
+ *     touched; the rewrite happens on a copy on the way to pandoc.
+ *  2. Floors a naturally narrow column (a ref, an id, a number) at a share wide
+ *     enough to hold it, AND marks those cells no-wrap in the output, because a
+ *     ref broken across two lines is the one thing in the document a reader
+ *     scans for (Paul, 2026-09-16).
+ *  3. Renders LANDSCAPE A4 with 1 cm margins — four columns of prose do not fit
+ *     a portrait page at any column ratio.
+ *  4. Gives every table full borders and a bold header row, and makes the
+ *     document headings bold, by patching the reference document's styles once
+ *     rather than 133 tables individually.
  *
  * Usage: node scripts/build-tests-summary-docx.mjs [outputPath]
  *   PANDOC_PATH  override the pandoc executable
@@ -38,9 +41,13 @@ const OUT = path.resolve(process.argv[2]
 
 /** Total dashes spread across a table's columns — pandoc reads the ratio, not the absolute. */
 const TOTAL = 100;
-/** A column that never wraps (a ref, an id) still needs enough not to break "T4422". */
-const MIN_SHARE = 5;
-/** Columns this short are treated as fixed-width labels rather than prose. */
+/**
+ * Floor for a narrow column. On a landscape A4 page with 1 cm margins the text
+ * width is ~27.7 cm, so 8% is ~2.2 cm — comfortably more than "T4422" plus the
+ * cell margins. At the previous 5% (~1.4 cm) it wrapped.
+ */
+const MIN_SHARE = 8;
+/** Columns this short are fixed-width labels rather than prose, and never wrap. */
 const NARROW_AT = 8;
 /** The long cells set the row height, so size on them rather than the median. */
 const PCTL = 0.9;
@@ -48,7 +55,7 @@ const PCTL = 0.9;
 const isSeparator = (line) => /^\|[\s:|-]+\|$/.test(line) && line.includes("-");
 const cellsOf = (line) => line.split("|").slice(1, -1);
 
-/** Dash counts proportional to each column's 90th-percentile content length. */
+/** Dash counts proportional to content, plus which columns are no-wrap labels. */
 function widthsFor(rows, ncol) {
   const lens = Array.from({ length: ncol }, () => []);
   for (const r of rows) r.forEach((v, i) => lens[i].push(v.trim().length));
@@ -60,15 +67,16 @@ function widthsFor(rows, ncol) {
   const narrow = p.map((v) => v <= NARROW_AT);
   const fixed = narrow.filter(Boolean).length * MIN_SHARE;
   const restTotal = p.reduce((s, v, i) => s + (narrow[i] ? 0 : v), 0) || 1;
-  return p.map((v, i) => (narrow[i]
+  const widths = p.map((v, i) => (narrow[i]
     ? MIN_SHARE
     : Math.max(MIN_SHARE, Math.round(((TOTAL - fixed) * v) / restTotal))));
+  return { widths, narrow };
 }
 
-/** Rewrite every table's separator row in place. Returns the new markdown. */
+/** Rewrite every separator row. Returns the markdown and the no-wrap columns per table, in document order. */
 function rewrite(md) {
   const lines = md.split(/\r?\n/);
-  let tables = 0;
+  const noWrapByTable = [];
   for (let i = 0; i < lines.length; i++) {
     if (!isSeparator(lines[i])) continue;
     const header = lines[i - 1];
@@ -82,32 +90,68 @@ function rewrite(md) {
       if (c.length !== ncol) break;
       body.push(c);
     }
-    const w = widthsFor(body.length ? body : [cellsOf(header)], ncol);
+    const { widths, narrow } = widthsFor(body.length ? body : [cellsOf(header)], ncol);
     const align = cellsOf(lines[i]).map((c) => [c.trim().startsWith(":"), c.trim().endsWith(":")]);
-    lines[i] = `|${w.map((n, k) => {
+    lines[i] = `|${widths.map((n, k) => {
       const [l, r] = align[k];
       const dashes = "-".repeat(Math.max(3, n - (l ? 1 : 0) - (r ? 1 : 0)));
       return `${l ? ":" : ""}${dashes}${r ? ":" : ""}`;
     }).join("|")}|`;
-    tables++;
+    noWrapByTable.push(new Set(narrow.flatMap((v, k) => (v ? [k] : []))));
   }
-  return { md: lines.join("\n"), tables };
+  return { md: lines.join("\n"), noWrapByTable };
 }
 
-/** Pandoc's default reference document, with its section properties made landscape. */
-function landscapeReference(work) {
+// ── docx plumbing ──────────────────────────────────────────────────────────
+const unpack = (docx, dir) => {
+  mkdirSync(dir, { recursive: true });
+  execFileSync("unzip", ["-qo", docx, "-d", dir], { stdio: "inherit" });
+};
+/**
+ * No `zip` on this box; .NET writes the archive instead — but NOT via
+ * CreateFromDirectory. On PowerShell 5.1 (.NET Framework) that stores entry
+ * names with the platform separator, so every path inside the archive comes out
+ * as `word\document.xml`. A zip is specified to use forward slashes, and an
+ * OOXML reader that takes it at its word sees a file with no parts in it.
+ * Entries are therefore added one at a time with the name spelled correctly,
+ * `[Content_Types].xml` first as the format expects.
+ */
+const pack = (dir, out) => {
+  const ps = `
+    Add-Type -AssemblyName System.IO.Compression;
+    Add-Type -AssemblyName System.IO.Compression.FileSystem;
+    if (Test-Path '${out}') { Remove-Item '${out}' -Force }
+    $base = (Resolve-Path '${dir}').Path.TrimEnd('\\') + '\\'
+    $zip = [System.IO.Compression.ZipFile]::Open('${out}', 'Create')
+    try {
+      $files = Get-ChildItem -LiteralPath $base -Recurse -File |
+        Sort-Object { if ($_.Name -eq '[Content_Types].xml') { 0 } else { 1 } }
+      foreach ($f in $files) {
+        $rel = $f.FullName.Substring($base.Length).Replace('\\', '/')
+        [void][System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
+          $zip, $f.FullName, $rel, [System.IO.Compression.CompressionLevel]::Optimal)
+      }
+    } finally { $zip.Dispose() }
+  `;
+  execFileSync("powershell", ["-NoProfile", "-NonInteractive", "-Command", ps], { stdio: "inherit" });
+};
+
+const BORDER = (w) => ["top", "left", "bottom", "right", "insideH", "insideV"]
+  .map((s) => `<w:${s} w:val="single" w:sz="${w}" w:space="0" w:color="808080" />`).join("");
+
+/** Pandoc's default reference document: landscape, bordered tables, bold headings. */
+function buildReference(work) {
   const plain = path.join(work, "default.docx");
   writeFileSync(plain, execFileSync(PANDOC, ["--print-default-data-file", "reference.docx"], {
     maxBuffer: 64 * 1024 * 1024, encoding: "buffer",
   }));
   const dir = path.join(work, "ref");
-  mkdirSync(dir, { recursive: true });
-  execFileSync("unzip", ["-q", plain, "-d", dir], { stdio: "inherit" });
+  unpack(plain, dir);
 
+  // Page: A4 landscape (twips), 1 cm margins.
   const docXml = path.join(dir, "word", "document.xml");
   let xml = readFileSync(docXml, "utf8");
   if (!xml.includes("w:pgSz")) {
-    // A4 landscape (twips), 1 cm margins — the widest page Word opens without fuss.
     xml = xml.replace("<w:sectPr>", "<w:sectPr>"
       + '<w:pgSz w:w="16838" w:h="11906" w:orient="landscape" />'
       + '<w:pgMar w:top="567" w:right="567" w:bottom="567" w:left="567"'
@@ -115,15 +159,77 @@ function landscapeReference(work) {
     writeFileSync(docXml, xml, "utf8");
   }
 
-  // No `zip` on this box; .NET writes the archive instead.
+  const stylesXml = path.join(dir, "word", "styles.xml");
+  let styles = readFileSync(stylesXml, "utf8");
+
+  // Every table gets a full grid; the header row gets a heavier box and bold text.
+  const i = styles.indexOf('w:styleId="Table"');
+  const open = styles.indexOf("<w:tblPr>", i);
+  const close = styles.indexOf("</w:tblPr>", open);
+  if (i >= 0 && open >= 0 && close > open && !styles.slice(open, close).includes("tblBorders")) {
+    styles = styles.slice(0, open + "<w:tblPr>".length)
+      + `<w:tblBorders>${BORDER(4)}</w:tblBorders>`
+      + styles.slice(open + "<w:tblPr>".length);
+  }
+  styles = styles.replace('<w:tblStylePr w:type="firstRow">',
+    '<w:tblStylePr w:type="firstRow"><w:rPr><w:b /><w:bCs /></w:rPr>');
+
+  // Document headings are coloured but not bold in the default reference.
+  for (let h = 1; h <= 6; h++) {
+    const at = styles.indexOf(`w:styleId="Heading${h}"`);
+    if (at < 0) continue;
+    const rpr = styles.indexOf("<w:rPr>", at);
+    const end = styles.indexOf("</w:style>", at);
+    if (rpr < 0 || rpr > end) continue;
+    if (styles.slice(rpr, styles.indexOf("</w:rPr>", rpr)).includes("<w:b ")) continue;
+    styles = styles.slice(0, rpr + "<w:rPr>".length) + "<w:b /><w:bCs />"
+      + styles.slice(rpr + "<w:rPr>".length);
+  }
+  writeFileSync(stylesXml, styles, "utf8");
+
   const out = path.join(work, "reference.docx");
-  const ps = [
-    "Add-Type -AssemblyName System.IO.Compression.FileSystem;",
-    `[System.IO.Compression.ZipFile]::CreateFromDirectory('${dir}','${out}',`,
-    "[System.IO.Compression.CompressionLevel]::Optimal, $false)",
-  ].join(" ");
-  execFileSync("powershell", ["-NoProfile", "-NonInteractive", "-Command", ps], { stdio: "inherit" });
+  pack(dir, out);
   return out;
+}
+
+/** Mark the label columns no-wrap, so a ref never breaks across two lines. */
+function applyNoWrap(docx, noWrapByTable, work) {
+  const dir = path.join(work, "out");
+  unpack(docx, dir);
+  const p = path.join(dir, "word", "document.xml");
+  let xml = readFileSync(p, "utf8");
+
+  let cursor = 0, table = 0, patched = 0;
+  const pieces = [];
+  for (;;) {
+    const start = xml.indexOf("<w:tbl>", cursor);
+    if (start < 0) break;
+    const end = xml.indexOf("</w:tbl>", start);
+    if (end < 0) break;
+    const cols = noWrapByTable[table++] ?? new Set();
+    let body = xml.slice(start, end);
+    if (cols.size) {
+      // Walk rows, then cells within each row, so the column index is right.
+      body = body.replace(/<w:tr>[\s\S]*?<\/w:tr>/g, (row) => {
+        let col = 0;
+        return row.replace(/<w:tc>(\s*)(<w:tcPr\s*\/>|<w:tcPr>)/g, (m, ws, tcpr) => {
+          const mine = cols.has(col++);
+          if (!mine) return m;
+          patched++;
+          return tcpr.endsWith("/>")
+            ? `<w:tc>${ws}<w:tcPr><w:noWrap /></w:tcPr>`
+            : `<w:tc>${ws}<w:tcPr><w:noWrap />`;
+        });
+      });
+    }
+    pieces.push(xml.slice(cursor, start), body);
+    cursor = end;
+  }
+  pieces.push(xml.slice(cursor));
+  xml = pieces.join("");
+  writeFileSync(p, xml, "utf8");
+  pack(dir, docx);
+  return { tables: table, cells: patched };
 }
 
 if (!existsSync(SOURCE)) throw new Error(`missing ${SOURCE}`);
@@ -131,18 +237,19 @@ if (!existsSync(PANDOC)) throw new Error(`pandoc not found at ${PANDOC} — set 
 
 const work = mkdtempSync(path.join(tmpdir(), "tests-summary-docx-"));
 try {
-  const { md, tables } = rewrite(readFileSync(SOURCE, "utf8"));
+  const { md, noWrapByTable } = rewrite(readFileSync(SOURCE, "utf8"));
   const src = path.join(work, "summary.md");
   writeFileSync(src, md, "utf8");
 
   execFileSync(PANDOC, [
     src, "-o", OUT,
     "--toc", "--toc-depth=2",
-    "--reference-doc", landscapeReference(work),
+    "--reference-doc", buildReference(work),
     "--metadata", "title=Diagramatix — Tests Summary",
   ], { stdio: "inherit" });
 
-  console.log(`rewrote ${tables} tables · wrote ${OUT}`);
+  const { tables, cells } = applyNoWrap(OUT, noWrapByTable, work);
+  console.log(`sized ${noWrapByTable.length} tables · no-wrap on ${cells} label cells across ${tables} · wrote ${OUT}`);
 } finally {
   rmSync(work, { recursive: true, force: true });
 }
