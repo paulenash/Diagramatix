@@ -1,0 +1,359 @@
+10Multi-Notation DiagrammingOne workspace for every diagram type your team needs — from BPMN to ArchiMate to UML.- BPMN 2.0 — pools, lanes, sub-processes, gateways, events, message flows, boundary events
+- Process Context — system + actor diagrams with edge connection points
+- State Machine — initial / final / composite states, transitions with guards
+- Domain models — UML class + enumeration; relational (PK/FK/NOT NULL) variants
+- Value Chain (Porter-style)
+- ArchiMate — structural, dependency, and dynamic relations
+- Use Case — actors, system boundaries, use case ovals
+10Process SimulatorRun your BPMN as a discrete-event simulation — see where work queues, who the bottleneck is, and prove the cost case for a redesign before you change anything.- Event-based engine — work items (tokens) flow over a simulated clock; tasks seize limited team capacity, so realistic queues and wait times emerge from contention
+- Annotate on the model — per-element arrival, cycle and wait times as statistical distributions (fixed, uniform, triangular, normal, exponential), edited in the Properties panel or a single Simulation Data table
+- Full BPMN behaviour — decision-branch probabilities and conditions, loops and multi-instance, expanded and event subprocesses (interrupting + non-interrupting)
+- Subprocess roll-up — a subprocess linked to its own diagram drills down and rolls its child's tasks, teams and times up into the parent (nested links and parallel instances included)
+- Shared team pools — teams are reusable resource pools shared across processes; one Study assembles a portfolio of diagrams to reveal cross-process overload
+- As-is vs To-be comparison — pin scenarios to different process variants and compare side by side with a plain-language verdict (e.g. "28% faster, +12% throughput, $4.2k less per case, frees ~1.4 FTE")
+- Cost & capacity planning — team cost-per-hour drives cost-per-case, total cost and savings, so a redesign has a business case, not just a speed number
+- Scenarios, what-ifs & planned interventions — duplicate a baseline, override a capacity or rate, or schedule a timed capacity surge / outage / demand spike / work injection
+- Monte-Carlo ranges — replications give mean / p50 / p95 ranges and a bottleneck ranking, not a single misleading number
+- Live Matrix replay + Operator — watch green tokens flow and stack at bottlenecks, then 'fork the timeline': intervene mid-run and re-run deterministically; plus a utilisation heatmap
+- Ready-made examples — load a worked example (loan origination, car-repair rework loop) into your own project and demo in two clicks
+- BPSim-aligned — parameters follow the OMG/WfMC BPSim standard, with import/export for interchange with other tools
+20AI-Assisted BPMN GenerationDescribe the process in plain English; Diagramatix builds a structured BPMN diagram you can refine.- Natural-language prompt → end-to-end BPMN diagram in seconds
+- Generates pools, lanes, tasks, gateways, and events automatically
+- Editable AI rules so you control conventions (sub-process splitting, gateway types, naming)
+- Generation history per diagram — try multiple prompts, pick the best
+- Powered by Anthropic Claude
+30Smart Connector RoutingConnectors that route cleanly around obstacles — no manual zig-zagging.- Orthogonal (rectilinear), curvilinear (Bézier), and direct modes per connector
+- Automatic hump-over crossings where sequence flows pass each other
+- Smart endpoint slots on every side with edge-aware routing
+- Waypoint editing for fine-grained control without losing the auto-routing fallback
+- Auto-connect on drop — newly placed activities, gateways and events wire themselves to their natural neighbours (toggle ON / incoming-only / OFF)
+- Group auto-connect — select a cluster of activities, gateways and events and stitch them into a legally-connected process fragment in one action; double-click a gateway to fan a whole group of branches out from it
+- Connections obey BPMN rules — never into a start event or out of an end event, never across a pool boundary, and gateway branches carry their own option labels
+40Microsoft Visio Round-TripAuthor in Diagramatix, share with Visio users, get edits back — no loss in translation.- Export any BPMN diagram as a native `.vsdx` file
+- Dedicated "Diagramatix Shapes" v1.6 stencil with proper BPMN markers
+- Re-import a Visio-edited `.vsdx` back into Diagramatix with style preserved
+- Multi-diagram import — open a multi-page `.vsdx` and turn its pages into separate Diagramatix diagrams; tick exactly which pages you want and send them to a new or existing project under a named folder
+- An import report shows shapes and connectors created, anything skipped, and a per-master breakdown so nothing lands silently
+- Newly-imported diagrams pair with the connector/structure health check and automatic sub-process linking (see those features) so a Visio set arrives properly wired, not just drawn
+- Free downloadable stencil for recipients editing in Visio
+40Text-to-Diagram for Every NotationAI generation isn't BPMN-only — describe it in plain English and generate Value Chain, Process Context, State Machine, Domain, Context and ArchiMate diagrams too.- One AI generator across every notation Diagramatix supports — not just BPMN, but Value Chain, Process Context, State Machine, Domain (UML / relational), Context and ArchiMate
+- Particularly strong for Value Chain, Process Context and BPMN
+- Per-diagram-type, admin-editable AI rules so each notation follows your house conventions
+- Process Context generation auto-classifies actors, external systems and timer/hourglass participants
+- Attach a PDF or text file to feed extra context into the prompt
+- Generation history per diagram — try several prompts and keep the best
+50BPMN 2.0 XML ImportBring diagrams in from any BPMN-compliant tool.- Standard BPMN 2.0 XML parser (pools, lanes, tasks, gateways, events, message flows, sub-processes)
+- Layout heuristics auto-position elements when the XML lacks coordinates
+- Validation report flags unsupported BPMN features
+50Image to DiagramSnap a whiteboard sketch, a screenshot, or someone else's flowchart and Diagramatix reverse-engineers it into an editable BPMN or flowchart.- Attach a PNG / JPEG / WebP / GIF; AI vision + OCR read the shapes and labels off the picture
+- BPMN images: pools, lanes, tasks, gateways and events are mapped to their proper BPMN types, with labels read from the image
+- Turn a plain flowchart image INTO BPMN — rectangles become tasks, decision diamonds become exclusive gateways, ovals become start/end events, cylinders become data stores, and loose flow is wrapped in a white-box pool
+- Modernise legacy flowcharts: photograph or scan an old hand-drawn or Visio/Word flowchart and convert it straight to BPMN — the fast way to start moving off the legacy flowchart standard onto BPMN
+- The image is the source of truth; add a text prompt to layer on extra detail (rules, roles, message flows)
+- Comes in as a fully editable diagram — for BPMN, as a plan you can review before it's laid out
+- Available for Flowchart and BPMN diagrams; pairs with Flowchart → BPMN Translation for flowcharts already drawn in Diagramatix
+60Cross-Functional Flowcharts (Pools / Lanes / Sub-Lanes)Model your organisation as it really works — multi-pool, multi-lane, multi-sub-lane.- Drag-drop pools onto the canvas; lanes auto-fit
+- Sub-lanes (lanes within lanes) for matrix orgs
+- Lane-and-pool grow-only on content add (no surprise shrinking)
+- Independent lane font sizes, header widths, and label rotation
+70Drag-Drop Palette + Smart Editing UXBuilt for fast iteration — drag, drop, type, done.- Per-diagram-type palette (only relevant symbols)
+- Snap-to-element alignment guides while dragging
+- Insert Space — push everything to the right (or down) to make room
+- Focus-edit zoom — double-click any label and the canvas snaps to centre it for easy typing
+- Drop on a connector to insert an element mid-flow
+- Quick-add menu for one-click element creation at cursor
+80Reusable Templates with GroupsSave your common patterns once; reuse them across every project.- User-defined templates per diagram type
+- Group templates under named, collapsible headers
+- Built-in template library shipped with Diagramatix
+- Per-user collapse state remembered between sessions
+90Drill-Down NavigationLink diagrams together for true hierarchical process documentation.- Sub-processes link to nested BPMN diagrams
+- Chevron-collapsed symbols link to any diagram type
+- One-click drill-back arrow returns to the parent diagram
+- "Linked from" list on every diagram shows its parents (auto-scanned)
+100Project & Folder OrganisationGroup diagrams by project, organise within folders, sort however you like.- Multiple projects per user
+- Nested folder hierarchy within each project
+- Drag-and-drop reordering, or sort by name / modified date
+- Per-project sort preference remembered
+110Properties Panel with Per-Element ConfigurationClick any element and edit every property without leaving the canvas.- Name, type, dimensions, colour
+- Type-specific properties: BPMN task type, gateway role, event trigger
+- UML attribute / operation editor for class diagrams
+- Connector waypoint, label offset, and arrow direction editing
+120Custom Display Modes (Normal + Hand-Drawn)Switch any diagram between polished and sketchy with one click.- Normal mode: clean, presentation-ready output
+- Hand-drawn mode: sketch-style strokes, monochrome
+- Per-diagram setting (some can be polished, others draft)
+- Export reflects the display mode
+130Configurable Colour Themes per Project & per DiagramMatch your brand or process taxonomy with custom colours.- Per-symbol-type colour overrides
+- Project-wide theme that all diagrams inherit by default
+- Per-diagram override when a specific diagram needs different colours
+- Black & white "hand-drawn" override
+140Bulk Visio ExportExport every BPMN diagram in a project as one multi-page `.vsdx` file.- One Visio page per diagram, ordered alphabetically
+- Single download for an entire project's worth of process documentation
+- Non-BPMN diagrams skipped silently
+- Round-trips on bulk import too
+150Backup & RestoreOne-click full-account snapshot to a portable `.diag` file.- Every project, diagram, template, user preference in one file
+- Restore brings everything back as it was
+- Use for moving between accounts, archival, or "try this on a copy"
+160Diagram Title Block with Version / Authors / StatusProfessional title block stamp for every diagram.- Free-text version string + authors list
+- Status: Draft / Final / Production with visual badge
+- Per-diagram toggle to show or hide
+- Renders in export files too
+170Tiered Subscriptions with Self-Serve UpgradeStart free, upgrade when you need more — at any time.- 30-day free trial covers every feature
+- Three paid tiers (Introductory / Professional / Expert) with progressively higher limits
+- Self-serve checkout (Stripe), self-serve cancellation, no support call required
+- AUD billing; international cards accepted
+180Collaboration & Diagram ReviewCirculate a diagram to colleagues, gather comments, and track sign-off — all inside Diagramatix.- Collaboration Groups: invite teammates by name or email, with in-app notifications, accept/decline, leave, remove, and ownership transfer
+- Send any diagram to one or more groups with an objective and a due date
+- Reviewers comment directly on the diagram — drag a pink Review Comment onto any element; it auto-links and is tagged with the reviewer
+- Dashboard collections for diagrams Received and Sent for review, colour-coded by due date
+- Live reviewer statuses (pending / in-progress / submitted / approved / declined) with Approve, Submit, and Decline actions
+- Owner controls: filter comments by reviewer, re-submit for a fresh approval round, and finish the review when done
+180Project Sharing with RolesShare a project with the people who need it — View or Edit, per project, anytime.- Owner picks any registered user by name or email and grants View or Edit access
+- View users see the project read-only; Edit users mutate diagrams but cannot delete the project or any of its diagrams
+- Shared projects show up on the recipient's dashboard with an amber tile and the owner's name + email
+- New per-diagram "Diagram Owner" field assigns accountability to a specific person without changing access
+- Recipients see who else is in the share — transparency about who's in the room
+- Cross-organisation sharing is allowed or blocked per-organisation by the Org admin
+190Diagram-Type Colour IdentityEvery diagram type gets a 2-character code and a distinct pastel colour, so you can tell process types apart at a glance.- 2-character badges (BP, CO, PC, SM, DM, VC, AM) in the project navigation tree
+- Colour-coded diagram tiles on the dashboard and project screens — for every user, including business viewers
+- The editor's top bar is tinted to the diagram type, with the type name highlighted in its colour
+- Consistent type chips everywhere a diagram type is shown
+- SuperAdmin-editable: change any code or colour and it flows across the whole app
+190Organisation Admin & SettingsDesignate organisation administrators with project-share oversight, configurable per-organisation sharing policies, and silent admin membership.- New OrgAdmin role for designated organisation administrators
+- Project Sharing oversight page lists every shared project in the organisation with owner, recipients, and inline share-list editing
+- Silent membership: OrgAdmins (and platform SuperAdmins) act as project owners for share management without ever appearing in any share list
+- Open any shared project as a full silent editor — full access without an audit footprint in the share UI
+- Org Settings page toggles whether cross-organisation sharing is allowed
+- SuperAdmin can assign or revoke the OrgAdmin role per user
+200Entity Lists — Governed Pool & Lane NamingName BPMN pools and lanes from a maintained Organisation hierarchy, external-participant list and IT-systems list — consistent across every diagram.- Maintain three reusable lists per Organisation: External Participants, IT Systems, and an Organisation → Org Unit → Team → Role hierarchy
+- Each Project adopts an org structure as its own editable copy, so projects tailor names without touching the master
+- Renaming a white-box Pool pre-fills the default Organisation name and shows the whole indented structure; type to filter, press Enter to accept, or pick any level
+- Lanes draw from the same hierarchy; black-box pools draw from the External Participants or IT Systems list
+- A brand-new name prompts where it belongs in the hierarchy and is saved to the project structure on the spot
+- Maintained by Project Owners, OrgAdmins and SuperAdmins, with role-appropriate options
+200Guided Backups with Live ProgressSee exactly what will be backed up, choose who to include, and watch it happen — with a report at the end.- Pre-flight preview: a stats table of everything that will be captured before you commit
+- OrgAdmins pick which members to back up; SuperAdmins scope to All Orgs or a single Org's selected users
+- Live per-section progress streamed as the backup is built, then a statistical report (rows per section, total, file size)
+- The same guided experience across user, Org, full-system, AI Rules & Prompts, and built-in template exports
+- Restores are additive and fully transactional — all-or-nothing, never a half-restored set
+200Live Co-authoringEdit the same diagram together in real time — see who's here, who's holding what, and never overwrite each other's work.- **Presence** — coloured initials of everyone in the diagram, updated live
+- **Live cursors** — see each other's cursor move around the canvas, name-tagged (real-time)
+- **Soft locks** — an element someone else is editing shows their coloured ring; you can't clash on it
+- **No silent clobber** — a version guard means two people saving at once never lose a whole document
+- **Automatic merge** — edits to different elements merge silently; only a genuine same-element clash is flagged
+- Works for anyone with Edit access to the diagram (project owner, Edit sharees, OrgAdmins)
+200Publishing & Review LifecyclePublish a versioned diagram — or a whole bundle of related diagrams — to a business-user audience, with scheduled re-review reminders so process maps never silently go stale.- Draft → Published lifecycle: publishing snapshots an immutable Published Version; readers always see the latest non-superseded version, and the history is kept
+- Publication Bundles: publish a set of related diagrams together (root diagrams plus the sub-processes they link to) as one release, with release notes
+- Business-user audiences: share a bundle with named colleagues, or invite by email — an invitee is promoted into the audience automatically when they sign up
+- Read-only viewer: audience members open a clean, navigable view and drill across linked diagrams, with no edit access
+- Scheduled re-review: set a next-review date or a review cadence; Diagramatix fires an automatic 'review due' reminder when it's time
+- Supersede & revoke: a new version supersedes the previous one; archiving a bundle revokes its audience grants
+210Domain-managed OrganisationsClaim your email domain so everyone who signs up on it automatically joins the right organisation — no stray personal orgs.- An organisation "claims" one or more email domains (e.g. yourcompany.com)
+- Anyone registering with a matching email auto-joins that organisation at a configurable role
+- They don't get — and can't create — a personal organisation, so your tenant stays tidy
+- Set the claimed domains and the join-role from Org Settings (SuperAdmin)
+- Everyone else keeps the default: their own personal organisation
+210Organisation Hierarchy from BPMNBuild your Organisation → Org Unit → Team hierarchy straight from the pools, lanes and sub-lanes you've already drawn — then refine it by moving entries between levels.- One click in **Project Structure → Populate from BPMN** reads every BPMN diagram in the project and builds the Organisation Hierarchy: white-box **Pool → Organisation**, **Lane → Org Unit**, **Sub-lane → Team**
+- Names are **deduped** across diagrams — one "Finance" Org Unit, however many diagrams mention it
+- **Non-destructive**: it merges into any existing structure and keeps your own additions (later "Sync updates" never removes them)
+- **Refine by moving between levels** — promote, demote and reorder entries; the whole moved branch re-levels automatically to stay consistent
+- The same move controls work in the org-admin master Entity-List editor, not just in projects
+- The result immediately drives pool/lane name suggestions on the canvas
+210SharePoint & OneDrive IntegrationSign in with Microsoft, save and open diagrams in SharePoint or OneDrive, and link Data Objects to live documents.- Sign in with your Microsoft (Entra) account alongside email / password
+- Save a diagram's data files — XML + matching XSD + JSON (and Visio .vsdx for BPMN) — straight into a SharePoint or OneDrive folder
+- Open those files back from SharePoint / OneDrive into Diagramatix
+- Browse your SharePoint sites, document libraries and OneDrive with a built-in file picker
+- Link a Data Object or Data Store to a SharePoint / OneDrive file
+- Preview the linked file embedded in the editor, with a link badge on the shape
+220AI Assist — Suggest as You DrawSwitch on Assist and the editor suggests the next step, the right template, even the data a task needs — every suggestion validated by the rules engine, so it's always legal and tidily placed.- **Ghost next-steps** — select an element and translucent chips suggest what comes next (Task / Decision / End). Press **Tab** or click to accept; it's placed and connected for you, never on top of anything.
+- **Boundary events & template fragments** suggested in context — attach a boundary event, or drop in a saved template inline.
+- **Content-aware** — name a task "Approve invoice" and it suggests the matching **approval template**; imply a document and it offers an **Output** data object; imply a policy and it offers an **Instructions** input.
+- **Always correct** — every suggestion is checked by the same rules engine that governs AI generation, so nothing illegal or badly laid out ever appears.
+- **Tunable** — admins edit a keyword → action catalog (Assist / NL Rules); the geometry rules are shown read-only.
+- BPMN, opt-in per diagram, and **instant + free** for the common cases (no AI call).
+220AI Usage & Attempt InsightsSee exactly how AI is being used — your attempts left this month, the diagrams you've generated, and full raw/success/failure analytics per person and per organisation.- Every member sees **AI attempts left this month** (and when they reset) plus **diagrams generated this month** in their usage panel
+- Admin **AI Usage** dashboard separates the measures clearly: **Raw Attempts** (every call), **Successes / Failures**, **User Attempts** (the quota-consuming ones), and **# Diagrams generated using AI**
+- Per-user and per-organisation breakdowns, over-time charts, tokens and estimated cost
+- **Fair counting**: transcript "AI Tidy" clean-ups and failed calls are tracked for analytics but never consume a member's monthly attempt allowance
+- Monthly allowances are set per subscription tier and enforced automatically
+230Abracadabra Mode — Voice-Driven DiagrammingJust talk. Say "add a task called Approve after Review", "put a pool around everything", "delete Prepare and compact" — and watch the diagram build itself, live and undoable.- **Speak or type** editing commands; each is applied to the **current** diagram, live.
+- Add / connect / rename / **move** / delete elements; add **boundary events**; create **named lanes & sublanes**; **wrap everything in a pool**; clear; **export to JSON**.
+- Refer to elements by **name**, by **type** ("the gateway"), by **position** ("the middle pool"), or with **"it / the last one / the previous one"**.
+- **Hybrid + cheap** — common phrasings are interpreted instantly and free; only unusual wording falls back to a metered AI, and the log colour-codes which is which.
+- **Always reversible** — every change is undoable; say **"undo that"**, and **"stop"** to finish. Voice minutes appear in **AI Usage**.
+- The only BPM tool that lets you model a process **by conversation** — hands-free, with the correctness guarantees of a governed rules engine behind every change.
+230ArchiMate 3.2 — Junctions & GroupingsAnd/Or junctions and Grouping containers are now recognised when importing an ArchiMate image, and are first-class, fully-editable shapes on the canvas.- **And / Or junctions** are detected from an imported ArchiMate diagram and wired through the relationships they join
+- **Groupings** are proper containers — easy to select (icon or any boundary), move as a unit, resize, double-click to rename, and nest other elements inside
+- Updated to the **ArchiMate 3.2** element set, including the Location element and refined icon/box notation on ingestion
+250Enterprise Governance & SecurityGive large organisations strict, per-tenant control over where their process information can go — and whether, and how, AI is used — with a full audit trail of privileged access.**Your policy, enforced by us.** Your own OrgAdmins control an **Organisation Policy** panel — turn each capability on or off for your whole organisation, and the platform enforces it (not just the UI):
+- **AI features** — disable all AI generation, or keep it on
+- **Voice transcription** — disable sending audio to the speech-to-text provider
+- **External export** — block pushing data out to SharePoint / OneDrive
+- **SharePoint integration** — disable the connector entirely
+- **Support attachments** — stop diagrams being attached to support requests
+
+**Enterprise Mode** — one click turns all of the above off (plus cross-organisation sharing), as a safe default for regulated tenants.
+
+**AI on your terms.** Route all AI through your own gateway/region, run a **local model fully on-premises**, or switch AI off completely for your tenant — AI uses a single, centrally-chosen model you approve. (See the *Flexible AI* feature for the deployment options.)
+
+**Accountability.** An append-only **Audit Log** records every privileged action — administrator impersonation (with a required reason and a time-boxed session), data exports and backups, deletions and policy changes — so you can see who did what, when, to which tenant.
+
+**Access & isolation.** Role-scoped administration (Organisation Admin vs system operator), tenant-isolated data, cross-organisation sharing off by default, a configurable session lifetime, and the option to **require Microsoft single sign-on** for your organisation (plus a self-registration domain allowlist).
+
+**Privacy.** Self-service **account deletion** (right to erasure) that removes your data and cleans up behind you; AI prompt text isn't retained by default.
+
+*On the roadmap:* bring-your-own IdP (SAML / OIDC) with MFA, dedicated single-tenant / in-region instances, and SOC 2 Type II.
+255Flexible AI — Your Cloud, Your Gateway, or On-PremisesUse AI diagram generation the way your security team allows — our managed service, routed through your own gateway, or a local model running entirely inside your network. Or switch AI off and keep the full deterministic platform.AI Generate turns a description, document or image into a BPMN, flowchart, ArchiMate, domain or state-machine diagram. **How** that AI runs is your choice:
+
+- **Managed (default)** — our hosted, up-to-date Claude models. Nothing to run.
+- **Your gateway / region** — route all AI through your own proxy or private endpoint, so traffic stays under your data-residency and DLP controls. A configuration setting, not a code change.
+- **Fully on-premises** — point Diagramatix at a **local, self-hosted model** (e.g. Llama or Qwen behind your own gateway). Diagram content never leaves your network — ideal for air-gapped or highly regulated environments.
+- **Off** — disable AI entirely per organisation and use the complete manual + deterministic platform (process mining, simulation and risk/controls all still work).
+
+Whichever mode you pick, AI uses a **single, centrally-chosen model** your administrators control — nothing is ever sent to a model you haven't approved.
+290Diagram Health Check & Connector ScanScan a whole project for BPMN connector and structure problems — especially handy after a Visio import — and fix them one at a time, each highlighted on its own diagram.- Project-wide scan against shared BPMN correctness rules: sequence / association connectors illegally attached to pools or lanes, hanging message flows, single-lane pools, duplicate element names and other structural slips
+- Every issue is grouped by diagram and carries the offending element and connector ids, so it lights up directly on the canvas
+- Scan → Fix → Re-scan rhythm: jump to an issue, correct it in the editor, and re-run to confirm it's cleared — the cycle remembers where you were
+- Purpose-built for cleaning up imported Visio diagrams, where connector attachment is the single most common thing to repair
+- SuperAdmin-editable scanner rules decide which checks run, so the health check matches your house BPMN conventions
+300Automatic Diagram LinkingLet Diagramatix wire up the sub-process links across a project for you — match each sub-process to the diagram that details it by name or process number, then confirm in one dialog.- Scans every BPMN diagram in the project for un-linked sub-processes and finds the diagram that expands each one
+- Exact-name matches are treated as definite and pre-selected; looser matches are offered as probable for you to confirm
+- Heuristics built for real-world naming: a shared leading process code (e.g. ABC123.45), matching descriptive text after the code, one name contained inside another, or a close edit-distance spelling match
+- Review everything in a single dialog — tick the links to add, untick existing links to remove — then apply in one step
+- Turns a freshly-imported set of diagrams (e.g. a Visio bundle) into a properly drill-down-navigable hierarchy in seconds
+310Flowchart → BPMN TranslationModernise legacy Standard Flowcharts into BPMN — translate an existing flowchart diagram into a proper BPMN process map in one step, so teams can move off the old flowchart standard onto the current business-process-modelling standard, BPMN.- One-click, deterministic translation of a Diagramatix Standard Flowchart into a brand-new BPMN diagram — the original flowchart is never touched (one-way)
+- Faithful shape mapping: processes → tasks, decisions → exclusive gateways (keeping the Yes/No branch labels), terminators → start/end events, predefined processes → sub-processes, delays → timer events
+- Data shapes become real BPMN artifacts: documents → data objects, databases → data stores, each attached to the right activity by an association rather than left in the control flow
+- Vertical swimlanes become a BPMN pool with one lane per swimlane; on/off-page connectors are followed through and spliced away so the flow stays connected
+- A preview report shows exactly what was mapped, approximated or spliced before the BPMN diagram is created
+- Optional one-click AI tidy refines labels, task types and gateway names — it can never change the structure
+- Pairs with Image to Diagram (snap a photo of a paper/Visio flowchart) so both drawn and scanned legacy flowcharts have a path to BPMN
+- Built to help organisations migrate from the legacy flowchart diagramming standard to BPMN, the current business process mapping standard
+320Voice Dictation (Speech-to-Text)Describe your process out loud — high-accuracy voice dictation feeds straight into AI Generate for every diagram type, so you can talk a diagram into existence instead of typing.- Dictate the prompt by voice in the AI Generate panel of EVERY notation — BPMN, Flowchart, Context, Process Context, State Machine, Domain, Value Chain and ArchiMate
+- Real-time, high-accuracy transcription via Deepgram streaming — words appear as you speak
+- Continuous: it keeps listening through natural pauses and doesn't drop words between phrases
+- A live indicator shows which engine is running — bright blue for the high-quality Deepgram service, red if it has fallen back to the browser's built-in recogniser
+- Automatic fallback to the browser speech engine when the premium service isn't available, so dictation always works
+- Built-in microphone test that records a few seconds and lets you replay it, so you can confirm your mic is clear before relying on it
+- Your key is never exposed: the browser streams through a short-lived, server-issued token
+330Simulation Working Hours & CalendarsGive teams real shift patterns and sources real operating hours, so simulated throughput, utilisation and queues reflect a working week — not a 24/7 ideal.- A reusable, project-level Calendar library — weekly open windows per weekday, with presets (Mon–Fri 9–5, 9–5 with lunch, 24/7)
+- Assign a calendar to any team: it's staffed at full capacity during open windows and stands down when closed
+- Work in progress at the end of a shift finishes; new work waits, and anything queued overnight starts the moment the shift reopens
+- Model breaks and full-team meetings as gaps between windows
+- Operating hours for arrival sources, with an optional per-window rate multiplier for time-varying (peak/off-peak) demand
+- Utilisation is measured against staffed time, and the replay shows work banking up out-of-hours and surging when the shift opens
+- Starter examples ship with a Business-hours calendar on their human teams
+340Diagramatix Miner — Process MiningIngest event logs from your systems and Diagramatix Miner reconstructs the process you actually run — the implied BPMN, the entity's real lifecycle, and where reality deviates from your reference — then calibrates a credible simulation twin in one click.- Import standard CSV event logs (case, activity, timestamp, state, optional resource) with auto-detected column mapping and a live preview
+- Discovers the implied BPMN process — an editable diagram with gateways at every branch, loops, and a detail slider to move between the happy path and the full spaghetti
+- Proposes a candidate State Machine — the real lifecycle of the underlying entity (Invoice, Employee, Registrant…), with each transition labelled by its triggering activity
+- Conformance checking against a reference State Machine: a fitness %, plus undocumented transitions, unknown states, unexpected entries/exits and never-used (dead) transitions — weighted by how many cases they affect
+- One-click digital twin: writes mined durations, arrival rates, gateway probabilities, teams/capacity and working-hours calendars onto the discovered process and opens it straight in the Simulator
+- Closes the loop — mine → discover → conform → simulate → improve — so to-be redesigns are compared against a baseline calibrated from real data, not guesses
+- Runs are saved per project and re-checkable against a different reference without re-uploading
+341Diagramatix Miner — the log you actually haveMost people do not have an XES file — they have a spreadsheet, and it is rarely the shape a miner expects. Excel, exports with the whole lifecycle across one row, and several systems' extracts of the same cases all import, with a refusal rather than a wrong answer when they cannot be reconciled.- Reads Excel (.xlsx) directly alongside CSV/TSV, IEEE XES and OCEL — and offers the sheet when a workbook holds more than one
+- Detects a "one row per case" export — state, date, state, date across the row — and offers to expand it, rather than reading one step per case and quietly discarding the rest
+- Merges several systems' exports of the SAME cases into one lifecycle: the CRM's front half and the ERP's back half become one process
+- Links records across systems on a shared business key or an explicit id crosswalk when the two do not agree on a case id
+- REFUSES a merge that cannot work: if no case appears in more than one file, you are told — rather than being handed twice as many half-length cases, which looks exactly like a successful import
+- Measures the wait BETWEEN two systems — a delay neither export contains on its own, and usually the largest in the process
+- Choose which spare columns to keep, hash or drop at import; kept columns become the dimensions you can slice by later
+342Diagramatix Miner — the analyst's workbenchSlice the run by date, team or any column you kept; see which hand-off is actually costing the time; get the case ids behind a deviation; and be told what to do next — with every figure saying whether it can be cited.- Filter a run by date range, team, or any column kept at import — the arrivals/completions chart doubles as the date brush
+- Every figure declares itself: filtered, filtered · estimated (a sampled run), or NOT filtered where the run cannot support it — never averaged into a plausible-looking number
+- "Between steps": the transitions ranked by how much elapsed time they account for, because most of the delay in a process is between the steps rather than inside them
+- Click a row to light its arrow on the model, or an arrow to find its row
+- Team hand-off map, workload, cases passed back and forth, and steps repeated within a case — with the rate ("Credit check runs 2.4× per case")
+- Deviations resolve to EVIDENCE: the actual case ids, each with its own timeline; and it states how many of the affected cases it can name, never showing a quietly short list
+- The whole per-case index exports as CSV — not the sixty rows the screen shows — honouring the filter you applied
+- Word/Excel reports state the slice they were run under, with summary counts that match the tables beneath them
+- "What to do next": ranked, deterministic recommendations, each with a button — show me the cases, slice to this, or calibrate a twin and try more capacity in that team
+- It can say "nothing stands out", and it names what it could not assess (no SLA set, no reference model) rather than staying quiet
+343Diagramatix Miner — watch it, rather than visit itNobody mines a process once. Runs link into a series, two periods can be compared, and a live source tells you when the process changed — starting with the alarm that matters most: it stopped sending.- Snapshots link into a run series, so a process has a history instead of a scattering of similarly-named copies
+- A live source keeps its own history automatically — bounded to one snapshot a day and thirty in total
+- Compare two periods: cases, cycle times, variants, conformance, which steps got slower, and which deviations appeared or went away
+- REFUSES to compare two runs whose activities barely overlap — they are different processes, and every difference between them would look like a dramatic regression
+- Notifies you when a source stops sending: the cheapest alarm and the most valuable, because a dead feed raises no error and stale figures look exactly like stable ones
+- Notifies you when conformance falls, when a deviation appears that was not there before, or when the late rate more than doubles
+- Nothing fires on a first observation, and a condition is announced once — one that gets worse is raised again; one that merely persists is not
+- Hold back the most recent share of cases at import so a digital twin can be tested against data it never saw, instead of marking its own homework
+- A twin whose log has moved on is marked stale, with the date — never silently re-calibrated over edits you made
+350Diagramatix Miner ExamplesReady-made process-mining studies you can load in one click — a real event log plus its reference lifecycle — to explore Discovery, Conformance and the digital-twin Simulator without any setup.- A gallery of published examples; Load & open copies one into a new project and opens ⛏ Diagramatix Miner on it
+- Each example ships a ready mined run (compressed event log with timing + resource data) so Discovery, Conformance and Calibrate & simulate all work immediately
+- Reference state machines travel with the example, so conformance checking has a source-of-truth to score against out of the box
+- The Accounts Payable starter: a month of ~200 invoices, with a permissive lifecycle (≈90% conformant) and a strict one that flags dozens of undocumented rework cases
+- One click hands the discovered process to the Simulator as a calibrated digital twin — watch cases animate through it in Replay
+- Administrators can capture any real mining run as a new example, then edit, duplicate and publish it from the catalog manager
+360Process Classification Framework (APQC PCF)Classify and structure your processes against the APQC Process Classification Framework® — the Cross-Industry standard plus industry variants — and tailor your own governed, upgradeable framework.- Browse the full APQC PCF: the Cross-Industry framework and industry variants (Banking, Healthcare, Retail, Telecommunications, Utilities, and more) as a searchable 5-level hierarchy (Category → Process Group → Process → Activity → Task)
+- Classify any diagram against a PCF element, so your models speak the recognised industry language
+- Create APQC Project — spin up a project pre-seeded with a folder structure mirroring a chosen PCF branch, to whatever depth you want
+- Create APQC Process — pick a standard process and generate its BPMN model in one click: higher-level processes decompose into collapsed sub-processes, task-level processes are AI-generated, with optional APQC numbering on every step
+- The AI generator is grounded on the selected APQC branch, so generated models align to the standard
+- Coverage analytics: see exactly which APQC processes are modelled vs. gaps, by category and level
+- Compose your own tailored framework from one or more industry variants, extend it with your own processes, curate it to your terminology, and scope it to business units/divisions
+- Stays current: import new APQC versions with an automatic change diff (added / renamed / removed) that carries your classifications forward — classifications key on APQC's stable process id, so they survive version updates
+- Uniquely integrated: report conformance and control operating-effectiveness by APQC process category, tying the standard to your live process models and mined data
+- Uses APQC's PCF® under its royalty-free licence with attribution preserved throughout (and carried into every export)
+370Process Portal — find any processA search-first portal where everyone in your organisation can browse and find the published processes they have access to — no need to know which project a process lives in.- Search across every published process you can access — by name, owner, APQC category, or the systems and teams it involves
+- Browse by facet: diagram type, process owner, APQC category, and review status — each with live counts, combining to narrow instantly
+- Access-scoped and safe: you only ever see processes you already have permission to open — the Portal adds discovery, never new exposure
+- Recently viewed and recently updated shortcuts get people back to what matters
+- One click opens the clean, read-only viewer with the current published version, its owner, and its linked procedure — and drills across sub-processes
+- Review status at a glance: a badge flags processes that are overdue or due soon for their scheduled re-review
+372ArchiMate Icon Library & DesignerDesign your own ArchiMate element icons — trace an image with AI, refine the vector shapes, and assign a glyph to any element type so it renders everywhere, recoloured to the layer.- Upload an image of an icon and have it AI-traced into editable vector shapes, with the source image kept as a faint underlay to refine against
+- A full vector editor: lines, Bézier curves, rectangles, triangles, circles, ellipses, arcs (semi-circles whose endpoints ride the circle) and orientable arrowheads — with fill/stroke, z-order, a background (knockout) fill, and lasso + group-move
+- Trace over a built-in glyph to improve it, or start from scratch; save to a reusable library and duplicate any icon as a starting point
+- Assign a library glyph to an element type — it renders as that element's icon everywhere (canvas + palette), recolouring to the element's theme so one glyph works across layers, and staying crisp at any zoom
+- Fine-tune per-element position and size, and per-category edge buffers, so glyphs sit exactly where you want
+- Full ArchiMate 3.2 element set, relationship compatibility (including the directed Association and cross-level Realisation), and proper icon-only shapes — Service, Event (triangular notch), Value Stream chevron, and more
+- Changes apply live across open diagrams and the Symbols Panel, for every user
+374Project Re-numberingGive a whole project consistent hierarchical numbers — folders, diagrams and activities — either preserving your APQC structure or renumbering from the root, with a full preview before anything changes.- Configure numbering per project: APQC-preserving (keep the APQC folders and diagram names, renumber each diagram's activities) or a full renumber from the project root
+- Full-renumber pattern: a fixed 0–3 letter prefix on the top-level number, then dotted level numbers (e.g. ABC2.3.1.4), single-digit up to 9 and two-digit zero-padded beyond — applied to folders, diagrams and activities
+- APQC mode keeps your framework codes and renumbers activities contiguously — new non-APQC steps slot in, and gaps from deleted steps close automatically (numbers stay bare and sort correctly)
+- Preview every change (old → new) for every folder, diagram and activity before you commit; confirm or cancel
+- Activity codes render on the first line of each step; diagram and folder names are prefixed with their code
+- "Show non-APQC" toggle highlights everything added outside the framework — in the navigation tree, on the tiles, and on the diagram canvas — in the APQC colour
+- Idempotent: re-running produces the same result, so numbers never stack up
+380Find processes by system or team (where-used)Answer “which processes use IT System X?” and “what is my team involved in?” — the Portal maps every process to the IT systems and teams/roles it references, matched to your Org Entity Lists.- Entity facets in the Portal: filter published processes by IT System, or by Team / Role
+- Canonical, roll-up matching: process pools/lanes are matched to your Org Entity Lists, and picking a team also surfaces processes that only name a role beneath it
+- Coverage signal: labels that aren't in your Entity Lists still appear (flagged as “uncatalogued”) so nothing is hidden — and you can see what to add to the catalogue
+- “Involving me”: one click shows every process that references a team or role you belong to — your personal process view
+- Admin-managed membership: OrgAdmins assign members to teams/roles (SuperAdmins across every org) from your governed Org-Structure list
+390Primary procedure documentLink the written procedure (SOP) to its process model, so a reader always has the diagram and the words side by side.- Attach a procedure document (a link — e.g. a SharePoint/OneDrive file, or any URL) to a diagram in Diagram Properties
+- Surfaced read-only as a prominent “Procedure” link in the published viewer and on Portal cards
+- Travels with the diagram: carried in the versioned publish snapshot and the diagram export
+400Import another vendor's BPMN diagramBring a BPMN diagram drawn in another tool into Diagramatix exactly as it looks — pools any size or side-by-side, message flows drawn straight between elements that aren't lined up — without a wall of layout warnings.- **Reproduce from an image:** attach a picture of the diagram to AI Generate, tick “Reproduce original layout”, and Diagramatix rebuilds it at the positions it was drawn — pools, lanes, tasks, gateways and the connectors between them, kept where they are
+- **Free-form / imported layout:** a per-diagram switch (Diagram Properties) that lets pools be any size and sit anywhere (not forced into stacked full-width bands) and lets message flows run rectilinearly between elements that aren't vertically aligned
+- **No false errors:** the layout validation that enforces Diagramatix's own conventions is relaxed for these diagrams, so an imported foreign model isn't buried in red flags
+- **Still fully editable:** an imported diagram is a normal Diagramatix diagram — move things, edit labels, and draw more, all without the editor snapping pools back into a column or messages back to vertical
+- **Safe fallback:** if the picture is too rough to place precisely, the import still succeeds using Diagramatix's clean auto-layout rather than failing
+410Simulation Resources You Can SeeEvery resource in a simulation is one you drew. Nothing is invented behind the scenes, nothing is provisioned silently — if a team affects the answer, it is named on screen where you can change it.- **Harvested from your diagram** — teams come from your swim-lanes and from any team named on a task, across the process you opened *and* every sub-process it links into.
+- **Nothing hidden.** A tool that quietly invents a resource gives you an answer you cannot audit. If work is charged to a name that isn't in the library, the results say so — and tell you that work ran with no capacity limit, so its waiting times are understated.
+- **Typos surface as findings, not silence.** "Sales Team" and "Sales Taem" both appear, side by side, so the discrepancy is something you can see and correct rather than something the run absorbs.
+- **Scoped to the process you're simulating** — opening one process doesn't provision the teams of every unrelated process in the project.
+- **Project-level library** — maintain resources from the project page without opening a diagram.
+420Repeats & Multi-Instance Simulation"Check each section" isn't done the same number of times twice. Give a repeating task a distribution for how many passes, and the simulation runs it the way the work is actually done.- **Sequential multi-instance** runs the instances as one uninterrupted block, holding the resource throughout — which is how a person actually works through a list.
+- **Parallel multi-instance** runs as many at once as the resource allows; the remainder queue and start as capacity frees. A parallel marker on a one-person team behaves sequentially, and the Simulator says so instead of pretending otherwise.
+- **The count is a distribution**, not a guess — because the number of passes varies exactly as much as the durations do.
+- **An implausible count is reported before the run**, not silently trimmed: entering 3 *minutes* where 3 *passes* were meant is caught up front, rather than discovered after the run.
+430System Tasks Run ThemselvesService, Script and Business-Rule tasks are charged to a shared Automation resource on a 24/7 calendar — so you can draw systems and people in the same lane without the flow zig-zagging between them.- Real processes interleave people and systems at every step. Modelling that faithfully used to mean a separate "Automation" lane and a flow that crossed into it and back on every system task.
+- Now a task's **marker** decides who does it: User / Manual / none go to the swim-lane's team; **Service, Script and Business Rule** go to **Automation**.
+- Automation runs **24/7** — it doesn't wait for office hours, so overnight processing is modelled correctly.
+- It is an **ordinary, visible resource**: it appears in the library with a capacity and a cost you control.
+- Your diagram stays readable, and the simulation still tells the truth about who is busy.
+440Honest Simulation RunsA model whose queues never drain is a finding about your process, not a crash. The run stops, says why, and points at the bottleneck — instead of showing you a half-finished answer that looks complete.- **When demand exceeds capacity**, the queue grows for as long as the run continues. The Simulator stops and explains, above every figure: how many cases were still in progress, and that the number was still climbing.
+- **Partial results are labelled as partial.** Stopping without saying so would present part of a run as a finished answer — the most dangerous kind of wrong number.
+- **It tells you what to change** — raise capacity on the named bottleneck, lower the arrival rate, or shorten the longest task.
+- **Token Trace Table** — the whole run as a grid, one row per case: where the time went, what waited, what was interrupted. A blank cell means the case never went there; a zero means it did and took no time. Export to CSV.
+450Compare Two Versions of a ProcessPoint at an as-is and a to-be and get the list of what actually changed — steps added, removed, renamed, moved between lanes — as a table, a document, or a plain-English narrative.- Reads the two **models**, not the two pictures: a renamed task is reported as a rename, not as a delete plus an add.
+- Covers steps, **connectors, gateways and properties**, including moves between swim-lanes.
+- Export as **CSV** for a spreadsheet or **.docx** for a change pack.
+- Generate an **AI narrative** — a plain-English summary of what changed and what it implies, grounded in the table rather than invented.
+- The artefact to attach to a change request or a process-improvement review, where "what exactly changed?" is the first question anyone asks.
+460Simulation that models what actually happensMost cases are routine and a few run far past the median; urgent work interrupts what someone is already doing; and plenty of costs do not care how long a task took. A model that cannot say those things produces answers that look right and queue wrongly.- **Right-skewed service times.** A lognormal duration: most cases cluster, a minority run far longer. A symmetric distribution cannot produce that tail — and the tail is what makes a queue form, which is usually the thing being simulated in the first place
+- **Or no assumed shape at all.** An empirical duration resamples the values actually observed. Where a mined log exists, laying a curve over it is a claim the evidence does not make
+- **Calibration fences its outliers.** A twin fitted from a mined log used to take the raw longest case as its ceiling, so one case that sat over a long weekend set the tail for every future run. The fit now uses the observed values behind a standard outlier fence — with a cap on how much may be trimmed, because if a tenth of the cases are slow they are not outliers, they are the process
+- **Preemption — who STOPS, not just who goes next.** Priority alone decides who is served next, which is powerless while every person is busy: exactly when an urgent case arrives, and exactly when it matters. An urgent case can now interrupt work in progress
+- **And it resumes.** The interrupted case keeps the work already done and finishes the remainder. Being interrupted costs you the wait, not the whole task
+- **Reported per segment.** Preemption does not make a process faster on average — it moves the waiting off the case that could not afford it and onto the one that could, and the report shows both halves rather than a flattering pooled average
+- **Costs that do not scale with time.** A per-run charge on an activity — a bureau check, a courier, a card-scheme fee. These are exactly the costs a redesign removes by stopping the work rather than speeding it up
+- **Kept separate from resource cost**, because the two have different remedies: one falls when the work gets faster, the other only when the work stops happening
+- **Absent, never zero.** An unpriced activity reports as not measured. "Nothing was charged" and "nothing was counted" are different claims
+- BPSim interchange throughout — lognormal and empirical distributions import and export as their standard elements
