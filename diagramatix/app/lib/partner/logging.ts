@@ -70,6 +70,30 @@ const clip = (s: string) =>
   s.length <= HARD_CEILING ? s : `${s.slice(0, HARD_CEILING)}…[${s.length} bytes total]`;
 
 /**
+ * Log writes that have been started but have not landed yet.
+ *
+ * The response deliberately does NOT wait for its row (a slow log must never
+ * slow the API), which makes the write invisible to anything that calls the
+ * handler and then looks at the table — it is simply not there yet. Tests used
+ * to bridge that with a fixed 150 ms sleep, which passed locally and failed on
+ * a loaded CI runner, twice, on different assertions in the same file.
+ *
+ * Holding the in-flight promises lets a caller await exactly the writes that
+ * are outstanding instead of guessing how long they take. Nothing on the
+ * request path awaits this set, so production behaviour is unchanged.
+ */
+const inFlightLogWrites = new Set<Promise<unknown>>();
+
+/** Resolve once every log write started so far has landed. For tests. */
+export async function settlePartnerLogs(): Promise<void> {
+  // A write can be added while we await, so drain until the set is empty
+  // rather than snapshotting it once.
+  while (inFlightLogWrites.size > 0) {
+    await Promise.all([...inFlightLogWrites]);
+  }
+}
+
+/**
  * Wrap a public route handler. Always returns the handler's response — a logging
  * failure must never become a caller-visible failure.
  */
@@ -114,7 +138,7 @@ export function withPartnerLogging(handler: PartnerHandler) {
     const responseText = await cloned.text().catch(() => "");
 
     const capturing = result.capturing === true;
-    void prisma.partnerRequest
+    const logWrite = prisma.partnerRequest
       .create({
         data: {
           ref,
@@ -136,6 +160,8 @@ export function withPartnerLogging(handler: PartnerHandler) {
         },
       })
       .catch((e) => console.error(`[partner:${ref}] could not log the request:`, e));
+    inFlightLogWrites.add(logWrite);
+    void logWrite.finally(() => inFlightLogWrites.delete(logWrite));
 
     // Every response carries the ref, so a caller can quote it.
     const headers = new Headers(result.response.headers);

@@ -19,7 +19,7 @@ import { prisma, pgPool } from "@/app/lib/db";
 import { truncateAll } from "../_setup/db";
 import { createUser, createOrg, addOrgMember } from "../_setup/factories";
 import { mintIngestKey } from "@/app/lib/mining/sourceAuth";
-import { withPartnerLogging } from "@/app/lib/partner/logging";
+import { withPartnerLogging, settlePartnerLogs } from "@/app/lib/partner/logging";
 import { SCOPE_PROCESS_MAPPING, BODY_CAPTURE_LIMIT } from "@/app/lib/partner/types";
 
 async function mintKey(orgId: string, serviceUserId: string, phase: string, captureUntil: Date | null) {
@@ -49,8 +49,10 @@ const post = (body: string, key?: string) =>
     body,
   });
 
-/** The wrapper writes its row without awaiting; give it a beat to land. */
-const settle = () => new Promise((r) => setTimeout(r, 150));
+/** The wrapper writes its row WITHOUT awaiting it, so the response can return
+ *  before the row lands. Await exactly those writes — a fixed sleep here passed
+ *  locally and failed twice on CI (T2957 and T2958, 2026-09-16). */
+const settle = () => settlePartnerLogs();
 
 describe("Partner API — request logging", () => {
   beforeEach(async () => { await truncateAll(); });
