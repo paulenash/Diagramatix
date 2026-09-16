@@ -192,12 +192,67 @@ function buildReference(work) {
   return out;
 }
 
+const xmlEscape = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const xmlUnescape = (s) => s.replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+  .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&");
+
+/**
+ * A REAL contents list, not a TOC field.
+ *
+ * Pandoc's `--toc` emits a `TOC` field, and Word greets every reader of a
+ * document containing one with "this document contains fields that may refer to
+ * other files, do you want to update them?" — because a contents field CAN pull
+ * entries from other documents (that is what its RD switch does). Ours refers to
+ * nothing outside itself, but Word cannot know that without evaluating it, so it
+ * asks. On a document sent to someone else that prompt reads like a warning
+ * about the file (Paul, 2026-09-16).
+ *
+ * Every heading already carries a bookmark, so the contents can be written out
+ * as ordinary paragraphs with internal links: same navigation, no field, no
+ * prompt. The cost is page numbers, which a field computes at layout time and
+ * nothing outside Word can know.
+ */
+function contentsXml(xml, depth = 2) {
+  const entries = [];
+  let bookmark = null;
+  const re = /<w:bookmarkStart[^>]*w:name="([^"]+)"[^>]*\/>|<w:p>([\s\S]*?)<\/w:p>/g;
+  for (let m; (m = re.exec(xml));) {
+    if (m[1] !== undefined) { bookmark = m[1]; continue; }
+    const body = m[2];
+    const lvl = /<w:pStyle w:val="Heading([1-6])"/.exec(body);
+    if (!lvl) continue;
+    const level = Number(lvl[1]);
+    if (level <= depth && bookmark) {
+      const text = [...body.matchAll(/<w:t[^>]*>([\s\S]*?)<\/w:t>/g)]
+        .map((t) => xmlUnescape(t[1])).join("").trim();
+      if (text) entries.push({ level, bookmark, text });
+    }
+    bookmark = null;
+  }
+  const rows = entries.map(({ level, bookmark, text }) =>
+    `<w:p><w:pPr><w:pStyle w:val="Compact" /><w:ind w:left="${(level - 1) * 340}" /></w:pPr>`
+    + `<w:hyperlink w:anchor="${bookmark}">`
+    + `<w:r><w:rPr><w:rStyle w:val="Hyperlink" />${level === 1 ? "<w:b /><w:bCs />" : ""}</w:rPr>`
+    + `<w:t xml:space="preserve">${xmlEscape(text)}</w:t></w:r></w:hyperlink></w:p>`).join("");
+  return {
+    xml: `<w:p><w:pPr><w:pStyle w:val="Heading1" /></w:pPr>`
+      + `<w:r><w:t xml:space="preserve">Contents</w:t></w:r></w:p>${rows}`,
+    count: entries.length,
+  };
+}
+
 /** Mark the label columns no-wrap, so a ref never breaks across two lines. */
 function applyNoWrap(docx, noWrapByTable, work) {
   const dir = path.join(work, "out");
   unpack(docx, dir);
   const p = path.join(dir, "word", "document.xml");
   let xml = readFileSync(p, "utf8");
+
+  // Static contents in place of the field, straight after the title.
+  const toc = contentsXml(xml);
+  const titleEnd = xml.indexOf("</w:p>", xml.indexOf('<w:pStyle w:val="Title"')) + "</w:p>".length;
+  const at = titleEnd > "</w:p>".length ? titleEnd : xml.indexOf("<w:body>") + "<w:body>".length;
+  xml = xml.slice(0, at) + toc.xml + xml.slice(at);
 
   let cursor = 0, table = 0, patched = 0;
   const pieces = [];
@@ -229,7 +284,7 @@ function applyNoWrap(docx, noWrapByTable, work) {
   xml = pieces.join("");
   writeFileSync(p, xml, "utf8");
   pack(dir, docx);
-  return { tables: table, cells: patched };
+  return { tables: table, cells: patched, toc: toc.count };
 }
 
 if (!existsSync(SOURCE)) throw new Error(`missing ${SOURCE}`);
@@ -243,13 +298,12 @@ try {
 
   execFileSync(PANDOC, [
     src, "-o", OUT,
-    "--toc", "--toc-depth=2",
     "--reference-doc", buildReference(work),
     "--metadata", "title=Diagramatix — Tests Summary",
   ], { stdio: "inherit" });
 
-  const { tables, cells } = applyNoWrap(OUT, noWrapByTable, work);
-  console.log(`sized ${noWrapByTable.length} tables · no-wrap on ${cells} label cells across ${tables} · wrote ${OUT}`);
+  const { tables, cells, toc } = applyNoWrap(OUT, noWrapByTable, work);
+  console.log(`sized ${noWrapByTable.length} tables · no-wrap on ${cells} label cells across ${tables} · ${toc} contents entries, no fields · wrote ${OUT}`);
 } finally {
   rmSync(work, { recursive: true, force: true });
 }
