@@ -3255,7 +3255,7 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 | T4148 | `tests/epc/spec-doc.test.ts` | Every EPC symbol appears in the specification. |
 | T4149 | `tests/epc/spec-doc.test.ts` | The rules table names every diagnostic the layout can report, and no others. |
 | T4150 | `tests/epc/spec-doc.test.ts` | It says the tables are generated, and how to regenerate them. |
-| T4151 | `tests/epc/comparison-currency.test.ts` | The comparison’s notation count matches the diagram types that exist. |
+| T4151 | `tests/epc/comparison-currency.test.ts` | The comparison AND the feature guide claim the real notation count (the canonical types, excluding the retired `basic` alias), in words and digits, and neither still lists Basic; the palette is cross-checked against the canonical list so a new notation cannot ship without the count moving. |
 | T4152 | `tests/epc/comparison-currency.test.ts` | Its version stamp is the version that shipped — every claim, not just one. |
 | T4153 | `tests/epc/comparison-currency.test.ts` | EPC is claimed on our side of the table, not ARIS’s alone. |
 | T4154 | `tests/epc/spec-doc.test.ts` | The EPC User Guide chapter and the default rules are seeded on deploy. |

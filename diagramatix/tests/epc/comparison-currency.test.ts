@@ -16,9 +16,13 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { PRODUCT_VERSION, SCHEMA_VERSION } from "@/app/lib/diagram/types";
 import { PALETTE_BY_DIAGRAM_TYPE } from "@/app/lib/diagram/symbols/definitions";
+import { EDITABLE_DIAGRAM_TYPE_KEYS } from "@/app/lib/diagram/diagramTypeStyles";
 
 const DOC = "../competitors/diagramatix-vs-signavio-aris-primebpm-2026-09.md";
 const doc = () => readFileSync(DOC, "utf8");
+/** The feature guide is the same kind of document and makes the same claim, so it is pinned too. */
+const FEATURES_DOC = "../competitors/diagramatix-features-2026-09.md";
+const featuresDoc = () => readFileSync(FEATURES_DOC, "utf8");
 
 /** Spelled out, because that is how the document writes it. */
 const WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven",
@@ -28,7 +32,19 @@ describe("the comparison's claims about US are current", () => {
   it("T4151 - the notation count matches the diagram types that exist", () => {
     // This is the one that was already wrong: "all 7 notations" survived the
     // flowchart shipping and then EPC shipping, because nothing looked.
-    const count = Object.keys(PALETTE_BY_DIAGRAM_TYPE).length;
+    //
+    // Count the CANONICAL types, not the palette. `basic` is a retired type
+    // kept only as an alias so diagrams saved under it still open — it maps to
+    // `context` (canonicalDiagramTypeKey), has no entry of its own in the type
+    // styles, and must never be offered or counted as a notation we sell
+    // (Paul, 2026-09-16). Counting palette keys said ten and made the document
+    // overstate by one. The palette is still cross-checked below, so a genuinely
+    // new notation cannot ship without this count moving.
+    const count = EDITABLE_DIAGRAM_TYPE_KEYS.length;
+    expect(
+      Object.keys(PALETTE_BY_DIAGRAM_TYPE).filter((k) => k !== "basic").sort(),
+      "every canonical diagram type has a palette, and the palette has no type the styles do not know",
+    ).toEqual([...EDITABLE_DIAGRAM_TYPE_KEYS].sort());
     const word = WORDS[count] ?? String(count);
     const d = doc();
     expect(
@@ -45,6 +61,19 @@ describe("the comparison's claims about US are current", () => {
     const wrong = [...new Set(claimed)].filter((c) => c !== word && c !== String(count));
     expect(wrong, "the comparison claims a notation count that is not the real one")
       .toEqual([]);
+
+    // The feature guide is the same liability and went out with the same wrong
+    // number (2026-09-16). Pin it the same way, in both spellings.
+    const f = featuresDoc();
+    expect(f, `the feature guide should say "${word} notations" — there are ${count}`)
+      .toContain(`${word} notations`);
+    const fClaimed = [...f.matchAll(numberish)].map((m) => m[1].toLowerCase());
+    const fWrong = [...new Set(fClaimed)].filter((c) => c !== word && c !== String(count));
+    expect(fWrong, "the feature guide claims a notation count that is not the real one")
+      .toEqual([]);
+    // And it must not list the retired `basic` type among the notations it sells.
+    expect(f, "the feature guide still lists the retired Basic type")
+      .not.toMatch(/Process Context and Basic|Context · Basic|and \*\*Basic\*\* diagrams/);
   });
 
   it("T4152 - the version stamp is the version that shipped", () => {
