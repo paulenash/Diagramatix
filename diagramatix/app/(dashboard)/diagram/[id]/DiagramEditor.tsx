@@ -2999,8 +2999,28 @@ export function DiagramEditor({
         continue;
       }
       if (op.op === "wrapInPool") {
+        // Say what will actually happen. With a pool already on the diagram the
+        // reducer GROWS the biggest one to adopt the loose elements rather than
+        // drawing a second pool — which is the right behaviour and looked like a
+        // no-op, because "wrapped everything in a pool" had you searching for a
+        // new pool that was never going to appear (Paul, 2026-09-18).
+        const loose = els.filter((e) => e.type !== "pool" && e.type !== "lane" && e.type !== "sublane"
+          && e.type !== "text-annotation" && !e.parentId);
+        const pools = els.filter((e) => e.type === "pool");
+        if (loose.length === 0) {
+          results.push(pools.length
+            ? "everything is already in a pool"
+            : "there's nothing loose to put in a pool");
+          anyFail = true;
+          continue;
+        }
         wrapInPool(op.label);
-        results.push("wrapped everything in a pool");
+        if (pools.length > 0) {
+          const biggest = pools.reduce((a, b) => (a.width * a.height >= b.width * b.height ? a : b));
+          results.push(`grew ${nameOf(biggest)} to take in ${loose.length} loose element${loose.length === 1 ? "" : "s"}`);
+        } else {
+          results.push(`put ${loose.length} element${loose.length === 1 ? "" : "s"} in a new pool`);
+        }
         continue;
       }
 

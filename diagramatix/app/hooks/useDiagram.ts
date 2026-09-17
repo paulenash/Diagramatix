@@ -24,6 +24,7 @@ import type {
 import { gatewayVertex, nudgeGatewayEndpoint, computeWaypoints, recomputeAllConnectors, consolidateWaypoints, rectifyWaypoints, constrainControlPoint, safeSidePair, selfLoopWaypoints, measureSelfLoopBulge, SELF_LOOP_BULGE, fuseCollinearWaypoints } from "@/app/lib/diagram/routing";
 import { planWrapInSubprocess, planUnwrapSubprocess, planWrapInContainer, type WrapIds } from "@/app/lib/diagram/subprocessWrap";
 import { isUmlConnType } from "@/app/lib/diagram/types";
+import { expandMoveSet } from "@/app/lib/diagram/moveSet";
 import { autoResizeUmlElement, sizeUmlNote } from "@/app/lib/diagram/umlAutoSize";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { getElementPoolId } from "@/app/lib/diagram/poolUtil";
@@ -5197,18 +5198,11 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       const { ids, dx, dy } = action.payload;
       if (dx === 0 && dy === 0) return state;
 
-      // Expand selection to include container descendants and boundary events
-      const expandedIds = new Set(ids);
-      for (const id of ids) {
-        const el = state.elements.find(e => e.id === id);
-        if (!el) continue;
-        if (isContainerType(el.type)) {
-          for (const descId of getAllDescendantIds(state.elements, id)) expandedIds.add(descId);
-        }
-        for (const be of state.elements) {
-          if (be.boundaryHostId === id) expandedIds.add(be.id);
-        }
-      }
+      // Expand selection to include container descendants and boundary events.
+      // An edge-mounted element follows its HOST and not its parent: the two can
+      // disagree, and when they do, following the parent slides the element off
+      // the boundary it is mounted on. See app/lib/diagram/moveSet.ts.
+      const expandedIds = expandMoveSet(state.elements, ids, isContainerType, getAllDescendantIds);
 
       const elements = state.elements.map(e => {
         if (!expandedIds.has(e.id)) return e;
