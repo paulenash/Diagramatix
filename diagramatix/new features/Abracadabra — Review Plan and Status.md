@@ -11,7 +11,7 @@ from memory, so this file never claims more or less than the code contains.
 | **Wrap the selection** (M2) | **SHIPPED** `9eb28faf`, `94e02a47` — expanded subprocess with its exact inverse, plus the pool and lane variants |
 | **Busy enforced on every path** (B4) | **PARTIAL** `b00e3c7b` — the text box is gated; the voice path is not |
 | **AI prompt op list** (B7) | **PARTIAL** `8c370014` — `renameByType` added; `addPool.relativeTo` still missing |
-| **Release-log entries** (D2) | **PARTIAL** — one entry for `a49a8006`; the six commits after it have none |
+| **Release-log entries** (D2) | **PARTIAL** — one entry for `a49a8006`; the eight commits after it have none |
 | **Tests for the untested half** (D3) | **PARTIAL** — pure modules extracted and covered; no `apply.ts`, no mocked-client route test |
 | **Greedy grammar, dead sub-lane checks, silent voice degrade** (B5, B6, B8) | **not started** |
 | **Disambiguation picker and the rest of Reliability/UX** (R2–R8) | **not started** |
