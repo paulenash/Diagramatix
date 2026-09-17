@@ -106,9 +106,9 @@ The Suggestion chip's own SQL was run by Paul via the database tile.
 
 ## A documentation gap
 
-Seven of the eight commits above have no `VERSION_HISTORY.md` entry. Only
-`a49a8006` was recorded, as `2.11.2583`. Everything from the Suggestion chip to
-the surround command is absent from the release log (D2).
+Eight of the nine commits above have no `VERSION_HISTORY.md` entry. Only
+`a49a8006` was recorded, as `2.11.2583`. Everything from the Suggestion chip
+onwards is absent from the release log (D2).
 
 ---
 
