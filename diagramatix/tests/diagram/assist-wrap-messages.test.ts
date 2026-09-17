@@ -92,6 +92,38 @@ describe("T4496 — a refused wrap names what is actually in the way", () => {
     expect(message, "the way forward is a lane").toContain("lane");
   });
 
+  it("does not claim a pool the selection is drawn nowhere near", () => {
+    // Paul, 2026-09-18: "The selected elements are above Pool 1 not in it!!".
+    // After an accidental wrap the elements claimed Pool 1 as an ancestor while
+    // sitting well above it, and the nesting rule refused on that basis.
+    // `parentId` is bookkeeping; if the pool is not drawn round them, it is not
+    // their pool.
+    const strayParentage: Shape = {
+      elements: [
+        el("P", "pool", "Pool 1", 187, 788, 1112, 78, { properties: { poolType: "white-box" } }),
+        el("A", "task", "Alpha", 300, 200, 102, 65, { parentId: "P" }),
+        el("B", "task", "Beta", 460, 200, 102, 65, { parentId: "P" }),
+      ],
+      connectors: [],
+    };
+    const p = planWrapInContainer(strayParentage, ["A", "B"], "pool", "Finance", ids);
+    expect(err(p), "a pool it is not inside must not block the wrap")
+      .not.toContain("cannot contain another pool");
+  });
+
+  it("still refuses when the selection really is inside the pool", () => {
+    const genuinely: Shape = {
+      elements: [
+        el("P", "pool", "Pool 1", 0, 0, 900, 400, { properties: { poolType: "white-box" } }),
+        el("A", "task", "Alpha", 120, 100, 102, 65, { parentId: "P" }),
+        el("B", "task", "Beta", 280, 100, 102, 65, { parentId: "P" }),
+      ],
+      connectors: [],
+    };
+    expect(err(planWrapInContainer(genuinely, ["A", "B"], "pool", "Finance", ids)))
+      .toContain("cannot contain another pool");
+  });
+
   it("says 'the canvas' rather than nothing when an element has no home", () => {
     const loose: Shape = {
       elements: [

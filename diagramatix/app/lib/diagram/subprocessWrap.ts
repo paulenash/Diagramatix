@@ -343,11 +343,25 @@ export function planWrapInContainer(
   const group = closure(shape.elements, members.map((e) => e.id));
   const box = bbox([...group].map((id) => byId.get(id)!));
 
-  // The pool an element belongs to, walking the parent chain.
+  /**
+   * The pool the selection is actually IN — walking the parent chain, but only
+   * accepting a pool the selection is drawn inside.
+   *
+   * `parentId` is bookkeeping and it goes stale. In Paul's diagram
+   * (2026-09-18) the selection claimed Pool 1 as an ancestor while sitting well
+   * above it, so "wrap selected in a pool" was refused for nesting inside a pool
+   * the elements were nowhere near. If it is not drawn round them, it is not
+   * their pool.
+   */
+  const selectionCentre = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
   const poolOf = (e: DiagramElement | undefined): DiagramElement | undefined => {
     let cur = e;
     for (let i = 0; cur && i < 12; i++) {
-      if (cur.type === "pool") return cur;
+      if (cur.type === "pool") {
+        const inIt = selectionCentre.x >= cur.x && selectionCentre.x <= cur.x + cur.width
+          && selectionCentre.y >= cur.y && selectionCentre.y <= cur.y + cur.height;
+        return inIt ? cur : undefined;
+      }
       cur = cur.parentId ? byId.get(cur.parentId) : undefined;
     }
     return undefined;

@@ -186,7 +186,14 @@ export function parseCommand(utterance: string): AssistOp[] | null {
       // wrap-everything-in-a-pool rule below, which would otherwise swallow
       // "wrap these in a pool" and wrap the whole diagram instead.
       const CONTAINER = "(?:an?\\s+)?(?:new\\s+)?(pool|poll|pull|lanes?|lines?)";
-      const c = raw.match(new RegExp(`^(?:surround|wrap|enclose|put|place)\\s+${SEL}\\s+(?:with|in|inside|into|within|using)\\s+${CONTAINER}${NAME}$`, "i"))
+      // The leading verb is OPTIONAL. The recogniser drops the first word often
+      // enough that "surround selected with a pool" arrives as "selected with a
+      // pool" — and the cost of not catching that is severe (Paul, 2026-09-18):
+      // it falls through to the AI, which reads the fragment as "put a pool
+      // around everything" and adopts the WHOLE DIAGRAM into an existing pool.
+      // The rule stays tight regardless, because it still demands a selection
+      // word, then a preposition, then a container word, then end of utterance.
+      const c = raw.match(new RegExp(`^(?:(?:surround|wrap|enclose|put|place)\\s+)?${SEL}\\s+(?:with|in|inside|into|within|using)\\s+${CONTAINER}${NAME}$`, "i"))
         ?? raw.match(new RegExp(`^(?:put|add|create|draw|make|insert|place)\\s+${CONTAINER}${NAME}\\s+(?:around|round|over|containing|enclosing)\\s+${SEL}${NAME}$`, "i"));
       if (c) {
         // The homophones the recogniser actually returns: poll/pull for pool,

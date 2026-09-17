@@ -28,6 +28,29 @@ export function needsConfirmation(
     if (op.op === "clear") {
       return elements.length ? `clear the whole diagram (${plural(elements.length, "element")})` : null;
     }
+
+    // "Put a pool around everything" destroys nothing, but when a pool already
+    // exists it does not draw a second one — it GROWS that pool and adopts every
+    // loose element into it, which re-homes the whole diagram in one step and is
+    // easy to miss on screen. Paul lost a diagram's structure to it (2026-09-18)
+    // when the recogniser dropped a word: "surround selected with a pool" became
+    // the fragment "selected with a pool", the AI read that as "everything", and
+    // the result reported success. The grammar now catches that fragment, but
+    // the command is still one word away from restructuring a diagram, so it
+    // asks when there is a pool for it to grow.
+    if (op.op === "wrapInPool") {
+      const pools = elements.filter((e) => e.type === "pool");
+      if (pools.length === 0) continue; // a brand-new pool is easy to see and to undo
+      const loose = elements.filter(
+        (e) => e.type !== "pool" && e.type !== "lane" && e.type !== "sublane"
+          && e.type !== "text-annotation" && !e.parentId,
+      );
+      if (loose.length === 0) continue; // nothing to adopt; the editor says so
+      const biggest = pools.reduce((a, b) => (a.width * a.height >= b.width * b.height ? a : b));
+      const name = biggest.label?.trim() || "the existing pool";
+      return `move ${plural(loose.length, "loose element")} into ${name}`;
+    }
+
     if (op.op !== "delete") continue;
 
     const sel = resolveSelectionRefs(op.ref, elements as DiagramElement[], selectedIds);

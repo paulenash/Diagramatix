@@ -35,6 +35,23 @@ import type { DiagramElement } from "./types";
 export type IsContainer = (type: DiagramElement["type"]) => boolean;
 
 /**
+ * Is `child` drawn inside `container`?
+ *
+ * Measured from the child's CENTRE, the same test the drag and the wrap use, so
+ * an element whose corner pokes out still counts as in. A small tolerance keeps
+ * something sitting exactly on the edge on the inside, where it looks.
+ */
+export function centreInside(child: DiagramElement, container: DiagramElement): boolean {
+  const EDGE = 2;
+  const cx = child.x + child.width / 2;
+  const cy = child.y + child.height / 2;
+  return cx >= container.x - EDGE
+    && cx <= container.x + container.width + EDGE
+    && cy >= container.y - EDGE
+    && cy <= container.y + container.height + EDGE;
+}
+
+/**
  * Every id that should move, given the ids the user asked to move.
  *
  * `descendantsOf` and `isContainer` are injected so this stays free of the
@@ -48,12 +65,23 @@ export function expandMoveSet(
 ): Set<string> {
   const asked = new Set(ids);
   const moving = new Set(ids);
+  const byId = new Map(elements.map((e) => [e.id, e] as const));
 
-  // 1. Containers take their contents.
+  // 1. Containers take their contents — the ones they are actually drawn
+  //    around. `parentId` is bookkeeping and it goes stale: in Paul's diagram
+  //    (2026-09-18) a row of elements sat well ABOVE Pool 1 while claiming it as
+  //    their parent, so nudging the pool moved the entire diagram. A container
+  //    is a visual statement; something drawn outside it is not in it, whatever
+  //    the record says.
   for (const id of ids) {
-    const el = elements.find((e) => e.id === id);
+    const el = byId.get(id);
     if (!el) continue;
-    if (isContainer(el.type)) for (const d of descendantsOf(elements, id)) moving.add(d);
+    if (!isContainer(el.type)) continue;
+    for (const d of descendantsOf(elements, id)) {
+      const child = byId.get(d);
+      if (child && !centreInside(child, el)) continue;
+      moving.add(d);
+    }
   }
 
   // 2. Anything mounted on something that is moving comes too — repeatedly,
