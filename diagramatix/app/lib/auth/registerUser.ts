@@ -11,13 +11,20 @@
  *   - bcrypt-hash at cost 12.
  *   - CPS 230: create user + default Org + Owner membership in one transaction.
  *
- * Note: the email is NOT lowercased (mirrors the prior route behaviour). The
- * login path lowercases on lookup, so a mixed-case registration is still
- * reachable at sign-in.
+ * SEC-25: the address IS normalised (trimmed and lowercased) before both the
+ * duplicate check and the create. It used to be stored verbatim, on the stated
+ * grounds that "the login path lowercases on lookup, so a mixed-case
+ * registration is still reachable at sign-in" — which was not true. Login looks
+ * up the LOWERCASED address against a case-sensitive column, so a row stored as
+ * `Victim@corp.com` never matched and could not sign in at all. Worse, it passed
+ * the duplicate check against an existing `victim@corp.com`, and registration
+ * immediately consumes that address's pending bundle invitations, so the real
+ * owner silently never received them.
  */
 import bcrypt from "bcryptjs";
 import { prisma } from "@/app/lib/db";
 import { joinDomainOrgOrCreatePersonal } from "@/app/lib/auth/domainOrg";
+import { normaliseEmail } from "@/app/lib/bundleInvites";
 
 export type RegisterResult =
   | { ok: true; user: { id: string; email: string; name: string | null } }
@@ -52,7 +59,11 @@ export async function registerUser(input: {
     }
   }
 
-  const existing = await prisma.user.findUnique({ where: { email: email as string } });
+  // One canonical form from here on — the duplicate check, the row, and the
+  // pending-invite promotion that follows registration must all agree.
+  const normalisedEmail = normaliseEmail(String(email));
+
+  const existing = await prisma.user.findUnique({ where: { email: normalisedEmail } });
   if (existing) {
     return { ok: false, status: 409, error: "Email already registered" };
   }
@@ -66,7 +77,7 @@ export async function registerUser(input: {
   const user = await prisma.$transaction(async (tx) => {
     const created = await tx.user.create({
       data: {
-        email: email as string,
+        email: normalisedEmail,
         name: (name as string | null | undefined) || null,
         password: hashedPassword,
         // New sign-ups start on Free. Existing users were grandfathered to

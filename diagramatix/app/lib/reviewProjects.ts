@@ -24,14 +24,36 @@ export function isReviewVirtualProject(id: string): boolean {
 }
 
 /**
- * True if `userId` is an assigned reviewer on any review of `diagramId`.
+ * Review rounds that are still running. A round is created `open` and moves to
+ * `resubmitted` for another pass; `closed` ends it. Deliberately an allow-list:
+ * a status nobody has taught this file about withholds the reviewer grant
+ * rather than handing it out.
+ */
+export const LIVE_REVIEW_STATUSES = ["open", "resubmitted"] as const;
+
+/** A reviewer who has declined keeps their row for history but loses the grant. */
+export const DECLINED_REVIEWER_STATUS = "declined-to-review";
+
+/**
+ * True if `userId` is an assigned reviewer on a LIVE review of `diagramId`.
  * Grants a non-owner reviewer the right to open + comment on the
  * diagram (Phase 3 Review Mode), checked by the diagram page and the
- * diagram save endpoint.
+ * diagram save endpoint. The grant lapses when the round closes.
  */
 export async function isAssignedReviewer(userId: string, diagramId: string): Promise<boolean> {
   const row = await prisma.diagramReviewer.findFirst({
-    where: { userId, review: { diagramId } },
+    // SEC-27: the grant has to EXPIRE. Reviewer rows are kept for history when
+    // a round is closed, so an unscoped match meant anyone ever added as a
+    // reviewer — including one who declined, and one whose round the requester
+    // has since closed — kept read and full `data` overwrite rights forever on
+    // a diagram they have no project access to, with no way to revoke short of
+    // editing the database. Scope it to a live round, and to a reviewer who has
+    // not declined.
+    where: {
+      userId,
+      status: { not: DECLINED_REVIEWER_STATUS },
+      review: { diagramId, status: { in: [...LIVE_REVIEW_STATUSES] } },
+    },
     select: { id: true },
   });
   return !!row;

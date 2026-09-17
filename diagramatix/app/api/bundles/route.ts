@@ -157,32 +157,13 @@ export async function POST(req: Request) {
     );
   }
 
-  // Verify audience users exist + are in the project's Org (or cross-org sharing is on).
+  // Verify the explicitly-named audience users exist. (The cross-org gate runs
+  // further down, once the email-resolved users have been folded in — see
+  // SEC-23 below. Ids that arrive by email are known to exist by construction.)
   if (audienceUserIds.length > 0) {
-    const audienceRows = await prisma.user.findMany({
-      where: { id: { in: audienceUserIds } },
-      select: { id: true, email: true, orgMembers: { where: { orgId: projectOrgId }, select: { id: true } } },
-    });
-    if (audienceRows.length !== audienceUserIds.length) {
+    const found = await prisma.user.count({ where: { id: { in: audienceUserIds } } });
+    if (found !== audienceUserIds.length) {
       return NextResponse.json({ error: "One or more audience users not found" }, { status: 404 });
-    }
-    // Cross-org gate.
-    const project = await prisma.project.findUnique({
-      where: { id: projectId },
-      select: { org: { select: { allowCrossOrgSharing: true } } },
-    });
-    const crossOrgAllowed = project?.org?.allowCrossOrgSharing ?? false;
-    if (!crossOrgAllowed) {
-      const outsiders = audienceRows.filter(u => u.orgMembers.length === 0);
-      if (outsiders.length > 0) {
-        return NextResponse.json(
-          {
-            error: "Some audience members are outside this Org; enable cross-Org sharing first",
-            outsiders: outsiders.map(u => ({ id: u.id, email: u.email })),
-          },
-          { status: 409 },
-        );
-      }
     }
   }
 
@@ -214,6 +195,34 @@ export async function POST(req: Request) {
     }
   }
   const finalAudienceUserIds = Array.from(audienceUserIdSet);
+
+  // SEC-23: the cross-org gate runs over the FINAL audience, not just the ids
+  // that were named outright. It used to run before the block above, so typing
+  // an outsider's email instead of picking them from the list walked straight
+  // past it — granting a user in another tenant read access to a whole
+  // published diagram closure in an org that forbids cross-org sharing.
+  if (finalAudienceUserIds.length > 0) {
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { org: { select: { allowCrossOrgSharing: true } } },
+    });
+    if (!(project?.org?.allowCrossOrgSharing ?? false)) {
+      const rows = await prisma.user.findMany({
+        where: { id: { in: finalAudienceUserIds } },
+        select: { id: true, email: true, orgMembers: { where: { orgId: projectOrgId }, select: { id: true } } },
+      });
+      const outsiders = rows.filter((u) => u.orgMembers.length === 0);
+      if (outsiders.length > 0) {
+        return NextResponse.json(
+          {
+            error: "Some audience members are outside this Org; enable cross-Org sharing first",
+            outsiders: outsiders.map((u) => ({ id: u.id, email: u.email })),
+          },
+          { status: 409 },
+        );
+      }
+    }
+  }
 
   const rootSet = new Set(rootDiagramIds);
 
