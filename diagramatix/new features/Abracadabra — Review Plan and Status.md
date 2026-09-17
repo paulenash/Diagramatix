@@ -63,6 +63,7 @@ appear anywhere in the plan.
 | `f51a2c7d` | Nudge in every direction, group nudge and move, label selected, label by number, swap gateway points | T4411–T4415 |
 | `8c370014` | Swap on every selected gateway; a split command is held for the rest; a comma after the verb is ignored | T4416–T4418 |
 | `9eb28faf` | Surround the selection with an expanded subprocess, and dissolve one back, round-tripping without undo | T4419–T4422 |
+| `94e02a47` | Wrap the selection in a pool or a lane, finishing M2; and "one" stops being heard as "lane" on a numbered pick | T4443–T4450 |
 
 ## Still open, in Paul's order
 
@@ -73,7 +74,7 @@ appear anywhere in the plan.
 5. **V1** — feed the diagram's own labels to the recogniser instead of a hard-coded list.
 6. **V2** — phonetic matching in reference resolution, so "pic items" resolves without an AI call.
 7. **D1** — publish the guide, tech-notes and feature rows.
-8. **M3** — convert in place; then **M2**'s pool and lane variants.
+8. **M3** — convert in place. (**M2** is finished: subprocess, pool and lane.)
 
 ## Two decisions still open
 
