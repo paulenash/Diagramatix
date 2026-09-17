@@ -5587,9 +5587,11 @@ export function Canvas({
                 }}
                 onDoubleClick={() => {
                   if (tryGroupConnectToGateway(el)) return;
-                  // Gateway shape double-click never opens the label editor —
-                  // the label rect has its own dblclick handler for that.
-                  if (el.type === "gateway") return;
+                  // A gateway's double-click first tries to fan a group selection
+                  // out of it (handled above). With no group to fan it used to do
+                  // nothing; it now opens the label editor like anything else
+                  // with a label, which is what a double-click means everywhere
+                  // else on the canvas.
                   const linkedId = (el.type === "subprocess" || el.type === "submachine" || el.type === "chevron-collapsed" || el.type === "use-case" || el.type === "archimate-shape" || el.type === "uml-package" || el.type === "epc-interface") ? el.properties.linkedDiagramId as string | undefined : undefined;
                   if (linkedId && onDrillIntoSubprocess) {
                     onDrillIntoSubprocess(linkedId);
@@ -5611,6 +5613,7 @@ export function Canvas({
                 onLabelFocusEditEnd={exitFocusMode}
                 onMoveEnd={() => { setDraggingElementId(null); if (el.type === "pool") setPoolBoundaryGuide(null); onElementMoveEnd?.(el.id); }}
                 multiSelected={selectedElementIds.size > 1 && selectedElementIds.has(el.id)}
+                isLabelEditing={editingLabel?.elementId === el.id}
                 onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoomRef.current, dy / zoomRef.current) : undefined}
                 onGroupMoveEnd={onElementsMoveEnd}
                 colorConfig={colorConfig}
@@ -5673,6 +5676,7 @@ export function Canvas({
               onLabelFocusEditStart={(cx, cy, w) => enterFocusModeAt(cx, cy, w, "external")}
               onLabelFocusEditEnd={exitFocusMode}
               multiSelected={selectedElementIds.size > 1 && selectedElementIds.has(el.id)}
+              isLabelEditing={editingLabel?.elementId === el.id}
               onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoomRef.current, dy / zoomRef.current) : undefined}
               onGroupMoveEnd={onElementsMoveEnd}
               colorConfig={colorConfig}
@@ -5863,6 +5867,7 @@ export function Canvas({
                 onLabelFocusEditEnd={exitFocusMode}
                 onMoveEnd={() => { setDraggingElementId(null); onElementMoveEnd?.(el.id); }}
                 multiSelected={selectedElementIds.size > 1 && selectedElementIds.has(el.id)}
+                isLabelEditing={editingLabel?.elementId === el.id}
                 onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoomRef.current, dy / zoomRef.current) : undefined}
                 onGroupMoveEnd={onElementsMoveEnd}
                 colorConfig={colorConfig}
@@ -6065,9 +6070,9 @@ export function Canvas({
               onToggleReviewCollapse={onToggleReviewCollapse}
               onDoubleClick={() => {
                 if (tryGroupConnectToGateway(el)) return;
-                // Gateway shape double-click never opens the label editor —
-                // the label rect has its own dblclick handler for that.
-                if (el.type === "gateway") return;
+                // A gateway's double-click fans a group selection out of it
+                // (handled above); with no group to fan it now opens the label
+                // editor like anything else with a label.
                 // Review comment: a COLLAPSED note expands + jumps to the front
                 // (item 14); an expanded note edits its body as usual.
                 if (el.type === "review-comment") {
@@ -6095,6 +6100,7 @@ export function Canvas({
               onLabelFocusEditEnd={exitFocusMode}
               onMoveEnd={() => { setDraggingElementId(null); onElementMoveEnd?.(el.id); }}
               multiSelected={selectedElementIds.size > 1 && selectedElementIds.has(el.id)}
+              isLabelEditing={editingLabel?.elementId === el.id}
               onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoomRef.current, dy / zoomRef.current) : undefined}
               onGroupMoveEnd={onElementsMoveEnd}
               colorConfig={colorConfig}
@@ -6213,7 +6219,7 @@ export function Canvas({
                   onSelectConnector(null);
                 }}
                 onMove={(x, y, uc) => { setDraggingElementId(el.id); onMoveElement(el.id, x, y, uc); }}
-                onDoubleClick={() => { tryGroupConnectToGateway(el); }}
+                onDoubleClick={() => { if (tryGroupConnectToGateway(el)) return; startEditingLabel(el); }}
                 onConnectionPointDragStart={(side, worldPos) => {
                   if (el.type === "final-state") return;
                   handleConnectionPointDragStart(el.id, side, worldPos);
@@ -6225,6 +6231,7 @@ export function Canvas({
                 onLabelFocusEditStart={(cx, cy, w) => enterFocusModeAt(cx, cy, w, "external")}
                 onLabelFocusEditEnd={exitFocusMode}
                 multiSelected={selectedElementIds.size > 1 && selectedElementIds.has(el.id)}
+                isLabelEditing={editingLabel?.elementId === el.id}
                 onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoomRef.current, dy / zoomRef.current) : undefined}
                 onGroupMoveEnd={onElementsMoveEnd}
                 colorConfig={colorConfig}
@@ -6278,6 +6285,7 @@ export function Canvas({
               onLabelFocusEditEnd={exitFocusMode}
               onMoveEnd={() => { setDraggingElementId(null); onElementMoveEnd?.(el.id); }}
               multiSelected={selectedElementIds.size > 1 && selectedElementIds.has(el.id)}
+              isLabelEditing={editingLabel?.elementId === el.id}
               onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoomRef.current, dy / zoomRef.current) : undefined}
               onGroupMoveEnd={onElementsMoveEnd}
               colorConfig={colorConfig}
@@ -6297,6 +6305,7 @@ export function Canvas({
               selected={selectedElementIds.has(el.id)}
               isDropTarget={false}
               isDisallowedTarget={false}
+              isLabelEditing={editingLabel?.elementId === el.id}
               onSelect={(ev) => {
                 if (ev?.shiftKey) {
                   onSetSelectedElements((prev) => { const next = new Set(prev); if (next.has(el.id)) next.delete(el.id); else next.add(el.id); return next; });
@@ -6306,7 +6315,11 @@ export function Canvas({
                 onSelectConnector(null);
               }}
               onMove={(x, y, uc) => { setDraggingElementId(el.id); onMoveElement(el.id, x, y, uc); }}
-              onDoubleClick={() => {}}
+              // The pain-point / issue marker sits ON TOP of its element, so a
+              // double-click here never reaches the shape underneath. Edit the
+              // element's label, which is what a double-click on any part of an
+              // element means everywhere else (Paul, 2026-09-17).
+              onDoubleClick={() => startEditingLabel(el)}
               onConnectionPointDragStart={() => {}}
               showConnectionPoints={false}
               onResizeDragStart={(handle, e) => handleResizeDragStart(el.id, handle, e)}
@@ -6404,6 +6417,7 @@ export function Canvas({
                 onLabelFocusEditEnd={exitFocusMode}
                 onMoveEnd={() => { setDraggingElementId(null); onElementMoveEnd?.(el.id); }}
                 multiSelected={true}
+                isLabelEditing={editingLabel?.elementId === el.id}
                 onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoomRef.current, dy / zoomRef.current) : undefined}
                 onGroupMoveEnd={onElementsMoveEnd}
                 colorConfig={colorConfig}
@@ -7326,6 +7340,7 @@ export function Canvas({
               selected={selectedElementIds.has(el.id)}
               isDropTarget={false}
               multiSelected={selectedElementIds.size > 1 && selectedElementIds.has(el.id)}
+              isLabelEditing={editingLabel?.elementId === el.id}
               onSelect={(ev) => {
                 onBringReviewToFront?.(el.id); // grab a note → it comes forward (item 15)
                 if (ev?.shiftKey && !ev?.ctrlKey) {

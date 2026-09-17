@@ -354,6 +354,10 @@ interface InteractionLabelProps {
   // branch label is suppressed entirely (still stored, just not drawn), so
   // flipping the marker back reveals it. Evaluated per render by Canvas.
   hideLabel?: boolean;
+  /** Bumped by ConnectorRenderer when the connector LINE is double-clicked.
+   *  The line is a far bigger target than the label box and is what a user
+   *  aims at, so it opens the same editor (Paul, 2026-09-17). */
+  editRequest?: number;
   // Which endpoint is a pool — a messageBPMN label defaults to 60px from the
   // (black-box) pool end rather than the spine midpoint.
   sourceIsPool?: boolean;
@@ -363,7 +367,7 @@ interface InteractionLabelProps {
   sourceType?: string;
 }
 
-function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, onUpdateLabel, onLabelFocusEditStart, onLabelFocusEditEnd, hideLabel, sourceIsPool, targetIsPool, sourceType }: InteractionLabelProps) {
+function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, onUpdateLabel, onLabelFocusEditStart, onLabelFocusEditEnd, hideLabel, sourceIsPool, targetIsPool, sourceType, editRequest }: InteractionLabelProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState("");
   const [isLabelFocused, setIsLabelFocused] = useState(false);
@@ -543,6 +547,18 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
     };
   }
 
+  // A double-click on the connector line asks for the same editor the label
+  // box opens. Skipped on the first render so an existing connector does not
+  // open an editor just by being drawn.
+  const seenEditRequest = useRef(editRequest);
+  useEffect(() => {
+    if (editRequest === undefined || editRequest === seenEditRequest.current) return;
+    seenEditRequest.current = editRequest;
+    setEditValue(label);
+    setIsEditing(true);
+    onLabelFocusEditStart?.(lCx, lMidY, effectiveLWidth);
+  }, [editRequest, label, lCx, lMidY, effectiveLWidth, onLabelFocusEditStart]);
+
   function handleDoubleClick(e: React.MouseEvent) {
     e.stopPropagation();
     setEditValue(label);
@@ -624,8 +640,8 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
         x={lCx - effectiveLWidth / 2 - 3} y={lTy - 2}
         width={effectiveLWidth + 6} height={lHeight + 4}
         fill="transparent"
-        stroke={(selected || isLabelFocused) ? "#2563eb" : "none"}
-        strokeWidth={1} strokeDasharray={(selected || isLabelFocused) ? "4 3" : undefined}
+        stroke={(selected || isLabelFocused) && !isEditing ? "#2563eb" : "none"}
+        strokeWidth={1} strokeDasharray={(selected || isLabelFocused) && !isEditing ? "4 3" : undefined}
         rx={3}
         style={{ cursor: onUpdateLabel ? "grab" : "default" }}
         onMouseDown={handleLabelMouseDown}
@@ -834,6 +850,10 @@ function ConstraintBox({
 }
 
 function ConnectorRendererInner({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onWaypointsDragEnd, onUpdateLabel, onUpdateCurveHandles, misaligned, otherConnectorWaypoints, debugMode, onUpdateEndOffset, showBottleneck, reviewLinkColor, maskBounds, sourceBounds, targetBounds, sourcePoolHeight, targetPoolHeight, sourceIsPool, sourceType, targetIsPool, onLabelFocusEditStart, onLabelFocusEditEnd, hideLabel, highlight, faded, relaxedLayout }: Props) {
+  // Bumped when the connector LINE is double-clicked, which opens the same
+  // label editor its label box does — the line is the bigger target, and the
+  // one a user aims at (Paul, 2026-09-17).
+  const [labelEditRequest, setLabelEditRequest] = useState(0);
   const displayMode = useContext(DisplayModeCtx);
   const connFontScale = useContext(ConnectorFontScaleCtx);
   const showReviewMarkers = useContext(ShowReviewCommentsCtx);
@@ -1220,6 +1240,7 @@ function ConnectorRendererInner({ connector, selected, onSelect, svgToWorld, onU
           e.stopPropagation();
         }}
         onClick={handleConnectorClick}
+        onDoubleClick={(e) => { e.stopPropagation(); setLabelEditRequest((n) => n + 1); }}
       />
 
       {/* Filtered connector line (hand-drawn wobble) — skip messageBPMN */}
@@ -1322,6 +1343,7 @@ function ConnectorRendererInner({ connector, selected, onSelect, svgToWorld, onU
         || (connector.type === "uml-dependency" && !!connector.label)
         || (connector.type === "sequence" && connector.label !== undefined)) && (
         <InteractionLabel
+          editRequest={labelEditRequest}
           connector={connector}
           selected={selected}
           visibleWaypoints={visibleWaypoints}

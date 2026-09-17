@@ -110,6 +110,11 @@ interface Props {
   onLabelFocusEditEnd?: () => void;
   colorConfig?: SymbolColorConfig;
   multiSelected?: boolean;
+  /** True while THIS element's label is open in the inline editor. The
+   *  dashed box that marks a label as grabbable is hidden then: it frames
+   *  the old text while you type the new, which reads as a second, stale
+   *  field (Paul, 2026-09-17). */
+  isLabelEditing?: boolean;
   onGroupMove?: (dx: number, dy: number) => void;
   onGroupMoveEnd?: () => void;
   onDrillBack?: () => void;
@@ -2607,6 +2612,7 @@ function SymbolRendererInner({
   onLabelFocusEditEnd,
   colorConfig,
   multiSelected,
+  isLabelEditing = false,
   onGroupMove,
   onGroupMoveEnd,
   onDrillBack,
@@ -4264,9 +4270,9 @@ function SymbolRendererInner({
               x={labelLeftX} y={labelTopY}
               width={labelWidth} height={totalLabelH}
               fill="transparent"
-              stroke={labelHighlighted && selected && !multiSelected ? "#2563eb" : "none"}
+              stroke={labelHighlighted && selected && !multiSelected && !isLabelEditing ? "#2563eb" : "none"}
               strokeWidth={1}
-              strokeDasharray={labelHighlighted && selected && !multiSelected ? "3 2" : undefined}
+              strokeDasharray={labelHighlighted && selected && !multiSelected && !isLabelEditing ? "3 2" : undefined}
               style={{
                 cursor: labelHighlighted ? "move" : "crosshair",
                 pointerEvents: labelHighlighted ? "auto" : "none",
