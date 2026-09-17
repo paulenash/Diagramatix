@@ -168,14 +168,21 @@ async function startDeepgram(token: string, scheme: string, cb: DictationCallbac
   });
   // Bias recognition toward the command vocabulary so "lane"≠"line", "pool"≠
   // "poll"/"pull", etc. (Deepgram `keywords`, with a boost on the confusable ones.)
-  // Number words are boosted too. Without them, `lane:3` — the strongest
-  // weight here — wins against the acoustically similar "one" on a numbered
-  // pick, which is the shortest utterance a user ever makes and the one with
-  // the least context to recover from (Paul, 2026-09-17). The pick handler
-  // also corrects the substitution after the fact (assist/spokenNumber.ts);
-  // this is the half that stops it happening in the first place.
+  // NUMBER WORDS ARE DELIBERATELY NOT BOOSTED HERE (Paul, 2026-09-18: "Turn is
+  // often heard as Ten"). They were, for one day: `lane:3` was beating "one" on
+  // a numbered pick, so the numbers went in to compete with it. That fixed the
+  // pick and broke ordinary speech everywhere else — boosting "ten" makes the
+  // recogniser reach for it, and "turn on gold flashing" came back as "ten on
+  // gold flashing".
+  //
+  // Numbers matter in exactly one place: while numbered badges are on screen.
+  // Deepgram's keyword list is fixed when the socket opens and a pick flow
+  // starts long after that, so the elevation cannot live here — it lives in the
+  // pick handler instead (assist/spokenNumber.ts), which is only consulted
+  // while a pick is open and is therefore scoped to precisely when the numbers
+  // are being shown. That is also why `lane:3` can stay: the pick handler
+  // undoes it, and nothing else in the language needs protecting from it.
   for (const kw of ["lane:3", "sublane:3", "pool:3", "gateway:2", "task:2", "subprocess:2",
-    "one:3", "two:2", "three:2", "four:2", "five:2", "six:2", "seven:2", "eight:2", "nine:2", "ten:2",
     "selected:3", "selection:2",
     "boundary", "connect", "rename", "delete", "compact", "Abracadabra"]) {
     params.append("keywords", kw);

@@ -99,10 +99,20 @@ describe("T4483 — only the commands worth pointing at flash", () => {
     }
   });
 
-  it("does not flash a delete, a rename, or the toggle itself", () => {
-    // Nothing left to outline; already under your eye; and the toggle is not an
-    // edit at all.
-    for (const op of ["delete", "rename", "renameByType", "labelSelected", "undo", "clear", "export", "goldFlash"] as const) {
+  it("flashes a rename", () => {
+    // Left out at first, on the reasoning that the guided flow has just had you
+    // read a number off that item. Paul overruled it (2026-09-18) and he is
+    // right: the badges renumber as soon as you finish, which pulls your eye
+    // away from the thing that actually changed.
+    for (const op of ["rename", "labelSelected"] as const) {
+      expect(opFlashes(op), op).toBe(true);
+    }
+  });
+
+  it("does not flash a delete, an undo, or the toggle itself", () => {
+    // Nothing left to outline; too varied to point at honestly; and the toggle
+    // is not an edit at all.
+    for (const op of ["delete", "undo", "clear", "export", "goldFlash"] as const) {
       expect(opFlashes(op), op).toBe(false);
     }
   });

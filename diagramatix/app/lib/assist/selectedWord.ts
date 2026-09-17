@@ -96,6 +96,35 @@ export function repairSelectedWord(text: string): SelectedWordRepair {
   return { text: out, corrected };
 }
 
+/**
+ * "Ten on gold flashing" → "turn on gold flashing" (Paul, 2026-09-18).
+ *
+ * The recogniser reaches for "ten" where the speaker said "turn". Only repaired
+ * at the very start of an utterance and only when the next word is `on` or
+ * `off`, which is a shape no sentence beginning with a real "ten" has: nobody
+ * says "ten on" or "ten off" to a diagram. Everything else keeps the number.
+ *
+ * Deliberately narrow because "ten" IS a number, and a numbered pick is the one
+ * place it has to survive untouched — a pick is a bare number with nothing
+ * after it, so it never matches.
+ */
+const TURN_MISHEARD = ["ten", "tern", "turned", "tan", "torn", "tun"] as const;
+
+const TURN_RE = new RegExp(`^(${TURN_MISHEARD.map(esc).join("|")})(\\s+(?:on|off)\\b)`, "i");
+
+export function repairTurnWord(text: string): SelectedWordRepair {
+  if (!text) return { text, corrected: false };
+  let corrected = false;
+  const out = text.replace(TURN_RE, (_m, heard: string, rest: string) => {
+    corrected = true;
+    return (/^[A-Z]/.test(heard) ? "Turn" : "turn") + rest;
+  });
+  return { text: out, corrected };
+}
+
+/** Exported for tests. */
+export const TURN_MISHEARD_WORDS = TURN_MISHEARD;
+
 /** True when this word already refers to the selection. */
 export function isSelectionWord(word: string): boolean {
   return (SELECTION_FORMS as readonly string[]).includes(word.trim().toLowerCase());

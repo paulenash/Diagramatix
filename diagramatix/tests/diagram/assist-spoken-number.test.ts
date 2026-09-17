@@ -9,10 +9,18 @@
  * Paul offered numbering the badges from 2 instead. That trades one confusion
  * for another: the first item would be labelled 2, every user would still say
  * "one" for the first thing in a list, and nothing would stop the same
- * mishearing at any other number. So the fix is in two halves, at both ends:
- *   - the number words are boosted too, so they compete (dictation/index.ts);
- *   - the pick handler corrects a known substitution on the LEADING token only,
- *     which is where a number is expected and where a name never begins.
+ * mishearing at any other number.
+ *
+ * The fix was originally in two halves — boost the number words so they compete,
+ * AND correct the substitution in the pick handler. The first half was withdrawn
+ * a day later (Paul, 2026-09-18: "Turn is often heard as Ten"): boosting numbers
+ * globally fixed the pick and broke ordinary speech, because the recogniser then
+ * reaches for a number everywhere, and "turn on gold flashing" came back as "ten
+ * on gold flashing". Numbers are wanted in exactly one place — while numbered
+ * badges are on screen — and Deepgram's keyword list is fixed when the socket
+ * opens, long before a pick starts. So the elevation now lives ONLY in the pick
+ * handler, which is consulted only during a pick and is therefore scoped to
+ * precisely when the numbers are being shown.
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
@@ -61,11 +69,15 @@ describe("reading the number off a spoken pick", () => {
     expect(editor, "and take the name from the same result").toMatch(/const trailing = picked\.rest;/);
 
     const dictation = readFileSync(join(process.cwd(), "app/lib/dictation/index.ts"), "utf8");
-    expect(dictation, "`lane` is boosted, so the numbers must be too or they lose").toMatch(/"one:3"/);
-    // The boost on "one" has to at least match the boost on "lane", or the
-    // competition this exists to fix is still lost at the recogniser.
-    const laneBoost = /"lane:(\d)"/.exec(dictation);
-    const oneBoost = /"one:(\d)"/.exec(dictation);
-    expect(Number(oneBoost![1])).toBeGreaterThanOrEqual(Number(laneBoost![1]));
+    // The number words are deliberately NOT boosted at the recogniser any more
+    // (Paul, 2026-09-18: Turn is often heard as Ten). Boosting them fixed the
+    // numbered pick and broke ordinary speech everywhere else. Numbers matter
+    // only while badges are on screen, and Deepgram's keyword list is fixed when
+    // the socket opens, so the elevation lives in the pick handler instead —
+    // which is consulted only during a pick, and is therefore scoped to exactly
+    // when the numbers are being shown. See T4491.
+    expect(dictation, "number words must not be boosted globally").not.toMatch(/"one:3"/);
+    expect(dictation, "nor any of the others").not.toMatch(/"ten:2"/);
+    expect(dictation, "but the lane boost still is — the pick handler undoes it").toMatch(/"lane:3"/);
   });
 });

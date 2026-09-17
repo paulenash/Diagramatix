@@ -6,7 +6,7 @@
 import type { AssistOp } from "./ops";
 import { SYMBOL_SYNONYMS, SYMBOL_PHRASES } from "./ops";
 import { parseRenameType } from "./renameTargets";
-import { repairSelectedWord } from "./selectedWord";
+import { repairSelectedWord, repairTurnWord } from "./selectedWord";
 import { capitaliseFirstWord } from "./nameCase";
 import type { SymbolType, EventType, GatewayType } from "../diagram/types";
 
@@ -42,7 +42,10 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   // the two are close in en-AU. Repaired before anything is matched, and only
   // where the word sits directly after a verb, a position `connect` never
   // legitimately occupies (see assist/selectedWord.ts).
-  const heard = repairSelectedWord(clean(utterance)).text;
+  // "Ten on gold flashing" is "turn on gold flashing" — the recogniser reaches
+  // for the number. Repaired before the selection word, since both are leading
+  // tokens and neither can produce the other (selectedWord.ts).
+  const heard = repairSelectedWord(repairTurnWord(clean(utterance)).text).text;
   const raw = heard.replace(/^([A-Za-z]+),\s+/, "$1 ");
   if (!raw) return null;
   const lower = raw.toLowerCase();

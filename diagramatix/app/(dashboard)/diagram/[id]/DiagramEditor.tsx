@@ -2719,6 +2719,22 @@ export function DiagramEditor({
   }, [diagramId]);
 
   const elBox = (e: DiagramElement) => ({ x: e.x, y: e.y, width: e.width, height: e.height });
+
+  /**
+   * Arm the gold flash: remember where everything was and what it was called,
+   * so the effect below can diff once React has re-rendered and outline what
+   * changed. A no-op unless the user has flashing switched on.
+   *
+   * Two callers — the op batch and the guided rename flow — because the rename
+   * flow writes labels through its own path and never touches applyAssistOps.
+   * That is why renaming flashed nothing at all (Paul, 2026-09-18).
+   */
+  const armGoldFlash = useCallback((elements: DiagramElement[]) => {
+    if (!isGoldFlashOn()) return;
+    goldFlashBeforeRef.current = elements.map((e) => ({
+      id: e.id, x: e.x, y: e.y, width: e.width, height: e.height, parentId: e.parentId, label: e.label,
+    }));
+  }, []);
   const nameOf = (e: DiagramElement) => (e.label?.trim() || e.type);
 
   // Apply one interpreted op via the granular (undoable) reducer helpers.
@@ -2737,11 +2753,7 @@ export function DiagramEditor({
     // re-rendered we can diff and outline whatever this command touched. Taken
     // here rather than asking each of the thirty-odd op handlers to report what
     // it changed — handlers drift, and a new op would silently stop flashing.
-    if (isGoldFlashOn() && batchFlashes(ops)) {
-      goldFlashBeforeRef.current = data.elements.map((e) => ({
-        id: e.id, x: e.x, y: e.y, width: e.width, height: e.height, parentId: e.parentId,
-      }));
-    }
+    if (batchFlashes(ops)) armGoldFlash(data.elements);
     // Working copy: each op's effect is threaded back in (workingSet.ts) so a
     // later op in the same batch can refer to what an earlier one created —
     // "add X and connect it to Y". React has not re-rendered mid-loop, so
@@ -3293,7 +3305,9 @@ export function DiagramEditor({
     goldFlashBeforeRef.current = null;
     const targets = flashTargets(
       snapshot,
-      data.elements.map((e) => ({ id: e.id, x: e.x, y: e.y, width: e.width, height: e.height, parentId: e.parentId })),
+      data.elements.map((e) => ({
+        id: e.id, x: e.x, y: e.y, width: e.width, height: e.height, parentId: e.parentId, label: e.label,
+      })),
     );
     if (targets.length === 0) return;
     setGoldFlashState((prev) => ({ runId: prev.runId + 1, targets }));
@@ -3315,6 +3329,9 @@ export function DiagramEditor({
     // is a phrase, and title case would give "Send To Customer For Approval".
     const clean = capitaliseFirstWord(name.trim().replace(/[.,!?;:]+$/g, ""));
     if (!clean) { cancelRenameFlow("rename cancelled (empty name)"); return; }
+    // The guided flow writes the label itself, so it has to arm the flash
+    // itself too — applyAssistOps is never involved.
+    armGoldFlash(data.elements);
     if (target.kind === "element") updateLabel(target.id, clean);
     else updateConnectorLabel(target.id, clean);
     cancelLabelEdit();
@@ -3408,6 +3425,19 @@ export function DiagramEditor({
     if (isMicStopWord(heard)) { stopAbraListeningRef.current(); log({ heard, summary: "stopped listening", ok: true }); return; }
     // While a guided pick is active, every utterance feeds it (a number, a
     // name, or "done") — never the general command parser.
+    //
+    // One exception: switching gold flashing on or off. It edits nothing, so it
+    // cannot disturb the pick, and the pick is exactly where you notice you
+    // wanted it on (Paul, 2026-09-18). Without this the words are taken as the
+    // new name for whichever item you had picked.
+    if (renameFlowRef.current || messageFlowRef.current) {
+      const toggle = parseCommand(heard);
+      if (toggle && toggle.length === 1 && toggle[0].op === "goldFlash") {
+        const r = applyGrouped(toggle);
+        log({ heard, summary: r.summary, ok: r.ok });
+        return;
+      }
+    }
     if (renameFlowRef.current) { handleRenameUtteranceRef.current(heard); return; }
     if (messageFlowRef.current) { handleMessageUtteranceRef.current(heard); return; }
 

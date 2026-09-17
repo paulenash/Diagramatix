@@ -51,6 +51,12 @@ export function GoldFlashOverlay({ runId, targets }: Props) {
 
   useEffect(() => {
     if (!runId || targets.length === 0) return;
+    // `window.__DIAG_GOLD_FLASH = true` in the console to watch runs arrive.
+    // Cheap to leave in: this is the one place that knows a flash was asked for,
+    // and "nothing happened" is otherwise indistinguishable from "never armed".
+    if (typeof window !== "undefined" && (window as { __DIAG_GOLD_FLASH?: boolean }).__DIAG_GOLD_FLASH) {
+      console.log("[goldFlash] run", runId, "→", targets.map((t) => t.id).join(", "));
+    }
     setLive({ runId, targets });
     // Clear when the last pulse has finished, so nothing is left in the tree.
     const t = setTimeout(() => setLive(null), GOLD_FLASH_TOTAL_MS + 120);
@@ -78,10 +84,14 @@ export function GoldFlashOverlay({ runId, targets }: Props) {
           18%      { opacity: 1; }
           62%      { opacity: 0.85; }
         }
+        /* Translate only — NO scale(). On an SVG element CSS transforms take
+           their origin from the SVG user space, not the shape, so a scale()
+           here would move each spark toward the top-left of the DIAGRAM rather
+           than shrink it in place. The taper comes from the radius instead. */
         @keyframes ${uid}-spark {
-          0%   { opacity: 0; transform: translate(0, 0) scale(0.4); }
+          0%   { opacity: 0; transform: translate(0, 0); }
           14%  { opacity: 1; }
-          100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.15); }
+          100% { opacity: 0; transform: translate(var(--dx), var(--dy)); }
         }
         /* Someone who has asked for less motion gets the outline, held steady,
            and no sparks at all. The information is in the gold, not the movement. */

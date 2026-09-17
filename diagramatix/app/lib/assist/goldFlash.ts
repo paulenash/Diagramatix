@@ -43,12 +43,16 @@ export const GOLD = {
 
 /**
  * The ops whose result is worth pointing at: something appeared, something was
- * enclosed, or something moved.
+ * enclosed, something moved, or something was renamed.
  *
- * `delete` is absent on purpose — there is nothing left to outline. So is
- * `rename`, because the guided rename has just had you read a number off that
- * very item. `undo` is absent because what it restores varies too much to point
- * at honestly.
+ * Renames were left out at first, on the reasoning that the guided flow has just
+ * had you read a number off that very item. Paul overruled it (2026-09-18:
+ * "Gold flashing does not work while in Rename tasks etc.") and he is right —
+ * you pick a number, say a name, and the badge renumbering pulls your eye away
+ * from the thing that actually changed.
+ *
+ * `delete` is still absent: there is nothing left to outline. So is `undo`,
+ * because what it restores varies too much to point at honestly.
  */
 const FLASHING_OPS: ReadonlySet<AssistOp["op"]> = new Set<AssistOp["op"]>([
   // added
@@ -58,6 +62,8 @@ const FLASHING_OPS: ReadonlySet<AssistOp["op"]> = new Set<AssistOp["op"]>([
   "wrapInPool", "wrapInSubprocess", "wrapInContainer",
   // moved / nudged
   "move", "nudgePool", "moveLane", "swapLanes",
+  // renamed
+  "rename", "labelSelected",
 ]);
 
 /** True when finishing this op should flash the items it touched. */
@@ -105,6 +111,13 @@ export interface FlashBox {
   width: number;
   height: number;
   parentId?: string;
+  /**
+   * Carried so a RENAME can be seen at all. A rename moves nothing and
+   * re-parents nothing, so without the label the diff finds no difference and
+   * the flash silently does nothing — which is what Paul hit (2026-09-18:
+   * "Gold flashing does not work while in Rename tasks").
+   */
+  label?: string;
 }
 
 /**
@@ -138,16 +151,20 @@ export function flashTargets(
 
   const added: FlashBox[] = [];
   const reparented: FlashBox[] = [];
-  const moved: FlashBox[] = [];
+  const changed: FlashBox[] = [];
 
   for (const e of after) {
     const old = was.get(e.id);
     if (!old) { added.push(e); continue; }
     if ((old.parentId ?? null) !== (e.parentId ?? null)) { reparented.push(e); continue; }
-    if (Math.abs(old.x - e.x) > MOVED_EPSILON || Math.abs(old.y - e.y) > MOVED_EPSILON) moved.push(e);
+    const movedIt = Math.abs(old.x - e.x) > MOVED_EPSILON || Math.abs(old.y - e.y) > MOVED_EPSILON;
+    // A rename is a change to that item as much as a nudge is, and it is the
+    // only one of the two that leaves the geometry alone.
+    const renamed = (old.label ?? "") !== (e.label ?? "");
+    if (movedIt || renamed) changed.push(e);
   }
 
-  const chosen = added.length || reparented.length ? [...added, ...reparented] : moved;
+  const chosen = added.length || reparented.length ? [...added, ...reparented] : changed;
   return chosen.slice(0, GOLD_FLASH_MAX_TARGETS);
 }
 
