@@ -19,9 +19,12 @@ from memory, so this file never claims more or less than the code contains.
 | **Convert in place, fill, pointer, marquee, tidy, ghost, properties** (M3–M9) | **not started** |
 | **Voice reliability** (V1–V3) | **not started**; V0 happened as a live session but produced no written tally |
 | **Publish the guide, tech-notes and feature rows** (D1) | **not started** — the three seed scripts are still unrun on production |
+| **Delivered from live use** (L1–L9) | **SHIPPED** — not in the original backlog; added to it after the fact so the plan is a complete record |
 
 **Source document:** the full review plan, including the walkthrough script and
-the ranked backlog, is reproduced in the appendix below.
+the ranked backlog, is reproduced in the appendix below. The backlog now also
+carries the **L family** — everything delivered that the plan never predicted —
+so a future session can cite it by id rather than by commit.
 
 ---
 
@@ -376,10 +379,43 @@ Order: V0 during the review → V1 → V2 → V3.
 | D3 | Tests for the untested half: extract the op-apply loop into `app/lib/assist/apply.ts` with an injected command interface; route test with a mocked client; fake-timer tests for `isIncompleteCommand`/flush | M/L | H |
 | D4 | Fix the stale docblock and the memory note ("NEXT: Tier-2 NL command bar, AI route" — both shipped) | S | L |
 
+#### Delivered from live use — the L family (added 2026-09-17, after the fact)
+
+These were not in the backlog above. They came out of Paul using the feature
+and saying what was wrong, and they account for roughly two thirds of
+everything shipped since the plan was written. They are given ids here so the
+plan is a complete record rather than only a record of what was predicted, and
+so later work can cite them.
+
+The pattern worth keeping: every one of these is an *interaction* defect —
+something that made the feature feel unreliable in the hand — and none of them
+were visible from reading the code, which is what the backlog above was built
+from.
+
+| # | Title | Commit | Tests |
+|---|---|---|---|
+| L1 | **The first word was lost.** Audio was wired to the recogniser only once the socket opened, while the bar already said "listening" — so whatever was said during the handshake went nowhere. Audio is now buffered through the handshake and the mic opens in parallel, with a "connecting…" state that tells the truth | `49b13eb1` | T4400–T4407 |
+| L2 | **"Stop" was ambiguous** — it ended a numbered pick and the microphone at once. Mic words are now separate from flow words: "stop" always ends the mic, "done"/"cancel"/Escape end a pick and keep listening | `49b13eb1` | T4400–T4407 |
+| L3 | **Messages by number.** "Add a message" numbers every valid end and takes "3 to 7 labelled Order Placed"; with a selection it numbers only the valid counterparts | `49b13eb1` | T4400–T4407 |
+| L4 | **Nudge was a jump.** 20 px, in any direction, on the named element only; the log line says whether a nudge or a move was heard. Wrap-in-pool stopped adding a lane | `49b13eb1`, `f51a2c7d` | T4400–T4415 |
+| L5 | **Green numbers by kind, and nothing left selected.** Badges sit below an activity, above an event, and in the header for a pool or lane; a voice rename or move never leaves the item selected. Paul's rule, to apply to every future rename or move | `ab40d0ed` | T4408–T4410 |
+| L6 | **Group nudge and move, label selected, label by number, swap gateway points** — including every ordered pair of top/bottom/middle/left/right, and later every *selected* gateway at once | `f51a2c7d`, `8c370014` | T4411–T4418 |
+| L7 | **A command split by a pause is held.** A lone verb, a dangling connective or a half rename waits for the rest instead of being guessed at by the AI; a comma straight after the verb is ignored | `8c370014` | T4416–T4418 |
+| L8 | **Surround the selection with an expanded subprocess, and dissolve one back.** Room is made in the lane only, the flow in and out re-attach to the subprocess, a Start and End go inside; the inverse restores every position, and the two round-trip without undo | `9eb28faf` | T4419–T4422 |
+| L9 | **Knowing what you can say and what it costs.** A movable Commands card whose every example is tested to parse, a cost-so-far button, and a SuperAdmin tile. Plus the "Suggestion" chip rename with a real target | `b00e3c7b`, `2117e392` | T4394–T4399 |
+
+**What this changes about the backlog.** L1–L9 are evidence that the next most
+valuable items are the ones that show up in use, not the ones that read worst in
+the source. R2, R3 and R6 (ask which, don't guess; say what you couldn't find)
+are the remaining entries of that kind, which is why they lead the order below.
+B5's greedy regexes are the other: every one of its symptoms is something a user
+hits mid-sentence.
+
 #### Order of attack
-- **Session 1 — bugs** (all in `DiagramEditor.tsx` + `useDiagram.ts`): B2 → B3 → B1 → B4 → B6 → B7 → B8 → R7. Do D3's `apply.ts` extraction first if tests for B1/B3 are wanted, otherwise after. End with the D2 entry.
-- **Session 2 — safety + cost + voice**: R1 → R3 → R2 (share the badge flow) → B5 → C5 + R4 → V1 → V2 → D1 → D4.
+- **Session 1 — bugs** (all in `DiagramEditor.tsx` + `useDiagram.ts`): B2 → B3 → B1 → B4 → B6 → B7 → B8 → R7. Do D3's `apply.ts` extraction first if tests for B1/B3 are wanted, otherwise after. End with the D2 entry. — **done** `a49a8006`, except B4 (half), B6, B7 (half), B8, R7.
+- **Session 2 — safety + cost + voice**: R1 → R3 → R2 (share the badge flow) → B5 → C5 + R4 → V1 → V2 → D1 → D4. — **R1 and D4 done** `a49a8006`; the rest stands.
 - **Session 3**: C9 (the gate for any wider rollout), V3 (phrase book, once V0's tally says ASR errors are worth it), then C2/C3 depending on decision 1.
+- **Unplanned, and it kept winning:** the L family above. Worth budgeting a live session per round rather than treating it as interruption.
 
 ---
 
