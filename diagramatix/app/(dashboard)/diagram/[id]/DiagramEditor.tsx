@@ -42,13 +42,14 @@ import { CollabFlushOnLeave } from "@/app/components/canvas/CollabFlushOnLeave";
 import { CollabDebug } from "@/app/components/canvas/CollabDebug";
 import { suggestNextSteps, type NextStepCandidate } from "@/app/lib/diagram/nextSteps";
 import { sizeOf, placeInline, placeGatewayBranch, placeBoundaryEvent, placeAfterBoundaryEvent, boundaryOuterSide, findFreeSlot, HALF_TASK_W, HALF_TASK_H } from "@/app/lib/diagram/assistPlacement";
-import { planWrapInSubprocess, planUnwrapSubprocess } from "@/app/lib/diagram/subprocessWrap";
+import { planWrapInSubprocess, planUnwrapSubprocess, planWrapInContainer } from "@/app/lib/diagram/subprocessWrap";
 import { matchIntent, matchAssistRules, type IntentRow } from "@/app/lib/diagram/intentMatch";
 import { canConnect } from "@/app/lib/diagram/canConnect";
 import { parseCommand } from "@/app/lib/assist/commandGrammar";
 import { resolveRef, resolveSelectionRefs, isSelectionRef, ID_REF_PREFIX } from "@/app/lib/assist/resolveRef";
 import { isMicStopWord, isFlowEndWord } from "@/app/lib/assist/stopWords";
 import { isIncompleteCommand } from "@/app/lib/assist/incompleteCommand";
+import { leadingSpokenNumber } from "@/app/lib/assist/spokenNumber";
 import { collectMessageTargets, parseMessageAnswer, type MessagePick } from "@/app/lib/assist/messageTargets";
 import { validateOps, type AssistOp } from "@/app/lib/assist/ops";
 import { syntheticElement, withAdded, withDeleted, withLabel } from "@/app/lib/assist/workingSet";
@@ -1168,6 +1169,7 @@ export function DiagramEditor({
     splitLaneEven,
     wrapInPool,
     wrapInSubprocess,
+    wrapInContainer,
     unwrapSubprocess,
     addPool,
     addLaneAt,
@@ -2926,6 +2928,22 @@ export function DiagramEditor({
         results.push(plan.summary);
         continue;
       }
+      if (op.op === "wrapInContainer") {
+        // Same shape as wrapInSubprocess: plan here so the guard message comes
+        // from the code the reducer will run, then dispatch, then widen the
+        // pools if the new container pushed past their right edge.
+        const label = op.label?.trim() || (op.container === "lane" ? "Lane" : "Pool");
+        const ids = { containerId: nanoid() };
+        const plan = planWrapInContainer({ elements: els, connectors: data.connectors }, selectedIds, op.container, label, ids);
+        if ("error" in plan) { results.push(plan.error); anyFail = true; continue; }
+        wrapInContainer([...selectedIds], op.container, label, ids);
+        if (els.some((e) => e.type === "pool" && e.x + e.width < plan.contentRight + 40)) extendPools();
+        els = plan.elements;
+        abraLastId.current = ids.containerId;
+        setSelectedElementIds(new Set()); // selection protocol
+        results.push(plan.summary);
+        continue;
+      }
       if (op.op === "unwrapSubprocess") {
         const eps = selectedIds.map((id) => els.find((x) => x.id === id)).filter((x): x is DiagramElement => !!x && x.type === "subprocess-expanded");
         if (eps.length !== 1) { results.push(eps.length ? "select just the one expanded subprocess" : "select the expanded subprocess first"); anyFail = true; continue; }
@@ -3224,7 +3242,7 @@ export function DiagramEditor({
       }
     }
     return { ok: !anyFail, summary: results.join("; ") || "nothing to do" };
-  }, [data.elements, data.connectors, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, updateConnectorLabel, deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool, wrapInSubprocess, unwrapSubprocess, addPool, addLaneAt, compressPool, extendPools, swapLane, moveLane, moveElements, elementsMoveEnd, removeSpace, setRenameFlow, setMessageFlow, updateConnectorEndpoint]);
+  }, [data.elements, data.connectors, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, updateConnectorLabel, deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool, wrapInSubprocess, wrapInContainer, unwrapSubprocess, addPool, addLaneAt, compressPool, extendPools, swapLane, moveLane, moveElements, elementsMoveEnd, removeSpace, setRenameFlow, setMessageFlow, updateConnectorEndpoint]);
 
   // Cancel the guided rename flow and clear any badge/edit state.
   const cancelRenameFlow = useCallback((reason?: string) => {
@@ -3267,17 +3285,19 @@ export function DiagramEditor({
     // "stop" never reaches here — it stops the mic (stopWords.ts).
     if (isFlowEndWord(low)) { cancelRenameFlow("rename finished"); return; }
     if (flow.phase === "pick") {
-      // Leading number (digit or number-word) selects a badge; trailing text is the name.
-      const digits = low.replace(/\b(zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty)\b/g, (m) => String(["zero","one","two","three","four","five","six","seven","eight","nine","ten","eleven","twelve","thirteen","fourteen","fifteen","sixteen","seventeen","eighteen","nineteen","twenty"].indexOf(m)));
-      const m = digits.match(/^(?:number\s+|item\s+|the\s+)?(\d+)\b\s*(.*)$/);
-      if (!m) { setAbraLog((prev) => [...prev, { id: nanoid(), heard: t, summary: "say the number of the item to rename", ok: false }]); return; }
-      const n = parseInt(m[1], 10);
+      // Leading number (digit, number-word, or a known mishearing of one)
+      // selects a badge; trailing text is the name. `leadingSpokenNumber`
+      // absorbs the recogniser substituting "lane" for "one" — a bias we
+      // create ourselves by boosting `lane` (spokenNumber.ts).
+      const picked = leadingSpokenNumber(low);
+      if (!picked) { setAbraLog((prev) => [...prev, { id: nanoid(), heard: t, summary: "say the number of the item to rename", ok: false }]); return; }
+      const n = picked.n;
       const target = flow.targets.find((x) => x.n === n);
       if (!target) { setAbraLog((prev) => [...prev, { id: nanoid(), heard: t, summary: `there’s no number ${n}`, ok: false }]); return; }
       // Select + enter edit mode (+ zoom for elements) so the change is visible.
       if (target.kind === "element") { setSelectedConnectorId(null); setSelectedElementIds(new Set([target.id])); beginLabelEdit(target.id); }
       else { setSelectedElementIds(new Set()); setSelectedConnectorId(target.id); }
-      const trailing = m[2].trim();
+      const trailing = picked.rest;
       if (trailing) { applyRenameName(target, trailing, flow.itemType); }         // "14 Approve Invoice" in one breath
       else { setRenameFlow({ phase: "name", itemType: flow.itemType, targetId: target.id, kind: target.kind }); } // wait for the name
       return;

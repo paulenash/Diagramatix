@@ -30,6 +30,7 @@ export const COMMAND_CATALOG: CatalogFamily[] = [
   { family: "The selection (mouse says which, voice says what)", items: [
     { does: "Refer to what is selected", say: ["rename the selected pool to Customer", "delete these", "connect this to Approve", "move the selected task right", "add a boundary event called Timeout to this"] },
     { does: "Surround the selection with an expanded subprocess — room is made in its lane, the flow in and out re-attach to the subprocess, a Start and End go inside (needs exactly one flow in and one out)", say: ["surround selected with an expanded subprocess called Check Stock", "wrap these in a subprocess", "put an expanded subprocess around the selected elements called Pick"] },
+    { does: "Wrap the selection in a pool or a lane — a pool refuses when a sequence flow would cross its boundary; a lane becomes a band in the pool the selection already sits in", say: ["wrap these in a pool called Finance", "surround selected with a lane called Picking", "put a pool around the selected elements called Sales"] },
     { does: "Dissolve the selected expanded subprocess back into the flow — the contents stay, the room is given back; “delete selected” on one does the same", say: ["unwrap the selected subprocess", "dissolve the EP", "delete selected"] },
   ] },
   { family: "Pools", items: [

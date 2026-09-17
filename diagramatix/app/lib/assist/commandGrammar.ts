@@ -151,6 +151,24 @@ export function parseCommand(utterance: string): AssistOp[] | null {
         const name = clean(s[1] ?? s[2] ?? "");
         return [{ op: "wrapInSubprocess", ...(name ? { label: name } : {}) }];
       }
+
+      // Same shapes, but a POOL or a LANE around the selection. Kept here, next
+      // to the subprocess rule, because the phrasing is identical and the only
+      // difference is the container word — and it must stay ABOVE the
+      // wrap-everything-in-a-pool rule below, which would otherwise swallow
+      // "wrap these in a pool" and wrap the whole diagram instead.
+      const CONTAINER = "(?:an?\\s+)?(?:new\\s+)?(pool|poll|pull|lanes?|lines?)";
+      const c = raw.match(new RegExp(`^(?:surround|wrap|enclose|put|place)\\s+${SEL}\\s+(?:with|in|inside|into|within|using)\\s+${CONTAINER}${NAME}$`, "i"))
+        ?? raw.match(new RegExp(`^(?:put|add|create|draw|make|insert|place)\\s+${CONTAINER}${NAME}\\s+(?:around|round|over|containing|enclosing)\\s+${SEL}${NAME}$`, "i"));
+      if (c) {
+        // The homophones the recogniser actually returns: poll/pull for pool,
+        // line for lane (the same confusion that makes "one" come back as
+        // "lane" — see assist/spokenNumber.ts).
+        const word = (c[1] ?? "").toLowerCase();
+        const container = /^(?:lane|line)/.test(word) ? "lane" as const : "pool" as const;
+        const name = clean(c[2] ?? c[3] ?? "");
+        return [{ op: "wrapInContainer", container, ...(name ? { label: name } : {}) }];
+      }
     }
 
     // Wrap all loose (un-pooled) elements INTO a pool (a qualifier is REQUIRED

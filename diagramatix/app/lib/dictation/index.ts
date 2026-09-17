@@ -168,7 +168,14 @@ async function startDeepgram(token: string, scheme: string, cb: DictationCallbac
   });
   // Bias recognition toward the command vocabulary so "lane"≠"line", "pool"≠
   // "poll"/"pull", etc. (Deepgram `keywords`, with a boost on the confusable ones.)
+  // Number words are boosted too. Without them, `lane:3` — the strongest
+  // weight here — wins against the acoustically similar "one" on a numbered
+  // pick, which is the shortest utterance a user ever makes and the one with
+  // the least context to recover from (Paul, 2026-09-17). The pick handler
+  // also corrects the substitution after the fact (assist/spokenNumber.ts);
+  // this is the half that stops it happening in the first place.
   for (const kw of ["lane:3", "sublane:3", "pool:3", "gateway:2", "task:2", "subprocess:2",
+    "one:3", "two:2", "three:2", "four:2", "five:2", "six:2", "seven:2", "eight:2", "nine:2", "ten:2",
     "boundary", "connect", "rename", "delete", "compact", "Abracadabra"]) {
     params.append("keywords", kw);
   }

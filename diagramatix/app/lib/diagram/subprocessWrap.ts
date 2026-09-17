@@ -233,3 +233,128 @@ export function planUnwrapSubprocess(shape: Shape, epId: string): WrapPlan {
     summary: `dissolved ${nameOf(ep)} — its ${content.length} element${content.length === 1 ? " is" : "s are"} back in the flow`,
   };
 }
+
+// ── Wrapping a selection in a POOL or a LANE ────────────────────────────────
+//
+// Both are containers rather than flow elements, so this is a much smaller job
+// than the expanded subprocess above: nothing is re-pointed, no Start or End is
+// created, and there is no one-in-one-out requirement. What each one DOES need
+// is a rule the subprocess does not:
+//
+//   POOL  A sequence flow may not cross a pool boundary (canConnect enforces
+//         it, and the reducer agrees). So a selection with a flow to anything
+//         outside it cannot become a pool without changing what those flows
+//         mean. That is a modelling decision, not a tidy-up, so it is refused
+//         and named rather than silently converted to message flows.
+//
+//   LANE  A lane is a full-width band inside a pool, not a box drawn round the
+//         selection. So the selection has to already live in one pool, and the
+//         band it implies must be clear of everything not selected — otherwise
+//         the new lane would silently adopt a neighbour that merely shares its
+//         vertical extent.
+
+export interface ContainerWrapIds { containerId: string }
+
+/** Wrap the selection in a new pool, or in a new lane of the pool it already sits in. */
+export function planWrapInContainer(
+  shape: Shape,
+  selectedIds: readonly string[],
+  container: "pool" | "lane",
+  label: string,
+  ids: ContainerWrapIds,
+): WrapPlan {
+  const byId = new Map(shape.elements.map((e) => [e.id, e] as const));
+  const picked = selectedIds.map((id) => byId.get(id)).filter((e): e is DiagramElement => !!e);
+  if (picked.some((e) => CONTAINER.has(e.type))) {
+    return { error: `the selection can't include a pool, lane or subprocess — select the elements to put in the ${container}` };
+  }
+  const members = picked.filter((e) => !ARTIFACT.has(e.type) && !e.boundaryHostId);
+  if (members.length === 0) return { error: `select the elements to put in the ${container} first` };
+
+  const homeId = members[0].parentId;
+  if (members.some((e) => e.parentId !== homeId)) {
+    return { error: `the selected elements must all sit in the same place — they are spread across more than one container` };
+  }
+  const home = homeId ? byId.get(homeId) : undefined;
+  const group = closure(shape.elements, members.map((e) => e.id));
+  const box = bbox([...group].map((id) => byId.get(id)!));
+
+  // The pool an element belongs to, walking the parent chain.
+  const poolOf = (e: DiagramElement | undefined): DiagramElement | undefined => {
+    let cur = e;
+    for (let i = 0; cur && i < 12; i++) {
+      if (cur.type === "pool") return cur;
+      cur = cur.parentId ? byId.get(cur.parentId) : undefined;
+    }
+    return undefined;
+  };
+
+  if (container === "pool") {
+    // Nested pools are not a thing.
+    if (poolOf(home)) {
+      return { error: "these elements are already in a pool — a pool cannot contain another pool" };
+    }
+    // A sequence flow that would end up crossing the new boundary.
+    const crossing = shape.connectors.filter((c) =>
+      c.type === "sequence" && (group.has(c.sourceId) !== group.has(c.targetId)));
+    if (crossing.length > 0) {
+      const names = crossing.slice(0, 3).map((c) => {
+        const outside = group.has(c.sourceId) ? byId.get(c.targetId) : byId.get(c.sourceId);
+        return outside ? nameOf(outside) : "something outside";
+      });
+      return {
+        error: `a sequence flow can't cross a pool boundary — ${crossing.length} flow${crossing.length === 1 ? "" : "s"} would (${names.join(", ")}${crossing.length > 3 ? ", …" : ""}). Include those elements in the selection, or disconnect them first.`,
+      };
+    }
+    const PAD = 40, HEADER_W = 36;
+    const pool: DiagramElement = {
+      id: ids.containerId, type: "pool",
+      x: box.x - PAD - HEADER_W, y: box.y - PAD,
+      width: box.width + 2 * PAD + HEADER_W, height: box.height + 2 * PAD,
+      label, properties: { poolType: "white-box" },
+    };
+    const elements: DiagramElement[] = [];
+    let placed = false;
+    for (const e of shape.elements) {
+      if (group.has(e.id) && !placed) { elements.push(pool); placed = true; } // drawn beneath its children
+      elements.push(group.has(e.id) && !e.parentId ? { ...e, parentId: pool.id } : e);
+    }
+    const contentRight = Math.max(...elements.filter((e) => !SWIMLANE.has(e.type)).map((e) => e.x + e.width));
+    const n = members.length;
+    return { elements, connectors: shape.connectors, contentRight,
+      summary: `put ${n} element${n === 1 ? "" : "s"} in the pool ${label}` };
+  }
+
+  // ── lane ──
+  const pool = poolOf(home);
+  if (!pool) return { error: "a lane lives inside a pool — put these elements in a pool first" };
+
+  const PAD = 12;
+  const top = box.y - PAD, bottom = box.bottom + PAD;
+  // A lane spans the pool, so anything else in that band would be adopted too.
+  const trapped = shape.elements.find((e) =>
+    !group.has(e.id) && !SWIMLANE.has(e.type) && !e.boundaryHostId
+    && poolOf(e)?.id === pool.id
+    && cy(e) > top && cy(e) < bottom);
+  if (trapped) {
+    return { error: `${nameOf(trapped)} sits level with the selection and would be swept into the lane — select it too, or move it out of the way first` };
+  }
+
+  const HEADER_W = 36;
+  const lane: DiagramElement = {
+    id: ids.containerId, type: "lane",
+    x: pool.x + HEADER_W, y: top,
+    width: pool.width - HEADER_W, height: bottom - top,
+    label, parentId: pool.id, properties: {},
+  };
+  const elements: DiagramElement[] = [];
+  let placed = false;
+  for (const e of shape.elements) {
+    if (group.has(e.id) && !placed) { elements.push(lane); placed = true; }
+    elements.push(group.has(e.id) && e.parentId === homeId ? { ...e, parentId: lane.id } : e);
+  }
+  const contentRight = Math.max(...elements.filter((e) => !SWIMLANE.has(e.type)).map((e) => e.x + e.width));
+  const n = members.length;
+  return { elements, connectors: shape.connectors, contentRight,
+    summary: `put ${n} element${n === 1 ? "" : "s"} in the lane ${label}` };
+}

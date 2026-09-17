@@ -125,6 +125,30 @@ Examples: "rename the selected pool to Customer" · "delete these" · "connect t
   leaves from the rightmost when there is no Start/End). The two round-trip without undo, and not
   necessarily straight after one another. An empty subprocess is deleted as before.
 
+## Wrap the selection in a pool or a lane (17 September 2026)
+
+- **"wrap these in a pool called Finance"** — a new pool around the selected
+  elements. Refused when a **sequence flow would cross the boundary**, because
+  BPMN does not allow that: the log names what is on the other side so you can
+  include it or disconnect it. Also refused if the elements are already in a
+  pool, since pools do not nest.
+- **"surround selected with a lane called Picking"** — a new lane in the pool
+  the selection already sits in. A lane is a full-width band, so anything
+  unselected that is level with the selection would be swept in; that is
+  refused by name rather than done quietly. Needs the elements to be in a pool.
+- Both take the same phrasings as the subprocess wrap, and both accept what the
+  recogniser usually returns instead: "poll"/"pull" for pool, "line" for lane.
+
+## The number one, during a numbered pick (17 September 2026)
+
+Saying **"one"** used to come back as **"lane"**. That was our own doing: the
+recogniser is told to favour BPMN words, and `lane` carried the strongest
+weight, so on a one-word utterance it won against the number. Fixed at both
+ends — the number words are now boosted too, and the pick corrects a known
+mishearing on the first word only. "One", "lane", "line", "won" and "juan" all
+pick item 1; a name that begins with "Lane" still works, because only the
+leading word is ever rewritten.
+
 ## Pausing mid-command
 
 Deepgram finalises a segment after ~0.8 s of silence, so "Swap … top and bottom" can arrive as two

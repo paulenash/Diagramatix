@@ -22,6 +22,8 @@ export type AssistOp =
   | { op: "wrapInPool"; label?: string }
   /** "surround selected with an expanded subprocess called X" — the SELECTION, one flow in, one out. */
   | { op: "wrapInSubprocess"; label?: string }
+  /** "wrap these in a pool/lane called X" — the SELECTION becomes the contents of a new container. */
+  | { op: "wrapInContainer"; container: "pool" | "lane"; label?: string }
   /** "unwrap the selected subprocess" — the reverse; "delete selected" on an EP does the same. */
   | { op: "unwrapSubprocess" }
   | { op: "addBoundary"; hostRef: Ref; label?: string; eventType?: EventType }
@@ -137,6 +139,11 @@ export function validateOp(raw: unknown): AssistOp | null {
     }
     case "wrapInPool":
       return { op: "wrapInPool", ...(isRef(o.label) ? { label: (o.label as string).trim() } : {}) };
+    case "wrapInContainer": {
+      const c = o.container === "lane" ? "lane" : o.container === "pool" ? "pool" : null;
+      if (!c) return null;
+      return { op: "wrapInContainer", container: c, ...(isRef(o.label) ? { label: (o.label as string).trim() } : {}) };
+    }
     case "wrapInSubprocess":
       return { op: "wrapInSubprocess", ...(isRef(o.label) ? { label: (o.label as string).trim() } : {}) };
     case "unwrapSubprocess":
