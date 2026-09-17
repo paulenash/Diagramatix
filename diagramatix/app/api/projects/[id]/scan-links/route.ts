@@ -436,7 +436,7 @@ export async function POST(req: Request, { params }: Params) {
         const d = diagramById.get(did);
         if (!d) continue;
         await client.query(
-          'UPDATE "Diagram" SET "data" = $1::jsonb, "updatedAt" = NOW() WHERE id = $2',
+          'UPDATE "Diagram" SET "data" = $1::jsonb, version = version + 1, "updatedAt" = NOW() WHERE id = $2',
           [JSON.stringify(d.data ?? {}), did],
         );
       }

@@ -165,7 +165,7 @@ export async function POST(request: Request) {
       // Also update the type — a domain .vsdx imported over a BPMN diagram must
       // switch to "domain" or it renders under the wrong engine.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      data: { data: parsed.data as any, type: resolvedType },
+      data: { data: parsed.data as any, type: resolvedType, version: { increment: 1 } },
     });
     return NextResponse.json(
       { diagram: updated, warnings: parsed.warnings, stats: parsed.stats, overwrote: true },

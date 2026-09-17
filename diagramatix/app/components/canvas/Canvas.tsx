@@ -1330,12 +1330,26 @@ export function Canvas({
     };
   }
 
+  // CANVAS-10: read pan/zoom through the refs so this callback is STABLE.
+  //
+  // It is handed to SymbolRenderer, which is memoised with `canvasMemoEqual` —
+  // and that comparator deliberately skips function props, since every handler
+  // is a fresh closure each render. Pan and zoom live only in Canvas state, so
+  // a pan or zoom changes no data prop the comparator looks at: the elements
+  // skip re-rendering and keep the closure built with the PREVIOUS viewport.
+  // The consequences are silent and look like bugs elsewhere — a pool or lane
+  // header hit-test compares a stale world point against an absolute element
+  // position, so the click lands on the wrong element, and a group drag divides
+  // client-pixel deltas by the old zoom, so the selection moves at the wrong
+  // rate. Depending on [pan, zoom] cannot fix it while the comparator skips
+  // functions; a stable callback that reads current values can, and it matches
+  // what `liveClientToWorld` below already does.
   const svgToWorld = useCallback(
     (svgX: number, svgY: number): Point => ({
-      x: (svgX - pan.x) / zoom,
-      y: (svgY - pan.y) / zoom,
+      x: (svgX - panRef.current.x) / zoomRef.current,
+      y: (svgY - panRef.current.y) / zoomRef.current,
     }),
-    [pan, zoom]
+    []
   );
 
   const clientToWorld = useCallback(
@@ -5597,7 +5611,7 @@ export function Canvas({
                 onLabelFocusEditEnd={exitFocusMode}
                 onMoveEnd={() => { setDraggingElementId(null); if (el.type === "pool") setPoolBoundaryGuide(null); onElementMoveEnd?.(el.id); }}
                 multiSelected={selectedElementIds.size > 1 && selectedElementIds.has(el.id)}
-                onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoom, dy / zoom) : undefined}
+                onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoomRef.current, dy / zoomRef.current) : undefined}
                 onGroupMoveEnd={onElementsMoveEnd}
                 colorConfig={colorConfig}
                 debugMode={debugMode}
@@ -5659,7 +5673,7 @@ export function Canvas({
               onLabelFocusEditStart={(cx, cy, w) => enterFocusModeAt(cx, cy, w, "external")}
               onLabelFocusEditEnd={exitFocusMode}
               multiSelected={selectedElementIds.size > 1 && selectedElementIds.has(el.id)}
-              onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoom, dy / zoom) : undefined}
+              onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoomRef.current, dy / zoomRef.current) : undefined}
               onGroupMoveEnd={onElementsMoveEnd}
               colorConfig={colorConfig}
               debugMode={debugMode}
@@ -5849,7 +5863,7 @@ export function Canvas({
                 onLabelFocusEditEnd={exitFocusMode}
                 onMoveEnd={() => { setDraggingElementId(null); onElementMoveEnd?.(el.id); }}
                 multiSelected={selectedElementIds.size > 1 && selectedElementIds.has(el.id)}
-                onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoom, dy / zoom) : undefined}
+                onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoomRef.current, dy / zoomRef.current) : undefined}
                 onGroupMoveEnd={onElementsMoveEnd}
                 colorConfig={colorConfig}
                 debugMode={debugMode}
@@ -6081,7 +6095,7 @@ export function Canvas({
               onLabelFocusEditEnd={exitFocusMode}
               onMoveEnd={() => { setDraggingElementId(null); onElementMoveEnd?.(el.id); }}
               multiSelected={selectedElementIds.size > 1 && selectedElementIds.has(el.id)}
-              onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoom, dy / zoom) : undefined}
+              onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoomRef.current, dy / zoomRef.current) : undefined}
               onGroupMoveEnd={onElementsMoveEnd}
               colorConfig={colorConfig}
               debugMode={debugMode}
@@ -6211,7 +6225,7 @@ export function Canvas({
                 onLabelFocusEditStart={(cx, cy, w) => enterFocusModeAt(cx, cy, w, "external")}
                 onLabelFocusEditEnd={exitFocusMode}
                 multiSelected={selectedElementIds.size > 1 && selectedElementIds.has(el.id)}
-                onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoom, dy / zoom) : undefined}
+                onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoomRef.current, dy / zoomRef.current) : undefined}
                 onGroupMoveEnd={onElementsMoveEnd}
                 colorConfig={colorConfig}
                 debugMode={debugMode}
@@ -6264,7 +6278,7 @@ export function Canvas({
               onLabelFocusEditEnd={exitFocusMode}
               onMoveEnd={() => { setDraggingElementId(null); onElementMoveEnd?.(el.id); }}
               multiSelected={selectedElementIds.size > 1 && selectedElementIds.has(el.id)}
-              onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoom, dy / zoom) : undefined}
+              onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoomRef.current, dy / zoomRef.current) : undefined}
               onGroupMoveEnd={onElementsMoveEnd}
               colorConfig={colorConfig}
               debugMode={debugMode}
@@ -6390,7 +6404,7 @@ export function Canvas({
                 onLabelFocusEditEnd={exitFocusMode}
                 onMoveEnd={() => { setDraggingElementId(null); onElementMoveEnd?.(el.id); }}
                 multiSelected={true}
-                onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoom, dy / zoom) : undefined}
+                onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoomRef.current, dy / zoomRef.current) : undefined}
                 onGroupMoveEnd={onElementsMoveEnd}
                 colorConfig={colorConfig}
                 debugMode={debugMode}
@@ -7338,7 +7352,7 @@ export function Canvas({
               onUpdateLabel={onUpdateLabel}
               onLabelFocusEditStart={(cx, cy, w) => enterFocusModeAt(cx, cy, w, "external")}
               onLabelFocusEditEnd={exitFocusMode}
-              onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoom, dy / zoom) : undefined}
+              onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoomRef.current, dy / zoomRef.current) : undefined}
               onGroupMoveEnd={onElementsMoveEnd}
               colorConfig={colorConfig}
               debugMode={debugMode}

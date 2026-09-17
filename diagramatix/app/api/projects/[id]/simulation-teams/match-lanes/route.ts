@@ -75,7 +75,7 @@ export async function POST(_req: Request, { params }: Params) {
       }
     }
     if (changed) {
-      await pgPool.query('UPDATE "Diagram" SET data = $1::jsonb, "updatedAt" = NOW() WHERE id = $2', [JSON.stringify(data), d.id]);
+      await pgPool.query('UPDATE "Diagram" SET data = $1::jsonb, version = version + 1, "updatedAt" = NOW() WHERE id = $2', [JSON.stringify(data), d.id]);
       diagramsUpdated++;
     }
   }

@@ -35,13 +35,47 @@ function attr(openTag: string, name: string): string | undefined {
   return decode(m[2] !== undefined ? m[2] : m[3] ?? "");
 }
 
-/** All `<x:Tag ...>inner</x:Tag>` blocks (prefix-agnostic). Captures the open-
- *  tag attributes and the inner content. Same-named tags here never nest. */
+/**
+ * All `<x:Tag ...>inner</x:Tag>` blocks (prefix-agnostic). Captures the open-
+ * tag attributes and the inner content. Same-named tags here never nest.
+ *
+ * IO-11: this used to be one regex, `<Tag\b([^>]*)>([\s\S]*?)</Tag>`, matched
+ * globally. On well-formed input that is fine. On input where an open tag has
+ * no matching close — which an uploaded file gets to decide — the lazy middle
+ * scans to the end of the document, fails, and the engine restarts one
+ * character later and scans to the end again. With many unmatched tags in a
+ * large file that is quadratic: a 1.8 MB upload burned about 33 seconds of a
+ * request core, and the try/catch around the caller does not bound elapsed
+ * time, only thrown errors.
+ *
+ * Anchoring removes the behaviour rather than capping it. Each open tag is
+ * found by a scan that cannot backtrack across the document, and its close is
+ * located from that point with a plain index search. An unmatched open tag
+ * costs one failed search and is then skipped, so the whole pass is linear.
+ */
 function blocks(xml: string, local: string): { open: string; inner: string }[] {
-  const re = new RegExp(`<${px}${local}\\b([^>]*)>([\\s\\S]*?)</${px}${local}>`, "g");
+  const openRe = new RegExp(`<${px}${local}\\b([^>]*)>`, "g");
+  // `g` so the search can be started at an offset via lastIndex. Searching the
+  // ORIGINAL string rather than a slice matters: slicing the remainder once per
+  // open tag copies the rest of the document each time, which is quadratic in
+  // allocation even though the scanning itself is linear.
+  const closeRe = new RegExp(`</${px}${local}\\s*>`, "g");
   const out: { open: string; inner: string }[] = [];
   let m: RegExpExecArray | null;
-  while ((m = re.exec(xml)) !== null) out.push({ open: m[1], inner: m[2] });
+  while ((m = openRe.exec(xml)) !== null) {
+    // A self-closing `<Tag ... />` has no inner content and no close tag.
+    if (m[1].endsWith("/")) {
+      out.push({ open: m[1].slice(0, -1), inner: "" });
+      continue;
+    }
+    const from = m.index + m[0].length;
+    closeRe.lastIndex = from;
+    const close = closeRe.exec(xml);
+    if (!close) break; // no close tag anywhere after here — nothing left to find
+    out.push({ open: m[1], inner: xml.slice(from, close.index) });
+    // Continue after this block's close, so nothing is scanned twice.
+    openRe.lastIndex = close.index + close[0].length;
+  }
   return out;
 }
 

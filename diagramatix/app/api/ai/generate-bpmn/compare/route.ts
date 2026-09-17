@@ -189,7 +189,7 @@ export async function POST(req: Request) {
     where: { id: diagramId },
     data: {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ...(chosenData ? { data: filledData as any } : {}),
+      ...(chosenData ? { data: filledData as any, version: { increment: 1 } } : {}),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       aiComparison: comparison as any,
     },

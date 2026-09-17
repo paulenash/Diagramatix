@@ -570,7 +570,7 @@ export async function restoreUserBackup(
     }
     if (dirty) {
       await tx.$executeRawUnsafe(
-        'UPDATE "Diagram" SET "data" = $1::jsonb, "updatedAt" = NOW() WHERE id = $2',
+        'UPDATE "Diagram" SET "data" = $1::jsonb, version = version + 1, "updatedAt" = NOW() WHERE id = $2',
         JSON.stringify(data),
         newDiagId,
       );

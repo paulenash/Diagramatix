@@ -164,7 +164,7 @@ export async function POST(req: Request, { params }: Params) {
       tasksUpdated++;
       return { ...el, ...simPatch(el, { ...getSimParams(el), requiredSkills: skills }) };
     });
-    await pgPool.query('UPDATE "Diagram" SET data = $1::jsonb, "updatedAt" = NOW() WHERE id = $2',
+    await pgPool.query('UPDATE "Diagram" SET data = $1::jsonb, version = version + 1, "updatedAt" = NOW() WHERE id = $2',
       [JSON.stringify({ ...data, elements }), dId]);
   }
 

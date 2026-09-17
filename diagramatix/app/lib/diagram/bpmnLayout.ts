@@ -223,7 +223,17 @@ function layoutBpmnPreserved(
       // An element inside an Expanded Subprocess must be parented to the EP (not
       // its lane/pool) so connector routing treats the EP as a containment box —
       // otherwise flows between EP children detour AROUND the EP boundary.
-      const epParent = ai.parentSubprocess && aiById.get(ai.parentSubprocess)?.type === "subprocess-expanded"
+      // ENG-20: refuse a self-parent HERE, because this path returns before the
+      // `containmentCycles` passes further down ever run. That is the
+      // reproduce-original-layout branch used by image import, where the plan
+      // comes from vision over someone else's diagram and an expanded
+      // subprocess naming ITSELF as its `parentSubprocess` is exactly the shape
+      // those passes were added to break. Left alone it saves an element whose
+      // `parentId` is its own id, which then walks the containment chain for
+      // ever in routing and enclosure.
+      const epParent = ai.parentSubprocess
+        && ai.parentSubprocess !== ai.id
+        && aiById.get(ai.parentSubprocess)?.type === "subprocess-expanded"
         ? ai.parentSubprocess : undefined;
       parentId = epParent ?? s.laneId ?? s.poolId;
       const def = getSymbolDefinition(ai.type as DiagramElement["type"]);

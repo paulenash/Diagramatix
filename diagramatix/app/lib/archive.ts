@@ -99,7 +99,7 @@ export async function archiveDiagram(
   const res = await pgPool.query(
     `UPDATE "Diagram"
         SET "data" = jsonb_set(COALESCE("data", '{}'::jsonb), '{_archive}', $1::jsonb, true),
-            "userId" = $2, "projectId" = $3, "updatedAt" = NOW()
+            "userId" = $2, "projectId" = $3, "updatedAt" = NOW(), version = version + 1
       WHERE id = $4`,
     [JSON.stringify(archiveMeta), archive.adminId, archive.id, diagramId]
   );
@@ -134,7 +134,7 @@ async function clearDanglingLinksTo(removedDiagramId: string, projectId: string 
     }
     if (touched) {
       await pgPool.query(
-        `UPDATE "Diagram" SET "data" = $1::jsonb, "updatedAt" = NOW() WHERE id = $2`,
+        `UPDATE "Diagram" SET "data" = $1::jsonb, version = version + 1, "updatedAt" = NOW() WHERE id = $2`,
         [JSON.stringify(data), sib.id],
       );
     }
@@ -189,7 +189,7 @@ export async function restoreDiagram(diagramId: string): Promise<{ success: bool
   // statement (was: write the whole data blob back, clobbering concurrent edits).
   await pgPool.query(
     `UPDATE "Diagram"
-        SET "data" = "data" - '_archive', "userId" = $1, "projectId" = $2, "updatedAt" = NOW()
+        SET "data" = "data" - '_archive', "userId" = $1, "projectId" = $2, "updatedAt" = NOW(), version = version + 1
       WHERE id = $3`,
     [originalUserId, targetProjectId, diagramId]
   );

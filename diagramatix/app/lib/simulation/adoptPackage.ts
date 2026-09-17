@@ -107,7 +107,7 @@ export async function repointProjectCalendars(tx: Tx, projectId: string, resolve
     if (!changed) continue;
     repointed += changed;
     await tx.$executeRawUnsafe(
-      'UPDATE "Diagram" SET "data" = $1::jsonb WHERE id = $2',
+      'UPDATE "Diagram" SET "data" = $1::jsonb, version = version + 1 WHERE id = $2',
       JSON.stringify(data),
       row.id,
     );

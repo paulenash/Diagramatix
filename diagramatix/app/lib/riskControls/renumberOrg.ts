@@ -51,7 +51,7 @@ export async function renumberOrgCodes(
         }
       }
     }
-    if (changed) { await prisma.$executeRawUnsafe('UPDATE "Diagram" SET data = $1::jsonb, "updatedAt" = NOW() WHERE id = $2', JSON.stringify(data), d.id); touched++; }
+    if (changed) { await prisma.$executeRawUnsafe('UPDATE "Diagram" SET data = $1::jsonb, version = version + 1, "updatedAt" = NOW() WHERE id = $2', JSON.stringify(data), d.id); touched++; }
   }
 
   return { groups: counters.reduce((s, c) => s + c.count, 0), items: newCodeByItem.size, diagrams: touched };

@@ -214,7 +214,7 @@ export async function POST(request: Request) {
     const updated = await prisma.diagram.update({
       where: { id: overwriteDiagramId },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      data: { data: bpsimData as any },
+      data: { data: bpsimData as any, version: { increment: 1 } },
     });
     return NextResponse.json(
       { diagram: updated, warnings: parsed.warnings, stats: parsed.stats, overwrote: true, bpsim: bpsimSummary },

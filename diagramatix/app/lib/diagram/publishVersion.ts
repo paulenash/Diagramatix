@@ -124,7 +124,7 @@ export async function restoreDiagramSnapshot(
       ...(s.name !== undefined && { name: s.name }),
       ...(s.type !== undefined && { type: s.type }),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ...(s.data !== undefined && { data: s.data as any }),
+      ...(s.data !== undefined && { data: s.data as any, version: { increment: 1 } }),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ...(s.colorConfig !== undefined && { colorConfig: s.colorConfig as any }),
       ...(s.displayMode !== undefined && { displayMode: s.displayMode }),

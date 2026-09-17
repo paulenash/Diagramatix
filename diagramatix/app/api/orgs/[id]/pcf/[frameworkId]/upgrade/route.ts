@@ -117,7 +117,7 @@ export async function POST(_req: Request, { params }: Params) {
       next = { ...p, removedInVersion: pair.nw.version };
       flaggedRemoved += 1;
     }
-    await pgPool.query('UPDATE "Diagram" SET data = $1::jsonb WHERE id = $2', [JSON.stringify({ ...data, pcf: next }), d.id]);
+    await pgPool.query('UPDATE "Diagram" SET data = $1::jsonb, version = version + 1 WHERE id = $2', [JSON.stringify({ ...data, pcf: next }), d.id]);
   }
 
   return NextResponse.json({ ok: true, repointed, flaggedRemoved, tailoredRepointed });

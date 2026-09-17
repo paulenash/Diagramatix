@@ -144,7 +144,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const url = `/dashboard/projects/${projectId}/sop/${created.id}`;
     try {
       await pgPool.query(
-        `UPDATE "Diagram" SET data = jsonb_set(data, '{procedureDoc}', $1::jsonb) WHERE id = $2`,
+        `UPDATE "Diagram" SET data = jsonb_set(data, '{procedureDoc}', $1::jsonb), version = version + 1 WHERE id = $2`,
         [JSON.stringify({ url, name: gen.title }), diagramId],
       );
       await prisma.diagram.update({ where: { id: diagramId }, data: { procedureDocUrl: url, procedureDocName: gen.title } });

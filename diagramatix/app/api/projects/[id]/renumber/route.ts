@@ -76,7 +76,7 @@ export async function POST(_req: Request, { params }: Params) {
         if (e) { el.label = e.newLabel; el.properties = { ...(el.properties ?? {}), nameCode: e.newCode }; }
       }
       await client.query(
-        'UPDATE "Diagram" SET "data" = $1::jsonb, "name" = $2, "updatedAt" = NOW() WHERE id = $3',
+        'UPDATE "Diagram" SET "data" = $1::jsonb, version = version + 1, "name" = $2, "updatedAt" = NOW() WHERE id = $3',
         [JSON.stringify(data), dd.newName, dd.id],
       );
     }
