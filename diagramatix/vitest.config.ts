@@ -33,10 +33,12 @@ export default defineConfig({
     environment: "node",
     // Real DB; one test mutating shared rows would race a parallel run.
     fileParallelism: false,
-    // Allow `vitest run` to exit 0 when no tests exist yet — keeps the
-    // pipeline green during the brief gap between deleting the old
-    // suite and adding the new one.
-    passWithNoTests: true,
+    // OPS-02: `passWithNoTests` is deliberately NOT set. It was added for the
+    // brief gap between deleting the old suite and adding the new one, 500-odd
+    // files ago. Now that the production deploy waits for CI to go green, an
+    // exit 0 on zero tests is a green tick that means nothing — a typo in the
+    // `include` glob would ship every commit unexamined. Failing on an empty
+    // run is the point.
     // Bootstrap test DB schema once before any test file is loaded.
     globalSetup: ["./tests/_setup/globalSetup.ts"],
     // Per-suite DB bootstrap (db push + truncate) can take a few seconds

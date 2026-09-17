@@ -1,12 +1,32 @@
 name: Build and deploy to Azure App Service
 
-# Triggered on every push to main. `workflow_dispatch` keeps a manual
-# button in the GitHub UI for emergency redeploys (e.g. rolling back to a
-# prior tag by re-running an older run).
+# OPS-02: triggered by CI FINISHING SUCCESSFULLY on main, not by the push
+# itself. It used to run on the push, independently of the suite, so a commit
+# whose tests failed was built and swapped into production at the same moment
+# the red X appeared on it — `next build` type-checking was the only gate. That
+# is also why branch protection could not help: nothing ran between the push
+# and the deploy for it to protect.
+#
+# A cancelled CI run (a newer push superseded it) does not deploy, which is
+# correct: that commit is already stale.
+#
+# `workflow_dispatch` keeps the manual button for emergency redeploys and
+# rollbacks, and deliberately skips the CI gate — it is the escape hatch for
+# when CI itself is broken.
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
+    inputs:
+      allow_destructive_schema_change:
+        description: >-
+          Let the schema push drop tables or columns. Leave this off unless you
+          have looked at the SQL in a failed run and you are certain the data
+          is disposable or backed up. (OPS-01)
+        type: boolean
+        default: false
 
 # OIDC federation. The `id-token: write` permission lets this job request
 # a short-lived OIDC token GitHub mints; `azure/login@v3` trades that
@@ -44,6 +64,11 @@ env:
   KEY_VAULT_NAME: dgx-kv
   DATABASE_URL_SECRET_NAME: database-url
   IMAGE_REPO: diagramatix
+  # The commit being deployed. Under `workflow_run` the default `github.sha` is
+  # the tip of the branch when the event fired, which is NOT necessarily the
+  # commit CI just tested — so every step that names a commit (the image tag,
+  # the build arg, the smoke test) uses this instead.
+  DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
 
 jobs:
   build-and-deploy:
@@ -53,11 +78,19 @@ jobs:
     # as a pass-through.
     environment: production
     runs-on: ubuntu-latest
+    # Deploy only when the CI run that triggered this one PASSED. A manual
+    # dispatch bypasses the check on purpose (see the trigger comment above).
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
 
     steps:
       - name: Checkout
         uses: actions/checkout@v5
         with:
+          # The commit CI tested, not the branch tip — they differ whenever a
+          # push lands while CI is still running.
+          ref: ${{ env.DEPLOY_SHA }}
           # Full history so `git rev-list --count HEAD` produces the real
           # commit count for NEXT_PUBLIC_COMMIT_COUNT. Shallow clones
           # return 1.
@@ -93,14 +126,14 @@ jobs:
           file: ./diagramatix/Dockerfile
           build-args: |
             GIT_COMMIT_COUNT=${{ steps.commit_count.outputs.count }}
-            GIT_COMMIT_SHA=${{ github.sha }}
+            GIT_COMMIT_SHA=${{ env.DEPLOY_SHA }}
           # Two tags every push: the immutable `:sha-<commit>` for
           # rollback targeting, and `:latest` so App Service settings
           # that reference `:latest` pick up the new image on restart.
           # Production should reference the sha tag — `:latest` is a
           # convenience for ad-hoc `docker run` and dev pulls.
           tags: |
-            ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_REPO }}:sha-${{ github.sha }}
+            ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_REPO }}:sha-${{ env.DEPLOY_SHA }}
             ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_REPO }}:latest
           push: true
           # Registry-side layer cache. Faster warm rebuilds; one-time
@@ -162,6 +195,34 @@ jobs:
           npm ci --omit=dev --ignore-scripts
           npx prisma generate
 
+      - name: Check the pending schema change is not destructive
+        # OPS-01: `db push --accept-data-loss` below runs unattended against
+        # production. The flag is not optional (Prisma treats every new unique
+        # constraint as possible data loss), so the switch that is supposed to
+        # mean "I have thought about this" is permanently on. A renamed field
+        # in prisma/schema.prisma reads as a DROP plus an ADD, and the old
+        # column's data would go with it the moment the commit landed on main.
+        #
+        # So: ask Prisma for the SQL it is about to run, print it, and refuse
+        # anything that destroys data. `--from-config-datasource` reads the
+        # live production database through prisma.config.ts (DATABASE_URL);
+        # `--to-schema` is the committed schema. The command is read-only.
+        #
+        # ALLOW_DESTRUCTIVE_SCHEMA_CHANGE is the escape hatch, and it can only
+        # be set from the workflow_dispatch input — a merge can never set it.
+        # An intentional destructive release is therefore a manual act with a
+        # name against it. The rule itself is unit-tested (see T4455+).
+        working-directory: ./diagramatix
+        env:
+          DATABASE_URL: ${{ steps.db.outputs.url }}
+          ALLOW_DESTRUCTIVE_SCHEMA_CHANGE: ${{ inputs.allow_destructive_schema_change }}
+        run: |
+          npx prisma migrate diff \
+            --from-config-datasource \
+            --to-schema prisma/schema.prisma \
+            --script > "$RUNNER_TEMP/schema-diff.sql"
+          tsx scripts/check-destructive-schema.ts "$RUNNER_TEMP/schema-diff.sql"
+
       - name: Apply database schema
         working-directory: ./diagramatix
         env:
@@ -177,9 +238,10 @@ jobs:
         #
         # `--accept-data-loss` is required even for additive changes
         # because Prisma flags every new unique constraint as a possible
-        # data-loss warning. Reviewers MUST inspect `prisma/schema.prisma`
-        # diffs carefully before pushing to main — a destructive column
-        # rename or drop would land on prod without confirmation.
+        # data-loss warning — which is exactly why the flag on its own is
+        # no protection. The step above (OPS-01) is the real gate: it has
+        # already read the SQL this push will run and failed the deploy if
+        # anything in it drops a table, a column or a type.
         #
         # `--url` passed explicitly rather than relying on the
         # prisma.config.ts datasource block — that file does
@@ -342,7 +404,7 @@ jobs:
         # second stop 21 s into the first one's start-up and reset the clock
         # (docker log, 2026-09-13 — ~72 s of outage per deploy).
         run: |
-          az webapp config container set --resource-group "$RESOURCE_GROUP" --name "$APP_SERVICE_NAME" --container-image-name "${ACR_NAME}.azurecr.io/${IMAGE_REPO}:sha-${{ github.sha }}"
+          az webapp config container set --resource-group "$RESOURCE_GROUP" --name "$APP_SERVICE_NAME" --container-image-name "${ACR_NAME}.azurecr.io/${IMAGE_REPO}:sha-${{ env.DEPLOY_SHA }}"
 
       - name: Ensure the App Service health check path
         # With no health check path, App Service rotates traffic as soon as
@@ -367,8 +429,8 @@ jobs:
         # stop-pull-start cycle is ~70 s.
         run: |
           APP_URL=$(az webapp show --resource-group "$RESOURCE_GROUP" --name "$APP_SERVICE_NAME" --query defaultHostName -o tsv)
-          WANT='"commit":"${{ github.sha }}"'
-          echo "Waiting for https://${APP_URL}/api/health to report ${{ github.sha }} ..."
+          WANT='"commit":"${{ env.DEPLOY_SHA }}"'
+          echo "Waiting for https://${APP_URL}/api/health to report ${{ env.DEPLOY_SHA }} ..."
           for i in $(seq 1 18); do
             CODE=$(curl -s -m 15 -o /tmp/health.json -w '%{http_code}' "https://${APP_URL}/api/health" || echo "000")
             BODY=$(cat /tmp/health.json 2>/dev/null || true)
@@ -379,7 +441,7 @@ jobs:
             fi
             sleep 10
           done
-          echo "::error::Smoke test failed - /api/health did not report commit ${{ github.sha }} with HTTP 200 within 3 minutes."
+          echo "::error::Smoke test failed - /api/health did not report commit ${{ env.DEPLOY_SHA }} with HTTP 200 within 3 minutes."
           exit 1
 
       - name: Purge old images from the registry

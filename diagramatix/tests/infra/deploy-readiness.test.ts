@@ -72,13 +72,19 @@ describe("deploy workflow", () => {
     expect(wf).toContain('--generic-configurations \'{"healthCheckPath": "/api/health"}\'');
 
     // The smoke test polls the probe and requires THIS commit in the body.
+    // "This commit" is DEPLOY_SHA, not github.sha: since OPS-02 the deploy is
+    // started by a finished CI run, and under that event github.sha is the
+    // branch tip at the time the event fired — which is a different commit
+    // whenever a push lands while CI is running. The tag, the build arg and
+    // the smoke test must all name the same commit or a correct deploy fails
+    // its own smoke test. (Enforced in full by T4460.)
     expect(wf).toContain('"https://${APP_URL}/api/health"');
-    expect(wf).toContain("WANT='\"commit\":\"${{ github.sha }}\"'");
+    expect(wf).toContain("WANT='\"commit\":\"${{ env.DEPLOY_SHA }}\"'");
     expect(wf).toContain('grep -qF "$WANT"');
     expect(wf, "the old any-2xx smoke test is gone").not.toContain('"https://${APP_URL}/"');
 
     // …and the image can only report a commit if the build passes one in.
-    expect(wf).toContain("GIT_COMMIT_SHA=${{ github.sha }}");
+    expect(wf).toContain("GIT_COMMIT_SHA=${{ env.DEPLOY_SHA }}");
     const docker = read("Dockerfile");
     expect(docker).toContain("ARG GIT_COMMIT_SHA=");
     expect(docker).toContain("ENV COMMIT_SHA=${GIT_COMMIT_SHA}");
