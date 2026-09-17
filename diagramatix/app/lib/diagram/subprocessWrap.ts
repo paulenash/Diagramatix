@@ -82,6 +82,12 @@ function withoutNestedPicks(picked: DiagramElement[], byId: Map<string, DiagramE
   return picked.filter((e) => !insideAnotherPick(e));
 }
 
+/** The name of an element's home, for a message: its parent, or the canvas. */
+function home0(byId: Map<string, DiagramElement>, parentId: string | undefined): string {
+  const p = parentId ? byId.get(parentId) : undefined;
+  return p ? (p.label?.trim() || p.type) : "the canvas";
+}
+
 const cx = (e: DiagramElement) => e.x + e.width / 2;
 const cy = (e: DiagramElement) => e.y + e.height / 2;
 const nameOf = (e: DiagramElement) => e.label?.trim() || e.type;
@@ -322,7 +328,16 @@ export function planWrapInContainer(
 
   const homeId = members[0].parentId;
   if (members.some((e) => e.parentId !== homeId)) {
-    return { error: `the selected elements must all sit in the same place — they are spread across more than one container` };
+    // Name the two places. The old wording — "spread across more than one
+    // container" — reads as a complaint about a container INSIDE the selection
+    // whenever there is one, which is exactly when it is most confusing
+    // (Paul, 2026-09-18).
+    const homeName = home0(byId, homeId);
+    const stray = members.find((e) => e.parentId !== homeId)!;
+    const strayName = home0(byId, stray.parentId);
+    return {
+      error: `${nameOf(stray)} sits in ${strayName} but the rest sit in ${homeName} — a ${container} can only be drawn round things that share a home`,
+    };
   }
   const home = homeId ? byId.get(homeId) : undefined;
   const group = closure(shape.elements, members.map((e) => e.id));
@@ -341,7 +356,9 @@ export function planWrapInContainer(
   if (container === "pool") {
     // Nested pools are not a thing.
     if (poolOf(home)) {
-      return { error: "these elements are already in a pool — a pool cannot contain another pool" };
+      return {
+        error: `these elements are already in ${nameOf(poolOf(home)!)} — a pool cannot contain another pool. Say "surround selected with a lane" instead.`,
+      };
     }
     // A sequence flow that would end up crossing the new boundary.
     const crossing = shape.connectors.filter((c) =>

@@ -76,13 +76,28 @@ export function batchFlashes(ops: readonly AssistOp[]): boolean {
   return ops.some((o) => opFlashes(o.op));
 }
 
-/** Read the toggle. Any failure — private window, blocked storage — reads as off. */
+/**
+ * Read the toggle. ON unless it has been explicitly switched off.
+ *
+ * It started off-by-default. Paul changed that the same day (2026-09-18: "Turn
+ * on Gold Flashing should be the default on initiating Abracadabra mode") —
+ * which is right, because nobody turns on a thing they have not seen, and
+ * seeing what a spoken command just did is the point of using the voice at all.
+ *
+ * "Default" and not "forced": an explicit "turn off gold flashing" is
+ * remembered and survives closing and reopening the bar. Only an absent setting
+ * reads as on.
+ *
+ * Any failure — private window, blocked storage — reads as ON too, since the
+ * default is what someone with no stored preference should get.
+ */
 export function isGoldFlashOn(storage?: Pick<Storage, "getItem">): boolean {
   try {
     const s = storage ?? (typeof window === "undefined" ? null : window.localStorage);
-    return s?.getItem(GOLD_FLASH_KEY) === "true";
+    const raw = s?.getItem(GOLD_FLASH_KEY);
+    return raw !== "false";
   } catch {
-    return false;
+    return true;
   }
 }
 

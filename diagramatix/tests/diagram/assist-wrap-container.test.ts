@@ -98,7 +98,7 @@ describe("wrap the selection in a pool or a lane", () => {
 
     // Nested pools are not legal.
     expect(planWrapInContainer(pooled(), ["X", "Y"], "pool", "Inner", ids))
-      .toMatchObject({ error: expect.stringContaining("already in a pool") });
+      .toMatchObject({ error: expect.stringContaining("a pool cannot contain another pool") });
   });
 
   it("T4445 — a lane is a band in the selection's pool, and refuses to sweep in a neighbour", () => {
@@ -137,6 +137,9 @@ describe("wrap the selection in a pool or a lane", () => {
       connectors: [],
     };
     expect(planWrapInContainer(mixed, ["X", "Q"], "lane", "Prep", ids))
-      .toMatchObject({ error: expect.stringContaining("more than one container") });
+      // The message names the two homes now, rather than saying "more than one
+      // container" — which read as a complaint about a container INSIDE the
+      // selection whenever there was one (Paul, 2026-09-18).
+      .toMatchObject({ error: expect.stringContaining("share a home") });
   });
 });

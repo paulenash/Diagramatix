@@ -124,13 +124,24 @@ describe("T4483 — only the commands worth pointing at flash", () => {
   });
 });
 
-describe("T4484 — the toggle is remembered, and off is the default", () => {
-  it("is off until it is turned on", () => {
+describe("T4484 — the toggle is remembered, and ON is the default", () => {
+  it("is on until it is explicitly turned off", () => {
+    // It shipped off-by-default and Paul changed it the same day (2026-09-18):
+    // nobody turns on a thing they have not seen, and seeing what a spoken
+    // command just did is the point of using the voice at all.
     const s = fakeStore();
+    expect(isGoldFlashOn(s), "an untouched browser gets the flash").toBe(true);
+    setGoldFlash(false, s);
     expect(isGoldFlashOn(s)).toBe(false);
     setGoldFlash(true, s);
     expect(isGoldFlashOn(s)).toBe(true);
+  });
+
+  it("remembers an explicit off across closing and reopening the bar", () => {
+    // Default, not forced: turning it off has to stick, or the command is a lie.
+    const s = fakeStore();
     setGoldFlash(false, s);
+    expect(isGoldFlashOn(s)).toBe(false);
     expect(isGoldFlashOn(s)).toBe(false);
   });
 
@@ -140,14 +151,15 @@ describe("T4484 — the toggle is remembered, and off is the default", () => {
     expect(s.raw.get(GOLD_FLASH_KEY)).toBe("true");
   });
 
-  it("reads as off when storage throws", () => {
+  it("survives storage that throws, and falls back to the default", () => {
     // A private window, or a browser set to block site data. The effect is a
-    // nicety; it must never be the reason an editor fails to load.
+    // nicety; it must never be the reason an editor fails to load. Someone with
+    // no stored preference should get what everyone with no preference gets.
     const hostile = {
       getItem: () => { throw new Error("blocked"); },
       setItem: () => { throw new Error("blocked"); },
     };
-    expect(isGoldFlashOn(hostile)).toBe(false);
+    expect(isGoldFlashOn(hostile)).toBe(true);
     expect(() => setGoldFlash(true, hostile)).not.toThrow();
   });
 
