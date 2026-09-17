@@ -138,6 +138,14 @@ const MAX_REPEAT_PASSES = 10_000;
  */
 const MAX_LIVE_TOKENS = 50_000;
 
+/**
+ * SIM-03: how many events may pass with the clock standing still before the run
+ * is declared stalled. A zero-duration cycle produces them indefinitely; a
+ * legitimate model produces a burst (everything scheduled at the same instant)
+ * and then moves on, so this is set far above any real simultaneous batch.
+ */
+const MAX_EVENTS_WITHOUT_PROGRESS = 500_000;
+
 /** A token-movement event for the live replay player (green-token animation). */
 export type TraceEventKind = "spawn" | "enter" | "queue" | "service" | "exit" | "fire" | "preempt";
 /** `fire` = an element ACTIVATION flash (not a token move): a boundary event that
@@ -334,6 +342,8 @@ export class Engine {
   runUntil(t: number): void {
     let ev = this.calendar.peek();
     let sinceCheck = 0;
+    let lastProgressClock = this.clock;
+    let eventsWithoutProgress = 0;
     while (ev && ev.time <= t) {
       this.calendar.pop();
       this.clock = ev.time;
@@ -355,6 +365,26 @@ export class Engine {
           this.liveAtOverload = this.tokens.size;
           break;
         }
+        // SIM-03: the check above only catches a model that is ACCUMULATING
+        // work. A cycle whose every step takes zero time accumulates nothing —
+        // the same token goes round for ever, live count flat, clock frozen, so
+        // the horizon is never reached and the loop never exits. That hangs the
+        // request thread permanently, server-side. An unconfigured intermediate
+        // event or a zero cycle time inside an always-true loop-back is enough,
+        // both routine on a part-configured diagram. Watch the CLOCK instead of
+        // the population: if it has not moved across this many events, the model
+        // cannot progress, and that is a finding about the process rather than a
+        // reason to spin.
+        if (this.clock === lastProgressClock) {
+          eventsWithoutProgress += 1000;
+          if (eventsWithoutProgress > MAX_EVENTS_WITHOUT_PROGRESS) {
+            this.stalledAt = this.clock;
+            break;
+          }
+        } else {
+          lastProgressClock = this.clock;
+          eventsWithoutProgress = 0;
+        }
       }
       ev = this.calendar.peek();
     }
@@ -364,6 +394,15 @@ export class Engine {
   /** Set when the run was stopped early because the model could not keep up. */
   private overloadedAt?: number;
   private liveAtOverload = 0;
+  /** Set when the run stopped because the clock stopped advancing (SIM-03). */
+  private stalledAt?: number;
+
+  /** Why a run stopped spinning, or undefined when the clock kept moving. A
+   *  zero-duration cycle is a defect in the MODEL, so the caller reports it
+   *  rather than showing a part-run as if it had finished. */
+  get stalled(): { at: number } | undefined {
+    return this.stalledAt === undefined ? undefined : { at: this.stalledAt };
+  }
   /** Why a run stopped short, or undefined when it completed its horizon. Read
    *  by the caller so the UI can explain rather than quietly show a part-run. */
   get overload(): { at: number; liveTokens: number } | undefined {
@@ -1236,8 +1275,24 @@ export class Engine {
       let acc = 0;
       for (const e of out) { acc += this.probOf(e) ?? 0; if (r < acc) return e; }
     }
-    // 3) default / else, then first
-    return out.find((e) => e.isDefault) ?? out.find((e) => !this.condCache.has(e.id)) ?? out[0];
+    // 3) default / else
+    const fallback = out.find((e) => e.isDefault);
+    if (fallback) return fallback;
+
+    // SIM-02: nothing configured on ANY branch — no condition, no probability,
+    // no default flow. Split evenly, because that is what the readiness check
+    // promises the modeller in as many words ("they'll be split evenly"), and
+    // an unconfigured gateway is routine on AI-generated and imported diagrams
+    // — which is why that warning exists at all. Taking the first edge every
+    // time instead produced a run that looked complete and was quietly wrong:
+    // a branch the model never visited, reported as if it had been simulated.
+    // Drawn from the seeded generator, so a run stays reproducible.
+    const unconfigured = out.every((e) => !this.condCache.has(e.id) && this.probOf(e) === undefined);
+    if (unconfigured && out.length > 1) {
+      return out[Math.min(out.length - 1, Math.floor(this.rng.next() * out.length))];
+    }
+
+    return out.find((e) => !this.condCache.has(e.id)) ?? out[0];
   }
 
   private completeToken(token: Token): void {
