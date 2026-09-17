@@ -31,6 +31,14 @@ import type { NextStepCandidate } from "@/app/lib/diagram/nextSteps";
 import { ElementContextMenu } from "./ElementContextMenu";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { canConnect } from "@/app/lib/diagram/canConnect";
+import {
+  planEditZoomAim,
+  computeEditZoom,
+  clampEditZoomFraction,
+  isHeaderStripContainer,
+  CONTAINER_NAME_EDITOR_W,
+  HEADER_H,
+} from "@/app/lib/diagram/labelEditZoom";
 import { getElementPoolId, computeDragContext, classifyDragTarget } from "@/app/lib/diagram/connectorHighlight";
 import { parseUmlAttribute, parseUmlOperation } from "@/app/lib/diagram/umlParse";
 
@@ -85,7 +93,6 @@ function measureHeaderLabel(text: string, fontSize: number): number {
   return headerMeasureCtx.measureText(text).width;
 }
 
-const HEADER_H = 28;
 const MIN_BOUNDARY_W = 100;
 const MIN_BOUNDARY_H = HEADER_H + 40;
 
@@ -764,17 +771,12 @@ export function Canvas({
       typeof window !== "undefined"
         ? parseFloat(window.localStorage.getItem("editZoomFraction") ?? "")
         : NaN;
-    const TARGET_FRACTION =
-      Number.isFinite(storedFraction) && storedFraction > 0
-        ? Math.max(0.05, Math.min(0.95, storedFraction))
-        : 0.2;
-    // Clamp tiny features (events, short connector labels) so they
-    // don't drive an absurd zoom level.
-    const effectiveWidth = Math.max(60, worldWidth);
-    const idealZoom = (TARGET_FRACTION * rect.width) / effectiveWidth;
-    const focusZoom = Math.min(4, Math.max(zoom, idealZoom));
-    // Only enter focus mode if the snap meaningfully changes zoom.
-    if (focusZoom <= zoom + 0.01) return null;
+    const TARGET_FRACTION = clampEditZoomFraction(storedFraction);
+    // The maths lives in app/lib/diagram/labelEditZoom.ts so the "does the snap
+    // fire at all" question can be tested without a DOM — it is the part that
+    // silently did nothing for wide containers.
+    const focusZoom = computeEditZoom(worldWidth, zoom, rect.width, TARGET_FRACTION);
+    if (focusZoom === null) return null;
     const focusPan = {
       x: rect.width / 2 - centerX * focusZoom,
       y: rect.height / 2 - centerY * focusZoom,
@@ -3790,9 +3792,6 @@ export function Canvas({
     // Seed the review-comment rich-editor ref so a Done with no edits keeps the
     // existing HTML instead of wiping it (item Q).
     if (el.type === "review-comment") rcZoomRef.current = el.label ?? "";
-    // Snapshot history once at edit start (for task/subprocess this is used
-    // by updateLabelLive per-keystroke without polluting the undo stack).
-    onBeginLabelEdit?.(el.id);
     // Events, gateways, data objects, data stores: shape-dblclick is a
     // no-op for these types. The user explicitly asked that only
     // double-clicking the LABEL trigger the focus-edit zoom + editor;
@@ -3810,6 +3809,13 @@ export function Canvas({
     ]);
     if (LABEL_ONLY_ZOOM.has(el.type)) return;
 
+    // Snapshot history once at edit start (for task/subprocess this is used
+    // by updateLabelLive per-keystroke without polluting the undo stack).
+    // Deliberately AFTER the bail above: the types that return there never
+    // open an editor here, and recording the start of an edit that never
+    // happens leaves a stray entry for undo to walk back through.
+    onBeginLabelEdit?.(el.id);
+
     // Focus-edit zoom: snap the canvas via the shared helper so the
     // element centres at ~20% of the screen width. The textarea's screen
     // coords below are computed using the POST-SNAP zoom/pan so it lines
@@ -3822,29 +3828,17 @@ export function Canvas({
     // editable text lives in a small textarea positioned just right of
     // the header strip; aim the focus zoom at THAT region so the snap
     // fires and the editor lands centred on screen.
-    let zoomCenterX = el.x + el.width / 2;
-    let zoomCenterY = el.y + el.height / 2;
-    let zoomWorldWidth = el.width;
-    if (el.type === "data-object" || el.type === "data-store" || el.type === "system") {
-      // Aim the focus zoom at the label below the shape.
-      zoomCenterY = el.y + el.height + 14;
-      zoomWorldWidth = Math.max(el.width, 150);
-    } else if (el.type === "pool" || el.type === "lane") {
-      const storedW = el.type === "pool"
-        ? (el.properties?.poolHeaderWidth as number | undefined)
-        : (el.properties?.laneHeaderWidth as number | undefined);
-      const lw = typeof storedW === "number" && storedW > 0 ? storedW : 36;
-      const taW = Math.min(180, el.width - lw);
-      const taH = Math.min(80, el.height);
-      zoomCenterX = el.x + lw + taW / 2;
-      zoomCenterY = el.y + taH / 2;
-      zoomWorldWidth = taW;
-    }
-    const snap = enterFocusModeAt(zoomCenterX, zoomCenterY, zoomWorldWidth, "element");
+    // An expanded subprocess is hundreds of pixels wide, so aiming the snap at
+    // the whole box made `idealZoom` tiny, the "only zoom IN" guard skipped it,
+    // and you typed the name at whatever zoom you happened to be at. Every
+    // type's aim now comes from one pure planner, which aims at the region you
+    // actually type into: the header strip, or the label below the shape.
+    const isOldContainer = isHeaderStripContainer(el.type);
+    const aim = planEditZoomAim(el);
+    const snap = enterFocusModeAt(aim.centerX, aim.centerY, aim.worldWidth, "element");
     const effectiveZoom = snap?.focusZoom ?? zoom;
     const effectivePan = snap?.focusPan ?? pan;
 
-    const isOldContainer = el.type === "system-boundary" || el.type === "composite-state" || el.type === "subprocess-expanded" || el.type === "group";
     if (el.type === "pool" || el.type === "lane") {
       // Both pool and lane support dynamic header widths.
       const storedW = el.type === "pool"
@@ -3898,6 +3892,20 @@ export function Canvas({
         height: 22 * effectiveZoom,
         value: el.label,
       });
+    } else if (isOldContainer) {
+      // Centred on the header, matching where the name is drawn, and only as
+      // wide as a name needs to be. Spanning the full container was fine at
+      // 1:1, but now that the snap zooms in on the header a full-width box
+      // would run off both sides of the screen.
+      const taW = Math.min(el.width, CONTAINER_NAME_EDITOR_W);
+      setEditingLabel({
+        elementId: el.id,
+        x: (el.x + el.width / 2 - taW / 2) * effectiveZoom + effectivePan.x,
+        y: el.y * effectiveZoom + effectivePan.y,
+        width: taW * effectiveZoom,
+        height: HEADER_H * effectiveZoom,
+        value: el.label,
+      });
     } else {
       const isUmlElement = el.type === "uml-class" || el.type === "uml-enumeration";
       setEditingLabel({
@@ -3905,7 +3913,7 @@ export function Canvas({
         x: el.x * effectiveZoom + effectivePan.x,
         y: el.y * effectiveZoom + effectivePan.y,
         width: el.width * effectiveZoom,
-        height: (isOldContainer || isUmlElement) ? HEADER_H * effectiveZoom : el.height * effectiveZoom,
+        height: isUmlElement ? HEADER_H * effectiveZoom : el.height * effectiveZoom,
         value: el.label,
       });
     }

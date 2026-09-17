@@ -380,6 +380,36 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
   const labelGestureCleanup = useRef<(() => void) | null>(null);
   useEffect(() => () => { labelGestureCleanup.current?.(); labelGestureCleanup.current = null; }, []);
 
+  // A double-click on the connector LINE asks for the same editor the label box
+  // opens. Both hooks for that live up here, above every early return, and they
+  // must stay here: this component returns null on three different paths, so a
+  // hook declared below them runs on some renders and not others. React counts
+  // hooks per render and throws when the count changes — which is exactly what
+  // happened when an unlabelled connector went from unselected (early return)
+  // to selected (full render).
+  //
+  // That early return is also why the request has to be handled without any
+  // geometry: an unlabelled, unselected connector renders nothing at all, so
+  // there is no label box to measure yet. The effect only opens the editor; the
+  // zoom follows on the next render, once the box exists.
+  const seenEditRequest = useRef(editRequest);
+  const labelGeom = useRef<{ cx: number; midY: number; width: number } | null>(null);
+  const zoomOnOpen = useRef(false);
+  const labelText = useRef(connector.label ?? "");
+  useEffect(() => {
+    if (editRequest === undefined || editRequest === seenEditRequest.current) return;
+    seenEditRequest.current = editRequest;
+    setEditValue(labelText.current);
+    zoomOnOpen.current = true;
+    setIsEditing(true);
+  }, [editRequest]);
+  useEffect(() => {
+    if (!isEditing || !zoomOnOpen.current) return;
+    zoomOnOpen.current = false;
+    const g = labelGeom.current;
+    if (g) onLabelFocusEditStart?.(g.cx, g.midY, g.width);
+  }, [isEditing, onLabelFocusEditStart]);
+
   if (visibleWaypoints.length < 2) return null;
   // Marker-driven suppression: a parallel / event-based gateway has no
   // branch conditions, so its outgoing labels are hidden — but only while
@@ -547,17 +577,11 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
     };
   }
 
-  // A double-click on the connector line asks for the same editor the label
-  // box opens. Skipped on the first render so an existing connector does not
-  // open an editor just by being drawn.
-  const seenEditRequest = useRef(editRequest);
-  useEffect(() => {
-    if (editRequest === undefined || editRequest === seenEditRequest.current) return;
-    seenEditRequest.current = editRequest;
-    setEditValue(label);
-    setIsEditing(true);
-    onLabelFocusEditStart?.(lCx, lMidY, effectiveLWidth);
-  }, [editRequest, label, lCx, lMidY, effectiveLWidth, onLabelFocusEditStart]);
+  // Publish the label box's geometry for the line-double-click effect above,
+  // which cannot compute it: on the render where the request arrives, this part
+  // of the component may not have run at all.
+  labelGeom.current = { cx: lCx, midY: lMidY, width: effectiveLWidth };
+  labelText.current = label;
 
   function handleDoubleClick(e: React.MouseEvent) {
     e.stopPropagation();

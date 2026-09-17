@@ -6,6 +6,7 @@
 import type { AssistOp } from "./ops";
 import { SYMBOL_SYNONYMS, SYMBOL_PHRASES } from "./ops";
 import { parseRenameType } from "./renameTargets";
+import { repairSelectedWord } from "./selectedWord";
 import type { SymbolType, EventType, GatewayType } from "../diagram/types";
 
 const clean = (s: string) => s.trim().replace(/[.,!?;:]+$/g, "").replace(/^["'“”‘’]+|["'“”‘’]+$/g, "").trim();
@@ -35,7 +36,13 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   // verb is a breath, not syntax (Paul's log, 2026-09-15). Only that comma is
   // dropped; commas inside a name list ("called Sales, Marketing and Support")
   // still separate the names.
-  const raw = clean(utterance).replace(/^([A-Za-z]+),\s+/, "$1 ");
+  // "Selected" is what says WHICH thing to act on, and the recogniser keeps
+  // returning "connect" for it — `connect` is boosted in the keyword list and
+  // the two are close in en-AU. Repaired before anything is matched, and only
+  // where the word sits directly after a verb, a position `connect` never
+  // legitimately occupies (see assist/selectedWord.ts).
+  const heard = repairSelectedWord(clean(utterance)).text;
+  const raw = heard.replace(/^([A-Za-z]+),\s+/, "$1 ");
   if (!raw) return null;
   const lower = raw.toLowerCase();
 

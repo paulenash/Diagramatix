@@ -176,6 +176,7 @@ async function startDeepgram(token: string, scheme: string, cb: DictationCallbac
   // this is the half that stops it happening in the first place.
   for (const kw of ["lane:3", "sublane:3", "pool:3", "gateway:2", "task:2", "subprocess:2",
     "one:3", "two:2", "three:2", "four:2", "five:2", "six:2", "seven:2", "eight:2", "nine:2", "ten:2",
+    "selected:3", "selection:2",
     "boundary", "connect", "rename", "delete", "compact", "Abracadabra"]) {
     params.append("keywords", kw);
   }

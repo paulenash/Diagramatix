@@ -153,6 +153,13 @@ function ellipseOctagonPoints(cx: number, cy: number, rx: number, ry: number): s
 const CONNECTION_POINT_SIDES: Side[] = ["top", "right", "bottom", "left"];
 
 export const HEADER_H = 28;
+/**
+ * Width of the group's name hit strip, in world units. A group has no solid
+ * body to click — its interior is click-through by design — so this strip is
+ * the only way to reach a group that has not been named yet. Kept narrow and
+ * centred so it takes as little of the group's top band as possible.
+ */
+export const GROUP_NAME_HIT_W = 240;
 // Horizontal padding subtracted from an ArchiMate box's width when wrapping its
 // name, so the text sits clear of the outline (and the top-right corner glyph).
 const ARCHI_LABEL_PAD = 16;
@@ -829,6 +836,22 @@ function GroupShape({ el }: { el: DiagramElement }) {
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
         rx={8} fill="none" stroke="rgba(0,0,0,0)" strokeWidth={16}
         style={{ pointerEvents: "stroke" }} />
+      {/* Name strip. A group's interior is deliberately click-through so you can
+          work with the elements inside it, which left the border as the only
+          way to reach the group at all — and a group with no name yet had no
+          text to aim at either, so there was no way to give it one. This strip
+          sits where the name is drawn (centred on the header band). It is
+          rendered before the group's contents, so any element overlapping the
+          band still wins the click; the strip only catches empty space. */}
+      <rect
+        x={el.x + el.width / 2 - Math.min(el.width, GROUP_NAME_HIT_W) / 2}
+        y={el.y}
+        width={Math.min(el.width, GROUP_NAME_HIT_W)}
+        height={HEADER_H}
+        fill="transparent"
+        stroke="none"
+        style={{ pointerEvents: "auto" }}
+      />
       {/* Visual dashed-dotted border — interior always transparent */}
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
         rx={8} fill={bodyFill} stroke={lineColor} strokeWidth={1.5}
@@ -3103,10 +3126,15 @@ function SymbolRendererInner({
       onDoubleClick={(e) => {
         e.stopPropagation();
         e.preventDefault();
-        // For pools, only trigger label edit when double-clicking the header strip (left 36px)
+        // For pools, only trigger label edit when double-clicking the header
+        // strip. The strip is user-resizable, so read its real width rather
+        // than assuming the 36px default — widening a pool header used to make
+        // double-clicks on the right of it silently do nothing.
         if (element.type === "pool" && svgToWorld) {
+          const storedW = element.properties?.poolHeaderWidth as number | undefined;
+          const headerW = typeof storedW === "number" && storedW > 0 ? storedW : 36;
           const world = svgToWorld(e.clientX, e.clientY);
-          if (world.x > element.x + 36) return;
+          if (world.x > element.x + headerW) return;
         }
         // Events / gateways / data objects: double-clicking the shape body
         // opens the element's external-label editor (zoom + edit) and the
