@@ -185,7 +185,18 @@ export function parseCommand(utterance: string): AssistOp[] | null {
       // difference is the container word — and it must stay ABOVE the
       // wrap-everything-in-a-pool rule below, which would otherwise swallow
       // "wrap these in a pool" and wrap the whole diagram instead.
-      const CONTAINER = "(?:an?\\s+)?(?:new\\s+)?(pool|poll|pull|lanes?|lines?)";
+      // The container word, optionally followed by a name said WITHOUT "called"
+      // — "surround selected with Pool 2" (Paul, 2026-09-18). Left out, that
+      // phrasing failed the grammar and reached the AI, which read it as the
+      // whole-diagram wrap and adopted every loose element into the existing
+      // pool. Only a short trailing name is taken, so it cannot run on and
+      // swallow the rest of a sentence.
+      // Words that are grammar, not a name: the explicit "called X" form, and
+      // the prepositions the second phrasing continues with. Without this the
+      // bare-name group eats "called Finance" and the pool ends up named
+      // "called Finance".
+      const NOT_A_NAME = "(?!(?:called|named|labell?ed|titled|around|round|over|containing|enclosing)\\b)";
+      const CONTAINER = `(?:an?\\s+)?(?:new\\s+)?(pool|poll|pull|lanes?|lines?)(?:\\s+${NOT_A_NAME}([A-Za-z0-9][\\w'-]*(?:\\s+[\\w'-]+){0,2}))?`;
       // The leading verb is OPTIONAL. The recogniser drops the first word often
       // enough that "surround selected with a pool" arrives as "selected with a
       // pool" — and the cost of not catching that is severe (Paul, 2026-09-18):
@@ -201,7 +212,17 @@ export function parseCommand(utterance: string): AssistOp[] | null {
         // "lane" — see assist/spokenNumber.ts).
         const word = (c[1] ?? "").toLowerCase();
         const container = /^(?:lane|line)/.test(word) ? "lane" as const : "pool" as const;
-        const name = clean(c[2] ?? c[3] ?? "");
+        // Groups, in order: the container word, a bare name straight after it
+        // ("with Pool 2"), then the "called …" names from each alternative. The
+        // first one that carries text wins — a speaker uses one form or the
+        // other, never both.
+        let name = clean(c[2] ?? c[3] ?? c[4] ?? c[5] ?? "");
+        // "Pool 2" is one name, and the container word has already been eaten by
+        // the group that identified it — so a bare number left behind is the
+        // second half of a name, not a name. "with pool Finance" is different:
+        // Finance stands on its own. Normalised to the real word, so a misheard
+        // "poll 2" still becomes "Pool 2".
+        if (/^\d+$/.test(name)) name = `${container === "lane" ? "Lane" : "Pool"} ${name}`;
         return [{ op: "wrapInContainer", container, ...(name ? { label: name } : {}) }];
       }
     }

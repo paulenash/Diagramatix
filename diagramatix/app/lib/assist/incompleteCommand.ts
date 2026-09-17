@@ -13,8 +13,25 @@
 const VERBS = /^(?:swap|rename|relabel|label|edit|move|slide|nudge|bump|shift|connect|link|join|disconnect|unlink|delete|remove|add|insert|create|put|send|draw|attach|place|compress|shrink|extend|widen|wrap|surround|enclose|unwrap|dissolve|call|change|set)$/;
 
 export function isIncompleteCommand(text: string): boolean {
-  const t = text.trim().toLowerCase().replace(/[.?!,]+$/g, "").trim();
+  const raw = text.trim();
+  const t = raw.toLowerCase().replace(/[.?!,]+$/g, "").trim();
   if (!t) return false;
+
+  // A TRAILING COMMA is the recogniser telling us the speaker had not finished.
+  // Deepgram punctuates on intonation, so "Surround selected with a pool, called
+  // Pool 2" split at the pause arrives as "Surround selected with a pool," and
+  // then "called Pool 2." The first half is a complete command on its own, so
+  // every rule below passes it, and it ran — making a pool named "Pool" — while
+  // the tail went to the AI and made a SECOND pool called Pool 2
+  // (Paul, 2026-09-18). The comma is the only thing that distinguishes the two
+  // cases, and holding a command that turns out to be finished only delays it by
+  // the grace period.
+  if (/,$/.test(raw)) return true;
+
+  // A tail that begins with "called X" is the end of somebody else's sentence.
+  // On its own it means nothing, and handed to the AI it becomes "add a pool
+  // called X" — a whole new element nobody asked for.
+  if (/^(?:called|named|labell?ed)\b/.test(t)) return true;
   // A bare verb — "Swap." "Rename." "Move." — is the start of something.
   if (VERBS.test(t)) return true;
   // Ends on a dangling connective / preposition → more is coming.

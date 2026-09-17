@@ -25,6 +25,7 @@ import { gatewayVertex, nudgeGatewayEndpoint, computeWaypoints, recomputeAllConn
 import { planWrapInSubprocess, planUnwrapSubprocess, planWrapInContainer, type WrapIds } from "@/app/lib/diagram/subprocessWrap";
 import { isUmlConnType } from "@/app/lib/diagram/types";
 import { expandMoveSet } from "@/app/lib/diagram/moveSet";
+import { growPoolToAdopt } from "@/app/lib/diagram/growPool";
 import { autoResizeUmlElement, sizeUmlNote } from "@/app/lib/diagram/umlAutoSize";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { getElementPoolId } from "@/app/lib/diagram/poolUtil";
@@ -9055,8 +9056,15 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         const lanes = state.elements.filter((e) => e.type === "lane" && e.parentId === pool.id).sort((a, b) => a.y - b.y);
         const holderId = lanes[0]?.id ?? pool.id; // adopt into the first lane, else the pool
         const adopted = state.elements.map((e) => (targetIds.has(e.id) && !e.parentId ? { ...e, parentId: holderId } : e));
-        // Let the shared enclosure pass grow the lane + pool around their new children.
-        return { ...state, elements: ensureContainersEncloseChildren(adopted), connectors: state.connectors };
+        // Size the pool and its lanes around what they have just taken in. This
+        // used to be left to `ensureContainersEncloseChildren`, which does not
+        // do it: for a pool or a lane that pass counts ONLY lane and sub-lane
+        // children, on purpose, so ordinary elements never shove swimlanes
+        // about. So the adoption reported success and the pool did not move a
+        // pixel, leaving elements owned by a pool drawn nowhere near them
+        // (Paul, 2026-09-18).
+        const sized = growPoolToAdopt(adopted, pool.id, holderId, [...targetIds]);
+        return { ...state, elements: ensureContainersEncloseChildren(sized), connectors: state.connectors };
       }
 
       // No pool yet → create ONE pool sized to contain the loose set, and adopt
