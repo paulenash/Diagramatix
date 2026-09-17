@@ -8,7 +8,7 @@ from memory, so this file never claims more or less than the code contains.
 | **Session 1 — the undo and reference bugs** | **SHIPPED** `a49a8006` — B1, B2, B3, D4 |
 | **Confirmation before destructive commands** (R1) | **SHIPPED** `a49a8006` |
 | **Selection as a reference** (M1) | **SHIPPED** `a49a8006` |
-| **Wrap the selection** (M2) | **PARTIAL** `9eb28faf` — expanded subprocess built, and its exact inverse; the pool and lane variants are not |
+| **Wrap the selection** (M2) | **SHIPPED** `9eb28faf`, `94e02a47` — expanded subprocess with its exact inverse, plus the pool and lane variants |
 | **Busy enforced on every path** (B4) | **PARTIAL** `b00e3c7b` — the text box is gated; the voice path is not |
 | **AI prompt op list** (B7) | **PARTIAL** `8c370014` — `renameByType` added; `addPool.relativeTo` still missing |
 | **Release-log entries** (D2) | **PARTIAL** — one entry for `a49a8006`; the six commits after it have none |
@@ -19,7 +19,7 @@ from memory, so this file never claims more or less than the code contains.
 | **Convert in place, fill, pointer, marquee, tidy, ghost, properties** (M3–M9) | **not started** |
 | **Voice reliability** (V1–V3) | **not started**; V0 happened as a live session but produced no written tally |
 | **Publish the guide, tech-notes and feature rows** (D1) | **not started** — the three seed scripts are still unrun on production |
-| **Delivered from live use** (L1–L9) | **SHIPPED** — not in the original backlog; added to it after the fact so the plan is a complete record |
+| **Delivered from live use** (L1–L10) | **SHIPPED** — not in the original backlog; added to it after the fact so the plan is a complete record |
 
 **Source document:** the full review plan, including the walkthrough script and
 the ranked backlog, is reproduced in the appendix below. The backlog now also
@@ -402,6 +402,7 @@ from.
 | L6 | **Group nudge and move, label selected, label by number, swap gateway points** — including every ordered pair of top/bottom/middle/left/right, and later every *selected* gateway at once | `f51a2c7d`, `8c370014` | T4411–T4418 |
 | L7 | **A command split by a pause is held.** A lone verb, a dangling connective or a half rename waits for the rest instead of being guessed at by the AI; a comma straight after the verb is ignored | `8c370014` | T4416–T4418 |
 | L8 | **Surround the selection with an expanded subprocess, and dissolve one back.** Room is made in the lane only, the flow in and out re-attach to the subprocess, a Start and End go inside; the inverse restores every position, and the two round-trip without undo | `9eb28faf` | T4419–T4422 |
+| L10 | **"One" was heard as "lane" on every numbered pick.** A bias we created: `lane` carried the strongest keyword boost, so on the shortest utterance a user makes it beat the number. Numbers are now boosted to match, and the pick corrects a known substitution on the leading token only | `94e02a47` | T4447–T4450 |
 | L9 | **Knowing what you can say and what it costs.** A movable Commands card whose every example is tested to parse, a cost-so-far button, and a SuperAdmin tile. Plus the "Suggestion" chip rename with a real target | `b00e3c7b`, `2117e392` | T4394–T4399 |
 
 **What this changes about the backlog.** L1–L9 are evidence that the next most
