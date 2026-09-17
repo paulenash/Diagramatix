@@ -50,6 +50,9 @@ next-env.d.ts
 /new features/*
 !/new features/Process Repository Final.md
 !/new features/Process Repository v2 — Plan.md
+# Abracadabra's review plan + live status. Prose, commit hashes and test refs
+# only — no keys, no transcripts; scanned before being added here.
+!/new features/Abracadabra — Review Plan and Status.md
 
 # The GETAI partner-API plan. The FOLDER has to be un-ignored before a file
 # inside it can be — git cannot re-include a file whose parent directory is
