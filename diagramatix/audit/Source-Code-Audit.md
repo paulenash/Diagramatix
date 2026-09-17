@@ -1,5 +1,12 @@
 # Diagramatix — Source Code Audit
 
+> **Superseded 2026-09-16.** This is the historical baseline, kept for the record of what was
+> found and fixed. Everything in it is now either fixed or retired, and nothing from it is
+> carried forward. The live worklist is
+> [`Audit-Rectification-Plan.md`](./Audit-Rectification-Plan.md), rebuilt from a fresh
+> code + architecture review at `092973c4`; where that review found a live instance of a
+> concern raised here, it appears there under a new code with a *supersedes* note.
+
 | | |
 |---|---|
 | **Audit started** | 2026-06-13 |
