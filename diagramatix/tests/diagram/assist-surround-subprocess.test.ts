@@ -103,7 +103,10 @@ describe("surround the selection with an expanded subprocess", () => {
 
     // Guards — each names the problem.
     expect(planWrapInSubprocess(base, [], "X", ids("2"))).toEqual({ error: "select the elements to surround first" });
-    expect(planWrapInSubprocess(base, ["L1"], "X", ids("2"))).toMatchObject({ error: expect.stringContaining("can't include a pool, lane or subprocess") });
+    // A swimlane is still refused: a lane says WHO does the work, so it cannot
+    // be moved inside a step of the work. Subprocesses are not refused any more
+    // — see T4479.
+    expect(planWrapInSubprocess(base, ["L1"], "X", ids("2"))).toMatchObject({ error: expect.stringContaining("can't include a pool or a lane") });
     expect(planWrapInSubprocess(base, ["B", "F"], "X", ids("2"))).toMatchObject({ error: expect.stringContaining("one lane or pool") });
     expect(planWrapInSubprocess(base, ["A", "C"], "X", ids("2")), "two in, two out").toMatchObject({ error: expect.stringContaining("it has 2 in and 2 out") });
     expect(planWrapInSubprocess(base, ["S"], "X", ids("2")), "nothing flows into the start").toMatchObject({ error: expect.stringContaining("it has 0 in and 1 out") });

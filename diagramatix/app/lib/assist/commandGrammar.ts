@@ -7,6 +7,7 @@ import type { AssistOp } from "./ops";
 import { SYMBOL_SYNONYMS, SYMBOL_PHRASES } from "./ops";
 import { parseRenameType } from "./renameTargets";
 import { repairSelectedWord } from "./selectedWord";
+import { capitaliseFirstWord } from "./nameCase";
 import type { SymbolType, EventType, GatewayType } from "../diagram/types";
 
 const clean = (s: string) => s.trim().replace(/[.,!?;:]+$/g, "").replace(/^["'“”‘’]+|["'“”‘’]+$/g, "").trim();
@@ -85,11 +86,11 @@ export function parseCommand(utterance: string): AssistOp[] | null {
 
   // ── Rename ──
   m = raw.match(/^(?:rename|relabel)\s+(.+?)\s+(?:to|as)\s+(.+)$/i);
-  if (m) return [{ op: "rename", ref: clean(m[1]), label: clean(m[2]) }];
+  if (m) return [{ op: "rename", ref: clean(m[1]), label: capitaliseFirstWord(clean(m[2])) }];
   m = raw.match(/^(?:change|set)\s+(?:the )?(?:name|label)(?: of)?\s+(.+?)\s+(?:to|as)\s+(.+)$/i);
-  if (m) return [{ op: "rename", ref: clean(m[1]), label: clean(m[2]) }];
+  if (m) return [{ op: "rename", ref: clean(m[1]), label: capitaliseFirstWord(clean(m[2])) }];
   m = raw.match(/^call\s+(.+?)\s+(.+)$/i);
-  if (m && !matchSymbol(m[1])) return [{ op: "rename", ref: clean(m[1]), label: clean(m[2]) }];
+  if (m && !matchSymbol(m[1])) return [{ op: "rename", ref: clean(m[1]), label: capitaliseFirstWord(clean(m[2])) }];
 
   // Guided rename: "rename <type>" (a bare element/connector TYPE, no "to <name>")
   // starts the numbered-badge pick flow. Types: pool · lane/sub-lane · message ·
@@ -98,7 +99,7 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   // text the editor waits for it. Checked before the by-type rule so "selected"
   // is never read as a type word.
   m = raw.match(/^label\s+(?:the\s+)?(?:selected|selection|this|that)(?:\s+(?:connector|flow|arrow|line|link))?(?:\s+(?:as|with|to))?(?:\s+(.+))?$/i);
-  if (m) return [{ op: "labelSelected", ...(m[1] ? { label: clean(m[1]) } : {}) }];
+  if (m) return [{ op: "labelSelected", ...(m[1] ? { label: capitaliseFirstWord(clean(m[1])) } : {}) }];
 
   m = raw.match(/^(?:rename|relabel|edit|label)\s+(?:a\s+|an\s+|the\s+|all\s+)?(pools?|sub-?lanes?|lanes?|messages?|tasks?|activit(?:y|ies)|steps?|subprocess(?:es)?|sub-?process(?:es)?|gateways?|decisions?|events?|connectors?|sequence(?:\s+flows?)?|flows?)\s*$/i);
   if (m) {

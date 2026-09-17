@@ -50,6 +50,7 @@ import { resolveRef, resolveSelectionRefs, isSelectionRef, ID_REF_PREFIX } from 
 import { isMicStopWord, isFlowEndWord } from "@/app/lib/assist/stopWords";
 import { isIncompleteCommand } from "@/app/lib/assist/incompleteCommand";
 import { leadingSpokenNumber } from "@/app/lib/assist/spokenNumber";
+import { capitaliseFirstWord } from "@/app/lib/assist/nameCase";
 import { collectMessageTargets, parseMessageAnswer, type MessagePick } from "@/app/lib/assist/messageTargets";
 import { validateOps, type AssistOp } from "@/app/lib/assist/ops";
 import { syntheticElement, withAdded, withDeleted, withLabel } from "@/app/lib/assist/workingSet";
@@ -3254,7 +3255,11 @@ export function DiagramEditor({
   // Apply a dictated name to the picked element/connector, then STAY in the loop
   // (#3): re-number the same type so the user can keep renaming until "stop"/Esc.
   const applyRenameName = useCallback((target: { id: string; kind: "element" | "connector" }, name: string, itemType: RenameType, single = false) => {
-    const clean = name.trim().replace(/[.,!?;:]+$/g, "").trim();
+    // Item names start with a capital (Paul, 2026-09-17). Dictation returns a
+    // lower-case sentence fragment, which then sits on the diagram looking like
+    // a typo beside every name that was typed. First word only — a process step
+    // is a phrase, and title case would give "Send To Customer For Approval".
+    const clean = capitaliseFirstWord(name.trim().replace(/[.,!?;:]+$/g, ""));
     if (!clean) { cancelRenameFlow("rename cancelled (empty name)"); return; }
     if (target.kind === "element") updateLabel(target.id, clean);
     else updateConnectorLabel(target.id, clean);
@@ -3289,7 +3294,7 @@ export function DiagramEditor({
       // selects a badge; trailing text is the name. `leadingSpokenNumber`
       // absorbs the recogniser substituting "lane" for "one" — a bias we
       // create ourselves by boosting `lane` (spokenNumber.ts).
-      const picked = leadingSpokenNumber(low);
+      const picked = leadingSpokenNumber(t);
       if (!picked) { setAbraLog((prev) => [...prev, { id: nanoid(), heard: t, summary: "say the number of the item to rename", ok: false }]); return; }
       const n = picked.n;
       const target = flow.targets.find((x) => x.n === n);

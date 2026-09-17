@@ -129,7 +129,8 @@ describe("wrap the selection in a pool or a lane", () => {
   it("T4446 — both refuse a selection that is empty, contains a container, or spans two parents", () => {
     for (const container of ["pool", "lane"] as const) {
       expect(planWrapInContainer(loose(), [], container, "X", ids)).toMatchObject({ error: expect.stringContaining("select the elements") });
-      expect(planWrapInContainer(pooled(), ["L1", "X"], container, "X", ids)).toMatchObject({ error: expect.stringContaining("can't include a pool, lane or subprocess") });
+      // A swimlane is still refused. Subprocesses are not — see T4479.
+      expect(planWrapInContainer(pooled(), ["L1", "X"], container, "X", ids)).toMatchObject({ error: expect.stringContaining("can't include a pool or a lane") });
     }
     const mixed: Shape = {
       elements: [...pooled().elements, el("Q", "task", "Loose", 600, 600, 102, 65)],

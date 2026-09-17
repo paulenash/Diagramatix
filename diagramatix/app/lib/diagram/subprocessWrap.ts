@@ -41,8 +41,46 @@ export interface Shape { elements: DiagramElement[]; connectors: Connector[] }
 export type WrapPlan = { error: string } | (Shape & { summary: string; contentRight: number });
 
 const SWIMLANE = new Set<string>(["pool", "lane", "sublane"]);
-const CONTAINER = new Set<string>(["pool", "lane", "sublane", "subprocess-expanded"]);
 const ARTIFACT = new Set<string>(["text-annotation", "review-comment", "data-object", "data-store"]);
+
+/**
+ * What a selection may never contain when wrapping. Only swimlanes: a pool or
+ * lane says WHO does the work, so it cannot be moved inside a step of the work.
+ *
+ * Subprocesses — collapsed and expanded — used to be refused here too, and that
+ * was wrong (Paul, 2026-09-17: he selected an event and a connected expanded
+ * subprocess and was told to "select the tasks, gateways and events"). Nesting
+ * a subprocess inside a subprocess is ordinary BPMN, and it is exactly what you
+ * want when a stretch of the flow that already has one step grouped needs to
+ * become a step itself.
+ */
+const NOT_WRAPPABLE = SWIMLANE;
+
+/** The refusal, phrased for the wrap being attempted. */
+const notWrappableError = (what: string) =>
+  `the selection can't include a pool or a lane — select the steps to ${what}`;
+
+/**
+ * Drop anything that is already inside something else in the same selection.
+ *
+ * Selecting an expanded subprocess and then one of the tasks inside it is a
+ * natural thing to do with a rubber band, and the task is coming along anyway
+ * as part of its parent. Left in, it fails the "must all sit in one lane" check
+ * for no reason the user can see, because its parent is the subprocess and not
+ * the lane.
+ */
+function withoutNestedPicks(picked: DiagramElement[], byId: Map<string, DiagramElement>): DiagramElement[] {
+  const pickedIds = new Set(picked.map((e) => e.id));
+  const insideAnotherPick = (e: DiagramElement): boolean => {
+    let parent = e.parentId ? byId.get(e.parentId) : undefined;
+    for (let i = 0; parent && i < 12; i++) {
+      if (pickedIds.has(parent.id)) return true;
+      parent = parent.parentId ? byId.get(parent.parentId) : undefined;
+    }
+    return false;
+  };
+  return picked.filter((e) => !insideAnotherPick(e));
+}
 
 const cx = (e: DiagramElement) => e.x + e.width / 2;
 const cy = (e: DiagramElement) => e.y + e.height / 2;
@@ -95,8 +133,11 @@ const flow = (id: string, sourceId: string, targetId: string): Connector => ({
 
 export function planWrapInSubprocess(shape: Shape, selectedIds: readonly string[], label: string, ids: WrapIds): WrapPlan {
   const byId = new Map(shape.elements.map((e) => [e.id, e] as const));
-  const picked = selectedIds.map((id) => byId.get(id)).filter((e): e is DiagramElement => !!e);
-  if (picked.some((e) => CONTAINER.has(e.type))) return { error: "the selection can't include a pool, lane or subprocess — select the tasks, gateways and events to surround" };
+  const picked = withoutNestedPicks(
+    selectedIds.map((id) => byId.get(id)).filter((e): e is DiagramElement => !!e),
+    byId,
+  );
+  if (picked.some((e) => NOT_WRAPPABLE.has(e.type))) return { error: notWrappableError("surround") };
   const members = picked.filter((e) => !ARTIFACT.has(e.type) && !e.boundaryHostId);
   if (members.length === 0) return { error: "select the elements to surround first" };
   const homeId = members[0].parentId;
@@ -144,13 +185,18 @@ export function planWrapInSubprocess(shape: Shape, selectedIds: readonly string[
   // on the element's centre line, so the two new flows are straight and short.
   const start: DiagramElement = { id: ids.startId, type: "start-event", label: "", x: ep.x + EVENT_INSET, y: cy(entry) - EVENT / 2, width: EVENT, height: EVENT, properties: {}, parentId: ep.id };
   const end: DiagramElement = { id: ids.endId, type: "end-event", label: "", x: ep.x + ep.width - EVENT_INSET - EVENT, y: cy(exit) - EVENT / 2, width: EVENT, height: EVENT, properties: {}, parentId: ep.id };
+  // Only the TOP of the group is reparented onto the new shell. An element
+  // already inside something else that is being wrapped — the contents of a
+  // selected subprocess — keeps the parent it has, or the nesting is flattened
+  // and the inner subprocess renders empty with its own children beside it.
+  const reparents = (e: DiagramElement) => group.has(e.id) && !(e.parentId && group.has(e.parentId));
   const elements: DiagramElement[] = [];
   let placed = false;
   for (const e of shape.elements) {
     if (group.has(e.id) && !placed) { elements.push(ep, start, end); placed = true; } // drawn beneath its children
     const dx = dxOf(e.id);
     const moved = dx ? { ...e, x: e.x + dx } : e;
-    elements.push(group.has(e.id) ? { ...moved, parentId: ep.id } : moved);
+    elements.push(reparents(e) ? { ...moved, parentId: ep.id } : moved);
   }
 
   const reroute = new Set<string>([incoming[0].id, outgoing[0].id, ids.startConnId, ids.endConnId]);
@@ -264,9 +310,12 @@ export function planWrapInContainer(
   ids: ContainerWrapIds,
 ): WrapPlan {
   const byId = new Map(shape.elements.map((e) => [e.id, e] as const));
-  const picked = selectedIds.map((id) => byId.get(id)).filter((e): e is DiagramElement => !!e);
-  if (picked.some((e) => CONTAINER.has(e.type))) {
-    return { error: `the selection can't include a pool, lane or subprocess — select the elements to put in the ${container}` };
+  const picked = withoutNestedPicks(
+    selectedIds.map((id) => byId.get(id)).filter((e): e is DiagramElement => !!e),
+    byId,
+  );
+  if (picked.some((e) => NOT_WRAPPABLE.has(e.type))) {
+    return { error: notWrappableError(`put in the ${container}`) };
   }
   const members = picked.filter((e) => !ARTIFACT.has(e.type) && !e.boundaryHostId);
   if (members.length === 0) return { error: `select the elements to put in the ${container} first` };
