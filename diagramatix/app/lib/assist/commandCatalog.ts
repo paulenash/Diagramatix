@@ -56,6 +56,10 @@ export const COMMAND_CATALOG: CatalogFamily[] = [
   { family: "Gateways (select one or more gateways first)", items: [
     { does: "Swap two connection points, any pair of top / bottom / middle / left / right — the outgoing points of a decision, the incoming points of a merge; “middle” is the side in the flow direction", say: ["swap top and bottom", "swap bottom and middle", "swap top with centre", "swap middle and top", "swap top and right"] },
   ] },
+  { family: "Pools in order", items: [
+    { does: "Move a pool above or below another — the stack is laid out again, so room is made automatically", say: ["move Pool 1 above Pool 2", "put Pool 3 below Pool 1"] },
+    { does: "Swap two pools", say: ["swap Pool 1 with Pool 2", "swap the selected pools"] },
+  ] },
   { family: "Diagram", items: [
     { does: "Undo, repeat, clear, export", say: ["undo that", "again", "clear the diagram", "export the diagram to JSON"] },
   ] },

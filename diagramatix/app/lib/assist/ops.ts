@@ -48,6 +48,8 @@ export type AssistOp =
   | { op: "addMessageByNumber"; fromSelection?: boolean }
   | { op: "clear" }
   | { op: "export"; format?: "json" }
+  | { op: "movePoolTo"; ref: Ref; position: "above" | "below"; relativeTo: Ref }
+  | { op: "swapPools"; a?: Ref; b?: Ref }
   | { op: "goldFlash"; on: boolean }
   | { op: "undo" };
 
@@ -218,6 +220,19 @@ export function validateOp(raw: unknown): AssistOp | null {
       return { op: "clear" };
     case "export":
       return { op: "export", format: "json" };
+    case "movePoolTo": {
+      const pos = o.position === "above" || o.position === "below" ? o.position : null;
+      return isRef(o.ref) && isRef(o.relativeTo) && pos
+        ? { op: "movePoolTo", ref: (o.ref as string).trim(), position: pos, relativeTo: (o.relativeTo as string).trim() }
+        : null;
+    }
+    case "swapPools": {
+      const a = isRef(o.a) ? (o.a as string).trim() : undefined;
+      const b = isRef(o.b) ? (o.b as string).trim() : undefined;
+      // Both named, or neither — one alone has nothing to swap with.
+      if ((a && !b) || (b && !a)) return null;
+      return { op: "swapPools", ...(a ? { a } : {}), ...(b ? { b } : {}) };
+    }
     case "goldFlash":
       return typeof o.on === "boolean" ? { op: "goldFlash", on: o.on } : null;
     case "undo":

@@ -26,6 +26,7 @@ import { planWrapInSubprocess, planUnwrapSubprocess, planWrapInContainer, type W
 import { isUmlConnType } from "@/app/lib/diagram/types";
 import { expandMoveSet } from "@/app/lib/diagram/moveSet";
 import { growPoolToAdopt } from "@/app/lib/diagram/growPool";
+import { planMovePool, planSwapPools, type PoolPosition } from "@/app/lib/diagram/poolOrder";
 import { autoResizeUmlElement, sizeUmlNote } from "@/app/lib/diagram/umlAutoSize";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { getElementPoolId } from "@/app/lib/diagram/poolUtil";
@@ -458,6 +459,8 @@ export type Action =
   | { type: "WRAP_IN_SUBPROCESS"; payload: { selectedIds: string[]; label: string; ids: WrapIds } }
   /** Wrap the SELECTION in a new pool or lane (subprocessWrap.ts). */
   | { type: "WRAP_IN_CONTAINER"; payload: { selectedIds: string[]; container: "pool" | "lane"; label: string; ids: { containerId: string } } }
+  | { type: "MOVE_POOL_TO"; payload: { poolId: string; position: PoolPosition; relativeToId: string } }
+  | { type: "SWAP_POOLS"; payload: { aId: string; bId: string } }
   /** Dissolve an expanded subprocess: shell + Start/End go, contents rejoin the flow. */
   | { type: "UNWRAP_SUBPROCESS"; payload: { epId: string } }
   | { type: "ADD_POOL"; payload: { label?: string; poolType?: string; position?: "above" | "below"; relativeToId?: string } }
@@ -483,7 +486,7 @@ const BPMN_CONTENT_TYPES = new Set<SymbolType>([
   "subprocess", "subprocess-expanded", "data-object", "data-store",
 ]);
 
-function isContainerType(type: SymbolType): boolean {
+export function isContainerType(type: SymbolType): boolean {
   return type === "system-boundary" || type === "composite-state"
       || type === "pool" || type === "lane" || type === "subprocess-expanded"
       || type === "process-group"
@@ -594,7 +597,7 @@ function centreInContainer(cx: number, cy: number, b: DiagramElement): boolean {
   return cx >= r.x && cx <= r.x + r.width && cy >= r.y && cy <= r.y + r.height;
 }
 
-function getAllDescendantIds(elements: DiagramElement[], containerId: string): Set<string> {
+export function getAllDescendantIds(elements: DiagramElement[], containerId: string): Set<string> {
   const result = new Set<string>();
   const queue = [containerId];
   while (queue.length) {
@@ -9026,6 +9029,23 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       if ("error" in plan) return state;
       return { ...state, elements: ensureContainersEncloseChildren(updatePoolTypes(plan.elements)), connectors: plan.connectors };
     }
+    // Reordering the pool stack. The planner lays the stack out again from the
+    // top, so making room for a pool inserted between two others is not a
+    // separate step — the ones below simply start lower.
+    case "MOVE_POOL_TO": {
+      const { poolId, position, relativeToId } = action.payload;
+      const plan = planMovePool(state.elements, poolId, position, relativeToId, isContainerType, getAllDescendantIds);
+      if ("error" in plan) return state;
+      return { ...state, elements: plan.elements };
+    }
+
+    case "SWAP_POOLS": {
+      const { aId, bId } = action.payload;
+      const plan = planSwapPools(state.elements, aId, bId, isContainerType, getAllDescendantIds);
+      if ("error" in plan) return state;
+      return { ...state, elements: plan.elements };
+    }
+
     case "UNWRAP_SUBPROCESS": {
       const plan = planUnwrapSubprocess(state, action.payload.epId);
       if ("error" in plan) return state;
@@ -9920,6 +9940,14 @@ export function useDiagram(initialData: DiagramData) {
     dispatch({ type: "MOVE_ELEMENTS", payload: { ids, dx, dy } });
   }, []);
 
+  const movePoolTo = useCallback((poolId: string, position: PoolPosition, relativeToId: string) => {
+    dispatch({ type: "MOVE_POOL_TO", payload: { poolId, position, relativeToId } });
+  }, []);
+
+  const swapPools = useCallback((aId: string, bId: string) => {
+    dispatch({ type: "SWAP_POOLS", payload: { aId, bId } });
+  }, []);
+
   const elementsMoveEnd = useCallback(() => {
     if (groupDraggingRef.current && preGroupMoveRef.current) {
       pushHistory(preGroupMoveRef.current);
@@ -10446,6 +10474,8 @@ export function useDiagram(initialData: DiagramData) {
     moveElements,
     swapLane,
     elementsMoveEnd,
+    movePoolTo,
+    swapPools,
     resizeElement,
     resizeElementEnd,
     updateLabel,

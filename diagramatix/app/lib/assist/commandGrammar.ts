@@ -127,6 +127,36 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     if (rt) return [{ op: "renameByType", itemType: rt }];
   }
 
+    // Reorder the pool stack (Paul, 2026-09-18): "move Pool 1 above Pool 2",
+    // "put Pool 1 below Pool 2". Before the generic move rule, which would take
+    // "above Pool 2" as a direction and nudge it. Asking for this before it
+    // existed got the AI's best guess — "nudge Pool 1 up", twenty pixels.
+    {
+      const mp = raw.match(
+        /^(?:move|put|place|shift|position)\s+(?:the\s+)?(.+?)\s+(above|over|before|below|under(?:neath)?|after)\s+(?:the\s+)?(.+?)$/i,
+      );
+      if (mp && /\b(?:pool|poll|pull)\b/i.test(mp[1]) && /\b(?:pool|poll|pull)\b/i.test(mp[3])) {
+        const position = /^(?:above|over|before)/i.test(mp[2]) ? "above" as const : "below" as const;
+        return [{ op: "movePoolTo", ref: clean(mp[1]), position, relativeTo: clean(mp[3]) }];
+      }
+    }
+
+    // Swap two pools in the stack: "swap Pool 1 with Pool 2", "swap the selected
+    // pools". Above the lane swap, which answers to the same verb.
+    {
+      const sp = raw.match(
+        /^swap\s+(?:the\s+)?(.+?)\s+(?:with|and|for|&)\s+(?:the\s+)?(.+?)$/i,
+      );
+      if (sp && /\b(?:pool|poll|pull)\b/i.test(sp[1]) && /\b(?:pool|poll|pull)\b/i.test(sp[2])) {
+        return [{ op: "swapPools", a: clean(sp[1]), b: clean(sp[2]) }];
+      }
+      // No names: the two pools the mouse has selected.
+      if (/^swap\s+(?:the\s+)?(?:selected|these|those|highlighted)\s+(?:pools?|polls?|pulls?)\s*$/i.test(raw)
+        || /^swap\s+(?:the\s+)?(?:two\s+)?(?:pools?|polls?|pulls?)\s*$/i.test(raw)) {
+        return [{ op: "swapPools" }];
+      }
+    }
+
   // ── Pool / lane container commands ("poll"/"pull"→pool, "line"→lane) ──
   {
     const P = "(?:pool|poll|pull)";

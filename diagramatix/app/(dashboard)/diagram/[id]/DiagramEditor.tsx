@@ -52,6 +52,8 @@ import { isIncompleteCommand } from "@/app/lib/assist/incompleteCommand";
 import { leadingSpokenNumber } from "@/app/lib/assist/spokenNumber";
 import { capitaliseFirstWord } from "@/app/lib/assist/nameCase";
 import { batchFlashes, isGoldFlashOn, setGoldFlash, goldFlashSummary, flashTargets, type FlashBox } from "@/app/lib/assist/goldFlash";
+import { planMovePool, planSwapPools, selectedPools, poolsInOrder } from "@/app/lib/diagram/poolOrder";
+import { isContainerType, getAllDescendantIds } from "@/app/hooks/useDiagram";
 import { collectMessageTargets, parseMessageAnswer, type MessagePick } from "@/app/lib/assist/messageTargets";
 import { validateOps, type AssistOp } from "@/app/lib/assist/ops";
 import { syntheticElement, withAdded, withDeleted, withLabel } from "@/app/lib/assist/workingSet";
@@ -1172,6 +1174,8 @@ export function DiagramEditor({
     splitPoolEven,
     splitLaneEven,
     wrapInPool,
+    movePoolTo,
+    swapPools,
     wrapInSubprocess,
     wrapInContainer,
     unwrapSubprocess,
@@ -2998,6 +3002,52 @@ export function DiagramEditor({
         if (!unwrapEp(eps[0])) anyFail = true;
         continue;
       }
+      // Reorder the pool stack (Paul, 2026-09-18). Planned first so a refusal
+      // says why, then applied by the reducer as one undoable step. The stack is
+      // laid out again from the top, so a pool dropped between two others pushes
+      // the rest down by its own height — no separate "make room" step.
+      if (op.op === "movePoolTo") {
+        const m = resolve1(op.ref), a = resolve1(op.relativeTo);
+        if ("err" in m) { results.push(m.err); anyFail = true; continue; }
+        if ("err" in a) { results.push(a.err); anyFail = true; continue; }
+        const plan = planMovePool(els, m.id, op.position, a.id, isContainerType, getAllDescendantIds);
+        if ("error" in plan) { results.push(plan.error); anyFail = true; continue; }
+        movePoolTo(m.id, op.position, a.id);
+        els = plan.elements;
+        abraLastId.current = m.id;
+        setSelectedElementIds(new Set()); // selection protocol
+        results.push(`moved ${nameOf(m)} ${op.position} ${nameOf(a)}`);
+        continue;
+      }
+
+      if (op.op === "swapPools") {
+        let a: DiagramElement | undefined, b: DiagramElement | undefined;
+        if (op.a && op.b) {
+          const ra = resolve1(op.a), rb = resolve1(op.b);
+          if ("err" in ra) { results.push(ra.err); anyFail = true; continue; }
+          if ("err" in rb) { results.push(rb.err); anyFail = true; continue; }
+          a = ra; b = rb;
+        } else {
+          const pair = selectedPools(els, selectedIds);
+          if (!pair) {
+            const pools = poolsInOrder(els);
+            results.push(pools.length === 2
+              ? `say "swap ${nameOf(pools[0])} with ${nameOf(pools[1])}"`
+              : "select exactly two pools, or name them both");
+            anyFail = true;
+            continue;
+          }
+          [a, b] = pair;
+        }
+        const plan = planSwapPools(els, a.id, b.id, isContainerType, getAllDescendantIds);
+        if ("error" in plan) { results.push(plan.error); anyFail = true; continue; }
+        swapPools(a.id, b.id);
+        els = plan.elements;
+        setSelectedElementIds(new Set()); // selection protocol
+        results.push(`swapped ${nameOf(a)} and ${nameOf(b)}`);
+        continue;
+      }
+
       if (op.op === "wrapInPool") {
         // Say what will actually happen. With a pool already on the diagram the
         // reducer GROWS the biggest one to adopt the loose elements rather than
