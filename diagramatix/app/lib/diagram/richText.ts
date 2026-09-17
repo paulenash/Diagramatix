@@ -74,8 +74,15 @@ export function sanitizeRichText(html: string): string {
       return m.startsWith("</") ? `</${t}>` : `<${t}>`;
     });
   }
-  const tpl = document.createElement("div");
-  tpl.innerHTML = html;
+  // SEC-26: parse in an INERT document, never in one attached to this page.
+  // `document.createElement("div")` belongs to the live document even while
+  // detached, so assigning `innerHTML` runs resource-load handlers as it
+  // parses — `<img src=x onerror=…>` fires before a single tag is stripped,
+  // and the sanitiser executes the payload it was called to remove. A document
+  // from `createHTMLDocument` has no browsing context: nothing loads, nothing
+  // runs, and the walk below sees the same tree either way.
+  const inert = document.implementation.createHTMLDocument("");
+  inert.body.innerHTML = html;
   const walk = (node: Node): string => {
     let out = "";
     node.childNodes.forEach((child) => {
@@ -92,5 +99,5 @@ export function sanitizeRichText(html: string): string {
     });
     return out;
   };
-  return walk(tpl).trim();
+  return walk(inert.body).trim();
 }

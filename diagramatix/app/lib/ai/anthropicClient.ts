@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { makeOpenAiShapeClient } from "./openAiShape";
 import { providerForModel, resolvedEnvSecret } from "./models";
 import { currentUserAiKey } from "./aiKeyContext";
+import { isSafeAiBaseUrl } from "./safeBaseUrl";
 import { recordAiInvocation } from "./aiTelemetry";
 
 /**
@@ -109,9 +110,19 @@ export function aiClientConfig(
     // The endpoint still falls back to the provider's default when the user
     // supplied only a key — which is the normal case, and the reason a key on
     // its own is enough for OpenRouter, Anthropic, Moonshot and DeepSeek.
+    // SEC-24: re-check the stored endpoint at the point of use, so a row
+    // written before the save-time guard existed (or by any future path that
+    // forgets it) cannot still aim the server at a private address. An
+    // endpoint that fails the check is dropped, not honoured: the request
+    // falls back to the provider's own base URL.
+    const stored = key.baseUrl?.trim() || "";
+    const safeBase = stored && isSafeAiBaseUrl(stored) ? stored : "";
+    if (stored && !safeBase) {
+      console.warn(`[ai] ignoring a stored ${provider} endpoint that is not a public https address`);
+    }
     return {
       apiKey: key.apiKey,
-      baseURL: key.baseUrl?.trim() || envClientConfig(model, fallbackApiKey).baseURL,
+      baseURL: safeBase || envClientConfig(model, fallbackApiKey).baseURL,
     };
   }
   return envClientConfig(model, fallbackApiKey);

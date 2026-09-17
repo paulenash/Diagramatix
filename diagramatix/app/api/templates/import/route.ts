@@ -105,9 +105,16 @@ export async function POST(req: Request) {
       const incomingGroup = typeof t.group === "string" ? t.group.trim() : "";
       const groupValue: string | null = incomingGroup.length > 0 ? incomingGroup : null;
       const descValue: string | null = typeof t.description === "string" && t.description.trim() ? t.description.trim() : null;
-      // Carry an exported preview if present; otherwise generate one from the data.
-      let thumb: string | null = typeof t.thumbnailSvg === "string" && t.thumbnailSvg ? t.thumbnailSvg : null;
-      if (!thumb) { try { thumb = renderTemplateThumbnailSvg((t.data ?? { elements: [], connectors: [] }) as TemplateData) || null; } catch { thumb = null; } }
+      // SEC-22: ALWAYS regenerate the preview; never store the uploaded one.
+      // `thumbnailSvg` is rendered with dangerouslySetInnerHTML in two places —
+      // the admin template list and the editor's template picker — so an
+      // uploaded file carrying `<img src=x onerror=…>` in this field executed
+      // in the session of whoever opened either. The thumbnail is derived data:
+      // it can be rebuilt from `data`, so there is nothing to gain by trusting
+      // the file. A template whose data will not render simply has no preview,
+      // exactly as before.
+      let thumb: string | null = null;
+      try { thumb = renderTemplateThumbnailSvg((t.data ?? { elements: [], connectors: [] }) as TemplateData) || null; } catch { thumb = null; }
       await pgPool.query(
         `INSERT INTO "DiagramTemplate"
           (id, name, "diagramType", "templateType", "group", description, "thumbnailSvg", data, "userId", "createdAt", "updatedAt")

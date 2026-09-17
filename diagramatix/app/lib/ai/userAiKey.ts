@@ -32,6 +32,7 @@
 import { prisma } from "@/app/lib/db";
 import { decryptSecret, encryptSecret, tokenCryptoConfigured } from "@/app/lib/crypto/tokenCrypto";
 import { providerForModel, type AiProvider } from "./models";
+import { assertSafeAiBaseUrl, UnsafeAiBaseUrlError } from "./safeBaseUrl";
 
 /**
  * Providers a user may supply their own key for.
@@ -111,10 +112,22 @@ export async function saveUserAiKey(opts: {
     return { ok: false, error: "Key storage is not configured on this deployment (MS_TOKEN_ENC_KEY is unset), so a key cannot be stored securely." };
   }
 
+  // SEC-24: a custom endpoint is the server's next outbound request, so it is
+  // validated before it is stored rather than at the moment it is used.
+  const rawBase = opts.baseUrl?.trim() || null;
+  if (rawBase) {
+    try {
+      assertSafeAiBaseUrl(rawBase);
+    } catch (e) {
+      if (e instanceof UnsafeAiBaseUrlError) return { ok: false, error: e.message };
+      throw e;
+    }
+  }
+
   const data = {
     keyCipher: encryptSecret(key),
     keyHint: keyHint(key),
-    baseUrl: opts.baseUrl?.trim() || null,
+    baseUrl: rawBase,
   };
   await prisma.userAiKey.upsert({
     where: { userId_provider: { userId: opts.userId, provider: opts.provider } },
