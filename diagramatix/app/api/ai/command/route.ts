@@ -17,6 +17,7 @@ import { resolveAiRouteContext } from "@/app/lib/ai/aiTelemetryRoute";
 import { AI_INVOCATION_POINTS, enterAiContext } from "@/app/lib/ai/aiTelemetry";
 import { auth } from "@/auth";
 import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
+import { gateFeature } from "@/app/lib/subscription-route";
 import { validateOps } from "@/app/lib/assist/ops";
 import { serializeDiagramForCommand } from "@/app/lib/assist/serializeDiagram";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
@@ -107,6 +108,12 @@ export async function POST(req: Request) {
   }
   const pol = await gateOrgPolicy(session, "allowAi");
   if (pol) return pol;
+  // Abracadabra is an Expert-and-above feature (Paul, 2026-09-17). The editor
+  // only decides which buttons to draw; this is the half that means anything,
+  // since the route is reachable directly. SuperAdmins bypass via the admin-email
+  // check inside the availability map.
+  const feat = await gateFeature(session.user.id, "abracadabra");
+  if (feat) return feat;
   enterAiContext(await resolveAiRouteContext(session, AI_INVOCATION_POINTS.LiveCommand));
 
   const body = await req.json().catch(() => null) as { instruction?: string; state?: DiagramData; selectedIds?: string[] } | null;

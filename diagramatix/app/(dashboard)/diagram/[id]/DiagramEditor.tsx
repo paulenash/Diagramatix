@@ -51,6 +51,7 @@ import { isMicStopWord, isFlowEndWord } from "@/app/lib/assist/stopWords";
 import { isIncompleteCommand } from "@/app/lib/assist/incompleteCommand";
 import { leadingSpokenNumber } from "@/app/lib/assist/spokenNumber";
 import { capitaliseFirstWord } from "@/app/lib/assist/nameCase";
+import { batchFlashes, isGoldFlashOn, setGoldFlash, goldFlashSummary, flashTargets, type FlashBox } from "@/app/lib/assist/goldFlash";
 import { collectMessageTargets, parseMessageAnswer, type MessagePick } from "@/app/lib/assist/messageTargets";
 import { validateOps, type AssistOp } from "@/app/lib/assist/ops";
 import { syntheticElement, withAdded, withDeleted, withLabel } from "@/app/lib/assist/workingSet";
@@ -81,6 +82,8 @@ import { InfoDialog } from "@/app/components/InfoDialog";
 import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
 import { useDiagramTypeStyles } from "@/app/hooks/useDiagramTypeStyles";
 import { useSuperAdminChrome, viewModeEntitlements } from "@/app/hooks/useSuperAdminChrome";
+import { useFeatureState } from "@/app/components/FeatureGate";
+import { atLeastTier } from "@/app/lib/features/tierRank";
 import { lightenHex } from "@/app/lib/diagram/diagramTypeStyles";
 import { AiPanel } from "./AiPanel";
 import { AiComparisonModal, type AiComparison } from "@/app/components/AiComparisonModal";
@@ -1920,6 +1923,20 @@ export function DiagramEditor({
   // the logo down to a lower (OrgAdmin / Normal) view mode. Gate SuperAdmin-only
   // menu options on this so they vanish when a SuperAdmin drops into a lower view.
   const isActingAdmin = isAdmin && !superAdminHidden;
+  // Abracadabra is available to Expert subscriptions and above (Paul,
+  // 2026-09-17), not SuperAdmin-only as it was while it settled down. The
+  // `abracadabra` key has been in the feature registry and seeded expert +
+  // enterprise since Phase 1 — nothing had ever read it. This is the first
+  // reader; the route gate on /api/ai/command is the half that actually
+  // enforces it, since anything here is only a matter of which buttons show.
+  //
+  // The second clause is for a SuperAdmin previewing a customer tier: the
+  // server hands an admin every feature, so without it the wand would stay put
+  // while pretending to be an Introductory user, which defeats the preview.
+  const abracadabraFeature = useFeatureState("abracadabra");
+  const abracadabraAllowed =
+    abracadabraFeature === "available" &&
+    (!isAdmin || atLeastTier(adminViewMode, "expert"));
   // Generate models the current user may pick (cost-gated; SA-in-mode = all).
   const { models: aiModels, current: currentAiModel } = useAllowedModels(isActingAdmin);
   // "Regenerate" from Diagram Properties: pull the linked prompt's CURRENT text and
@@ -2650,6 +2667,12 @@ export function DiagramEditor({
   const stopAbraListeningRef = useRef<() => void>(() => {});
   // Remembers the last real command so "again" can repeat it (e.g. nudge again).
   const lastAbraOpsRef = useRef<AssistOp[]>([]);
+  // Gold flashing. `goldFlashBeforeRef` holds the pre-command snapshot while the
+  // reducer and React catch up; the effect below turns it into a set of boxes to
+  // outline once the new elements have actually rendered. `runId` is what the
+  // overlay watches — a number, so an unrelated re-render cannot re-trigger it.
+  const goldFlashBeforeRef = useRef<FlashBox[] | null>(null);
+  const [goldFlash, setGoldFlashState] = useState<{ runId: number; targets: FlashBox[] }>({ runId: 0, targets: [] });
   // A destructive command waiting for "yes" (confirm.ts): the ops, what they
   // would do in words, and whether the AI interpreted them (for the log badge).
   const pendingConfirmRef = useRef<{ ops: AssistOp[]; what: string; viaAi: boolean } | null>(null);
@@ -2710,6 +2733,15 @@ export function DiagramEditor({
     }
     const results: string[] = [];
     let anyFail = false;
+    // Gold flashing: remember where everything was, so that once React has
+    // re-rendered we can diff and outline whatever this command touched. Taken
+    // here rather than asking each of the thirty-odd op handlers to report what
+    // it changed — handlers drift, and a new op would silently stop flashing.
+    if (isGoldFlashOn() && batchFlashes(ops)) {
+      goldFlashBeforeRef.current = data.elements.map((e) => ({
+        id: e.id, x: e.x, y: e.y, width: e.width, height: e.height, parentId: e.parentId,
+      }));
+    }
     // Working copy: each op's effect is threaded back in (workingSet.ts) so a
     // later op in the same batch can refer to what an earlier one created —
     // "add X and connect it to Y". React has not re-rendered mid-loop, so
@@ -2742,6 +2774,9 @@ export function DiagramEditor({
       if (op.op === "undo") { undo(); results.push("undid the last change"); continue; }
       if (op.op === "clear") { clearDiagram(); abraLastId.current = null; results.push("cleared the diagram"); continue; }
       if (op.op === "export") { exportJsonRef.current?.(); results.push("exported to JSON"); continue; }
+      // Gold flashing is a display preference, not an edit: it changes nothing
+      // on the diagram, takes no undo entry, and is remembered per browser.
+      if (op.op === "goldFlash") { setGoldFlash(op.on); results.push(goldFlashSummary(op.on)); continue; }
 
       if (op.op === "add") {
         const { w, h } = sizeOf(op.symbolType);
@@ -3244,6 +3279,25 @@ export function DiagramEditor({
     }
     return { ok: !anyFail, summary: results.join("; ") || "nothing to do" };
   }, [data.elements, data.connectors, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, updateConnectorLabel, deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool, wrapInSubprocess, wrapInContainer, unwrapSubprocess, addPool, addLaneAt, compressPool, extendPools, swapLane, moveLane, moveElements, elementsMoveEnd, removeSpace, setRenameFlow, setMessageFlow, updateConnectorEndpoint]);
+
+  // Gold flashing, part two: the command has run, React has re-rendered, and
+  // `data.elements` is now the after picture. Diff it against the snapshot taken
+  // when the batch was armed and hand the result to the overlay.
+  //
+  // This runs on every element change, but does nothing at all unless a batch
+  // armed it — the ref is the gate, and it is cleared immediately so one command
+  // flashes once however many times the canvas re-renders afterwards.
+  useEffect(() => {
+    const snapshot = goldFlashBeforeRef.current;
+    if (!snapshot) return;
+    goldFlashBeforeRef.current = null;
+    const targets = flashTargets(
+      snapshot,
+      data.elements.map((e) => ({ id: e.id, x: e.x, y: e.y, width: e.width, height: e.height, parentId: e.parentId })),
+    );
+    if (targets.length === 0) return;
+    setGoldFlashState((prev) => ({ runId: prev.runId + 1, targets }));
+  }, [data.elements]);
 
   // Cancel the guided rename flow and clear any badge/edit state.
   const cancelRenameFlow = useCallback((reason?: string) => {
@@ -5837,8 +5891,8 @@ export function DiagramEditor({
           </button>
         )}
         {/* Abracadabra Mode — live voice/typed command editing (BPMN only).
-            SuperAdmin-only for the time being. */}
-        {!readOnly && diagramType === "bpmn" && isActingAdmin && (
+            Expert subscriptions and above. */}
+        {!readOnly && diagramType === "bpmn" && abracadabraAllowed && (
           <button
             onClick={() => {
               setAbracadabraOn((prev) => {
@@ -6108,6 +6162,7 @@ export function DiagramEditor({
           data={displayData}
           diagramType={diagramType}
           renameBadges={renameFlow?.phase === "pick" ? renameFlow.targets : messageFlow?.targets}
+          goldFlash={goldFlash}
           onAddElement={addElementGated}
           onMoveElement={(id, x, y, uc) => { if (feedbackMode && !isFeedbackNote(id)) return; if (!isCoLocked(id)) moveElement(id, x, y, uc); }}
           onResizeElement={(id, x, y, w, h) => { if (feedbackMode && !isFeedbackNote(id)) return; if (!isCoLocked(id)) resizeElement(id, x, y, w, h); }}
@@ -6203,8 +6258,11 @@ export function DiagramEditor({
           onAddSelfTransition={diagramType === "state-machine" ? addSelfTransition : undefined}
         />
 
-        {/* Abracadabra Mode command bar — voice/typed live editing (SuperAdmin only). */}
-        {abracadabraOn && !readOnly && isActingAdmin && (
+        {/* Abracadabra Mode command bar — voice/typed live editing.
+            Same gate as the wand that opens it, plus the BPMN check the wand
+            had and this did not: a diagram-type switch used to leave the bar
+            up on a diagram whose commands could not apply to it. */}
+        {abracadabraOn && !readOnly && diagramType === "bpmn" && abracadabraAllowed && (
           <AbracadabraBar
             listening={abraListening}
             connecting={abraConnecting}

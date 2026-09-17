@@ -65,3 +65,25 @@ export const COMMAND_CATALOG: CatalogFamily[] = [
     { does: "Answer a confirmation (clear, delete a pool or lane, delete several)", say: ["yes", "no"], voice: true },
   ] },
 ];
+
+/**
+ * Commands that work, but are deliberately NOT on the card behind the bar's
+ * "Commands" button (Paul, 2026-09-17).
+ *
+ * The card is the reminder someone reads while they are trying to get work
+ * done, and every line on it costs the reader something. A presentation flourish
+ * does not earn a place there. It still has to be written down somewhere a
+ * person can find it, which is the SuperAdmin Abracadabra tile — so this list is
+ * rendered there and only there.
+ *
+ * Same parse guarantee as the main catalogue: every phrase here is asserted to
+ * parse, because a list nobody can see is exactly where a dead phrase survives.
+ */
+export const SUPERADMIN_COMMAND_CATALOG: CatalogFamily[] = [
+  { family: "Presentation", items: [
+    {
+      does: "Gold flashing — after a command that adds, encloses, moves or nudges, outline what changed in gold three times, with sparks. Off by default, remembered per browser.",
+      say: ["turn on gold flashing", "turn on flashing gold", "turn off gold flashing", "turn off flashing gold"],
+    },
+  ] },
+];

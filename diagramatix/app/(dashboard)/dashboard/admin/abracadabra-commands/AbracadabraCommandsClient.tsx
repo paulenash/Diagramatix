@@ -1,6 +1,29 @@
 "use client";
 import Link from "next/link";
-import { COMMAND_CATALOG } from "@/app/lib/assist/commandCatalog";
+import { COMMAND_CATALOG, SUPERADMIN_COMMAND_CATALOG, type CatalogFamily } from "@/app/lib/assist/commandCatalog";
+
+
+/** One family as a table. Shared so the two catalogues cannot drift apart. */
+function CommandFamily({ fam }: { fam: CatalogFamily }) {
+  return (
+    <section className="mb-6">
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-purple-700 mb-2">{fam.family}</h2>
+      <table className="w-full text-sm border border-gray-200 rounded">
+        <thead className="bg-gray-50 text-xs text-gray-500">
+          <tr><th className="text-left px-3 py-1.5 w-1/3">Does</th><th className="text-left px-3 py-1.5">Say (any of)</th></tr>
+        </thead>
+        <tbody>
+          {fam.items.map((item) => (
+            <tr key={item.does} className="border-t border-gray-100 align-top">
+              <td className="px-3 py-1.5 text-gray-800">{item.does}{item.voice && <span className="ml-1 text-[10px] text-gray-400">(mic word)</span>}</td>
+              <td className="px-3 py-1.5 text-gray-600 italic">{item.say.map((s) => `“${s}”`).join(" · ")}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  );
+}
 
 /** Read-only catalogue of Abracadabra commands (SuperAdmin tile). */
 export function AbracadabraCommandsClient() {
@@ -28,24 +51,21 @@ export function AbracadabraCommandsClient() {
         </ul>
       </div>
 
-      {COMMAND_CATALOG.map((fam) => (
-        <section key={fam.family} className="mb-6">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-purple-700 mb-2">{fam.family}</h2>
-          <table className="w-full text-sm border border-gray-200 rounded">
-            <thead className="bg-gray-50 text-xs text-gray-500">
-              <tr><th className="text-left px-3 py-1.5 w-1/3">Does</th><th className="text-left px-3 py-1.5">Say (any of)</th></tr>
-            </thead>
-            <tbody>
-              {fam.items.map((item) => (
-                <tr key={item.does} className="border-t border-gray-100 align-top">
-                  <td className="px-3 py-1.5 text-gray-800">{item.does}{item.voice && <span className="ml-1 text-[10px] text-gray-400">(mic word)</span>}</td>
-                  <td className="px-3 py-1.5 text-gray-600 italic">{item.say.map((s) => `“${s}”`).join(" · ")}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-      ))}
+      {COMMAND_CATALOG.map((fam) => <CommandFamily key={fam.family} fam={fam} />)}
+
+      {/* Commands that work but are deliberately kept off the card behind the
+          bar's "Commands" button (Paul, 2026-09-17). The card is what someone
+          reads while trying to get work done; a presentation flourish does not
+          earn a line on it. It still has to be written down somewhere, and this
+          is that somewhere. */}
+      <div className="rounded-lg border border-purple-200 bg-purple-50 px-4 py-3 text-sm text-purple-900 mb-4 mt-8">
+        <div className="font-semibold mb-1">Not shown to users</div>
+        <p>
+          These work exactly like any other command, but are left off the “What you can say” card in the editor so it
+          stays about doing the work. They are listed here instead.
+        </p>
+      </div>
+      {SUPERADMIN_COMMAND_CATALOG.map((fam) => <CommandFamily key={fam.family} fam={fam} />)}
 
       <p className="text-xs text-gray-500">Reference document: <code>docs/abracadabra-commands.md</code>. Selection references (this / these / the selected …) and confirmations are described there too.</p>
     </div>

@@ -31,6 +31,7 @@ import type { NextStepCandidate } from "@/app/lib/diagram/nextSteps";
 import { ElementContextMenu } from "./ElementContextMenu";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { canConnect } from "@/app/lib/diagram/canConnect";
+import { GoldFlashOverlay, type GoldFlashTarget } from "./GoldFlashOverlay";
 import {
   planEditZoomAim,
   computeEditZoom,
@@ -401,6 +402,9 @@ interface Props {
   /** Guided "rename by number": green number badges to draw on matching
    *  elements/connectors while the voice rename-pick flow is active. */
   renameBadges?: Array<{ id: string; n: number; x: number; y: number; height: number; kind: "element" | "connector"; place?: "below" | "above" | "header" }>;
+  /** Gold flashing: outline what the last Abracadabra command touched. `runId`
+   *  is bumped per command so the overlay can tell a new run from a re-render. */
+  goldFlash?: { runId: number; targets: readonly GoldFlashTarget[] };
 }
 
 interface EditingLabel {
@@ -648,6 +652,7 @@ export function Canvas({
   onAddSelfTransition,
   onSwapLane,
   renameBadges,
+  goldFlash,
 }: Props) {
   const displayMode = displayModeProp ?? "normal";
   const svgRef = useRef<SVGSVGElement>(null);
@@ -6458,6 +6463,13 @@ export function Canvas({
                 </rect>
               ))}
             </g>
+          )}
+
+          {/* Gold flashing (Paul, 2026-09-17). Inside the world group, so the
+              outline sits on the items through any pan or zoom. Decorative and
+              pointer-transparent throughout; it can never eat a click. */}
+          {goldFlash && goldFlash.runId > 0 && (
+            <GoldFlashOverlay runId={goldFlash.runId} targets={goldFlash.targets} />
           )}
 
           {/* Guided rename — large green number badges on every matching item.

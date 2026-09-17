@@ -76,7 +76,15 @@ describe("cost so far", () => {
     const page = fs.readFileSync(pagePath, "utf8");
     expect(page, "SuperAdmin-only").toContain("if (!(await isActingSuperuser(session))) redirect(\"/dashboard\");");
     const client = read("app", "(dashboard)", "dashboard", "admin", "abracadabra-commands", "AbracadabraCommandsClient.tsx");
-    expect(client, "one catalogue for the bar and the tile").toContain("COMMAND_CATALOG.map(");
+    // The ordinary commands are still one catalogue shown in both places. The
+    // tile ALSO shows a second, deliberately hidden list that the bar must not
+    // (Paul, 2026-09-17) — see T4486.
+    expect(client, "the ordinary catalogue is shared with the bar").toContain("COMMAND_CATALOG.map(");
+    expect(client, "and the tile carries the hidden list too").toContain("SUPERADMIN_COMMAND_CATALOG");
+    expect(
+      read("app", "components", "canvas", "AbracadabraBar.tsx"),
+      "which the bar must never show",
+    ).not.toContain("SUPERADMIN_COMMAND_CATALOG");
     expect(client, "says what is editable").toContain("/dashboard/admin/intent-keywords");
   });
 });

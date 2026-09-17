@@ -52,6 +52,23 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     return [{ op: "undo" }];
   }
 
+  // ── Gold flashing (Paul, 2026-09-17) ──
+  // Either word order — "flashing gold" and "gold flashing" are both natural,
+  // and which one comes out of your mouth is not something to have to remember.
+  // Deliberately absent from the user-facing Commands card; it lives in the
+  // SuperAdmin Abracadabra tile instead.
+  {
+    const gf = lower.match(
+      /^turn\s+(on|off)\s+(?:the\s+)?(?:gold(?:en)?\s+flash(?:ing)?|flash(?:ing)?\s+gold(?:en)?)\s*$/,
+    );
+    if (gf) return [{ op: "goldFlash", on: gf[1] === "on" }];
+    // "gold flashing on" / "flashing gold off" — the same thing said the short way.
+    const gf2 = lower.match(
+      /^(?:gold(?:en)?\s+flash(?:ing)?|flash(?:ing)?\s+gold(?:en)?)\s+(on|off)\s*$/,
+    );
+    if (gf2) return [{ op: "goldFlash", on: gf2[1] === "on" }];
+  }
+
   // ── Again — repeat the last command (e.g. another nudge) ──
   if (/^(again|and again|do (?:it|that) again|repeat(?:\s+(?:it|that))?|once more|same again|one more(?:\s+time)?|keep going)\s*$/.test(lower)) {
     return [{ op: "again" }];

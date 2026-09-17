@@ -48,6 +48,7 @@ export type AssistOp =
   | { op: "addMessageByNumber"; fromSelection?: boolean }
   | { op: "clear" }
   | { op: "export"; format?: "json" }
+  | { op: "goldFlash"; on: boolean }
   | { op: "undo" };
 
 // ── Spoken vocabulary → canonical BPMN types ────────────────────────────────
@@ -217,6 +218,8 @@ export function validateOp(raw: unknown): AssistOp | null {
       return { op: "clear" };
     case "export":
       return { op: "export", format: "json" };
+    case "goldFlash":
+      return typeof o.on === "boolean" ? { op: "goldFlash", on: o.on } : null;
     case "undo":
       return { op: "undo" };
     default:
