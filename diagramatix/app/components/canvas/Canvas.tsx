@@ -5065,6 +5065,15 @@ export function Canvas({
   // pass AFTER the boundary-event pass — they must float ABOVE edge-mounted
   // intermediate events, which the single-pass order can't do (#1).
   let renderNonContainerEl: ((el: DiagramElement) => React.ReactNode) | null = null;
+  /**
+   * The same trick for containers. A pool being dragged has to be drawn LAST to
+   * sit above what it crosses, and SVG paints in document order, so the only way
+   * is to render it in a later pass — which means the renderer has to be
+   * reachable from two places (Paul, 2026-09-18).
+   */
+  let renderContainerEl: ((el: DiagramElement) => React.ReactNode) | null = null;
+  /** True for anything travelling with the current drag. */
+  const isLifted = (id: string) => !!liftedIds && liftedIds.length > 1 && liftedIds.includes(id);
   const isDataArtifactType = (t: string) => t === "data-object" || t === "data-store" || t === "text-annotation";
 
   // Hump geometry for the regular-connector pass, MEMOISED so each connector's
@@ -5502,7 +5511,7 @@ export function Canvas({
               multi-selection are skipped here and re-rendered in the
               overlay block at the END of this group, so the whole
               moving template stays above the existing diagram. */}
-          {[...pools, ...vswimlanes, ...otherContainers].filter(el => !inActiveGroup(el.id)).map((el) => {
+          {(() => { renderContainerEl = (el: DiagramElement) => {
             // Highlight rules: app/lib/diagram/connectorHighlight.ts (tested).
             // This pass renders pools / swimlanes / composite-states (no EPs), so
             // only pool (message) and composite-state (sequence) can highlight —
@@ -5649,7 +5658,9 @@ export function Canvas({
                 showValueDisplay={showValueDisplay}
               />
             );
-          })}
+          }; return [...pools, ...vswimlanes, ...otherContainers]
+            .filter(el => !inActiveGroup(el.id) && !isLifted(el.id))
+            .map(renderContainerEl); })()}
 
           {/* Lanes — selectable (for deletion) but not individually draggable.
               Lanes still participate in GROUP moves when part of a
@@ -6273,8 +6284,27 @@ export function Canvas({
               renderer; order is preserved from the nonContainers sort (the
               dragged artifact is last, so it stays on top of its peers). */}
           {renderNonContainerEl && nonContainers
-            .filter(el => !inActiveGroup(el.id) && isDataArtifactType(el.type))
+            .filter(el => !inActiveGroup(el.id) && isDataArtifactType(el.type) && !isLifted(el.id))
             .map(renderNonContainerEl)}
+
+          {/* THE LIFTED PASS. Everything travelling with the current drag, drawn
+              last so the whole moving group sits above whatever it is crossing —
+              Paul asked for a pool moving across other pools or loose elements to
+              be "always on top and not interact at all with elements they cross
+              over" (2026-09-18). Containers first, so a pool still draws beneath
+              its own contents; the group's internal order is otherwise the same
+              as it would have been. Rendered by the very same functions, so the
+              elements behave identically while they are up here. */}
+          {liftedIds && liftedIds.length > 1 && (
+            <g data-lifted-drag="true">
+              {renderContainerEl && [...pools, ...vswimlanes, ...otherContainers]
+                .filter(el => isLifted(el.id))
+                .map(renderContainerEl)}
+              {renderNonContainerEl && nonContainers
+                .filter(el => isLifted(el.id))
+                .map(renderNonContainerEl)}
+            </g>
+          )}
 
           {/* Group elements — rendered on top of all other elements */}
           {groupElements.filter(el => !inActiveGroup(el.id)).map((el) => (

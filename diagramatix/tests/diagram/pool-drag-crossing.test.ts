@@ -114,13 +114,38 @@ describe("T4513 — the drag path uses the same rule as everything else", () => 
 describe("T4514 — the moving group draws on top of what it crosses", () => {
   const CANVAS = readFileSync(join(process.cwd(), "app", "components", "canvas", "Canvas.tsx"), "utf8");
 
-  it("ranks the travelling group above everything else", () => {
-    expect(CANVAS).toContain("liftedIds");
-    expect(CANVAS).toMatch(/lifted\?\.has\(el\.id\)\)\s*return 3;/);
+  it("draws the group in a LATER pass, which is the only thing that moves it up", () => {
+    // SVG paints in document order, and a pool is rendered in the container
+    // pass — long before the tasks it crosses. A sort rank inside a list that
+    // does not contain pools cannot fix that, which is why the first attempt
+    // changed nothing on screen. There has to be a pass after the others.
+    expect(CANVAS).toContain('data-lifted-drag="true"');
+    const containerPass = CANVAS.indexOf("renderContainerEl = (el: DiagramElement)");
+    const nonContainerPass = CANVAS.indexOf("renderNonContainerEl = (el: DiagramElement)");
+    const liftedPass = CANVAS.indexOf('data-lifted-drag="true"');
+    expect(containerPass).toBeGreaterThan(-1);
+    expect(liftedPass, "after the containers").toBeGreaterThan(containerPass);
+    expect(liftedPass, "and after the ordinary elements").toBeGreaterThan(nonContainerPass);
   });
 
-  it("leaves the group's own internal order to the depth sort", () => {
-    // Otherwise a pool would draw on top of its own contents and hide them.
+  it("holds the lifted elements OUT of their normal passes", () => {
+    // Rendered twice they would be drawn in both places and carry two sets of
+    // event handlers.
+    expect(CANVAS).toContain("!inActiveGroup(el.id) && !isLifted(el.id)");
+    expect(CANVAS).toMatch(/isDataArtifactType\(el\.type\) && !isLifted\(el\.id\)/);
+  });
+
+  it("draws containers before the rest inside the lifted pass", () => {
+    // Otherwise a pool would paint over its own contents and hide them.
+    const pass = CANVAS.slice(CANVAS.indexOf('data-lifted-drag="true"'));
+    const c = pass.indexOf("renderContainerEl && ");
+    const nc = pass.indexOf("renderNonContainerEl && ");
+    expect(c).toBeGreaterThan(-1);
+    expect(nc).toBeGreaterThan(c);
+  });
+
+  it("keeps the rank that orders the group internally", () => {
+    expect(CANVAS).toMatch(/lifted\?\.has\(el\.id\)\)\s*return 3;/);
     expect(CANVAS).toMatch(/if \(ra !== rb\) return ra - rb;[\s\S]{0,80}getParentDepth/);
   });
 
