@@ -9,6 +9,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
+import { blockReadOnlyImpersonation } from "@/app/lib/routeGuard";
 
 interface PrevSection {
   heading: string | null; bodyMarkdown: string; image: string | null; imageCaption: string | null;
@@ -19,6 +20,9 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params;
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // SEC-34: undo rewrites the section set, so it is a write like any other.
+  const _ro = await blockReadOnlyImpersonation(session);
+  if (_ro) return _ro;
 
   const doc = await prisma.sopDocument.findUnique({ where: { id }, select: { projectId: true, prevSectionsJson: true } });
   if (!doc) return NextResponse.json({ error: "Not found" }, { status: 404 });

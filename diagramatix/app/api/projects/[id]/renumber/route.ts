@@ -8,6 +8,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma, pgPool } from "@/app/lib/db";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
+import { blockReadOnlyImpersonation } from "@/app/lib/routeGuard";
 import { dataHasPcf } from "@/app/lib/pcf/attribution";
 import { computeRenumber, resolveNumberingConfig, type FolderTree, type DiagramInput } from "@/app/lib/numbering/renumber";
 import type { DiagramData } from "@/app/lib/diagram/types";
@@ -50,6 +51,10 @@ export async function GET(_req: Request, { params }: Params) {
 export async function POST(_req: Request, { params }: Params) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // SEC-31: renumbering rewrites every diagram in the project. A read-only
+  // "view as" session must not do that in the viewed user's name.
+  const _ro = await blockReadOnlyImpersonation(session);
+  if (_ro) return _ro;
   const { id: projectId } = await params;
   let orgId: string;
   try { orgId = (await requireProjectAccess(session, await cookies(), projectId, "edit")).projectOrgId; }

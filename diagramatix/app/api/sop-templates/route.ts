@@ -12,6 +12,8 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { requireProjectAccess, requireOrgAdminFor, OrgContextError } from "@/app/lib/auth/orgContext";
+import { blockReadOnlyImpersonation } from "@/app/lib/routeGuard";
+import { contentLengthError } from "@/app/lib/uploadLimit";
 
 const DOCX_EXT = /\.(docx|dotx)$/i;
 const MAX_BYTES = 8 * 1024 * 1024;
@@ -45,6 +47,18 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  // SEC-33: authenticate and size-check BEFORE the body is buffered. The
+  // scope-specific access check still has to wait for the form (the scope id
+  // is IN the body), but an anonymous caller must not be able to make the
+  // server parse a multipart upload just to be told 401.
+  const session = await auth();
+  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // SEC-34: creating or defaulting a template is a write in the viewed user's name.
+  const ro = await blockReadOnlyImpersonation(session);
+  if (ro) return ro;
+  const tooBig = contentLengthError(req, MAX_BYTES);
+  if (tooBig) return NextResponse.json({ error: tooBig }, { status: 413 });
+
   const form = await req.formData().catch(() => null);
   if (!form) return NextResponse.json({ error: "multipart body required" }, { status: 400 });
   const scope = form.get("scope") === "org" ? "org" : "project";

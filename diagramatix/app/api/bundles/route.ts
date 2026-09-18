@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { walkForwardClosure } from "@/app/lib/diagram/linkClosure";
 import { getEffectiveUserId } from "@/app/lib/superuser";
+import { blockReadOnlyImpersonation } from "@/app/lib/routeGuard";
 
 // RFC-lite email shape check — good enough to reject obvious typos in the
 // invite path. Real validation happens when Microsoft actually delivers
@@ -48,6 +49,11 @@ export async function POST(req: Request) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  // SEC-31: publishing a bundle grants an audience access and emails them in
+  // the owner's name — not something read-only impersonation may do. Checked
+  // before the body is read.
+  const _ro = await blockReadOnlyImpersonation(session);
+  if (_ro) return _ro;
   const callerId = session.user.id;
 
   const body = await req.json().catch(() => ({}));

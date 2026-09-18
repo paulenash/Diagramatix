@@ -33,6 +33,31 @@ export function uploadSizeError(
   return null;
 }
 
+/**
+ * Refuse an oversized request from its declared Content-Length, BEFORE the body
+ * is read (SEC-33). `uploadSizeError` above measures a File that `formData()`
+ * has already buffered, which is too late to protect memory — this is the check
+ * that belongs at the top of a multipart handler, alongside authentication.
+ *
+ * A request with no Content-Length (chunked) returns null: the length is
+ * genuinely unknown, and refusing would break legitimate streaming clients. The
+ * per-file cap still applies once parsed, so this narrows the window rather
+ * than closing it.
+ */
+export function contentLengthError(
+  req: { headers: { get(name: string): string | null } },
+  maxBytes = MAX_UPLOAD_BYTES,
+): string | null {
+  const raw = req.headers.get("content-length");
+  if (raw === null || raw.trim() === "") return null;
+  const size = Number(raw);
+  if (!Number.isFinite(size) || size < 0) return null;
+  if (size > maxBytes) {
+    return `Request too large: ${(size / 1048576).toFixed(1)} MB (max ${Math.floor(maxBytes / 1048576)} MB)`;
+  }
+  return null;
+}
+
 /** Guard against a zip bomb. `loadAsync` parses the central directory but does
  *  NOT decompress entries, so the declared uncompressed sizes are available up
  *  front — sum them and refuse to extract past the cap. Throws (so the caller's

@@ -10,6 +10,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
+import { blockReadOnlyImpersonation } from "@/app/lib/routeGuard";
 import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
 import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
@@ -25,6 +26,10 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params;
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // SEC-34: regenerate replaces the SOP's sections in place and spends an AI
+  // attempt. Not something a read-only impersonation session may do.
+  const _ro = await blockReadOnlyImpersonation(session);
+  if (_ro) return _ro;
 
   const doc = await prisma.sopDocument.findUnique({ where: { id }, select: { projectId: true, diagramId: true, scope: true, scopeElementId: true } });
   if (!doc) return NextResponse.json({ error: "Not found" }, { status: 404 });

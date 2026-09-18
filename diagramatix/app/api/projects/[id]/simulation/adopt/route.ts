@@ -12,6 +12,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
+import { blockReadOnlyImpersonation } from "@/app/lib/routeGuard";
 import { adoptLibraryInto, adoptPackageInto, repointProjectCalendars } from "@/app/lib/simulation/adoptPackage";
 import { validateExamplePackage, type ExampleLibrary, type ExamplePackage } from "@/app/lib/simulation/examplePackage";
 
@@ -19,6 +20,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // SEC-32: adopt creates studies, scenarios, teams and calendars, and
+  // repointProjectCalendars rewrites every diagram's data jsonb. Read-only
+  // "view as" impersonation must not write any of it in the user's name.
+  const _ro = await blockReadOnlyImpersonation(session);
+  if (_ro) return _ro;
   try {
     await requireProjectAccess(session, await cookies(), id, "edit");
   } catch (err) {

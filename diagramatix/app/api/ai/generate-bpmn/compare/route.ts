@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
+import { blockReadOnlyImpersonation } from "@/app/lib/routeGuard";
 import { prisma, pgPool } from "@/app/lib/db";
 import { isSuperuser } from "@/app/lib/superuser";
 import { planBpmn } from "@/app/lib/ai/planBpmn";
@@ -45,6 +46,11 @@ type ModelResult = {
 export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // SEC-38: Compare creates diagrams owned by the viewed user and overwrites
+  // the viewed diagram's data. Not available to a read-only "view as" session,
+  // even though the caller is a SuperAdmin — that is the whole point of the mode.
+  const _ro = await blockReadOnlyImpersonation(session);
+  if (_ro) return _ro;
   const _pol = await gateOrgPolicy(session, "allowAi");
   if (_pol) return _pol;
   if (!isSuperuser(session)) return NextResponse.json({ error: "AI model comparison is SuperAdmin-only" }, { status: 403 });
@@ -209,6 +215,9 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // SEC-38: clearing the comparison matrix writes the viewed diagram.
+  const _ro = await blockReadOnlyImpersonation(session);
+  if (_ro) return _ro;
   if (!isSuperuser(session)) return NextResponse.json({ error: "SuperAdmin only" }, { status: 403 });
   const diagramId = new URL(req.url).searchParams.get("diagramId");
   if (!diagramId) return NextResponse.json({ error: "diagramId is required" }, { status: 400 });

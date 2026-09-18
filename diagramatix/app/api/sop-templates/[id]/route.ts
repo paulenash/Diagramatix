@@ -8,10 +8,15 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { requireProjectAccess, requireOrgAdminFor, OrgContextError } from "@/app/lib/auth/orgContext";
+import { blockReadOnlyImpersonation } from "@/app/lib/routeGuard";
 
+// Both handlers here mutate, so the guard sits in the shared helper.
 async function guard(id: string) {
   const session = await auth();
   if (!session?.user?.id) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+  // SEC-34: renaming, re-defaulting or deleting a template is a write.
+  const ro = await blockReadOnlyImpersonation(session);
+  if (ro) return { error: ro };
   const tpl = await prisma.sopTemplate.findUnique({ where: { id }, select: { orgId: true, projectId: true } });
   if (!tpl) return { error: NextResponse.json({ error: "Not found" }, { status: 404 }) };
   try {

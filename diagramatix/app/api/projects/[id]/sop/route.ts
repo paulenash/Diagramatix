@@ -12,6 +12,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma, pgPool } from "@/app/lib/db";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
+import { blockReadOnlyImpersonation } from "@/app/lib/routeGuard";
 import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
 import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
@@ -70,6 +71,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { id: projectId } = await params;
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // SEC-31/SEC-34: generating an SOP writes a document AND the source
+  // diagram's data jsonb, and spends the org's AI quota. Read-only "view as"
+  // impersonation must not be able to do any of that in the user's name.
+  const _ro = await blockReadOnlyImpersonation(session);
+  if (_ro) return _ro;
 
   let orgId: string;
   try {

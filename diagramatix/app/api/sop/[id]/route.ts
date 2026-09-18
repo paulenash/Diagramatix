@@ -10,6 +10,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
+import { blockReadOnlyImpersonation } from "@/app/lib/routeGuard";
 
 async function loadProjectId(sopId: string): Promise<string | null> {
   const doc = await prisma.sopDocument.findUnique({ where: { id: sopId }, select: { projectId: true } });
@@ -19,6 +20,13 @@ async function loadProjectId(sopId: string): Promise<string | null> {
 async function guard(sopId: string, role: "view" | "edit") {
   const session = await auth();
   if (!session?.user?.id) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+  // SEC-34: a SuperAdmin viewing this user's account in read-only mode must not
+  // be able to rewrite or delete their SOPs — the write would be attributed to
+  // the user being viewed. Blocked before any lookup, as the write routes do.
+  if (role === "edit") {
+    const ro = await blockReadOnlyImpersonation(session);
+    if (ro) return { error: ro };
+  }
   const projectId = await loadProjectId(sopId);
   if (!projectId) return { error: NextResponse.json({ error: "Not found" }, { status: 404 }) };
   try {
