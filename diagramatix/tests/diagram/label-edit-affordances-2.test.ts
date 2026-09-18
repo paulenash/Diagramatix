@@ -102,10 +102,14 @@ describe("T4473 — a pool's header target follows the header's real width", () 
   it("reads the stored header width instead of assuming the default", () => {
     // The editor geometry has always read poolHeaderWidth; the hit test had a
     // literal 36. Widen the header and the right-hand part of it went dead.
-    const dbl = CANVAS.indexOf("poolHeaderWidth");
-    expect(dbl).toBeGreaterThan(-1);
-    expect(SYMBOL).toContain("element.properties?.poolHeaderWidth as number | undefined");
-    expect(SYMBOL).toMatch(/world\.x > element\.x \+ headerW/);
+    //
+    // 2026-09-19: the reading moved into app/lib/diagram/containerHeader.ts,
+    // which is now the only copy of it (it had been re-derived in five
+    // places). The claim is unchanged — the width is READ, never assumed — so
+    // this asserts it at its new home, and T4550 covers the rule itself.
+    expect(CANVAS).toContain("containerHeaderWidth");
+    expect(SYMBOL).toContain("containerHeaderWidth");
+    expect(SYMBOL).toMatch(/world\.x > element\.x \+ containerHeaderWidth\(element\)/);
     expect(SYMBOL, "the hardcoded 36 is still the hit test").not.toMatch(
       /world\.x > element\.x \+ 36/,
     );

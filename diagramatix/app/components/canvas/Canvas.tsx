@@ -30,6 +30,8 @@ import { GhostSuggestion } from "./GhostSuggestion";
 import type { NextStepCandidate } from "@/app/lib/diagram/nextSteps";
 import { ElementContextMenu } from "./ElementContextMenu";
 import { isBlackBoxPool } from "@/app/lib/diagram/blackBoxPoolMenu";
+import { containerHeaderWidth, inContainerHeader } from "@/app/lib/diagram/containerHeader";
+import { quickAddSymbols, QUICK_ADD_LABELS } from "@/app/lib/diagram/quickAddSymbols";
 import { poolGuideNext, type PoolBoundaryGuide, type PoolGuideEvent } from "@/app/lib/diagram/poolGuide";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { canConnect } from "@/app/lib/diagram/canConnect";
@@ -3865,10 +3867,7 @@ export function Canvas({
 
     if (el.type === "pool" || el.type === "lane") {
       // Both pool and lane support dynamic header widths.
-      const storedW = el.type === "pool"
-        ? (el.properties?.poolHeaderWidth as number | undefined)
-        : (el.properties?.laneHeaderWidth as number | undefined);
-      const lw = typeof storedW === "number" && storedW > 0 ? storedW : 36;
+      const lw = containerHeaderWidth(el);
       setEditingLabel({
         elementId: el.id,
         x: (el.x + lw) * effectiveZoom + effectivePan.x,
@@ -5437,11 +5436,20 @@ export function Canvas({
               else if (el.type === "pool") { if (!poolHit || el.width * el.height < poolHit.width * poolHit.height) poolHit = el; }
             }
             const target = laneHit ?? poolHit;
+            // Paul, 2026-09-19: the container's own menu belongs to the
+            // container's own HEADER strip; a right-click in the body offers
+            // the element matrix instead — what you can put IN it. A black-box
+            // pool is the exception: it has no body to put anything in (and
+            // dropping something in would make it a white-box pool, which is
+            // never what is wanted), so its flags menu answers anywhere.
+            const headerClick = target
+              ? isBlackBoxPool(target) || inContainerHeader(target, worldPos)
+              : false;
             // Only open a menu that will actually have something in it.
             const hasItems = target
               ? (isBlackBoxPool(target) ? !!onUpdateProperties : !!onGenerateSopForElement)
               : false;
-            if (target && hasItems) {
+            if (target && headerClick && hasItems) {
               setElementContextMenu({ elementId: target.id, kind: target.type === "lane" ? "lane" : "pool", screenX: e.clientX - rect.left, screenY: e.clientY - rect.top });
               return;
             }
@@ -6556,7 +6564,7 @@ export function Canvas({
                     const e = data.elements.find((el) => el.id === b.id);
                     if (e) {
                       const isPool = e.type === "pool";
-                      const LW = ((isPool ? e.properties?.poolHeaderWidth : e.properties?.laneHeaderWidth) as number | undefined) || 36;
+                      const LW = containerHeaderWidth(e);
                       const fs = (isPool ? (data.poolFontSize ?? 16) : (data.laneFontSize ?? 14)) * (displayMode === "hand-drawn" ? 1.3 : 1);
                       const nameW = Math.max(0, ...(e.label ?? "").split("\n").map((l) => measureHeaderLabel(l, fs)));
                       return { x: e.x + LW / 2 + 3, y: e.y + e.height / 2 + nameW / 2 + 6 + 13 / zoom };
@@ -7896,41 +7904,8 @@ export function Canvas({
 
       {/* Right-click quick-add popup */}
       {quickAdd && (() => {
-        const BPMN_QUICK_ADD: SymbolType[] = [
-          "start-event", "intermediate-event", "end-event",
-          "task", "subprocess", "subprocess-expanded", "gateway",
-          "data-object", "data-store", "text-annotation", "group",
-        ];
-        const SM_QUICK_ADD: SymbolType[] = [
-          "state", "submachine", "initial-state", "final-state", "composite-state", "gateway", "fork-join",
-        ];
-        const VC_QUICK_ADD: SymbolType[] = [
-          "chevron", "chevron-collapsed", "process-group",
-        ];
-        const QUICK_ADD_TYPES = diagramType === "state-machine" ? SM_QUICK_ADD
-          : diagramType === "value-chain" ? VC_QUICK_ADD : BPMN_QUICK_ADD;
-        const labels: Record<string, string> = {
-          "start-event": "Start",
-          "task": "Task",
-          "subprocess": "Sub-Process",
-          "subprocess-expanded": "Expanded",
-          "intermediate-event": "Intermediate",
-          "end-event": "End",
-          "data-object": "Data Object",
-          "data-store": "Data Store",
-          "text-annotation": "Annotation",
-          "group": "Group",
-          "state": "State",
-          "initial-state": "Initial",
-          "final-state": "Final",
-          "composite-state": "Composite",
-          "gateway": "Gateway",
-          "fork-join": "Fork/Join",
-          "submachine": "SubMachine",
-          "chevron": "Process",
-          "chevron-collapsed": "Collapsed",
-          "process-group": "Value Chain",
-        };
+        const QUICK_ADD_TYPES = quickAddSymbols(diagramType, { canAddReviewComment: !!onAddReviewComment });
+        const labels = QUICK_ADD_LABELS;
         const COLS = 4;
         const BUTTON = 40;       // w-10 / h-10
         const GAP = 4;           // gap-1 in tailwind = 0.25rem ≈ 4px
@@ -7969,7 +7944,11 @@ export function Canvas({
                 onMouseDown={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  addElementWithAutoConnect(sym, quickAdd.worldPos);
+                  // A Review Comment carries its author and timestamp, so it
+                  // is built by the editor rather than added as a bare shape —
+                  // the same path the palette drop takes.
+                  if (sym === "review-comment") onAddReviewComment?.(quickAdd.worldPos, null);
+                  else addElementWithAutoConnect(sym, quickAdd.worldPos);
                   setQuickAdd(null);
                 }}
               >

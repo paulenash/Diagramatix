@@ -8,6 +8,7 @@ import { DisplayModeCtx, FontScaleCtx, PoolFontSizeCtx, LaneFontSizeCtx, Process
 import { wrapText, computePackageTab } from "@/app/lib/diagram/textMetrics";
 import { holdsInternalLabel, wrapShapeLabel } from "@/app/lib/diagram/shapeFit";
 import { archiNodeDepth } from "@/app/lib/diagram/nodeGeometry";
+import { containerHeaderWidth } from "@/app/lib/diagram/containerHeader";
 import { readableTextOn } from "@/app/lib/diagram/chevronThemes";
 import { isRichText, sanitizeRichText, plainToHtml } from "@/app/lib/diagram/richText";
 import { ArchimateShape } from "./ArchimateShape";
@@ -2708,10 +2709,7 @@ function SymbolRendererInner({
         return;
       }
       // Both pools and lanes can have dynamic header widths now.
-      const stored = element.type === "pool"
-        ? (element.properties?.poolHeaderWidth as number | undefined)
-        : (element.properties?.laneHeaderWidth as number | undefined);
-      const HEADER_LW = typeof stored === "number" && stored > 0 ? stored : 36;
+      const HEADER_LW = containerHeaderWidth(element);
       const worldPos = svgToWorld ? svgToWorld(e.clientX, e.clientY) : null;
       if (worldPos) {
         const headerHit = worldPos.x <= element.x + HEADER_LW;
@@ -3131,10 +3129,8 @@ function SymbolRendererInner({
         // than assuming the 36px default — widening a pool header used to make
         // double-clicks on the right of it silently do nothing.
         if (element.type === "pool" && svgToWorld) {
-          const storedW = element.properties?.poolHeaderWidth as number | undefined;
-          const headerW = typeof storedW === "number" && storedW > 0 ? storedW : 36;
           const world = svgToWorld(e.clientX, e.clientY);
-          if (world.x > element.x + headerW) return;
+          if (world.x > element.x + containerHeaderWidth(element)) return;
         }
         // Events / gateways / data objects: double-clicking the shape body
         // opens the element's external-label editor (zoom + edit) and the
@@ -3158,8 +3154,7 @@ function SymbolRendererInner({
           received `canSwapLaneUp` / `canSwapLaneDown` props from Canvas
           (Canvas decides eligibility — sub-lanes don't get these). */}
       {element.type === "lane" && selected && (canSwapLaneUp !== undefined || canSwapLaneDown !== undefined) && (() => {
-        const stored = element.properties?.laneHeaderWidth as number | undefined;
-        const HEADER_W = typeof stored === "number" && stored > 0 ? stored : 36;
+        const HEADER_W = containerHeaderWidth(element);
         const BTN_M = 4;                          // margin from header edges
         const BTN_W = HEADER_W - 2 * BTN_M;
         const BTN_H = Math.min(28, Math.max(20, element.height * 0.18));
