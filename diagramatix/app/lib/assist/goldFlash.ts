@@ -1,7 +1,7 @@
 /**
  * Gold flashing — show me what you just changed.
  *
- * Paul, 2026-09-17: with flashing on, finishing an Abracadabra command outlines
+ * Paul, 2026-09-17: with flashing on, finishing an Voice Assist command outlines
  * the items it touched in gold, three times, with gold sparks coming off them.
  * A spoken command can change something off to the side of where you are
  * looking, and the command log tells you what happened in words after the fact;
@@ -12,7 +12,7 @@
  * located — the item is already under your eye because you picked its number.
  *
  * The toggle is deliberately NOT in the user-facing Commands card. It is in the
- * SuperAdmin Abracadabra tile, so it can be turned on for a demo without
+ * SuperAdmin Voice Assist tile, so it can be turned on for a demo without
  * becoming another line everyone has to read past.
  */
 import type { AssistOp } from "./ops";
@@ -80,7 +80,7 @@ export function batchFlashes(ops: readonly AssistOp[]): boolean {
  * Read the toggle. ON unless it has been explicitly switched off.
  *
  * It started off-by-default. Paul changed that the same day (2026-09-18: "Turn
- * on Gold Flashing should be the default on initiating Abracadabra mode") —
+ * on Gold Flashing should be the default on initiating Voice Assist mode") —
  * which is right, because nobody turns on a thing they have not seen, and
  * seeing what a spoken command just did is the point of using the voice at all.
  *

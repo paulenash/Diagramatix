@@ -1,5 +1,5 @@
 /**
- * Add an "AI Assist & Abracadabra Mode" chapter to the in-app User Guide.
+ * Add an "AI Assist & Voice Assist" chapter to the in-app User Guide.
  * Idempotent: upserts the chapter + each section by heading; appended after the
  * current last user-guide chapter.
  *
@@ -13,7 +13,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 
 const COLLECTION = "user-guide";
 const SLUG = "ai-assist";
-const TITLE = "AI Assist & Abracadabra Mode";
+const TITLE = "AI Assist & Voice Assist";
 
 const SECTIONS: Array<{ heading: string; body: string }> = [
   {
@@ -21,7 +21,7 @@ const SECTIONS: Array<{ heading: string; body: string }> = [
     body: [
       "**Assist** helps you build a BPMN diagram faster by suggesting the next thing as you draw, and by letting you **speak or type** what you want. It's optional and off until you turn it on, and most of it is instant and free — the AI is only called for the trickier requests.",
       "",
-      "There are two switches in the toolbar (BPMN diagrams only): **👻 Assist** (ghost suggestions) and **🪄 Abracadabra** (voice/typed commands). Each remembers its own on/off state per diagram.",
+      "There are two switches in the toolbar (BPMN diagrams only): **👻 Assist** (ghost suggestions) and **🪄 Voice Assist** (voice/typed commands). Each remembers its own on/off state per diagram.",
     ].join("\n"),
   },
   {
@@ -38,9 +38,9 @@ const SECTIONS: Array<{ heading: string; body: string }> = [
     ].join("\n"),
   },
   {
-    heading: "🪄 Abracadabra Mode — say it or type it",
+    heading: "🪄 Voice Assist — say it or type it",
     body: [
-      "Turn on **🪄 Abracadabra** and a command bar appears. Click the **🎙 mic** and just talk, or type a command and press **Run**. Each sentence is applied to the diagram **live**, and a log shows what it heard and did — every change is undoable (say **\"undo that\"** or press Ctrl+Z).",
+      "Turn on **🪄 Voice Assist** and a command bar appears. Click the **🎙 mic** and just talk, or type a command and press **Run**. Each sentence is applied to the diagram **live**, and a log shows what it heard and did — every change is undoable (say **\"undo that\"** or press Ctrl+Z).",
       "",
       "Say **\"stop\"** (or \"that's enough\") to end listening. Commands are interpreted instantly by built-in rules; anything unusual falls back to the AI — the log tags each entry **rule** (instant, free) or **✨ AI** (metered) so you can see which is which.",
     ].join("\n"),

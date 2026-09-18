@@ -1,5 +1,5 @@
 /**
- * Guided "rename by number" (Abracadabra): the user says "rename <type>", green
+ * Guided "rename by number" (Voice Assist): the user says "rename <type>", green
  * numbers appear on every element/connector of that type, and they pick one by
  * number then dictate the new name. This module is the pure part: mapping a
  * spoken type word to a RenameType, and collecting + numbering the targets in

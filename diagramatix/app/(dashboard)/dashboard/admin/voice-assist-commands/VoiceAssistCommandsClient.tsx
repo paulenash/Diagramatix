@@ -25,15 +25,15 @@ function CommandFamily({ fam }: { fam: CatalogFamily }) {
   );
 }
 
-/** Read-only catalogue of Abracadabra commands (SuperAdmin tile). */
-export function AbracadabraCommandsClient() {
+/** Read-only catalogue of Voice Assist commands (SuperAdmin tile). */
+export function VoiceAssistCommandsClient() {
   const total = COMMAND_CATALOG.reduce((n, f) => n + f.items.reduce((m, i) => m + i.say.length, 0), 0);
   return (
     <div className="max-w-4xl mx-auto px-6 py-6">
       <div className="flex items-center justify-between mb-4">
         <div>
           <Link href="/dashboard/admin" className="text-xs text-gray-500 hover:text-gray-700">← SuperAdmin</Link>
-          <h1 className="text-xl font-semibold text-purple-800 mt-1">🪄 Abracadabra Commands</h1>
+          <h1 className="text-xl font-semibold text-purple-800 mt-1">🪄 Voice Assist Commands</h1>
           <p className="text-sm text-gray-600 mt-1">
             Everything the voice / typed editor accepts, by family — {total} example phrases. Each one is held to the
             grammar by a test, so a phrase listed here is a phrase that works today.
@@ -67,7 +67,7 @@ export function AbracadabraCommandsClient() {
       </div>
       {SUPERADMIN_COMMAND_CATALOG.map((fam) => <CommandFamily key={fam.family} fam={fam} />)}
 
-      <p className="text-xs text-gray-500">Reference document: <code>docs/abracadabra-commands.md</code>. Selection references (this / these / the selected …) and confirmations are described there too.</p>
+      <p className="text-xs text-gray-500">Reference document: <code>docs/voice-assist-commands.md</code>. Selection references (this / these / the selected …) and confirmations are described there too.</p>
     </div>
   );
 }

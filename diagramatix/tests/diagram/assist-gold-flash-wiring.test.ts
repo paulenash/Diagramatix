@@ -2,8 +2,8 @@
  * The rest of the gold-flashing request (Paul, 2026-09-17):
  *
  *  3. the two commands must NOT appear on the card users read, but MUST appear
- *     in the SuperAdmin Abracadabra tile;
- *  4. Abracadabra becomes available to Expert subscriptions and above.
+ *     in the SuperAdmin Voice Assist tile;
+ *  4. Voice Assist becomes available to Expert subscriptions and above.
  *
  * Until now the card and the tile rendered ONE array, and a test enforced that
  * sharing. There are two arrays now, and the tile renders both.
@@ -48,8 +48,8 @@ describe("T4486 — gold flashing is off the user's card and on the SuperAdmin t
   });
 
   it("renders the hidden list in the tile and NOT in the bar", () => {
-    const tile = read("app", "(dashboard)", "dashboard", "admin", "abracadabra-commands", "AbracadabraCommandsClient.tsx");
-    const bar = read("app", "components", "canvas", "AbracadabraBar.tsx");
+    const tile = read("app", "(dashboard)", "dashboard", "admin", "voice-assist-commands", "VoiceAssistCommandsClient.tsx");
+    const bar = read("app", "components", "canvas", "VoiceAssistBar.tsx");
     // The RENDER, not the import: a tile that imports the hidden list and never
     // draws it satisfies a substring check while showing the user nothing.
     expect(tile).toContain("SUPERADMIN_COMMAND_CATALOG.map(");
@@ -154,16 +154,16 @@ describe("T4488 — one ordering of the tiers", () => {
   });
 });
 
-describe("T4489 — Abracadabra is gated on the feature, not on being an admin", () => {
+describe("T4489 — Voice Assist is gated on the feature, not on being an admin", () => {
   const editor = read("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
 
   it("reads the registry key that has been seeded since Phase 1", () => {
-    expect(editor).toContain('useFeatureState("abracadabra")');
+    expect(editor).toContain('useFeatureState("voice-assist")');
   });
 
   it("no longer hangs the wand or the bar on isActingAdmin", () => {
-    expect(editor).toContain("diagramType === \"bpmn\" && abracadabraAllowed");
-    expect(editor).toContain("abracadabraOn && !readOnly && diagramType === \"bpmn\" && abracadabraAllowed");
+    expect(editor).toContain("diagramType === \"bpmn\" && voiceAssistAllowed");
+    expect(editor).toContain("voiceAssistOn && !readOnly && diagramType === \"bpmn\" && voiceAssistAllowed");
     expect(editor, "the old SuperAdmin-only gate is gone").not.toContain(
       'diagramType === "bpmn" && isActingAdmin',
     );
@@ -179,7 +179,7 @@ describe("T4489 — Abracadabra is gated on the feature, not on being an admin",
     // Anything in the editor decides which buttons are drawn. The route is
     // reachable directly.
     const route = read("app", "api", "ai", "command", "route.ts");
-    expect(route).toContain('gateFeature(session.user.id, "abracadabra")');
+    expect(route).toContain('gateFeature(session.user.id, "voice-assist")');
     const gate = route.indexOf("gateFeature");
     const work = route.indexOf("const body = await req.json()");
     expect(gate, "the gate must run before any work").toBeLessThan(work);
@@ -191,8 +191,8 @@ describe("T4489 — Abracadabra is gated on the feature, not on being an admin",
     };
     const rows = seed.rows ?? [];
     expect(rows.length, "the seed has no rows — the shape changed").toBeGreaterThan(0);
-    const abra = rows.find((f) => f.key === "abracadabra");
-    expect(abra, "the abracadabra key is missing from the seed").toBeDefined();
+    const abra = rows.find((f) => f.key === "voice-assist");
+    expect(abra, "the voice-assist key is missing from the seed").toBeDefined();
     const states = abra!.states ?? {};
     expect(states.expert).toBe("available");
     expect(states.enterprise).toBe("available");

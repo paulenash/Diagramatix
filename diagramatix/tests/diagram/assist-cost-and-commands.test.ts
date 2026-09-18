@@ -47,7 +47,7 @@ describe("cost so far", () => {
   });
 
   it("T4398 — the bar has Commands and Cost, the panel is draggable, and the editor adds the live mic seconds", () => {
-    const bar = read("app", "components", "canvas", "AbracadabraBar.tsx");
+    const bar = read("app", "components", "canvas", "VoiceAssistBar.tsx");
     expect(bar).toContain(">Commands</button>");
     expect(bar).toContain("COMMAND_CATALOG.map(");
     expect(bar, "the reminder card scrolls").toContain('className="overflow-y-auto px-3 py-2"');
@@ -57,7 +57,7 @@ describe("cost so far", () => {
 
     const editor = read("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
     expect(editor).toContain("onCost={fetchAbraCost}");
-    expect(editor, "the open mic session is added live").toMatch(/abraMicOpenedAt\.current = Date\.now\(\);/);
+    expect(editor, "the open mic session is added live").toMatch(/voiceMicOpenedAt\.current = Date\.now\(\);/);
     expect(editor).toMatch(/\/api\/ai\/command\/usage\?\$\{q\}/);
 
     const route = read("app", "api", "ai", "command", "usage", "route.ts");
@@ -66,23 +66,23 @@ describe("cost so far", () => {
     expect(route, "only this feature's rows are summed").toContain("invocationPoint: { in: [LIVE_COMMAND_POINT, VOICE_POINT] }");
   });
 
-  it("T4399 — the SuperAdmin tile 'Abracadabra Commands' is advertised, reachable, guarded, and renders the same catalogue", () => {
+  it("T4399 — the SuperAdmin tile 'Voice Assist Commands' is advertised, reachable, guarded, and renders the same catalogue", () => {
     const admin = read("app", "(dashboard)", "dashboard", "admin", "AdminClient.tsx");
-    const tile = admin.match(/\{ id: "abracadabra-commands",[^\n]*\}/)?.[0] ?? "";
-    expect(tile).toContain('href: "/dashboard/admin/abracadabra-commands"');
+    const tile = admin.match(/\{ id: "voice-assist-commands",[^\n]*\}/)?.[0] ?? "";
+    expect(tile).toContain('href: "/dashboard/admin/voice-assist-commands"');
     // Advertised path must resolve to a real page (a handler can be perfect and unreachable).
-    const pagePath = path.resolve(__dirname, "..", "..", "app", "(dashboard)", "dashboard", "admin", "abracadabra-commands", "page.tsx");
+    const pagePath = path.resolve(__dirname, "..", "..", "app", "(dashboard)", "dashboard", "admin", "voice-assist-commands", "page.tsx");
     expect(fs.existsSync(pagePath), "the tile's page exists").toBe(true);
     const page = fs.readFileSync(pagePath, "utf8");
     expect(page, "SuperAdmin-only").toContain("if (!(await isActingSuperuser(session))) redirect(\"/dashboard\");");
-    const client = read("app", "(dashboard)", "dashboard", "admin", "abracadabra-commands", "AbracadabraCommandsClient.tsx");
+    const client = read("app", "(dashboard)", "dashboard", "admin", "voice-assist-commands", "VoiceAssistCommandsClient.tsx");
     // The ordinary commands are still one catalogue shown in both places. The
     // tile ALSO shows a second, deliberately hidden list that the bar must not
     // (Paul, 2026-09-17) — see T4486.
     expect(client, "the ordinary catalogue is shared with the bar").toContain("COMMAND_CATALOG.map(");
     expect(client, "and the tile carries the hidden list too").toContain("SUPERADMIN_COMMAND_CATALOG");
     expect(
-      read("app", "components", "canvas", "AbracadabraBar.tsx"),
+      read("app", "components", "canvas", "VoiceAssistBar.tsx"),
       "which the bar must never show",
     ).not.toContain("SUPERADMIN_COMMAND_CATALOG");
     expect(client, "says what is editable").toContain("/dashboard/admin/intent-keywords");

@@ -1,5 +1,5 @@
 /**
- * Add an "AI Assist & Abracadabra Mode" chapter to the SuperAdmin **Technical
+ * Add an "AI Assist & Voice Assist" chapter to the SuperAdmin **Technical
  * Design Notes** (`tech-design` collection, /tech-notes). Documents the
  * non-obvious engineering behind the 2026-08-04 assist suite. Idempotent.
  *
@@ -13,7 +13,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 
 const COLLECTION = "tech-design";
 const SLUG = "ai-assist";
-const TITLE = "AI Assist & Abracadabra Mode";
+const TITLE = "AI Assist & Voice Assist";
 
 const SECTIONS: Array<{ heading: string; body: string }> = [
   {
@@ -27,7 +27,7 @@ const SECTIONS: Array<{ heading: string; body: string }> = [
     ].join("\n"),
   },
   {
-    heading: "The command interpreter (Abracadabra)",
+    heading: "The command interpreter (Voice Assist)",
     body: [
       "A spoken/typed utterance becomes a small **op list** (`app/lib/assist/`):",
       "- `ops.ts` — the `AssistOp` union (add / connect / disconnect / delete[+compact] / rename / move / addBoundary / addLanes / addSublanes / wrapInPool / clear / export / undo). Refs are spoken **names**, resolved at apply time.",
@@ -43,7 +43,7 @@ const SECTIONS: Array<{ heading: string; body: string }> = [
     body: [
       "`POST /api/ai/command` is the first **incremental** AI path (every other AI route regenerates a whole diagram). It takes `{instruction, state}` and returns a validated `AssistOp[]` delta, grounded with `aiRules` + the compact serialization. Blocking (~1s); no streaming needed.",
       "",
-      "New invocation point `LiveCommand` (\"Live Command (Abracadabra)\") is deliberately **NOT** in `AI_USER_METERED_POINTS` — a *Raw Attempt only*, like `dictation.refine` — so a chatty session never burns the `aiAttempts` quota. The command log colour-codes each entry **rule** vs **✨ AI**.",
+      "New invocation point `LiveCommand` (\"Live Command (Voice Assist)\") is deliberately **NOT** in `AI_USER_METERED_POINTS` — a *Raw Attempt only*, like `dictation.refine` — so a chatty session never burns the `aiAttempts` quota. The command log colour-codes each entry **rule** vs **✨ AI**.",
     ].join("\n"),
   },
   {
@@ -59,7 +59,7 @@ const SECTIONS: Array<{ heading: string; body: string }> = [
     body: [
       "The **green** rules are one editable catalog (`IntentKeywordMap`, generalised): each row = keywords → an action (`suggest-template` | `add-input-data-object` | `add-output-data-object`) + `diagramType` + `defaultLabel`. Edited at **Admin → Assist / NL Rules**, which also shows the **red** geometry rules read-only. `matchAssistRules(name, diagramType, catalog, action?)` is the shared, word-boundary matcher.",
       "",
-      "**Voice metering:** `startDictation` records one `DictationSession` row per session (who, org, engine, seconds) via `sendBeacon` on session end — for both consumers (Abracadabra + the AI panel). Deepgram audio is billed by Deepgram; the AI Usage page surfaces our lightweight minutes/sessions-by-engine view, scoped by the same filters.",
+      "**Voice metering:** `startDictation` records one `DictationSession` row per session (who, org, engine, seconds) via `sendBeacon` on session end — for both consumers (Voice Assist + the AI panel). Deepgram audio is billed by Deepgram; the AI Usage page surfaces our lightweight minutes/sessions-by-engine view, scoped by the same filters.",
     ].join("\n"),
   },
 ];

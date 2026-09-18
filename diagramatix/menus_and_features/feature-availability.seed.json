@@ -198,7 +198,7 @@
       }
     },
     {
-      "key": "abracadabra",
+      "key": "voice-assist",
       "states": {
         "free": "hidden",
         "introductory": "hidden",

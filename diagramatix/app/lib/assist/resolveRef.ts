@@ -1,7 +1,7 @@
 /**
  * Resolve a spoken reference ("Review", "the gateway", "it", "the last one") to
  * an element id. Pure. Returns a single id, an ambiguity list (caller asks which
- * one), or null (not found). Used by the Abracadabra apply layer.
+ * one), or null (not found). Used by the Voice Assist apply layer.
  */
 import type { DiagramElement } from "../diagram/types";
 import { SYMBOL_SYNONYMS, SYMBOL_PHRASES } from "./ops";

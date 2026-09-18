@@ -1,5 +1,5 @@
 /**
- * Abracadabra Mode interpreter: deterministic grammar + name/pronoun resolution.
+ * Voice Assist interpreter: deterministic grammar + name/pronoun resolution.
  */
 import { describe, it, expect } from "vitest";
 import { parseCommand } from "@/app/lib/assist/commandGrammar";
@@ -109,7 +109,7 @@ describe("parseCommand — lanes / sublanes", () => {
   });
 });
 
-// The definitive container-maintenance command set (docs/abracadabra-commands.md).
+// The definitive container-maintenance command set (docs/voice-assist-commands.md).
 describe("container maintenance — definitive set", () => {
   it("1. Add Pool", () => {
     expect(parseCommand("add a pool")).toEqual([{ op: "addPool" }]);

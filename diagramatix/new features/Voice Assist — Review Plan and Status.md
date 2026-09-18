@@ -1,4 +1,4 @@
-# Abracadabra Mode — review plan and status
+# Voice Assist — review plan and status
 
 **Status as at 2026-09-17** — read from the repository and the commit history, not
 from memory, so this file never claims more or less than the code contains.
@@ -30,7 +30,7 @@ so a future session can cite it by id rather than by commit.
 
 ## What this is
 
-Abracadabra Mode is voice and typed live editing for BPMN: say "add a task
+Voice Assist is voice and typed live editing for BPMN: say "add a task
 called Approve after Review" and the diagram edits itself, undoably, with a log
 of what was heard and what was done. It shipped on 4–5 August 2026 and sat
 untouched for six weeks. A read-only review on 14 September produced the plan in
@@ -119,7 +119,7 @@ of writing. Confidential feature — no external sharing.*
 
 ### Context
 
-Abracadabra Mode is the voice/typed live-editing feature for BPMN: say or type "add a task called Approve after Review" and the diagram edits itself, undoably, with a visible log of what was heard and what was done. It shipped in five stages on 4–5 August 2026 (`d57eaafc` → `7c164eeb`), Paul confirmed it "very reliable now", it was locked to SuperAdmin "for the time being", and **it has not been touched since 5 August** — the only later changes were to the separate ghost-suggestion feature. Six weeks on, Paul wants a complete review. This document is the brief: what it does today (read from the code, not the memory), what is wrong with it, what could make it better, and a script to test it live tomorrow.
+Voice Assist is the voice/typed live-editing feature for BPMN: say or type "add a task called Approve after Review" and the diagram edits itself, undoably, with a visible log of what was heard and what was done. It shipped in five stages on 4–5 August 2026 (`d57eaafc` → `7c164eeb`), Paul confirmed it "very reliable now", it was locked to SuperAdmin "for the time being", and **it has not been touched since 5 August** — the only later changes were to the separate ghost-suggestion feature. Six weeks on, Paul wants a complete review. This document is the brief: what it does today (read from the code, not the memory), what is wrong with it, what could make it better, and a script to test it live tomorrow.
 
 Confidential feature — no external sharing (Paul's standing instruction).
 
@@ -131,9 +131,9 @@ Confidential feature — no external sharing (Paul's standing instruction).
 
 ```
 🪄 toggle (BPMN diagram, SuperAdmin only)
-   └─ AbracadabraBar: 🎙 mic (Deepgram nova-2 en-AU streaming, browser fallback) + typed input + command log
+   └─ VoiceAssistBar: 🎙 mic (Deepgram nova-2 en-AU streaming, browser fallback) + typed input + command log
         └─ fragment buffering (2.2 s silence; 3.2 s if the sentence looks unfinished, max 3 waits)
-             └─ runAbraCommand(utterance)
+             └─ runVoiceCommand(utterance)
                   ├─ parseCommand()  — deterministic regex grammar, 23 op kinds, instant, free   → tagged "rule"
                   └─ (null) POST /api/ai/command {instruction, whole diagram}                   → tagged "✨ AI"
                           returns {canonical, ops}; canonical is re-parsed by the grammar
@@ -141,7 +141,7 @@ Confidential feature — no external sharing (Paul's standing instruction).
                                     → command log line "heard → did" (✓ or amber)
 ```
 
-Key files: `app/lib/assist/{ops,commandGrammar,resolveRef,renameTargets,serializeDiagram}.ts` · `app/(dashboard)/diagram/[id]/DiagramEditor.tsx` (`applyAssistOps` ~2669–3036, `runAbraCommand` ~3090–3130, voice ~3140–3240) · `app/components/canvas/AbracadabraBar.tsx` · `app/api/ai/command/route.ts` · `app/lib/dictation/index.ts` · reference doc `docs/abracadabra-commands.md`.
+Key files: `app/lib/assist/{ops,commandGrammar,resolveRef,renameTargets,serializeDiagram}.ts` · `app/(dashboard)/diagram/[id]/DiagramEditor.tsx` (`applyAssistOps` ~2669–3036, `runVoiceCommand` ~3090–3130, voice ~3140–3240) · `app/components/canvas/VoiceAssistBar.tsx` · `app/api/ai/command/route.ts` · `app/lib/dictation/index.ts` · reference doc `docs/voice-assist-commands.md`.
 
 #### The vocabulary (23 ops)
 
@@ -162,11 +162,11 @@ Connector types other than sequence, typed boundary events (error/timer), a labe
 Org policy `allowAi` on the route; `allowVoiceAi` on the Deepgram token (but see defect 9); per-session `DictationSession` row + AI Usage "Voice dictation" card; 2-minute idle auto-close because an open Deepgram stream is billed by the minute; spoken "stop" / "that's enough" / "thank you Gort" ends the session.
 
 #### Docs and gating status (found, not assumed)
-- `docs/abracadabra-commands.md` is complete and current.
-- The User Guide chapter "AI Assist & Abracadabra Mode" and the Tech Notes chapter exist **only as unrun seed scripts** (`scripts/add-guide-ai-assist.ts`, `add-tech-notes-ai-assist.ts`); the 10 Sep guide snapshot has no such chapter. Features rows (`add-features-ai-assist.ts`) insert as DRAFT.
-- Feature registry keys `abracadabra` and `nl-assist` exist but **nothing reads them**; the real gate is `isActingAdmin && diagramType === "bpmn"`.
+- `docs/voice-assist-commands.md` is complete and current.
+- The User Guide chapter "AI Assist & Voice Assist" and the Tech Notes chapter exist **only as unrun seed scripts** (`scripts/add-guide-ai-assist.ts`, `add-tech-notes-ai-assist.ts`); the 10 Sep guide snapshot has no such chapter. Features rows (`add-features-ai-assist.ts`) insert as DRAFT.
+- Feature registry keys `voice-assist` and `nl-assist` exist but **nothing reads them**; the real gate is `isActingAdmin && diagramType === "bpmn"`.
 - No `VERSION_HISTORY.md` entry — the feature predates the file by two days.
-- Tests: T2212–T2215 (grammar, resolveRef, validateOps) + T2207–T2211 (placement geometry). **Nothing** tests the API route, `applyAssistOps`, `runAbraCommand` or the voice buffering.
+- Tests: T2212–T2215 (grammar, resolveRef, validateOps) + T2207–T2211 (placement geometry). **Nothing** tests the API route, `applyAssistOps`, `runVoiceCommand` or the voice buffering.
 
 ---
 
@@ -179,11 +179,11 @@ Org policy `allowAi` on the route; `allowVoiceAi` on the Deepgram token (but see
 | 3 | One utterance → up to 5 history entries | every reducer helper pushes its own snapshot | "undo that" after "add a task called X after Y" removes only the connector |
 | 4 | `e.type === "sublane"` checks are dead (sublanes are `type: "lane"` with a lane parent) | `applyAssistOps` 2697/2786/2810 | "which sublane?" guard and move-band exclusion never apply to sublanes |
 | 5 | Over-greedy regexes | `commandGrammar.ts` 101, 106, 167 | "collapse the subprocess" → compressPool; "swap Task A with Task B" → swapLanes; "move the Assembly Line task up" → moveLane |
-| 6 | Bar's docblock promises per-entry undo that doesn't exist | `AbracadabraBar.tsx:5` | Stale comment / unbuilt feature |
+| 6 | Bar's docblock promises per-entry undo that doesn't exist | `VoiceAssistBar.tsx:5` | Stale comment / unbuilt feature |
 | 7 | `renameByType` and `addPool.relativeTo` missing from the AI prompt's op list | `route.ts` 59–80 | AI can't reach the guided rename or "add pool above X" |
-| 8 | `abraBusy` gates the Run button, not the voice path | `flushAbraBuffer` | Two spoken commands during one AI call both act on stale state; log lines interleave |
+| 8 | `voiceBusy` gates the Run button, not the voice path | `flushVoiceBuffer` | Two spoken commands during one AI call both act on stale state; log lines interleave |
 | 9 | `allowVoiceAi` 403 silently falls back to browser speech | `startDictation` treats any non-ok token as "not configured" | An org that forbids cloud voice still gets voice |
-| 10 | Enter in the text box ignores `busy` | `AbracadabraBar.tsx:106` | Double submission |
+| 10 | Enter in the text box ignores `busy` | `VoiceAssistBar.tsx:106` | Double submission |
 
 ---
 
@@ -194,7 +194,7 @@ Org policy `allowAi` on the route; `allowVoiceAi` on the Deepgram token (but see
 - **Undo is per reducer call**, not per command (defect 3 is the symptom; the fix is a `beginBatch/endBatch` in `useDiagram`).
 - **`canConnect` is not consulted** for the auto-connect in `add` (only for explicit `connect`).
 - **Whole-diagram re-serialisation** per AI call, no cap; **no timeout/abort/streaming**; runs on the expensive generate model.
-- **Grammar is regex-only** — an admin-editable phrase overlay pattern already exists for rich-text dictation (`app/lib/dictation/commands.ts` + `/api/ai/dictation/commands`) but Abracadabra doesn't use it; only the AI prompt gets the green "assist" rules.
+- **Grammar is regex-only** — an admin-editable phrase overlay pattern already exists for rich-text dictation (`app/lib/dictation/commands.ts` + `/api/ai/dictation/commands`) but Voice Assist doesn't use it; only the AI prompt gets the green "assist" rules.
 - **Unconnected neighbours that are already imported into the same file**: the scanner (`checkDiagram`) never runs after a command, so "that leaves Task X unconnected" is never said; Entity Lists never validate a spoken lane/pool name; ghost suggestions (`suggestNextSteps`) and spoken commands don't know about each other; `closeFlowVoids` could be a safe no-AI "tidy up" but is only called inside the layout engine.
 - **No macros** (a SavedPrompt store exists for generation prompts; the `canonical` string the route returns is the natural recordable unit).
 - **No TTS** anywhere in the app — feedback is the visual log only.
@@ -312,8 +312,8 @@ Effort S/M/L · Value H/M/L · Evidence = script line.
 |---|---|---|---|---|---|
 | B1 | Stale snapshot across a multi-op batch | In `applyAssistOps` keep a mutable working copy of `els`: after each `add`/`addBoundary` push a synthetic element so `resolve1` and `lastAddedId` see it; splice on delete | M | H | 6.3 |
 | B2 | `move`/`nudgePool` skip `elementsMoveEnd` | Call `elementsMoveEnd()` right after `moveElements(...)` (two sites) | S | H | 5.4–5.6, 7.4 |
-| B3 | One utterance = up to 5 undo entries | `beginHistoryGroup()/endHistoryGroup()` in `useDiagram.ts` (one snapshot on begin, suppress `pushHistory` until end); wrap each `applyAssistOps` call; fix the AbracadabraBar docblock [6] in the same change | M | H | 5.2, 5.3 |
-| B4 | Busy not enforced (Enter, voice); AI result applied to a stale closure | Gate Enter on `busy`; `abraBusyRef` + FIFO queue drained in `finally`; read `data.elements` through a ref after the await | S | M | 7.6 |
+| B3 | One utterance = up to 5 undo entries | `beginHistoryGroup()/endHistoryGroup()` in `useDiagram.ts` (one snapshot on begin, suppress `pushHistory` until end); wrap each `applyAssistOps` call; fix the VoiceAssistBar docblock [6] in the same change | M | H | 5.2, 5.3 |
+| B4 | Busy not enforced (Enter, voice); AI result applied to a stale closure | Gate Enter on `busy`; `voiceBusyRef` + FIFO queue drained in `finally`; read `data.elements` through a ref after the await | S | M | 7.6 |
 | B5 | Over-greedy grammar | compress requires a pool word or bails; lane rule requires "lane" adjacent to the ref; add rule bails on `between/before/instead of/replace`; swap type-mismatch → retry via AI | M | M | 2.11, 2.12, 6.4 |
 | B6 | Dead `"sublane"` checks | `isSublane(e, els)` (lane whose parent is a lane), as `resolveRef` already does | S | L | 2.7 |
 | B7 | AI prompt op list incomplete | Add `renameByType` and `addPool.relativeTo` + canonical "add a pool called X above/below Y" to `SYSTEM` | S | M | 2.8 |
@@ -342,7 +342,7 @@ Effort S/M/L · Value H/M/L · Evidence = script line.
 | C6 | Admin phrase overlay + macros | reuse the DB-backed pattern from `app/lib/dictation/commands.ts`; macros = a store of `canonical` utterance lists | M/L | M |
 | C7 | Select / annotation / colour ops | `select X`, `add a note to X saying …`, `colour X red` | M | L |
 | C8 | EPC / flowchart | `SYMBOL_SYNONYMS` per `diagramType`; placement is already generic | L | M |
-| C9 | Non-SuperAdmin gating via entitlements | read registry key `abracadabra` + plan entitlement instead of `isActingAdmin`; voice also behind `allowVoiceAi` | S/M | H |
+| C9 | Non-SuperAdmin gating via entitlements | read registry key `voice-assist` + plan entitlement instead of `isActingAdmin`; voice also behind `allowVoiceAi` | S/M | H |
 | C10 | TTS read-back of the summary | browser `speechSynthesis` | S | L |
 
 #### Multi-modal — selection + voice (Paul, 14 Sep: "Add an Expanded Subprocess around the selected elements", "Change the name of the selected Pool to Customer")
@@ -375,7 +375,7 @@ Order: V0 during the review → V1 → V2 → V3.
 #### Docs / ops
 | # | Title | E | V |
 |---|---|---|---|
-| D1 | Publish the guide, tech-notes and features rows (diff the three seed scripts against `docs/abracadabra-commands.md`, then run them) | S | M |
+| D1 | Publish the guide, tech-notes and features rows (diff the three seed scripts against `docs/voice-assist-commands.md`, then run them) | S | M |
 | D2 | VERSION_HISTORY entry for the 2026-08-05 feature + the fix sessions | S | M |
 | D3 | Tests for the untested half: extract the op-apply loop into `app/lib/assist/apply.ts` with an injected command interface; route test with a mocked client; fake-timer tests for `isIncompleteCommand`/flush | M/L | H |
 | D4 | Fix the stale docblock and the memory note ("NEXT: Tier-2 NL command bar, AI route" — both shipped) | S | L |
@@ -423,7 +423,7 @@ hits mid-sentence.
 
 ### Part 6 — Three decisions only Paul can make
 
-1. **Rollout — who gets Abracadabra, and when?** (a) stay SuperAdmin-only as a demo/power tool; (b) gate via registry key + plan entitlement (C9) after sessions 1–2; (c) open to all BPMN editors now behind `allowVoiceAi`. *Recommendation: (b).* Defects 1–3 and the missing confirmation make (c) unsafe today; (a) wastes a differentiator.
+1. **Rollout — who gets Voice Assist, and when?** (a) stay SuperAdmin-only as a demo/power tool; (b) gate via registry key + plan entitlement (C9) after sessions 1–2; (c) open to all BPMN editors now behind `allowVoiceAi`. *Recommendation: (b).* Defects 1–3 and the missing confirmation make (c) unsafe today; (a) wastes a differentiator.
 2. **Undo semantics — what does "undo that" mean?** (a) atomic per utterance (B3), Ctrl+Z matches; (b) keep granular history and add per-entry undo buttons; (c) both. *Recommendation: (a)* — it is what the docblock and the user's mental model already assume.
 3. **AI fallback spend — which model, how much diagram?** (a) keep Opus 5 with full serialisation; (b) dedicated cheap command model + system-prompt caching + geometry-stripped payload (C5, R4); (c) no AI by default — grammar + admin phrase overlay (C6), AI opt-in per org. *Recommendation: (b)* — 6.5 shows even a non-edit burns a full Opus call, and the job is canonicalising one sentence that the grammar re-validates anyway.
 

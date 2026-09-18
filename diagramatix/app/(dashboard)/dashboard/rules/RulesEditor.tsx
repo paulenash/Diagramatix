@@ -39,7 +39,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   // its system prompt. Lives in the same editor so admins can tune
   // the voice / vocabulary without code changes.
   "staff-narrative": "Staff Narrative Briefing",
-  // "assist" holds the Abracadabra (voice/typed command) rules: GREEN command
+  // "assist" holds the Voice Assist (voice/typed command) rules: GREEN command
   // aliases / phrasing hints that reach the AI command fallback, plus RED
   // code-enforced container naming & sizing invariants (reference only).
   assist: "Assist / Voice Commands",

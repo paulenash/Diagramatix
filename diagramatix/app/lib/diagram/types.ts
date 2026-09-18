@@ -1260,7 +1260,7 @@ export interface TemplateData {
  *             (new enumerations in diagramatix-export.xsd, marked "schema 1.44"/"schema 44").
  *
  *  2026-08-04 (NO version bump — feature-only, no export-shape change): the AI Assist +
- *             Abracadabra Mode suite shipped — assist-while-you-draw ghosts (next-step,
+ *             Voice Assist suite shipped — assist-while-you-draw ghosts (next-step,
  *             boundary, template, intent, data-object), live voice/typed command editing,
  *             the editable Assist/NL-Rules catalog, and voice-dictation metering. All of it
  *             uses EXISTING element/connector types + open `properties` keys and DB/telemetry

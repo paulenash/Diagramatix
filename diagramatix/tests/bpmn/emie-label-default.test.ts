@@ -4,7 +4,7 @@
  * Paul, 2026-09-19: "The default location for EMIE labels should be 1/2 the
  * initial default label length to the left of its current centrally placed
  * position, so it is clear of any outbound connector. This is on Manual
- * creation, Assist Creation and Abracadabra creation. If an EMIE is ever
+ * creation, Assist Creation and Voice Assist creation. If an EMIE is ever
  * manually placed on a vertical boundary then its label should be just above
  * the outgoing connector."
  * Paul, 2026-09-19 after testing: "EMIE label placement good except when placed
@@ -152,7 +152,7 @@ describe("T4549 — all three creation paths get it", () => {
     expect(p.labelOffsetY).toBe(-(36 / 2 + LABEL_LINE_H + CONNECTOR_CLEARANCE));
   });
 
-  it("assist / Abracadabra: the addBoundary op's setEventBoundary", () => {
+  it("assist / Voice Assist: the addBoundary op's setEventBoundary", () => {
     // "add a boundary event called Timeout to Check Stock" ends in this action.
     const loose = { ...ev(258, 60), id: "spoken" } as DiagramElement;
     const out = reducer(state([HOST, loose]), {

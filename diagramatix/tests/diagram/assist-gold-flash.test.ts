@@ -1,7 +1,7 @@
 /**
  * Gold flashing (Paul, 2026-09-17).
  *
- * With it on, finishing an Abracadabra command outlines the items it touched in
+ * With it on, finishing an Voice Assist command outlines the items it touched in
  * gold, three times, with gold sparks coming off them. A spoken command can
  * change something off to the side of where you are looking; the command log
  * says what happened in words, this says where.

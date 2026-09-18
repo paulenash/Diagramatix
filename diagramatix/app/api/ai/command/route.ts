@@ -1,5 +1,5 @@
 /**
- * POST /api/ai/command  — Abracadabra Mode AI fallback.
+ * POST /api/ai/command  — Voice Assist AI fallback.
  *   Body: { instruction: string, state: DiagramData }
  *   Returns: { ops: AssistOp[] } — a small edit-op list the editor applies to
  *   the CURRENT diagram. This is the incremental (delta) counterpart to the
@@ -108,11 +108,11 @@ export async function POST(req: Request) {
   }
   const pol = await gateOrgPolicy(session, "allowAi");
   if (pol) return pol;
-  // Abracadabra is an Expert-and-above feature (Paul, 2026-09-17). The editor
+  // Voice Assist is an Expert-and-above feature (Paul, 2026-09-17). The editor
   // only decides which buttons to draw; this is the half that means anything,
   // since the route is reachable directly. SuperAdmins bypass via the admin-email
   // check inside the availability map.
-  const feat = await gateFeature(session.user.id, "abracadabra");
+  const feat = await gateFeature(session.user.id, "voice-assist");
   if (feat) return feat;
   enterAiContext(await resolveAiRouteContext(session, AI_INVOCATION_POINTS.LiveCommand));
 

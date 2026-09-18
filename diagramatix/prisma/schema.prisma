@@ -1105,7 +1105,7 @@ model DiagramTypeStyle {
 // category). SuperAdmin-editable; seeded with common intents.
 // The editable GREEN half of the Assist / NL Rules. Each row = keywords → an
 // ACTION taken when the just-named element matches: suggest a template, or ghost
-// an input/output Data Object. Injected into the Abracadabra AI prompt too.
+// an input/output Data Object. Injected into the Voice Assist AI prompt too.
 model IntentKeywordMap {
   id                 String   @id @default(cuid())
   label              String   // shown on the ghost chip, e.g. "Approval" / "Instructions"
@@ -2082,7 +2082,7 @@ model AiInvocation {
   @@index([status])
 }
 
-// One row per voice-dictation session (Abracadabra / AI panel mic). Deepgram
+// One row per voice-dictation session (Voice Assist / AI panel mic). Deepgram
 // audio is billed by Deepgram, not visible in-app — this gives lightweight
 // app-side visibility of voice minutes per user/org in the AI Usage report.
 model DictationSession {

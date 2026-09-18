@@ -24,7 +24,7 @@ const state = (): DiagramData =>
     viewport: { x: 0, y: 0, zoom: 1 },
   } as unknown as DiagramData);
 
-describe("T4494 — an Abracadabra edit gives React a new elements array to see", () => {
+describe("T4494 — an Voice Assist edit gives React a new elements array to see", () => {
   it("a move produces a different array instance", () => {
     const before = state();
     const after = reducer(before, {

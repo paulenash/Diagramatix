@@ -60,6 +60,6 @@ describe("the selection protocol", () => {
     expect(ed).toMatch(/updateLabel\(e\.id, newLabel\); els = withLabel\(els, e\.id, newLabel\); setSelectedElementIds\(new Set\(\)\);/);
     expect(ed).toMatch(/elementsMoveEnd\(\);[^\n]*\n\s*setSelectedElementIds\(new Set\(\)\); \/\/ selection protocol: a voice move leaves nothing selected/);
     expect(ed).toMatch(/elementsMoveEnd\(\); \/\/ commit the nudge as its own undo entry\s*setSelectedElementIds\(new Set\(\)\);/);
-    expect(ed).toMatch(/moveLane\(r\.id, op\.direction, op\.distance \?\? 32\);\s*abraLastId\.current = r\.id;\s*setSelectedElementIds\(new Set\(\)\);/);
+    expect(ed).toMatch(/moveLane\(r\.id, op\.direction, op\.distance \?\? 32\);\s*voiceLastId\.current = r\.id;\s*setSelectedElementIds\(new Set\(\)\);/);
   });
 });

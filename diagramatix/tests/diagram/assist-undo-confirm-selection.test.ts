@@ -1,5 +1,5 @@
 /**
- * Abracadabra, session 1 (15 Sep 2026): the three undo defects the review found,
+ * Voice Assist, session 1 (15 Sep 2026): the three undo defects the review found,
  * a confirmation for destructive commands, and the selection as a reference.
  *
  * The pure halves are tested as functions. The editor wiring is pinned by
@@ -67,8 +67,8 @@ describe("B3 — one spoken command, one undo", () => {
     const e = editor();
     const grouped = callbackBody(e, "applyGrouped");
     expect(grouped).toMatch(/beginHistoryGroup\(\);\s*try \{ return applyAssistOps\(ops\); \} finally \{ endHistoryGroup\(\); \}/);
-    const run = callbackBody(e, "runAbraCommand");
-    expect(run, "runAbraCommand must apply through the group, never bare").not.toContain("applyAssistOps(");
+    const run = callbackBody(e, "runVoiceCommand");
+    expect(run, "runVoiceCommand must apply through the group, never bare").not.toContain("applyAssistOps(");
     expect(run).toContain("applyGrouped(");
   });
 });
@@ -104,11 +104,11 @@ describe("B1 — a batch sees what it has already done", () => {
 
     const body = callbackBody(editor(), "applyAssistOps");
     expect(body, "a WORKING copy, not a one-time snapshot").toContain("let els: DiagramElement[] = data.elements;");
-    expect(body).toMatch(/abraLastId\.current = newId;\s*els = withAdded\(els, syntheticElement\(newId/);
+    expect(body).toMatch(/voiceLastId\.current = newId;\s*els = withAdded\(els, syntheticElement\(newId/);
     expect(body).toMatch(/deleteElement\(e\.id\);\s*els = withDeleted\(els, e\.id\);/);
     expect(body).toContain("els = withLabel(els, e.id, newLabel);");
     // The resolver reads the working copy AND the selection.
-    expect(body).toContain("resolveRef(ref, els, abraLastId.current, selectedIds)");
+    expect(body).toContain("resolveRef(ref, els, voiceLastId.current, selectedIds)");
   });
 });
 
@@ -136,9 +136,9 @@ describe("R1 — destructive commands ask first", () => {
     expect(parseConfirmation("never mind")).toBe("no");
     expect(parseConfirmation("add a task called Ship")).toBeNull();
 
-    const run = callbackBody(editor(), "runAbraCommand");
+    const run = callbackBody(editor(), "runVoiceCommand");
     expect(run).toContain("if (pendingConfirmRef.current) {");
-    expect(run).toContain("needsConfirmation(ops, data.elements, abraLastId.current, selectedIdsRef.current)");
+    expect(run).toContain("needsConfirmation(ops, data.elements, voiceLastId.current, selectedIdsRef.current)");
     expect(run, "the parked ops are applied only on a yes").toMatch(/if \(answer === "yes"\) \{\s*const r = applyGrouped\(pending\.ops\);/);
   });
 });

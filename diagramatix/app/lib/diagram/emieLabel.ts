@@ -4,7 +4,7 @@
  * Paul, 2026-09-19: "The default location for EMIE labels should be 1/2 the
  * initial default label length to the left of its current centrally placed
  * position, so it is clear of any outbound connector. This is on Manual
- * creation, Assist Creation and Abracadabra creation. If an EMIE is ever
+ * creation, Assist Creation and Voice Assist creation. If an EMIE is ever
  * manually placed on a vertical boundary then its label should be just above
  * the outgoing connector."
  *
@@ -32,7 +32,7 @@
  * directly above it.
  *
  * Scope is deliberately the three USER creation paths — a palette drop, a drag
- * onto a host rim, and the assist/Abracadabra `addBoundary` op, all three of
+ * onto a host rim, and the assist/Voice Assist `addBoundary` op, all three of
  * which mount through the reducer. Generated diagrams keep R7.05 in
  * `bpmnLayout.ts`, which solves the same problem with the whole picture in
  * hand (it knows where the target is).

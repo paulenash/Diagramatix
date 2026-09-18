@@ -59,7 +59,7 @@ import { validateOps, type AssistOp } from "@/app/lib/assist/ops";
 import { syntheticElement, withAdded, withDeleted, withLabel } from "@/app/lib/assist/workingSet";
 import { needsConfirmation, parseConfirmation } from "@/app/lib/assist/confirm";
 import { collectRenameTargets, type RenameType, type RenameTarget } from "@/app/lib/assist/renameTargets";
-import { AbracadabraBar, type CommandLogEntry } from "@/app/components/canvas/AbracadabraBar";
+import { VoiceAssistBar, type CommandLogEntry } from "@/app/components/canvas/VoiceAssistBar";
 import { startDictation, type DictationHandle } from "@/app/lib/dictation";
 import { PropertiesPanel } from "@/app/components/canvas/PropertiesPanel";
 import { captureTemplate, instantiateTemplate, templateAttachData, instantiateTemplateAnchored } from "@/app/lib/diagram/templates";
@@ -1928,9 +1928,9 @@ export function DiagramEditor({
   // the logo down to a lower (OrgAdmin / Normal) view mode. Gate SuperAdmin-only
   // menu options on this so they vanish when a SuperAdmin drops into a lower view.
   const isActingAdmin = isAdmin && !superAdminHidden;
-  // Abracadabra is available to Expert subscriptions and above (Paul,
+  // Voice Assist is available to Expert subscriptions and above (Paul,
   // 2026-09-17), not SuperAdmin-only as it was while it settled down. The
-  // `abracadabra` key has been in the feature registry and seeded expert +
+  // `voice-assist` key has been in the feature registry and seeded expert +
   // enterprise since Phase 1 — nothing had ever read it. This is the first
   // reader; the route gate on /api/ai/command is the half that actually
   // enforces it, since anything here is only a matter of which buttons show.
@@ -1938,9 +1938,9 @@ export function DiagramEditor({
   // The second clause is for a SuperAdmin previewing a customer tier: the
   // server hands an admin every feature, so without it the wand would stay put
   // while pretending to be an Introductory user, which defeats the preview.
-  const abracadabraFeature = useFeatureState("abracadabra");
-  const abracadabraAllowed =
-    abracadabraFeature === "available" &&
+  const voiceAssistFeature = useFeatureState("voice-assist");
+  const voiceAssistAllowed =
+    voiceAssistFeature === "available" &&
     (!isAdmin || atLeastTier(adminViewMode, "expert"));
   // Generate models the current user may pick (cost-gated; SA-in-mode = all).
   const { models: aiModels, current: currentAiModel } = useAllowedModels(isActingAdmin);
@@ -2642,17 +2642,17 @@ export function DiagramEditor({
   const nextStepRef = useRef<{ candidates: NextStepCandidate[]; accept: (c: NextStepCandidate) => void }>({ candidates: [], accept: () => {} });
   nextStepRef.current = { candidates: nextStepCandidates, accept: acceptNextStep };
 
-  // ── Abracadabra Mode: live voice/typed command editing ──
-  const [abracadabraOn, setAbracadabraOn] = useState(false);
-  const [abraLog, setAbraLog] = useState<CommandLogEntry[]>([]);
-  const [abraListening, setAbraListening] = useState(false);
+  // ── Voice Assist: live voice/typed command editing ──
+  const [voiceAssistOn, setVoiceAssistOn] = useState(false);
+  const [voiceLog, setVoiceLog] = useState<CommandLogEntry[]>([]);
+  const [voiceListening, setVoiceListening] = useState(false);
   const [abraEngine, setAbraEngine] = useState<"deepgram" | "browser" | null>(null);
   // Mic pressed but the recogniser not yet live (token + permission + socket):
   // the bar says "connecting…" so nobody talks into the gap.
   const [abraConnecting, setAbraConnecting] = useState(false);
-  const [abraInterim, setAbraInterim] = useState("");
-  const [abraBusy, setAbraBusy] = useState(false);
-  const abraLastId = useRef<string | null>(null);
+  const [voiceInterim, setVoiceInterim] = useState("");
+  const [voiceBusy, setVoiceBusy] = useState(false);
+  const voiceLastId = useRef<string | null>(null);
   // stopAbraListening is defined after the command runner (it needs the buffer
   // flush); the runner reaches it through this ref.
   const stopAbraListeningRef = useRef<() => void>(() => {});
@@ -2669,17 +2669,17 @@ export function DiagramEditor({
   const pendingConfirmRef = useRef<{ ops: AssistOp[]; what: string; viaAi: boolean } | null>(null);
   // "Cost so far": the session starts when the bar opens; the microphone's open
   // stretch is added live because its usage row is only written when it stops.
-  const abraSessionStart = useRef<Date>(new Date());
-  const abraMicOpenedAt = useRef<number | null>(null);
-  useEffect(() => { if (abracadabraOn) abraSessionStart.current = new Date(); }, [abracadabraOn]);
+  const voiceSessionStart = useRef<Date>(new Date());
+  const voiceMicOpenedAt = useRef<number | null>(null);
+  useEffect(() => { if (voiceAssistOn) voiceSessionStart.current = new Date(); }, [voiceAssistOn]);
   const fetchAbraCost = useCallback(async () => {
-    const live = abraListening && abraMicOpenedAt.current ? Math.round((Date.now() - abraMicOpenedAt.current) / 1000) : 0;
-    const q = new URLSearchParams({ since: abraSessionStart.current.toISOString(), live: String(live) });
+    const live = voiceListening && voiceMicOpenedAt.current ? Math.round((Date.now() - voiceMicOpenedAt.current) / 1000) : 0;
+    const q = new URLSearchParams({ since: voiceSessionStart.current.toISOString(), live: String(live) });
     const res = await fetch(`/api/ai/command/usage?${q}`);
     if (!res.ok) return null;
     return (await res.json()) as import("@/app/lib/assist/usageCost").CostReport;
-  }, [abracadabraOn, abraListening]);
-  const abraDictRef = useRef<DictationHandle | null>(null);
+  }, [voiceAssistOn, voiceListening]);
+  const voiceDictRef = useRef<DictationHandle | null>(null);
 
   // ── Guided "rename by number" flow (voice) ──
   //   pick: green number badges shown; user says a number.
@@ -2695,17 +2695,17 @@ export function DiagramEditor({
   const [messageFlow, setMessageFlowState] = useState<MessagePick | null>(null);
   const messageFlowRef = useRef<MessagePick | null>(null);
   const setMessageFlow = useCallback((f: MessagePick | null) => { messageFlowRef.current = f; setMessageFlowState(f); }, []);
-  const abraStopRequested = useRef(false);
+  const voiceStopRequested = useRef(false);
   // Stable ref to the JSON export (a plain function redefined each render) so
   // the memoised apply layer can call it without churning its deps.
   const exportJsonRef = useRef<(() => void) | null>(null);
-  // Abracadabra is always OFF when you open (or switch) a diagram — a live mic
+  // Voice Assist is always OFF when you open (or switch) a diagram — a live mic
   // should never be silently on when you arrive. Reset + stop on diagram change.
   useEffect(() => {
-    setAbracadabraOn(false);
-    abraDictRef.current?.stop();
-    abraDictRef.current = null;
-    setAbraListening(false);
+    setVoiceAssistOn(false);
+    voiceDictRef.current?.stop();
+    voiceDictRef.current = null;
+    setVoiceListening(false);
     pendingConfirmRef.current = null; // a parked "clear the diagram?" never outlives the diagram it was asked on
   }, [diagramId]);
 
@@ -2754,7 +2754,7 @@ export function DiagramEditor({
     // selection — the mouse says WHICH, the voice says WHAT.
     const selectedIds = selectedIdsRef.current;
     const resolve1 = (ref: string): DiagramElement | { err: string } => {
-      const r = resolveRef(ref, els, abraLastId.current, selectedIds);
+      const r = resolveRef(ref, els, voiceLastId.current, selectedIds);
       if (!r) return { err: isSelectionRef(ref) && selectedIds.length === 0 ? "nothing is selected" : `couldn't find “${ref}”` };
       if ("ambiguous" in r) return { err: isSelectionRef(ref) ? `${r.ambiguous.length} elements are selected — select just one for that` : `“${ref}” is ambiguous` };
       return els.find((e) => e.id === r.id)!;
@@ -2768,14 +2768,14 @@ export function DiagramEditor({
       if ("error" in plan) { results.push(plan.error); return false; }
       unwrapSubprocess(ep.id);
       els = plan.elements;
-      if (abraLastId.current === ep.id) abraLastId.current = null;
+      if (voiceLastId.current === ep.id) voiceLastId.current = null;
       setSelectedElementIds(new Set()); // selection protocol: nothing stays selected
       results.push(plan.summary);
       return true;
     };
     for (const op of ops) {
       if (op.op === "undo") { undo(); results.push("undid the last change"); continue; }
-      if (op.op === "clear") { clearDiagram(); abraLastId.current = null; results.push("cleared the diagram"); continue; }
+      if (op.op === "clear") { clearDiagram(); voiceLastId.current = null; results.push("cleared the diagram"); continue; }
       if (op.op === "export") { exportJsonRef.current?.(); results.push("exported to JSON"); continue; }
       // Gold flashing is a display preference, not an edit: it changes nothing
       // on the diagram, takes no undo entry, and is remembered per browser.
@@ -2785,7 +2785,7 @@ export function DiagramEditor({
         const { w, h } = sizeOf(op.symbolType);
         let anchor: DiagramElement | null = null;
         if (op.afterRef) { const a = resolve1(op.afterRef); if ("err" in a) { results.push(a.err); anyFail = true; } else anchor = a; }
-        if (!anchor && abraLastId.current) anchor = els.find((e) => e.id === abraLastId.current) ?? null;
+        if (!anchor && voiceLastId.current) anchor = els.find((e) => e.id === voiceLastId.current) ?? null;
         const others = els.filter((e) => e.type !== "pool" && e.type !== "lane" && e.type !== "sublane").map(elBox);
         let center; let srcSide: Side | undefined;
         if (anchor && anchor.boundaryHostId) {
@@ -2836,7 +2836,7 @@ export function DiagramEditor({
         // ALL pools to the same width so they stay aligned (Paul).
         const addRight = center.x + w / 2;
         if (parentId && els.some((e) => e.type === "pool" && e.x + e.width < addRight + 40)) extendPools();
-        abraLastId.current = newId;
+        voiceLastId.current = newId;
         els = withAdded(els, syntheticElement(newId, op.symbolType, center, w, h, { label: op.label, parentId, eventType: op.eventType }));
         setSelectedElementIds(new Set([newId]));
         results.push(`added ${op.label ?? op.symbolType}${anchor && op.afterRef ? ` after ${nameOf(anchor)}` : ""}`);
@@ -2873,7 +2873,7 @@ export function DiagramEditor({
           for (const t of targets) {
             deleteElement(t.id);
             els = withDeleted(els, t.id);
-            if (abraLastId.current === t.id) abraLastId.current = null;
+            if (voiceLastId.current === t.id) voiceLastId.current = null;
           }
           results.push(`deleted ${targets.length} selected elements`);
           continue;
@@ -2903,7 +2903,7 @@ export function DiagramEditor({
         const foot = { x: e.x, y: e.y, width: e.width, height: e.height };
         deleteElement(e.id);
         els = withDeleted(els, e.id);
-        if (abraLastId.current === e.id) abraLastId.current = null;
+        if (voiceLastId.current === e.id) voiceLastId.current = null;
         // Compact: close the horizontal gap the element left (vertical strip only).
         if (op.compact) removeSpace({ x: foot.x, y: foot.y, width: foot.width, height: 0 });
         results.push(`deleted ${nameOf(e)}${op.compact ? " and compacted" : ""}`);
@@ -2962,7 +2962,7 @@ export function DiagramEditor({
         // The room came out of the lane's right-hand side: widen the pools to fit (they stay one width).
         if (els.some((e) => e.type === "pool" && e.x + e.width < plan.contentRight + 40)) extendPools();
         els = plan.elements;
-        abraLastId.current = ids.epId;
+        voiceLastId.current = ids.epId;
         setSelectedElementIds(new Set()); // selection protocol: nothing stays selected
         results.push(plan.summary);
         continue;
@@ -2978,7 +2978,7 @@ export function DiagramEditor({
         wrapInContainer([...selectedIds], op.container, label, ids);
         if (els.some((e) => e.type === "pool" && e.x + e.width < plan.contentRight + 40)) extendPools();
         els = plan.elements;
-        abraLastId.current = ids.containerId;
+        voiceLastId.current = ids.containerId;
         setSelectedElementIds(new Set()); // selection protocol
         results.push(plan.summary);
         continue;
@@ -3001,7 +3001,7 @@ export function DiagramEditor({
         if ("error" in plan) { results.push(plan.error); anyFail = true; continue; }
         movePoolTo(m.id, op.position, a.id);
         els = plan.elements;
-        abraLastId.current = m.id;
+        voiceLastId.current = m.id;
         setSelectedElementIds(new Set()); // selection protocol
         results.push(`moved ${nameOf(m)} ${op.position} ${nameOf(a)}`);
         continue;
@@ -3149,7 +3149,7 @@ export function DiagramEditor({
         moveElements([target.id], dx, dy);
         elementsMoveEnd(); // commit the nudge as its own undo entry
         setSelectedElementIds(new Set()); // selection protocol
-        abraLastId.current = target.id;
+        voiceLastId.current = target.id;
         results.push(`nudged ${nameOf(target)} ${op.direction} ${dist}px`);
         continue;
       }
@@ -3163,7 +3163,7 @@ export function DiagramEditor({
         const toward = op.direction === "down" ? sibs[i + 1] : sibs[i - 1];
         if (!toward) { results.push(`${nameOf(r)} is against the pool edge — can't move it ${op.direction}`); anyFail = true; continue; }
         moveLane(r.id, op.direction, op.distance ?? 32);
-        abraLastId.current = r.id;
+        voiceLastId.current = r.id;
         setSelectedElementIds(new Set()); // selection protocol
         results.push(`moved ${nameOf(r)} ${op.direction}`);
         continue;
@@ -3322,7 +3322,7 @@ export function DiagramEditor({
         addElementGated("intermediate-event", spot, undefined, op.eventType, newId);
         setEventBoundary(newId, host.id);
         if (op.label) updateLabel(newId, op.label);
-        abraLastId.current = newId;
+        voiceLastId.current = newId;
         setSelectedElementIds(new Set([newId]));
         results.push(`added boundary event${op.label ? ` ${op.label}` : ""} on ${nameOf(host)}`);
         continue;
@@ -3374,7 +3374,7 @@ export function DiagramEditor({
   const cancelRenameFlow = useCallback((reason?: string) => {
     setRenameFlow(null);
     cancelLabelEdit();
-    if (reason) setAbraLog((prev) => [...prev, { id: nanoid(), heard: "", summary: reason, ok: true }]);
+    if (reason) setVoiceLog((prev) => [...prev, { id: nanoid(), heard: "", summary: reason, ok: true }]);
   }, [setRenameFlow, cancelLabelEdit]);
 
   // Apply a dictated name to the picked element/connector, then STAY in the loop
@@ -3399,13 +3399,13 @@ export function DiagramEditor({
     if (single) {
       // "label selected": one item, no pick loop afterwards.
       setRenameFlow(null);
-      setAbraLog((prev) => [...prev, { id: nanoid(), heard: clean, summary: `labelled the connector “${clean}”`, ok: true }]);
+      setVoiceLog((prev) => [...prev, { id: nanoid(), heard: clean, summary: `labelled the connector “${clean}”`, ok: true }]);
       return;
     }
     const targets = collectRenameTargets(data.elements, data.connectors, itemType);
     if (targets.length > 0) setRenameFlow({ phase: "pick", itemType, targets });
     else setRenameFlow(null);
-    setAbraLog((prev) => [...prev, { id: nanoid(), heard: clean, summary: `renamed to “${clean}” — pick another or say “done”`, ok: true }]);
+    setVoiceLog((prev) => [...prev, { id: nanoid(), heard: clean, summary: `renamed to “${clean}” — pick another or say “done”`, ok: true }]);
   }, [updateLabel, updateConnectorLabel, cancelLabelEdit, setRenameFlow, cancelRenameFlow, data.elements, data.connectors]);
 
   // Handle one utterance while the guided rename flow is active.
@@ -3423,10 +3423,10 @@ export function DiagramEditor({
       // absorbs the recogniser substituting "lane" for "one" — a bias we
       // create ourselves by boosting `lane` (spokenNumber.ts).
       const picked = leadingSpokenNumber(t);
-      if (!picked) { setAbraLog((prev) => [...prev, { id: nanoid(), heard: t, summary: "say the number of the item to rename", ok: false }]); return; }
+      if (!picked) { setVoiceLog((prev) => [...prev, { id: nanoid(), heard: t, summary: "say the number of the item to rename", ok: false }]); return; }
       const n = picked.n;
       const target = flow.targets.find((x) => x.n === n);
-      if (!target) { setAbraLog((prev) => [...prev, { id: nanoid(), heard: t, summary: `there’s no number ${n}`, ok: false }]); return; }
+      if (!target) { setVoiceLog((prev) => [...prev, { id: nanoid(), heard: t, summary: `there’s no number ${n}`, ok: false }]); return; }
       // Select + enter edit mode (+ zoom for elements) so the change is visible.
       if (target.kind === "element") { setSelectedConnectorId(null); setSelectedElementIds(new Set([target.id])); beginLabelEdit(target.id); }
       else { setSelectedElementIds(new Set()); setSelectedConnectorId(target.id); }
@@ -3454,7 +3454,7 @@ export function DiagramEditor({
     const flow = messageFlowRef.current;
     if (!flow) return;
     const t = text.trim();
-    const log = (summary: string, ok: boolean) => setAbraLog((prev) => [...prev, { id: nanoid(), heard: t, summary, ok }]);
+    const log = (summary: string, ok: boolean) => setVoiceLog((prev) => [...prev, { id: nanoid(), heard: t, summary, ok }]);
     if (isFlowEndWord(t)) { setMessageFlow(null); log("message cancelled", true); return; }
     const a = parseMessageAnswer(t, flow.mode);
     if (!a) {
@@ -3474,10 +3474,10 @@ export function DiagramEditor({
   handleMessageUtteranceRef.current = handleMessageUtterance;
 
   // Interpret a raw command (deterministic first; AI fallback added in Stage 4).
-  const runAbraCommand = useCallback(async (text: string) => {
+  const runVoiceCommand = useCallback(async (text: string) => {
     const heard = text.trim();
     if (!heard) return;
-    const log = (entry: Omit<CommandLogEntry, "id">) => setAbraLog((prev) => [...prev, { id: nanoid(), ...entry }]);
+    const log = (entry: Omit<CommandLogEntry, "id">) => setVoiceLog((prev) => [...prev, { id: nanoid(), ...entry }]);
     // A typed "stop" means the same as a spoken one: the mic, and anything parked, ends.
     if (isMicStopWord(heard)) { stopAbraListeningRef.current(); log({ heard, summary: "stopped listening", ok: true }); return; }
     // While a guided pick is active, every utterance feeds it (a number, a
@@ -3529,7 +3529,7 @@ export function DiagramEditor({
           ? { op: "wrapInContainer", container: "pool" as const, ...(op.label ? { label: op.label } : {}) } as AssistOp
           : op,
       );
-      const what = needsConfirmation(ops, data.elements, abraLastId.current, selectedIdsRef.current);
+      const what = needsConfirmation(ops, data.elements, voiceLastId.current, selectedIdsRef.current);
       if (what) {
         pendingConfirmRef.current = { ops, what, viaAi };
         log({ heard, summary: `${prefix}${what}? — say “yes” to confirm`, ok: true, viaAi });
@@ -3542,7 +3542,7 @@ export function DiagramEditor({
     const ops = parseCommand(heard);
     if (ops) { applyOrAsk(ops, false); return; }
     // Deterministic parser didn't recognise it → AI fallback (metered).
-    setAbraBusy(true);
+    setVoiceBusy(true);
     try {
       const res = await fetch("/api/ai/command", {
         method: "POST",
@@ -3562,80 +3562,80 @@ export function DiagramEditor({
     } catch {
       log({ heard, summary: "command service unavailable", ok: false, viaAi: true });
     } finally {
-      setAbraBusy(false);
+      setVoiceBusy(false);
     }
   }, [applyGrouped, data.elements, data.connectors]);
   // Keep a stable ref so the mic's onText callback always calls the latest.
-  const runAbraCommandRef = useRef(runAbraCommand);
-  runAbraCommandRef.current = runAbraCommand;
+  const runAbraCommandRef = useRef(runVoiceCommand);
+  runAbraCommandRef.current = runVoiceCommand;
   exportJsonRef.current = () => { void handleExportJson(); };
 
   // Voice comes in as fragments (Deepgram finalises on every pause), so ONE
   // spoken command arrives as several onText calls. Buffer the fragments and
   // interpret the whole sentence after a short silence, so "rename the pool …
   // to … My Company" is treated as a single command.
-  const abraBuffer = useRef("");
-  const abraFlushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const abraWaits = useRef(0);           // how many times we've held an incomplete command
+  const voiceBuffer = useRef("");
+  const voiceFlushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const voiceWaits = useRef(0);           // how many times we've held an incomplete command
   const ABRA_SILENCE_MS = 2200;
   const ABRA_CONTINUE_MS = 3200;         // longer grace while waiting for the rest of a split command
   const ABRA_MAX_WAITS = 3;
   // Auto-close after 2 min of no voice — an open Deepgram stream is billed by
   // duration, so an idle mic keeps costing money. Reset on every voice fragment.
-  const abraIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const voiceIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ABRA_IDLE_MS = 120000;
-  const flushAbraBuffer = useCallback((force = false) => {
-    if (abraFlushTimer.current) { clearTimeout(abraFlushTimer.current); abraFlushTimer.current = null; }
-    const cmd = abraBuffer.current.trim();
+  const flushVoiceBuffer = useCallback((force = false) => {
+    if (voiceFlushTimer.current) { clearTimeout(voiceFlushTimer.current); voiceFlushTimer.current = null; }
+    const cmd = voiceBuffer.current.trim();
     // A split command ("rename Task 8 to" … pause … "Approve") — keep the buffer
     // and wait a bit longer for the continuation rather than running the half.
-    if (!force && cmd && isIncompleteCommand(cmd) && abraWaits.current < ABRA_MAX_WAITS) {
-      abraWaits.current += 1;
-      abraFlushTimer.current = setTimeout(() => flushAbraBuffer(), ABRA_CONTINUE_MS);
+    if (!force && cmd && isIncompleteCommand(cmd) && voiceWaits.current < ABRA_MAX_WAITS) {
+      voiceWaits.current += 1;
+      voiceFlushTimer.current = setTimeout(() => flushVoiceBuffer(), ABRA_CONTINUE_MS);
       return;
     }
-    abraWaits.current = 0;
-    abraBuffer.current = "";
-    setAbraInterim("");
+    voiceWaits.current = 0;
+    voiceBuffer.current = "";
+    setVoiceInterim("");
     if (cmd) void runAbraCommandRef.current(cmd);
   }, []);
 
   const stopAbraListening = useCallback(() => {
-    abraStopRequested.current = true;
-    if (abraIdleTimer.current) { clearTimeout(abraIdleTimer.current); abraIdleTimer.current = null; }
-    abraDictRef.current?.stop();
-    abraDictRef.current = null;
-    setAbraListening(false);
+    voiceStopRequested.current = true;
+    if (voiceIdleTimer.current) { clearTimeout(voiceIdleTimer.current); voiceIdleTimer.current = null; }
+    voiceDictRef.current?.stop();
+    voiceDictRef.current = null;
+    setVoiceListening(false);
     setAbraConnecting(false);
     // "stop" ends everything: a numbered pick or a parked confirmation dies with the mic.
     setRenameFlow(null);
     setMessageFlow(null);
     pendingConfirmRef.current = null;
-    flushAbraBuffer(true); // apply anything still buffered (force — no more is coming)
-  }, [flushAbraBuffer, setRenameFlow, setMessageFlow]);
+    flushVoiceBuffer(true); // apply anything still buffered (force — no more is coming)
+  }, [flushVoiceBuffer, setRenameFlow, setMessageFlow]);
   stopAbraListeningRef.current = stopAbraListening;
 
   // (Re)arm the 2-minute idle auto-close; called on every voice fragment.
   const bumpAbraIdle = useCallback(() => {
-    if (abraIdleTimer.current) clearTimeout(abraIdleTimer.current);
-    abraIdleTimer.current = setTimeout(() => {
-      setAbraLog((prev) => [...prev, { id: nanoid(), heard: "", summary: "Abracadabra closed — 2 minutes idle", ok: true }]);
+    if (voiceIdleTimer.current) clearTimeout(voiceIdleTimer.current);
+    voiceIdleTimer.current = setTimeout(() => {
+      setVoiceLog((prev) => [...prev, { id: nanoid(), heard: "", summary: "Voice Assist closed — 2 minutes idle", ok: true }]);
       stopAbraListening();
     }, ABRA_IDLE_MS);
   }, [stopAbraListening]);
 
   const toggleAbraListening = useCallback(async () => {
-    if (abraListening || abraDictRef.current) { stopAbraListening(); return; }
-    abraStopRequested.current = false;
-    abraBuffer.current = "";
-    abraMicOpenedAt.current = Date.now(); // the open session has no usage row yet — Cost adds its seconds live
-    setAbraListening(true);
+    if (voiceListening || voiceDictRef.current) { stopAbraListening(); return; }
+    voiceStopRequested.current = false;
+    voiceBuffer.current = "";
+    voiceMicOpenedAt.current = Date.now(); // the open session has no usage row yet — Cost adds its seconds live
+    setVoiceListening(true);
     setAbraConnecting(true);
     const handle = await startDictation({
       onEngine: (e) => setAbraEngine(e),
       onReady: () => setAbraConnecting(false),
       // Show the command building: buffered fragments + the in-progress words.
-      onInterim: (t) => { bumpAbraIdle(); setAbraInterim((abraBuffer.current ? abraBuffer.current + " " : "") + t); },
+      onInterim: (t) => { bumpAbraIdle(); setVoiceInterim((voiceBuffer.current ? voiceBuffer.current + " " : "") + t); },
       onText: (t) => {
         bumpAbraIdle();
         const txt = t.trim();
@@ -3643,31 +3643,31 @@ export function DiagramEditor({
         // Spoken "stop" ALWAYS ends the session (stopWords.ts) — a numbered pick
         // ends with "done", so the two can no longer be confused.
         if (isMicStopWord(txt)) {
-          abraBuffer.current = "";
+          voiceBuffer.current = "";
           stopAbraListening();
           return;
         }
         // Accumulate this fragment and restart the silence timer. A fresh
         // fragment may complete a held command, so re-evaluate from scratch.
-        abraBuffer.current = (abraBuffer.current ? abraBuffer.current + " " : "") + txt;
-        abraWaits.current = 0;
-        setAbraInterim(abraBuffer.current);
-        const buf = abraBuffer.current.trim();
+        voiceBuffer.current = (voiceBuffer.current ? voiceBuffer.current + " " : "") + txt;
+        voiceWaits.current = 0;
+        setVoiceInterim(voiceBuffer.current);
+        const buf = voiceBuffer.current.trim();
         // #5 Instant: show badges the moment a "rename <type>" is heard, and pick
         // a number the moment it's spoken — skip the silence wait entirely.
         const flow = renameFlowRef.current;
-        if (flow?.phase === "pick" && /(?:^|\s)(?:\d{1,3}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty)(?:\s|$)/i.test(buf)) { flushAbraBuffer(true); return; }
-        if (!flow) { const p = parseCommand(buf); if (p && p.length === 1 && p[0].op === "renameByType") { flushAbraBuffer(true); return; } }
-        if (abraFlushTimer.current) clearTimeout(abraFlushTimer.current);
-        abraFlushTimer.current = setTimeout(() => flushAbraBuffer(), ABRA_SILENCE_MS);
+        if (flow?.phase === "pick" && /(?:^|\s)(?:\d{1,3}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty)(?:\s|$)/i.test(buf)) { flushVoiceBuffer(true); return; }
+        if (!flow) { const p = parseCommand(buf); if (p && p.length === 1 && p[0].op === "renameByType") { flushVoiceBuffer(true); return; } }
+        if (voiceFlushTimer.current) clearTimeout(voiceFlushTimer.current);
+        voiceFlushTimer.current = setTimeout(() => flushVoiceBuffer(), ABRA_SILENCE_MS);
       },
-      onError: (msg) => setAbraLog((prev) => [...prev, { id: nanoid(), heard: "", summary: msg, ok: false }]),
-      onEnd: () => { abraDictRef.current = null; setAbraListening(false); flushAbraBuffer(true); },
+      onError: (msg) => setVoiceLog((prev) => [...prev, { id: nanoid(), heard: "", summary: msg, ok: false }]),
+      onEnd: () => { voiceDictRef.current = null; setVoiceListening(false); flushVoiceBuffer(true); },
     });
-    if (!handle || abraStopRequested.current) { handle?.stop(); abraDictRef.current = null; setAbraListening(false); return; }
-    abraDictRef.current = handle;
+    if (!handle || voiceStopRequested.current) { handle?.stop(); voiceDictRef.current = null; setVoiceListening(false); return; }
+    voiceDictRef.current = handle;
     bumpAbraIdle(); // start the idle clock even if no voice ever arrives
-  }, [abraListening, stopAbraListening, flushAbraBuffer, bumpAbraIdle]);
+  }, [voiceListening, stopAbraListening, flushVoiceBuffer, bumpAbraIdle]);
 
   // Escape cancels a guided pick (rename or message) at any phase.
   useEffect(() => {
@@ -3675,7 +3675,7 @@ export function DiagramEditor({
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       if (renameFlow) cancelRenameFlow("rename cancelled");
-      if (messageFlow) { setMessageFlow(null); setAbraLog((prev) => [...prev, { id: nanoid(), heard: "", summary: "message cancelled", ok: true }]); }
+      if (messageFlow) { setMessageFlow(null); setVoiceLog((prev) => [...prev, { id: nanoid(), heard: "", summary: "message cancelled", ok: true }]); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -3683,9 +3683,9 @@ export function DiagramEditor({
 
   // Stop the mic when the mode is turned off or the editor unmounts.
   useEffect(() => {
-    if (!abracadabraOn && abraDictRef.current) stopAbraListening();
-  }, [abracadabraOn, stopAbraListening]);
-  useEffect(() => () => { abraDictRef.current?.stop(); }, []);
+    if (!voiceAssistOn && voiceDictRef.current) stopAbraListening();
+  }, [voiceAssistOn, stopAbraListening]);
+  useEffect(() => () => { voiceDictRef.current?.stop(); }, []);
 
   const isContext = diagramType === "context" || diagramType === "basic";
   const defaultDirectionType: DirectionType =
@@ -5870,25 +5870,25 @@ export function DiagramEditor({
             👻 Assist{assistEnabled ? " ●" : ""}
           </button>
         )}
-        {/* Abracadabra Mode — live voice/typed command editing (BPMN only).
+        {/* Voice Assist — live voice/typed command editing (BPMN only).
             Expert subscriptions and above. */}
-        {!readOnly && diagramType === "bpmn" && abracadabraAllowed && (
+        {!readOnly && diagramType === "bpmn" && voiceAssistAllowed && (
           <button
             onClick={() => {
-              setAbracadabraOn((prev) => {
+              setVoiceAssistOn((prev) => {
                 const nv = !prev;
-                try { localStorage.setItem(`abracadabra-${diagramId}`, String(nv)); } catch { /* ignore */ }
+                try { localStorage.setItem(`voice-assist-${diagramId}`, String(nv)); } catch { /* ignore */ }
                 return nv;
               });
             }}
             className={`px-2 py-0.5 text-[11px] rounded border ${
-              abracadabraOn
+              voiceAssistOn
                 ? "text-fuchsia-700 border-fuchsia-400 bg-fuchsia-50"
                 : "text-gray-700 border-gray-300 hover:bg-gray-50"
             }`}
-            title="Abracadabra Mode — speak or type commands and the diagram edits itself live"
+            title="Voice Assist — speak or type commands and the diagram edits itself live"
           >
-            🪄 Abracadabra{abracadabraOn ? " ●" : ""}
+            🪄 Voice Assist{voiceAssistOn ? " ●" : ""}
           </button>
         )}
         {!readOnly && (
@@ -6211,7 +6211,7 @@ export function DiagramEditor({
             disabledSymbols={disabledSymbols}
             colorConfig={effectiveColorConfig}
             extraSymbols={reviewMode ? ["review-comment"] : []}
-            forceCollapsed={abracadabraOn}
+            forceCollapsed={voiceAssistOn}
           />
         )}
 
@@ -6337,22 +6337,22 @@ export function DiagramEditor({
           onAddSelfTransition={diagramType === "state-machine" ? addSelfTransition : undefined}
         />
 
-        {/* Abracadabra Mode command bar — voice/typed live editing.
+        {/* Voice Assist command bar — voice/typed live editing.
             Same gate as the wand that opens it, plus the BPMN check the wand
             had and this did not: a diagram-type switch used to leave the bar
             up on a diagram whose commands could not apply to it. */}
-        {abracadabraOn && !readOnly && diagramType === "bpmn" && abracadabraAllowed && (
-          <AbracadabraBar
-            listening={abraListening}
+        {voiceAssistOn && !readOnly && diagramType === "bpmn" && voiceAssistAllowed && (
+          <VoiceAssistBar
+            listening={voiceListening}
             connecting={abraConnecting}
             engine={abraEngine}
-            interim={abraInterim}
-            busy={abraBusy}
-            log={abraLog}
-            onSubmitText={(t) => { void runAbraCommand(t); }}
+            interim={voiceInterim}
+            busy={voiceBusy}
+            log={voiceLog}
+            onSubmitText={(t) => { void runVoiceCommand(t); }}
             onToggleListen={() => { void toggleAbraListening(); }}
-            onClear={() => setAbraLog([])}
-            onClose={() => { stopAbraListening(); setAbracadabraOn(false); try { localStorage.setItem(`abracadabra-${diagramId}`, "false"); } catch {} }}
+            onClear={() => setVoiceLog([])}
+            onClose={() => { stopAbraListening(); setVoiceAssistOn(false); try { localStorage.setItem(`voice-assist-${diagramId}`, "false"); } catch {} }}
             onCost={fetchAbraCost}
           />
         )}
@@ -6516,7 +6516,7 @@ export function DiagramEditor({
             onConvertProcessCollapsed={convertProcessCollapsed}
             onConvertEventType={convertEventType}
             forceCollapseTitle={showAiPanel || showPlanPanel || showHistoryPanel}
-            forceCollapsePanel={abracadabraOn}
+            forceCollapsePanel={voiceAssistOn}
           />
         )}
 

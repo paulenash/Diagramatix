@@ -1,6 +1,6 @@
 "use client";
 /**
- * Abracadabra Mode UI — a floating command bar. Shows the live-listening caption
+ * Voice Assist UI — a floating command bar. Shows the live-listening caption
  * (Stage 3 voice), a typed-command input, and a scrolling command log (heard →
  * did — one undo per command). Presentational: all state + apply logic live in the
  * editor.
@@ -52,7 +52,7 @@ function FloatingPanel({ title, onClose, children }: { title: string; onClose: (
   );
 }
 
-export function AbracadabraBar({
+export function VoiceAssistBar({
   listening,
   engine,
   interim,
@@ -148,7 +148,7 @@ export function AbracadabraBar({
           onPointerDown={onBarDown} onPointerMove={onBarMove} onPointerUp={onBarUp} onPointerCancel={onBarUp}
           title="Drag to move">
           <div className="flex items-center gap-2 text-sm font-semibold text-purple-800">
-            <span>🪄 Abracadabra</span>
+            <span>🪄 Voice Assist</span>
             {listening && (connecting
               ? <span className="text-[10px] font-normal text-amber-600 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />connecting…</span>
               : <span className="text-[10px] font-normal text-red-500 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />listening{engine === "browser" ? " (browser)" : ""}…</span>)}

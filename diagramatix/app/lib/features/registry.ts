@@ -38,8 +38,8 @@ export const FEATURES: FeatureDef[] = [
   { key: "ai-generate-record",   label: "AI Generate: Record to Prompt", category: "AI Generation" },
   // Authoring
   { key: "bpmn-templates",       label: "BPMN Templates",                category: "Authoring" },
-  { key: "nl-assist",            label: "NL Assist",                     category: "Authoring" },
-  { key: "abracadabra",          label: "Abracadabra (voice editing)",   category: "Authoring" },
+  { key: "nl-assist",            label: "Assist",                        category: "Authoring" },
+  { key: "voice-assist",         label: "Voice Assist",                  category: "Authoring" },
   // Collaboration
   { key: "collaboration-groups", label: "Collaboration Groups",          category: "Collaboration" },
   { key: "sharing",              label: "Project & Diagram Sharing",     category: "Collaboration" },

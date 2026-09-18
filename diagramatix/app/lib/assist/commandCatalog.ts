@@ -1,7 +1,7 @@
 /**
  * What you can say — the reminder card behind the bar's "Commands" button.
  *
- * Kept in code rather than in `docs/abracadabra-commands.md` so it ships to the
+ * Kept in code rather than in `docs/voice-assist-commands.md` so it ships to the
  * browser and so a test can prove every example still parses: a reminder that
  * lists a phrase the grammar no longer accepts is worse than no reminder.
  * Entries flagged `voice` are mic words, not commands, and are not parsed.
@@ -77,7 +77,7 @@ export const COMMAND_CATALOG: CatalogFamily[] = [
  * The card is the reminder someone reads while they are trying to get work
  * done, and every line on it costs the reader something. A presentation flourish
  * does not earn a place there. It still has to be written down somewhere a
- * person can find it, which is the SuperAdmin Abracadabra tile — so this list is
+ * person can find it, which is the SuperAdmin Voice Assist tile — so this list is
  * rendered there and only there.
  *
  * Same parse guarantee as the main catalogue: every phrase here is asserted to

@@ -1,5 +1,5 @@
 /**
- * Append Feature-catalog rows for the AI Assist + Abracadabra Mode suite
+ * Append Feature-catalog rows for the AI Assist + Voice Assist suite
  * (2026-08-04). Idempotent (skipped if a row with the same `name` exists).
  * New rows insert as DRAFT — open /dashboard/admin/features to review, then
  * Publish All to push to /features.
@@ -31,7 +31,7 @@ const FEATURES: Array<{ name: string; summary: string; details: string; sortOrde
     ].join("\n"),
   },
   {
-    name: "Abracadabra Mode — Voice-Driven Diagramming",
+    name: "Voice Assist — Voice-Driven Diagramming",
     sortOrder: 230,
     summary:
       "Just talk. Say \"add a task called Approve after Review\", \"put a pool around everything\", \"delete Prepare and compact\" — and watch the diagram build itself, live and undoable.",
@@ -50,7 +50,7 @@ const FEATURES: Array<{ name: string; summary: string; details: string; sortOrde
 const dq = (tag: string, s: string) => `$${tag}$${s}$${tag}$`;
 function toSql(): string {
   const out = [
-    "-- AI Assist + Abracadabra feature-catalog rows (draft). Idempotent.",
+    "-- AI Assist + Voice Assist feature-catalog rows (draft). Idempotent.",
     "-- Run in the SuperAdmin Database Manager, then /dashboard/admin/features → Publish All.",
     "BEGIN;",
     "",

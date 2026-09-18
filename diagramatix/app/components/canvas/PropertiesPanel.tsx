@@ -206,7 +206,7 @@ interface Props {
   /** Collapse or expand EVERY review comment at once (panel button). */
   onSetAllReviewCollapsed?: (collapsed: boolean) => void;
   forceCollapseTitle?: boolean;
-  /** Collapse the whole panel while true (Abracadabra open); restore the
+  /** Collapse the whole panel while true (Voice Assist open); restore the
    *  user's own state when it goes false again. */
   forceCollapsePanel?: boolean;
   /** Per-diagram process owner — surfaced in the new Process Owner
@@ -989,7 +989,7 @@ export function PropertiesPanel({
     }
   }, [forceCollapseTitle]);
 
-  // Abracadabra open → fold the panel away; closed → put back what the user had.
+  // Voice Assist open → fold the panel away; closed → put back what the user had.
   const beforeForceRef = useRef<boolean | null>(null);
   useEffect(() => {
     if (forceCollapsePanel) { beforeForceRef.current = panelCollapsed; setPanelCollapsed(true); }

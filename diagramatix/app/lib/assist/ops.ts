@@ -1,5 +1,5 @@
 /**
- * Abracadabra Mode — the op vocabulary a spoken/typed command turns into, plus a
+ * Voice Assist — the op vocabulary a spoken/typed command turns into, plus a
  * validator for AI-returned ops. Refs are spoken NAMES or pronouns, resolved to
  * ids at apply time (see resolveRef.ts) so the interpreter never needs ids.
  */

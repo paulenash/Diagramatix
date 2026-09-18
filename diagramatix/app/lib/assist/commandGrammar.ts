@@ -1,5 +1,5 @@
 /**
- * Abracadabra Mode — deterministic (no-LLM) parser for common spoken editing
+ * Voice Assist — deterministic (no-LLM) parser for common spoken editing
  * commands. Returns an op list for phrasings it recognises, or null so the
  * caller falls back to the AI interpreter. Pure + tested.
  */
@@ -59,7 +59,7 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   // Either word order — "flashing gold" and "gold flashing" are both natural,
   // and which one comes out of your mouth is not something to have to remember.
   // Deliberately absent from the user-facing Commands card; it lives in the
-  // SuperAdmin Abracadabra tile instead.
+  // SuperAdmin Voice Assist tile instead.
   {
     const gf = lower.match(
       /^turn\s+(on|off)\s+(?:the\s+)?(?:gold(?:en)?\s+flash(?:ing)?|flash(?:ing)?\s+gold(?:en)?)\s*$/,

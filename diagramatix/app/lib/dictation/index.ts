@@ -184,7 +184,7 @@ async function startDeepgram(token: string, scheme: string, cb: DictationCallbac
   // undoes it, and nothing else in the language needs protecting from it.
   for (const kw of ["lane:3", "sublane:3", "pool:3", "gateway:2", "task:2", "subprocess:2",
     "selected:3", "selection:2",
-    "boundary", "connect", "rename", "delete", "compact", "Abracadabra"]) {
+    "boundary", "connect", "rename", "delete", "compact", "Voice Assist"]) {
     params.append("keywords", kw);
   }
   const ws = new WebSocket(`wss://api.deepgram.com/v1/listen?${params.toString()}`, [scheme, token]);

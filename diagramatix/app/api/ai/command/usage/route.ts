@@ -10,7 +10,7 @@ import { summariseCommandUsage, LIVE_COMMAND_POINT, VOICE_POINT } from "@/app/li
 /**
  * GET /api/ai/command/usage?since=<ISO>&live=<seconds>
  *
- * The cost of the current Abracadabra session for the signed-in user (and the
+ * The cost of the current Voice Assist session for the signed-in user (and the
  * user they are viewing as, whose key would pay): AI fallback calls plus closed
  * dictation sessions since `since`, with `live` — the seconds the microphone
  * has been open on a session that has not closed yet — added by the caller.

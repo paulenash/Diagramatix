@@ -1,4 +1,4 @@
-# Abracadabra Mode — Command Reference
+# Voice Assist — Command Reference
 
 The **definitive list** of voice/typed commands. Every command here is recognised by the
 **deterministic parser** (`app/lib/assist/commandGrammar.ts`) — instant, free, offline — and is
@@ -167,15 +167,15 @@ one breath is still the surest way; the hold is the safety net.
 
 ## "stop" versus "done"
 
-- **stop** (also "stop listening", "that's enough", "abracadabra off") — **always stops the
+- **stop** (also "stop listening", "that's enough", "voice-assist off") — **always stops the
   microphone**, and drops any numbered pick or parked confirmation with it. Typed or spoken.
 - **done** (also "cancel", "finished", "stop rename") — ends a numbered pick (rename by number,
   message by number) and **keeps listening**. Escape does the same.
 
-## While Abracadabra is open
+## While Voice Assist is open
 
 - The bar can be **dragged by its header**; the Symbols palette and the Properties panel fold away
-  when Abracadabra opens and come back as they were when it closes.
+  when Voice Assist opens and come back as they were when it closes.
 - The mic header says **connecting…** until the recogniser is live, then **listening…** — speech
   during the handshake is captured and sent once the connection opens, so the first word is no
   longer lost.

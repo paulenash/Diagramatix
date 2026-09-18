@@ -1,7 +1,7 @@
 /**
  * Moving a container must not drag things off the boundaries they are mounted on.
  *
- * Paul's repro (2026-09-18), from "Abracadabra Testing 2": turn Abracadabra on,
+ * Paul's repro (2026-09-18), from "Voice Assist Testing 2": turn Voice Assist on,
  * select "Pool 1" with the mouse, say "nudge selected up", and the Start, the
  * End and three intermediate events all slide up with it — off the edge of the
  * "Document Handling" subprocess they are mounted on, which has not moved.

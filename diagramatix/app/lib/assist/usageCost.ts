@@ -1,5 +1,5 @@
 /**
- * "What has this Abracadabra session cost so far?" — summed from the usage rows
+ * "What has this Voice Assist session cost so far?" — summed from the usage rows
  * the feature already writes: one `AiInvocation` per AI fallback call (tokens
  * recorded) and one per closed dictation session (`latencyMs` = seconds × 1000,
  * provider "deepgram" or "browser").

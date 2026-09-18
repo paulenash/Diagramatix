@@ -1,5 +1,5 @@
 /**
- * Paul's seven Abracadabra findings, 15 September 2026: nudge distance, the
+ * Paul's seven Voice Assist findings, 15 September 2026: nudge distance, the
  * missing first word, "stop" meaning two things, a movable bar with the side
  * panels folded, the Commands card's wording, and messages by number.
  */
@@ -70,13 +70,13 @@ describe("2 — nothing said during the handshake is lost", () => {
     expect(dict, "the UI is told when the recogniser is live").toContain("cb.onReady?.();");
     const ed = editor();
     expect(ed).toContain("onReady: () => setAbraConnecting(false),");
-    expect(read("app", "components", "canvas", "AbracadabraBar.tsx")).toContain("connecting…");
+    expect(read("app", "components", "canvas", "VoiceAssistBar.tsx")).toContain("connecting…");
   });
 });
 
 describe("3 — 'stop' means one thing", () => {
   it("T4402 — stop words end the mic; done/cancel end a numbered pick; the editor uses each in the right place", () => {
-    for (const w of ["stop", "Stop.", "stop listening", "that's enough", "abracadabra off", "thank you Gort"]) expect(isMicStopWord(w), w).toBe(true);
+    for (const w of ["stop", "Stop.", "stop listening", "that's enough", "voice-assist off", "thank you Gort"]) expect(isMicStopWord(w), w).toBe(true);
     for (const w of ["done", "cancel", "never mind", "nevermind", "stop rename", "finished", "all done"]) expect(isFlowEndWord(w), w).toBe(true);
     // The two vocabularies do not overlap on the word that caused the trouble.
     expect(isFlowEndWord("stop")).toBe(false);
@@ -99,7 +99,7 @@ describe("3 — 'stop' means one thing", () => {
 
 describe("4 — a movable bar, with the side panels folded while it is open", () => {
   it("T4403 — the bar drags by its header; Palette and Properties fold on open and restore on close", () => {
-    const bar = read("app", "components", "canvas", "AbracadabraBar.tsx");
+    const bar = read("app", "components", "canvas", "VoiceAssistBar.tsx");
     expect(bar).toMatch(/onPointerDown=\{onBarDown\} onPointerMove=\{onBarMove\} onPointerUp=\{onBarUp\}/);
     expect(bar, "until dragged it sits where it always did").toContain('barPos ? "" : "left-1/2 -translate-x-1/2 bottom-4"');
     const pal = read("app", "components", "canvas", "Palette.tsx");
@@ -109,14 +109,14 @@ describe("4 — a movable bar, with the side panels folded while it is open", ()
     expect(props).toContain("forceCollapsePanel?: boolean;");
     expect(props).toMatch(/if \(forceCollapsePanel\) \{ beforeForceRef\.current = panelCollapsed; setPanelCollapsed\(true\); \}/);
     const ed = editor();
-    expect(ed).toContain("forceCollapsed={abracadabraOn}");
-    expect(ed).toContain("forceCollapsePanel={abracadabraOn}");
+    expect(ed).toContain("forceCollapsed={voiceAssistOn}");
+    expect(ed).toContain("forceCollapsePanel={voiceAssistOn}");
   });
 });
 
 describe("5 — the Commands card says what it shows", () => {
   it("T4404 — no dangling reference to 'green commands': the card states that everything on it is instant", () => {
-    const bar = read("app", "components", "canvas", "AbracadabraBar.tsx");
+    const bar = read("app", "components", "canvas", "VoiceAssistBar.tsx");
     expect(bar).toContain("Everything on this card is instant and free");
     expect(bar).not.toContain("Green <span");
   });

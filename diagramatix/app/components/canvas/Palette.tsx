@@ -26,7 +26,7 @@ interface Props {
   /** Appended to the diagram's normal palette — used to surface the
    *  review-comment symbol only while in Review Mode. */
   extraSymbols?: SymbolType[];
-  /** Collapse the palette while true (Abracadabra open) and restore the user's
+  /** Collapse the palette while true (Voice Assist open) and restore the user's
    *  own state when it goes false again. */
   forceCollapsed?: boolean;
 }
@@ -865,7 +865,7 @@ function ArchimatePalette({
 
 export function Palette({ diagramType, onDragStart, disabledSymbols = [], colorConfig, extraSymbols = [], forceCollapsed = false }: Props) {
   const [collapsed, setCollapsed] = useState(false);
-  // Abracadabra needs the canvas: fold the palette away while it is open and
+  // Voice Assist needs the canvas: fold the palette away while it is open and
   // put back whatever the user had when it closes (Paul, 2026-09-15).
   const beforeForceRef = useRef<boolean | null>(null);
   useEffect(() => {

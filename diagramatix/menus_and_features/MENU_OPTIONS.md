@@ -157,7 +157,7 @@ Every menu option, button, and action available on the three main screens — **
 - **AI Comparison Results** *(SA, when present)* — the multi‑model comparison modal.
 - **Highlight** *(Process Context)* — dim all but the selected element and its connections. **Entity Drift** — ring names not in the adopted Entity Structure. **Comments:** — filter shown review comments by reviewer.
 - **✨ AI Generate** — the AI plan/generation panel *(hidden when AI is disabled or read‑only)*.
-- **👻 Assist** *(BPMN)* — opt‑in ghost next‑step suggestions. **🪄 Abracadabra** *(BPMN, SA)* — live voice/typed command editing.
+- **👻 Assist** *(BPMN)* — opt‑in ghost next‑step suggestions. **🪄 Voice Assist** *(BPMN, SA)* — live voice/typed command editing.
 - **Diagram ▾** — **◈ Simulator** *(BPMN)*, **▸ Animate!**, **Send for Review**, **Get help**, **Clear Diagram**, **Clear All but Selected**, **History** (view/restore versions), **Configuration** (see below), **Process description** (deterministic plain‑language, no AI), **Scan Diagram for Issues** *(BPMN)*.
 - **User Guide** — opens `/help`.
 
