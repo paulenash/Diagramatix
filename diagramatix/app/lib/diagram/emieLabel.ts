@@ -19,6 +19,18 @@
  * "left a bit" does not help: the label goes ABOVE the line instead, on the
  * side the line travels.
  *
+ * Paul, 2026-09-19 after testing: "EMIE label placement good except when placed
+ * on top horizontal boundary. The label should be outside the parent to the top
+ * left of the EMIE."
+ *
+ * A TOP mount is the third case, and the reason is the same one in a different
+ * direction: the event straddles the host's TOP edge, so everything below that
+ * edge is the host's own body. A label the usual distance below the event lands
+ * INSIDE the host, over whatever is drawn there. It goes above the event
+ * instead — outside the parent entirely — and far enough left to clear the
+ * event, since a top-mounted event sends its flow upward through the space
+ * directly above it.
+ *
  * Scope is deliberately the three USER creation paths — a palette drop, a drag
  * onto a host rim, and the assist/Abracadabra `addBoundary` op, all three of
  * which mount through the reducer. Generated diagrams keep R7.05 in
@@ -74,12 +86,26 @@ export const isVerticalBoundary = (side: BoundarySide): boolean =>
  * `labelOffsetY` the label's TOP from the event's bottom — the two the
  * renderer reads.
  */
-export function emieLabelOffset(side: BoundarySide, eventHeight: number): LabelOffsets {
+export function emieLabelOffset(side: BoundarySide, eventWidth: number, eventHeight: number): LabelOffsets {
   const half = DEFAULT_LABEL_WIDTH / 2;
-  if (!isVerticalBoundary(side)) {
-    // Half a label to the left of centre, at the usual distance below.
+
+  if (side === "top") {
+    // Up and to the left, both by enough to be clear: the label's BOTTOM above
+    // the event's top (which puts it outside the host, whose body starts at the
+    // edge the event straddles), and its RIGHT edge left of the event's left
+    // edge, out of the way of the flow leaving upward.
+    return {
+      labelOffsetX: -(half + eventWidth / 2 + CONNECTOR_CLEARANCE),
+      labelOffsetY: -(eventHeight + LABEL_LINE_H + CONNECTOR_CLEARANCE),
+    };
+  }
+
+  if (side === "bottom") {
+    // Below a bottom mount is already outside the host, so only the sideways
+    // shift is needed: half a label left of centre, at the usual distance down.
     return { labelOffsetX: -half, labelOffsetY: DEFAULT_LABEL_OFFSET_Y };
   }
+
   // Sit the label's BOTTOM just above the outgoing connector, which leaves
   // horizontally from the event's vertical centre; and put it on the side the
   // connector travels, so it labels that line rather than floating off it.
@@ -98,5 +124,5 @@ export function emieMountProps(
   ev: DiagramElement,
 ): LabelOffsets & { boundarySide: BoundarySide } {
   const side = boundarySideOf(host, ev);
-  return { boundarySide: side, ...emieLabelOffset(side, ev.height) };
+  return { boundarySide: side, ...emieLabelOffset(side, ev.width, ev.height) };
 }
