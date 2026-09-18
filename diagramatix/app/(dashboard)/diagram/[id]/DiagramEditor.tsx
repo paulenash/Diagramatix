@@ -3011,7 +3011,7 @@ export function DiagramEditor({
         const m = resolve1(op.ref), a = resolve1(op.relativeTo);
         if ("err" in m) { results.push(m.err); anyFail = true; continue; }
         if ("err" in a) { results.push(a.err); anyFail = true; continue; }
-        const plan = planMovePool(els, m.id, op.position, a.id, isContainerType, getAllDescendantIds);
+        const plan = planMovePool(els, data.connectors, m.id, op.position, a.id, isContainerType, getAllDescendantIds);
         if ("error" in plan) { results.push(plan.error); anyFail = true; continue; }
         movePoolTo(m.id, op.position, a.id);
         els = plan.elements;
@@ -3040,7 +3040,7 @@ export function DiagramEditor({
           }
           [a, b] = pair;
         }
-        const plan = planSwapPools(els, a.id, b.id, isContainerType, getAllDescendantIds);
+        const plan = planSwapPools(els, data.connectors, a.id, b.id, isContainerType, getAllDescendantIds);
         if ("error" in plan) { results.push(plan.error); anyFail = true; continue; }
         swapPools(a.id, b.id);
         els = plan.elements;

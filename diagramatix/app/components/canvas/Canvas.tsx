@@ -4693,7 +4693,7 @@ export function Canvas({
     // they cross over" (2026-09-18). Ranked above the data artifacts, and the
     // group's own internal order is left to the depth sort below, so a pool
     // still draws beneath its own contents.
-    const lifted = liftedIds && liftedIds.length > 1 ? new Set(liftedIds) : null;
+    const lifted = liftedIds && liftedIds.length > 0 ? new Set(liftedIds) : null;
     const stackRank = (el: DiagramElement): number => {
       if (lifted?.has(el.id)) return 3;
       if (!DATA_ARTIFACT_TYPES.has(el.type)) return 0;
@@ -5073,7 +5073,7 @@ export function Canvas({
    */
   let renderContainerEl: ((el: DiagramElement) => React.ReactNode) | null = null;
   /** True for anything travelling with the current drag. */
-  const isLifted = (id: string) => !!liftedIds && liftedIds.length > 1 && liftedIds.includes(id);
+  const isLifted = (id: string) => !!liftedIds && liftedIds.length > 0 && liftedIds.includes(id);
   const isDataArtifactType = (t: string) => t === "data-object" || t === "data-store" || t === "text-annotation";
 
   // Hump geometry for the regular-connector pass, MEMOISED so each connector's
@@ -6295,7 +6295,7 @@ export function Canvas({
               its own contents; the group's internal order is otherwise the same
               as it would have been. Rendered by the very same functions, so the
               elements behave identically while they are up here. */}
-          {liftedIds && liftedIds.length > 1 && (
+          {liftedIds && liftedIds.length > 0 && (
             <g data-lifted-drag="true">
               {renderContainerEl && [...pools, ...vswimlanes, ...otherContainers]
                 .filter(el => isLifted(el.id))

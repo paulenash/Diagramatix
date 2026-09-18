@@ -22,8 +22,9 @@
  * what the pool is drawn around — so a stale parentId cannot drag along an
  * element that is somewhere else entirely.
  */
-import type { DiagramElement } from "./types";
+import type { Connector, DiagramElement } from "./types";
 import { expandMoveSet } from "./moveSet";
+import { recomputeAllConnectors } from "./routing";
 
 /** Default gap when there is nothing to copy from. */
 const DEFAULT_GAP = 24;
@@ -32,6 +33,13 @@ export type PoolPosition = "above" | "below";
 
 export interface ReorderPlan {
   elements: DiagramElement[];
+  /**
+   * Connectors after the move. A message flow between a pool and something
+   * outside it has waypoints in world coordinates, so moving the pool without
+   * touching them leaves the message hanging in mid-air, visibly detached
+   * (Paul, 2026-09-18: "message attachments ... become disconnected").
+   */
+  connectors: Connector[];
   /** Pool ids in their new top-to-bottom order. */
   order: string[];
   /** How far each pool moved, for a summary. */
@@ -53,6 +61,7 @@ export function poolsInOrder(elements: readonly DiagramElement[]): DiagramElemen
  */
 function restack(
   elements: readonly DiagramElement[],
+  connectors: readonly Connector[],
   order: readonly string[],
   isContainer: (t: DiagramElement["type"]) => boolean,
   descendantsOf: (els: DiagramElement[], id: string) => Iterable<string>,
@@ -96,12 +105,30 @@ function restack(
     return { ...e, y: e.y + dy };
   });
 
-  return { elements: out, order: [...order], moved };
+  // A connector whose two ends moved together keeps its shape — the whole thing
+  // just slid down the page. Any other is routed afresh, which is what re-anchors
+  // a message flow onto the pool's new edge.
+  const shiftOf = (id: string) => dyById.get(id) ?? 0;
+  const stale = new Set<string>();
+  const translated = connectors.map((c) => {
+    const a = shiftOf(c.sourceId);
+    const b = shiftOf(c.targetId);
+    if (a !== b) { stale.add(c.id); return c; }
+    if (a === 0) return c;
+    return { ...c, waypoints: c.waypoints.map((p) => ({ ...p, y: p.y + a })) };
+  });
+  const rerouted = new Map(
+    recomputeAllConnectors(translated.filter((c) => stale.has(c.id)), out).map((c) => [c.id, c] as const),
+  );
+  const finalConnectors = translated.map((c) => rerouted.get(c.id) ?? c);
+
+  return { elements: out, connectors: finalConnectors, order: [...order], moved };
 }
 
 /** "Move Pool 1 above Pool 2". */
 export function planMovePool(
   elements: readonly DiagramElement[],
+  connectors: readonly Connector[],
   poolId: string,
   position: PoolPosition,
   relativeToId: string,
@@ -123,12 +150,13 @@ export function planMovePool(
   if (order.every((id, i) => id === pools[i].id)) {
     return { error: `${nameOf(mover)} is already ${position} ${nameOf(anchor)}` };
   }
-  return restack(elements, order, isContainer, descendantsOf);
+  return restack(elements, connectors, order, isContainer, descendantsOf);
 }
 
 /** "Swap Pool 1 with Pool 2" — exchange two pools' places in the stack. */
 export function planSwapPools(
   elements: readonly DiagramElement[],
+  connectors: readonly Connector[],
   aId: string,
   bId: string,
   isContainer: (t: DiagramElement["type"]) => boolean,
@@ -142,7 +170,7 @@ export function planSwapPools(
 
   const order = pools.map((p) => p.id);
   [order[ia], order[ib]] = [order[ib], order[ia]];
-  return restack(elements, order, isContainer, descendantsOf);
+  return restack(elements, connectors, order, isContainer, descendantsOf);
 }
 
 /** The two pools a "swap the selected pools" refers to, or null. */

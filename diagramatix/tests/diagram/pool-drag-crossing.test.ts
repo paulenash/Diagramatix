@@ -149,9 +149,14 @@ describe("T4514 — the moving group draws on top of what it crosses", () => {
     expect(CANVAS).toMatch(/if \(ra !== rb\) return ra - rb;[\s\S]{0,80}getParentDepth/);
   });
 
-  it("does not lift a lone element being dragged", () => {
-    // One id means nothing is travelling with it, and the existing data-artifact
-    // rule already handles that case.
-    expect(CANVAS).toContain("liftedIds.length > 1");
+  it("lifts a pool that has nothing travelling with it", () => {
+    // The first version only lifted a group of two or more, on the reasoning
+    // that a lone element does not need it. That was wrong in the one case that
+    // matters: an EMPTY pool, or one whose only children are mounted elsewhere
+    // and so stay behind, travels alone — and those were exactly the two Paul
+    // found still drawing underneath (2026-09-18: "Pool 3 is underneath
+    // everything??").
+    expect(CANVAS).toContain("liftedIds.length > 0");
+    expect(CANVAS).not.toContain("liftedIds.length > 1");
   });
 });

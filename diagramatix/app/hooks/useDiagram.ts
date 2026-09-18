@@ -9055,16 +9055,16 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
     // separate step — the ones below simply start lower.
     case "MOVE_POOL_TO": {
       const { poolId, position, relativeToId } = action.payload;
-      const plan = planMovePool(state.elements, poolId, position, relativeToId, isContainerType, getAllDescendantIds);
+      const plan = planMovePool(state.elements, state.connectors, poolId, position, relativeToId, isContainerType, getAllDescendantIds);
       if ("error" in plan) return state;
-      return { ...state, elements: plan.elements };
+      return { ...state, elements: plan.elements, connectors: plan.connectors };
     }
 
     case "SWAP_POOLS": {
       const { aId, bId } = action.payload;
-      const plan = planSwapPools(state.elements, aId, bId, isContainerType, getAllDescendantIds);
+      const plan = planSwapPools(state.elements, state.connectors, aId, bId, isContainerType, getAllDescendantIds);
       if ("error" in plan) return state;
-      return { ...state, elements: plan.elements };
+      return { ...state, elements: plan.elements, connectors: plan.connectors };
     }
 
     case "UNWRAP_SUBPROCESS": {
