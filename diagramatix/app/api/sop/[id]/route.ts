@@ -50,9 +50,36 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   const title = typeof body.title === "string" ? body.title : undefined;
   const status = body.status === "published" || body.status === "draft" ? body.status : undefined;
   const sections = Array.isArray(body.sections) ? body.sections : null;
+  const clientVersion = typeof body.version === "number" ? body.version : null;
 
+  // DATA-36: a save with sections DELETES every section and recreates them, so
+  // two people editing one SOP would have the second wholesale destroy the
+  // first's work — and get a 200 for it. Same contract the diagram save has:
+  // send the version you loaded, and a 409 comes back with the current document
+  // if it has moved on. A save that only touches the title or the status leaves
+  // the sections alone and needs no token.
+  if (sections && clientVersion === null) {
+    return NextResponse.json({
+      error: "version-required",
+      message: "Send the version you loaded so a concurrent edit is not overwritten.",
+    }, { status: 400 });
+  }
+
+  let conflict = false;
   await prisma.$transaction(async (tx) => {
-    if (title !== undefined || status !== undefined) {
+    if (sections) {
+      // The compare-and-swap IS the version bump: it only affects a row still at
+      // the version this editor loaded, so losing the race writes nothing.
+      const cas = await tx.sopDocument.updateMany({
+        where: { id, version: clientVersion! },
+        data: {
+          ...(title !== undefined ? { title } : {}),
+          ...(status !== undefined ? { status } : {}),
+          version: { increment: 1 },
+        },
+      });
+      if (cas.count === 0) { conflict = true; return; }
+    } else if (title !== undefined || status !== undefined) {
       await tx.sopDocument.update({ where: { id }, data: { ...(title !== undefined ? { title } : {}), ...(status !== undefined ? { status } : {}) } });
     }
     if (sections) {
@@ -76,6 +103,21 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       });
     }
   });
+
+  if (conflict) {
+    // Hand back what is actually there, so the editor can show the other version
+    // rather than just refusing. Mirrors the diagram route's 409 body.
+    const current = await prisma.sopDocument.findUnique({
+      where: { id },
+      include: { sections: { orderBy: { sortOrder: "asc" } } },
+    });
+    return NextResponse.json({
+      error: "conflict",
+      message: "Someone else saved this SOP while you were editing it.",
+      currentVersion: current?.version ?? null,
+      document: current,
+    }, { status: 409 });
+  }
   return NextResponse.json({ ok: true });
 }
 

@@ -2170,6 +2170,10 @@ model SopDocument {
   // One-level undo: the section set (JSON string) captured just before the last
   // regenerate, so a merge can be reverted. String (not Json) per Prisma-7 caveat.
   prevSectionsJson String?    @db.Text
+  /// Optimistic concurrency, the same contract `Diagram.version` has (DATA-36).
+  /// A save deletes and recreates every section, so without this the second of
+  /// two people editing one SOP destroys the first's work and gets a 200 for it.
+  version        Int          @default(0)
   sections       SopSection[]
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt

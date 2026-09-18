@@ -25,6 +25,7 @@ import { seedSimulationDefaults } from "@/app/lib/simulation/seedDefaults";
 import { usedTeamNames } from "@/app/lib/simulation/harvestTeams";
 import { autofillSimulation, unfillSimulation } from "@/app/lib/simulation/autofill";
 import { autofillProject, reachableDiagramIds } from "@/app/lib/simulation/autofillProject";
+import { mergeSimProperties } from "@/app/lib/simulation/mergeSimProperties";
 import type { ScenarioRunConfig, WorkCalendar } from "@/app/lib/simulation/types";
 import { ConsoleUserGuideLink } from "@/app/components/ConsoleUserGuideLink";
 
@@ -245,10 +246,26 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId,
       if (id === rootId) applyActive(data);
       else {
         setDiagramsById((prev) => new Map(prev).set(id, data));
-        fetch(`/api/diagrams/${id}`, {
-          method: "PUT", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ data, unconditional: true }),
-        }).catch(() => {});
+        // DATA-37: `data` here is built from the snapshot taken when this console
+        // opened, so writing it whole — which is what `unconditional: true` did —
+        // reverted every edit anyone had made to that sub-process since. Re-read
+        // the child, lay ONLY the simulation parameters over what is actually
+        // there, and send its version so the server refuses rather than
+        // clobbers if it moves again in the meantime.
+        void (async () => {
+          try {
+            const cur = await fetch(`/api/diagrams/${id}`);
+            if (!cur.ok) return;
+            const row = await cur.json() as { data?: DiagramData; version?: number };
+            if (!row?.data || typeof row.version !== "number") return;
+            const merged = mergeSimProperties(row.data, data);
+            if (merged.applied === 0) return;
+            await fetch(`/api/diagrams/${id}`, {
+              method: "PUT", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ data: merged.data, version: row.version }),
+            });
+          } catch { /* a child that cannot be written is left alone, not overwritten */ }
+        })();
       }
     }
     return n;

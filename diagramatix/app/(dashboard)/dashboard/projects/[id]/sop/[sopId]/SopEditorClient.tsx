@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState , useRef } from "react";
 import { useRouter } from "next/navigation";
 import { GuideEditor } from "@/app/(dashboard)/dashboard/admin/user-guide/GuideEditor";
 import { FilePreviewDialog, type PreviewPayload } from "@/app/components/preview/FilePreviewDialog";
@@ -22,10 +22,13 @@ interface RegenSummary { refreshed: number; kept: number; added: number; dropped
  * edits, added sections, and locked sections survive — with one-level Undo.
  */
 export function SopEditorClient({
-  projectId, sopId, backHref, stale, initialTitle, initialStatus, initialScopeLabel, initialUndoAvailable, initialSections,
+  projectId, sopId, backHref, stale, initialTitle, initialStatus, initialScopeLabel, initialUndoAvailable, initialSections, initialVersion,
 }: {
   projectId: string;
   sopId: string;
+  /** The version this editor loaded. Sent back on save so a concurrent edit is
+   *  reported rather than destroyed (DATA-36). */
+  initialVersion: number;
   backHref: string;
   stale: boolean;
   initialTitle: string;
@@ -44,6 +47,11 @@ export function SopEditorClient({
   );
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  /** The version last known to be on the server. A ref, not state: it must not
+   *  make the editor re-render, and the save closure has to see the newest one. */
+  const versionRef = useRef(initialVersion);
+  /** Set when someone else saved first — the editor keeps its work and says so. */
+  const [conflict, setConflict] = useState<number | null>(null);
   const [previewPayload, setPreviewPayload] = useState<PreviewPayload | null>(null);
   const [previewing, setPreviewing] = useState(false);
 
@@ -111,11 +119,27 @@ export function SopEditorClient({
   async function save() {
     setSaving(true);
     try {
+      // DATA-36: a save replaces every section, so it carries the version this
+      // editor loaded. If someone else saved in between the server refuses and
+      // hands back theirs, rather than letting this one destroy their work and
+      // reporting success.
       const res = await fetch(`/api/sop/${sopId}`, {
         method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, status, sections }),
+        body: JSON.stringify({ title, status, sections, version: versionRef.current }),
       });
-      if (res.ok) { setDirty(false); router.refresh(); }
+      if (res.status === 409) {
+        const body = await res.json().catch(() => ({}));
+        // Nothing of theirs is thrown away and nothing of this editor's is
+        // either — the work stays on screen, unsaved, and the author decides.
+        setConflict(body?.currentVersion ?? null);
+        return;
+      }
+      if (res.ok) {
+        versionRef.current += 1;
+        setConflict(null);
+        setDirty(false);
+        router.refresh();
+      }
     } finally { setSaving(false); }
   }
 
@@ -191,6 +215,23 @@ export function SopEditorClient({
             className="px-3 py-1.5 text-xs text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-40">
             {saving ? "Saving…" : dirty ? "Save" : "Saved"}
           </button>
+          {conflict !== null && (
+            // DATA-36: the save was refused because someone else got there
+            // first. Nothing of theirs was overwritten and nothing typed here
+            // has been thrown away — it is still on screen, still unsaved, and
+            // the author decides what to do. Silence here is what made the old
+            // behaviour dangerous: it destroyed their work and returned 200.
+            <span className="flex items-center gap-2 text-[11px] text-amber-800 bg-amber-50 border border-amber-300 rounded px-2 py-1.5">
+              <span>Someone else saved this SOP. Your edits are still here, unsaved.</span>
+              <button
+                onClick={() => { window.location.reload(); }}
+                className="underline hover:no-underline"
+                title="Discard what is on screen and load their version"
+              >
+                Load theirs
+              </button>
+            </span>
+          )}
           {confirmDelete ? (
             <span className="flex items-center gap-1">
               <button onClick={del} className="px-2 py-1.5 text-xs text-white bg-red-600 rounded hover:bg-red-700">Delete</button>

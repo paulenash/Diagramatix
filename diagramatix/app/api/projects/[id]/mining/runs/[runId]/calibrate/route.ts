@@ -11,6 +11,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma, pgPool } from "@/app/lib/db";
 import { writeDiagramData } from "@/app/lib/mining/diagramStore";
+import { updateDiagramData } from "@/app/lib/diagram/updateDiagramData";
 import { updateRunJson } from "@/app/lib/mining/runStore";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
@@ -79,8 +80,18 @@ export async function POST(_req: Request, { params }: Params) {
   }
 
   // ── Calibrate ──
-  const cal = calibrateSimulation(baseData, perf);
-  await writeDiagramData(bpmnId, cal.data);
+  // DATA-39: this is a read-modify-write — the calibration is computed FROM the
+  // diagram's current contents — so it goes through the guarded path rather than
+  // writing the copy read at the top of the route. If someone edited the
+  // discovered diagram in between, the calibration is recomputed against what is
+  // actually there instead of reverting them. `calibrateSimulation` is pure, so
+  // running it again on a retry is free; the calendar is taken from whichever
+  // run actually landed.
+  let cal = calibrateSimulation(baseData, perf);
+  await updateDiagramData(bpmnId, (current) => {
+    cal = calibrateSimulation(current, perf);
+    return cal.data;
+  });
 
   // Mined working calendar (upsert by name).
   const CAL_NAME = "Working hours (mined)";
