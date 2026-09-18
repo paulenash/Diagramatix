@@ -405,6 +405,8 @@ interface Props {
   /** Gold flashing: outline what the last Abracadabra command touched. `runId`
    *  is bumped per command so the overlay can tell a new run from a re-render. */
   goldFlash?: { runId: number; targets: readonly GoldFlashTarget[] };
+  /** Ids travelling with the current drag — drawn above everything they cross. */
+  liftedIds?: readonly string[] | null;
 }
 
 interface EditingLabel {
@@ -653,6 +655,7 @@ export function Canvas({
   onSwapLane,
   renameBadges,
   goldFlash,
+  liftedIds,
 }: Props) {
   const displayMode = displayModeProp ?? "normal";
   const svgRef = useRef<SVGSVGElement>(null);
@@ -4684,7 +4687,15 @@ export function Canvas({
     // (requested UX). Rank: 0 = flow element, 1 = data artifact, 2 = the one
     // being dragged.
     const DATA_ARTIFACT_TYPES = new Set<string>(["data-object", "data-store", "text-annotation"]);
+    // Anything travelling with the current drag rides ABOVE everything it
+    // passes over, as one block — Paul asked for a pool crossing other pools or
+    // loose elements to be "always on top and not interact at all with elements
+    // they cross over" (2026-09-18). Ranked above the data artifacts, and the
+    // group's own internal order is left to the depth sort below, so a pool
+    // still draws beneath its own contents.
+    const lifted = liftedIds && liftedIds.length > 1 ? new Set(liftedIds) : null;
     const stackRank = (el: DiagramElement): number => {
+      if (lifted?.has(el.id)) return 3;
       if (!DATA_ARTIFACT_TYPES.has(el.type)) return 0;
       return el.id === draggingElementId ? 2 : 1;
     };

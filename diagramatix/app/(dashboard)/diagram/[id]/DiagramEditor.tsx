@@ -1176,6 +1176,7 @@ export function DiagramEditor({
     wrapInPool,
     movePoolTo,
     swapPools,
+    dragTravellingIds,
     wrapInSubprocess,
     wrapInContainer,
     unwrapSubprocess,
@@ -6263,6 +6264,7 @@ export function DiagramEditor({
           diagramType={diagramType}
           renameBadges={renameFlow?.phase === "pick" ? renameFlow.targets : messageFlow?.targets}
           goldFlash={goldFlash}
+          liftedIds={dragTravellingIds}
           onAddElement={addElementGated}
           onMoveElement={(id, x, y, uc) => { if (feedbackMode && !isFeedbackNote(id)) return; if (!isCoLocked(id)) moveElement(id, x, y, uc); }}
           onResizeElement={(id, x, y, w, h) => { if (feedbackMode && !isFeedbackNote(id)) return; if (!isCoLocked(id)) resizeElement(id, x, y, w, h); }}

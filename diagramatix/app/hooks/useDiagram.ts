@@ -355,7 +355,7 @@ function adjustMsgLabelOffset(
 export type Action =
   | { type: "SET_DATA"; payload: DiagramData }
   | { type: "ADD_ELEMENT"; payload: { symbolType: SymbolType; position: Point; taskType?: BpmnTaskType; eventType?: EventType; id?: string; initial?: { properties?: Record<string, unknown>; width?: number; height?: number; label?: string; parentId?: string } } }
-  | { type: "MOVE_ELEMENT"; payload: { id: string; x: number; y: number; unconstrained?: boolean } }
+  | { type: "MOVE_ELEMENT"; payload: { id: string; x: number; y: number; unconstrained?: boolean; travellingIds?: string[] } }
   | { type: "SWAP_LANES_VERTICAL"; payload: { laneId: string; direction: "up" | "down" } }
   | { type: "RESIZE_ELEMENT"; payload: { id: string; x: number; y: number; width: number; height: number; wasWhiteBoxAtResizeStart?: boolean } }
   | { type: "RESIZE_END"; payload: { id: string } }
@@ -4484,8 +4484,27 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       }
       const dx = effectiveX - el.x, dy = effectiveY - el.y;
       const movingIsContainer = isContainerType(el.type);
-      const descendantIds = movingIsContainer ? getAllDescendantIds(state.elements, id) : new Set<string>();
-      const attachedBoundaryIds = new Set(state.elements.filter(e => e.boundaryHostId === id).map(e => e.id));
+      // What travels with the thing being dragged. Same rule as the multi-select
+      // move (moveSet.ts): a container takes what it is DRAWN AROUND, and an
+      // edge-mounted element follows its HOST rather than its parent.
+      //
+      // This used to walk parentId alone, which is how dragging Pool 1 upward
+      // took five events mounted on a subprocess with it, off the boundary they
+      // sit on — they named the pool as their parent while being drawn nowhere
+      // near it (Paul, 2026-09-18).
+      // Fixed at drag START and handed in, so membership cannot change
+      // mid-gesture. Without that, a pool dragged up the page keeps picking up
+      // whatever it happens to be drawn around at that instant — Paul asked for
+      // a pool crossing other pools or loose elements to "not interact at all
+      // with elements they cross over" (2026-09-18). Recomputed here only for
+      // callers that do not supply one.
+      const travelling = action.payload.travellingIds
+        ? new Set(action.payload.travellingIds)
+        : expandMoveSet(state.elements, [id], isContainerType, getAllDescendantIds);
+      const descendantIds = new Set([...travelling].filter((tid) => tid !== id));
+      const attachedBoundaryIds = new Set(
+        state.elements.filter(e => e.boundaryHostId === id).map(e => e.id),
+      );
 
       // Event boundary-attach is deferred to MOVE_END (drop) — a free event
       // must glide over activities while dragging and attach ONLY to the
@@ -4557,8 +4576,10 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           }
           return { ...e, x: effectiveX, y: effectiveY, parentId };
         }
-        // If moving a container, move all descendants
-        if (movingIsContainer && (e.parentId === id || descendantIds.has(e.id))) {
+        // If moving a container, move what travels with it. The `descendantIds`
+        // set is the authority — the old `e.parentId === id` shortcut beside it
+        // put the stale-parented elements straight back in.
+        if (movingIsContainer && descendantIds.has(e.id)) {
           return { ...e, x: e.x + dx, y: e.y + dy };
         }
         // Pain points / issues attached to a NON-container host follow it when
@@ -9825,6 +9846,15 @@ export function useDiagram(initialData: DiagramData) {
   // Drag-coalescing refs — capture snapshot at drag start, push at drag end
   const preMoveRef        = useRef<Snapshot | null>(null);
   const draggingRef       = useRef<string | null>(null);
+  /** Who travels with the current drag, decided once when it starts. */
+  const dragTravellingRef = useRef<string[] | null>(null);
+  /**
+   * The same set, as state, so the canvas can draw the whole moving group ABOVE
+   * everything it passes over (Paul, 2026-09-18: a pool crossing other pools
+   * "should be always on top and not interact at all"). Written twice per drag —
+   * once at the start, once at the end — never per frame.
+   */
+  const [dragTravellingIds, setDragTravellingIds] = useState<string[] | null>(null);
   const preResizeRef      = useRef<Snapshot | null>(null);
   const resizingRef       = useRef<string | null>(null);
   const preGroupMoveRef   = useRef<Snapshot | null>(null);
@@ -9917,8 +9947,14 @@ export function useDiagram(initialData: DiagramData) {
       if (preMoveRef.current) pushHistory(preMoveRef.current);
       draggingRef.current = id;
       preMoveRef.current = snapshotData(); // snapshot before drag starts
+      // Who travels with this drag, decided once, from where things were when
+      // the drag began.
+      dragTravellingRef.current = [
+        ...expandMoveSet(preMoveRef.current.elements, [id], isContainerType, getAllDescendantIds),
+      ];
+      setDragTravellingIds(dragTravellingRef.current);
     }
-    dispatch({ type: "MOVE_ELEMENT", payload: { id, x, y, unconstrained } });
+    dispatch({ type: "MOVE_ELEMENT", payload: { id, x, y, unconstrained, travellingIds: dragTravellingRef.current ?? undefined } });
   }, []);
 
   const swapLane = useCallback((laneId: string, direction: "up" | "down") => {
@@ -10217,6 +10253,8 @@ export function useDiagram(initialData: DiagramData) {
       pushHistory(preMoveRef.current);
       preMoveRef.current = null;
       draggingRef.current = null;
+      dragTravellingRef.current = null;
+      setDragTravellingIds(null);
     }
     dispatch({ type: "MOVE_END", payload: { id, fromX: before?.x, fromY: before?.y } });
   }, []);
@@ -10476,6 +10514,7 @@ export function useDiagram(initialData: DiagramData) {
     elementsMoveEnd,
     movePoolTo,
     swapPools,
+    dragTravellingIds,
     resizeElement,
     resizeElementEnd,
     updateLabel,
