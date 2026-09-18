@@ -3,6 +3,7 @@ import { Geist, Caveat } from "next/font/google";
 import { SessionProvider } from "@/app/components/SessionProvider";
 import { GlobalOverlays } from "@/app/components/GlobalOverlays";
 import { ScreenBrightness } from "@/app/components/ScreenBrightness";
+import { displayBootScript } from "@/app/lib/ui/screenDisplay";
 import { auth } from "@/auth";
 import { isSuperuser } from "@/app/lib/superuser";
 import "./globals.css";
@@ -50,6 +51,13 @@ export default async function RootLayout({
   const superAdmin = isSuperuser(await auth());
   return (
     <html lang="en">
+      <head>
+        {/* Blocking, and deliberately so: it puts the stored brightness and
+            contrast in force BEFORE the first paint. React cannot read
+            localStorage until after hydration, which would flash a
+            full-brightness screen on every hard reload. */}
+        <script dangerouslySetInnerHTML={{ __html: displayBootScript() }} />
+      </head>
       <body className={`${geist.variable} ${caveat.variable} antialiased`}>
           <SessionProvider>
             {children}

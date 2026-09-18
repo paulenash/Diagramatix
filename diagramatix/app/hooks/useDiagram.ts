@@ -26,6 +26,7 @@ import { planWrapInSubprocess, planUnwrapSubprocess, planWrapInContainer, type W
 import { isUmlConnType } from "@/app/lib/diagram/types";
 import { expandMoveSet } from "@/app/lib/diagram/moveSet";
 import { retypeTasksForSystemFlag, applyTaskTypeChanges } from "@/app/lib/diagram/itSystemTaskTypes";
+import { emieMountProps } from "@/app/lib/diagram/emieLabel";
 import { growPoolToAdopt } from "@/app/lib/diagram/growPool";
 import { planMovePool, planSwapPools, type PoolPosition } from "@/app/lib/diagram/poolOrder";
 import { autoResizeUmlElement, sizeUmlNote } from "@/app/lib/diagram/umlAutoSize";
@@ -4066,12 +4067,19 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           if (dist < bestDist) { bestDist = dist; bestHost = candidate; bestPt = pt; }
         }
         if (bestHost) {
-          newEl = {
+          const mounted = {
             ...newEl,
             x: bestPt.x - BOUNDARY_W / 2, y: bestPt.y - BOUNDARY_H / 2,
             width: BOUNDARY_W, height: BOUNDARY_H,
             boundaryHostId: bestHost.id,
             parentId: bestHost.parentId,
+          };
+          // Paul's EMIE label rule: half a label-width left of centre so the
+          // outbound connector is clear of it, or above the line on a vertical
+          // edge. See app/lib/diagram/emieLabel.ts.
+          newEl = {
+            ...mounted,
+            properties: { ...mounted.properties, ...emieMountProps(bestHost, mounted) },
           };
         }
       }
@@ -6335,11 +6343,11 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       if (!host || !BOUNDARY_HOST_TYPES.has(host.type)) return state;
       const centre = { x: evt.x + evt.width / 2, y: evt.y + evt.height / 2 };
       const pt = nearestPointOnRectBoundary(host, centre);
-      const elements = state.elements.map((e) =>
-        e.id === id
-          ? { ...e, x: pt.x - evt.width / 2, y: pt.y - evt.height / 2, boundaryHostId: hostId, parentId: host.parentId }
-          : e,
-      );
+      const elements = state.elements.map((e) => {
+        if (e.id !== id) return e;
+        const mounted = { ...e, x: pt.x - evt.width / 2, y: pt.y - evt.height / 2, boundaryHostId: hostId, parentId: host.parentId };
+        return { ...mounted, properties: { ...mounted.properties, ...emieMountProps(host, mounted) } };
+      });
       const connectors = state.connectors.map((conn) => {
         if (conn.sourceId !== id && conn.targetId !== id) return conn;
         return recomputeAllConnectors([conn], elements, state.relaxedLayout)[0] ?? conn;
@@ -8389,11 +8397,15 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         }
         if (snap) {
           const host = state.elements.find(h => h.id === snap!.hostId)!;
-          const attachedEls = state.elements.map(e => e.id === id ? {
-            ...e, width: BOUNDARY_W, height: BOUNDARY_H,
-            x: snap!.cx - BOUNDARY_W / 2, y: snap!.cy - BOUNDARY_H / 2,
-            boundaryHostId: snap!.hostId, parentId: host.parentId,
-          } : e);
+          const attachedEls = state.elements.map(e => {
+            if (e.id !== id) return e;
+            const mounted = {
+              ...e, width: BOUNDARY_W, height: BOUNDARY_H,
+              x: snap!.cx - BOUNDARY_W / 2, y: snap!.cy - BOUNDARY_H / 2,
+              boundaryHostId: snap!.hostId, parentId: host.parentId,
+            };
+            return { ...mounted, properties: { ...mounted.properties, ...emieMountProps(host, mounted) } };
+          });
           const reconns = state.connectors.map(conn =>
             (conn.sourceId === id || conn.targetId === id)
               ? recomputeAllConnectors([conn], attachedEls, state.relaxedLayout)[0] ?? conn

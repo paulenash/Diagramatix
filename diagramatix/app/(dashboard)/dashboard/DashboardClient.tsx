@@ -33,6 +33,13 @@ import { returnProjectOf } from "@/app/lib/help/guideReturn";
 import { useSuperAdminChrome, effectiveEntitlements, VIEW_MODE_TIER } from "@/app/hooks/useSuperAdminChrome";
 import { useFeatureColors } from "@/app/lib/theme/useFeatureColors";
 import { featureVars } from "@/app/lib/theme/featureColors";
+import { loadScreenDisplay, setScreenDisplay } from "@/app/components/ScreenBrightness";
+import {
+  BRIGHTNESS_DEFAULT, BRIGHTNESS_MAX, BRIGHTNESS_MIN,
+  CONTRAST_DEFAULT, CONTRAST_MAX, CONTRAST_MIN,
+  DISPLAY_DEFAULTS, clampBrightness, clampContrast, isDisplayDefault,
+  type ScreenDisplay,
+} from "@/app/lib/ui/screenDisplay";
 
 interface DiagramSummary {
   id: string;
@@ -804,6 +811,10 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   // disable the snap entirely without losing their chosen percentage.
   const EDIT_ZOOM_DEFAULT_PCT = 20;
   const [showEditZoom, setShowEditZoom] = useState(false);
+  // System ▸ Display. The draft applies LIVE as the sliders move — you cannot
+  // judge a brightness you cannot see — so Cancel restores what was stored.
+  const [showDisplay, setShowDisplay] = useState(false);
+  const [displayDraft, setDisplayDraft] = useState<ScreenDisplay>(DISPLAY_DEFAULTS);
   const [editZoomInput, setEditZoomInput] = useState<string>(() => {
     if (typeof window === "undefined") return String(EDIT_ZOOM_DEFAULT_PCT);
     const stored = window.localStorage.getItem("editZoomFraction");
@@ -1822,6 +1833,15 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                         </button>
                       </div>
                     </div>
+                    {/* Display \u2014 brightness and contrast for the whole window.
+                        Moved here from the canvas toolbar (Paul, 2026-09-19). */}
+                    <button
+                      onClick={() => { setFileMenuOpen(false); setDisplayDraft(loadScreenDisplay()); setShowDisplay(true); }}
+                      title="Brightness and contrast for the whole Diagramatix screen."
+                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                    >
+                      {"Display\u2026"}
+                    </button>
                     <button
                       onClick={() => { setFileMenuOpen(false); setShowMatrixConfig(true); }}
                       title="Set how long the screen must be idle before the Matrix screensaver kicks in. Arm it with Ctrl+Alt+M."
@@ -3048,6 +3068,69 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           </div>
         </div>
       )}
+
+      {/* Display dialog — brightness + contrast for the whole window.
+          Both apply live while you drag, because a brightness you cannot see is
+          a brightness you cannot judge; Cancel puts back what was stored. */}
+      {showDisplay && (() => {
+        const apply = (next: ScreenDisplay) => { setDisplayDraft(next); setScreenDisplay(next); };
+        const atDefault = isDisplayDefault(displayDraft);
+        const row = (
+          label: string, value: number, min: number, max: number, dflt: number,
+          onChange: (v: number) => void, hint: string,
+        ) => (
+          <div className="mb-4">
+            <div className="flex items-baseline justify-between mb-1">
+              <label className="block text-sm font-medium text-gray-700">{label}</label>
+              <span className="text-xs text-gray-500 tabular-nums">
+                {value}%{value === dflt ? " (default)" : ""}
+              </span>
+            </div>
+            <input
+              type="range"
+              min={min}
+              max={max}
+              value={value}
+              onChange={(e) => onChange(parseInt(e.target.value))}
+              className="w-full h-1 accent-blue-600 cursor-pointer"
+            />
+            <p className="text-[11px] text-gray-400 mt-1">{hint}</p>
+          </div>
+        );
+        return (
+          <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm">
+              <h2 className="text-lg font-semibold text-gray-900 mb-2">Display</h2>
+              <p className="text-xs text-gray-500 mb-4">
+                Brightness and contrast for the whole Diagramatix screen. Both
+                take effect as you drag, and are remembered in this browser.
+              </p>
+              {row("Brightness", displayDraft.brightness, BRIGHTNESS_MIN, BRIGHTNESS_MAX, BRIGHTNESS_DEFAULT,
+                (v) => apply({ ...displayDraft, brightness: clampBrightness(v) }),
+                `${BRIGHTNESS_DEFAULT}% is the normal screen. Up to ${BRIGHTNESS_MAX}% is a little brighter; ${BRIGHTNESS_MIN}% is a long way darker.`)}
+              {row("Contrast", displayDraft.contrast, CONTRAST_MIN, CONTRAST_MAX, CONTRAST_DEFAULT,
+                (v) => apply({ ...displayDraft, contrast: clampContrast(v) }),
+                `${CONTRAST_DEFAULT}% is the normal screen. Higher is harder, lower is softer.`)}
+              <div className="flex gap-3 justify-between items-center">
+                <button
+                  onClick={() => apply(DISPLAY_DEFAULTS)}
+                  disabled={atDefault}
+                  title={atDefault ? "Already at the default settings" : "Put both sliders back to the normal screen"}
+                  className="px-3 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                >
+                  Reset to default
+                </button>
+                <button
+                  onClick={() => setShowDisplay(false)}
+                  className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Matrix Screensaver dialog */}
       {showMatrixConfig && (

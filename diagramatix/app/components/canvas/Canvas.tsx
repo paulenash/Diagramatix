@@ -31,11 +31,6 @@ import type { NextStepCandidate } from "@/app/lib/diagram/nextSteps";
 import { ElementContextMenu } from "./ElementContextMenu";
 import { isBlackBoxPool } from "@/app/lib/diagram/blackBoxPoolMenu";
 import { poolGuideNext, type PoolBoundaryGuide, type PoolGuideEvent } from "@/app/lib/diagram/poolGuide";
-import { setScreenBrightness } from "@/app/components/ScreenBrightness";
-import {
-  BRIGHTNESS_DEFAULT, BRIGHTNESS_MAX, BRIGHTNESS_MIN, BRIGHTNESS_KEY,
-  clampBrightness, readBrightness,
-} from "@/app/lib/ui/screenBrightness";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { canConnect } from "@/app/lib/diagram/canConnect";
 import { GoldFlashOverlay, type GoldFlashTarget } from "./GoldFlashOverlay";
@@ -1058,14 +1053,6 @@ export function Canvas({
   // resize of a pool. Shows a dotted vertical line at the moving
   // boundary's current X plus a marker at every other pool's same-side
   // boundary (vertical centre), highlighted green on alignment.
-  // Screen brightness. Starts at the default and is corrected from storage
-  // after mount, so the server and first client render agree.
-  const [brightness, setBrightness] = useState(BRIGHTNESS_DEFAULT);
-  useEffect(() => {
-    try { setBrightness(readBrightness(window.localStorage.getItem(BRIGHTNESS_KEY))); }
-    catch { /* blocked site data — the default stands */ }
-  }, []);
-
   const [poolBoundaryGuide, setPoolBoundaryGuideState] = useState<PoolBoundaryGuide | null>(null);
   // Escape takes the guide away for the REST of the current gesture — without
   // the suppression it would come straight back on the next mouse-move, since
@@ -8301,31 +8288,9 @@ export function Canvas({
 
         return (
           <div
-            className="absolute bottom-2 flex items-center gap-1.5 z-30 select-none"
+            className="absolute bottom-2 flex items-center gap-1.5 bg-white/90 border border-gray-200 rounded-full px-2 py-1 shadow-sm backdrop-blur-sm z-30 select-none"
             style={{ right: "calc(0.5rem + 156px + 6px + 130px + 6px)" }}
           >
-          {/* Brightness sits immediately LEFT of Zoom so the zoom bar stays
-              exactly where it has always been; the pair reads as one group at
-              the bottom-right. Dims the whole window, not just the canvas —
-              the overlay lives at the app root. */}
-          <div className="flex items-center gap-1.5 bg-white/90 border border-gray-200 rounded-full px-2 py-1 shadow-sm backdrop-blur-sm">
-            <span className="text-gray-500 text-[11px] leading-none" title="Screen brightness">☀</span>
-            <input
-              type="range"
-              min={BRIGHTNESS_MIN}
-              max={BRIGHTNESS_MAX}
-              value={brightness}
-              onChange={(e) => {
-                const v = clampBrightness(parseInt(e.target.value));
-                setBrightness(v);
-                setScreenBrightness(v);
-              }}
-              className="w-20 h-1 accent-amber-500 cursor-pointer"
-              title={`Screen brightness ${brightness}% (${BRIGHTNESS_DEFAULT}% = normal)`}
-            />
-            <span className="text-[10px] text-gray-600 tabular-nums w-7 text-right">{brightness}%</span>
-          </div>
-          <div className="flex items-center gap-1.5 bg-white/90 border border-gray-200 rounded-full px-2 py-1 shadow-sm backdrop-blur-sm">
             <button
               onClick={() => applyZoomPct(displayPct - 10)}
               className="text-gray-500 hover:text-gray-800 text-xs font-bold w-5 h-5 flex items-center justify-center"
@@ -8356,7 +8321,6 @@ export function Canvas({
               onBlur={(e) => { const v = parseInt(e.target.value); if (!isNaN(v)) applyZoomPct(v); }}
               onKeyDown={(e) => { if (e.key === "Enter") { const v = parseInt((e.target as HTMLInputElement).value); if (!isNaN(v)) applyZoomPct(v); (e.target as HTMLInputElement).blur(); } if (e.key === "Escape") (e.target as HTMLInputElement).blur(); }}
             />
-          </div>
           </div>
         );
       })()}
