@@ -16,6 +16,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma, pgPool } from "@/app/lib/db";
+import { diagramDataSql } from "@/app/lib/diagram/updateDiagramData";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 import { skillsFromArchimate, matchSkills } from "@/app/lib/simulation/skillsFromArchimate";
@@ -164,8 +165,8 @@ export async function POST(req: Request, { params }: Params) {
       tasksUpdated++;
       return { ...el, ...simPatch(el, { ...getSimParams(el), requiredSkills: skills }) };
     });
-    await pgPool.query('UPDATE "Diagram" SET data = $1::jsonb, version = version + 1, "updatedAt" = NOW() WHERE id = $2',
-      [JSON.stringify({ ...data, elements }), dId]);
+    const stmt = diagramDataSql(dId, { ...data, elements });
+      await pgPool.query(stmt.text, stmt.values);
   }
 
   return NextResponse.json({

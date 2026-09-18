@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma, pgPool } from "@/app/lib/db";
+import { diagramDataSql } from "@/app/lib/diagram/updateDiagramData";
 import { requireOrgAdminFor, OrgContextError } from "@/app/lib/auth/orgContext";
 import { diffPcfVersions, type DiffNode } from "@/app/lib/pcf/versionDiff";
 
@@ -117,7 +118,8 @@ export async function POST(_req: Request, { params }: Params) {
       next = { ...p, removedInVersion: pair.nw.version };
       flaggedRemoved += 1;
     }
-    await pgPool.query('UPDATE "Diagram" SET data = $1::jsonb, version = version + 1 WHERE id = $2', [JSON.stringify({ ...data, pcf: next }), d.id]);
+    const stmt = diagramDataSql(d.id, { ...data, pcf: next });
+      await pgPool.query(stmt.text, stmt.values);
   }
 
   return NextResponse.json({ ok: true, repointed, flaggedRemoved, tailoredRepointed });

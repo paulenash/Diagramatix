@@ -7,6 +7,7 @@
  * shared by the example "adopt" route AND the user-facing "Import simulation".
  */
 import { prisma } from "@/app/lib/db";
+import { diagramDataSql, runDiagramDataSqlInTx } from "@/app/lib/diagram/updateDiagramData";
 import type { DiagramData } from "@/app/lib/diagram/types";
 import { validateExamplePackage, type ExampleLibrary, type ExamplePackage } from "./examplePackage";
 import { calendarResolver, remapCalendarRefs, type CalendarResolver } from "./calendarRefs";
@@ -106,11 +107,7 @@ export async function repointProjectCalendars(tx: Tx, projectId: string, resolve
     );
     if (!changed) continue;
     repointed += changed;
-    await tx.$executeRawUnsafe(
-      'UPDATE "Diagram" SET "data" = $1::jsonb, version = version + 1 WHERE id = $2',
-      JSON.stringify(data),
-      row.id,
-    );
+    await runDiagramDataSqlInTx(tx, diagramDataSql(row.id, data));
   }
   return repointed;
 }

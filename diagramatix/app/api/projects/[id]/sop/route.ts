@@ -143,8 +143,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (scope === "whole") {
     const url = `/dashboard/projects/${projectId}/sop/${created.id}`;
     try {
+      // Deliberately surgical rather than the shared whole-blob statement
+      // (DATA-40): `jsonb_set` re-reads the row at write time, so it sets ONE
+      // key and preserves whatever a concurrent editor save did to the rest.
+      // Now also sets `updatedAt`, which this statement was skipping — a
+      // diagram could gain a procedure doc without anything that sorts by
+      // modification date noticing.
       await pgPool.query(
-        `UPDATE "Diagram" SET data = jsonb_set(data, '{procedureDoc}', $1::jsonb), version = version + 1 WHERE id = $2`,
+        `UPDATE "Diagram" SET data = jsonb_set(data, '{procedureDoc}', $1::jsonb), version = version + 1, "updatedAt" = NOW() WHERE id = $2`,
         [JSON.stringify({ url, name: gen.title }), diagramId],
       );
       await prisma.diagram.update({ where: { id: diagramId }, data: { procedureDocUrl: url, procedureDocName: gen.title } });

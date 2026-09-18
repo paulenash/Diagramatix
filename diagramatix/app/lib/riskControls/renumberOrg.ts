@@ -9,6 +9,7 @@
  *  OrgAdmin renumber route (`app/api/orgs/[id]/risk-controls/renumber`). */
 import type { PrismaClient } from "@/app/generated/prisma/client";
 import { assignOrgWideCodes, type RenumberLib } from "./renumber";
+import { diagramDataSql, runDiagramDataSqlInTx } from "@/app/lib/diagram/updateDiagramData";
 import type { RiskControlKind } from "./types";
 
 export interface RenumberResult { groups: number; items: number; diagrams: number }
@@ -51,7 +52,7 @@ export async function renumberOrgCodes(
         }
       }
     }
-    if (changed) { await prisma.$executeRawUnsafe('UPDATE "Diagram" SET data = $1::jsonb, version = version + 1, "updatedAt" = NOW() WHERE id = $2', JSON.stringify(data), d.id); touched++; }
+    if (changed) { await runDiagramDataSqlInTx(prisma, diagramDataSql(d.id, data)); touched++; }
   }
 
   return { groups: counters.reduce((s, c) => s + c.count, 0), items: newCodeByItem.size, diagrams: touched };

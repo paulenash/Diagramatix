@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma, pgPool } from "@/app/lib/db";
+import { diagramDataSql } from "@/app/lib/diagram/updateDiagramData";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 import { extractCode, stripCodeTail, normalize } from "@/app/lib/numbering/codes";
@@ -435,10 +436,12 @@ export async function POST(req: Request, { params }: Params) {
       for (const did of touched) {
         const d = diagramById.get(did);
         if (!d) continue;
-        await client.query(
-          'UPDATE "Diagram" SET "data" = $1::jsonb, version = version + 1, "updatedAt" = NOW() WHERE id = $2',
-          [JSON.stringify(d.data ?? {}), did],
-        );
+        // One shared statement for every writer of Diagram.data (DATA-40), run
+        // on this route's own pg client because the write has to be inside the
+        // surrounding BEGIN/COMMIT — a pooled write is a different connection
+        // and could not join it.
+        const stmt = diagramDataSql(did, d.data ?? {});
+        await client.query(stmt.text, stmt.values);
       }
       await client.query("COMMIT");
     } catch (err) {

@@ -12,6 +12,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma, pgPool } from "@/app/lib/db";
+import { diagramDataSql } from "@/app/lib/diagram/updateDiagramData";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 
@@ -75,7 +76,8 @@ export async function POST(_req: Request, { params }: Params) {
       }
     }
     if (changed) {
-      await pgPool.query('UPDATE "Diagram" SET data = $1::jsonb, version = version + 1, "updatedAt" = NOW() WHERE id = $2', [JSON.stringify(data), d.id]);
+      const stmt = diagramDataSql(d.id, data);
+      await pgPool.query(stmt.text, stmt.values);
       diagramsUpdated++;
     }
   }

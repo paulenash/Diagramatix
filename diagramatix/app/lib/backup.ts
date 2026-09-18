@@ -29,6 +29,7 @@
 import JSZip from "jszip";
 import { assertZipWithinLimit } from "@/app/lib/uploadLimit";
 import { prisma } from "./db";
+import { diagramDataSql, runDiagramDataSqlInTx } from "@/app/lib/diagram/updateDiagramData";
 import { ARCHIVE_PROJECT_NAME } from "./archive";
 import { SCHEMA_VERSION } from "./diagram/types";
 import { type BackupProgressFn } from "./full-backup";
@@ -569,11 +570,7 @@ export async function restoreUserBackup(
       }
     }
     if (dirty) {
-      await tx.$executeRawUnsafe(
-        'UPDATE "Diagram" SET "data" = $1::jsonb, version = version + 1, "updatedAt" = NOW() WHERE id = $2',
-        JSON.stringify(data),
-        newDiagId,
-      );
+      await runDiagramDataSqlInTx(tx, diagramDataSql(newDiagId, data));
     }
   }
 

@@ -1,4 +1,5 @@
 import { prisma, pgPool } from "@/app/lib/db";
+import { updateDiagramData } from "@/app/lib/diagram/updateDiagramData";
 import { SUPERUSER_EMAILS } from "@/app/lib/superuser";
 
 /** The name used to identify the system archive project */
@@ -119,25 +120,27 @@ async function clearDanglingLinksTo(removedDiagramId: string, projectId: string 
   if (!projectId) return;
   const siblings = await prisma.diagram.findMany({
     where: { projectId, id: { not: removedDiagramId } },
-    select: { id: true, data: true },
+    select: { id: true },
   });
+  // DATA-38/DATA-40: this used to read every sibling here, edit the copy in
+  // memory, and write the whole blob back — so anything the author of that
+  // diagram had done in between was silently reverted. Each sibling is now read
+  // and written as one guarded step, and the read happens INSIDE that step, so
+  // the ids above are only a list of which diagrams to visit.
   for (const sib of siblings) {
-    const data = sib.data as unknown as { elements?: Array<{ properties?: Record<string, unknown> }> } | null;
-    const els = data?.elements;
-    if (!Array.isArray(els)) continue;
-    let touched = false;
-    for (const e of els) {
-      if (e.properties && e.properties.linkedDiagramId === removedDiagramId) {
-        e.properties.linkedDiagramId = null;
-        touched = true;
-      }
-    }
-    if (touched) {
-      await pgPool.query(
-        `UPDATE "Diagram" SET "data" = $1::jsonb, version = version + 1, "updatedAt" = NOW() WHERE id = $2`,
-        [JSON.stringify(data), sib.id],
-      );
-    }
+    await updateDiagramData(sib.id, (current) => {
+      const els = (current as unknown as { elements?: Array<{ properties?: Record<string, unknown> }> }).elements;
+      if (!Array.isArray(els)) return null;
+      let touched = false;
+      const next = els.map((e) => {
+        if (e.properties && e.properties.linkedDiagramId === removedDiagramId) {
+          touched = true;
+          return { ...e, properties: { ...e.properties, linkedDiagramId: null } };
+        }
+        return e;
+      });
+      return touched ? ({ ...current, elements: next } as typeof current) : null;
+    });
   }
 }
 
