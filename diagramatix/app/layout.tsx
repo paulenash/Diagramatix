@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Caveat } from "next/font/google";
 import { SessionProvider } from "@/app/components/SessionProvider";
 import { GlobalOverlays } from "@/app/components/GlobalOverlays";
+import { ScreenBrightness } from "@/app/components/ScreenBrightness";
 import { auth } from "@/auth";
 import { isSuperuser } from "@/app/lib/superuser";
 import "./globals.css";
@@ -53,6 +54,8 @@ export default async function RootLayout({
           <SessionProvider>
             {children}
             <GlobalOverlays superAdmin={superAdmin} />
+            {/* Above everything, so the dimmer covers the whole window. */}
+            <ScreenBrightness />
           </SessionProvider>
         </body>
     </html>
