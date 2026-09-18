@@ -29,6 +29,7 @@ import { CollabGhosts } from "./CollabGhosts";
 import { GhostSuggestion } from "./GhostSuggestion";
 import type { NextStepCandidate } from "@/app/lib/diagram/nextSteps";
 import { ElementContextMenu } from "./ElementContextMenu";
+import { isBlackBoxPool } from "@/app/lib/diagram/blackBoxPoolMenu";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { canConnect } from "@/app/lib/diagram/canConnect";
 import { GoldFlashOverlay, type GoldFlashTarget } from "./GoldFlashOverlay";
@@ -5406,8 +5407,10 @@ export function Canvas({
             return;
           }
           // No inner element hit → offer "Generate SOP for this lane/pool"
-          // (BPMN only) when the cursor is over a lane/pool container.
-          if (onGenerateSopForElement && diagramType === "bpmn") {
+          // (BPMN only) when the cursor is over a lane/pool container. A
+          // BLACK-BOX pool gets the IT System / Collection flags instead, so
+          // its menu opens even where SOP generation isn't available.
+          if ((onGenerateSopForElement || onUpdateProperties) && diagramType === "bpmn") {
             let laneHit: DiagramElement | null = null, poolHit: DiagramElement | null = null;
             for (const el of data.elements) {
               if (worldPos.x < el.x || worldPos.x > el.x + el.width || worldPos.y < el.y || worldPos.y > el.y + el.height) continue;
@@ -5415,7 +5418,11 @@ export function Canvas({
               else if (el.type === "pool") { if (!poolHit || el.width * el.height < poolHit.width * poolHit.height) poolHit = el; }
             }
             const target = laneHit ?? poolHit;
-            if (target) {
+            // Only open a menu that will actually have something in it.
+            const hasItems = target
+              ? (isBlackBoxPool(target) ? !!onUpdateProperties : !!onGenerateSopForElement)
+              : false;
+            if (target && hasItems) {
               setElementContextMenu({ elementId: target.id, kind: target.type === "lane" ? "lane" : "pool", screenX: e.clientX - rect.left, screenY: e.clientY - rect.top });
               return;
             }
@@ -7983,6 +7990,7 @@ export function Canvas({
               onUpdateProperties?.(el.id, { [propKey]: value });
               setElementContextMenu(null);
             }}
+            onToggle={(patch) => { onUpdateProperties?.(el.id, patch); }}
             onAction={(action) => {
               setElementContextMenu(null);
               if (action === "collapse-ep" && el.type === "subprocess-expanded") {

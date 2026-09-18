@@ -42,7 +42,7 @@ const SECTIONS: Array<{ heading: string; body: string }> = [
       "",
       "For a lane / pool / subprocess, pick the specific element from the **Which …?** list, then click **Generate SOP**. It takes around 15–30 seconds, then opens the editable SOP with a picture of the diagram embedded.",
       "",
-      "> **Tip:** you can also **right-click a lane or pool** on the canvas and choose **Generate SOP for this lane/pool** to jump straight to a role SOP.",
+      "> **Tip:** you can also **right-click a lane or a white-box pool** on the canvas and choose **Generate SOP for this lane/pool** to jump straight to a role SOP. A **black-box pool** has no internals to write about, so its right-click menu offers **IT System** and **Collection** instead — tick either to say what the participant is.",
     ].join("\n"),
   },
   {

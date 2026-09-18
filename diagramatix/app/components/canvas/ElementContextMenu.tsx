@@ -2,6 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DiagramElement } from "@/app/lib/diagram/types";
+import {
+  blackBoxPoolMenuItems,
+  isBlackBoxPool,
+  toggleBlackBoxPoolFlag,
+} from "@/app/lib/diagram/blackBoxPoolMenu";
 
 /**
  * Right-click "type-picker" menu for tasks, gateways, sub-processes,
@@ -164,7 +169,7 @@ function sectionsFor(kind: ContextMenuKind, el: DiagramElement): Section[] {
       return []; // no type-picker sections — just the Collapse Package action
     case "lane":
     case "pool":
-      return []; // no type-picker — just the Generate SOP action
+      return []; // no type-picker — just the actions below the sections
   }
 }
 
@@ -177,11 +182,16 @@ export interface ElementContextMenuProps {
   onSelect: (propKey: string, value: string) => void;
   /** One-off actions (not property picks) e.g. "collapse-ep". */
   onAction?: (action: string) => void;
+  /**
+   * A tick-box style property patch. Unlike `onSelect` the menu STAYS OPEN, so
+   * both black-box pool flags can be set in one right-click.
+   */
+  onToggle?: (patch: Record<string, unknown>) => void;
   onClose: () => void;
 }
 
 export function ElementContextMenu({
-  el, kind, left, top, width = 160, onSelect, onAction, onClose,
+  el, kind, left, top, width = 160, onSelect, onAction, onToggle, onClose,
 }: ElementContextMenuProps) {
   const sections = useMemo(() => sectionsFor(kind, el), [kind, el]);
   // Flat list of selectable items across all sections — headers excluded.
@@ -302,8 +312,38 @@ export function ElementContextMenu({
         </div>
       )}
 
-      {/* Lane / Pool → generate a role-scoped SOP for just this swim-lane/pool. */}
-      {(el.type === "lane" || el.type === "pool") && onAction && (
+      {/* Black-box pool → what the participant IS. No Generate SOP below:
+          a black-box pool has no internals, so a role SOP for it is empty.
+          Clicking a flag leaves the menu open so both can be set at once. */}
+      {isBlackBoxPool(el) && onToggle && (
+        <div>
+          <div className="px-3 py-0.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wide select-none">
+            Pool
+          </div>
+          {blackBoxPoolMenuItems(el).map((item) => (
+            <button
+              key={item.flag}
+              role="menuitemcheckbox"
+              aria-checked={item.checked}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onToggle(toggleBlackBoxPoolFlag(el, item.flag));
+              }}
+              className={`text-left w-full px-3 py-0.5 text-sm hover:bg-gray-50 flex items-center gap-1.5 ${
+                item.checked ? "text-blue-700 font-medium" : "text-gray-700"
+              }`}
+            >
+              <span className="w-3 shrink-0 text-center">{item.checked ? "✓" : ""}</span>
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Lane / white-box pool → generate a role-scoped SOP for just this
+          swim-lane/pool. */}
+      {(el.type === "lane" || (el.type === "pool" && !isBlackBoxPool(el))) && onAction && (
         <div>
           <div className="px-3 py-0.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wide select-none">
             Actions

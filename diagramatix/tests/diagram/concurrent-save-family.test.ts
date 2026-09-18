@@ -32,7 +32,7 @@ describe("T4529 — the simulator Fill stops overwriting a child diagram", () =>
     const fresh = diagram([el("a", { x: 900, y: 40, label: "Renamed by someone else" })]);
     const filled = diagram([el("a", { x: 0, y: 0, label: "Old name", properties: { sim: { cycleTime: 5 } } })]);
     const out = mergeSimProperties(fresh, filled);
-    const merged = out.data.elements[0] as { x: number; label: string; properties: { sim: unknown } };
+    const merged = out.data.elements[0] as unknown as { x: number; label: string; properties: { sim: unknown } };
     expect(merged.properties.sim, "the parameters are applied").toEqual({ cycleTime: 5 });
     expect(merged.x, "and their move is kept").toBe(900);
     expect(merged.label, "and their rename").toBe("Renamed by someone else");

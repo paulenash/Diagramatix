@@ -11,10 +11,12 @@
  */
 import type { DiagramElement } from "../diagram/types";
 import { badgePlaceFor, type RenameTarget } from "./renameTargets";
+import { isBlackBoxPool } from "../diagram/blackBoxPoolMenu";
 
 const ACTIVITY_TYPES = new Set<string>(["task", "subprocess", "subprocess-collapsed"]);
 export const isMessageActivity = (e: DiagramElement) => ACTIVITY_TYPES.has(e.type);
-export const isBlackBoxPool = (e: DiagramElement) => e.type === "pool" && (e.properties?.poolType as string | undefined) === "black-box";
+// One definition of "black-box pool", shared with the canvas right-click menu.
+export { isBlackBoxPool };
 
 export type MessagePick =
   | { mode: "pair"; targets: RenameTarget[] }
