@@ -25,6 +25,7 @@
 import type { Connector, DiagramElement } from "./types";
 import { expandMoveSet } from "./moveSet";
 import { recomputeAllConnectors } from "./routing";
+import { preserveMessageLabel } from "./messageLabel";
 
 /** Default gap when there is nothing to copy from. */
 const DEFAULT_GAP = 24;
@@ -120,7 +121,19 @@ function restack(
   const rerouted = new Map(
     recomputeAllConnectors(translated.filter((c) => stale.has(c.id)), out).map((c) => [c.id, c] as const),
   );
-  const finalConnectors = translated.map((c) => rerouted.get(c.id) ?? c);
+  const byIdBefore = new Map(connectors.map((c) => [c.id, c] as const));
+  const finalConnectors = translated.map((c) => {
+    const routed = rerouted.get(c.id);
+    if (!routed) return c;
+    // A message label is stored as an offset from the line's MIDPOINT, so
+    // moving one end slides it somewhere the user never put it. Re-anchor it
+    // to the end that moved (messageLabel.ts).
+    const original = byIdBefore.get(c.id);
+    if (!original) return routed;
+    const movedEnd = shiftOf(c.sourceId) !== 0 ? "source" as const : "target" as const;
+    const adj = preserveMessageLabel(routed, original, movedEnd);
+    return adj ? { ...routed, ...adj } : routed;
+  });
 
   return { elements: out, connectors: finalConnectors, order: [...order], moved };
 }
