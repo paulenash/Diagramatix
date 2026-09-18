@@ -25,6 +25,7 @@ import { gatewayVertex, nudgeGatewayEndpoint, computeWaypoints, recomputeAllConn
 import { planWrapInSubprocess, planUnwrapSubprocess, planWrapInContainer, type WrapIds } from "@/app/lib/diagram/subprocessWrap";
 import { isUmlConnType } from "@/app/lib/diagram/types";
 import { expandMoveSet } from "@/app/lib/diagram/moveSet";
+import { retypeTasksForSystemFlag, applyTaskTypeChanges } from "@/app/lib/diagram/itSystemTaskTypes";
 import { growPoolToAdopt } from "@/app/lib/diagram/growPool";
 import { planMovePool, planSwapPools, type PoolPosition } from "@/app/lib/diagram/poolOrder";
 import { autoResizeUmlElement, sizeUmlNote } from "@/app/lib/diagram/umlAutoSize";
@@ -6160,6 +6161,21 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
     }
 
     case "UPDATE_PROPERTIES": {
+      // Paul's 2026-09-18 rule: flipping a black-box pool's IT System flag
+      // retypes the tasks that exchange messages with it. Computed from the
+      // PRE-change elements (the "used to be type…" in the rule) and applied
+      // below, in the reducer rather than in either UI, so the Properties
+      // panel checkbox and the right-click menu behave identically.
+      const before = state.elements.find((e) => e.id === action.payload.id);
+      const nextIsSystem = action.payload.properties.isSystem;
+      const systemFlagChanged =
+        before?.type === "pool" &&
+        typeof nextIsSystem === "boolean" &&
+        (before.properties?.isSystem === true) !== nextIsSystem;
+      const taskRetypes = systemFlagChanged
+        ? retypeTasksForSystemFlag(state.elements, state.connectors, action.payload.id, nextIsSystem as boolean)
+        : [];
+
       const elements = state.elements.map((el) => {
         if (el.id !== action.payload.id) return el;
         const { taskType, gatewayType, eventType, repeatType, flowType, ...rest } = action.payload.properties;
@@ -6192,6 +6208,26 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           properties: { ...el.properties, ...rest },
         };
       });
+      if (taskRetypes.length > 0) {
+        // A task's type drives its marker, which drives its size, so the
+        // retyped tasks are re-sized about their centres and their connectors
+        // recomputed — the same treatment the edited element gets below.
+        const retyped = applyTaskTypeChanges(elements, taskRetypes);
+        const touched = new Set(taskRetypes.map((c) => c.id));
+        const sized = retyped.map((e) => {
+          if (!touched.has(e.id)) return e;
+          const { w, h } = autoSizeForElement(e);
+          if (w === e.width && h === e.height) return e;
+          return { ...e, x: e.x - (w - e.width) / 2, y: e.y - (h - e.height) / 2, width: w, height: h };
+        });
+        const finalElements = ensureContainersEncloseChildren(sized);
+        const changedIds = new Set([...touched, action.payload.id]);
+        const connectors = state.connectors.map((conn) => {
+          if (!changedIds.has(conn.sourceId) && !changedIds.has(conn.targetId)) return conn;
+          return recomputeAllConnectors([conn], finalElements, state.relaxedLayout)[0] ?? conn;
+        });
+        return { ...state, elements: finalElements, connectors };
+      }
       // Auto-resize UML elements and recompute attached connectors
       const el = elements.find(e => e.id === action.payload.id);
       if (el && (el.type === "uml-enumeration" || el.type === "uml-class")) {

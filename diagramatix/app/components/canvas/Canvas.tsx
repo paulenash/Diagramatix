@@ -30,6 +30,7 @@ import { GhostSuggestion } from "./GhostSuggestion";
 import type { NextStepCandidate } from "@/app/lib/diagram/nextSteps";
 import { ElementContextMenu } from "./ElementContextMenu";
 import { isBlackBoxPool } from "@/app/lib/diagram/blackBoxPoolMenu";
+import { poolGuideNext, type PoolBoundaryGuide, type PoolGuideEvent } from "@/app/lib/diagram/poolGuide";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { canConnect } from "@/app/lib/diagram/canConnect";
 import { GoldFlashOverlay, type GoldFlashTarget } from "./GoldFlashOverlay";
@@ -1052,11 +1053,23 @@ export function Canvas({
   // resize of a pool. Shows a dotted vertical line at the moving
   // boundary's current X plus a marker at every other pool's same-side
   // boundary (vertical centre), highlighted green on alignment.
-  const [poolBoundaryGuide, setPoolBoundaryGuide] = useState<{
-    side: "left" | "right";
-    currentX: number;
-    others: { id: string; x: number; midY: number; isMoving: boolean }[];
-  } | null>(null);
+  const [poolBoundaryGuide, setPoolBoundaryGuideState] = useState<PoolBoundaryGuide | null>(null);
+  // Escape takes the guide away for the REST of the current gesture — without
+  // the suppression it would come straight back on the next mouse-move, since
+  // the drag re-proposes it every pixel. `poolGuide.ts` owns the rule.
+  const poolGuideSuppressedRef = useRef(false);
+  const dispatchPoolGuide = useCallback((event: PoolGuideEvent) => {
+    setPoolBoundaryGuideState((prev) => {
+      const next = poolGuideNext({ guide: prev, suppressed: poolGuideSuppressedRef.current }, event);
+      poolGuideSuppressedRef.current = next.suppressed;
+      return next.guide;
+    });
+  }, []);
+  /** Offer a guide for the gesture in progress; ignored once Escape has fired. */
+  const setPoolBoundaryGuide = useCallback(
+    (guide: PoolBoundaryGuide | null) => dispatchPoolGuide({ type: "propose", guide }),
+    [dispatchPoolGuide],
+  );
   const [debugLabelOffsets, setDebugLabelOffsets] = useState<Map<string, Point>>(new Map());
   const setDebugLabelOffset = useCallback((id: string, offset: Point) => {
     setDebugLabelOffsets(prev => { const next = new Map(prev); next.set(id, offset); return next; });
@@ -2326,7 +2339,8 @@ export function Canvas({
       // Live-update the boundary guide's X as the user drags.
       if (movingSide) {
         const newX = movingSide === "left" ? x : x + width;
-        setPoolBoundaryGuide(prev => prev ? { ...prev, currentX: newX } : null);
+        setPoolBoundaryGuideState(prev =>
+          poolGuideSuppressedRef.current || !prev ? null : { ...prev, currentX: newX });
       }
     }
 
@@ -2334,7 +2348,8 @@ export function Canvas({
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
       onResizeElementEnd?.(elementId);
-      if (movingSide) setPoolBoundaryGuide(null);
+      // The gesture is over, so an Escape pressed during it expires with it.
+      if (movingSide) dispatchPoolGuide({ type: "gestureEnd" });
     }
 
     window.addEventListener("mousemove", onMouseMove);
@@ -4031,6 +4046,10 @@ export function Canvas({
       // Cancel connection-creation mode
       if (pendingConnSourceId) setPendingConnSourceId(null);
       if (forceConnect) setForceConnect(null);
+      // Paul: Escape takes the pool alignment line and its green markers away.
+      // Suppressed rather than merely cleared, so the drag that raised it does
+      // not put it straight back on the next mouse-move.
+      dispatchPoolGuide({ type: "escape" });
       // Dismiss right-click popups
       if (quickAdd) setQuickAdd(null);
       if (themePicker) setThemePicker(null);
@@ -5651,7 +5670,7 @@ export function Canvas({
                 onUpdateLabel={onUpdateLabel}
                 onLabelFocusEditStart={(cx, cy, w) => enterFocusModeAt(cx, cy, w, "external")}
                 onLabelFocusEditEnd={exitFocusMode}
-                onMoveEnd={() => { setDraggingElementId(null); if (el.type === "pool") setPoolBoundaryGuide(null); onElementMoveEnd?.(el.id); }}
+                onMoveEnd={() => { setDraggingElementId(null); if (el.type === "pool") dispatchPoolGuide({ type: "gestureEnd" }); onElementMoveEnd?.(el.id); }}
                 multiSelected={selectedElementIds.size > 1 && selectedElementIds.has(el.id)}
                 isLabelEditing={editingLabel?.elementId === el.id}
                 onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoomRef.current, dy / zoomRef.current) : undefined}
