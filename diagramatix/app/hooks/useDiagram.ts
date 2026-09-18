@@ -9091,7 +9091,18 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
 
       // If a pool already exists, GROW it to include the loose elements rather
       // than creating a second pool (assist "extend the pool to include all…").
-      const existingPools = state.elements.filter((e) => e.type === "pool");
+      //
+      // NEVER a black-box pool (Paul, 2026-09-19: "It is never correct to grow
+      // an existing black-box pool to engulf elements and become a white-box
+      // pool"). A black-box participant is a deliberate statement that its
+      // insides are not being modelled; putting elements in it contradicts the
+      // thing it is there to say, and silently changes its type. With only
+      // black-box pools on the diagram there is nothing to grow, so a new pool
+      // is created instead — which is the right answer anyway.
+      const isBlackBox = (p: DiagramElement) =>
+        ((p.properties?.poolType as string | undefined) ?? "black-box") === "black-box"
+        && !state.elements.some((e) => e.type === "lane" && e.parentId === p.id);
+      const existingPools = state.elements.filter((e) => e.type === "pool" && !isBlackBox(e));
       if (existingPools.length > 0) {
         const pool = existingPools.reduce((a, b) => (a.width * a.height >= b.width * b.height ? a : b));
         const lanes = state.elements.filter((e) => e.type === "lane" && e.parentId === pool.id).sort((a, b) => a.y - b.y);

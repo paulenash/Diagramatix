@@ -3530,7 +3530,19 @@ export function DiagramEditor({
     // Apply now — or, when the command would remove more than one thing, park
     // it and ask (confirm.ts). Undo would recover a mis-heard "clear the
     // diagram", but nobody should have to know that.
-    const applyOrAsk = (ops: AssistOp[], viaAi: boolean, prefix = "") => {
+    const applyOrAsk = (rawOps: AssistOp[], viaAi: boolean, prefix = "") => {
+      // A SURROUND ALWAYS MAKES A NEW POOL (Paul, 2026-09-19). The deterministic
+      // grammar already does; the AI does not, and keeps canonicalising a
+      // surround it did not quite hear — "Selected with a pool" — into "put a
+      // pool around everything", which grows an existing pool and re-homes the
+      // diagram instead. When the words the user actually said name the
+      // selection, the whole-diagram wrap is not what they asked for, whatever
+      // the model returned.
+      const ops = rawOps.map((op) =>
+        op.op === "wrapInPool" && /\b(?:selected|selection|these|those|highlighted)\b/i.test(heard)
+          ? { op: "wrapInContainer", container: "pool" as const, ...(op.label ? { label: op.label } : {}) } as AssistOp
+          : op,
+      );
       const what = needsConfirmation(ops, data.elements, abraLastId.current, selectedIdsRef.current);
       if (what) {
         pendingConfirmRef.current = { ops, what, viaAi };
