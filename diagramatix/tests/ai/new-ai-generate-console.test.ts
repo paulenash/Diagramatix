@@ -76,10 +76,13 @@ describe("the console is themed by the configured AI colour", () => {
     const src = editor();
     const btn = src.slice(src.indexOf("NEW AI Generate — the full-screen console"));
     const decl = btn.slice(0, btn.indexOf("✨ NEW AI Generate"));
-    expect(decl, "the AI feature vars are applied unconditionally")
-      .toMatch(/style=\{featureVars\(featureScheme, "ai"\)\}/);
-    expect(decl, "no active-only gate on the colour").not.toMatch(/showAiGenerateScreen \? featureVars/);
-    expect(decl, "and it wears the feature-tile skin").toMatch(/className="[^"]*feature-tile"/);
+    // It is a MENU ITEM now rather than a toolbar button (Paul, 2026-09-19), so
+    // it wears the menu's own styling instead of the feature-tile skin. The
+    // durable half of this test is the half that was the bug: the colour must
+    // never be conditional on the console being open, because the moment it is
+    // open it is covered by the thing it opened.
+    expect(decl, "no active-only gate on the colour").not.toMatch(/showAiGenerateScreen \?/);
+    expect(decl, "it is coloured, not left as default text").toMatch(/className="[^"]*text-\w+-\d+[^"]*"/);
   });
 
   it("T4330 — the accent stays SATURATED, not washed to near-white", () => {

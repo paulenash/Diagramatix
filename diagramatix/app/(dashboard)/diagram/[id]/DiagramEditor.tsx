@@ -2001,8 +2001,6 @@ export function DiagramEditor({
   const resizeDropdownRef = useRef<HTMLDivElement>(null);
   // Publish dropdown state — consolidates lifecycle status + Publish
   // version + Publish bundle under one B&W trigger.
-  const [publishDropdownOpen, setPublishDropdownOpen] = useState(false);
-  const publishDropdownRef = useRef<HTMLDivElement>(null);
   // Space dropdown state — Insert Space / Remove Space (BPMN + state-machine).
   const [spaceDropdownOpen, setSpaceDropdownOpen] = useState(false);
   const [showSopDialog, setShowSopDialog] = useState(false);
@@ -2388,18 +2386,6 @@ export function DiagramEditor({
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [alignDropdownOpen]);
-
-  // Close publish dropdown on outside click
-  useEffect(() => {
-    if (!publishDropdownOpen) return;
-    function handleClick(e: MouseEvent) {
-      if (publishDropdownRef.current && !publishDropdownRef.current.contains(e.target as Node)) {
-        setPublishDropdownOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [publishDropdownOpen]);
 
   // Close space dropdown on outside click
   useEffect(() => {
@@ -4999,85 +4985,6 @@ export function DiagramEditor({
           </>
         )}
 
-        {/* Publish dropdown — owner-only. A single black-and-white trigger
-            that consolidates the lifecycle status + Publish version +
-            Publish bundle. The dropdown items keep their colours (blue
-            version, purple bundle); the bundle item is disabled until the
-            diagram has been published at least once. */}
-        {!readOnly && isDiagramOwner && isExampleProject && (
-          <span className="text-[11px] text-gray-400 italic" title="Adopted example projects can't be published — rename the project to make it your own first.">Example — not publishable</span>
-        )}
-        {!readOnly && isDiagramOwner && !isExampleProject && (
-          <div className="relative" ref={publishDropdownRef}>
-            <button
-              onClick={() => setPublishDropdownOpen(prev => !prev)}
-              className="px-2 py-0.5 text-[11px] font-medium text-gray-800 border border-gray-400 rounded hover:bg-gray-50"
-              title="Publish this diagram or a bundle"
-            >
-              Publish ▾
-            </button>
-            {publishDropdownOpen && (
-              <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded shadow-lg z-50">
-                {/* Status header — current lifecycle state, keeps colours. */}
-                <div className="px-3 py-2 border-b border-gray-100 text-[11px]">
-                  {lifecycle === "PUBLISHED" && currentPublishedVersion ? (
-                    <span className="text-blue-700 font-medium">
-                      Published v{currentPublishedVersion.versionNumber}
-                      <span className="text-blue-500/70 font-normal ml-1">
-                        · {new Date(currentPublishedVersion.publishedAt).toLocaleDateString()}
-                      </span>
-                    </span>
-                  ) : lifecycle === "ARCHIVED" ? (
-                    <span className="text-gray-500 font-medium">Archived</span>
-                  ) : (
-                    <span className="text-gray-600 font-medium">Draft — not yet published</span>
-                  )}
-                </div>
-                {/* Publish version */}
-                <button
-                  onClick={async () => {
-                    setPublishDropdownOpen(false);
-                    if (saveStatus === "unsaved") {
-                      await saveNowRef.current();
-                    }
-                    setShowPublishDialog(true);
-                  }}
-                  title={
-                    saveStatus === "unsaved"
-                      ? "Saves first, then captures the saved snapshot"
-                      : "Publish a new immutable version of this diagram"
-                  }
-                  className="w-full text-left px-3 py-2 text-xs text-blue-700 hover:bg-blue-50 font-medium"
-                >
-                  Publish v{(currentPublishedVersion?.versionNumber ?? 0) + 1}…
-                </button>
-                {/* Publish bundle — disabled until published at least once. */}
-                <button
-                  onClick={() => {
-                    if (lifecycle !== "PUBLISHED" || !projectId) return;
-                    setPublishDropdownOpen(false);
-                    setShowPublishBundleDialog(true);
-                  }}
-                  disabled={lifecycle !== "PUBLISHED" || !projectId}
-                  title={
-                    lifecycle !== "PUBLISHED"
-                      ? "Publish a version first before bundling to business users"
-                      : !projectId
-                        ? "Move this diagram into a project before bundling"
-                        : "Publish this diagram (and its linked descendants) to business users"
-                  }
-                  className={`w-full text-left px-3 py-2 text-xs font-medium ${
-                    lifecycle === "PUBLISHED" && projectId
-                      ? "text-purple-700 hover:bg-purple-50"
-                      : "text-gray-400 cursor-not-allowed"
-                  }`}
-                >
-                  Publish bundle…
-                </button>
-              </div>
-            )}
-          </div>
-        )}
 
         {/* Feedback button — owner-only, once published. Opens the
             FeedbackPanel listing business-user feedback on this diagram. */}
@@ -5209,18 +5116,6 @@ export function DiagramEditor({
                 </svg>
               </button>
             </div>
-
-            {/* Generate SOP — BPMN diagrams in a project. Deterministic extract
-                → AI prose → editable SOP document → export .docx. */}
-            {diagramType === "bpmn" && projectId && (
-              <button
-                onClick={() => { setSopInitial({}); setShowSopDialog(true); }}
-                className="px-2 py-0.5 text-[11px] text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
-                title="Generate a Standard Operating Procedure from this diagram (whole, or a single lane/pool/subprocess)"
-              >
-                Generate SOP
-              </button>
-            )}
 
             {/* Space tools — BPMN, state-machine + ArchiMate. Insert Space drops
                 one green marker at the viewport centre (then Shift+drag to
@@ -5951,34 +5846,6 @@ export function DiagramEditor({
           </button>
         )}
 
-        {/* NEW AI Generate — the full-screen console. A SECOND button beside the
-            first, deliberately: both are live so the same prompt can be run
-            through each and the results compared. BPMN only while it is being
-            judged. */}
-        {/* SuperAdmin-only while the replacement is being judged (Paul,
-            2026-09-14: "Make NEW AI Generation SuperAdmin only"). `isActingAdmin`
-            rather than `isAdmin`: a SuperAdmin presenting in a lower view mode
-            is showing what a customer sees, and a customer does not see this. */}
-        {!readOnly && diagramType === "bpmn" && aiAllowedHere && isActingAdmin && (
-          <button
-            onClick={() => {
-              setShowAiGenerateScreen(true);
-              setShowPlanPanel(false);
-              setShowAiPanel(false);
-              setShowHistoryPanel(false);
-            }}
-            /* Coloured AT REST, unlike the sidebar's button beside it. That one
-               greys until active because you can see it while its panel is open;
-               this console is a full-screen overlay, so its "active" state is
-               behind the console and never visible — a button that only takes the
-               feature colour when active would be permanently grey. */
-            style={featureVars(featureScheme, "ai")}
-            className="px-2 py-0.5 text-[11px] rounded border feature-tile"
-            title="The new full-screen AI Generate console — same two-phase generation, given a screen instead of a sidebar"
-          >
-            ✨ NEW AI Generate
-          </button>
-        )}
         {/* Tier-1 Assist toggle (BPMN only) — OPT-IN. When on, selecting a single
             element shows translucent ghost next-step suggestions (Tab / click to
             accept). Remembered per-diagram. */}
@@ -6039,6 +5906,104 @@ export function DiagramEditor({
             </button>
             {clearMenuOpen && (
               <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded shadow-lg z-50">
+                {/* Generating and publishing, moved in from the toolbar (Paul,
+                    2026-09-19). They were three separate controls competing for
+                    space along the top; none of them is something you reach for
+                    mid-edit, which is what the toolbar is for. */}
+                {/* NEW AI Generate — the full-screen console. Lives in this menu now
+                    rather than the toolbar; still SuperAdmin-only while the
+                    replacement is being judged against the original. */}
+                {!readOnly && diagramType === "bpmn" && aiAllowedHere && isActingAdmin && (
+                  <button
+                    onClick={() => {
+                      setClearMenuOpen(false);
+                      setShowAiGenerateScreen(true);
+                      setShowPlanPanel(false);
+                      setShowAiPanel(false);
+                      setShowHistoryPanel(false);
+                    }}
+                    className="w-full text-left px-3 py-2 text-xs text-fuchsia-700 hover:bg-fuchsia-50 font-medium"
+                    title="The new full-screen AI Generate console — same two-phase generation, given a screen instead of a sidebar"
+                  >
+                    ✨ NEW AI Generate
+                  </button>
+                )}
+                {diagramType === "bpmn" && projectId && (
+                  <button
+                    onClick={() => { setClearMenuOpen(false); setSopInitial({}); setShowSopDialog(true); }}
+                    className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                    title="Generate a Standard Operating Procedure from this diagram (whole, or a single lane/pool/subprocess)"
+                  >
+                    Generate SOP
+                  </button>
+                )}
+
+                {/* Publishing. The old dropdown's status line is kept — it is the
+                    only place the current version number is shown, and burying it
+                    without it would lose that. */}
+                {!readOnly && isDiagramOwner && isExampleProject && (
+                  <div className="px-3 py-2 border-t border-gray-100 text-[11px] text-gray-400 italic" title="Adopted example projects can't be published — rename the project to make it your own first.">
+                    Example — not publishable
+                  </div>
+                )}
+                {!readOnly && isDiagramOwner && !isExampleProject && (
+                  <>
+                    <div className="px-3 py-2 border-t border-gray-100 text-[11px]">
+                      {lifecycle === "PUBLISHED" && currentPublishedVersion ? (
+                        <span className="text-blue-700 font-medium">
+                          Published v{currentPublishedVersion.versionNumber}
+                          <span className="text-blue-500/70 font-normal ml-1">
+                            · {new Date(currentPublishedVersion.publishedAt).toLocaleDateString()}
+                          </span>
+                        </span>
+                      ) : lifecycle === "ARCHIVED" ? (
+                        <span className="text-gray-500 font-medium">Archived</span>
+                      ) : (
+                        <span className="text-gray-600 font-medium">Draft — not yet published</span>
+                      )}
+                    </div>
+                    <button
+                      onClick={async () => {
+                        setClearMenuOpen(false);
+                        if (saveStatus === "unsaved") {
+                          await saveNowRef.current();
+                        }
+                        setShowPublishDialog(true);
+                      }}
+                      title={
+                        saveStatus === "unsaved"
+                          ? "Saves first, then captures the saved snapshot"
+                          : "Publish a new immutable version of this diagram"
+                      }
+                      className="w-full text-left px-3 py-2 text-xs text-blue-700 hover:bg-blue-50 font-medium"
+                    >
+                      Publish v{(currentPublishedVersion?.versionNumber ?? 0) + 1}…
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (lifecycle !== "PUBLISHED" || !projectId) return;
+                        setClearMenuOpen(false);
+                        setShowPublishBundleDialog(true);
+                      }}
+                      disabled={lifecycle !== "PUBLISHED" || !projectId}
+                      title={
+                        lifecycle !== "PUBLISHED"
+                          ? "Publish a version first before bundling to business users"
+                          : !projectId
+                            ? "Move this diagram into a project before bundling"
+                            : "Publish this diagram (and its linked descendants) to business users"
+                      }
+                      className={`w-full text-left px-3 py-2 text-xs font-medium ${
+                        lifecycle === "PUBLISHED" && projectId
+                          ? "text-purple-700 hover:bg-purple-50"
+                          : "text-gray-400 cursor-not-allowed"
+                      }`}
+                    >
+                      Publish bundle…
+                    </button>
+                  </>
+                )}
+
                 {supportsSimulator && simAllowed && (
                   <button
                     onClick={() => { setClearMenuOpen(false); setShowSimulator(true); }}
