@@ -1,6 +1,6 @@
 # Voice Assist — review plan and status
 
-**Status as at 2026-09-17** — read from the repository and the commit history, not
+**Status as at 2026-09-20** — read from the repository and the commit history, not
 from memory, so this file never claims more or less than the code contains.
 
 | Part | State |
@@ -9,17 +9,27 @@ from memory, so this file never claims more or less than the code contains.
 | **Confirmation before destructive commands** (R1) | **SHIPPED** `a49a8006` |
 | **Selection as a reference** (M1) | **SHIPPED** `a49a8006` |
 | **Wrap the selection** (M2) | **SHIPPED** `9eb28faf`, `94e02a47` — expanded subprocess with its exact inverse, plus the pool and lane variants |
-| **Busy enforced on every path** (B4) | **PARTIAL** `b00e3c7b` — the text box is gated; the voice path is not |
+| **Busy enforced on every path** (B4) | **SHIPPED** `0fa62276` — a synchronous ref plus a FIFO queue drained through the ref; "stop" bypasses it |
 | **AI prompt op list** (B7) | **PARTIAL** `8c370014` — `renameByType` added; `addPool.relativeTo` still missing |
 | **Release-log entries** (D2) | **PARTIAL** — one entry for `a49a8006`; the eight commits after it have none |
 | **Tests for the untested half** (D3) | **PARTIAL** — pure modules extracted and covered; no `apply.ts`, no mocked-client route test |
 | **Greedy grammar, dead sub-lane checks, silent voice degrade** (B5, B6, B8) | **not started** |
-| **Disambiguation picker and the rest of Reliability/UX** (R2–R8) | **not started** |
+| **Destructive commands do not guess** (R3) | **SHIPPED** `0fa62276` — `resolveRef`'s `strict`; a delete reports the candidates |
+| **An ambiguity names what it found** (R2, first half) | **SHIPPED** `0fa62276` — up to four labels and a count; the numbered PICKER itself is still to do |
+| **Cheaper fallback, capped and timed out** (C5 + R4) | **SHIPPED** `fb4dc71d` — Haiku by default, 120-element cap, 20s abort, admin picker |
+| **The rest of Reliability/UX** (R5–R8) | **not started** |
 | **Capability extensions** (C1–C10) | **not started** — C6's green-rules half pre-dated the plan |
 | **Convert in place, fill, pointer, marquee, tidy, ghost, properties** (M3–M9) | **not started** |
 | **Voice reliability** (V1–V3) | **not started**; V0 happened as a live session but produced no written tally |
 | **Publish the guide, tech-notes and feature rows** (D1) | **not started** — the three seed scripts are still unrun on production |
 | **Delivered from live use** (L1–L10) | **SHIPPED** — not in the original backlog; added to it after the fact so the plan is a complete record |
+
+**What changed on 2026-09-20:** Paul asked what mattered most next. The answer
+turned out to start with an operational item rather than a plan item — the
+rename to Voice Assist had changed the feature-registry key while production
+still carried the old one, and `isFeatureAvailable` fails CLOSED, so the
+feature was off for every Expert and Enterprise user until the migration SQL
+was run. It has been. Then C5+R4, then B4, R3 and R2's first half.
 
 **Source document:** the full review plan, including the walkthrough script and
 the ranked backlog, is reproduced in the appendix below. The backlog now also
@@ -64,29 +74,37 @@ appear anywhere in the plan.
 | `8c370014` | Swap on every selected gateway; a split command is held for the rest; a comma after the verb is ignored | T4416–T4418 |
 | `9eb28faf` | Surround the selection with an expanded subprocess, and dissolve one back, round-tripping without undo | T4419–T4422 |
 | `94e02a47` | Wrap the selection in a pool or a lane, finishing M2; and "one" stops being heard as "lane" on a numbered pick | T4443–T4450 |
+| `66e0d890` | The gate moves off the acting-admin check onto the registry key, at Expert and above — decision 1, settled | — |
+| `b2975716` | Abracadabra becomes Voice Assist everywhere: 301 replacements, five file renames, and the DB half as idempotent SQL | T4553–T4555 |
+| `fb4dc71d` | C5 + R4: Haiku for the fallback, the payload capped at 120 keeping the selection first, a 20s abort, and an admin picker | T4562–T4564 |
+| `0fa62276` | B4, R3 and R2's first half: the voice path queues instead of racing, a destructive command reports candidates rather than guessing, and an ambiguity names what it found | T4565–T4567 |
 
 ## Still open, in Paul's order
 
-1. **R3** — a bare type noun on a destructive command should ask which, not pick the most recent.
-2. **R2** — the disambiguation picker, reusing the numbered-badge flow that already exists.
-3. **B5** — the greedy regexes: "collapse the subprocess" becomes a pool compress, "move the Assembly Line task up" becomes a lane move.
-4. **C5 + R4** — a cheaper model for the fallback, with a cap and a timeout on the payload.
-5. **V1** — feed the diagram's own labels to the recogniser instead of a hard-coded list.
-6. **V2** — phonetic matching in reference resolution, so "pic items" resolves without an AI call.
-7. **D1** — publish the guide, tech-notes and feature rows.
-8. **M3** — convert in place. (**M2** is finished: subprocess, pool and lane.)
+1. **B5** — the greedy regexes: "collapse the subprocess" becomes a pool compress, "move the Assembly Line task up" becomes a lane move. Now the top of the list.
+2. **R2, second half** — the numbered-badge PICKER. The ambiguity is now reported by name; parking the op and resuming on a spoken number is still to build, and the badge machinery already exists in the rename and message flows.
+3. **V1** — feed the diagram's own labels to the recogniser instead of a hard-coded list. Note the standing warning: every keyword boost creates a mis-hear somewhere else.
+4. **V2** — phonetic matching in reference resolution, so "pic items" resolves without an AI call.
+5. **D1** — publish the guide, tech-notes and feature rows. Partly overtaken: the rename SQL renamed the chapters that existed. What is unverified is whether the three seed scripts ever ran on production at all.
+6. **M3** — convert in place. (**M2** is finished: subprocess, pool and lane.)
+7. **B6, B8** — the dead sub-lane checks, and the silent degrade when `allowVoiceAi` is refused.
 
 ## Two decisions still open
 
-**Who gets it, and when.** Still SuperAdmin-only. The feature registry keys
-exist and nothing reads them; the real gate is the acting-admin check. The plan
-recommended gating by registry key and plan entitlement after the first two
-sessions.
+Both are now settled. Kept here because the reasoning still explains the code.
 
-**What the AI fallback should cost.** Still the global generation model with the
-whole diagram serialised on every call, no cap, no timeout. Measurement shipped
-instead of reduction: the cost button now shows what a session has spent, so the
-number is visible but unchanged.
+**Who gets it, and when.** SETTLED 2026-09-17 (`66e0d890`): the registry key
+`voice-assist` at Expert and above, which is the plan's own recommendation (b).
+The editor draws the buttons; `/api/ai/command` enforces it, since the route is
+reachable directly.
+
+**What the AI fallback should cost.** SETTLED 2026-09-20 (`fb4dc71d`): the
+plan's option (b). Haiku by default, the payload capped at 120 elements keeping
+the selection first, and a 20s abort. Haiku is safe HERE and would not be for
+generation — Paul's own 2026-09-04 measurement found it returning about a third
+of the content — because this is not generation: the model rewrites one
+sentence against a listed vocabulary and the deterministic grammar re-parses
+the result, so a poor rewrite fails to parse rather than corrupting anything.
 
 The undo decision is settled: one utterance is one undo, built in `a49a8006`.
 
