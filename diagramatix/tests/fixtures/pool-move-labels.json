@@ -1,0 +1,958 @@
+{
+  "schemaVersion": "48",
+  "appVersion": "2.11",
+  "exportedAt": "2026-09-19T01:19:23.979Z",
+  "project": {
+    "name": "(single diagram)",
+    "description": "",
+    "ownerName": "",
+    "colorConfig": {}
+  },
+  "diagrams": [
+    {
+      "originalId": "cmu4q941k000201o9mo5r5chl",
+      "name": "Voice Assist Testing 2",
+      "type": "bpmn",
+      "data": {
+        "elements": [
+          {
+            "x": 343.4375321624789,
+            "y": 310.81884861397737,
+            "id": "54zyovkj",
+            "type": "start-event",
+            "label": "",
+            "width": 36,
+            "height": 36,
+            "properties": {}
+          },
+          {
+            "x": 431.1883488347689,
+            "y": 137.4656168758432,
+            "id": "cfw0a978",
+            "type": "subprocess-expanded",
+            "label": "Document Handling",
+            "width": 628.5729795882755,
+            "height": 385.2709856911165,
+            "properties": {
+              "subprocessType": "normal"
+            },
+            "repeatType": "none"
+          },
+          {
+            "x": 413.1883488347689,
+            "y": 212.97228871275803,
+            "id": "j9vsv2vw",
+            "type": "start-event",
+            "label": "Start",
+            "width": 36,
+            "height": 36,
+            "parentId": "nilkl65v",
+            "properties": {},
+            "boundaryHostId": "cfw0a978"
+          },
+          {
+            "x": 1041.7613284230447,
+            "y": 234.2580029984723,
+            "id": "47vstcu8",
+            "type": "end-event",
+            "label": "End",
+            "width": 36,
+            "height": 36,
+            "parentId": "nilkl65v",
+            "properties": {},
+            "boundaryHostId": "cfw0a978"
+          },
+          {
+            "x": 521.9263401215014,
+            "y": 208.18841225404452,
+            "id": "cyy6o0jb",
+            "type": "task",
+            "label": "This is another new label",
+            "width": 102,
+            "height": 65,
+            "parentId": "cfw0a978",
+            "properties": {}
+          },
+          {
+            "x": 703.2120544072159,
+            "y": 208.18841225404452,
+            "id": "6yw0906g",
+            "type": "task",
+            "label": "This is a new task",
+            "width": 102,
+            "height": 65,
+            "parentId": "cfw0a978",
+            "properties": {}
+          },
+          {
+            "x": 872.662023221807,
+            "y": 203.18841225404452,
+            "id": "9y474aiv",
+            "type": "task",
+            "label": "here we finalize everything to do with document one",
+            "width": 117,
+            "height": 75,
+            "parentId": "cfw0a978",
+            "taskType": "send",
+            "properties": {}
+          },
+          {
+            "x": 576.9026345490545,
+            "y": 332.40269796833024,
+            "id": "fh2lfrw4",
+            "type": "subprocess-expanded",
+            "label": "Handle Event in Parallel",
+            "width": 368.5714285714286,
+            "height": 153.71428571428572,
+            "parentId": "cfw0a978",
+            "properties": {
+              "subprocessType": "event"
+            }
+          },
+          {
+            "x": 610.3312059776258,
+            "y": 389.8312693969017,
+            "id": "wjg3gece",
+            "type": "start-event",
+            "label": "Non-Interrupting Event\nHappens",
+            "width": 36,
+            "height": 36,
+            "parentId": "fh2lfrw4",
+            "eventType": "message",
+            "properties": {
+              "labelWidth": 128,
+              "interruptionType": "non-interrupting"
+            }
+          },
+          {
+            "x": 700.1883488347689,
+            "y": 375.3312693969017,
+            "id": "q2rq8olj",
+            "type": "task",
+            "label": "Handle exception",
+            "width": 102,
+            "height": 65,
+            "parentId": "fh2lfrw4",
+            "taskType": "user",
+            "properties": {}
+          },
+          {
+            "x": 850.331205977626,
+            "y": 389.8312693969017,
+            "id": "6cci3y4l",
+            "type": "end-event",
+            "label": "this is the end of handle",
+            "width": 36,
+            "height": 36,
+            "parentId": "fh2lfrw4",
+            "properties": {}
+          },
+          {
+            "x": 1013.7604095095439,
+            "y": 504.73660256695973,
+            "id": "07m47dts",
+            "type": "intermediate-event",
+            "label": "Event 1",
+            "width": 36,
+            "height": 36,
+            "parentId": "nilkl65v",
+            "eventType": "error",
+            "properties": {
+              "labelOffsetX": -43.44965696050326,
+              "labelOffsetY": 7
+            },
+            "boundaryHostId": "cfw0a978"
+          },
+          {
+            "x": 1057.468495653165,
+            "y": 551.9641647444084,
+            "id": "79g6xjpe",
+            "type": "task",
+            "label": "Task five",
+            "width": 102,
+            "height": 65,
+            "properties": {}
+          },
+          {
+            "x": 1207.193995318415,
+            "y": 562.8353144355872,
+            "id": "fyimrktw",
+            "type": "end-event",
+            "label": "",
+            "width": 36,
+            "height": 36,
+            "properties": {}
+          },
+          {
+            "x": 819.050493629687,
+            "y": 504.73660256695973,
+            "id": "hbz1wfr7",
+            "type": "intermediate-event",
+            "label": "Event 3",
+            "width": 36,
+            "height": 36,
+            "parentId": "nilkl65v",
+            "eventType": "timer",
+            "properties": {
+              "labelOffsetX": -43.213939027668175,
+              "labelOffsetY": 14.899937629182432
+            },
+            "boundaryHostId": "cfw0a978"
+          },
+          {
+            "x": 751.2120544072159,
+            "y": 255.18841225404452,
+            "id": "eer8zhqe",
+            "type": "intermediate-event",
+            "label": "Event 4",
+            "width": 36,
+            "height": 36,
+            "parentId": "cfw0a978",
+            "eventType": "escalation",
+            "properties": {},
+            "boundaryHostId": "6yw0906g"
+          },
+          {
+            "x": 866.8187602226374,
+            "y": 596.542555355921,
+            "id": "0w642cyt",
+            "type": "task",
+            "label": "This is a time out",
+            "width": 102,
+            "height": 65,
+            "properties": {}
+          },
+          {
+            "x": 1109.3786481252077,
+            "y": 306.7219210088794,
+            "id": "gobu9si2",
+            "type": "end-event",
+            "label": "End",
+            "width": 36,
+            "height": 36,
+            "properties": {}
+          },
+          {
+            "x": 306.09142518281095,
+            "y": 732.5312900448773,
+            "id": "nilkl65v",
+            "type": "pool",
+            "label": "Pool 1",
+            "width": 1004.2454272784614,
+            "height": 78,
+            "properties": {
+              "isSystem": true,
+              "poolType": "black-box"
+            }
+          },
+          {
+            "x": 278.9485680399538,
+            "y": 929.3636422477972,
+            "id": "vvvmv0n4",
+            "type": "pool",
+            "label": "Pool 3",
+            "width": 1004.2454272784614,
+            "height": 75,
+            "properties": {
+              "poolType": "black-box"
+            }
+          },
+          {
+            "x": 592.8982353155028,
+            "y": 504.73660256695973,
+            "id": "nfullfnl",
+            "type": "intermediate-event",
+            "label": "Event 5",
+            "width": 36,
+            "height": 36,
+            "eventType": "timer",
+            "properties": {
+              "boundarySide": "bottom",
+              "labelOffsetX": -40,
+              "labelOffsetY": 7
+            },
+            "boundaryHostId": "cfw0a978"
+          },
+          {
+            "x": 644.183949601217,
+            "y": 574.4836537840578,
+            "id": "i41vsmq4",
+            "type": "task",
+            "label": "Task 7",
+            "width": 102,
+            "height": 65,
+            "properties": {}
+          }
+        ],
+        "viewport": {
+          "x": 0,
+          "y": 0,
+          "zoom": 1
+        },
+        "connectors": [
+          {
+            "id": "j8c11x1h",
+            "type": "messageBPMN",
+            "label": "message 2",
+            "sourceId": "q2rq8olj",
+            "targetId": "nilkl65v",
+            "waypoints": [
+              {
+                "x": 782.1883488347689,
+                "y": 407.8312693969017
+              },
+              {
+                "x": 782.1883488347689,
+                "y": 440.3312693969017
+              },
+              {
+                "x": 782.1883488347689,
+                "y": 732.5312900448773
+              },
+              {
+                "x": 782.1883488347689,
+                "y": 771.5312900448773
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "routingType": "rectilinear",
+            "labelOffsetX": 66.42857142857133,
+            "labelOffsetY": 98.38572460970215,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.803921568627451,
+            "targetOffsetAlong": 0.5,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "ebf6ovpe",
+            "type": "messageBPMN",
+            "label": "message 2",
+            "sourceId": "9y474aiv",
+            "targetId": "vvvmv0n4",
+            "waypoints": [
+              {
+                "x": 931.162023221807,
+                "y": 240.68841225404452
+              },
+              {
+                "x": 962.5191660789501,
+                "y": 278.1884122540445
+              },
+              {
+                "x": 962.5191660789501,
+                "y": 929.3636422477972
+              },
+              {
+                "x": 781.0712816791845,
+                "y": 966.8636422477972
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "routingType": "rectilinear",
+            "labelOffsetX": -59.28571428571422,
+            "labelOffsetY": 286.7788997870973,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.7680097680097703,
+            "targetOffsetAlong": 0.5,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "5dl66pq1",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "hbz1wfr7",
+            "targetId": "0w642cyt",
+            "waypoints": [
+              {
+                "x": 837.050493629687,
+                "y": 522.7366025669597
+              },
+              {
+                "x": 837.050493629687,
+                "y": 540.7366025669597
+              },
+              {
+                "x": 837.050493629687,
+                "y": 629.9529882582489
+              },
+              {
+                "x": 866.8187602226374,
+                "y": 629.9529882582489
+              },
+              {
+                "x": 917.8187602226374,
+                "y": 629.042555355921
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "bottom",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "labelOffsetX": 0,
+            "labelOffsetY": -20,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5140066600358139,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "vosx8ket",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "cfw0a978",
+            "targetId": "gobu9si2",
+            "waypoints": [
+              {
+                "x": 745.4748386289066,
+                "y": 330.1011097214015
+              },
+              {
+                "x": 1059.7613284230445,
+                "y": 330.1011097214015
+              },
+              {
+                "x": 1081.7613284230445,
+                "y": 330.1011097214015
+              },
+              {
+                "x": 1086.569988274126,
+                "y": 330.1011097214015
+              },
+              {
+                "x": 1086.569988274126,
+                "y": 324.7219210088794
+              },
+              {
+                "x": 1091.3786481252077,
+                "y": 324.7219210088794
+              },
+              {
+                "x": 1109.3786481252077,
+                "y": 324.7219210088794
+              },
+              {
+                "x": 1127.3786481252077,
+                "y": 324.7219210088794
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "labelOffsetX": 0,
+            "labelOffsetY": -20,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "75nfly53",
+            "type": "sequence",
+            "label": "first",
+            "sourceId": "54zyovkj",
+            "targetId": "cfw0a978",
+            "waypoints": [
+              {
+                "x": 361.4375321624789,
+                "y": 328.81884861397737
+              },
+              {
+                "x": 379.4375321624789,
+                "y": 328.81884861397737
+              },
+              {
+                "x": 397.4375321624789,
+                "y": 328.81884861397737
+              },
+              {
+                "x": 402.81294049862385,
+                "y": 328.81884861397737
+              },
+              {
+                "x": 402.81294049862385,
+                "y": 330.1011097214015
+              },
+              {
+                "x": 408.1883488347689,
+                "y": 330.1011097214015
+              },
+              {
+                "x": 431.1883488347689,
+                "y": 330.1011097214015
+              },
+              {
+                "x": 745.4748386289066,
+                "y": 330.1011097214015
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "labelOffsetX": 0,
+            "labelOffsetY": -30,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "33d5z1ll",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "wjg3gece",
+            "targetId": "q2rq8olj",
+            "waypoints": [
+              {
+                "x": 628.3312059776258,
+                "y": 407.8312693969017
+              },
+              {
+                "x": 646.3312059776258,
+                "y": 407.8312693969017
+              },
+              {
+                "x": 664.3312059776258,
+                "y": 407.8312693969017
+              },
+              {
+                "x": 676.1883488347689,
+                "y": 407.8312693969017
+              },
+              {
+                "x": 700.1883488347689,
+                "y": 407.8312693969017
+              },
+              {
+                "x": 751.1883488347689,
+                "y": 407.8312693969017
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "labelOffsetX": 0,
+            "labelOffsetY": -20,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "nlduxgx7",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "q2rq8olj",
+            "targetId": "6cci3y4l",
+            "waypoints": [
+              {
+                "x": 751.1883488347689,
+                "y": 407.8312693969017
+              },
+              {
+                "x": 802.1883488347689,
+                "y": 407.8312693969017
+              },
+              {
+                "x": 824.1883488347689,
+                "y": 407.8312693969017
+              },
+              {
+                "x": 832.331205977626,
+                "y": 407.8312693969017
+              },
+              {
+                "x": 850.331205977626,
+                "y": 407.8312693969017
+              },
+              {
+                "x": 868.331205977626,
+                "y": 407.8312693969017
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "labelOffsetX": 0,
+            "labelOffsetY": -20,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "bjsix7kq",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "07m47dts",
+            "targetId": "79g6xjpe",
+            "waypoints": [
+              {
+                "x": 1031.760409509544,
+                "y": 522.7366025669597
+              },
+              {
+                "x": 1035.586737967154,
+                "y": 540.7366025669597
+              },
+              {
+                "x": 1035.586737967154,
+                "y": 584.4641647444084
+              },
+              {
+                "x": 1057.468495653165,
+                "y": 584.4641647444084
+              },
+              {
+                "x": 1108.468495653165,
+                "y": 584.4641647444084
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "bottom",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "labelOffsetX": 0,
+            "labelOffsetY": -20,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.6062869016002802,
+            "targetOffsetAlong": 0.5,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "w6m4rv7a",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "j9vsv2vw",
+            "targetId": "cyy6o0jb",
+            "waypoints": [
+              {
+                "x": 431.1883488347689,
+                "y": 230.97228871275803
+              },
+              {
+                "x": 449.1883488347689,
+                "y": 230.97228871275803
+              },
+              {
+                "x": 467.1883488347689,
+                "y": 230.97228871275803
+              },
+              {
+                "x": 482.5573444781351,
+                "y": 230.97228871275803
+              },
+              {
+                "x": 482.5573444781351,
+                "y": 240.68841225404452
+              },
+              {
+                "x": 497.9263401215014,
+                "y": 240.68841225404452
+              },
+              {
+                "x": 521.9263401215014,
+                "y": 240.68841225404452
+              },
+              {
+                "x": 572.9263401215014,
+                "y": 240.68841225404452
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "labelOffsetX": 0,
+            "labelOffsetY": -20,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "0d51xkck",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "9y474aiv",
+            "targetId": "47vstcu8",
+            "waypoints": [
+              {
+                "x": 931.162023221807,
+                "y": 240.68841225404452
+              },
+              {
+                "x": 989.662023221807,
+                "y": 240.68841225404452
+              },
+              {
+                "x": 1013.662023221807,
+                "y": 240.68841225404452
+              },
+              {
+                "x": 1018.7116758224258,
+                "y": 240.68841225404452
+              },
+              {
+                "x": 1018.7116758224258,
+                "y": 252.2580029984723
+              },
+              {
+                "x": 1023.7613284230445,
+                "y": 252.2580029984723
+              },
+              {
+                "x": 1041.7613284230447,
+                "y": 252.2580029984723
+              },
+              {
+                "x": 1059.7613284230447,
+                "y": 252.2580029984723
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "labelOffsetX": 0,
+            "labelOffsetY": -20,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "q29r9jhq",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "cyy6o0jb",
+            "targetId": "6yw0906g",
+            "waypoints": [
+              {
+                "x": 572.9263401215014,
+                "y": 240.68841225404452
+              },
+              {
+                "x": 623.9263401215014,
+                "y": 240.68841225404452
+              },
+              {
+                "x": 647.9263401215014,
+                "y": 240.68841225404452
+              },
+              {
+                "x": 679.2120544072159,
+                "y": 240.68841225404452
+              },
+              {
+                "x": 703.2120544072159,
+                "y": 240.68841225404452
+              },
+              {
+                "x": 754.2120544072159,
+                "y": 240.68841225404452
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "labelOffsetX": 0,
+            "labelOffsetY": -20,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "ad1563e6",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "6yw0906g",
+            "targetId": "9y474aiv",
+            "waypoints": [
+              {
+                "x": 754.2120544072159,
+                "y": 240.68841225404452
+              },
+              {
+                "x": 805.2120544072159,
+                "y": 240.68841225404452
+              },
+              {
+                "x": 829.2120544072159,
+                "y": 240.68841225404452
+              },
+              {
+                "x": 848.662023221807,
+                "y": 240.68841225404452
+              },
+              {
+                "x": 872.662023221807,
+                "y": 240.68841225404452
+              },
+              {
+                "x": 931.162023221807,
+                "y": 240.68841225404452
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "labelOffsetX": 0,
+            "labelOffsetY": -20,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "apngb0xk",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "79g6xjpe",
+            "targetId": "fyimrktw",
+            "waypoints": [
+              {
+                "x": 1108.468495653165,
+                "y": 584.4641647444084
+              },
+              {
+                "x": 1159.468495653165,
+                "y": 584.4641647444084
+              },
+              {
+                "x": 1180.468495653165,
+                "y": 584.4641647444084
+              },
+              {
+                "x": 1184.83124548579,
+                "y": 584.4641647444084
+              },
+              {
+                "x": 1184.83124548579,
+                "y": 580.8353144355872
+              },
+              {
+                "x": 1189.193995318415,
+                "y": 580.8353144355872
+              },
+              {
+                "x": 1207.193995318415,
+                "y": 580.8353144355872
+              },
+              {
+                "x": 1225.193995318415,
+                "y": 580.8353144355872
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "labelOffsetX": 0,
+            "labelOffsetY": -20,
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "9u7aw8he",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "nfullfnl",
+            "targetId": "i41vsmq4",
+            "waypoints": [
+              {
+                "x": 610.8982353155028,
+                "y": 522.7366025669597
+              },
+              {
+                "x": 610.8982353155028,
+                "y": 540.7366025669597
+              },
+              {
+                "x": 610.8982353155028,
+                "y": 606.9836537840578
+              },
+              {
+                "x": 644.183949601217,
+                "y": 606.9836537840578
+              },
+              {
+                "x": 695.183949601217,
+                "y": 606.9836537840578
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "bottom",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "labelOffsetX": 0,
+            "labelOffsetY": -20,
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "6y5lhpdv",
+            "sourceId": "nilkl65v",
+            "targetId": "q2rq8olj",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "sourceOffsetAlong": 0.4102081583701569,
+            "type": "messageBPMN",
+            "directionType": "directed",
+            "routingType": "direct",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 808.2141388220416,
+                "y": 771.5312900448773
+              },
+              {
+                "x": 718.0410924583599,
+                "y": 732.5312900448773
+              },
+              {
+                "x": 718.0410924583599,
+                "y": 440.3312693969017
+              },
+              {
+                "x": 751.1883488347689,
+                "y": 407.8312693969017
+              }
+            ],
+            "label": "message 3",
+            "labelOffsetX": -47.857142857143,
+            "labelOffsetY": 95.71428571428567,
+            "labelWidth": 80
+          }
+        ]
+      },
+      "colorConfig": {},
+      "displayMode": "normal"
+    }
+  ]
+}
