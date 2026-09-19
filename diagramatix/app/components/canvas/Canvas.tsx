@@ -32,6 +32,7 @@ import { ElementContextMenu } from "./ElementContextMenu";
 import { isBlackBoxPool } from "@/app/lib/diagram/blackBoxPoolMenu";
 import { containerHeaderWidth, inContainerHeader } from "@/app/lib/diagram/containerHeader";
 import { quickAddSymbols, QUICK_ADD_LABELS } from "@/app/lib/diagram/quickAddSymbols";
+import { messageLabelsHiddenWhileDragging } from "@/app/lib/diagram/labelVisibility";
 import { poolGuideNext, type PoolBoundaryGuide, type PoolGuideEvent } from "@/app/lib/diagram/poolGuide";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { canConnect } from "@/app/lib/diagram/canConnect";
@@ -4840,14 +4841,22 @@ export function Canvas({
   // Event-based, since those markers carry no branch conditions. Computed
   // every render so flipping the marker back to None/Exclusive/Inclusive
   // re-reveals the stored optionN labels exactly where they were placed.
-  const hiddenBranchLabelConnIds = new Set<string>();
+  const hiddenLabelConnIds = new Set<string>();
   {
     const gwMarker = new Map<string, string>();
     for (const e of data.elements) if (e.type === "gateway") gwMarker.set(e.id, e.gatewayType ?? "exclusive");
     for (const c of data.connectors) {
       if (c.labelAnchor !== "source") continue;
       const m = gwMarker.get(c.sourceId);
-      if (m === "parallel" || m === "event-based") hiddenBranchLabelConnIds.add(c.id);
+      if (m === "parallel" || m === "event-based") hiddenLabelConnIds.add(c.id);
+    }
+    // Paul: "Hide the message labels when moving a Pool across another Pool or
+    // group of pool-less elements until they are finally placed correctly."
+    // The final position is settled at the DROP, so mid-drag the label is the
+    // old offset riding a line whose midpoint is moving — a number that is
+    // about to change. The connector stays; only the text goes.
+    for (const id of messageLabelsHiddenWhileDragging(draggingElementId, data.elements, data.connectors)) {
+      hiddenLabelConnIds.add(id);
     }
   }
 
@@ -5989,7 +5998,7 @@ export function Canvas({
                 misaligned={obstacleViolationConnIds.has(conn.id)}
                 onUpdateEndOffset={handleUpdateEndOffset}
                 showBottleneck={showBottleneck}
-                hideLabel={hiddenBranchLabelConnIds.has(conn.id)}
+                hideLabel={hiddenLabelConnIds.has(conn.id)}
                 highlight={assocHighlightConnIds.has(conn.id)}
                 faded={isAssocFadedConn(conn)}
                 relaxedLayout={data.relaxedLayout}
@@ -6657,7 +6666,7 @@ export function Canvas({
                 sourceIsPool={srcIsPool}
                 sourceType={srcEl?.type}
                 targetIsPool={tgtIsPool}
-                hideLabel={hiddenBranchLabelConnIds.has(conn.id)}
+                hideLabel={hiddenLabelConnIds.has(conn.id)}
                 highlight={assocHighlightConnIds.has(conn.id)}
                 faded={isAssocFadedConn(conn)}
                 relaxedLayout={data.relaxedLayout}
@@ -6686,7 +6695,7 @@ export function Canvas({
               debugMode={debugMode}
               misaligned={obstacleViolationConnIds.has(conn.id)}
               onUpdateEndOffset={handleUpdateEndOffset}
-              hideLabel={hiddenBranchLabelConnIds.has(conn.id)}
+              hideLabel={hiddenLabelConnIds.has(conn.id)}
               highlight={assocHighlightConnIds.has(conn.id)}
               faded={isAssocFadedConn(conn)}
                 relaxedLayout={data.relaxedLayout}
@@ -6732,7 +6741,7 @@ export function Canvas({
                 misaligned={obstacleViolationConnIds.has(conn.id)}
                 onUpdateEndOffset={handleUpdateEndOffset}
                 showBottleneck={showBottleneck}
-                hideLabel={hiddenBranchLabelConnIds.has(conn.id)}
+                hideLabel={hiddenLabelConnIds.has(conn.id)}
                 highlight={assocHighlightConnIds.has(conn.id)}
                 faded={isAssocFadedConn(conn)}
                 relaxedLayout={data.relaxedLayout}
