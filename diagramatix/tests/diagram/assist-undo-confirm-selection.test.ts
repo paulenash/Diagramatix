@@ -107,8 +107,11 @@ describe("B1 — a batch sees what it has already done", () => {
     expect(body).toMatch(/voiceLastId\.current = newId;\s*els = withAdded\(els, syntheticElement\(newId/);
     expect(body).toMatch(/deleteElement\(e\.id\);\s*els = withDeleted\(els, e\.id\);/);
     expect(body).toContain("els = withLabel(els, e.id, newLabel);");
-    // The resolver reads the working copy AND the selection.
-    expect(body).toContain("resolveRef(ref, els, voiceLastId.current, selectedIds)");
+    // The resolver reads the working copy AND the selection. (It gained a
+    // fifth argument on 2026-09-20 — R3's `strict`, which stops a DESTRUCTIVE
+    // command guessing between candidates. The claim here is unchanged: the
+    // working copy and the selection are what it resolves against.)
+    expect(body).toContain("resolveRef(ref, els, voiceLastId.current, selectedIds, opts)");
   });
 });
 

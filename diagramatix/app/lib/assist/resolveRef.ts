@@ -8,6 +8,26 @@ import { SYMBOL_SYNONYMS, SYMBOL_PHRASES } from "./ops";
 
 export type RefResolution = { id: string } | { ambiguous: string[] } | null;
 
+/**
+ * R3. A bare type noun — "the gateway", "the pool" — normally resolves to the
+ * MOST RECENT one of its kind. That is a deliberate convenience: "add a task
+ * after the gateway" almost always means the gateway you just made, and having
+ * to name it would make the feature slower than the mouse.
+ *
+ * It is the wrong answer for a command that DESTROYS something. "delete the
+ * task" picking the most recent, with a green tick, is the feature quietly
+ * removing the wrong element — and the inconsistency was visible in the
+ * product: "delete the lane" already asked which, because containers had their
+ * own guard, while "delete the task" did not.
+ *
+ * `strict` makes a bare type noun with more than one candidate report the
+ * ambiguity instead of guessing, so the caller can ask.
+ */
+export interface ResolveOpts {
+  /** Refuse to guess between candidates; report them instead. */
+  strict?: boolean;
+}
+
 const LAST_PRONOUNS = new Set(["it", "that", "this", "the last", "the last one", "last one", "the new one"]);
 const PREV_PRONOUNS = new Set(["the previous", "previous one", "the previous one", "second last", "the second last", "the one before"]);
 
@@ -27,7 +47,7 @@ const tokens = (s: string) => norm(s).split(/\s+/).filter(Boolean);
 // resolveRef never knew these (SYMBOL_SYNONYMS has no pool/lane), so "the pool"
 // used to fall through to name-matching and fail. Resolve to the unique / most
 // recent element of that container type.
-function containerNoun(spoken: string, elements: DiagramElement[]): RefResolution {
+function containerNoun(spoken: string, elements: DiagramElement[], strict = false): RefResolution {
   const s = stripArticle(norm(spoken));
   const parentType = (e: DiagramElement) => elements.find((p) => p.id === e.parentId)?.type;
   let items: DiagramElement[] | null = null;
@@ -35,7 +55,10 @@ function containerNoun(spoken: string, elements: DiagramElement[]): RefResolutio
   else if (/^sub-?lanes?$/.test(s)) items = elements.filter((e) => e.type === "lane" && parentType(e) === "lane");
   else if (/^lanes?$/.test(s)) items = elements.filter((e) => e.type === "lane");
   if (!items) return null;
-  return items.length ? { id: items[items.length - 1].id } : null; // most-recent
+  if (!items.length) return null;
+  // Destructive: report the candidates rather than taking the newest.
+  if (strict && items.length > 1) return { ambiguous: items.map((e) => e.id) };
+  return { id: items[items.length - 1].id }; // most-recent
 }
 
 function pick(ids: string[]): RefResolution {
@@ -154,7 +177,7 @@ export function resolveSelectionRefs(spoken: string, elements: DiagramElement[],
 /** An exact-id reference the editor's guided flows hand to the apply layer ("#id:abc"). Never spoken. */
 export const ID_REF_PREFIX = "#id:";
 
-export function resolveRef(spoken: string, elements: DiagramElement[], lastAddedId?: string | null, selectedIds?: readonly string[]): RefResolution {
+export function resolveRef(spoken: string, elements: DiagramElement[], lastAddedId?: string | null, selectedIds?: readonly string[], opts: ResolveOpts = {}): RefResolution {
   if (spoken.startsWith(ID_REF_PREFIX)) {
     const id = spoken.slice(ID_REF_PREFIX.length);
     return elements.some((e) => e.id === id) ? { id } : null;
@@ -181,15 +204,17 @@ export function resolveRef(spoken: string, elements: DiagramElement[], lastAdded
   }
 
   // Bare container noun ("the pool", "pool", "sublane") → the unique/most-recent.
-  const cont = containerNoun(s, elements);
+  const cont = containerNoun(s, elements, opts.strict);
   if (cont) return cont;
 
   // Bare type noun ("the gateway", "the end event") → elements of that type.
   const t = typeNoun(s);
   if (t) {
     const ofType = elements.filter((e) => e.type === t);
-    // Prefer the most-recent when there are several of a bare type.
-    return ofType.length > 1 ? { id: ofType[ofType.length - 1].id } : pick(ofType.map((e) => e.id));
+    // Prefer the most-recent when there are several of a bare type — except
+    // under strict, where guessing is precisely what we are avoiding.
+    if (ofType.length > 1 && !opts.strict) return { id: ofType[ofType.length - 1].id };
+    return pick(ofType.map((e) => e.id));
   }
 
   const fullTarget = stripArticle(s);          // "lane 2"

@@ -2652,6 +2652,19 @@ export function DiagramEditor({
   const [abraConnecting, setAbraConnecting] = useState(false);
   const [voiceInterim, setVoiceInterim] = useState("");
   const [voiceBusy, setVoiceBusy] = useState(false);
+  /**
+   * B4. `voiceBusy` is React state, so it is not true until the next render —
+   * far too late to stop the NEXT utterance, which arrives from the mic
+   * whenever the speaker stops for breath. The ref flips synchronously, and
+   * anything spoken while a call is in flight waits its turn in the queue
+   * instead of racing it.
+   *
+   * Without this, two sentences spoken over one AI call both applied against
+   * the state from BEFORE the call, and their log lines interleaved. The text
+   * box has been gated since b00e3c7b; the voice path never was.
+   */
+  const voiceBusyRef = useRef(false);
+  const voiceQueueRef = useRef<string[]>([]);
   const voiceLastId = useRef<string | null>(null);
   // stopAbraListening is defined after the command runner (it needs the buffer
   // flush); the runner reaches it through this ref.
@@ -2753,10 +2766,29 @@ export function DiagramEditor({
     // Multi-modal: "this" / "these" / "the selected task" resolve to the mouse
     // selection — the mouse says WHICH, the voice says WHAT.
     const selectedIds = selectedIdsRef.current;
-    const resolve1 = (ref: string): DiagramElement | { err: string } => {
-      const r = resolveRef(ref, els, voiceLastId.current, selectedIds);
+    /**
+     * `strict` (R3) is for commands that DESTROY something. Without it a bare
+     * type noun resolves to the most recent of its kind — the right call for
+     * "add a task after the gateway", and quietly the wrong element for
+     * "delete the task".
+     *
+     * R2: an ambiguity now names the candidates instead of throwing them away.
+     * `resolveRef` has always returned the list; the message discarded it and
+     * said only "is ambiguous", which left the user to guess what it had found.
+     */
+    const resolve1 = (ref: string, opts: { strict?: boolean } = {}): DiagramElement | { err: string } => {
+      const r = resolveRef(ref, els, voiceLastId.current, selectedIds, opts);
       if (!r) return { err: isSelectionRef(ref) && selectedIds.length === 0 ? "nothing is selected" : `couldn't find “${ref}”` };
-      if ("ambiguous" in r) return { err: isSelectionRef(ref) ? `${r.ambiguous.length} elements are selected — select just one for that` : `“${ref}” is ambiguous` };
+      if ("ambiguous" in r) {
+        if (isSelectionRef(ref)) return { err: `${r.ambiguous.length} elements are selected — select just one for that` };
+        const names = r.ambiguous
+          .map((id) => els.find((e) => e.id === id))
+          .filter((e): e is DiagramElement => !!e)
+          .map((e) => (e.label ?? "").trim() || e.type);
+        const shown = names.slice(0, 4).map((nm) => `“${nm}”`).join(", ");
+        const more = names.length > 4 ? `, and ${names.length - 4} more` : "";
+        return { err: `which “${ref}”? ${names.length} match: ${shown}${more} — say the name` };
+      }
       return els.find((e) => e.id === r.id)!;
     };
     // "delete selected" on an expanded subprocess DISSOLVES it: the shell and
@@ -2878,7 +2910,10 @@ export function DiagramEditor({
           results.push(`deleted ${targets.length} selected elements`);
           continue;
         }
-        const e = resolve1(op.ref);
+        // R3: a delete never guesses between candidates. "delete the lane"
+        // already asked which — containers had their own guard below — while
+        // "delete the task" silently took the newest and reported success.
+        const e = resolve1(op.ref, { strict: true });
         if ("err" in e) {
           // Not an element — maybe a message/connector label.
           const key = messageLabelKey(op.ref);
@@ -3479,7 +3514,22 @@ export function DiagramEditor({
     if (!heard) return;
     const log = (entry: Omit<CommandLogEntry, "id">) => setVoiceLog((prev) => [...prev, { id: nanoid(), ...entry }]);
     // A typed "stop" means the same as a spoken one: the mic, and anything parked, ends.
-    if (isMicStopWord(heard)) { stopAbraListeningRef.current(); log({ heard, summary: "stopped listening", ok: true }); return; }
+    if (isMicStopWord(heard)) {
+      // "stop" is the brake — it must never queue behind an in-flight call,
+      // and it throws away anything already parked. Paul made the word
+      // unambiguous for exactly this reason (49b13eb1).
+      voiceQueueRef.current = [];
+      stopAbraListeningRef.current();
+      log({ heard, summary: "stopped listening", ok: true });
+      return;
+    }
+    // Everything else queues rather than races, so commands apply in the order
+    // they were spoken, each against the state the one before it left behind.
+    if (voiceBusyRef.current) {
+      voiceQueueRef.current.push(heard);
+      log({ heard, summary: "waiting for the previous command…", ok: true });
+      return;
+    }
     // While a guided pick is active, every utterance feeds it (a number, a
     // name, or "done") — never the general command parser.
     //
@@ -3542,6 +3592,7 @@ export function DiagramEditor({
     const ops = parseCommand(heard);
     if (ops) { applyOrAsk(ops, false); return; }
     // Deterministic parser didn't recognise it → AI fallback (metered).
+    voiceBusyRef.current = true;
     setVoiceBusy(true);
     try {
       const res = await fetch("/api/ai/command", {
@@ -3562,7 +3613,13 @@ export function DiagramEditor({
     } catch {
       log({ heard, summary: "command service unavailable", ok: false, viaAi: true });
     } finally {
+      voiceBusyRef.current = false;
       setVoiceBusy(false);
+      // Drain through the REF, not this closure: the render that follows the
+      // call rebuilds runVoiceCommand over the NEW diagram, and the queued
+      // command must see that, not the diagram as it was when it was spoken.
+      const next = voiceQueueRef.current.shift();
+      if (next !== undefined) void runAbraCommandRef.current(next);
     }
   }, [applyGrouped, data.elements, data.connectors]);
   // Keep a stable ref so the mic's onText callback always calls the latest.

@@ -87,8 +87,17 @@ describe("3 — 'stop' means one thing", () => {
     // Spoken: no rename-flow guard in front of the mic stop any more.
     expect(ed).toContain("if (isMicStopWord(txt)) {");
     expect(ed).not.toMatch(/!renameFlowRef\.current && \/\^\(stop/);
-    // Typed: the same word stops the mic before any flow sees it.
-    expect(ed).toMatch(/if \(isMicStopWord\(heard\)\) \{ stopAbraListeningRef\.current\(\);/);
+    // Typed: the same word stops the mic before any flow sees it. Matched on
+    // ORDER rather than on one line of text — the block grew on 2026-09-20
+    // (B4) to also discard anything queued, since the brake must not leave
+    // commands parked behind the call it just stopped.
+    const stopAt = ed.indexOf("if (isMicStopWord(heard))");
+    expect(stopAt, "the typed stop word is handled").toBeGreaterThan(-1);
+    const afterStop = ed.slice(stopAt, stopAt + 400);
+    expect(afterStop).toContain("stopAbraListeningRef.current()");
+    expect(afterStop, "and it drops what is parked").toContain("voiceQueueRef.current = []");
+    expect(stopAt, "before any flow handling sees the word")
+      .toBeLessThan(ed.indexOf("if (renameFlowRef.current) { handleRenameUtteranceRef"));
     // The rename loop ends on flow words only, and its prompts say "done".
     expect(ed).toContain("if (isFlowEndWord(low)) { cancelRenameFlow(\"rename finished\"); return; }");
     expect(ed).toContain("pick another or say “done”");
