@@ -12,7 +12,7 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { makeAiClient, aiApiKey } from "@/app/lib/ai/anthropicClient";
-import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
+import { getAiCommandModel } from "@/app/lib/ai/aiModelSetting";
 import { resolveAiRouteContext } from "@/app/lib/ai/aiTelemetryRoute";
 import { AI_INVOCATION_POINTS, enterAiContext } from "@/app/lib/ai/aiTelemetry";
 import { auth } from "@/auth";
@@ -101,6 +101,9 @@ function extractJsonObject(text: string): { canonical?: unknown; ops?: unknown }
   try { return JSON.parse(text.slice(s, e + 1)); } catch { return null; }
 }
 
+/** How long one sentence may take to canonicalise before we stop waiting. */
+export const COMMAND_TIMEOUT_MS = 20_000;
+
 export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -122,7 +125,7 @@ export async function POST(req: Request) {
   const state = body?.state ?? { elements: [], connectors: [] } as unknown as DiagramData;
   const selectedIds = Array.isArray(body?.selectedIds) ? body!.selectedIds!.filter((s) => typeof s === "string") : [];
 
-  const model = await getAiGenerateModel();
+  const model = await getAiCommandModel();
   const apiKey = aiApiKey(model);
   if (!apiKey) return NextResponse.json({ canonical: "", ops: [] }); // no AI configured → no-op
 
@@ -131,6 +134,12 @@ export async function POST(req: Request) {
     ? `${SYSTEM}\n\nAdmin-maintained command aliases / phrasing hints (use them when normalising the instruction):\n${greenRules}`
     : SYSTEM;
 
+  // A command bar that sits on "thinking…" for ever is worse than one that says
+  // it gave up: the user cannot tell a slow provider from a dead one, and the
+  // grammar was going to re-validate the answer anyway. 20s is far longer than
+  // a one-sentence rewrite needs.
+  const ac = new AbortController();
+  const timeout = setTimeout(() => ac.abort(), COMMAND_TIMEOUT_MS);
   try {
     const client = makeAiClient(model, apiKey);
     const resp = await client.messages.create({
@@ -141,7 +150,7 @@ export async function POST(req: Request) {
         role: "user",
         content: `CURRENT DIAGRAM:\n${serializeDiagramForCommand(state, selectedIds)}\n\nINSTRUCTION:\n${instruction}\n\nReturn the JSON object { "canonical", "ops" }.`,
       }],
-    });
+    }, { signal: ac.signal });
     const text = resp.content
       .filter((c): c is Anthropic.TextBlock => c.type === "text")
       .map((c) => c.text)
@@ -151,8 +160,13 @@ export async function POST(req: Request) {
     const ops = validateOps(obj?.ops);
     return NextResponse.json({ canonical, ops });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error("[POST /api/ai/command] error:", message);
+    const aborted = ac.signal.aborted;
+    const message = aborted
+      ? `The command interpreter took longer than ${Math.round(COMMAND_TIMEOUT_MS / 1000)}s — try saying it again, or use a simpler phrasing.`
+      : err instanceof Error ? err.message : String(err);
+    console.error("[POST /api/ai/command] error:", aborted ? "timeout" : message);
     return NextResponse.json({ canonical: "", ops: [], error: message }, { status: 200 });
+  } finally {
+    clearTimeout(timeout);
   }
 }

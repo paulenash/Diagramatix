@@ -10,6 +10,7 @@
  */
 import { prisma } from "@/app/lib/db";
 import { resolveAiModel, isKnownAiModel } from "./models";
+import { aiApiKey } from "./anthropicClient";
 
 export const AI_MODEL_KEY = "ai.generate.model";
 /** Optional override used ONLY for image → diagram (vision) generation. When
@@ -76,4 +77,65 @@ export async function resolveGenerateModel(hasImage: boolean): Promise<string> {
     if (vision) return vision;
   }
   return getAiGenerateModel();
+}
+
+/**
+ * The model the Voice Assist command interpreter uses, and its default.
+ *
+ * Plan item C5. The fallback used to run on the global AI-Generate model —
+ * Opus 5, chosen for writing a whole diagram from a prompt — to do a much
+ * smaller job: rewrite ONE spoken sentence into a canonical command. That was
+ * defensible while the feature was SuperAdmin-only; it went Expert-and-above on
+ * 2026-09-17, so the spend became customers' rather than Paul's own testing.
+ *
+ * Paul, 2026-09-20, chose Haiku. The reason it is safe here and NOT safe for
+ * generation — where his own 2026-09-04 measurement found Haiku returning about
+ * a third of the content — is that this is not generation. The model picks from
+ * a listed vocabulary against a listed diagram, and whatever it returns is
+ * re-parsed by the deterministic grammar before anything touches the canvas. A
+ * poor rewrite fails to parse; it cannot corrupt the diagram.
+ *
+ * An admin can override it in AI Model settings; blank clears the override and
+ * returns to this default.
+ */
+export const AI_COMMAND_MODEL_KEY = "ai.command.model";
+
+/** Small, quick, and re-validated downstream — see above. */
+export const DEFAULT_AI_COMMAND_MODEL = "claude-haiku-4-5-20251001";
+
+/**
+ * The model the Voice Assist command route should use right now.
+ *
+ * Falls back to the AI-Generate model when the chosen one is not reachable from
+ * THIS deployment — a Haiku default is no use on an install with no Anthropic
+ * key, and a command that cannot run is worse than a dearer one that can.
+ */
+export async function getAiCommandModel(): Promise<string> {
+  const usable = (id: string | undefined | null): id is string =>
+    !!id && isKnownAiModel(id) && !!aiApiKey(id);
+  try {
+    const row = await prisma.appSetting.findUnique({ where: { key: AI_COMMAND_MODEL_KEY } });
+    const chosen = row?.value?.trim();
+    if (usable(chosen)) return chosen;
+  } catch {
+    // DB hiccup → fall through, never block a command over a settings read.
+  }
+  if (usable(DEFAULT_AI_COMMAND_MODEL)) return DEFAULT_AI_COMMAND_MODEL;
+  return getAiGenerateModel();
+}
+
+/** Set (or, with a blank id, clear back to the default) the command model. */
+export async function setAiCommandModel(id: string): Promise<string | null> {
+  const trimmed = id.trim();
+  if (!trimmed) {
+    await prisma.appSetting.deleteMany({ where: { key: AI_COMMAND_MODEL_KEY } });
+    return null;
+  }
+  if (!isKnownAiModel(trimmed)) throw new Error(`Unknown model: ${trimmed}`);
+  await prisma.appSetting.upsert({
+    where: { key: AI_COMMAND_MODEL_KEY },
+    create: { key: AI_COMMAND_MODEL_KEY, value: trimmed },
+    update: { value: trimmed },
+  });
+  return trimmed;
 }

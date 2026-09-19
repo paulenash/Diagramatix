@@ -8,18 +8,27 @@ import { pricingFor, typicalCost, TYPICAL_GEN, PRICING_SNAPSHOT_DATE } from "@/a
 const fmtRate = (n: number) => `$${n % 1 === 0 ? n.toFixed(0) : n.toFixed(2)}`;
 const fmtCost = (n: number) => (n < 0.01 ? `${(n * 100).toFixed(2)}¢` : `$${n.toFixed(3)}`);
 
-export function AiModelClient({ models, initialModel, initialVisionModel }: {
+export function AiModelClient({
+  models, initialModel, initialVisionModel,
+  initialCommandModel = "", commandModelDefault = "", commandModelInUse = "",
+}: {
   models: AiModel[];
   initialModel: string;
   initialVisionModel: string;
+  /** Stored override; "" means the command model is following its default. */
+  initialCommandModel?: string;
+  commandModelDefault?: string;
+  commandModelInUse?: string;
 }) {
   const [model, setModel] = useState(initialModel);
   const [savedModel, setSavedModel] = useState(initialModel);
   const [visionModel, setVisionModel] = useState(initialVisionModel);
   const [savedVision, setSavedVision] = useState(initialVisionModel);
+  const [commandModel, setCommandModel] = useState(initialCommandModel);
+  const [savedCommand, setSavedCommand] = useState(initialCommandModel);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const dirty = model !== savedModel || visionModel !== savedVision;
+  const dirty = model !== savedModel || visionModel !== savedVision || commandModel !== savedCommand;
 
   /**
    * Paul, 2026-09-06: "Not on Kimi K3 forgot to Save!!!"
@@ -66,12 +75,13 @@ export function AiModelClient({ models, initialModel, initialVisionModel }: {
     try {
       const res = await fetch("/api/admin/ai-model", {
         method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model, visionModel }),
+        body: JSON.stringify({ model, visionModel, commandModel }),
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) { setErr(j.error ?? "Failed to save"); return; }
       if (typeof j.model === "string") setSavedModel(j.model);
       if (typeof j.visionModel === "string") { setSavedVision(j.visionModel); setVisionModel(j.visionModel); }
+      { const c = typeof j.commandModel === "string" ? j.commandModel : ""; setSavedCommand(c); setCommandModel(c); }
     } catch {
       setErr("Network error");
     } finally { setBusy(false); }
@@ -153,6 +163,41 @@ export function AiModelClient({ models, initialModel, initialVisionModel }: {
           <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 mt-2">
             ⚠ Your default model is <strong>text-only</strong>, so image → diagram will fail. Pick a
             vision model above (or choose a vision-capable default).
+          </p>
+        )}
+      </div>
+
+      {/* Voice Assist command model — rewrites ONE spoken sentence into a
+          canonical command, which the deterministic grammar then re-parses
+          before anything touches the canvas. A small job, so it defaults to a
+          small model rather than the generation default. */}
+      <div className="mt-4 bg-white border border-gray-200 rounded-lg p-4">
+        <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+          Voice Assist command model <span className="normal-case text-gray-400">(spoken / typed commands)</span>
+        </label>
+        <select
+          value={commandModel}
+          onChange={(e) => setCommandModel(e.target.value)}
+          className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-200"
+        >
+          <option value="">
+            {commandModelDefault
+              ? `— Default (${models.find((m) => m.id === commandModelDefault)?.label ?? commandModelDefault}) —`
+              : "— Use the default —"}
+          </option>
+          {models.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+        </select>
+        <p className="text-[11px] text-gray-400 mt-2">
+          Used only when the deterministic grammar does <strong>not</strong> recognise a command and it
+          falls through to the AI. The job is rewriting one sentence into a command the grammar
+          can parse, and that rewrite is re-validated before it is applied — so a small, quick
+          model is the right default here, unlike AI Generate.
+        </p>
+        {commandModelInUse && commandModelInUse !== commandModelDefault && !commandModel && (
+          <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 mt-2">
+            ⚠ The default model isn&rsquo;t reachable on this deployment (no API key for its
+            provider), so commands are falling back to{" "}
+            <strong>{models.find((m) => m.id === commandModelInUse)?.label ?? commandModelInUse}</strong>.
           </p>
         )}
       </div>
