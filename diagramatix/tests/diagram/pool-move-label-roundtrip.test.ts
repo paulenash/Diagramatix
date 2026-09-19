@@ -20,22 +20,18 @@
  * this measures, at several step sizes, because a rule that depends on where
  * the samples fell will give a different answer for each.
  *
- * ⚠ THREE OF THESE ARE `it.fails` — they are a MEASUREMENT of a defect that is
- * still open, not a guard on a fix. A ONE-step drag round-trips perfectly, so
- * the formula itself is sound; a seven-step drag lands 213px out and a
- * thirty-step drag 174px out, which is the label Paul found sitting below the
- * returned pool.
+ * WHAT WAS WRONG, and what the numbers were before the fix: a ONE-step drag
+ * round-tripped exactly, so the formula was always sound, but a seven-step drag
+ * landed 213px out and a thirty-step drag 174px out — the label Paul found
+ * sitting below the returned pool. The rule was applied at EVERY mouse sample,
+ * so the crossing from one side of the partner to the other landed on whichever
+ * sample it happened to land on, and mid-crossing the attachment can still sit
+ * on the old face while the geometry already says otherwise.
  *
- * The cause is that the rule is applied once per mouse sample and the message
- * label rule exists in THREE places that compose differently depending on where
- * the samples fell: `app/lib/diagram/messageLabel.ts`, the inline copy in CASE
- * A2 of `useDiagram.ts`, and the `preserveLabelWorldPos` /
- * `pickMsgLabelAnchorEnd` pair that runs on every waypoint change and anchors
- * to the NEAREST endpoint — which switches ends part-way through a move.
- *
- * When the fix lands these become plain `it` and the suite holds it. Until
- * then `it.fails` means FIXING the defect fails this file, which is the point:
- * nobody can fix it and leave the measurement saying it is still broken.
+ * THE FIX: settle once, at MOVE_END, against the state the gesture started
+ * from (`settleMessageLabels`). The result is then a function of where the pool
+ * STARTED and where it ENDED UP and nothing in between, which is why every step
+ * count now agrees and why dragging back restores the offsets exactly.
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
@@ -63,16 +59,46 @@ function labelOffsets(d: DiagramData): Record<string, { x: number; y: number }> 
   return out;
 }
 
-/** A drag: `steps` MOVE_ELEMENTs from where the pool is to `toY`, then MOVE_END. */
+/**
+ * How far each label sits from the POOL's own attachment point, and on which
+ * side. This — not the stored offset — is what Paul means by "the same
+ * relative place": `labelOffsetX/Y` are stored relative to the line's MIDPOINT,
+ * which necessarily moves when the pool does, so the stored number changing is
+ * correct and says nothing.
+ */
+function gapDistances(d: DiagramData): Record<string, number> {
+  const pool = poolOf(d);
+  const out: Record<string, number> = {};
+  for (const c of d.connectors as Connector[]) {
+    if (c.type !== "messageBPMN") continue;
+    if (c.sourceId !== pool.id && c.targetId !== pool.id) continue;
+    const wp = c.waypoints;
+    const a = wp[c.sourceInvisibleLeader ? 1 : 0];
+    const b = wp[c.targetInvisibleLeader ? wp.length - 2 : wp.length - 1];
+    const attach = c.sourceId === pool.id ? a : b;
+    const other = c.sourceId === pool.id ? b : a;
+    const centreY = (a.y + b.y) / 2 + (c.labelOffsetY ?? 0) + 7;
+    // Signed INTO the gap, so a clean side-swap reads as the same number.
+    out[c.label ?? c.id] = (centreY - attach.y) * (other.y < attach.y ? -1 : 1);
+  }
+  return out;
+}
+
+/**
+ * A drag: `steps` MOVE_ELEMENTs from where the pool is to `toY`, then MOVE_END
+ * carrying the pre-drag snapshot — which is what the editor does, since
+ * `elementMoveEnd` reads it off `preMoveRef` before clearing it.
+ */
 function drag(state: DiagramData, toY: number, steps: number): DiagramData {
   const pool = poolOf(state);
   const fromY = pool.y, x = pool.x;
+  const preDrag = { elements: state.elements, connectors: state.connectors };
   let s = state;
   for (let i = 1; i <= steps; i++) {
     const y = fromY + ((toY - fromY) * i) / steps;
     s = reducer(s, { type: "MOVE_ELEMENT", payload: { id: pool.id, x, y } } as Action);
   }
-  return reducer(s, { type: "MOVE_END", payload: { id: poolOf(s).id } } as Action);
+  return reducer(s, { type: "MOVE_END", payload: { id: poolOf(s).id, preDrag } } as Action);
 }
 
 // Where Paul dragged it to, from his "after" export.
@@ -95,7 +121,7 @@ describe("T4556 — pool moved away and back puts its message labels back", () =
   });
 
   for (const steps of [1, 7, 30]) {
-    (steps === 1 ? it : it.fails)(`returns every label to its starting offset after a ${steps}-step drag there and back`, () => {
+    it(`returns every label to its starting offset after a ${steps}-step drag there and back`, () => {
       const start = fixture();
       const before = labelOffsets(start);
       const startY = poolOf(start).y;
@@ -114,7 +140,7 @@ describe("T4556 — pool moved away and back puts its message labels back", () =
     });
   }
 
-  it.fails("does not depend on how many mouse samples the drag happened to get", () => {
+  it("does not depend on how many mouse samples the drag happened to get", () => {
     // The crossing from one side of the partner to the other lands on whichever
     // sample it lands on. If the rule mirrors about THAT moment's attachment
     // rather than the settled one, every drag gives a different answer.
@@ -122,6 +148,74 @@ describe("T4556 — pool moved away and back puts its message labels back", () =
     for (const key of Object.keys(results[0])) {
       expect(results[1][key].y, `${key} after 7 steps vs 1`).toBeCloseTo(results[0][key].y, 0);
       expect(results[2][key].y, `${key} after 30 steps vs 1`).toBeCloseTo(results[0][key].y, 0);
+    }
+  });
+
+  it("lands in the same place however far the pool is dragged past", () => {
+    // Not just Paul's one destination: the settle must be a function of where
+    // the pool ended up, so ending at the same place by a different route —
+    // or after going further and coming back — must agree.
+    const direct = labelOffsets(drag(fixture(), ABOVE_Y, 5));
+    const viaFurther = labelOffsets(drag(drag(fixture(), ABOVE_Y - 400, 5), ABOVE_Y, 5));
+    for (const key of Object.keys(direct)) {
+      expect(viaFurther[key].y, `${key} reached by a different route`).toBeCloseTo(direct[key].y, 0);
+    }
+  });
+
+  it("returns the labels after a move that never crosses the partner at all", () => {
+    // The no-crossing case must be a plain translation and come back exactly.
+    const start = fixture();
+    const before = labelOffsets(start);
+    const startY = poolOf(start).y;
+    const nudged = drag(start, startY + 60, 9);
+    const back = labelOffsets(drag(nudged, startY, 9));
+    for (const key of Object.keys(before)) {
+      expect(back[key].y, `${key} after a short there-and-back`).toBeCloseTo(before[key].y, 0);
+    }
+  });
+
+  it("is unchanged by a MOVE_END that carries no snapshot", () => {
+    // Older call sites (and a click that never became a drag) send no preDrag.
+    // That must be a no-op rather than a throw or a reset.
+    const s = fixture();
+    const pool = poolOf(s);
+    const out = reducer(s, { type: "MOVE_END", payload: { id: pool.id } } as Action);
+    expect(labelOffsets(out)).toEqual(labelOffsets(s));
+  });
+
+  it("changes nothing more once the pool is clear on the other side", () => {
+    // Paul's rule, 2026-09-19: "when moving a Pool with messages attached from
+    // elements that it is going to cross … the message attachment points and
+    // labels don't need to be redone until the Pool is on the other side …
+    // Once clear the message attachment points swap sides and the label are
+    // place in the same relative place and if the movement continues they do
+    // not need to change any more."
+    //
+    // So: one swap, then nothing. Dragging further and further past must keep
+    // giving the same offsets — the label is placed relative to the pool's own
+    // attachment, and that relationship stops changing once the sides settle.
+    const clear = drag(fixture(), ABOVE_Y, 6);
+    const gaps = gapDistances(clear);
+    let s = clear;
+    for (const further of [ABOVE_Y - 150, ABOVE_Y - 500, ABOVE_Y - 1200]) {
+      s = drag(s, further, 6);
+      const now = gapDistances(s);
+      for (const key of Object.keys(gaps)) {
+        expect(now[key], `${key} must keep its place beside the pool at y=${further}`)
+          .toBeCloseTo(gaps[key], 0);
+      }
+    }
+  });
+
+  it("keeps the same distance beside the pool across the crossing", () => {
+    // The other half of Paul's rule: once clear, the attachments swap sides
+    // "and the label are place in the same relative place". Measured from the
+    // pool's own attachment, that distance is the thing that must survive.
+    const start = fixture();
+    const before = gapDistances(start);
+    const after = gapDistances(drag(start, ABOVE_Y, 6));
+    for (const key of Object.keys(before)) {
+      expect(after[key], `${key} beside the pool, after the swap`).toBeCloseTo(before[key], 0);
     }
   });
 

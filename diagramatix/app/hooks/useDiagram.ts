@@ -27,6 +27,7 @@ import { isUmlConnType } from "@/app/lib/diagram/types";
 import { expandMoveSet } from "@/app/lib/diagram/moveSet";
 import { retypeTasksForSystemFlag, applyTaskTypeChanges } from "@/app/lib/diagram/itSystemTaskTypes";
 import { emieMountProps } from "@/app/lib/diagram/emieLabel";
+import { settleMessageLabels, movedElementIds } from "@/app/lib/diagram/messageLabel";
 import { growPoolToAdopt } from "@/app/lib/diagram/growPool";
 import { planMovePool, planSwapPools, type PoolPosition } from "@/app/lib/diagram/poolOrder";
 import { autoResizeUmlElement, sizeUmlNote } from "@/app/lib/diagram/umlAutoSize";
@@ -444,7 +445,10 @@ export type Action =
   | { type: "INSERT_SPACE"; payload: { markerX: number; markerY: number; dx: number; dy: number } }
   | { type: "REMOVE_SPACE"; payload: { zone: { x: number; y: number; width: number; height: number }; preserveIds?: string[]; extraDeleteIds?: string[]; leaveAloneIds?: string[] } }
   | { type: "SET_VIEWPORT"; payload: { x: number; y: number; zoom: number } }
-  | { type: "MOVE_END"; payload: { id: string; fromX?: number; fromY?: number } }
+  | { type: "MOVE_END"; payload: { id: string; fromX?: number; fromY?: number;
+      /** The elements + connectors as they were when the drag began. Message
+       *  labels are settled against this once, at the end. */
+      preDrag?: { elements: DiagramElement[]; connectors: Connector[] } } }
   | { type: "SPLIT_CONNECTOR"; payload: {
       symbolType: SymbolType;
       position: Point;
@@ -3483,6 +3487,16 @@ export function reducer(state: DiagramData, action: Action): DiagramData {
   if (LANE_RECONCILE_ACTIONS.has(action.type)) {
     const reconciled = reconcileLaneMembership(next.elements);
     if (reconciled !== next.elements) return { ...next, elements: reconciled };
+  }
+  // A gesture's message labels are settled ONCE, here, against the state the
+  // gesture started from — never per mouse sample. See settleMessageLabels;
+  // this sits in the wrapper because MOVE_END has a dozen exits and every one
+  // of them has to be settled the same way.
+  if (action.type === "MOVE_END" && action.payload.preDrag) {
+    const { elements: wasEls, connectors: wasConns } = action.payload.preDrag;
+    const moved = movedElementIds(wasEls, next.elements);
+    const settled = settleMessageLabels(next.connectors, wasConns, moved);
+    if (settled !== next.connectors) return { ...next, connectors: settled };
   }
   return next;
 }
@@ -10308,6 +10322,12 @@ export function useDiagram(initialData: DiagramData) {
   const elementMoveEnd = useCallback((id: string) => {
     // Capture the pre-drag position so MOVE_END can tell a real drag from a click.
     const before = preMoveRef.current?.elements.find((e) => e.id === id) ?? null;
+    // Captured before preMoveRef is cleared: the reducer settles this drag's
+    // message labels against it, so the answer depends on where the pool
+    // started and ended and not on how many mouse samples it got.
+    const preDrag = preMoveRef.current
+      ? { elements: preMoveRef.current.elements, connectors: preMoveRef.current.connectors }
+      : undefined;
     if (draggingRef.current === id && preMoveRef.current) {
       pushHistory(preMoveRef.current);
       preMoveRef.current = null;
@@ -10315,7 +10335,7 @@ export function useDiagram(initialData: DiagramData) {
       dragTravellingRef.current = null;
       setDragTravellingIds(null);
     }
-    dispatch({ type: "MOVE_END", payload: { id, fromX: before?.x, fromY: before?.y } });
+    dispatch({ type: "MOVE_END", payload: { id, fromX: before?.x, fromY: before?.y, preDrag } });
   }, []);
 
   const splitConnector = useCallback((

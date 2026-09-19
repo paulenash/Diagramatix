@@ -93,3 +93,70 @@ export function preserveMessageLabel(
     labelOffsetY: (newLabelCentreY - halfLabelH) - newMidY,
   };
 }
+
+/**
+ * Settle every message label ONCE, at the end of a gesture, against the state
+ * the gesture started from.
+ *
+ * This is the answer to Paul's 2026-09-19 question — "can you devise a way so
+ * that these labels on moved pools are more reliably placed and in the case of
+ * the Pool returned to its starting position are back where they used to be?".
+ *
+ * `preserveMessageLabel` above is correct for ONE move, and a one-step drag
+ * round-tripped exactly. A real drag is one reducer action per mouse sample,
+ * and applying the rule at every sample is what broke it: the crossing from one
+ * side of the partner to the other lands on whichever sample it lands on, and
+ * while the pool overlaps its partner the attachment can sit on the old face
+ * while the geometry already says otherwise. A seven-step drag there and back
+ * left the label 213px from where it started, below the returned pool; a
+ * thirty-step drag left it somewhere else again.
+ *
+ * Settling once removes the whole class of problem. The result is a function of
+ * where the pool STARTED and where it ENDED UP — nothing in between — so it
+ * cannot depend on the mouse, and dragging back reverses the same function and
+ * restores the offsets exactly.
+ *
+ * `movedIds` is the set of elements the gesture actually moved, worked out by
+ * comparing positions rather than trusting a travelling list, so an element
+ * that came along for the ride is counted too.
+ */
+export function settleMessageLabels(
+  connectors: Connector[],
+  beforeConnectors: Connector[],
+  movedIds: Set<string>,
+): Connector[] {
+  if (movedIds.size === 0) return connectors;
+  const before = new Map(beforeConnectors.map((c) => [c.id, c]));
+  let changed = false;
+  const out = connectors.map((conn) => {
+    if (conn.type !== "messageBPMN" && conn.type !== "message") return conn;
+    const prev = before.get(conn.id);
+    if (!prev) return conn;                       // created during the gesture
+    const srcMoved = movedIds.has(conn.sourceId);
+    const tgtMoved = movedIds.has(conn.targetId);
+    if (!srcMoved && !tgtMoved) return conn;
+    // Both ends moving is a rigid translation as far as the label is concerned,
+    // and either end gives the same answer; source keeps it deterministic.
+    const offsets = preserveMessageLabel(conn, prev, srcMoved ? "source" : "target");
+    if (!offsets) return conn;
+    if (offsets.labelOffsetX === conn.labelOffsetX && offsets.labelOffsetY === conn.labelOffsetY) return conn;
+    changed = true;
+    return { ...conn, ...offsets };
+  });
+  return changed ? out : connectors;
+}
+
+/** Which elements a gesture actually moved, by comparing before and after. */
+export function movedElementIds(
+  before: { id: string; x: number; y: number }[],
+  after: { id: string; x: number; y: number }[],
+): Set<string> {
+  const was = new Map(before.map((e) => [e.id, e]));
+  const ids = new Set<string>();
+  for (const e of after) {
+    const b = was.get(e.id);
+    if (!b) continue;
+    if (Math.abs(b.x - e.x) > 0.01 || Math.abs(b.y - e.y) > 0.01) ids.add(e.id);
+  }
+  return ids;
+}
