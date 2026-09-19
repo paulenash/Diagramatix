@@ -221,7 +221,11 @@ describe("T4543 — Escape removes the pool alignment line and its green markers
     const src = read("app", "components", "canvas", "Canvas.tsx");
     expect(src).toContain('dispatchPoolGuide({ type: "escape" })');
     // Two gestures raise the guide — a pool resize and a pool move — and both
-    // must release the suppression when they finish.
-    expect((src.match(/dispatchPoolGuide\(\{ type: "gestureEnd" \}\)/g) ?? []).length).toBe(2);
+    // must release the suppression when they finish. A THIRD call was added
+    // 2026-09-19 (T4559): mousedown capture retires a guide stranded by a
+    // gesture that ended some other way. So this is a floor, not an exact
+    // count; T4559 owns the cancel itself.
+    expect((src.match(/dispatchPoolGuide\(\{ type: "gestureEnd" \}\)/g) ?? []).length)
+      .toBeGreaterThanOrEqual(2);
   });
 });

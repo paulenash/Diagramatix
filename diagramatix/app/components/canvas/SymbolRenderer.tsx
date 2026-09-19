@@ -9,6 +9,7 @@ import { wrapText, computePackageTab } from "@/app/lib/diagram/textMetrics";
 import { holdsInternalLabel, wrapShapeLabel } from "@/app/lib/diagram/shapeFit";
 import { archiNodeDepth } from "@/app/lib/diagram/nodeGeometry";
 import { containerHeaderWidth } from "@/app/lib/diagram/containerHeader";
+import { classifyEdgeDrag, edgeBand, type EdgeSide } from "@/app/lib/diagram/edgeGesture";
 import { readableTextOn } from "@/app/lib/diagram/chevronThemes";
 import { isRichText, sanitizeRichText, plainToHtml } from "@/app/lib/diagram/richText";
 import { ArchimateShape } from "./ArchimateShape";
@@ -2765,8 +2766,14 @@ function SymbolRendererInner({
           // Pools never resize their left edge — no onLeft case.
           if (inX && inY && (onRight || onTop || onBottom)) {
             e.stopPropagation();
-            if (selected) onSelect();
-            else onSelect(e);
+            // Select, but never TOGGLE OFF here: an edge press may still turn
+            // into a drag (the hit-zone decides at the 4px mark, by
+            // direction), and deselecting the thing the user is about to move
+            // is the opposite of what they asked for. Deselect by clicking
+            // the canvas. The parent still starts no drag of its own — the
+            // hit-zone owns that, which is what stops an edge drag from
+            // translating the pool when it meant to resize it.
+            if (!selected) onSelect(e);
             return;
           }
         }
@@ -3932,7 +3939,8 @@ function SymbolRendererInner({
           // East (right)
           {
             side: "e", cursor: "ew-resize",
-            hit: { x: element.x + element.width - HANDLE_W, y: element.y, width: HANDLE_W * 2, height: element.height },
+            hit: (() => { const b = edgeBand("e", element.width, element.height);
+              return { x: element.x + element.width - b.inside, y: element.y, width: b.inside + b.outside, height: element.height }; })(),
             grip: { x: element.x + element.width - HANDLE_W / 2, y: element.y + element.height / 2 - horizontalGripLen / 2, width: HANDLE_W, height: horizontalGripLen },
             arrowPath: (() => { const cx = element.x + element.width, cy = element.y + element.height / 2;
               return `M ${cx - 4} ${cy} L ${cx - 1} ${cy - 3} L ${cx - 1} ${cy + 3} Z M ${cx + 4} ${cy} L ${cx + 1} ${cy - 3} L ${cx + 1} ${cy + 3} Z`; })(),
@@ -3940,7 +3948,8 @@ function SymbolRendererInner({
           // West (left)
           {
             side: "w", cursor: "ew-resize",
-            hit: { x: element.x - HANDLE_W, y: element.y, width: HANDLE_W * 2, height: element.height },
+            hit: (() => { const b = edgeBand("w", element.width, element.height);
+              return { x: element.x - b.outside, y: element.y, width: b.inside + b.outside, height: element.height }; })(),
             grip: { x: element.x - HANDLE_W / 2, y: element.y + element.height / 2 - horizontalGripLen / 2, width: HANDLE_W, height: horizontalGripLen },
             arrowPath: (() => { const cx = element.x, cy = element.y + element.height / 2;
               return `M ${cx - 4} ${cy} L ${cx - 1} ${cy - 3} L ${cx - 1} ${cy + 3} Z M ${cx + 4} ${cy} L ${cx + 1} ${cy - 3} L ${cx + 1} ${cy + 3} Z`; })(),
@@ -3948,7 +3957,8 @@ function SymbolRendererInner({
           // North (top)
           {
             side: "n", cursor: "ns-resize",
-            hit: { x: element.x, y: element.y - HANDLE_W, width: element.width, height: HANDLE_W * 2 },
+            hit: (() => { const b = edgeBand("n", element.width, element.height);
+              return { x: element.x, y: element.y - b.outside, width: element.width, height: b.inside + b.outside }; })(),
             grip: { x: element.x + element.width / 2 - verticalGripLen / 2, y: element.y - HANDLE_W / 2, width: verticalGripLen, height: HANDLE_W },
             arrowPath: (() => { const cx = element.x + element.width / 2, cy = element.y;
               return `M ${cx} ${cy - 4} L ${cx - 3} ${cy - 1} L ${cx + 3} ${cy - 1} Z M ${cx} ${cy + 4} L ${cx - 3} ${cy + 1} L ${cx + 3} ${cy + 1} Z`; })(),
@@ -3956,7 +3966,8 @@ function SymbolRendererInner({
           // South (bottom)
           {
             side: "s", cursor: "ns-resize",
-            hit: { x: element.x, y: element.y + element.height - HANDLE_W, width: element.width, height: HANDLE_W * 2 },
+            hit: (() => { const b = edgeBand("s", element.width, element.height);
+              return { x: element.x, y: element.y + element.height - b.inside, width: element.width, height: b.inside + b.outside }; })(),
             grip: { x: element.x + element.width / 2 - verticalGripLen / 2, y: element.y + element.height - HANDLE_W / 2, width: verticalGripLen, height: HANDLE_W },
             arrowPath: (() => { const cx = element.x + element.width / 2, cy = element.y + element.height;
               return `M ${cx} ${cy - 4} L ${cx - 3} ${cy - 1} L ${cx + 3} ${cy - 1} Z M ${cx} ${cy + 4} L ${cx - 3} ${cy + 1} L ${cx + 3} ${cy + 1} Z`; })(),
@@ -3986,13 +3997,20 @@ function SymbolRendererInner({
                     // drag (mouse moved > 4 px before mouseup) takes the
                     // resize path.
                     const startX = e.clientX, startY = e.clientY;
-                    const THRESH = 4;
                     let started = false;
                     const reactEvt = e;
                     const onMove = (ev: MouseEvent) => {
                       if (started) return;
-                      if (Math.hypot(ev.clientX - startX, ev.clientY - startY) <= THRESH) return;
+                      // Paul's "sometimes it works, sometimes it does not":
+                      // the band used to mean "resize or nothing", so a
+                      // quarter of a 78px pool could not be dragged at all.
+                      // The DIRECTION decides instead — across the edge is a
+                      // resize, along it is a move. See edgeGesture.ts.
+                      const intent = classifyEdgeDrag(
+                        edge.side as EdgeSide, ev.clientX - startX, ev.clientY - startY);
+                      if (intent === "pending") return;
                       started = true;
+                      if (intent === "move") { beginElementDrag(reactEvt); return; }
                       setPoolResizeActive(edge.side);
                       onResizeDragStart(edge.side, reactEvt);
                     };

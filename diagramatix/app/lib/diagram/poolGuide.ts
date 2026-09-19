@@ -29,7 +29,19 @@ export type PoolGuideEvent =
   | { type: "propose"; guide: PoolBoundaryGuide | null }
   /** Escape. */
   | { type: "escape" }
-  /** Mouse-up — the gesture is over, so the suppression expires with it. */
+  /**
+   * The gesture is over, HOWEVER it ended — completed on mouse-up, abandoned
+   * (pointer released off-window, component re-rendered mid-drag), or
+   * superseded because the user started doing something else.
+   *
+   * Paul, 2026-09-19: "The green alignment markers should disappear when I
+   * click elsewhere but they persist until I explicitly remove them with
+   * <esc>." They persisted because only the originating gesture's own mouse-up
+   * cleared them, so any gesture that ended another way stranded them on
+   * screen. The Canvas now also sends this on mousedown CAPTURE, which fires
+   * before any child's stopPropagation and so catches a click anywhere —
+   * empty canvas or another element alike.
+   */
   | { type: "gestureEnd" };
 
 export const EMPTY_POOL_GUIDE: PoolGuideState = { guide: null, suppressed: false };

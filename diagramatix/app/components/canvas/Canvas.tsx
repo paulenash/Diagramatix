@@ -5154,6 +5154,13 @@ export function Canvas({
         className="w-full h-full outline-none dgx-pan"
         tabIndex={0}
         onMouseDownCapture={(e) => {
+          // Any new pointer interaction retires a pool-alignment guide left
+          // over from a previous one. In CAPTURE, so it still runs when a
+          // child element stops the event — a click on another shape must
+          // clear it too. A drag that legitimately wants the guide re-raises
+          // it on its first mousemove, which comes after this. (Paul: the
+          // markers "persist until I explicitly remove them with <esc>".)
+          dispatchPoolGuide({ type: "gestureEnd" });
           // Don't steal focus when the click landed inside a
           // foreignObject — that's where the inline label editors
           // (event / gateway / data-object / data-store) live, and
