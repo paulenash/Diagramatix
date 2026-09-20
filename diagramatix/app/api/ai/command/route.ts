@@ -95,7 +95,7 @@ Op shapes (use element NAMES for refs — they are resolved against the diagram;
         // bottom, each row left to right). The counts must match; a mismatch is refused, not truncated.
   { "op":"assignTeam", "team": string }      // put the SELECTED activities in a simulation team
   { "op":"attachRiskControl", "ref": string } // attach a Risk or Control from the project's library to the SELECTED
-        // elements. `ref` is a code ("R-012") or a name ("duplicate payment"), as spoken.
+        // elements. "ref" is a code ("R-012") or a name ("duplicate payment"), as spoken.
   { "op":"convert", "ref": string, "subtype": string }  // set a SUBTYPE MARKER on an element that already has the right
         // shape — the same choices as the right-click menu. subtype is the spoken phrase, e.g. "user task",
         // "service task", "parallel gateway", "event-based gateway", "merge", "timer event", "error event",
