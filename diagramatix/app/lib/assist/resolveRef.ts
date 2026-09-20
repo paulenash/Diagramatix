@@ -7,6 +7,7 @@ import type { DiagramElement } from "../diagram/types";
 import { SYMBOL_SYNONYMS, SYMBOL_PHRASES } from "./ops";
 import { phoneticMatches, soundsLike } from "./phonetic";
 import { isSublane, isTopLevelLane } from "../diagram/laneKind";
+import { elementUnderPointer, isPointerElementRef } from "./pointerRef";
 
 export type RefResolution = { id: string } | { ambiguous: string[] } | null;
 
@@ -28,6 +29,16 @@ export type RefResolution = { id: string } | { ambiguous: string[] } | null;
 export interface ResolveOpts {
   /** Refuse to guess between candidates; report them instead. */
   strict?: boolean;
+  /**
+   * M5 — where the mouse last was, in world coordinates. Editor state rather
+   * than diagram state, so it is passed in rather than derived.
+   *
+   * It makes two references work: the explicit "the one under the cursor", and
+   * a bare "this"/"that" when NOTHING is selected. The selection still wins,
+   * so no phrase that worked before changes meaning; pointing at something is
+   * simply a better guess than "the last element added" ever was.
+   */
+  pointer?: { x: number; y: number } | null;
 }
 
 const LAST_PRONOUNS = new Set(["it", "that", "this", "the last", "the last one", "last one", "the new one"]);
@@ -189,6 +200,17 @@ export function resolveRef(spoken: string, elements: DiagramElement[], lastAdded
   const s = norm(spoken);
   if (!s) return null;
 
+  // M5 — "the one under the cursor" is explicit and beats everything, because
+  // saying that whole phrase is unambiguous about what was meant.
+  //
+  // Tested against `spoken`, NOT `s`: `norm` spells number words as digits so
+  // "lane two" matches "Lane 2", which also turns "the ONE under the cursor"
+  // into "the 1 under the cursor" and makes the phrase unrecognisable.
+  if (isPointerElementRef(spoken)) {
+    const under = elementUnderPointer(opts.pointer ?? null, elements);
+    return under ? { id: under.id } : null;
+  }
+
   const sel = resolveSelectionRefs(s, elements, selectedIds);
   if (sel) return pick(sel);
 
@@ -199,6 +221,10 @@ export function resolveRef(spoken: string, elements: DiagramElement[], lastAdded
   // last two entries are "it"/"the last" and "the previous".
   if (LAST_PRONOUNS.has(s)) {
     if (lastAddedId && elements.some((e) => e.id === lastAddedId)) return { id: lastAddedId };
+    // M5 — with nothing selected and nothing added this session, what the mouse
+    // is resting on is a better answer than the last element in the document.
+    const under = elementUnderPointer(opts.pointer ?? null, elements);
+    if (under) return { id: under.id };
     return elements.length ? { id: elements[elements.length - 1].id } : null;
   }
   if (PREV_PRONOUNS.has(s)) {

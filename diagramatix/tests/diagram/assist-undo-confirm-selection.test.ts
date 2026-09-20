@@ -117,7 +117,13 @@ describe("B1 — a batch sees what it has already done", () => {
     // fifth argument on 2026-09-20 — R3's `strict`, which stops a DESTRUCTIVE
     // command guessing between candidates. The claim here is unchanged: the
     // working copy and the selection are what it resolves against.)
-    expect(body).toContain("resolveRef(ref, els, voiceLastId.current, selectedIds, opts)");
+    // The CLAIM: the resolver reads the WORKING COPY and the selection. The
+    // options object has grown twice since — R3's `strict` (2026-09-20) and
+    // M5's `pointer` (2026-09-21) — without changing that claim, so it is
+    // asserted rather than the literal argument list.
+    expect(body).toMatch(/resolveRef\(ref, els, voiceLastId\.current, selectedIds,/);
+    expect(body, "and the pointer rides along with the options, not instead of them")
+      .toMatch(/resolveRef\(ref, els, voiceLastId\.current, selectedIds, \{ \.\.\.opts, pointer: pointerWorld\.current \}\)/);
   });
 });
 

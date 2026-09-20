@@ -106,6 +106,48 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   m = raw.match(/^(.+?)\s+(?:goes to|flows to|connects to|then goes to|leads to)\s+(.+)$/i);
   if (m) return [{ op: "connect", fromRef: clean(m[1]), toRef: clean(m[2]) }];
 
+  // ── Fill the selection (M4) ──
+  // Before Convert and Rename: "name these A, B and C" must not be read as a
+  // rename of something called "these".
+  //
+  // Each of these takes NO target — the selection is the target — which is
+  // what makes them safe to put this early: they only match when the sentence
+  // names the selection explicitly.
+  {
+    // "name these Receive, Check and Ship" · "label the selected tasks A and B"
+    //
+    // The kind word must be PLURAL. Filling is inherently plural — one name per
+    // selected element — and "label the selected connector Approved" is a
+    // different, older command that labels a single connector. Without the `s`
+    // this rule swallowed it and turned one connector label into a fill.
+    const f = raw.match(/^(?:name|label|call)\s+(these|those|them|the selection|the selected\s+\w+s)\s+(.+)$/i);
+    if (f) {
+      const labels = splitLabels(f[2]).map(capitaliseFirstWord);
+      if (labels.length) return [{ op: "fillLabels", labels }];
+    }
+  }
+  {
+    // "assign the selected tasks to the Finance team" · "put these in the Sales team"
+    const t = raw.match(/^(?:assign|put|move)\s+(?:these|those|them|the selection|the selected(?:\s+\w+)?)\s+(?:to|in|into|onto)\s+(?:the\s+)?(.+?)(?:\s+team)?$/i)
+      ?? raw.match(/^(?:set|make)\s+(?:the\s+)?team\s+(?:for\s+)?(?:these|those|them|the selection|the selected(?:\s+\w+)?)\s+(?:to\s+)?(.+)$/i);
+    // Only when the sentence actually said "team" — "move these to the right"
+    // is a move, and "put these in a pool" is a wrap.
+    if (t && /\bteam\b/i.test(raw)) {
+      const team = clean(t[1]);
+      if (team && !/^(?:the\s+)?(?:right|left|up|down|top|bottom)$/i.test(team)) {
+        return [{ op: "assignTeam", team }];
+      }
+    }
+  }
+  {
+    // "attach risk R-012 to these" · "attach control C-3 to the selected task"
+    const rc = raw.match(/^(?:attach|add|link)\s+(?:the\s+)?(?:risk|control)\s+(.+?)\s+(?:to|onto)\s+(these|those|them|the selection|the selected(?:\s+\w+)?)$/i);
+    if (rc) {
+      const ref = clean(rc[1]);
+      if (ref) return [{ op: "attachRiskControl", ref }];
+    }
+  }
+
   // ── Convert in place (M3) ──
   // "make this a user task", "turn the selected gateway into a parallel
   // gateway", "make Review a service task". The right-click menu has offered
@@ -458,6 +500,21 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     const after = rest.match(/\s+(?:after|following|behind|next to|onto)\s+(.+)$/i);
     if (after) { afterRef = clean(after[1]); rest = rest.slice(0, after.index).trim(); }
 
+    // M5 — "put a task here", "add a gateway over there". Stripped BEFORE the
+    // name is read, or "add a task called Approve here" would be named
+    // "Approve here". Refused when stripping would leave a naming keyword with
+    // nothing after it, so a task someone really does want to call "Here"
+    // still works.
+    let atPointer = false;
+    const pos = rest.match(/\s+(?:right\s+|over\s+|just\s+)?(?:here|there)$/i);
+    if (pos && pos.index !== undefined) {
+      const without = rest.slice(0, pos.index).trim();
+      if (without && !/\b(?:called|named|labell?ed|titled)$/i.test(without)) {
+        atPointer = true;
+        rest = without;
+      }
+    }
+
     let label: string | undefined;
     const named = rest.match(/\s+(?:called|named|labell?ed|titled)\s+(.+)$/i);
     if (named) { label = clean(named[1]); rest = rest.slice(0, named.index).trim(); }
@@ -482,6 +539,7 @@ export function parseCommand(utterance: string): AssistOp[] | null {
       if (sym.gatewayType) op.gatewayType = sym.gatewayType;
       if (label) op.label = label;
       if (afterRef) op.afterRef = afterRef;
+      if (atPointer) op.at = "pointer";
       return [op];
     }
     // "add Approve after Review" — no type word → a task named by the rest.
@@ -490,6 +548,7 @@ export function parseCommand(utterance: string): AssistOp[] | null {
       if (!named && !quoted && looksPositionalNotAName(implicit)) return null;
       const op: AssistOp = { op: "add", symbolType: "task", label: implicit };
       if (afterRef) op.afterRef = afterRef;
+      if (atPointer) op.at = "pointer";
       return [op];
     }
   }

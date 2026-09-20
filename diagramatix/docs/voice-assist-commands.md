@@ -140,6 +140,42 @@ Examples: "rename the selected pool to Customer" · "delete these" · "connect t
 - Both take the same phrasings as the subprocess wrap, and both accept what the
   recogniser usually returns instead: "poll"/"pull" for pool, "line" for lane.
 
+## Fill the selection, and point instead of naming (21 September 2026)
+
+**Say several things at once.** Select a group, then:
+
+- **"name these Receive, Check and Ship"** — the names land in **reading order**:
+  rows top to bottom, each row left to right, the way you read the diagram. The
+  counts must match; three names for four selected elements is refused rather
+  than filling three of them and leaving one looking finished.
+- **"assign these to the Finance team"** · "put the selected tasks in the Sales
+  team" — the simulation team. A team belongs to an activity, so anything else
+  in the selection is named and skipped rather than quietly given one.
+- **"attach risk R-012 to these"** · "attach control C-3 to the selected task" —
+  from the project's Risk & Control library, by code or by name. Codes are
+  matched loosely on how they are dictated ("R-012", "r 012", "are 012" are one
+  thing), but **names are never matched fuzzily**: attaching the wrong control
+  survives into an audit, so a near miss is reported rather than guessed.
+
+**Point instead of naming.**
+
+- **"put a task here"** · "add a gateway over there" — at the **mouse position**.
+  It is still nudged clear of anything already there, and no connector is drawn,
+  because you said where rather than what it follows. If the mouse has never
+  been over the canvas you are told so rather than given one at the far corner.
+- **"the one under the cursor"** — the element the mouse is over. Also "this one
+  here", "that one there", "the one I'm pointing at". Works with any command
+  that takes a reference: "rename the one under the cursor to Approve".
+- **"this" and "that" are unchanged** — they still mean the selection. What is
+  new is the fallback: with nothing selected and nothing added yet, they now
+  mean whatever the mouse is resting on, which is a better guess than the last
+  element in the document.
+
+> The review plan asked for *"connect this to that"*, with *that* meaning the
+> pointer. That is not what shipped: "this" and "that" already mean the
+> selection, and that sentence needs the two words to mean different things in
+> one breath. Say **"connect the selected task to the one under the cursor"**.
+
 ## Convert in place (20 September 2026)
 
 Everything the right-click type-picker offers can now be said instead:

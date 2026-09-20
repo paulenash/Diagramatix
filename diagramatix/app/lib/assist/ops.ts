@@ -12,7 +12,12 @@ export type GatewayPoint = "top" | "middle" | "bottom" | "left" | "right";
 export const GATEWAY_POINTS: readonly GatewayPoint[] = ["top", "middle", "bottom", "left", "right"];
 
 export type AssistOp =
-  | { op: "add"; symbolType: SymbolType; label?: string; eventType?: EventType; gatewayType?: GatewayType; afterRef?: Ref }
+  /**
+   * M5: `at: "pointer"` places the new element where the mouse last was,
+   * instead of inline after `afterRef` or right of the rightmost element.
+   * "Put a task here."
+   */
+  | { op: "add"; symbolType: SymbolType; label?: string; eventType?: EventType; gatewayType?: GatewayType; afterRef?: Ref; at?: "pointer" }
   | { op: "connect"; fromRef: Ref; toRef: Ref; connectorType?: ConnectorType }
   | { op: "disconnect"; fromRef: Ref; toRef: Ref }
   | { op: "delete"; ref: Ref; compact?: boolean }
@@ -59,6 +64,14 @@ export type AssistOp =
    * menu offering the same choices.
    */
   | { op: "convert"; ref: Ref; subtype: string }
+  /**
+   * M4 — fill the selection. Each names none of its targets and says several
+   * things at once, relying on the selection; `fillLabels` relies on reading
+   * order too (`fillSelection.ts`).
+   */
+  | { op: "fillLabels"; labels: string[] }
+  | { op: "assignTeam"; team: string }
+  | { op: "attachRiskControl"; ref: string }
   | { op: "undo" };
 
 // ── Spoken vocabulary → canonical BPMN types ────────────────────────────────
@@ -125,6 +138,7 @@ export function validateOp(raw: unknown): AssistOp | null {
       if (isRef(o.eventType)) op.eventType = o.eventType as EventType;
       if (isRef(o.gatewayType)) op.gatewayType = o.gatewayType as GatewayType;
       if (isRef(o.afterRef)) op.afterRef = (o.afterRef as string).trim();
+      if (o.at === "pointer") op.at = "pointer";
       return op;
     }
     case "connect":
@@ -243,6 +257,16 @@ export function validateOp(raw: unknown): AssistOp | null {
     }
     case "goldFlash":
       return typeof o.on === "boolean" ? { op: "goldFlash", on: o.on } : null;
+    case "fillLabels": {
+      const labels = Array.isArray(o.labels)
+        ? (o.labels as unknown[]).filter((l): l is string => typeof l === "string" && !!l.trim()).map((l) => l.trim())
+        : [];
+      return labels.length ? { op: "fillLabels", labels } : null;
+    }
+    case "assignTeam":
+      return isRef(o.team) ? { op: "assignTeam", team: (o.team as string).trim() } : null;
+    case "attachRiskControl":
+      return isRef(o.ref) ? { op: "attachRiskControl", ref: (o.ref as string).trim() } : null;
     case "convert": {
       // The subtype is validated against the shared table at apply time, not
       // here — a phrase the table does not know produces a named refusal in the

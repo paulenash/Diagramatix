@@ -50,6 +50,8 @@ import { resolveRef, resolveSelectionRefs, isSelectionRef, nearestRefs, ID_REF_P
 import { isAnyLane, laneKindWord, sameKindAs } from "@/app/lib/diagram/laneKind";
 import { convertMatches, matchesForType } from "@/app/lib/assist/convertPhrase";
 import { subtypeFingerprint } from "@/app/lib/diagram/elementSubtypes";
+import { planLabelFill } from "@/app/lib/assist/fillSelection";
+import { findRiskCatalogItem } from "@/app/lib/assist/riskCatalogRef";
 import { isMicStopWord, isFlowEndWord } from "@/app/lib/assist/stopWords";
 import { isIncompleteCommand } from "@/app/lib/assist/incompleteCommand";
 import { leadingSpokenNumber } from "@/app/lib/assist/spokenNumber";
@@ -73,7 +75,8 @@ import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { SimulatorOverlay } from "@/app/components/simulation/SimulatorOverlay";
 import { AnimateOverlay } from "@/app/components/canvas/AnimateOverlay";
 import type { RiskCatalogItem } from "@/app/components/canvas/RiskControlSection";
-import { getRiskControl } from "@/app/lib/diagram/riskControl";
+import { getRiskControl, riskControlPatch } from "@/app/lib/diagram/riskControl";
+import { simPatch } from "@/app/lib/diagram/simParams";
 import { autofillSimulation } from "@/app/lib/simulation/autofill";
 import { clearSimData } from "@/app/lib/simulation/clearSimData";
 import { useFeatureColors } from "@/app/lib/theme/useFeatureColors";
@@ -2675,6 +2678,11 @@ export function DiagramEditor({
   const voiceBusyRef = useRef(false);
   const voiceQueueRef = useRef<string[]>([]);
   const voiceLastId = useRef<string | null>(null);
+  // M5 — where the mouse last was on the canvas, in world coordinates. A REF,
+  // not state: it is written on every pointer move and must never cause a
+  // render. Null until the pointer has been over the canvas at all, which is
+  // what lets "put a task here" refuse with a reason rather than guess (0,0).
+  const pointerWorld = useRef<{ x: number; y: number } | null>(null);
   // stopAbraListening is defined after the command runner (it needs the buffer
   // flush); the runner reaches it through this ref.
   const stopAbraListeningRef = useRef<() => void>(() => {});
@@ -2800,7 +2808,7 @@ export function DiagramEditor({
      * said only "is ambiguous", which left the user to guess what it had found.
      */
     const resolve1 = (ref: string, opts: { strict?: boolean } = {}): DiagramElement | { err: string; ambiguous?: string[] } => {
-      const r = resolveRef(ref, els, voiceLastId.current, selectedIds, opts);
+      const r = resolveRef(ref, els, voiceLastId.current, selectedIds, { ...opts, pointer: pointerWorld.current });
       if (!r) {
         if (isSelectionRef(ref) && selectedIds.length === 0) return { err: "nothing is selected" };
         // R6 — "couldn't find X" on its own leaves the user unable to tell
@@ -2858,7 +2866,24 @@ export function DiagramEditor({
         if (!anchor && voiceLastId.current) anchor = els.find((e) => e.id === voiceLastId.current) ?? null;
         const others = els.filter((e) => e.type !== "pool" && e.type !== "lane" && e.type !== "sublane").map(elBox);
         let center; let srcSide: Side | undefined;
-        if (anchor && anchor.boundaryHostId) {
+        // M5 — "put a task here". The pointer beats every placement rule below,
+        // because the user has said exactly where they want it; `findFreeSlot`
+        // still nudges it clear of anything already there, so "here" cannot
+        // drop one element on top of another.
+        //
+        // Refused rather than guessed when the pointer has never been over the
+        // canvas: placing at (0,0) because the mouse was never seen would look
+        // like a bug, and saying so costs one sentence.
+        if (op.at === "pointer") {
+          if (!pointerWorld.current) {
+            results.push("I don't know where “here” is — move the mouse over the canvas first");
+            anyFail = true; continue;
+          }
+          center = findFreeSlot(pointerWorld.current, w, h, others);
+          // An explicit position means the user is not asking for a flow, so
+          // the anchor is dropped and no connector is drawn.
+          anchor = null;
+        } else if (anchor && anchor.boundaryHostId) {
           // R7: task after a boundary event → bottom/top-right, connector exits the outer face.
           const host = els.find((e) => e.id === anchor!.boundaryHostId);
           const side = host ? boundaryOuterSide(anchor, host) : "bottom";
@@ -3421,6 +3446,68 @@ export function DiagramEditor({
           results.push("err" in e ? e.err : `couldn't rename “${op.ref}”`);
           anyFail = true;
         }
+        continue;
+      }
+
+      // ── M4: fill the selection ────────────────────────────────────────────
+      // All three take NO target — the selection is the target — so each
+      // begins by insisting on one rather than falling back to recency. A
+      // command that names nothing must never act on a guess.
+      if (op.op === "fillLabels") {
+        const chosen = selectedIds.map((id) => els.find((e) => e.id === id)).filter((e): e is DiagramElement => !!e);
+        const plan = planLabelFill(chosen, op.labels);
+        if (!plan.ok) { results.push(plan.reason); anyFail = true; continue; }
+        for (const a of plan.assign) { updateLabel(a.id, a.label); els = withLabel(els, a.id, a.label); }
+        setSelectedElementIds(new Set());   // the standing selection protocol
+        results.push(`named ${plan.assign.length} in reading order: ${plan.assign.map((a) => a.label).join(", ")}`);
+        continue;
+      }
+
+      if (op.op === "assignTeam") {
+        const chosen = selectedIds.map((id) => els.find((e) => e.id === id)).filter((e): e is DiagramElement => !!e);
+        if (!chosen.length) { results.push("nothing is selected"); anyFail = true; continue; }
+        // A team is a simulation property of an ACTIVITY. Silently writing one
+        // onto a gateway or an event would make the simulator's team harvest
+        // disagree with what the diagram shows, so anything else is named.
+        const ACTIVITY = new Set(["task", "subprocess", "subprocess-expanded", "call-activity", "transaction"]);
+        const ok = chosen.filter((e) => ACTIVITY.has(e.type));
+        const skipped = chosen.filter((e) => !ACTIVITY.has(e.type));
+        if (!ok.length) { results.push(`a team belongs to an activity — ${nameOf(chosen[0])} is a ${chosen[0].type}`); anyFail = true; continue; }
+        for (const e of ok) updateProperties(e.id, simPatch(e, { teamId: op.team }));
+        setSelectedElementIds(new Set());
+        results.push(
+          `put ${ok.length} task${ok.length === 1 ? "" : "s"} in the ${op.team} team`
+          + (skipped.length ? ` — skipped ${skipped.map(nameOf).join(", ")}` : ""),
+        );
+        continue;
+      }
+
+      if (op.op === "attachRiskControl") {
+        const chosen = selectedIds.map((id) => els.find((e) => e.id === id)).filter((e): e is DiagramElement => !!e);
+        if (!chosen.length) { results.push("nothing is selected"); anyFail = true; continue; }
+        const item = findRiskCatalogItem(riskCatalog, op.ref);
+        if (!item) {
+          // Naming the catalogue is the useful half of the failure: "R-012"
+          // that does not exist is usually a mis-hear of one that does, or a
+          // library that was never adopted into this project.
+          results.push(riskCatalog.length
+            ? `no risk or control called “${op.ref}” in this project's library`
+            : "this project has no Risk & Control library to attach from");
+          anyFail = true; continue;
+        }
+        const key = item.kind === "Risk" ? "riskRefs" : "controlRefs";
+        let attached = 0;
+        for (const e of chosen) {
+          const cur = (getRiskControl(e)[key] ?? []) as { itemId: string }[];
+          if (cur.some((r) => r.itemId === item.id)) continue;   // already on it
+          updateProperties(e.id, riskControlPatch(e, { [key]: [...cur, { itemId: item.id, code: item.code, label: item.name }] }));
+          attached++;
+        }
+        setSelectedElementIds(new Set());
+        results.push(attached
+          ? `attached ${item.code} ${item.name} to ${attached} element${attached === 1 ? "" : "s"}`
+          : `${item.code} was already on ${chosen.length === 1 ? "it" : "all of them"}`);
+        if (!attached) anyFail = true;
         continue;
       }
 
@@ -6517,6 +6604,7 @@ export function DiagramEditor({
           parentDiagramName={parentDiagram?.name}
           showValueDisplay={showValueDisplay}
           showBottleneck={showBottleneck}
+          onPointerWorld={(p) => { pointerWorld.current = p; }}
           onGenerateSopForElement={(diagramType === "bpmn" && projectId) ? ((scope, elementId) => { setSopInitial({ scope, elementId }); setShowSopDialog(true); }) : undefined}
           onInsertSpace={(diagramType === "bpmn" || diagramType === "state-machine" || diagramType === "archimate") ? insertSpace : undefined}
           onRemoveSpace={(diagramType === "bpmn" || diagramType === "state-machine" || diagramType === "archimate") ? removeSpace : undefined}

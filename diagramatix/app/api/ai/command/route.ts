@@ -56,14 +56,17 @@ Canonical forms:
   unwrap the selected subprocess   ·   delete selected (on an expanded subprocess: dissolves it, the contents stay in the flow)
   label selected <text> (the selected connector)   ·   label connectors (numbers them)   ·   rename tasks|lanes|events… (numbers them)
   add a message from <name> to <name> labelled <text>   ·   add a message (numbers the candidates, then "n to m labelled <text>")   ·   add a message to the selected   ·   rename connector <text> to <text>   ·   delete connector <text>
+  name these <A, B and C> (the SELECTED elements, in reading order — the counts must match)   ·   assign these to the <name> team   ·   attach risk <code or name> to these
+  put a <type> here (at the MOUSE position; "there" too)   ·   rename the one under the cursor to <name>
   clear the diagram   ·   export the diagram to JSON   ·   undo that
 
 **ops** (fallback, used only if canonical is ""): the same edit as structured ops.
 
 Elements marked [selected] are the user's current mouse selection: "this", "these", "the selection" and "the selected <type>" refer to them — KEEP those words in canonical rather than substituting names.
 
-Op shapes (use element NAMES for refs — they are resolved against the diagram; you may also use "it"/"the last"/"the previous"/"the <type>"/"this"/"these"/"the selected <type>"):
-  { "op":"add", "symbolType": <type>, "label"?: string, "gatewayType"?: "exclusive"|"parallel"|"inclusive"|"event-based", "eventType"?: "message"|"timer"|"error"|..., "afterRef"?: <name> }
+Op shapes (use element NAMES for refs — they are resolved against the diagram; you may also use "it"/"the last"/"the previous"/"the <type>"/"this"/"these"/"the selected <type>"/"the one under the cursor"):
+  { "op":"add", "symbolType": <type>, "label"?: string, "gatewayType"?: "exclusive"|"parallel"|"inclusive"|"event-based", "eventType"?: "message"|"timer"|"error"|..., "afterRef"?: <name>, "at"?: "pointer" }
+        // "at":"pointer" places it where the MOUSE is ("put a task here"/"there") and draws no connector.
   { "op":"connect", "fromRef": <name>, "toRef": <name> }
   { "op":"disconnect", "fromRef": <name>, "toRef": <name> }
   { "op":"delete", "ref": <name>, "compact"?: boolean }   // compact closes the gap left behind
@@ -88,6 +91,11 @@ Op shapes (use element NAMES for refs — they are resolved against the diagram;
   { "op":"wrapInSubprocess", "label"?: string }           // surround the SELECTED elements with an expanded subprocess
   { "op":"unwrapSubprocess" }                              // dissolve the SELECTED expanded subprocess back into the flow
   { "op":"renameByType", "itemType": "pool"|"lane"|"message"|"task"|"subprocess"|"gateway"|"event"|"connector" }  // numbers them for a pick
+  { "op":"fillLabels", "labels": string[] }  // name every SELECTED element at once, in reading order (rows top to
+        // bottom, each row left to right). The counts must match; a mismatch is refused, not truncated.
+  { "op":"assignTeam", "team": string }      // put the SELECTED activities in a simulation team
+  { "op":"attachRiskControl", "ref": string } // attach a Risk or Control from the project's library to the SELECTED
+        // elements. `ref` is a code ("R-012") or a name ("duplicate payment"), as spoken.
   { "op":"convert", "ref": string, "subtype": string }  // set a SUBTYPE MARKER on an element that already has the right
         // shape — the same choices as the right-click menu. subtype is the spoken phrase, e.g. "user task",
         // "service task", "parallel gateway", "event-based gateway", "merge", "timer event", "error event",

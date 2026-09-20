@@ -352,6 +352,9 @@ interface Props {
    *  editor creates the pink note + a review-comment-link to it. */
   onAddReviewComment?: (worldPos: Point, targetElementId: string | null) => void;
   onGenerateSopForElement?: (scope: "lane" | "pool", elementId: string) => void;
+  /** M5 — the mouse position in WORLD coordinates, on every move over the canvas.
+   *  The editor stores it in a ref, so this fires often and renders nothing. */
+  onPointerWorld?: (p: { x: number; y: number }) => void;
   onElementMoveEnd?: (id: string) => void;
   onMoveLaneBoundary?: (aboveLaneId: string, belowLaneId: string, dy: number) => void;
   onMoveVSwimlaneBoundary?: (kind: "divider" | "left" | "right" | "bottom", delta: number, leftId?: string, rightId?: string) => void;
@@ -628,6 +631,7 @@ export function Canvas({
   onBringReviewToFront,
   onAddReviewComment,
   onGenerateSopForElement,
+  onPointerWorld,
   onElementMoveEnd,
   onMoveLaneBoundary,
   onMoveVSwimlaneBoundary,
@@ -5162,6 +5166,12 @@ export function Canvas({
         // override with their own grabbing cursors via .dgx-grab.
         className="w-full h-full outline-none dgx-pan"
         tabIndex={0}
+        // M5 — remember where the mouse is, in world coordinates, so a spoken
+        // "put a task here" has somewhere to put it. CAPTURE, so it still fires
+        // over a child that stops the event; the handler writes to a ref in the
+        // editor and triggers no render, which is why tracking every move is
+        // affordable.
+        onPointerMoveCapture={(e) => { onPointerWorld?.(clientToWorld(e.clientX, e.clientY)); }}
         onMouseDownCapture={(e) => {
           // Any new pointer interaction retires a pool-alignment guide left
           // over from a previous one. In CAPTURE, so it still runs when a
