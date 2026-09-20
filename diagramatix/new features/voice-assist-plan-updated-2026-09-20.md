@@ -29,13 +29,18 @@ is reproduced verbatim in the appendix, so every item can still be cited by id.
 | **Phonetic reference matching** (V2) | **SHIPPED** `2b30eefc` |
 | **AI prompt op list** (B7) | **PARTIAL** `8c370014` — `renameByType` added; `addPool.relativeTo` still missing |
 | **Tests for the untested half** (D3) | **PARTIAL** — pure modules extracted and covered; no `apply.ts`, no mocked-client route test |
-| **Release-log entries** (D2) | **PARTIAL** — one entry for `a49a8006`; everything since is absent |
-| **Dead sub-lane checks, silent voice degrade** (B6, B8) | **not started** |
-| **The rest of Reliability/UX** (R5–R8) | **not started** |
+| **Release-log entries** (D2) | **SHIPPED** `496969a8` — twelve entries covering the 72 commits since `a49a8006` |
+| **Dead sub-lane checks** (B6) | **SHIPPED** `496969a8` — one rule in `laneKind.ts`, five call sites |
+| **Silent voice degrade** (B8) | **SHIPPED** `496969a8` — a 403 refuses and says why; 503 falls back and says so |
+| **Auto-connect respects `canConnect`** (R7) | **SHIPPED** `496969a8` |
+| **Richer log entries** (R5) | **SHIPPED** `496969a8` — the flash diff now sees a subtype change. Per-entry undo buttons remain unbuilt |
+| **Better failure messages** (R6) | **SHIPPED** `496969a8` — "did you mean …?" from the words AND the sound |
+| **Scanner feedback per command** (R8) | **not started** |
 | **Capability extensions** (C1–C4, C6–C8, C10) | **not started** |
-| **Convert in place, fill, pointer, marquee, tidy, ghost, properties** (M3–M9) | **not started** |
-| **Personal phrase book** (V3) | **not started** |
-| **Publish the guide, tech-notes and feature rows** (D1) | **not started on production** |
+| **Convert in place** (M3) | **SHIPPED** `496969a8` — the menu's own subtype table, said out loud |
+| **Fill, pointer, marquee, tidy, ghost, properties** (M4–M9) | **not started** |
+| **Personal phrase book** (V3) | **HALF** `1da089b4` — the measurement ships; the phrase book itself waits on it (see below) |
+| **Publish the guide, tech-notes and feature rows** (D1) | **READY** `496969a8` — two SQL files, proven on `diagramatix_test` and local. **Paul still has to run them on prod** |
 | **Delivered from live use** (L1–L10) | **SHIPPED** — never in the backlog; added to it afterwards so the plan is a complete record |
 
 ---
@@ -89,37 +94,57 @@ any list:
 
 ## What to do next, in order
 
-1. **D1 — publish the guide, tech-notes and feature rows on production.** Now
-   the most valuable item, because Voice Assist is live to Expert-and-above
-   customers who have no documentation for it. Partly overtaken: the rename SQL
-   renamed the chapters that *exist*, but whether the three seed scripts ever
-   ran on production is unverified. Check first, then seed — as SQL, per the
-   standing rule.
-2. **D2 — the release log.** Everything since `a49a8006` is missing from
-   `VERSION_HISTORY.md`. Fifteen commits now, not eight. This is cheap and it is
-   the record customers' support questions get answered from.
-3. **B8 — the silent voice degrade.** An org that forbids cloud voice gets
-   browser speech without being told. Small, and it is a policy being quietly
-   ignored, which matters more now the feature is not SuperAdmin-only.
-4. **M3 — convert in place.** "make this a user task" / "a parallel gateway".
-   The type-conversion actions already exist in the right-click menu; this is
-   grammar plus a reference, and it is the most-asked-for thing in the M family.
-5. **R7 — auto-connect respects `canConnect`.** "add a task after Done" can draw
-   a flow OUT of an end event. Small and clearly wrong.
-6. **B6 — the dead sub-lane checks.** `e.type === "sublane"` is never true;
-   sub-lanes are lanes with a lane parent. Three guards silently do nothing.
-7. **R5, R6** — richer log entries (flash the affected ids) and better failure
-   messages ("did you mean …?" from the token-overlap pass, which now has
-   phonetic matching to draw on too).
-8. **V3 — the personal phrase book.** Learn from corrections: a failed command
-   followed by a working re-issue is a training pair. Worth doing only after V1
-   and V2 have been used enough to say whether they left anything.
+Paul's list of 20 September was D1, D2, B8, M3, R7, B6, R5/R6 and V3. All of it
+is done except V3's second half, which is waiting on data by design. What
+follows is what is left.
 
-Deferred deliberately: C1–C4, C6–C8, C10 and M4–M9 are capability extensions
-rather than defects, and D3's `apply.ts` extraction is now much less pressing —
-the apply layer's rules have been extracted into tested pure modules one at a
-time (`greedyGuards`, `disambiguate`, `phonetic`, `messageLabel`, `emieLabel`,
-`workingSet`) as each was worked on.
+1. **Run D1's SQL on production.** This is the only item on the list that is not
+   finished, and it is not finished because it is Paul's to run, not mine:
+   `scripts/sql/check-voice-assist-content.sql` first (read-only, one report
+   table), then `scripts/sql/seed-voice-assist-content.sql`. Both proven on
+   `diagramatix_test` and on local dev. Until that runs, Expert-and-above
+   customers still have no documentation for a feature they can use.
+2. **V3's second half — the phrase book itself.** Gated on its own measurement
+   (below), not on effort.
+3. **R8 — scanner feedback per command.** Run `checkDiagram` on the new state
+   and append "+N issues" to the log line. The last of the R family.
+4. **B7's remainder** — `addPool.relativeTo` is still missing from the AI prompt
+   op list.
+5. **M4–M9** — fill, pointer, marquee, tidy, ghost, properties. Capability, not
+   defect.
+
+Deferred deliberately: C1–C4, C6–C8 and C10 are capability extensions rather
+than defects, and D3's `apply.ts` extraction is now much less pressing — the
+apply layer's rules have been extracted into tested pure modules one at a time
+(`greedyGuards`, `disambiguate`, `phonetic`, `messageLabel`, `emieLabel`,
+`workingSet`, `laneKind`, `convertPhrase`, `elementSubtypes`, `tokenOutcome`,
+`correctionPairs`) as each was worked on.
+
+### V3 — why only half of it shipped
+
+Paul's own wording: V3 is "worth doing only after V1 and V2 have been used
+enough to say whether they left anything". V1 and V2 shipped the same morning,
+so there is no such data yet — and building the phrase book now would be
+guessing at the shape of a problem V1 and V2 may already have removed.
+
+So what shipped (`1da089b4`) is the measurement the phrase book would be built
+on, which is also the V0 tally the original review asked for and never got.
+Under the Cost readout the bar now says how the session went, splitting the
+commands that had to be said twice into:
+
+- **misheard** — said the same thing again and it worked. The words were right
+  in the user's mouth and wrong on the wire. A phrase book could learn this.
+- **rephrased** — said something different and it worked. The user changed their
+  words to suit the grammar. No amount of phonetic learning helps; the grammar
+  or the AI prompt is what is short.
+
+Nothing is stored or sent — it is read from the log already on screen.
+
+**The decision this feeds.** After a week of real use: if the sessions carry
+real `misheard` counts, build the phrase book as planned. If they are mostly
+`rephrased`, V3 is the wrong answer and the same effort belongs in the grammar
+and the AI prompt instead. A phrase book built on a mostly-rephrased log would
+learn the wrong lesson and add a layer of aliases nobody needed.
 
 ---
 
@@ -142,10 +167,30 @@ means "use the default" and names it.
 Seeds and rows that exist only as unrun scripts. Per the standing rule they need
 an idempotent SQL file for the in-app database tile rather than a script run:
 
-- `add-guide-ai-assist.ts`, `add-tech-notes-ai-assist.ts`,
-  `add-features-ai-assist.ts` — the guide and tech-notes chapters and the
-  feature rows (D1). **Verify first** whether they ever ran: the rename SQL
-  renamed what it found, which says nothing about what was there.
+- **D1 — ready to run, two files, in this order.** Written 2026-09-20, proven on
+  `diagramatix_test` (never seeded — the prod worst case) and on local dev
+  (already seeded, and the harder path because it exercises the repair):
+  1. `scripts/sql/check-voice-assist-content.sql` — READ-ONLY. Returns one
+     report table; the `verdict` column is the whole answer.
+  2. `scripts/sql/seed-voice-assist-content.sql` — idempotent. Seeds the User
+     Guide chapter (9 sections), the Technical Notes chapter (8 sections) and
+     the two Features rows, **and publishes them**, which none of the `.ts`
+     seeds ever did — so even a database where those ran shows nothing on
+     `/features`.
+
+  The guide content is rewritten to what Voice Assist is *today*. The `.ts`
+  seeds describe the 4 August feature: SuperAdmin-only, no confirmations, no
+  numbered picks, no selection references, half the vocabulary. They stay
+  useful locally and are no longer the route to production.
+
+  ⚠ The seed also **repairs a latent data-loss bug** the check turned up.
+  `HelpSection.collection` is a denormalised copy of its chapter's, and the
+  User Guide's bulk save is `deleteMany({ collection: "user-guide" })`. Five
+  `add-tech-notes-*.ts` seeds omitted the field, so Technical Notes sections
+  were labelled `user-guide` — saving the User Guide would have deleted them.
+  33 rows on local dev; the check says how many on prod. The code half is fixed
+  and guarded (T4578).
+
 - `seed-intent-keywords.ts` and `seed-builtin-templates.ts` — both outstanding
   since before the Suggestion chip work.
 - `seed-diagram-rules.cjs` — publishes the assist defaults.
