@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { serverError } from "@/app/lib/apiError";
 import { auth } from "@/auth";
 import { pgPool } from "@/app/lib/db";
+import { flattenQueryResult } from "@/app/lib/admin/sqlResult";
 import { isSuperuser } from "@/app/lib/superuser";
 
 /** GET — return database schema (tables, columns, types) */
@@ -63,13 +64,11 @@ export async function POST(req: Request) {
     const result = params?.length ? await pgPool.query(sql, params) : await pgPool.query(sql);
     const duration = Date.now() - start;
 
-    return NextResponse.json({
-      rows: result.rows ?? [],
-      rowCount: result.rowCount ?? 0,
-      fields: (result.fields ?? []).map(f => ({ name: f.name, dataTypeID: f.dataTypeID })),
-      command: result.command,
-      duration,
-    });
+    // A MULTI-STATEMENT script — a seed pasted in whole — comes back as an
+    // ARRAY of results and `result.rows` is then `undefined`, so this used to
+    // report "0 rows" and no error for a script that had fully run and
+    // committed. See `flattenQueryResult` for the measurement.
+    return NextResponse.json({ ...flattenQueryResult(result), duration });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: message }, { status: 400 });

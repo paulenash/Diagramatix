@@ -170,13 +170,20 @@ an idempotent SQL file for the in-app database tile rather than a script run:
 - **D1 — ready to run, two files, in this order.** Written 2026-09-20, proven on
   `diagramatix_test` (never seeded — the prod worst case) and on local dev
   (already seeded, and the harder path because it exercises the repair):
-  1. `scripts/sql/check-voice-assist-content.sql` — READ-ONLY. Returns one
-     report table; the `verdict` column is the whole answer.
-  2. `scripts/sql/seed-voice-assist-content.sql` — idempotent. Seeds the User
-     Guide chapter (9 sections), the Technical Notes chapter (8 sections) and
-     the two Features rows, **and publishes them**, which none of the `.ts`
-     seeds ever did — so even a database where those ran shows nothing on
-     `/features`.
+  Full paths — note the doubled folder name, which is easy to miss: the repo
+  root is `c:\Git\Diagramatix` and the app is one level down, so there is no
+  `scripts\` at the root.
+
+  1. `c:\Git\Diagramatix\diagramatix\scripts\sql\check-voice-assist-content.sql`
+     — READ-ONLY. Returns one report table; the `verdict` column is the whole
+     answer.
+  2. `c:\Git\Diagramatix\diagramatix\scripts\sql\seed-voice-assist-content.sql`
+     — idempotent. Seeds the User Guide chapter (9 sections), the Technical
+     Notes chapter (8 sections) and the two Features rows, **and publishes
+     them**, which none of the `.ts` seeds ever did — so even a database where
+     those ran shows nothing on `/features`. It ends with its own verification
+     query after the COMMIT, so the tile shows the same ten-row verdict table
+     once it has run: no need to go back and re-run the check.
 
   The guide content is rewritten to what Voice Assist is *today*. The `.ts`
   seeds describe the 4 August feature: SuperAdmin-only, no confirmations, no

@@ -335,8 +335,12 @@ UPDATE "Feature"
 
 COMMIT;
 
--- ── What you should see afterwards ──────────────────────────────────────────
--- Re-run check-voice-assist-content.sql. Every row should read:
+-- ── Prove it, in the same paste ─────────────────────────────────────────────
+-- Deliberately AFTER the COMMIT, so it reports what was actually committed
+-- rather than what the transaction was about to do.
+--
+-- The Database tile shows the last statement that returned rows, so this is
+-- what you will see. Every row should read:
 --
 --   1  User Guide chapter        present: 1 chapter(s)
 --   2  User Guide sections       present: 9 section(s)
@@ -349,5 +353,68 @@ COMMIT;
 --   9  voice-assist availability Expert and Enterprise available
 --  10  nl-assist availability    all levels available
 --
+-- If a row disagrees, nothing here is destructive and the file can be re-run.
+
+SELECT * FROM (
+  SELECT 1 AS n, 'User Guide chapter' AS item,
+         CASE WHEN count(*) = 0 THEN 'MISSING' ELSE 'present: ' || count(*) || ' chapter(s)' END AS verdict
+    FROM "HelpChapter" WHERE collection = 'user-guide' AND slug = 'ai-assist'
+  UNION ALL
+  SELECT 2, 'User Guide sections',
+         CASE WHEN count(*) = 0 THEN 'MISSING' ELSE 'present: ' || count(*) || ' section(s)' END
+    FROM "HelpSection" s JOIN "HelpChapter" c ON c.id = s."chapterId"
+   WHERE c.collection = 'user-guide' AND c.slug = 'ai-assist'
+  UNION ALL
+  SELECT 3, 'Tech Notes chapter',
+         CASE WHEN count(*) = 0 THEN 'MISSING' ELSE 'present: ' || count(*) || ' chapter(s)' END
+    FROM "HelpChapter" WHERE collection = 'tech-design' AND slug = 'ai-assist'
+  UNION ALL
+  SELECT 4, 'Tech Notes sections',
+         CASE WHEN count(*) = 0 THEN 'MISSING' ELSE 'present: ' || count(*) || ' section(s)' END
+    FROM "HelpSection" s JOIN "HelpChapter" c ON c.id = s."chapterId"
+   WHERE c.collection = 'tech-design' AND c.slug = 'ai-assist'
+  UNION ALL
+  SELECT 5, 'Mislabelled sections',
+         CASE WHEN count(*) = 0 THEN 'none — good'
+              ELSE 'STILL ' || count(*) || ' — the repair did not take' END
+    FROM "HelpSection" s JOIN "HelpChapter" c ON c.id = s."chapterId"
+   WHERE s.collection <> c.collection
+  UNION ALL
+  SELECT 6, 'Feature rows (draft)',
+         CASE WHEN count(*) < 2 THEN 'PARTIAL — ' || count(*) || ' of 2' ELSE 'present: ' || count(*) END
+    FROM "Feature"
+   WHERE name IN ('AI Assist — Suggest as You Draw', 'Voice Assist — Voice-Driven Diagramming')
+  UNION ALL
+  SELECT 7, 'Feature rows (published)',
+         CASE WHEN count(*) < 2 THEN 'NOT PUBLISHED — ' || count(*) || ' of 2' ELSE 'published: ' || count(*) END
+    FROM "Feature"
+   WHERE "publishedAt" IS NOT NULL
+     AND "publishedName" IN ('AI Assist — Suggest as You Draw', 'Voice Assist — Voice-Driven Diagramming')
+  UNION ALL
+  SELECT 8, 'Old name still present',
+         CASE WHEN count(*) = 0 THEN 'none — rename complete'
+              ELSE 'FOUND — run rename-abracadabra-to-voice-assist.sql' END
+    FROM (
+      SELECT 1 FROM "Feature"
+       WHERE name ILIKE '%abracadabra%' OR "publishedName" ILIKE '%abracadabra%'
+          OR summary ILIKE '%abracadabra%' OR details ILIKE '%abracadabra%'
+      UNION ALL SELECT 1 FROM "HelpChapter" WHERE title ILIKE '%abracadabra%'
+      UNION ALL SELECT 1 FROM "HelpSection" WHERE heading ILIKE '%abracadabra%' OR "bodyMarkdown" ILIKE '%abracadabra%'
+      UNION ALL SELECT 1 FROM "FeatureAvailability" WHERE "featureKey" = 'abracadabra'
+    ) old
+  UNION ALL
+  SELECT 9, 'voice-assist availability',
+         CASE WHEN count(*) = 0 THEN 'NO ROWS — nobody has it'
+              ELSE coalesce(string_agg(l.name || '=' || a.state, ', ' ORDER BY l.name), '—') END
+    FROM "FeatureAvailability" a JOIN "SubscriptionLevel" l ON l.id = a."levelId"
+   WHERE a."featureKey" = 'voice-assist'
+  UNION ALL
+  SELECT 10, 'nl-assist availability',
+         CASE WHEN count(*) = 0 THEN 'NO ROWS — nobody has it'
+              ELSE coalesce(string_agg(l.name || '=' || a.state, ', ' ORDER BY l.name), '—') END
+    FROM "FeatureAvailability" a JOIN "SubscriptionLevel" l ON l.id = a."levelId"
+   WHERE a."featureKey" = 'nl-assist'
+) after_seed ORDER BY n;
+
 -- Then open /features (published copy), /dashboard/help (User Guide) and
 -- /tech-notes (Technical Notes) to see them.

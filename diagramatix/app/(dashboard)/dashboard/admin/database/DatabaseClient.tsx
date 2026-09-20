@@ -23,6 +23,10 @@ interface QueryResult {
   command: string;
   duration: number;
   error?: string;
+  /** Present only for a MULTI-STATEMENT script (a seed pasted in whole): one
+   *  entry per statement. Without it such a script reported "0 rows" and no
+   *  error, which looked exactly like a silent no-op. */
+  statements?: { command: string; rowCount: number }[];
 }
 
 interface JsonEditorState {
@@ -824,7 +828,9 @@ export function DatabaseClient() {
               <span className="text-[10px] text-gray-400">Alt+Up/Down for history</span>
               {queryResult && (
                 <span className="text-[10px] text-green-600">
-                  {queryResult.command} — {queryResult.rowCount} row(s) in {queryResult.duration}ms
+                  {queryResult.statements
+                    ? `${queryResult.statements.length} statements in ${queryResult.duration}ms`
+                    : `${queryResult.command} — ${queryResult.rowCount} row(s) in ${queryResult.duration}ms`}
                 </span>
               )}
             </div>
@@ -885,7 +891,22 @@ export function DatabaseClient() {
                 </div>
               </div>
             )}
-            {queryResult && queryResult.rows.length === 0 && !queryError && (
+            {/* A multi-statement script says what EVERY statement did. It used
+                to report "0 rows" and nothing else, so a seed that had fully
+                run looked identical to one that had done nothing. */}
+            {queryResult?.statements && !queryError && (
+              <div className="m-3 p-3 bg-green-50 border border-green-200 rounded text-xs text-green-700">
+                <div className="font-semibold mb-1">
+                  {queryResult.statements.length} statements ran ({queryResult.duration}ms)
+                </div>
+                <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-green-800">
+                  {queryResult.statements.map((s, i) => (
+                    <span key={i}>{i + 1}. {s.command} {s.rowCount}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {queryResult && !queryResult.statements && queryResult.rows.length === 0 && !queryError && (
               <div className="m-3 p-3 bg-green-50 border border-green-200 rounded text-xs text-green-700">
                 {queryResult.command} completed — {queryResult.rowCount} row(s) affected ({queryResult.duration}ms)
               </div>
