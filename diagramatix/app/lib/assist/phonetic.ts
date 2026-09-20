@@ -105,7 +105,7 @@ function editDistance(a: string, b: string): number {
  * Compared with spaces AND without, so a word the recogniser split ("where
  * house") still matches the one it was ("Warehouse").
  */
-export function soundsLike(spoken: string, label: string): boolean {
+export function soundsLike(spoken: string, label: string, maxEdits = 1): boolean {
   const a = phoneticKey(spoken);
   const b = phoneticKey(label);
   if (!a || !b) return false;
@@ -116,9 +116,14 @@ export function soundsLike(spoken: string, label: string): boolean {
   if (aj === bj) return true;                       // split or joined differently
 
   // One edit, but only where one letter is not most of the word.
+  //
+  // R6 allows a caller to widen this. That is safe ONLY because the wider
+  // setting is used to SUGGEST ("did you mean Escalate?") and never to act:
+  // two edits is enough slack to reach the wrong element, which is fine in a
+  // question and would not be fine in a rename.
   if (Math.min(aj.length, bj.length) < MIN_KEY_FOR_FUZZ) return false;
-  if (Math.abs(aj.length - bj.length) > 1) return false;
-  return editDistance(aj, bj) <= 1;
+  if (Math.abs(aj.length - bj.length) > maxEdits) return false;
+  return editDistance(aj, bj) <= maxEdits;
 }
 
 /**

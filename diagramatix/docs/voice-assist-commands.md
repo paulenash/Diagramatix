@@ -59,6 +59,7 @@ command (with variants) → if none, the **AI** interprets it → ops apply live
 | Boundary event | "add a boundary event called Cancel to the Repeat‑Until subprocess" |
 | Connect / disconnect | "connect Send Invoice to Receive Payment", "connect them", "disconnect Review from Approve" |
 | Rename | "rename the gateway to Approved?", "rename Lane 2 to Sales" |
+| Convert in place | "make this a user task", "turn the selected gateway into a parallel gateway", "make Review a service task", "make the selected event a timer event" |
 | Move | "move the gateway two elements to the right" |
 | Delete (+ compact) | "delete Prepare", "remove Prepare and compact" |
 | Diagram | "clear the diagram", "export the diagram to JSON", "undo that", "stop" |
@@ -139,6 +140,26 @@ Examples: "rename the selected pool to Customer" · "delete these" · "connect t
 - Both take the same phrasings as the subprocess wrap, and both accept what the
   recogniser usually returns instead: "poll"/"pull" for pool, "line" for lane.
 
+## Convert in place (20 September 2026)
+
+Everything the right-click type-picker offers can now be said instead:
+
+- **"make this a user task"** · "make Review a business rule task" · "make the selected task plain"
+- **"turn the selected gateway into a parallel gateway"** · "make it exclusive" · "make this a merge"
+- **"make the selected event a timer event"** · "make this an error event"
+- **"make the subprocess a call subprocess"** · "make this a transaction" · "make it a loop"
+- **"make this an input data object"**
+
+This sets a **marker on the element it is already** — it does not turn a task
+into a gateway. That is a different operation (the shape is replaced and
+properties would be dropped), so asking for it is refused by name rather than
+done approximately.
+
+The wording comes from the same table the menu draws, so the two can never
+offer different things. Say the kind word when the word alone could mean two
+things — "parallel" is only a gateway, but if a subtype ever became ambiguous
+you are asked which rather than guessed at.
+
 ## The number one, during a numbered pick (17 September 2026)
 
 Saying **"one"** used to come back as **"lane"**. That was our own doing: the
@@ -205,7 +226,11 @@ one breath is still the surest way; the hold is the safety net.
 
 ## Variants the parser already accepts
 
-- **Verbs:** add · insert · create · put · make · draw · split (context‑dependent).
+- **Verbs, by what they do** (they are not interchangeable — checked against the grammar 2026‑09‑20):
+  - *add* — add · insert · create · put · place · drop in · give me · new
+  - *connect* — connect · link · join · draw (a line/arrow/flow)
+  - *convert in place* — make · turn · convert · change · set
+  - *split* is context‑dependent.
 - **Homophones** (common Deepgram mishears): **pool** ← poll / pull; **lane** ← line.
 - **Counts:** digits ("3") or words ("three"); "a/an" = 1; "some" = 1.
 - **Fillers:** "new / another / extra" before a lane/pool; "the/a/an"; a trailing "on the diagram".

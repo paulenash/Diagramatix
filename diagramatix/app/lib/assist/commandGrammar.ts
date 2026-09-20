@@ -9,6 +9,7 @@ import { namesNonContainerKind, laneWordIsAttached, looksPositionalNotAName } fr
 import { parseRenameType } from "./renameTargets";
 import { repairSelectedWord, repairTurnWord } from "./selectedWord";
 import { capitaliseFirstWord } from "./nameCase";
+import { convertMatches } from "./convertPhrase";
 import type { SymbolType, EventType, GatewayType } from "../diagram/types";
 
 const clean = (s: string) => s.trim().replace(/[.,!?;:]+$/g, "").replace(/^["'“”‘’]+|["'“”‘’]+$/g, "").trim();
@@ -104,6 +105,28 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   if (m) return [{ op: "connect", fromRef: clean(m[1]), toRef: clean(m[2]) }];
   m = raw.match(/^(.+?)\s+(?:goes to|flows to|connects to|then goes to|leads to)\s+(.+)$/i);
   if (m) return [{ op: "connect", fromRef: clean(m[1]), toRef: clean(m[2]) }];
+
+  // ── Convert in place (M3) ──
+  // "make this a user task", "turn the selected gateway into a parallel
+  // gateway", "make Review a service task". The right-click menu has offered
+  // every one of these since the beginning; this is only the way to say it.
+  //
+  // The discriminator is the TAIL, not the verb: "make" is also an add verb
+  // ("make a task called Approve"), so a pattern alone would steal it. A
+  // convert op is returned only when the tail is a subtype the shared table
+  // knows — which is also what keeps this rule from being the next greedy one.
+  for (const pat of [
+    /^(?:make|turn|convert|change|set)\s+(.+?)\s+(?:in)?to\s+(?:an?\s+)?(.+)$/i,
+    /^(?:make|turn|convert|change|set)\s+(.+?)\s+an?\s+(.+)$/i,
+  ]) {
+    const c = raw.match(pat);
+    if (!c) continue;
+    const ref = clean(c[1]);
+    const subtype = clean(c[2]);
+    if (!ref || !subtype) continue;
+    if (!convertMatches(subtype).length) continue;   // not a subtype → let other rules try
+    return [{ op: "convert", ref, subtype }];
+  }
 
   // ── Rename ──
   m = raw.match(/^(?:rename|relabel)\s+(.+?)\s+(?:to|as)\s+(.+)$/i);

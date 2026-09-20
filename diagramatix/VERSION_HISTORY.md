@@ -15,6 +15,310 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.11.2654 — 2026-09-20 — Voice Assist: a cheaper fallback, a picker instead of a guess, and fewer mis-hears
+
+Five items from the 14 September review, in the order they mattered.
+
+- **The AI fallback is no longer an Opus call.** Canonicalising one sentence
+  the grammar then re-validates does not need the generate model. A new
+  `ai.command.model` setting (default Haiku-class, admin-selectable beside the
+  other model pickers) carries it, with a **20-second abort** so a slow
+  provider fails visibly instead of hanging the bar, and a **serialisation
+  cap** that keeps selected elements first, drops connectors whose other end
+  was cut, and states in the payload what it omitted.
+- **The voice path waits its turn.** `abraBusy` gated the Run button but not
+  speech, so two utterances during one AI call both acted on stale state and
+  their log lines interleaved. A busy ref plus a FIFO queue, drained in
+  `finally`, and the post-await state is read through a ref.
+- **A bare noun on a destructive command asks.** "Delete the task" quietly
+  removed the most recent task with a green tick, while "delete the lane"
+  already asked which. Both ask now.
+- **Ambiguity raises a picker, not an error.** An ambiguous reference used to
+  print a terse message and throw the candidate list away. It now parks the
+  command and puts the same green numbers on the candidates that the rename
+  flow uses; the next number resumes it.
+- **Greedy grammar rules decline instead of guessing.** "Collapse the
+  subprocess" parsed as *compress a pool*; "move the Assembly Line task up"
+  parsed as *move a lane*, because the word "Line" was in the name. Compress
+  now needs a pool word, the lane rule needs "lane" adjacent to the reference,
+  and the add rule bails on "between / before / instead of / replace" rather
+  than creating a task literally named "between Check Stock and Pick Items".
+- **Voice reliability, at both ends.** Every keyword boost is a bet against
+  every other word in the language — boosting the numbers to win a pick is
+  what made "turn on gold flashing" come back as "ten on gold flashing". So:
+  the recogniser is sent **this diagram's own labels** when the mic opens,
+  deliberately timidly (no boost suffix ever, phrases preferred, bare common
+  words never, nothing the command vocabulary already owns, capped); and what
+  still comes back wrong is repaired in the **parser** by how it sounds —
+  "escalade" finds Escalate, "where house" finds Warehouse — with no AI call.
+  When several names sound alike the answer is *ambiguous*, which raises the
+  picker rather than guessing.
+
+T4557–T4577, each proven by planting the defect. Feature-only: `SCHEMA_VERSION`
+stays **48**. Reference: `docs/voice-assist-commands.md`.
+
+---
+
+## 2.11.2648 — 2026-09-19 — A pool can be dragged anywhere, and its message labels come back right
+
+Paul sent three exported diagrams showing a pool moved away and returned with
+its message labels 200 px from where they started.
+
+- **Settled once per drag, not once per mouse sample.** The rule that keeps a
+  label anchored to the moving pool's attachment point was applied on every
+  pointer event, so a seven-step drag applied it seven times and compounded
+  the error; a one-step drag was exact. The labels are now settled **once**, at
+  the end of the drag, against the pre-drag geometry — so a pool returned to
+  where it started has its labels exactly where they were.
+- **A pool edge decides move versus resize by direction.** The outer band and
+  the inner band each assumed the other handled the click, leaving about 20 px
+  of a 78 px pool dead. The gesture is now classified from the direction of the
+  first few pixels of travel.
+- **Message labels come off while a pool is dragged** across another pool or a
+  group of pool-less elements, and come back when it is put down — rather than
+  flickering through every intermediate position on the way.
+
+T4544–T4556. Feature-only: `SCHEMA_VERSION` stays **48**.
+
+---
+
+## 2.11.2644 — 2026-09-19 — Abracadabra is Voice Assist, and Assist is included at every level
+
+Paul: "Change Abracadabra to Voice Assist everywhere and make normal Assist
+available to all Subscription levels."
+
+- The name changes **everywhere** — code, tests, seeds, documents, file and
+  directory names — and a guard holds it there. The one exemption is the
+  historical record: this log, the schema changelog and the audit documents
+  keep the name a thing had when it shipped, which is why the entries below
+  this one still say Abracadabra.
+- **Assist** (the ghost next-step suggestions) is now available on **every**
+  subscription level. It had never been gated in code, so this makes the
+  availability matrix say what the product already did.
+- **Voice Assist** keeps the Expert-and-above availability it had — a rename is
+  not a re-pricing. Because `isFeatureAvailable` fails closed, the key rename
+  had to carry each level's existing state across rather than insert fresh
+  rows, or the feature would have switched itself off for the customers who
+  had it.
+- The wand icon survives, and so does the version history.
+
+T4553–T4556. Feature-only: `SCHEMA_VERSION` stays **48**.
+
+---
+
+## 2.11.2642 — 2026-09-19 — Display settings, container menus, and an EMIE label clear of its connector
+
+- **Brightness and Contrast** for the whole Diagramatix window, on the System
+  menu's Dashboard screen, with a return to defaults. Brightness starts at 80%
+  (what it has always looked like) and can go a little brighter or much darker;
+  Contrast starts at 50%. Both are painted by a blocking script in the document
+  head, so the chosen setting survives a hard reload without a flash of the
+  default.
+- **The right-click menu belongs to where you clicked.** "Generate SOP for this
+  pool" appears on a pool or lane **header**; clicking in the **body** offers
+  the element matrix instead. The matrix gained Pool/Lane after the gateway,
+  and Pain Point, Issue and Review Comment at the end.
+- **An edge-mounted intermediate event's label clears its connector.** The
+  default now sits half a label-length left of centre so it is clear of the
+  outbound connector, on manual, Assist and Voice Assist creation alike. On a
+  vertical boundary it sits just above the outgoing connector; on the **top**
+  boundary it goes outside the host, up and to the left.
+
+T4522–T4543. Feature-only: `SCHEMA_VERSION` stays **48**.
+
+---
+
+## 2.11.2638 — 2026-09-18 — The black-box pool gets its own menu, and the task types that follow from it
+
+- **Right-clicking a black-box pool** no longer offers "Generate SOP for this
+  pool" — there is no procedure inside a participant box. It offers a
+  select/deselect menu for **IT System** and **Collection** instead.
+- **Changing the IT System flag retypes the tasks that message it.** Turning it
+  **on**, any Send or Receive task with a message flow to or from that pool
+  becomes a **User** task. Turning it **off**, any User task with such a message
+  becomes **Send** if all its messages go to the pool, **Receive** if they all
+  come from it, and **None** for any mix. The same rule applies whether the flag
+  is changed in Properties or from the right-click menu.
+- **Escape clears the pool alignment guide** — the green line and its
+  indicators — while they are showing.
+
+T4500–T4521. Feature-only: `SCHEMA_VERSION` stays **48**.
+
+---
+
+## 2.11.2636 — 2026-09-18 — One writer for a diagram, and one guard for a read-only impersonation
+
+Audit Wave G and the first of Wave H.
+
+- **One writer for `Diagram.data`, with a compare-and-swap.** Several routes
+  wrote the diagram document directly, so two of them landing together left the
+  loser's work gone with no error anywhere (DATA-40). All of them now go through
+  one writer that checks the version it read is still the version on disk.
+- **The rest of the silent-overwrite family** — the same read-modify-write shape
+  on simulation studies, mining runs and SOP documents (DATA-36/37/38/39).
+- **One route guard.** Six audit rows turned out to be one gap: a SuperAdmin
+  impersonating a customer in read-only mode could still reach mutating routes
+  that had been added since the check was written. `app/lib/routeGuard.ts` is now
+  the single place that decides, and a ratchet test lists every route that does
+  not yet use it, so the list can only shrink. `admin/impersonate` is exempt with
+  a written reason — guarding it would lock a SuperAdmin out of leaving.
+- **NEW AI Generate, Generate SOP and publishing** move into the Diagram menu.
+
+T4471–T4499. Feature-only: `SCHEMA_VERSION` stays **48**.
+
+---
+
+## 2.11.2630 — 2026-09-18 — Pools that move as a unit, and stay where they were put
+
+Nine fixes to one subject, found by dragging pools around a real diagram.
+
+- **A dragged pool rides over what it crosses** instead of collecting it, and is
+  drawn in a later pass so it is genuinely on top rather than merely later in
+  the document.
+- **A pool that travels alone lifts with its contents**, and message flows stay
+  attached through a reorder.
+- **A message label keeps its place when its pool moves.**
+- **An edge-mounted element follows its host, not its parent** — the two are not
+  the same thing once the host has been re-parented.
+- **A container moves what it is drawn around**, and a dropped verb in a spoken
+  command no longer rewrites the diagram.
+- **The adopting pool actually grows**, and a pause mid-command stops producing a
+  second pool.
+- **Move and swap pools in the stack** by voice.
+- **A surround always makes a NEW pool** and never engulfs a black-box one.
+
+T4441–T4470. Feature-only: `SCHEMA_VERSION` stays **48**.
+
+---
+
+## 2.11.2620 — 2026-09-18 — Gold flashing, and Abracadabra opens to Expert and above
+
+- **The feature is no longer SuperAdmin-only.** It reads the feature registry
+  key and the plan entitlement, seeded Expert and above. A SuperAdmin previewing
+  a lower tier is held to that tier too, or the preview would be a lie.
+- **Gold flashing** marks what a command just touched, on by default — so you
+  can see what happened without reading the log. It reaches a rename as well as
+  an add, which it did not at first.
+- **"Turn" stopped being heard as "ten."** Boosting the number words to win a
+  numbered pick made ordinary speech worse everywhere else. Corrected at the
+  recogniser and at the parser, rather than at one of them.
+- **A refused wrap says what it is really objecting to** — which element, and on
+  which side — instead of a generic refusal.
+- **A renamed item is capitalised**, surround accepts a subprocess, the canvas
+  zooms when naming a container, items with no name yet can be reached, and
+  "selected" stopped being lost to the recogniser.
+- **Double-click any label to edit it**, and the label border hides while editing.
+
+T4423–T4440. Feature-only: `SCHEMA_VERSION` stays **48**.
+
+---
+
+## 2.11.2614 — 2026-09-17 — A fresh audit, its first fixes, and a deploy that cannot outrun CI
+
+- **The rectification plan was rebuilt** from a complete code and architecture
+  re-audit — the previous list had gone stale, with items marked open that
+  shipped in August and four entirely new trust surfaces never reviewed at all.
+- **Wave G (Critical and High) fixed in four batches:** exposure and injection;
+  access that outlived its grant; two simulation answers that were confidently
+  wrong; and writes that quietly undid each other.
+- **The deploy is gated on CI**, and the production schema push is gated on the
+  SQL it would run (OPS-01, OPS-02) — so a red build can no longer reach
+  production, and a destructive schema change cannot be applied by accident.
+
+Feature-only: `SCHEMA_VERSION` stays **48**. Detail:
+`audit/Audit-Rectification-Plan.md`.
+
+---
+
+## 2.11.2608 — 2026-09-17 — Wrap the selection in a pool or a lane
+
+The subprocess half shipped the day before; pool and lane were what remained.
+Neither is a flow element, so nothing is re-pointed and there is no Start or
+End — but each carries a rule the subprocess does not, and both are enforced
+rather than worked around.
+
+- **Pool.** A sequence flow may not cross a pool boundary. A selection with a
+  flow to anything outside it is **refused**, naming what is on the other side,
+  rather than silently converting those flows to message flows — that is a
+  modelling decision, not a tidy-up. Nested pools are refused too.
+- **Lane.** A lane is a full-width band inside a pool, not a box round the
+  selection. It is created in the pool the selection already occupies, and
+  anything unselected merely level with the selection would be swept in — so it
+  is refused by name, the same guard the subprocess wrap uses.
+- Both accept what the recogniser usually returns instead: "poll" and "pull"
+  for pool, "line" for lane.
+
+Feature-only: `SCHEMA_VERSION` stays **48**.
+
+---
+
+## 2.11.2591 — 2026-09-16 — Surround the selection with an expanded subprocess, and dissolve one back
+
+- **"Surround selected with an expanded subprocess called X."** Room is made in
+  the selection's lane **only** — the group moves 90 px right and what is right
+  of it in the same lane moves 180 px; neighbouring lanes are untouched and the
+  pools widen to one width. The subprocess wraps the elements exactly as they
+  were with their internal flows; the one flow in and one flow out are
+  re-pointed at it; a Start faces the entry element and an End faces the exit
+  element inside it, on short straight flows. Legal only with exactly one flow
+  in and one out; an unselected element that would end up inside is refused by
+  name, never adopted silently.
+- **"Delete selected" on a subprocess with contents** — also "unwrap" or
+  "dissolve" — is the exact reverse: the shell and its Start/End go, the
+  contents are spliced back into the flow and slide back to where they were, and
+  everything right of the shell slides back too. It works on any expanded
+  subprocess, not only one made this way. The two round-trip without undo, and
+  not necessarily one straight after the other.
+- Also: old images are purged from the container registry after every deploy
+  (the registry had grown to 277 GB), and the partner API awaits its log write
+  instead of sleeping for it.
+
+T4419–T4422. Feature-only: `SCHEMA_VERSION` stays **48**.
+
+---
+
+## 2.11.2589 — 2026-09-15 — Abracadabra: the Commands card, green numbers, and Paul's eight findings
+
+Three batches from a live review session.
+
+- **A Commands card** in the bar: a movable, scrollable reminder of everything
+  the grammar accepts, grouped by family. Every example on it is held to the
+  grammar by a test, so it cannot advertise a phrase that no longer works.
+- **Cost so far** — AI fallback calls at the rate catalogue's list prices plus
+  microphone minutes at a per-minute estimate, with the open session counted
+  live because its usage row is only written when it stops. Labelled an
+  estimate, because the provider's invoice is the truth.
+- **The first word is no longer lost.** Audio reached the recogniser only after
+  the socket opened, while the header already said "listening". The mic now
+  opens in parallel with the token, chunks queue during the handshake and drain
+  on open, and the header says "connecting…" until it is really listening.
+- **"Stop" and "done" stopped overlapping.** "Stop" always stops the microphone
+  and drops any numbered pick or parked confirmation; "done", "cancel" or
+  Escape ends a pick and keeps listening.
+- **Green numbers, placed by kind** — below an activity, above an event, and in
+  a pool or lane header just before the start of the name, moving as the name
+  changes length.
+- **A rename or a move by voice leaves nothing selected**, so the next thing
+  said cannot land on it by accident. The one exception is the moment between a
+  bare number and its name, where the highlight is the cue.
+- **Messages by number** — "add a message" numbers every task, collapsed
+  subprocess and black-box pool and waits for "3 to 7 labelled Order Placed";
+  "add a message to the selected" numbers only the valid counterparts.
+- **Nudge, group move, label and swap** — 20 px in any direction for a nudge
+  and 100 px per step for a move, a selection moving as a group; "label
+  selected Yes" for a connector; and swapping the connection points of every
+  selected gateway, any ordered pair of top / bottom / middle / left / right.
+- **A split command is held for the rest of itself.** A lone verb, a dangling
+  connective or a half-finished rename waits up to three short grace periods,
+  and a comma straight after the verb is ignored — so "Swap, top and bottom."
+  is one command rather than a lane swap.
+- Also: the amber "Notification" chip in Assist becomes **Suggestion**, and now
+  names a real template to attach instead of opening a loosely related picker.
+
+T4394–T4418. Feature-only: `SCHEMA_VERSION` stays **48**.
+
+---
+
 ## 2.11.2583 — 2026-09-15 — Abracadabra: one command, one undo — and "the selected …"
 
 Abracadabra Mode — say or type "add a task called Approve after Review" and the

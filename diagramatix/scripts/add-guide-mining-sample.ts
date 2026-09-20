@@ -51,7 +51,7 @@ async function main() {
       return;
     }
     const at = Math.max(0, ...chapter.sections.map((s) => s.sortOrder)) + 1;
-    await prisma.helpSection.create({ data: { chapterId: chapter.id, heading: HEADING, bodyMarkdown: BODY, sortOrder: at } });
+    await prisma.helpSection.create({ data: { chapterId: chapter.id, collection: "user-guide", heading: HEADING, bodyMarkdown: BODY, sortOrder: at } });
     console.log(`Appended "${HEADING}" at sortOrder ${at}.`);
   } finally {
     await prisma.$disconnect();

@@ -24,6 +24,7 @@ export const COMMAND_CATALOG: CatalogFamily[] = [
     { does: "Rename by number (say a type, pick a green number, say the name)", say: ["rename tasks", "rename lanes"] },
     { does: "Move — one element-span; a selection moves together, 100 px per step", say: ["move the gateway two elements to the right", "move Approve up", "move these right", "move the selected task two steps up"] },
     { does: "Nudge — 20 px in any direction, any element; a selection nudges together", say: ["nudge the selected task left", "nudge these down", "bump Approve right", "nudge Customer down by 40"] },
+    { does: "Change what kind of thing it is — the same choices as the right-click menu", say: ["make this a user task", "turn the selected gateway into a parallel gateway", "make Review a service task", "make the selected event a timer event"] },
     { does: "Delete (and close the gap)", say: ["delete Prepare", "remove Prepare and compact"] },
     { does: "Boundary event on a task or subprocess", say: ["add a boundary event called Cancel to the Review subprocess", "add a boundary event to Approve called Timeout"] },
   ] },

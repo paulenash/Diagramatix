@@ -88,6 +88,11 @@ Op shapes (use element NAMES for refs — they are resolved against the diagram;
   { "op":"wrapInSubprocess", "label"?: string }           // surround the SELECTED elements with an expanded subprocess
   { "op":"unwrapSubprocess" }                              // dissolve the SELECTED expanded subprocess back into the flow
   { "op":"renameByType", "itemType": "pool"|"lane"|"message"|"task"|"subprocess"|"gateway"|"event"|"connector" }  // numbers them for a pick
+  { "op":"convert", "ref": string, "subtype": string }  // set a SUBTYPE MARKER on an element that already has the right
+        // shape — the same choices as the right-click menu. subtype is the spoken phrase, e.g. "user task",
+        // "service task", "parallel gateway", "event-based gateway", "merge", "timer event", "error event",
+        // "call subprocess", "transaction", "loop", "MI parallel", "input data object". This CANNOT change a task
+        // into a gateway; if that is what was asked, return no ops rather than something adjacent.
   { "op":"clear" }                    // empty the whole diagram
   { "op":"export", "format":"json" }  // download the diagram as JSON
   { "op":"undo" }

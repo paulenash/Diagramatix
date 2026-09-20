@@ -46,7 +46,10 @@ import { planWrapInSubprocess, planUnwrapSubprocess, planWrapInContainer } from 
 import { matchIntent, matchAssistRules, type IntentRow } from "@/app/lib/diagram/intentMatch";
 import { canConnect } from "@/app/lib/diagram/canConnect";
 import { parseCommand } from "@/app/lib/assist/commandGrammar";
-import { resolveRef, resolveSelectionRefs, isSelectionRef, ID_REF_PREFIX } from "@/app/lib/assist/resolveRef";
+import { resolveRef, resolveSelectionRefs, isSelectionRef, nearestRefs, ID_REF_PREFIX } from "@/app/lib/assist/resolveRef";
+import { isAnyLane, laneKindWord, sameKindAs } from "@/app/lib/diagram/laneKind";
+import { convertMatches, matchesForType } from "@/app/lib/assist/convertPhrase";
+import { subtypeFingerprint } from "@/app/lib/diagram/elementSubtypes";
 import { isMicStopWord, isFlowEndWord } from "@/app/lib/assist/stopWords";
 import { isIncompleteCommand } from "@/app/lib/assist/incompleteCommand";
 import { leadingSpokenNumber } from "@/app/lib/assist/spokenNumber";
@@ -2752,6 +2755,7 @@ export function DiagramEditor({
     if (!isGoldFlashOn()) return;
     goldFlashBeforeRef.current = elements.map((e) => ({
       id: e.id, x: e.x, y: e.y, width: e.width, height: e.height, parentId: e.parentId, label: e.label,
+      marks: subtypeFingerprint(e as unknown as Record<string, unknown>),
     }));
   }, []);
   const nameOf = (e: DiagramElement) => (e.label?.trim() || e.type);
@@ -2797,7 +2801,19 @@ export function DiagramEditor({
      */
     const resolve1 = (ref: string, opts: { strict?: boolean } = {}): DiagramElement | { err: string; ambiguous?: string[] } => {
       const r = resolveRef(ref, els, voiceLastId.current, selectedIds, opts);
-      if (!r) return { err: isSelectionRef(ref) && selectedIds.length === 0 ? "nothing is selected" : `couldn't find “${ref}”` };
+      if (!r) {
+        if (isSelectionRef(ref) && selectedIds.length === 0) return { err: "nothing is selected" };
+        // R6 — "couldn't find X" on its own leaves the user unable to tell
+        // whether they said the wrong name, said the right one and were
+        // misheard, or are on the wrong diagram. The passes above computed the
+        // answer and discarded it; `nearestRefs` re-runs them loosely, which is
+        // safe because the result only ever becomes a question.
+        const near = nearestRefs(ref, els, 3);
+        if (!near.length) return { err: `couldn't find “${ref}”` };
+        const names = near.map((n) => `“${n.label}”`);
+        const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} or ${names[names.length - 1]}`;
+        return { err: `couldn't find “${ref}” — did you mean ${list}?`, ambiguous: near.map((n) => n.id) };
+      }
       if ("ambiguous" in r) {
         if (isSelectionRef(ref)) return { err: `${r.ambiguous.length} elements are selected — select just one for that` };
         const names = r.ambiguous
@@ -2882,16 +2898,28 @@ export function DiagramEditor({
         addElementGated(op.symbolType, center, undefined, op.eventType, newId, parentId ? { parentId } : undefined);
         if (op.gatewayType) updateProperties(newId, { gatewayType: op.gatewayType });
         if (op.label) updateLabel(newId, op.label);
+        const addedEl = syntheticElement(newId, op.symbolType, center, w, h, { label: op.label, parentId, eventType: op.eventType });
         if (anchor && op.afterRef) {
-          if (srcSide) addConnector(anchor.id, newId, "sequence", "directed", "rectilinear", srcSide, "left");
-          else addConnector(anchor.id, newId, "sequence");
+          // R7 — the explicit `connect` op has always been checked against
+          // `canConnect`; this auto-connect never was. So "add a task after
+          // Done" drew a sequence flow OUT of an end event and reported it with
+          // a green tick. Check the same gauntlet the reducer and the ghost
+          // suggestions use, against the state that WILL exist — the new
+          // element is not in `els` yet.
+          if (!canConnect(anchor, addedEl, "sequence", withAdded(els, addedEl))) {
+            results.push(`added ${nameOf(addedEl)} but left it unconnected — a sequence flow from ${nameOf(anchor)} isn’t legal`);
+          } else if (srcSide) {
+            addConnector(anchor.id, newId, "sequence", "directed", "rectilinear", srcSide, "left");
+          } else {
+            addConnector(anchor.id, newId, "sequence");
+          }
         }
         // Auto-extend: if the new element overflows its pool's right edge, widen
         // ALL pools to the same width so they stay aligned (Paul).
         const addRight = center.x + w / 2;
         if (parentId && els.some((e) => e.type === "pool" && e.x + e.width < addRight + 40)) extendPools();
         voiceLastId.current = newId;
-        els = withAdded(els, syntheticElement(newId, op.symbolType, center, w, h, { label: op.label, parentId, eventType: op.eventType }));
+        els = withAdded(els, addedEl);
         setSelectedElementIds(new Set([newId]));
         results.push(`added ${op.label ?? op.symbolType}${anchor && op.afterRef ? ` after ${nameOf(anchor)}` : ""}`);
         continue;
@@ -2953,12 +2981,19 @@ export function DiagramEditor({
         // #7 — never delete a container we can't confidently identify. If the
         // spoken name doesn't actually appear in the resolved container's label
         // and there's more than one of its kind, ask rather than guess.
-        if (e.type === "pool" || e.type === "lane" || e.type === "sublane") {
-          const kindWord = e.type === "sublane" ? "sub-?lanes?" : `${e.type}s?`;
+        if (e.type === "pool" || isAnyLane(e)) {
+          // B6 — a sub-lane is `type: "lane"` with a lane parent on every
+          // interactive path, and `type: "sublane"` only when the AI or an
+          // importer stamped it. Testing the type alone missed the common
+          // shape: "delete the sublane Staff" left the word "sublane" in the
+          // name (so it matched no label) and counted top-level lanes as
+          // siblings, so it answered "which lane? there are 4".
+          const kind = e.type === "pool" ? "pool" : laneKindWord(e, els);
+          const kindWord = kind === "sub-lane" ? "sub-?lanes?" : `${kind}s?`;
           const named = op.ref.replace(new RegExp(`\\b(?:the|a|an|named|called|${kindWord})\\b`, "gi"), "").trim();
-          const siblings = els.filter((x) => x.type === e.type);
+          const siblings = sameKindAs(e, els);
           if (siblings.length > 1 && (!named || !(e.label ?? "").toLowerCase().includes(named.toLowerCase()))) {
-            results.push(`which ${e.type}? there are ${siblings.length}${named ? ` — I couldn't match “${named}”` : ""}; say its exact name`);
+            results.push(`which ${kind}? there are ${siblings.length}${named ? ` — I couldn't match “${named}”` : ""}; say its exact name`);
             anyFail = true; continue;
           }
         }
@@ -3389,6 +3424,33 @@ export function DiagramEditor({
         continue;
       }
 
+      // M3 — set a subtype marker: "make this a user task". Writes exactly what
+      // the right-click menu writes, from the same table, so the two cannot say
+      // different things. Refusals are specific on purpose: "I don't know that
+      // subtype" and "I know it, but not for a gateway" are different problems
+      // and only the second one tells the user what to do next.
+      if (op.op === "convert") {
+        const e = resolve1(op.ref);
+        if ("err" in e) { results.push(e.err); anyFail = true; continue; }
+        const all = convertMatches(op.subtype);
+        if (!all.length) { results.push(`I don't know a “${op.subtype}”`); anyFail = true; continue; }
+        const here = matchesForType(all, e.type);
+        if (!here.length) {
+          const kinds = [...new Set(all.flatMap((c) => c.appliesTo))].join(", ");
+          results.push(`${nameOf(e)} is a ${e.type} — “${op.subtype}” applies to ${kinds}`);
+          anyFail = true; continue;
+        }
+        if (here.length > 1) {
+          results.push(`“${op.subtype}” could mean ${here.map((c) => `a ${c.phrase}`).join(" or ")} — say which`);
+          anyFail = true; continue;
+        }
+        const pick = here[0];
+        updateProperties(e.id, { [pick.propKey]: pick.value });
+        setSelectedElementIds(new Set());   // the standing selection protocol
+        results.push(`made ${nameOf(e)} ${pick.value === "none" ? "plain" : pick.label.toLowerCase()}`);
+        continue;
+      }
+
       if (op.op === "addBoundary") {
         const host = resolve1(op.hostRef);
         if ("err" in host) { results.push(host.err); anyFail = true; continue; }
@@ -3442,6 +3504,7 @@ export function DiagramEditor({
       snapshot,
       data.elements.map((e) => ({
         id: e.id, x: e.x, y: e.y, width: e.width, height: e.height, parentId: e.parentId, label: e.label,
+      marks: subtypeFingerprint(e as unknown as Record<string, unknown>),
       })),
     );
     if (targets.length === 0) return;

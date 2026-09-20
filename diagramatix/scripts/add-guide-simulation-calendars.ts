@@ -49,7 +49,7 @@ async function main() {
     const teamLib = chapter.sections.find((s) => s.heading === "The Team library");
     const at = (teamLib?.sortOrder ?? 5) + 1;
     await prisma.helpSection.updateMany({ where: { chapterId: chapter.id, sortOrder: { gte: at } }, data: { sortOrder: { increment: 1 } } });
-    await prisma.helpSection.create({ data: { chapterId: chapter.id, heading: HEADING, bodyMarkdown: BODY, sortOrder: at } });
+    await prisma.helpSection.create({ data: { chapterId: chapter.id, collection: "user-guide", heading: HEADING, bodyMarkdown: BODY, sortOrder: at } });
     console.log(`Inserted "${HEADING}" at sortOrder ${at}.`);
   } finally {
     // no-op

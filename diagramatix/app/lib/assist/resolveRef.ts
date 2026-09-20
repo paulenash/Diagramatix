@@ -5,7 +5,8 @@
  */
 import type { DiagramElement } from "../diagram/types";
 import { SYMBOL_SYNONYMS, SYMBOL_PHRASES } from "./ops";
-import { phoneticMatches } from "./phonetic";
+import { phoneticMatches, soundsLike } from "./phonetic";
+import { isSublane, isTopLevelLane } from "../diagram/laneKind";
 
 export type RefResolution = { id: string } | { ambiguous: string[] } | null;
 
@@ -50,11 +51,13 @@ const tokens = (s: string) => norm(s).split(/\s+/).filter(Boolean);
 // recent element of that container type.
 function containerNoun(spoken: string, elements: DiagramElement[], strict = false): RefResolution {
   const s = stripArticle(norm(spoken));
-  const parentType = (e: DiagramElement) => elements.find((p) => p.id === e.parentId)?.type;
   let items: DiagramElement[] | null = null;
   if (/^pools?$/.test(s)) items = elements.filter((e) => e.type === "pool");
-  else if (/^sub-?lanes?$/.test(s)) items = elements.filter((e) => e.type === "lane" && parentType(e) === "lane");
-  else if (/^lanes?$/.test(s)) items = elements.filter((e) => e.type === "lane");
+  // B6 — a sub-lane is a nested lane OR a stamped "sublane"; "lane" on its own
+  // means a band directly in a pool. The two sets do not overlap, so a
+  // "which one?" count is right either way round.
+  else if (/^sub-?lanes?$/.test(s)) items = elements.filter((e) => isSublane(e, elements));
+  else if (/^lanes?$/.test(s)) items = elements.filter((e) => isTopLevelLane(e, elements));
   if (!items) return null;
   if (!items.length) return null;
   // Destructive: report the candidates rather than taking the newest.
@@ -102,12 +105,13 @@ function positional(spoken: string, elements: DiagramElement[]): RefResolution {
   if (!m) return null;
   const pos = m[1];
   const kind = m[2].replace(/\s/g, "");
-  const isLane = (e: DiagramElement) => e.type === "lane";
-  const parentType = (e: DiagramElement) => elements.find((p) => p.id === e.parentId)?.type;
+  // B6 — both shapes of a sub-lane count. This pass used to recognise only the
+  // nested-parent shape, so "the middle sublane" found nothing on a generated
+  // diagram, where the converter stamps `type: "sublane"` instead.
   const items = elements.filter((e) =>
     kind === "pool" ? e.type === "pool"
-    : kind === "sublane" ? (isLane(e) && parentType(e) === "lane")
-    : isLane(e),
+    : kind === "sublane" ? isSublane(e, elements)
+    : isTopLevelLane(e, elements),
   );
   if (items.length === 0) return null;
   const spreadX = Math.max(...items.map((e) => e.x)) - Math.min(...items.map((e) => e.x));
@@ -138,10 +142,9 @@ const DEMONSTRATIVE = /^(?:this|that|this one|that one)$/;
 /** Element type named by a kind word, singular or plural ("tasks", "pool", "sub-lanes"). */
 function kindToType(word: string, elements: DiagramElement[]): ((e: DiagramElement) => boolean) | null {
   const w = word.trim().toLowerCase();
-  const parentType = (e: DiagramElement) => elements.find((p) => p.id === e.parentId)?.type;
   if (/^pools?$/.test(w)) return (e) => e.type === "pool";
-  if (/^sub-?lanes?$/.test(w)) return (e) => e.type === "lane" && parentType(e) === "lane";
-  if (/^lanes?$/.test(w)) return (e) => e.type === "lane";
+  if (/^sub-?lanes?$/.test(w)) return (e) => isSublane(e, elements);
+  if (/^lanes?$/.test(w)) return (e) => isTopLevelLane(e, elements);
   // "the selected subprocess" is either kind; "the selected expanded subprocess" / "EP" only the expanded one.
   if (/^(?:expanded\s+)?(?:sub-?\s?process(?:es)?|eps?)$/.test(w)) {
     const expandedOnly = /^(?:expanded|eps?$)/.test(w);
@@ -276,4 +279,68 @@ export function resolveRef(spoken: string, elements: DiagramElement[], lastAdded
   if (heard.length) return pick(heard.map((e) => e.id));
 
   return null;
+}
+
+/**
+ * R6 — the near misses, for "couldn't find X — did you mean Y?".
+ *
+ * When every pass above fails the user is told the reference did not resolve
+ * and nothing else, which leaves them to guess whether they said the wrong
+ * name, said it right and were misheard, or are looking at the wrong diagram.
+ * The passes had the answer and threw it away: the token-overlap pass computed
+ * a score for every label and discarded everything under its threshold, and
+ * the phonetic pass knows what the words sounded like.
+ *
+ * So this re-runs both at a deliberately looser setting. The looseness is safe
+ * here and nowhere else: these candidates are only ever put in a QUESTION. An
+ * answer this uncertain must not become an action, which is why the thresholds
+ * live here rather than being lowered in `resolveRef` itself.
+ *
+ * Returns at most `max`, best first, never the empty-label elements.
+ */
+export interface NearMiss {
+  id: string;
+  label: string;
+  /** Why it is a candidate — words in common, or it sounds the same. */
+  why: "words" | "sound";
+}
+
+/** Below `resolveRef`'s own 0.5: enough in common to be worth naming. */
+const NEAR_SCORE = 0.25;
+
+export function nearestRefs(
+  spoken: string,
+  elements: DiagramElement[],
+  max = 3,
+): NearMiss[] {
+  const fullTarget = stripArticle(norm(spoken));
+  if (!fullTarget) return [];
+  const target = stripKind(fullTarget);
+  const labelled = elements.filter((e) => (e.label ?? "").trim().length > 0);
+  const want = new Set(tokens(target));
+
+  const scored = new Map<string, { m: NearMiss; score: number }>();
+
+  for (const e of labelled) {
+    const ltoks = tokens(e.label!);
+    if (!ltoks.length || !want.size) continue;
+    const overlap = ltoks.filter((tk) => want.has(tk)).length;
+    if (!overlap) continue;
+    const score = overlap / Math.max(want.size, ltoks.length);
+    if (score < NEAR_SCORE) continue;
+    scored.set(e.id, { m: { id: e.id, label: e.label!, why: "words" }, score });
+  }
+
+  // Two edits rather than one — a question may reach further than an action.
+  for (const e of labelled) {
+    if (scored.has(e.id)) continue;
+    if (soundsLike(fullTarget, e.label!, 2)) {
+      scored.set(e.id, { m: { id: e.id, label: e.label!, why: "sound" }, score: 0.5 });
+    }
+  }
+
+  return [...scored.values()]
+    .sort((a, b) => b.score - a.score || a.m.label.localeCompare(b.m.label))
+    .slice(0, Math.max(0, max))
+    .map((s) => s.m);
 }

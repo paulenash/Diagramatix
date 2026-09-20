@@ -51,6 +51,14 @@ export type AssistOp =
   | { op: "movePoolTo"; ref: Ref; position: "above" | "below"; relativeTo: Ref }
   | { op: "swapPools"; a?: Ref; b?: Ref }
   | { op: "goldFlash"; on: boolean }
+  /**
+   * M3 — set a subtype marker on an element that already has the right shape:
+   * "make this a user task", "make the selected gateway parallel". `subtype` is
+   * the spoken phrase, resolved against the shared subtype table at apply time
+   * (`convertPhrase.ts`) so the vocabulary cannot drift from the right-click
+   * menu offering the same choices.
+   */
+  | { op: "convert"; ref: Ref; subtype: string }
   | { op: "undo" };
 
 // ── Spoken vocabulary → canonical BPMN types ────────────────────────────────
@@ -235,6 +243,13 @@ export function validateOp(raw: unknown): AssistOp | null {
     }
     case "goldFlash":
       return typeof o.on === "boolean" ? { op: "goldFlash", on: o.on } : null;
+    case "convert": {
+      // The subtype is validated against the shared table at apply time, not
+      // here — a phrase the table does not know produces a named refusal in the
+      // log, which is more use than an op vanishing silently.
+      if (!isRef(o.ref) || typeof o.subtype !== "string" || !o.subtype.trim()) return null;
+      return { op: "convert", ref: (o.ref as string).trim(), subtype: o.subtype.trim() };
+    }
     case "undo":
       return { op: "undo" };
     default:

@@ -64,6 +64,9 @@ const FLASHING_OPS: ReadonlySet<AssistOp["op"]> = new Set<AssistOp["op"]>([
   "move", "nudgePool", "moveLane", "swapLanes",
   // renamed
   "rename", "labelSelected",
+  // re-typed (R5 + M3) — "make this a user task" changes the symbol under your
+  // eye without moving it, which is exactly when a pointer is worth having.
+  "convert",
 ]);
 
 /** True when finishing this op should flash the items it touched. */
@@ -133,6 +136,14 @@ export interface FlashBox {
    * "Gold flashing does not work while in Rename tasks").
    */
   label?: string;
+  /**
+   * R5 — the element's SUBTYPE MARKERS, fingerprinted by
+   * `subtypeFingerprint`. "Make this a user task" moves nothing, re-parents
+   * nothing and renames nothing, so without this the diff below finds no
+   * difference and the flash silently does nothing: the rename defect arriving
+   * again through a different door.
+   */
+  marks?: string;
 }
 
 /**
@@ -176,7 +187,10 @@ export function flashTargets(
     // A rename is a change to that item as much as a nudge is, and it is the
     // only one of the two that leaves the geometry alone.
     const renamed = (old.label ?? "") !== (e.label ?? "");
-    if (movedIt || renamed) changed.push(e);
+    // R5 — so is becoming a user task. A subtype change can leave position,
+    // parent and label all identical.
+    const remarked = (old.marks ?? "") !== (e.marks ?? "");
+    if (movedIt || renamed || remarked) changed.push(e);
   }
 
   const chosen = added.length || reparented.length ? [...added, ...reparented] : changed;

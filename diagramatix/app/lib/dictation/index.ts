@@ -29,6 +29,7 @@ export interface DictationCallbacks {
 }
 import { createPcmQueue, PCM_QUEUE_MAX_CHUNKS } from "./pcmQueue";
 import { MAX_DIAGRAM_KEYTERMS } from "./diagramKeyterms";
+import { tokenOutcome, type TokenOutcome } from "./tokenOutcome";
 
 export interface DictationHandle {
   stop(): void;
@@ -108,17 +109,30 @@ export async function startDictation(cb: DictationCallbacks): Promise<DictationH
       ? navigator.mediaDevices.getUserMedia({ audio: true }).catch(() => null)
       : Promise.resolve(null);
 
-  let token: string | null = null;
-  let scheme = "token";   // "bearer" for grant tokens, "token" for API keys
+  // B8 — the three ways this can fail are not the same thing. A 403 is the
+  // org's DECISION that audio must not leave the browser for transcription;
+  // quietly starting a different speech engine defeats it. `tokenOutcome`
+  // holds that distinction, and is pure so it can be tested without a network.
+  let outcome: TokenOutcome;
   try {
     const r = await fetch("/api/ai/dictation/token", { method: "POST" });
-    if (r.ok) {
-      const data = await r.json();
-      token = data?.token ?? null;
-      if (data?.scheme) scheme = data.scheme;
-    }
-  } catch { /* offline / not configured → fall back below */ }
+    const body = await r.json().catch(() => null);
+    outcome = tokenOutcome(r.status, body);
+  } catch {
+    outcome = tokenOutcome(null, null);   // offline → browser engine, said out loud
+  }
 
+  if (outcome.kind === "refused") {
+    // Release the microphone we opened optimistically — nothing is going to
+    // listen through it.
+    (await micPromise)?.getTracks().forEach((t) => t.stop());
+    cb.onError?.(outcome.message);
+    cb.onEnd?.();
+    return null;
+  }
+
+  const token = outcome.kind === "cloud" ? outcome.token : null;
+  const scheme = outcome.kind === "cloud" ? outcome.scheme : "token";
   const engine: "deepgram" | "browser" = token ? "deepgram" : "browser";
   const startedAt = Date.now();
   let reported = false;
@@ -138,7 +152,12 @@ export async function startDictation(cb: DictationCallbacks): Promise<DictationH
     // The browser engine opens its own microphone; release the early one.
     (await micPromise)?.getTracks().forEach((t) => t.stop());
     handle = startBrowserSpeech(metered);
-    if (handle) cb.onReady?.();
+    if (handle) {
+      // Say WHICH engine is listening and why. The bar's "(browser)" suffix
+      // says it is the weaker one; this says what to do about it.
+      if (outcome.kind === "fallback") cb.onError?.(outcome.notice);
+      cb.onReady?.();
+    }
   }
   if (!handle) { report(); return null; }
   return { stop: () => { report(); handle.stop(); } };

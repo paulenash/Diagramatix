@@ -7,6 +7,10 @@ import {
   isBlackBoxPool,
   toggleBlackBoxPoolFlag,
 } from "@/app/lib/diagram/blackBoxPoolMenu";
+import {
+  TASK_OPTS, GATEWAY_OPTS, ROLE_OPTS, SUBPROCESS_OPTS, REPEAT_OPTS,
+  DATA_OBJECT_OPTS, EVENT_OPTS, FLOW_TYPE_OPTS,
+} from "@/app/lib/diagram/elementSubtypes";
 
 /**
  * Right-click "type-picker" menu for tasks, gateways, sub-processes,
@@ -34,65 +38,10 @@ type Section = {
   currentValue: string;
 };
 
-const TASK_OPTS: Opt[] = [
-  { value: "none",          label: "None" },
-  { value: "user",          label: "User" },
-  { value: "service",       label: "Service" },
-  { value: "script",        label: "Script" },
-  { value: "send",          label: "Send" },
-  { value: "receive",       label: "Receive" },
-  { value: "manual",        label: "Manual" },
-  { value: "business-rule", label: "Business Rule" },
-];
-const GATEWAY_OPTS: Opt[] = [
-  { value: "none",        label: "None" },
-  { value: "exclusive",   label: "Exclusive ×" },
-  { value: "inclusive",   label: "Inclusive ○" },
-  { value: "parallel",    label: "Parallel +" },
-  { value: "event-based", label: "Event-based ⬠" },
-];
-const ROLE_OPTS: Opt[] = [
-  { value: "decision", label: "Decision" },
-  { value: "merge",    label: "Merge" },
-];
-const SUBPROCESS_OPTS: Opt[] = [
-  { value: "normal",      label: "Normal" },
-  { value: "call",        label: "Call" },
-  { value: "event",       label: "Event" },
-  { value: "transaction", label: "Transaction" },
-];
-const REPEAT_OPTS: Opt[] = [
-  { value: "none",          label: "None" },
-  { value: "loop",          label: "Loop" },
-  { value: "mi-sequential", label: "MI Sequential" },
-  { value: "mi-parallel",   label: "MI Parallel" },
-];
-const DATA_OBJECT_OPTS: Opt[] = [
-  { value: "none",   label: "None" },
-  { value: "input",  label: "Input" },
-  { value: "output", label: "Output" },
-];
-const EVENT_OPTS: Opt[] = [
-  { value: "none",         label: "None" },
-  { value: "message",      label: "Message" },
-  { value: "timer",        label: "Timer" },
-  { value: "error",        label: "Error" },
-  { value: "signal",       label: "Signal" },
-  { value: "terminate",    label: "Terminate" },
-  { value: "conditional",  label: "Conditional" },
-  { value: "escalation",   label: "Escalation" },
-  { value: "cancel",       label: "Cancel" },
-  { value: "compensation", label: "Compensation" },
-  { value: "link",         label: "Link" },
-];
-// Flow direction — only meaningful for intermediate events. Start events
-// are always catching and end events are always throwing, so they don't
-// get this section.
-const FLOW_TYPE_OPTS: Opt[] = [
-  { value: "none",     label: "None" },
-  { value: "catching", label: "Catching" },
-  { value: "throwing", label: "Throwing" },
-];
+// The option tables live in `app/lib/diagram/elementSubtypes.ts` so the spoken
+// form of this menu ("make this a user task") reads the same rows. A second
+// copy would go stale the first time a subtype was added to one and not the
+// other.
 
 function sectionsFor(kind: ContextMenuKind, el: DiagramElement): Section[] {
   switch (kind) {

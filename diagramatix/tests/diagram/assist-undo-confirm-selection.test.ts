@@ -104,7 +104,13 @@ describe("B1 — a batch sees what it has already done", () => {
 
     const body = callbackBody(editor(), "applyAssistOps");
     expect(body, "a WORKING copy, not a one-time snapshot").toContain("let els: DiagramElement[] = data.elements;");
-    expect(body).toMatch(/voiceLastId\.current = newId;\s*els = withAdded\(els, syntheticElement\(newId/);
+    // The CLAIM is that the newly added element is threaded into the working
+    // copy, not the expression that builds it. R7 (2026-09-20) had to build the
+    // synthetic element one step earlier, so it could be handed to `canConnect`
+    // before the auto-connect, and the add site now names that binding instead
+    // of constructing it inline.
+    expect(body).toMatch(/const addedEl = syntheticElement\(newId/);
+    expect(body).toMatch(/voiceLastId\.current = newId;\s*els = withAdded\(els, addedEl\);/);
     expect(body).toMatch(/deleteElement\(e\.id\);\s*els = withDeleted\(els, e\.id\);/);
     expect(body).toContain("els = withLabel(els, e.id, newLabel);");
     // The resolver reads the working copy AND the selection. (It gained a

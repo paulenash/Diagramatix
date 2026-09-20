@@ -52,7 +52,7 @@ async function main() {
     const anchor = chapter.sections.find((s) => s.heading === ANCHOR);
     const at = anchor?.sortOrder ?? (Math.max(0, ...chapter.sections.map((s) => s.sortOrder)) + 1);
     await prisma.helpSection.updateMany({ where: { chapterId: chapter.id, sortOrder: { gte: at } }, data: { sortOrder: { increment: 1 } } });
-    await prisma.helpSection.create({ data: { chapterId: chapter.id, heading: HEADING, bodyMarkdown: BODY, sortOrder: at } });
+    await prisma.helpSection.create({ data: { chapterId: chapter.id, collection: "user-guide", heading: HEADING, bodyMarkdown: BODY, sortOrder: at } });
     console.log(`Inserted "${HEADING}" at sortOrder ${at}.`);
   } finally {
     await prisma.$disconnect();

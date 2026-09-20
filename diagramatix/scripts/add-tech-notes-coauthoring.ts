@@ -81,7 +81,7 @@ async function main() {
         await prisma.helpSection.update({ where: { id: existing.id }, data: { bodyMarkdown: s.body, sortOrder: i } });
         console.log(`  update "${s.heading}"`);
       } else {
-        await prisma.helpSection.create({ data: { chapterId: chapter.id, heading: s.heading, bodyMarkdown: s.body, sortOrder: i } });
+        await prisma.helpSection.create({ data: { chapterId: chapter.id, collection: COLLECTION, heading: s.heading, bodyMarkdown: s.body, sortOrder: i } });
         console.log(`  insert "${s.heading}"`);
       }
       i++;
