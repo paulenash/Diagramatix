@@ -9,9 +9,10 @@
  * reminder of what can be said (from `commandCatalog.ts`, every example tested
  * to parse); **Cost** asks the editor what this session has cost so far.
  */
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { COMMAND_CATALOG } from "@/app/lib/assist/commandCatalog";
 import { formatCostReport, type CostReport } from "@/app/lib/assist/usageCost";
+import { correctionTally, formatCorrectionTally } from "@/app/lib/assist/correctionPairs";
 
 export interface CommandLogEntry {
   id: string;
@@ -102,6 +103,11 @@ export function VoiceAssistBar({
   };
   const onBarUp = () => { barDrag.current = null; };
   const [cost, setCost] = useState<{ state: "idle" | "loading" | "error"; report: CostReport | null }>({ state: "idle", report: null });
+  // V3, first half: how the session GOT ON, alongside what it cost. Computed
+  // from the log already on screen — nothing is stored, sent or persisted yet.
+  // The split between "misheard" and "rephrased" is the measurement that says
+  // whether a personal phrase book would have anything to learn.
+  const sessionLine = useMemo(() => formatCorrectionTally(correctionTally(log)), [log]);
   const logEnd = useRef<HTMLDivElement | null>(null);
   useEffect(() => { logEnd.current?.scrollIntoView({ block: "end" }); }, [log.length]);
   const submit = () => {
@@ -182,6 +188,22 @@ export function VoiceAssistBar({
             ) : (
               <span className="text-amber-600">couldn’t fetch the cost</span>
             )}
+          </div>
+        )}
+
+        {/* How the session GOT ON — the other half of what it cost you. A
+            command that had to be said twice is a cost the dollar figure does
+            not show. "Misheard" (said again, worked) and "rephrased" (said
+            differently, worked) are different problems: the first is the
+            recogniser's, the second is the grammar's, and only the first is
+            something a personal phrase book could ever learn. That split is
+            what decides whether V3 is worth building. */}
+        {cost.report && sessionLine && (
+          <div
+            className="px-3 py-1.5 border-b border-gray-100 text-[11px] text-gray-500"
+            title="A command that had to be said twice is a cost too. Misheard = said again and it worked (the recogniser); rephrased = said differently and it worked (the grammar)."
+          >
+            {sessionLine}
           </div>
         )}
 

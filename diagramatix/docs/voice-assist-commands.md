@@ -212,6 +212,11 @@ one breath is still the surest way; the hold is the safety net.
   plus microphone minutes at a per-minute Deepgram estimate (the open mic session is counted live; a
   closed one is counted from its usage row). An **estimate** — the provider's invoice is the truth, and
   browser-engine voice is free.
+- Under the cost, **how the session got on**: how many commands, how many did not land, and how many
+  were fixed on a re-try — split into **misheard** (you said it again and it worked, so the recogniser
+  lost the words) and **rephrased** (you said it differently and it worked, so the grammar was short).
+  A command you had to say twice is a cost the dollar figure does not show. Nothing is stored or sent;
+  it is read from the log already on screen.
 
 ## Confirmation and undo
 
