@@ -31,6 +31,13 @@ const HISTORY = [
   join("schema", "SCHEMA_CHANGELOG.md"),
   join("scripts", "sql", "rename-abracadabra-to-voice-assist.sql"),
   join("tests", "config", "voice-assist-rename.test.ts"),
+  // The status documents RECORD the rename — "Abracadabra becomes Voice Assist
+  // everywhere, 301 replacements" is the line in their shipped-commits table.
+  // Same category as a release note: scrubbing the old name out would make the
+  // record unable to say what happened. (This guard caught them in CI, which
+  // is the guard working; the exemption is deliberate, not a workaround.)
+  join("new features", "Voice Assist — Review Plan and Status.md"),
+  join("new features", "voice-assist-plan-updated-2026-09-20.md"),
 ];
 const HISTORY_DIRS = ["audit"];
 const SKIP_DIRS = new Set(["node_modules", ".next", ".git", "generated", "scratchpad"]);

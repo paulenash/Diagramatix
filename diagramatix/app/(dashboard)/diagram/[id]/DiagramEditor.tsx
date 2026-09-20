@@ -3190,9 +3190,23 @@ export function DiagramEditor({
       }
 
       if (op.op === "moveLane") {
+        // B5, the half the grammar cannot decide. "move Pick Line up" is a lane
+        // move if there is a lane called "Pick", and an element move if what
+        // exists is a task called "Pick Line" — and only the diagram knows
+        // which. The grammar guesses lane because the recogniser spells "lane"
+        // as "line"; when that guess turns out to be wrong, move the element
+        // the user actually named rather than telling them it "isn't a lane".
         const r = resolve1(op.ref);
         if ("err" in r) { results.push(r.err); anyFail = true; continue; }
-        if (r.type !== "lane") { results.push(`${nameOf(r)} isn't a lane`); anyFail = true; continue; }
+        if (r.type !== "lane") {
+          const dy = (op.distance ?? 32) * (op.direction === "down" ? 1 : -1);
+          moveElements([r.id], 0, dy);
+          elementsMoveEnd();
+          voiceLastId.current = r.id;
+          setSelectedElementIds(new Set()); // selection protocol
+          results.push(`moved ${nameOf(r)} ${op.direction}`);
+          continue;
+        }
         const sibs = els.filter((e) => e.type === "lane" && e.parentId === r.parentId).sort((a, b) => a.y - b.y);
         const i = sibs.findIndex((s) => s.id === r.id);
         const toward = op.direction === "down" ? sibs[i + 1] : sibs[i - 1];

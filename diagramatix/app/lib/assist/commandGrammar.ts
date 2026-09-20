@@ -5,6 +5,7 @@
  */
 import type { AssistOp } from "./ops";
 import { SYMBOL_SYNONYMS, SYMBOL_PHRASES } from "./ops";
+import { namesNonContainerKind, laneWordIsAttached, looksPositionalNotAName } from "./greedyGuards";
 import { parseRenameType } from "./renameTargets";
 import { repairSelectedWord, repairTurnWord } from "./selectedWord";
 import { capitaliseFirstWord } from "./nameCase";
@@ -167,7 +168,11 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     // Aliases: compress · collapse · shrink · reduce · shorten · compact
     //          (+ tighten · condense · minimise/minimize).
     let mc = raw.match(new RegExp(`^(?:compress|collapse|shrink|reduce|shorten|compact|tighten|condense|minimise|minimize)\\s+(?:the\\s+)?(?:${P}\\s+)?(.+?)(?:\\s+${P})?$`, "i"));
-    if (mc) return [{ op: "compressPool", poolRef: clean(mc[1]) }];
+    // B5: the pool word is optional on BOTH sides, so this reduces to "any
+    // word after collapse". Decline when the ref plainly names something else
+    // — "collapse the subprocess" is an EP collapse, and saying so is the AI's
+    // job, not this rule's.
+    if (mc && !namesNonContainerKind(mc[1])) return [{ op: "compressPool", poolRef: clean(mc[1]) }];
 
     // Swap two named lanes: "swap lane A with lane B" / "swap A and B".
     // (resolveRef strips a leading "lane"/"pool" kind word, so keep the raw ref.)
@@ -185,7 +190,11 @@ export function parseCommand(utterance: string): AssistOp[] | null {
       if (a !== b) return [{ op: "swapGatewayPoints", a, b }];
     }
     let mm = raw.match(new RegExp(`^swap\\s+(.+?)\\s+(?:with|and|for|<->|<>)\\s+(.+)$`, "i"));
-    if (mm) return [{ op: "swapLanes", laneA: clean(mm[1]), laneB: clean(mm[2]) }];
+    // B5: nothing here requires either side to be a lane, so "swap Task A with
+    // Task B" became a lane swap and failed. Decline and let the AI have it.
+    if (mm && !namesNonContainerKind(mm[1]) && !namesNonContainerKind(mm[2])) {
+      return [{ op: "swapLanes", laneA: clean(mm[1]), laneB: clean(mm[2]) }];
+    }
 
     // Insert a lane above/below a reference lane: "add a lane above/below Lane X".
     mm = raw.match(new RegExp(`^(?:add|insert|create)\\s+(?:a\\s+)?(?:new\\s+)?${L}\\s+(?:to\\s+(?:the\\s+)?(.+?)\\s+)?(above|below|under(?:neath)?|over|before|after)\\s+(?:the\\s+)?(.+?)(?:\\s+(?:called|named|labell?ed)\\s+(.+))?$`, "i"));
@@ -312,9 +321,14 @@ export function parseCommand(utterance: string): AssistOp[] | null {
       // Keep a leading "lane" in the ref (so "lane 2" stays "lane 2" and
       // resolveRef matches it whole); only a TRAILING "lane" ("Sales lane") is
       // stripped here.
-      const mlane = raw.match(new RegExp(`^(?:move|nudge|bump|shift|slide|inch)\\s+(?:the\\s+)?(.+?)(?:\\s+${L})?\\s+(up|down)(?:\\s+by\\s+(\\d+)\\s*(?:px|pixels?)?)?$`, "i"));
-      if (mlane) {
-        return [{ op: "moveLane", ref: clean(mlane[1]), direction: mlane[2].toLowerCase() as "up" | "down", ...(mlane[3] ? { distance: Number(mlane[3]) } : {}) }];
+      const mlane = raw.match(new RegExp(`^(?:move|nudge|bump|shift|slide|inch)\\s+(?:the\\s+)?(.+?)(\\s+${L})?\\s+(up|down)(?:\\s+by\\s+(\\d+)\\s*(?:px|pixels?)?)?$`, "i"));
+      // B5: the guard above only asks whether a lane-ish word appears ANYWHERE
+      // in the sentence, and "lane" is spelled (?:lanes?|lines?) because the
+      // recogniser mishears it — so "move the Assembly LINE task up" came in
+      // here and failed as "isn't a lane". The word has to be ATTACHED to the
+      // thing being moved: leading ("lane 2") or trailing ("Sales lane").
+      if (mlane && laneWordIsAttached(mlane[1], !!mlane[2])) {
+        return [{ op: "moveLane", ref: clean(mlane[1]), direction: mlane[3].toLowerCase() as "up" | "down", ...(mlane[4] ? { distance: Number(mlane[4]) } : {}) }];
       }
     }
 
@@ -434,6 +448,12 @@ export function parseCommand(utterance: string): AssistOp[] | null {
         const leftover = clean(stripArticle(rest.toLowerCase().replace(sym.phrase, " ").replace(/\s+/g, " ")));
         if (leftover) label = clean(rest.replace(new RegExp(sym.phrase, "i"), "").replace(/^(a|an|the)\s+/i, "").trim());
       }
+      // B5: the leftover after the type word became the label, so "insert a
+      // parallel gateway between Check Stock and Pick Items" made a gateway
+      // NAMED "between Check Stock and Pick Items". A positional phrase is a
+      // relationship, not a name — decline, and the AI can place it. Only
+      // implicit labels: an explicit "called …" is the user's own words.
+      if (label && !named && !quoted && looksPositionalNotAName(label)) return null;
       const op: AssistOp = { op: "add", symbolType: sym.symbolType };
       if (sym.eventType) op.eventType = sym.eventType;
       if (sym.gatewayType) op.gatewayType = sym.gatewayType;
@@ -443,7 +463,9 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     }
     // "add Approve after Review" — no type word → a task named by the rest.
     if (rest) {
-      const op: AssistOp = { op: "add", symbolType: "task", label: label ?? clean(stripArticle(rest)) };
+      const implicit = label ?? clean(stripArticle(rest));
+      if (!named && !quoted && looksPositionalNotAName(implicit)) return null;
+      const op: AssistOp = { op: "add", symbolType: "task", label: implicit };
       if (afterRef) op.afterRef = afterRef;
       return [op];
     }
