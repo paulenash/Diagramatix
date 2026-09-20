@@ -60,6 +60,7 @@ import { syntheticElement, withAdded, withDeleted, withLabel } from "@/app/lib/a
 import { needsConfirmation, parseConfirmation } from "@/app/lib/assist/confirm";
 import { collectRenameTargets, type RenameType, type RenameTarget } from "@/app/lib/assist/renameTargets";
 import { buildPickFlow, parsePickAnswer, substituteRef, type PickFlow } from "@/app/lib/assist/disambiguate";
+import { diagramKeyterms } from "@/app/lib/dictation/diagramKeyterms";
 import { VoiceAssistBar, type CommandLogEntry } from "@/app/components/canvas/VoiceAssistBar";
 import { startDictation, type DictationHandle } from "@/app/lib/dictation";
 import { PropertiesPanel } from "@/app/components/canvas/PropertiesPanel";
@@ -1327,6 +1328,10 @@ export function DiagramEditor({
   // in-flight AI call read the selection at the moment they apply.
   const selectedIdsRef = useRef<string[]>([]);
   selectedIdsRef.current = [...selectedElementIds];
+  // Always-fresh element list, for callbacks that must not rebuild on every
+  // edit — the mic opener reads it to build V1's keyterms at OPEN time.
+  const elementsRef = useRef(data.elements);
+  elementsRef.current = data.elements;
   const [selectedConnectorId, setSelectedConnectorId] = useState<string | null>(null);
   // The selected connector as the command interpreter sees it ("label selected Yes").
   const selectedConnectorIdRef = useRef<string | null>(null);
@@ -3744,6 +3749,11 @@ export function DiagramEditor({
     setVoiceListening(true);
     setAbraConnecting(true);
     const handle = await startDictation({
+      // V1: bias the recogniser toward the names on THIS diagram. Computed at
+      // OPEN because Deepgram fixes its keyword list when the socket opens —
+      // which is also why the number-word elevation cannot live here and sits
+      // in the pick handler instead.
+      keyterms: diagramKeyterms(elementsRef.current.map((e) => e.label)),
       onEngine: (e) => setAbraEngine(e),
       onReady: () => setAbraConnecting(false),
       // Show the command building: buffered fragments + the in-progress words.

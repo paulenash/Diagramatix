@@ -20,8 +20,15 @@ export interface DictationCallbacks {
   /** The recogniser is live — audio from now on is heard. Before this the UI
    *  should say "connecting…", not "listening…". */
   onReady?: () => void;
+  /**
+   * V1: names from THIS diagram, to bias recognition toward the proper nouns
+   * the user is about to say. Sent UNBOOSTED and filtered by
+   * `diagramKeyterms` — see that module for why the timidity is deliberate.
+   */
+  keyterms?: readonly string[];
 }
 import { createPcmQueue, PCM_QUEUE_MAX_CHUNKS } from "./pcmQueue";
+import { MAX_DIAGRAM_KEYTERMS } from "./diagramKeyterms";
 
 export interface DictationHandle {
   stop(): void;
@@ -186,6 +193,12 @@ async function startDeepgram(token: string, scheme: string, cb: DictationCallbac
     "selected:3", "selection:2",
     "boundary", "connect", "rename", "delete", "compact", "Voice Assist"]) {
     params.append("keywords", kw);
+  }
+  // V1: this diagram's own names, after the command words and WITHOUT a boost
+  // suffix. The caller has already filtered them (diagramKeyterms); the cap is
+  // applied again here so a careless caller cannot drown the command words.
+  for (const term of (cb.keyterms ?? []).slice(0, MAX_DIAGRAM_KEYTERMS)) {
+    if (term.trim()) params.append("keywords", term.trim());
   }
   const ws = new WebSocket(`wss://api.deepgram.com/v1/listen?${params.toString()}`, [scheme, token]);
   ws.binaryType = "arraybuffer";

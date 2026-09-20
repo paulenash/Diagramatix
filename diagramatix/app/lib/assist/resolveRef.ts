@@ -5,6 +5,7 @@
  */
 import type { DiagramElement } from "../diagram/types";
 import { SYMBOL_SYNONYMS, SYMBOL_PHRASES } from "./ops";
+import { phoneticMatches } from "./phonetic";
 
 export type RefResolution = { id: string } | { ambiguous: string[] } | null;
 
@@ -236,14 +237,43 @@ export function resolveRef(spoken: string, elements: DiagramElement[], lastAdded
   if (contains.length) return pick(contains.map((e) => e.id));
 
   // 3. Token overlap — best-scoring label if it clears a threshold.
+  //
+  //    A TIE used to be settled by document order, silently: "shop order"
+  //    scores 0.5 against both "Back Order" and "Ship Order", and whichever
+  //    came first won. That is a guess wearing a green tick. Ties now ask the
+  //    SOUND first — which is what the user got wrong — and failing that
+  //    report the ambiguity, which raises the picker.
   const want = new Set(tokens(target));
-  let best: { id: string; score: number } | null = null;
+  let bestScore = 0;
+  let bestIds: string[] = [];
   for (const e of labelled) {
     const ltoks = tokens(e.label!);
     if (ltoks.length === 0) continue;
     const overlap = ltoks.filter((tk) => want.has(tk)).length;
     const score = overlap / Math.max(want.size, ltoks.length);
-    if (score >= 0.5 && (!best || score > best.score)) best = { id: e.id, score };
+    if (score < 0.5) continue;
+    if (score > bestScore) { bestScore = score; bestIds = [e.id]; }
+    else if (score === bestScore) bestIds.push(e.id);
   }
-  return best ? { id: best.id } : null;
+  if (bestIds.length === 1) return { id: bestIds[0] };
+  if (bestIds.length > 1) {
+    const tied = labelled.filter((e) => bestIds.includes(e.id));
+    const heard = phoneticMatches(fullTarget, tied, (e) => e.label ?? undefined);
+    if (heard.length === 1) return { id: heard[0].id };
+    return pick(bestIds);
+  }
+
+  // 4. V2 — how it SOUNDS. Last, and only for what the passes above cannot
+  //    reach: a single mis-heard word ("escalade" → Escalate), or a word the
+  //    recogniser split or joined ("where house" → Warehouse). Multi-word
+  //    mis-hears are already handled by the token overlap above, because one
+  //    word of two is usually heard correctly.
+  //
+  //    Several labels sounding alike returns AMBIGUOUS rather than a guess,
+  //    which raises the picker — sounding similar is exactly when the user
+  //    should be the one to choose.
+  const heard = phoneticMatches(fullTarget, labelled, (e) => e.label ?? undefined);
+  if (heard.length) return pick(heard.map((e) => e.id));
+
+  return null;
 }
