@@ -140,6 +140,27 @@ Examples: "rename the selected pool to Customer" · "delete these" · "connect t
 - Both take the same phrasings as the subprocess wrap, and both accept what the
   recogniser usually returns instead: "poll"/"pull" for pool, "line" for lane.
 
+## Align, and take a suggestion (21 September 2026)
+
+- **"align these"** — tidies the selection, the same as the Alignment ▾ menu's
+  smart option. Also **"align these in a row"** (one horizontal line),
+  **"line these up in a column"**, and the four edges: **"align their left
+  edges"**, right, tops, bottoms.
+  - **"align these horizontally" is not accepted**, on purpose. Half of people
+    mean "lay them along a horizontal line" and half mean "move them
+    horizontally"; rather than be wrong half the time with a green tick, it
+    goes to the AI, which can ask. Say a row, a column, or an edge.
+  - *"Space these evenly"* and *"same size as this"* are **not** built — those
+    reducers do not exist yet, and distributing badly is worse than not
+    distributing, because it looks finished.
+- **"accept the suggestion"** — takes the 👻 Assist ghost, the same as pressing
+  **Tab**. Also **"take the gateway"** (by what it is), **"take the second
+  one"**, **"accept ghost 2"**. Needs Assist on and one element selected.
+  - **"Yes" is not an accept word.** It already means *go ahead* for a parked
+    destructive command, and a word that changes meaning depending on whether a
+    ghost happens to be showing is how a diagram gets cleared by accident.
+  - A bare number is left alone too — that answers a numbered pick.
+
 ## Fill the selection, and point instead of naming (21 September 2026)
 
 **Say several things at once.** Select a group, then:

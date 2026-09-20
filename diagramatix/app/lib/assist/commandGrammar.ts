@@ -10,6 +10,8 @@ import { parseRenameType } from "./renameTargets";
 import { repairSelectedWord, repairTurnWord } from "./selectedWord";
 import { capitaliseFirstWord } from "./nameCase";
 import { convertMatches } from "./convertPhrase";
+import { parseAlignTail } from "./alignPhrase";
+import { parseGhostPick } from "./ghostPick";
 import type { SymbolType, EventType, GatewayType } from "../diagram/types";
 
 const clean = (s: string) => s.trim().replace(/[.,!?;:]+$/g, "").replace(/^["'“”‘’]+|["'“”‘’]+$/g, "").trim();
@@ -105,6 +107,37 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   if (m) return [{ op: "connect", fromRef: clean(m[1]), toRef: clean(m[2]) }];
   m = raw.match(/^(.+?)\s+(?:goes to|flows to|connects to|then goes to|leads to)\s+(.+)$/i);
   if (m) return [{ op: "connect", fromRef: clean(m[1]), toRef: clean(m[2]) }];
+
+  // ── Take a ghost suggestion (M8) ──
+  // Before everything, because every form names the ACT of accepting and none
+  // of them is an ordinary command. "Add a gateway" stays an add; "take the
+  // gateway" is a pick. "Yes" is deliberately NOT here — it already confirms a
+  // parked destructive command, and a word that means two things depending on
+  // whether a ghost happens to be showing is how you clear a diagram by
+  // accident.
+  {
+    const g = parseGhostPick(raw);
+    if (g) return [{ op: "acceptGhost", pick: clean(raw) }];
+  }
+
+  // ── Align the selection (M7) ──
+  // The reducer has done this all along, driven by the Alignment ▾ menu; only
+  // the way to say it was missing. A BARE AXIS WORD is refused rather than
+  // guessed: "align these horizontally" means "lay them along a horizontal
+  // line" to some people and "move them horizontally" to others, and a coin
+  // toss on every utterance is worse than asking.
+  {
+    // "their" counts as a selection word here — "align their left edges" is
+    // natural English and can only mean the selection, since align takes no
+    // other kind of target.
+    const a = raw.match(/^(?:align|line\s+up|straighten)\s+(these|those|them|their|the selection|the selected(?:\s+\w+s?)?)\s*(.*)$/i)
+      ?? raw.match(/^(?:line|straighten)\s+(these|those|them)\s+(up.*)$/i);
+    if (a) {
+      const parsed = parseAlignTail(a[2] ?? "");
+      if (parsed?.kind === "align") return [{ op: "alignSelection", mode: parsed.mode }];
+      if (parsed?.kind === "ambiguous-axis") return null;   // → the AI can ask
+    }
+  }
 
   // ── Fill the selection (M4) ──
   // Before Convert and Rename: "name these A, B and C" must not be read as a

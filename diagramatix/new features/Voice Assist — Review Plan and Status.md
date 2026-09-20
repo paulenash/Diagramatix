@@ -1,7 +1,7 @@
 # Voice Assist — review plan and status
 
 > **SUPERSEDED 2026-09-20** by
-> [`voice-assist-plan-updated-2026-09-20.md`](./voice-assist-plan-updated-2026-09-20.md),
+> [`voice-assist-plan-updated-2026-09-21.md`](./voice-assist-plan-updated-2026-09-21.md),
 > which is the current plan. This file is kept as the record of what the plan
 > looked like before that pass — B5, R2's picker, V1 and V2 were all still open
 > when it was written, and the fallback still ran on the generation model.

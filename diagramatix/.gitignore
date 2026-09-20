@@ -55,7 +55,7 @@ next-env.d.ts
 # transcripts; scanned before being added here.
 !/new features/Abracadabra — Review Plan and Status.md
 !/new features/Voice Assist — Review Plan and Status.md
-!/new features/voice-assist-plan-updated-2026-09-20.md
+!/new features/voice-assist-plan-updated-2026-09-21.md
 
 # The GETAI partner-API plan. The FOLDER has to be un-ignored before a file
 # inside it can be — git cannot re-include a file whose parent directory is

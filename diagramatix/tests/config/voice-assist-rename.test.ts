@@ -37,7 +37,7 @@ const HISTORY = [
   // record unable to say what happened. (This guard caught them in CI, which
   // is the guard working; the exemption is deliberate, not a workaround.)
   join("new features", "Voice Assist — Review Plan and Status.md"),
-  join("new features", "voice-assist-plan-updated-2026-09-20.md"),
+  join("new features", "voice-assist-plan-updated-2026-09-21.md"),
 ];
 const HISTORY_DIRS = ["audit"];
 const SKIP_DIRS = new Set(["node_modules", ".next", ".git", "generated", "scratchpad"]);

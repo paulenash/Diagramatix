@@ -52,6 +52,7 @@ import { convertMatches, matchesForType } from "@/app/lib/assist/convertPhrase";
 import { subtypeFingerprint } from "@/app/lib/diagram/elementSubtypes";
 import { planLabelFill } from "@/app/lib/assist/fillSelection";
 import { findRiskCatalogItem } from "@/app/lib/assist/riskCatalogRef";
+import { parseGhostPick, resolveGhostPick } from "@/app/lib/assist/ghostPick";
 import { isMicStopWord, isFlowEndWord } from "@/app/lib/assist/stopWords";
 import { isIncompleteCommand } from "@/app/lib/assist/incompleteCommand";
 import { leadingSpokenNumber } from "@/app/lib/assist/spokenNumber";
@@ -2767,6 +2768,12 @@ export function DiagramEditor({
     }));
   }, []);
   const nameOf = (e: DiagramElement) => (e.label?.trim() || e.type);
+  /** M7 — how the log says what an align just did. */
+  const ALIGN_LABEL: Record<string, string> = {
+    smart: "tidily", center: "into a row", vcenter: "into a column",
+    left: "on their left edges", right: "on their right edges",
+    top: "on their top edges", bottom: "on their bottom edges",
+  };
 
   // Apply one interpreted op via the granular (undoable) reducer helpers.
   const applyAssistOps = useCallback((incoming: AssistOp[]): { ok: boolean; summary: string } => {
@@ -3446,6 +3453,38 @@ export function DiagramEditor({
           results.push("err" in e ? e.err : `couldn't rename “${op.ref}”`);
           anyFail = true;
         }
+        continue;
+      }
+
+      // M7 — align the selection, the same dispatch the Alignment ▾ menu makes.
+      if (op.op === "alignSelection") {
+        const ids = selectedIds.filter((id) => els.some((e) => e.id === id));
+        if (ids.length < 2) { results.push("select two or more elements to align"); anyFail = true; continue; }
+        alignElements(ids, op.mode);
+        setSelectedElementIds(new Set());
+        results.push(`aligned ${ids.length} elements ${ALIGN_LABEL[op.mode]}`);
+        continue;
+      }
+
+      // M8 — take a ghost suggestion. The candidates are live editor state, so
+      // the pick is resolved here rather than in the grammar.
+      if (op.op === "acceptGhost") {
+        const cands = nextStepRef.current.candidates;
+        if (!cands.length) {
+          results.push(selectedIds.length === 0
+            ? "no suggestion showing — select an element with Assist on"
+            : "no suggestion showing for that element");
+          anyFail = true; continue;
+        }
+        const idx = resolveGhostPick(parseGhostPick(op.pick), cands);
+        if (idx === null) {
+          // The ghosts are translucent and easy to misread, so naming what IS
+          // on offer is more use than saying the pick was not one of them.
+          results.push(`that isn't on offer — ${cands.map((c) => c.label).join(", ")}`);
+          anyFail = true; continue;
+        }
+        nextStepRef.current.accept(cands[idx]);
+        results.push(`accepted the ${cands[idx].label} suggestion`);
         continue;
       }
 

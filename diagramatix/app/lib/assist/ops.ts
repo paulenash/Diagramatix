@@ -72,6 +72,13 @@ export type AssistOp =
   | { op: "fillLabels"; labels: string[] }
   | { op: "assignTeam"; team: string }
   | { op: "attachRiskControl"; ref: string }
+  /** M7 — align the SELECTED elements, the same seven modes the Alignment ▾
+   *  menu offers. Distribute and "same size" are not here: those reducers do
+   *  not exist, and distributing badly is worse than not distributing. */
+  | { op: "alignSelection"; mode: "smart" | "center" | "vcenter" | "left" | "right" | "top" | "bottom" }
+  /** M8 — take a ghost suggestion. `pick` is the spoken phrase, resolved
+   *  against the live candidates at apply time (`ghostPick.ts`). */
+  | { op: "acceptGhost"; pick: string }
   | { op: "undo" };
 
 // ── Spoken vocabulary → canonical BPMN types ────────────────────────────────
@@ -267,6 +274,14 @@ export function validateOp(raw: unknown): AssistOp | null {
       return isRef(o.team) ? { op: "assignTeam", team: (o.team as string).trim() } : null;
     case "attachRiskControl":
       return isRef(o.ref) ? { op: "attachRiskControl", ref: (o.ref as string).trim() } : null;
+    case "alignSelection": {
+      const MODES = new Set(["smart", "center", "vcenter", "left", "right", "top", "bottom"]);
+      return isRef(o.mode) && MODES.has(o.mode as string)
+        ? { op: "alignSelection", mode: o.mode as "smart" }
+        : null;
+    }
+    case "acceptGhost":
+      return { op: "acceptGhost", pick: isRef(o.pick) ? (o.pick as string).trim() : "" };
     case "convert": {
       // The subtype is validated against the shared table at apply time, not
       // here — a phrase the table does not know produces a named refusal in the

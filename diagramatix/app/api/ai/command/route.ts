@@ -48,7 +48,9 @@ Canonical forms:
   add a <type> called <name> after <name>   ·   connect <name> to <name>   ·   disconnect <name> from <name>
   rename <name> to <name>   ·   move <name> <n> elements <left|right|up|down>
   delete <name>   ·   delete <name> and compact   ·   add a boundary event called <name> to <name>
-  add a pool   ·   add a black-box pool above|below existing pools   ·   put a pool around everything (wraps loose elements)
+  add a pool   ·   add a black-box pool above|below existing pools   ·   add a pool called <name> above|below <pool>   ·   put a pool around everything (wraps loose elements)
+  align these (tidily)   ·   align these in a row   ·   align these in a column   ·   align their left edges
+  accept the suggestion   ·   take the <type>   ·   take the second one
   add <n> lanes to <pool> called <A, B and C>   ·   add a lane above|below <lane>   ·   add <n> sublanes to <lane> called <A, B and C>   ·   swap <lane> with <lane>
   compress <pool>   ·   extend the pools to include all elements   ·   nudge <name> up|down|left|right (20px; "nudge these left" for the selection)   ·   move these right (the selection, 100px per step)   ·   again
   swap top and bottom (the SELECTED gateway's connection points — any pair of top|bottom|middle|left|right; NOT a lane swap unless two lane NAMES are given)
@@ -74,7 +76,14 @@ Op shapes (use element NAMES for refs — they are resolved against the diagram;
   { "op":"move", "ref": <name>, "direction": "left"|"right"|"up"|"down", "count"?: number }
   { "op":"wrapInPool", "label"?: string }                 // put a pool around all un-pooled elements
   { "op":"addBoundary", "hostRef": <name>, "label"?: string, "eventType"?: "error"|"timer"|"message"|... }  // boundary event on a task/subprocess
-  { "op":"addPool", "label"?: string, "poolType"?: "black-box"|"white-box", "position"?: "above"|"below" }  // new pool
+  { "op":"addPool", "label"?: string, "poolType"?: "black-box"|"white-box", "position"?: "above"|"below", "relativeTo"?: <pool name> }
+        // B7: "relativeTo" is the pool the new one goes above or below. WITHOUT it "position" has no anchor and the
+        // pool lands relative to the existing stack, which is rarely what was asked. Always send it when a pool is named.
+  { "op":"alignSelection", "mode": "smart"|"center"|"vcenter"|"left"|"right"|"top"|"bottom" }  // align the SELECTED
+        // elements. "center" = one horizontal line (a row); "vcenter" = one vertical line (a column); "smart" tidies.
+        // If the user says only "align these horizontally", ASK which they mean — it means both things to people.
+  { "op":"acceptGhost", "pick"?: string }  // take an Assist ghost suggestion ("accept", "take the gateway",
+        // "the second one"). Only when a suggestion is showing; do NOT use it to add an element.
   { "op":"addLanes", "poolRef": <name>, "labels": [string,…] }      // N equal named lanes in a pool
   { "op":"addLaneAt", "poolRef": <name>, "position": "above"|"below", "refLane": <name>, "label"?: string }  // insert a lane by a ref lane
   { "op":"addSublanes", "laneRef": <name>, "labels": [string,…] }   // N equal named sublanes in a lane

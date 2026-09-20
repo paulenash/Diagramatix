@@ -1,6 +1,6 @@
-# Voice Assist — updated plan, 20 September 2026
+# Voice Assist — updated plan, 21 September 2026
 
-**Status as at 2026-09-20** — read from the repository and the commit history,
+**Status as at 2026-09-21** — read from the repository and the commit history,
 not from memory, so this file never claims more or less than the code contains.
 
 This supersedes `Voice Assist — Review Plan and Status.md`, which is kept as the
@@ -27,7 +27,7 @@ is reproduced verbatim in the appendix, so every item can still be cited by id.
 | **The disambiguation picker** (R2b) | **SHIPPED** `8e1f13fd` |
 | **Diagram names fed to the recogniser** (V1) | **SHIPPED** `2b30eefc` |
 | **Phonetic reference matching** (V2) | **SHIPPED** `2b30eefc` |
-| **AI prompt op list** (B7) | **PARTIAL** `8c370014` — `renameByType` added; `addPool.relativeTo` still missing |
+| **AI prompt op list** (B7) | **SHIPPED** `8c370014`, completed 21 Sep — `renameByType`, then `addPool.relativeTo` so "above" has an anchor |
 | **Tests for the untested half** (D3) | **PARTIAL** — pure modules extracted and covered; no `apply.ts`, no mocked-client route test |
 | **Release-log entries** (D2) | **SHIPPED** `496969a8` — twelve entries covering the 72 commits since `a49a8006` |
 | **Dead sub-lane checks** (B6) | **SHIPPED** `496969a8` — one rule in `laneKind.ts`, five call sites |
@@ -40,7 +40,9 @@ is reproduced verbatim in the appendix, so every item can still be cited by id.
 | **Convert in place** (M3) | **SHIPPED** `496969a8` — the menu's own subtype table, said out loud |
 | **Fill the selection** (M4) | **SHIPPED** `2fe89dcb` — names in reading order, simulation team, Risk/Control attach |
 | **Pointer as a reference** (M5) | **SHIPPED** `2fe89dcb` — "here" places at the mouse; "the one under the cursor" resolves to it. See the note on "connect this to that" below |
-| **Marquee, tidy, ghost, properties** (M6–M9) | **not started** |
+| **Align the selection** (M7, the align half) | **SHIPPED** 21 Sep — the Alignment ▾ menu's seven modes, said out loud. Distribute and "same size" are NOT built: those reducers do not exist |
+| **Ghost + voice** (M8) | **SHIPPED** 21 Sep — "accept the suggestion", by position or by kind. "Yes" deliberately left to the confirmation flow |
+| **Marquee, properties** (M6, M9) | **not started** |
 | **Personal phrase book** (V3) | **HALF** `1da089b4` — the measurement ships; the phrase book itself waits on it (see below) |
 | **Publish the guide, tech-notes and feature rows** (D1) | **SHIPPED** `496969a8` — **run on production by Paul, 2026-09-20.** Verified from the public `/features` page: both rows published with the September wording, zero occurrences of the old name |
 | **Delivered from live use** (L1–L10) | **SHIPPED** — never in the backlog; added to it afterwards so the plan is a complete record |
@@ -91,6 +93,39 @@ any list:
 - A bare quoted name is not an escape hatch — `clean()` strips the trailing
   quote before the quoted-name branch runs, so `called …` is the only one. Left
   as it is (you cannot say quote marks) but now recorded.
+
+---
+
+## Also on 21 September — M7's align half, M8, and B7
+
+Three items that are all the M3 shape: the machinery existed, only the way to
+reach it was missing. Together they close **every defect (B1–B8)** and **every
+reliability item (R1–R7)** except R8.
+
+- **M7 (align).** `ALIGN_ELEMENTS` has driven the Alignment ▾ menu all along, so
+  "align these" is grammar plus a dispatch. The plan's note that no
+  align/distribute reducers exist was written before that landed and is stale.
+  **A bare axis word is refused rather than guessed:** "align these
+  horizontally" means *lay them along a horizontal line* to some people and
+  *move them horizontally* to others, so the parser declines and the AI can
+  ask. Say a row, a column, or an edge.
+  *Not built:* "space these evenly" and "same size as this" — those reducers
+  really do not exist, and distributing badly is worse than not distributing,
+  because it looks finished.
+- **M8 (ghost).** `acceptNextStep` was already exposed through a ref the voice
+  layer could read. **"Yes" is deliberately not an accept word** — it already
+  confirms a parked destructive command, and a word that changes meaning
+  depending on whether a ghost happens to be showing is how a diagram gets
+  cleared by accident. A bare number is left alone too, because it answers a
+  numbered pick.
+- **B7.** `addPool.relativeTo` was in the op type and the apply branch the whole
+  time; the AI prompt never mentioned it, so the model could say *above* with
+  nowhere to put the anchor and the pool landed relative to the existing stack.
+
+One guard was added that is not about any of them: **T4600 checks every op in
+the union has a `validateOp` case.** An op added to the union and the grammar
+but not the validator works when typed and vanishes when the AI returns it —
+a failure that shows only on the expensive path, and only sometimes.
 
 ---
 
@@ -153,28 +188,25 @@ the cursor"**. T4595 pins this so it cannot be quietly undone.
 ## What to do next, in order
 
 Paul's list of 20 September was D1, D2, B8, M3, R7, B6, R5/R6 and V3 — all done,
-and D1 was run on production on the 20th. M4 and M5 followed on the 21st. What
-is left:
+and D1 was run on production on the 20th. M4, M5, M7's align half, M8 and B7's
+remainder followed on the 21st. Every defect (B1–B8) and every reliability item
+(R1–R7) is now closed. What is left:
 
-1. **M8 — ghost + voice.** The cheapest thing on the list: `acceptNextStep`
-   exists and is already exposed through a ref the voice layer can reach, so
-   this is grammar plus a reference.
-2. **M7's align half.** "Align these" is grammar-only — `ALIGN_ELEMENTS` already
-   exists with seven modes including `smart`. (The plan's note that no
-   align/distribute reducers exist is stale.) "Space these evenly" and "same
-   size as this" still need reducers.
-3. **B7's remainder** — `addPool.relativeTo` is still missing from the AI prompt
-   op list, so the model can say *above* or *below* with nowhere to put the
-   anchor.
-4. **R8 — scanner feedback per command.** Run `checkDiagram` on the new state
-   and append "+N issues" to the log line. The last of the R family, and the
-   only one with a real design question: whether to report every violation or
-   only those touching the ids this command changed.
-5. **M6, M9** — marquee (needs M5's plumbing, now landed) and properties-panel
-   context. **M9 last regardless of value**: letting bare fragments become
-   commands is how the parser starts guessing, and that cost a session once
-   already (B5).
-6. **V3's second half — the phrase book itself.** Gated on its own measurement
+1. **R8 — scanner feedback per command.** Run `checkDiagram` on the new state
+   and append "+N issues" to the log line. **The last of the R family, and the
+   only remaining item with a real design question:** whether to report every
+   violation or only those touching the ids this command changed. Reporting
+   pre-existing problems after every unrelated command is noise; the gold flash
+   already knows what a command touched, so the second option is cheap.
+2. **M7's other two thirds** — "space these evenly" and "same size as this".
+   These genuinely need new reducers, unlike the align half.
+3. **M6** — marquee + voice. M5's pointer plumbing has now landed, which was
+   its blocker.
+4. **M9** — properties-panel context. **Last regardless of value:** letting bare
+   fragments become commands is how the parser starts guessing, and that cost a
+   session once already (B5). It would need those guards designed in, not
+   retrofitted.
+5. **V3's second half — the phrase book itself.** Gated on its own measurement
    (below), not on effort.
 
 Deferred deliberately: C1–C4, C6–C8 and C10 are capability extensions rather
@@ -264,6 +296,248 @@ an idempotent SQL file for the in-app database tile rather than a script run:
 
 Already run by Paul via the database tile: the Suggestion chip's SQL, and
 `rename-abracadabra-to-voice-assist.sql`.
+
+---
+
+## The walkthrough — a current script (~2 hours)
+
+The appendix still carries the 14 September script. **Do not use it.** Most of
+what it asks you to watch for is fixed, so it now tests a product that no longer
+exists: block 5 tells you a voice move creates no undo entry, block 6 tells you
+a batch cannot see its own additions, and block 4 tells you an ambiguous name is
+a dead end. All three were the point of the work. It is kept because it is the
+record of what was wrong on the day, and because Part 5's item ids are cited
+throughout this document.
+
+This is the replacement. It covers everything that has shipped, in the order it
+is easiest to test, and it is written so a line that behaves differently from
+its **E** column is a finding worth reporting rather than a puzzle.
+
+### Before you start
+
+- A **throwaway BPMN diagram** — `Voice Assist Review 2026-09-21`. `clear` and
+  `delete` are real, and although everything is one undo away, do not do this on
+  something you care about.
+- Sign in as a user whose subscription is **Expert or above**, or stay
+  SuperAdmin. If the 🪄 button is missing on a BPMN diagram, that is the gate,
+  not a bug.
+- Open **DevTools → Network**, filtered on `command`. Every fuchsia **✨ AI** log
+  entry should have exactly one request beside it. Counting them is how you tell
+  a cheap session from an expensive one.
+- Blocks 1–9 can be **typed**, which removes the recogniser from the equation
+  and makes a failure unambiguous. Blocks 10–12 need the microphone.
+
+Legend: **E** = expected · **W** = what to watch for. Tick each line.
+
+---
+
+### Block 1 — The shape of a process (10 min, typed)
+
+| # | Say or type | E | W |
+|---|---|---|---|
+| 1.1 | `add a start event` | Start event near (240, 200) | log tagged **rule**, not ✨ AI |
+| 1.2 | `add a task called Receive Order after the start` | Added and connected | — |
+| 1.3 | `add a task called Check Stock after Receive Order` | Added and connected | — |
+| 1.4 | `insert an exclusive gateway called In Stock after Check Stock` | Gateway, connected | the trailing `?` is stripped if you add one |
+| 1.5 | `add a task called Pick Items after the gateway` | Branch 0 | — |
+| 1.6 | `add a task called Back Order after the gateway` | Branch 1, ½-task below | fan-out spacing, not overlap |
+| 1.7 | `add an end event called Done after Pick Items` | End event, connected | — |
+| 1.8 | **R7 probe:** `add a task called Oops after Done` | Task added, **not connected**, log says a sequence flow from Done is not legal | this used to draw a flow **out of an end event** with a green tick |
+| 1.9 | `delete Oops` | Gone, no confirmation asked | a single named element deletes at once — deliberate |
+| 1.10 | **B5 probe:** `insert a parallel gateway between Check Stock and Pick Items` | Goes to ✨ AI | it must **not** create a gateway named "between Check Stock and Pick Items" |
+| 1.11 | **B5 probe:** `add a task before Review` | Goes to ✨ AI | not a task *named* "before Review" |
+
+### Block 2 — Containers (12 min, typed)
+
+| # | Say or type | E | W |
+|---|---|---|---|
+| 2.1 | `put a pool around everything` | One pool, **no lane**, adopting the loose elements | — |
+| 2.2 | `rename the pool to Warehouse` | Header reads Warehouse | — |
+| 2.3 | `add three lanes to Warehouse called Sales, Picking and Shipping` | Three equal lanes; elements stay put | lane membership is geometric |
+| 2.4 | `add a lane below Picking called Packing` | Four lanes, pool grows | — |
+| 2.5 | `swap Sales with Picking` | Swapped | — |
+| 2.6 | `swap Sales with Shipping` | Refused — lanes must be adjacent | the message should say why |
+| 2.7 | `add two sublanes to Shipping called Domestic and International` | Two sub-lanes | — |
+| 2.8 | **B6 probe:** `delete the sublane Domestic` | Deleted, or asks naming only the **sub-lanes** | it must not answer "which lane? there are 4" — that counted top-level lanes as siblings |
+| 2.9 | **B6 probe:** `rename the middle sublane to Overseas` | Resolves | — |
+| 2.10 | `add a black box pool above Warehouse called Customer` | Black-box participant above | — |
+| 2.11 | `compress Warehouse` then `extend the pools to include all elements` | Shrinks, then all pools one width | — |
+| 2.12 | **B7 probe:** `create a participant box for the courier above Customer` | Goes to ✨ AI; the new pool lands **above Customer** | the prompt now carries `relativeTo`; without it the model named a position with no anchor and the pool went relative to the whole stack |
+
+### Block 3 — Messages and boundary events (8 min, typed)
+
+| # | Say or type | E | W |
+|---|---|---|---|
+| 3.1 | `add a message from Receive Order to Customer labelled Order Placed` | Vertical message flow | — |
+| 3.2 | `add a message from Customer to Receive Order labelled Confirmation` | Second flow, ≥20px apart | spacing |
+| 3.3 | `rename connector Order Placed to Order Received` | Label changes | — |
+| 3.4 | `add a boundary event called Timeout to Check Stock` | Clipped to the edge, no connector | — |
+| 3.5 | `add a task called Escalate after Timeout` | Placed below/above-right, connector exits the outer face | R7 boundary-follow |
+| 3.6 | `delete connector Confirmation` | Removed | — |
+
+### Block 4 — Right-click the black-box pool (4 min, mouse)
+
+| # | Do | E | W |
+|---|---|---|---|
+| 4.1 | Right-click **Customer**'s header | **No** "Generate SOP for this pool"; IT System / Collection toggles instead | there is no procedure inside a participant box |
+| 4.2 | Tick **IT System** | Any Send/Receive task messaging it becomes a **User** task | the rule runs in the reducer, so Properties and the menu agree |
+| 4.3 | Untick it | A User task with messages only **to** the pool → Send; only **from** → Receive; a mix → None | — |
+| 4.4 | Right-click a **lane header** | "Generate SOP …" is offered | — |
+| 4.5 | Right-click the **lane body** | The element matrix instead — Pool/Lane after the gateway, Pain Point / Issue / Review Comment at the end | — |
+
+### Block 5 — The selection as a reference, M1 (8 min, mouse + typed)
+
+| # | Do, then say | E | W |
+|---|---|---|---|
+| 5.1 | Select **Pick Items** · `rename this to Pick Line` | Renamed, **nothing left selected** | the selection protocol |
+| 5.2 | `rename Pick Line to Pick Items` | Back | **B5**: "Line" must not trigger the lane rule |
+| 5.3 | Select three tasks · `move these right` | All three move together, 100px | — |
+| 5.4 | `nudge these down` | 20px, together | nudge is 20, move is 100 — the log says which |
+| 5.5 | Select the pool · `rename the selected pool to Depot` | Renamed | — |
+| 5.6 | Select two tasks · `delete these` | **Asks first** | more than one thing → confirmation |
+| 5.7 | Say `no` | Dropped, nothing deleted | — |
+
+### Block 6 — Wrapping the selection, M2 (10 min)
+
+| # | Do, then say | E | W |
+|---|---|---|---|
+| 6.1 | Select two adjacent tasks in one lane · `surround selected with an expanded subprocess called Quality Check` | Room made **in that lane only**; contents kept with their internal flows; Start and End inside; the one flow in and out re-point at the shell | neighbouring lanes untouched; pools widen to one width |
+| 6.2 | `delete selected` on that subprocess | Shell and Start/End go, contents splice back, everything slides back to where it was | it should round-trip **without undo** |
+| 6.3 | Select elements with a flow to something outside · `wrap these in a pool called Finance` | **Refused**, naming what is on the other side | a sequence flow may not cross a pool boundary — it must not silently become a message flow |
+| 6.4 | Select tasks in a pool · `surround selected with a lane called Picking` | New band in that pool, or refused by name if something unselected is level with them | — |
+
+### Block 7 — Convert in place, M3 (6 min)
+
+| # | Do, then say | E | W |
+|---|---|---|---|
+| 7.1 | Select a task · `make this a user task` | User marker appears | **R5**: it should **flash gold** — a subtype change moves nothing, and used to flash nothing |
+| 7.2 | `make it a service task` | Changes | — |
+| 7.3 | Select the gateway · `turn the selected gateway into a parallel gateway` | Parallel | — |
+| 7.4 | `make this a merge` | Role changes | — |
+| 7.5 | Select an event · `make the selected event a timer event` | Timer | — |
+| 7.6 | Select a task · `make this a gateway` | **Refused or sent to AI** — a shape change is a different operation | it must not half-do it |
+| 7.7 | `make this a plain task` | Marker cleared | — |
+
+### Block 8 — Fill the selection, M4 (8 min)
+
+| # | Do, then say | E | W |
+|---|---|---|---|
+| 8.1 | Select three tasks across **two lanes** · `name these Alpha, Bravo and Charlie` | Names land in **reading order** — rows top to bottom, each row left to right | the lanes must not interleave; this is the whole design problem |
+| 8.2 | Select four · `name these One, Two and Three` | **Refused**, naming both counts | it must not rename three and leave the fourth |
+| 8.3 | Select two tasks · `assign these to the Finance team` | Both get the team | check Properties → Simulation |
+| 8.4 | Select a task **and a gateway** · `assign these to the Sales team` | Task assigned, gateway **named and skipped** | a team belongs to an activity |
+| 8.5 | `move these right` | A **move**, not a team assignment | the word "team" must actually be said |
+| 8.6 | Select tasks · `attach risk R-012 to these` | Attached if the project has a library; otherwise says there is none | — |
+| 8.7 | `attach risk R-99 to these` | Not found, says so | — |
+| 8.8 | `attach risk duplicate paymnt to these` (typo) | **Not found** | names are never matched fuzzily — the wrong control survives into an audit |
+
+### Block 8b — Align the selection, M7 (5 min)
+
+| # | Do, then say | E | W |
+|---|---|---|---|
+| 8b.1 | Select three untidy tasks · `align these` | Tidied — the Alignment ▾ menu's smart mode | one dispatch, one undo |
+| 8b.2 | `undo that` · then `align these in a row` | All three on one **horizontal** line | — |
+| 8b.3 | `undo that` · then `line these up in a column` | One **vertical** line | — |
+| 8b.4 | `align their left edges` | Left edges flush | the four edge forms are never ambiguous |
+| 8b.5 | **The deliberate refusal:** `align these horizontally` | Goes to **✨ AI**, which should ask what you mean | it must **not** silently pick one — half of people mean "along a horizontal line", half mean "move them horizontally" |
+| 8b.6 | `space these evenly` | Not understood / ✨ AI | **not built** — no distribute reducer exists, and a bad distribute looks finished |
+| 8b.7 | Select **one** element · `align these` | "Select two or more elements to align" | — |
+
+### Block 8c — Take the ghost, M8 (5 min)
+
+Turn **👻 Assist** on for this block.
+
+| # | Do, then say | E | W |
+|---|---|---|---|
+| 8c.1 | Select a task with ghosts showing · `accept the suggestion` | The first ghost is applied — same as **Tab** | — |
+| 8c.2 | Select another · `take the gateway` | The gateway ghost, whichever position it is in | by kind, not position |
+| 8c.3 | `take the second one` | The second ghost | — |
+| 8c.4 | `take the subprocess` when no subprocess is offered | "That isn't on offer — Task, Decision, End" | it names what IS offered; the ghosts are translucent and easy to misread |
+| 8c.5 | With **no** ghost showing · `accept` | "No suggestion showing — select an element with Assist on" | — |
+| 8c.6 | **The "yes" probe:** say `clear the diagram`, then with a ghost showing say `yes` | **The diagram clears** — "yes" belongs to the confirmation, not the ghost | this is why "yes" was not made an accept word |
+| 8c.7 | `undo that` | Everything back in one step | — |
+| 8c.8 | During `rename tasks`, say `3` | Picks item **3**, not ghost 3 | a bare number answers a numbered pick |
+
+### Block 9 — Point instead of naming, M5 (6 min, mouse + typed)
+
+| # | Do, then say | E | W |
+|---|---|---|---|
+| 9.1 | Move the mouse to empty canvas · type `put a task here` | Task appears **at the pointer**, no connector | nudged clear if something is close |
+| 9.2 | Hover a task · `rename the one under the cursor to Spotted` | That task renamed | — |
+| 9.3 | Deselect everything, hover a task · `delete this` | The hovered task | with **nothing** selected, the pointer beats document order |
+| 9.4 | **Select** a different task, hover another · `rename this to Chosen` | The **selected** one renames, not the hovered one | the selection always wins — this is the M1 guarantee |
+| 9.5 | Hover a pool's bare area · `rename the one under the cursor to Depot Two` | The pool | a pointer inside a pool over a task finds the task |
+| 9.6 | `add a task called Here` | A task named "Here" | the position word must not eat the name |
+
+### Block 10 — Numbered picks and the picker, R2/R3 (8 min, voice from here)
+
+| # | Say | E | W |
+|---|---|---|---|
+| 10.1 | Click 🎙 | Header says **connecting…** then **listening…**, with no "(browser)" | "(browser)" means cloud voice is unavailable — it should now say why |
+| 10.2 | `rename tasks` | Green numbers on every task, **below** activities | — |
+| 10.3 | `3 Approve Order` | Renamed in one breath; badges renumber; **nothing stays selected** | — |
+| 10.4 | `5` … pause … `Verify Goods` | Two-step pick works | between number and name the item **stays** highlighted — that is the cue |
+| 10.5 | `done` | Pick ends, **mic stays on** | — |
+| 10.6 | Make two tasks called Review · `rename Review to Final Review` | **The picker appears** on the two candidates | it used to be a dead end that threw the list away |
+| 10.7 | Say the number | Renamed | — |
+| 10.8 | **R3 probe:** `delete the task` with several present | **Asks which** | it used to take the most recent with a green tick |
+| 10.9 | `add a message` | Numbers every task, collapsed subprocess and black-box pool | — |
+| 10.10 | `3 to 7 labelled Order Placed` | Message drawn | — |
+
+### Block 11 — Undo, confirmation, and failure messages (8 min, voice)
+
+| # | Say | E | W |
+|---|---|---|---|
+| 11.1 | `add a task called Ship Order after Approve Order` then `undo that` | **The whole command** reverts in one step | **B3** — this used to take 3–5 Ctrl+Z |
+| 11.2 | `nudge Ship Order up` then `undo that` | The nudge reverts | **B2** — a voice move used to create no history entry at all |
+| 11.3 | Drag any element by hand, release, Ctrl+Z | Only the drag reverts | **B2** — the drag and the voice move used to revert together |
+| 11.4 | `clear the diagram` | **Asks first** | — |
+| 11.5 | `no` | Nothing cleared | — |
+| 11.6 | **R6 probe:** `rename Eskalate to Chase` | "Couldn't find … — did you mean *Escalate*?" | it used to say only "couldn't find" |
+| 11.7 | **R6 probe:** `delete Pick Crates` | Suggests *Pick Items* | from shared words as well as sound |
+| 11.8 | `again` after a nudge | Repeats it | — |
+
+### Block 12 — Voice reliability, V1/V2/B4/B8 (12 min, voice)
+
+| # | Do | E | W |
+|---|---|---|---|
+| 12.1 | Say a task's **own name** — an unusual one like *Reconciliation* | Heard correctly | **V1** primes the recogniser with this diagram's labels when the mic opens |
+| 12.2 | Deliberately mispronounce a name slightly — "eskalayt" for Escalate | Resolves anyway, tagged **rule**, no AI call | **V2** matches by sound |
+| 12.3 | Say a name that sounds like two others | **Asks**, does not guess | sounding alike is exactly when you should choose |
+| 12.4 | Say `rename Quality Gate to` … pause 2s … `Inspect Goods` | Held and applied as **one** command | the split-command hold |
+| 12.5 | Say `Swap,` then `top and bottom` | One command | the comma after the verb is ignored |
+| 12.6 | **B4 probe:** start a long ✨ AI command, and while "thinking…" shows, say another | The second **queues**, does not act on stale state; log lines do not interleave | — |
+| 12.7 | **B8 probe (needs an OrgAdmin):** turn off **allowVoiceAi** in Org Settings, drop out of SuperAdmin view, click 🎙 | A **policy message**, and voice does not start | it used to silently use the browser engine, ignoring the policy |
+| 12.8 | Leave the mic idle 2 minutes | Closes itself, says so | an open socket is billed by the minute |
+| 12.9 | Say `stop` | Mic off | — |
+
+### Block 13 — What it cost, and what to report (6 min)
+
+| # | Do | E |
+|---|---|---|
+| 13.1 | Click **Commands** | The card lists everything by family; drag it by its title |
+| 13.2 | Click **Cost** | One line: AI calls at list price + microphone minutes, labelled an estimate |
+| 13.3 | Read the line **under** Cost | "N commands · M didn't land · K fixed on a re-try (x misheard, y rephrased)" |
+| 13.4 | Count fuchsia ✨ AI entries against Network requests | They should match exactly |
+
+**13.5 — the number that decides V3.** Write down the misheard/rephrased split
+from 13.3, and from any other real session you run this week.
+
+- Mostly **misheard** → the recogniser is still losing words, and a personal
+  phrase book (V3) has something to learn. Build it.
+- Mostly **rephrased** → you were changing your words to suit the grammar. No
+  amount of phonetic learning helps; the same effort belongs in the grammar and
+  the AI prompt instead, and V3 should be dropped.
+
+That is the whole reason V3 shipped as a measurement rather than a feature, and
+this line is how the decision gets made from evidence instead of impressions.
+
+### What to report back
+
+For each ticked line that did **not** match its **E** column: the block number,
+what you said, what the log said, and what the diagram did. A log line and a
+screenshot is enough — the log records what was heard *and* what was done, which
+separates a recogniser problem from a grammar problem straight away.
 
 ---
 
