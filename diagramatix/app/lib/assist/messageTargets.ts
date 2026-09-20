@@ -10,7 +10,7 @@
  * Pure: the editor draws the badges and applies the resulting addMessage op.
  */
 import type { DiagramElement } from "../diagram/types";
-import { badgePlaceFor, type RenameTarget } from "./renameTargets";
+import { numberTargets, type RenameTarget } from "./renameTargets";
 import { isBlackBoxPool } from "../diagram/blackBoxPoolMenu";
 
 const ACTIVITY_TYPES = new Set<string>(["task", "subprocess", "subprocess-collapsed"]);
@@ -22,13 +22,9 @@ export type MessagePick =
   | { mode: "pair"; targets: RenameTarget[] }
   | { mode: "one"; targets: RenameTarget[]; anchorId: string; anchorIsPool: boolean };
 
-/** Number candidates in reading order (rows of ~64px, then left to right), like the rename flow. */
-function numbered(els: DiagramElement[]): RenameTarget[] {
-  const band = (y: number) => Math.round(y / 64);
-  return [...els]
-    .sort((a, b) => band(a.y + a.height / 2) - band(b.y + b.height / 2) || (a.x + a.width / 2) - (b.x + b.width / 2))
-    .map((e, i) => ({ id: e.id, n: i + 1, kind: "element" as const, x: e.x + e.width / 2, y: e.y + e.height / 2, height: e.height, place: badgePlaceFor(e.type) }));
-}
+/** Number candidates in reading order — the shared rule, so the same element
+ *  carries the same number whichever flow is asking. */
+const numbered = numberTargets;
 
 /**
  * The badges to draw. `anchorId` = the selected element for "add message to

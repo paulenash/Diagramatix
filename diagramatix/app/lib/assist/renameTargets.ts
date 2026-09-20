@@ -35,6 +35,26 @@ const EVENT_TYPES = new Set<string>(["start-event", "intermediate-event", "end-e
 const SUBPROCESS_TYPES = new Set<string>(["subprocess", "subprocess-expanded", "subprocess-collapsed"]);
 
 /** Map a spoken type word ("tasks", "sub-lane", "decision"…) to a RenameType. */
+/**
+ * Number a set of elements in reading order — rows of about 64px, then left to
+ * right — and place each badge by its kind.
+ *
+ * Shared, because three flows now put numbers on the canvas: the guided rename,
+ * "add message by number", and R2's disambiguation picker. They must agree, or
+ * the same element carries a different number depending on which question is
+ * being asked.
+ */
+export function numberTargets(els: readonly DiagramElement[]): RenameTarget[] {
+  const band = (y: number) => Math.round(y / 64);
+  return [...els]
+    .sort((a, b) => band(a.y + a.height / 2) - band(b.y + b.height / 2) || (a.x + a.width / 2) - (b.x + b.width / 2))
+    .map((e, i) => ({
+      id: e.id, n: i + 1, kind: "element" as const,
+      x: e.x + e.width / 2, y: e.y + e.height / 2, height: e.height,
+      place: badgePlaceFor(e.type),
+    }));
+}
+
 export function parseRenameType(word: string): RenameType | null {
   const w = word.toLowerCase().replace(/[-\s]/g, "").trim();
   if (/^pools?$/.test(w)) return "pool";

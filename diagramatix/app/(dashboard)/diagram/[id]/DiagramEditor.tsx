@@ -59,6 +59,7 @@ import { validateOps, type AssistOp } from "@/app/lib/assist/ops";
 import { syntheticElement, withAdded, withDeleted, withLabel } from "@/app/lib/assist/workingSet";
 import { needsConfirmation, parseConfirmation } from "@/app/lib/assist/confirm";
 import { collectRenameTargets, type RenameType, type RenameTarget } from "@/app/lib/assist/renameTargets";
+import { buildPickFlow, parsePickAnswer, substituteRef, type PickFlow } from "@/app/lib/assist/disambiguate";
 import { VoiceAssistBar, type CommandLogEntry } from "@/app/components/canvas/VoiceAssistBar";
 import { startDictation, type DictationHandle } from "@/app/lib/dictation";
 import { PropertiesPanel } from "@/app/components/canvas/PropertiesPanel";
@@ -2708,6 +2709,13 @@ export function DiagramEditor({
   const [messageFlow, setMessageFlowState] = useState<MessagePick | null>(null);
   const messageFlowRef = useRef<MessagePick | null>(null);
   const setMessageFlow = useCallback((f: MessagePick | null) => { messageFlowRef.current = f; setMessageFlowState(f); }, []);
+  // ── R2: the disambiguation picker. Same numbered-badge mechanism as the
+  //    rename and message flows — the point of R2 was never new UI, it was that
+  //    a mechanism the product already had was not reached from the one place
+  //    that most needed it.
+  const [pickFlow, setPickFlowState] = useState<PickFlow | null>(null);
+  const pickFlowRef = useRef<PickFlow | null>(null);
+  const setPickFlow = useCallback((f: PickFlow | null) => { pickFlowRef.current = f; setPickFlowState(f); }, []);
   const voiceStopRequested = useRef(false);
   // Stable ref to the JSON export (a plain function redefined each render) so
   // the memoised apply layer can call it without churning its deps.
@@ -2720,6 +2728,8 @@ export function DiagramEditor({
     voiceDictRef.current = null;
     setVoiceListening(false);
     pendingConfirmRef.current = null; // a parked "clear the diagram?" never outlives the diagram it was asked on
+    pickFlowRef.current = null;       // nor a parked "which one?" — its candidates are on the old diagram
+    setPickFlowState(null);
   }, [diagramId]);
 
   const elBox = (e: DiagramElement) => ({ x: e.x, y: e.y, width: e.width, height: e.height });
@@ -2753,6 +2763,10 @@ export function DiagramEditor({
     }
     const results: string[] = [];
     let anyFail = false;
+    // R2: set when a command has been PARKED for a disambiguation pick. It is
+    // not a failure — the user is about to answer — so the log says what it is
+    // waiting for rather than reporting an error.
+    let pickParked = false;
     // Gold flashing: remember where everything was, so that once React has
     // re-rendered we can diff and outline whatever this command touched. Taken
     // here rather than asking each of the thirty-odd op handlers to report what
@@ -2776,7 +2790,7 @@ export function DiagramEditor({
      * `resolveRef` has always returned the list; the message discarded it and
      * said only "is ambiguous", which left the user to guess what it had found.
      */
-    const resolve1 = (ref: string, opts: { strict?: boolean } = {}): DiagramElement | { err: string } => {
+    const resolve1 = (ref: string, opts: { strict?: boolean } = {}): DiagramElement | { err: string; ambiguous?: string[] } => {
       const r = resolveRef(ref, els, voiceLastId.current, selectedIds, opts);
       if (!r) return { err: isSelectionRef(ref) && selectedIds.length === 0 ? "nothing is selected" : `couldn't find “${ref}”` };
       if ("ambiguous" in r) {
@@ -2787,7 +2801,10 @@ export function DiagramEditor({
           .map((e) => (e.label ?? "").trim() || e.type);
         const shown = names.slice(0, 4).map((nm) => `“${nm}”`).join(", ");
         const more = names.length > 4 ? `, and ${names.length - 4} more` : "";
-        return { err: `which “${ref}”? ${names.length} match: ${shown}${more} — say the name` };
+        // The ids travel with the message so a caller can raise the PICKER
+        // (R2) instead of only reporting; callers that don't care still get a
+        // sentence that names what it found.
+        return { err: `which “${ref}”? ${names.length} match: ${shown}${more} — say the name`, ambiguous: r.ambiguous };
       }
       return els.find((e) => e.id === r.id)!;
     };
@@ -2914,6 +2931,13 @@ export function DiagramEditor({
         // already asked which — containers had their own guard below — while
         // "delete the task" silently took the newest and reported success.
         const e = resolve1(op.ref, { strict: true });
+        if ("err" in e && e.ambiguous) {
+          // R2: number the candidates and wait for a number, rather than
+          // making the user rephrase a command that was already unambiguous
+          // to THEM — they can see which one they meant.
+          const flow = buildPickFlow(ops, op.ref, e.ambiguous, els);
+          if (flow) { setPickFlow(flow); results.push(flow.prompt); pickParked = true; break; }
+        }
         if ("err" in e) {
           // Not an element — maybe a message/connector label.
           const key = messageLabelKey(op.ref);
@@ -3395,7 +3419,7 @@ export function DiagramEditor({
         continue;
       }
     }
-    return { ok: !anyFail, summary: results.join("; ") || "nothing to do" };
+    return { ok: !anyFail || pickParked, summary: results.join("; ") || "nothing to do" };
   }, [data.elements, data.connectors, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, updateConnectorLabel, deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool, wrapInSubprocess, wrapInContainer, unwrapSubprocess, addPool, addLaneAt, compressPool, extendPools, swapLane, moveLane, moveElements, elementsMoveEnd, removeSpace, setRenameFlow, setMessageFlow, updateConnectorEndpoint]);
 
   // Gold flashing, part two: the command has run, React has re-rendered, and
@@ -3558,6 +3582,23 @@ export function DiagramEditor({
         log({ heard, summary: r.summary, ok: r.ok });
         return;
       }
+    }
+    if (pickFlowRef.current) {
+      const flow = pickFlowRef.current;
+      if (isFlowEndWord(heard)) {
+        setPickFlow(null);
+        log({ heard, summary: "cancelled", ok: true });
+        return;
+      }
+      const chosen = parsePickAnswer(heard, flow);
+      if (!chosen) { log({ heard, summary: flow.prompt, ok: false }); return; }
+      setPickFlow(null);
+      // Re-run the PARKED command with the choice substituted as an #id:
+      // reference, so it goes back through the ordinary path rather than a
+      // second one that could behave differently.
+      const r = applyGrouped(substituteRef(flow.ops, flow.ref, chosen.id));
+      log({ heard, summary: `${chosen.n} → ${r.summary}`, ok: r.ok });
+      return;
     }
     if (renameFlowRef.current) { handleRenameUtteranceRef.current(heard); return; }
     if (messageFlowRef.current) { handleMessageUtteranceRef.current(heard); return; }
@@ -3742,15 +3783,16 @@ export function DiagramEditor({
 
   // Escape cancels a guided pick (rename or message) at any phase.
   useEffect(() => {
-    if (!renameFlow && !messageFlow) return;
+    if (!renameFlow && !messageFlow && !pickFlow) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       if (renameFlow) cancelRenameFlow("rename cancelled");
       if (messageFlow) { setMessageFlow(null); setVoiceLog((prev) => [...prev, { id: nanoid(), heard: "", summary: "message cancelled", ok: true }]); }
+      if (pickFlow) { setPickFlow(null); setVoiceLog((prev) => [...prev, { id: nanoid(), heard: "", summary: "cancelled", ok: true }]); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [renameFlow, messageFlow, cancelRenameFlow, setMessageFlow]);
+  }, [renameFlow, messageFlow, pickFlow, cancelRenameFlow, setMessageFlow, setPickFlow]);
 
   // Stop the mic when the mode is turned off or the editor unmounts.
   useEffect(() => {
@@ -6310,7 +6352,7 @@ export function DiagramEditor({
         <Canvas
           data={displayData}
           diagramType={diagramType}
-          renameBadges={renameFlow?.phase === "pick" ? renameFlow.targets : messageFlow?.targets}
+          renameBadges={renameFlow?.phase === "pick" ? renameFlow.targets : (messageFlow?.targets ?? pickFlow?.targets)}
           goldFlash={goldFlash}
           liftedIds={dragTravellingIds}
           onAddElement={addElementGated}

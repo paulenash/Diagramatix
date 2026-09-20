@@ -204,7 +204,13 @@ describe("6 & 7 — messages by number", () => {
     const ed = editor();
     expect(ed).toContain('if (op.op === "addMessageByNumber") {');
     expect(ed).toContain("if (messageFlowRef.current) { handleMessageUtteranceRef.current(heard); return; }");
-    expect(ed, "badges are shared with the rename flow").toContain('renameBadges={renameFlow?.phase === "pick" ? renameFlow.targets : messageFlow?.targets}');
+    // Badges are shared with the rename flow — and, since 2026-09-20, with
+    // R2's disambiguation picker too, so this asserts that ONE prop carries
+    // all of them rather than pinning the exact expression.
+    const badges = ed.slice(ed.indexOf("renameBadges={"), ed.indexOf("renameBadges={") + 200);
+    expect(badges, "the rename flow's targets").toContain("renameFlow.targets");
+    expect(badges, "and the message flow's").toContain("messageFlow?.targets");
+    expect(badges, "and the picker's").toContain("pickFlow?.targets");
     expect(ed).toMatch(/applyGrouped\(\[\{ op: "addMessage", fromRef: ID_REF_PREFIX \+ fromId, toRef: ID_REF_PREFIX \+ toId/);
     // …and the reminder card lists both forms (their parse is pinned by T4395).
     const msgs = COMMAND_CATALOG.find((f) => f.family === "Messages")!;
