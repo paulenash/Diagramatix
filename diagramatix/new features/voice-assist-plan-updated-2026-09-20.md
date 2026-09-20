@@ -38,7 +38,9 @@ is reproduced verbatim in the appendix, so every item can still be cited by id.
 | **Scanner feedback per command** (R8) | **not started** |
 | **Capability extensions** (C1–C4, C6–C8, C10) | **not started** |
 | **Convert in place** (M3) | **SHIPPED** `496969a8` — the menu's own subtype table, said out loud |
-| **Fill, pointer, marquee, tidy, ghost, properties** (M4–M9) | **not started** |
+| **Fill the selection** (M4) | **SHIPPED** `2fe89dcb` — names in reading order, simulation team, Risk/Control attach |
+| **Pointer as a reference** (M5) | **SHIPPED** `2fe89dcb` — "here" places at the mouse; "the one under the cursor" resolves to it. See the note on "connect this to that" below |
+| **Marquee, tidy, ghost, properties** (M6–M9) | **not started** |
 | **Personal phrase book** (V3) | **HALF** `1da089b4` — the measurement ships; the phrase book itself waits on it (see below) |
 | **Publish the guide, tech-notes and feature rows** (D1) | **SHIPPED** `496969a8` — **run on production by Paul, 2026-09-20.** Verified from the public `/features` page: both rows published with the September wording, zero occurrences of the old name |
 | **Delivered from live use** (L1–L10) | **SHIPPED** — never in the backlog; added to it afterwards so the plan is a complete record |
@@ -92,30 +94,96 @@ any list:
 
 ---
 
+## What changed on 21 September — M4 and M5 (`2fe89dcb`)
+
+Both extend what M1 started. M4 pushes it as far as it goes in one direction —
+the voice says several things at once, and the selection plus the READING ORDER
+says which is which. M5 pushes it in the other — the mouse says WHERE, which a
+name cannot express at all.
+
+**M4's three commands all name no target**, because the selection is the target,
+so each begins by insisting on one rather than falling back to recency.
+
+- *"name these Receive, Check and Ship"* fills in reading order: rows top to
+  bottom, each row left to right. Sorting by x alone interleaves two lanes and
+  lands one lane's names on the other's elements, which is why the ordering is
+  its own tested module. A **count mismatch is refused, not truncated** —
+  renaming three of four leaves a diagram that looks finished and is wrong.
+- *"assign these to the Finance team"*. The word "team" must actually appear, or
+  "move these right" and "wrap these in a pool" would be swallowed. A team
+  belongs to an activity, so anything else selected is named and skipped.
+- *"attach risk R-012 to these"*. Codes are normalised on both sides because
+  they are the worst thing to dictate; **names are never matched fuzzily**,
+  because attaching the wrong control survives into an audit and a near miss
+  reported beats a plausible neighbour applied. This is the one reference in the
+  product that deliberately does *not* use the phonetic pass.
+
+**M5** places at the mouse (*"put a task here"*) — still nudged clear of what is
+already there, no connector drawn, and refused with a reason when the pointer
+has never been over the canvas rather than dropped at (0,0).
+
+### The one departure from the plan: "connect this to that"
+
+The plan asked for that sentence with *that* meaning the element under the
+pointer. It is not what shipped, deliberately.
+
+"This" and "that" already mean the selection — M1, shipped in `a49a8006` and
+tested. Redefining one of them regresses that. Worse, the sentence needs the two
+demonstratives to mean **different things inside one utterance**: a rule nobody
+could remember, and one that would make every existing "delete that" ambiguous.
+
+What ships keeps the selection winning and adds the pointer where it costs
+nothing:
+
+| Say | Means |
+|---|---|
+| "here", "there" | the pointer POSITION — placement only |
+| "the one under the cursor", "this one here", "the one I'm pointing at" | the ELEMENT under the pointer |
+| "this", "that" | the selection, as before; then the last added; and now the hovered element before falling back to document order |
+
+That last row is the part that delivers the plan's intent without breaking
+anything — pointing at something with nothing selected is a better guess than
+"the last element in the document" ever was.
+
+So the plan's sentence is said as **"connect the selected task to the one under
+the cursor"**. T4595 pins this so it cannot be quietly undone.
+
+---
+
 ## What to do next, in order
 
-Paul's list of 20 September was D1, D2, B8, M3, R7, B6, R5/R6 and V3. All of it
-is done except V3's second half, which is waiting on data by design. What
-follows is what is left.
+Paul's list of 20 September was D1, D2, B8, M3, R7, B6, R5/R6 and V3 — all done,
+and D1 was run on production on the 20th. M4 and M5 followed on the 21st. What
+is left:
 
-D1 was run on production on 20 September, which closes the list. What follows is
-what is left after it.
-
-1. **V3's second half — the phrase book itself.** Gated on its own measurement
-   (below), not on effort.
-2. **R8 — scanner feedback per command.** Run `checkDiagram` on the new state
-   and append "+N issues" to the log line. The last of the R family.
+1. **M8 — ghost + voice.** The cheapest thing on the list: `acceptNextStep`
+   exists and is already exposed through a ref the voice layer can reach, so
+   this is grammar plus a reference.
+2. **M7's align half.** "Align these" is grammar-only — `ALIGN_ELEMENTS` already
+   exists with seven modes including `smart`. (The plan's note that no
+   align/distribute reducers exist is stale.) "Space these evenly" and "same
+   size as this" still need reducers.
 3. **B7's remainder** — `addPool.relativeTo` is still missing from the AI prompt
-   op list.
-4. **M4–M9** — fill, pointer, marquee, tidy, ghost, properties. Capability, not
-   defect.
+   op list, so the model can say *above* or *below* with nowhere to put the
+   anchor.
+4. **R8 — scanner feedback per command.** Run `checkDiagram` on the new state
+   and append "+N issues" to the log line. The last of the R family, and the
+   only one with a real design question: whether to report every violation or
+   only those touching the ids this command changed.
+5. **M6, M9** — marquee (needs M5's plumbing, now landed) and properties-panel
+   context. **M9 last regardless of value**: letting bare fragments become
+   commands is how the parser starts guessing, and that cost a session once
+   already (B5).
+6. **V3's second half — the phrase book itself.** Gated on its own measurement
+   (below), not on effort.
 
 Deferred deliberately: C1–C4, C6–C8 and C10 are capability extensions rather
 than defects, and D3's `apply.ts` extraction is now much less pressing — the
 apply layer's rules have been extracted into tested pure modules one at a time
 (`greedyGuards`, `disambiguate`, `phonetic`, `messageLabel`, `emieLabel`,
 `workingSet`, `laneKind`, `convertPhrase`, `elementSubtypes`, `tokenOutcome`,
-`correctionPairs`) as each was worked on.
+`correctionPairs`, `fillSelection`, `pointerRef`, `riskCatalogRef`) as each was
+worked on.
 
 ### V3 — why only half of it shipped
 
