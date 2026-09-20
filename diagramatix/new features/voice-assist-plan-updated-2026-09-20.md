@@ -40,7 +40,7 @@ is reproduced verbatim in the appendix, so every item can still be cited by id.
 | **Convert in place** (M3) | **SHIPPED** `496969a8` — the menu's own subtype table, said out loud |
 | **Fill, pointer, marquee, tidy, ghost, properties** (M4–M9) | **not started** |
 | **Personal phrase book** (V3) | **HALF** `1da089b4` — the measurement ships; the phrase book itself waits on it (see below) |
-| **Publish the guide, tech-notes and feature rows** (D1) | **READY** `496969a8` — two SQL files, proven on `diagramatix_test` and local. **Paul still has to run them on prod** |
+| **Publish the guide, tech-notes and feature rows** (D1) | **SHIPPED** `496969a8` — **run on production by Paul, 2026-09-20.** Verified from the public `/features` page: both rows published with the September wording, zero occurrences of the old name |
 | **Delivered from live use** (L1–L10) | **SHIPPED** — never in the backlog; added to it afterwards so the plan is a complete record |
 
 ---
@@ -98,19 +98,16 @@ Paul's list of 20 September was D1, D2, B8, M3, R7, B6, R5/R6 and V3. All of it
 is done except V3's second half, which is waiting on data by design. What
 follows is what is left.
 
-1. **Run D1's SQL on production.** This is the only item on the list that is not
-   finished, and it is not finished because it is Paul's to run, not mine:
-   `scripts/sql/check-voice-assist-content.sql` first (read-only, one report
-   table), then `scripts/sql/seed-voice-assist-content.sql`. Both proven on
-   `diagramatix_test` and on local dev. Until that runs, Expert-and-above
-   customers still have no documentation for a feature they can use.
-2. **V3's second half — the phrase book itself.** Gated on its own measurement
+D1 was run on production on 20 September, which closes the list. What follows is
+what is left after it.
+
+1. **V3's second half — the phrase book itself.** Gated on its own measurement
    (below), not on effort.
-3. **R8 — scanner feedback per command.** Run `checkDiagram` on the new state
+2. **R8 — scanner feedback per command.** Run `checkDiagram` on the new state
    and append "+N issues" to the log line. The last of the R family.
-4. **B7's remainder** — `addPool.relativeTo` is still missing from the AI prompt
+3. **B7's remainder** — `addPool.relativeTo` is still missing from the AI prompt
    op list.
-5. **M4–M9** — fill, pointer, marquee, tidy, ghost, properties. Capability, not
+4. **M4–M9** — fill, pointer, marquee, tidy, ghost, properties. Capability, not
    defect.
 
 Deferred deliberately: C1–C4, C6–C8 and C10 are capability extensions rather
@@ -167,36 +164,31 @@ means "use the default" and names it.
 Seeds and rows that exist only as unrun scripts. Per the standing rule they need
 an idempotent SQL file for the in-app database tile rather than a script run:
 
-- **D1 — ready to run, two files, in this order.** Written 2026-09-20, proven on
-  `diagramatix_test` (never seeded — the prod worst case) and on local dev
-  (already seeded, and the harder path because it exercises the repair):
-  Full paths — note the doubled folder name, which is easy to miss: the repo
-  root is `c:\Git\Diagramatix` and the app is one level down, so there is no
-  `scripts\` at the root.
+- ✅ **D1 — RUN ON PRODUCTION by Paul, 2026-09-20.** Files (note the doubled
+  folder name — the repo root is `c:\Git\Diagramatix` and the app is one level
+  down, so there is no `scripts\` at the root):
+  `…\diagramatix\scripts\sql\check-voice-assist-content.sql` then
+  `…\diagramatix\scripts\sql\seed-voice-assist-content.sql`.
 
-  1. `c:\Git\Diagramatix\diagramatix\scripts\sql\check-voice-assist-content.sql`
-     — READ-ONLY. Returns one report table; the `verdict` column is the whole
-     answer.
-  2. `c:\Git\Diagramatix\diagramatix\scripts\sql\seed-voice-assist-content.sql`
-     — idempotent. Seeds the User Guide chapter (9 sections), the Technical
-     Notes chapter (8 sections) and the two Features rows, **and publishes
-     them**, which none of the `.ts` seeds ever did — so even a database where
-     those ran shows nothing on `/features`. It ends with its own verification
-     query after the COMMIT, so the tile shows the same ten-row verdict table
-     once it has run: no need to go back and re-run the check.
+  **Verified independently, not taken on trust:** the public `/features` page
+  now carries both rows *with the September wording* ("Point at it instead of
+  naming it", "Built to mishear gracefully") — text that exists only in the new
+  seed — and zero occurrences of the old name. The seed publishes as well as
+  inserts, which none of the `.ts` seeds ever did, so a database where those had
+  run would still have shown nothing there.
 
-  The guide content is rewritten to what Voice Assist is *today*. The `.ts`
-  seeds describe the 4 August feature: SuperAdmin-only, no confirmations, no
-  numbered picks, no selection references, half the vocabulary. They stay
-  useful locally and are no longer the route to production.
+  The guide content is what Voice Assist is *today*. The `.ts` seeds describe
+  the 4 August feature: SuperAdmin-only, no confirmations, no numbered picks, no
+  selection references, half the vocabulary. They stay useful locally and are no
+  longer the route to production.
 
-  ⚠ The seed also **repairs a latent data-loss bug** the check turned up.
-  `HelpSection.collection` is a denormalised copy of its chapter's, and the
-  User Guide's bulk save is `deleteMany({ collection: "user-guide" })`. Five
-  `add-tech-notes-*.ts` seeds omitted the field, so Technical Notes sections
-  were labelled `user-guide` — saving the User Guide would have deleted them.
-  33 rows on local dev; the check says how many on prod. The code half is fixed
-  and guarded (T4578).
+  The same run **repaired a latent data-loss bug**: `HelpSection.collection` is
+  a denormalised copy of its chapter's, and the User Guide's bulk save is
+  `deleteMany({ collection: "user-guide" })`. Five `add-tech-notes-*.ts` seeds
+  omitted the field, so Technical Notes sections were labelled `user-guide` —
+  saving the User Guide would have deleted them. 33 rows on local dev; row 5 of
+  the verdict table says how many there were on prod. The code half is fixed and
+  guarded (T4578).
 
 - `seed-intent-keywords.ts` and `seed-builtin-templates.ts` — both outstanding
   since before the Suggestion chip work.
