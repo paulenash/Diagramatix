@@ -9177,20 +9177,57 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       });
       const all = [...existing, ...newSubs];
       const N = all.length;
-      const bodyH = parent.height;
-      const each = Math.max(28, Math.floor(bodyH / N));
+      // THE LANE MUST BE BIG ENOUGH TO HOLD THE BANDS (Paul, 2026-09-21:
+      // "adding 3 lanes does not work properly, but adding 2 is ok").
+      //
+      // `each` was floored at MIN_SUBLANE_H while the LAST band took whatever
+      // was left over — so as soon as the floor ate the lane, the remainder
+      // went NEGATIVE and the stack ran past the bottom of its parent:
+      //
+      //   lane 40px ÷ 2 → [28, 12]              contained
+      //   lane 40px ÷ 3 → [28, 28, -16]         16px past the lane AND the pool
+      //   lane 80px ÷ 4 → [28, 28, 28, -4]      4px past
+      //
+      // Two is almost always safe and three is not, which is exactly what he
+      // saw. A lane asked to hold N bands needs room for N bands, so it GROWS
+      // to fit rather than producing a negative one; the lanes below it move
+      // down by the same amount, and `ensureContainersEncloseChildren` at the
+      // return carries the growth up through the pool.
+      const MIN_SUBLANE_H = 28;
+      const bodyH = Math.max(parent.height, MIN_SUBLANE_H * N);
+      const grewBy = bodyH - parent.height;
+      const each = Math.floor(bodyH / N);
       let y = parent.y;
       const geo = new Map<string, { y: number; h: number }>();
       all.forEach((l, i) => { const h = i === N - 1 ? (parent.y + bodyH) - y : each; geo.set(l.id, { y, h }); y += h; });
       const placedNew = newSubs.map((l) => ({ ...l, y: geo.get(l.id)!.y, height: geo.get(l.id)!.h }));
       const firstId = all[0].id;
+      // When the lane grew, every LATER sibling lane in the same pool slides
+      // down — otherwise the one below it would be overlapped rather than the
+      // pool simply being taller.
+      const laneBottomBefore = parent.y + parent.height;
+      const siblingShift = new Set(
+        grewBy > 0
+          ? state.elements
+              .filter((e) => (e.type === "lane" || e.type === "sublane") && e.parentId === parent.parentId && e.y >= laneBottomBefore)
+              .flatMap((e) => [e.id, ...state.elements.filter((d) => d.parentId === e.id).map((d) => d.id)])
+          : [],
+      );
       const elements = state.elements.map((e) => {
         const g = geo.get(e.id);
         if (g) return { ...e, y: g.y, height: g.h };
+        if (e.id === laneId) return { ...e, height: bodyH };
+        if (siblingShift.has(e.id)) return { ...e, y: e.y + grewBy };
         if (e.parentId === laneId && e.type !== "lane") return { ...e, parentId: firstId };
         return e;
       });
-      return { ...state, elements: updatePoolTypes([...elements, ...placedNew]), connectors: state.connectors };
+      // The only lane action that did NOT re-fit its ancestors, which is why a
+      // lane that outgrew its pool left the pool behind.
+      return {
+        ...state,
+        elements: ensureContainersEncloseChildren(updatePoolTypes([...elements, ...placedNew])),
+        connectors: state.connectors,
+      };
     }
 
     // Wrap all loose (un-pooled) flow elements in a new pool + single lane sized
