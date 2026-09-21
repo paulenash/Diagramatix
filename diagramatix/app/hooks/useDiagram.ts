@@ -26,6 +26,7 @@ import { planWrapInSubprocess, planUnwrapSubprocess, planWrapInContainer, type W
 import { isUmlConnType } from "@/app/lib/diagram/types";
 import { capitaliseFirstWord, needsCapital, decisionLabel, isDecisionGateway } from "@/app/lib/diagram/nameCase";
 import { contentBoundsOf, clampRectToContent, clampRectToLimits, poolFollowsLanes, leftGapShortfall, MIN_LEFT_GAP } from "@/app/lib/diagram/poolLaneBounds";
+import { absorbAtEdge, shrinkRoom, stackFrom, type Band, type StackEdge } from "@/app/lib/diagram/laneBands";
 import { fillLaneWithSublanes } from "@/app/lib/diagram/laneFill";
 import { bandOf, mergeTargetSide, facingSide, isMergeGateway } from "@/app/lib/diagram/gatewaySides";
 import { isLabelMove } from "@/app/lib/diagram/labelTether";
@@ -2755,6 +2756,41 @@ function minHeightForContainer(
  * already applied the new (x, y, width, height) to `parentLane` itself in
  * `elementsArr`.
  */
+/**
+ * Move a lane's whole sub-lane subtree by `dy`, keeping every height, and
+ * re-fit it to the lane's x / width.
+ *
+ * The counterpart to `absorbAtEdge`: a band that did NOT absorb the change
+ * keeps its size, so its own dividers must not move either — they simply
+ * travel with it. Rescaling it instead is what made every divider in the
+ * stack shift when only one boundary was dragged.
+ */
+function shiftSublanesBy(
+  elements: DiagramElement[],
+  laneId: string,
+  dy: number,
+  laneX: number,
+  laneW: number,
+): DiagramElement[] {
+  const lane = elements.find((e) => e.id === laneId);
+  if (!lane) return elements;
+  const LANE_LW = getLaneHeaderWidth(lane);
+  const subs = elements.filter((e) => e.type === "lane" && e.parentId === laneId);
+  if (subs.length === 0) return elements;
+  let result = elements;
+  for (const sub of subs) {
+    const updated: DiagramElement = {
+      ...sub,
+      x: laneX + LANE_LW,
+      y: sub.y + dy,
+      width: laneW - LANE_LW,
+    };
+    result = result.map((e) => (e.id === sub.id ? updated : e));
+    result = shiftSublanesBy(result, sub.id, dy, updated.x, updated.width);
+  }
+  return result;
+}
+
 function rescaleSublanesRecursive(
   elementsArr: DiagramElement[],
   parentLane: DiagramElement,
@@ -9882,8 +9918,36 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       // its top edge moves to follow. The enclosing parent (pool or
       // outer lane) keeps its size — sublanes always fill their lane,
       // lanes always fill their pool. No external push, no pool cascade.
-      const maxGrow   = below.height - MIN_H;
-      const maxShrink = above.height - MIN_H;
+      // ONLY THE BOUNDARY MOVES. Paul, 2026-09-21: "When moving the top or
+      // bottom boundary of a Lane with 2 or more sublanes the boundary moves
+      // ok but the middle sublane dividers also move. This does not happen
+      // with Lanes within a Pool. Only the boundary should move."
+      //
+      // He had caught the two levels disagreeing. A pool resize picks ONE lane
+      // to absorb — the top one for a top-edge drag, the bottom for a bottom —
+      // and leaves the rest alone; this spread the change proportionally over
+      // the sublanes, so dragging one divider moved all of them.
+      //
+      // ABOVE's bottom edge is the one that moved, so its LAST sublane
+      // absorbs; BELOW's top edge moved, so its FIRST one does. Which is also
+      // why the clamp is asked of THOSE bands and not of the lane as a whole:
+      // the drag has to stop when the band that is giving way runs out, not
+      // when the lane does — otherwise the shortfall passes inward and moves
+      // the dividers again by another route.
+      const poolFsNow = state.poolFontSize ?? 16;
+      const laneFsNow2 = state.laneFontSize ?? 14;
+      // The tree, not a flat list: the room a lane has is the room ITS edge
+      // band has, recursively — see `shrinkRoom`.
+      const bandTree = (lane: DiagramElement, depth = 0): Band => ({
+        height: lane.height,
+        min: Math.max(MIN_H, laneMetrics(lane.label ?? "", laneFsNow2).minHeight),
+        bands: depth > 12 ? [] : state.elements
+          .filter((e) => e.type === "lane" && e.parentId === lane.id)
+          .sort((a, b) => a.y - b.y)
+          .map((sub) => bandTree(sub, depth + 1)),
+      });
+      const maxGrow   = shrinkRoom(bandTree(below), "first");
+      const maxShrink = shrinkRoom(bandTree(above), "last");
       const clampedDy = Math.max(-maxShrink, Math.min(maxGrow, dy));
       if (clampedDy === 0) return state;
 
@@ -9897,34 +9961,45 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         return e;
       });
 
-      // Proportionally rescale sub-lanes within each affected lane so
-      // the sublane stack continues to fill the parent lane's new
-      // height. Recurses through arbitrary nesting depth.
-      function rescaleSubs(els: DiagramElement[], laneId: string, laneY: number, laneH: number, laneX: number, laneW: number): DiagramElement[] {
+      // Re-fit each affected lane's sub-lanes, the edge band taking the whole
+      // change. Recurses: a sub-lane that absorbs re-fits its own bands at the
+      // SAME edge, because the same edge of it is the one that moved.
+      function rescaleSubs(
+        els: DiagramElement[], laneId: string,
+        laneY: number, laneH: number, laneX: number, laneW: number,
+        edge: StackEdge,
+      ): DiagramElement[] {
         const lane = els.find((e) => e.id === laneId);
         const LANE_LW = lane ? getLaneHeaderWidth(lane) : 36;
         const subs = els.filter((e) => e.type === "lane" && e.parentId === laneId).sort((a, b) => a.y - b.y);
         if (subs.length === 0) return els;
-        const totalSubH = subs.reduce((s, l) => s + l.height, 0) || 1;
-        let stackY = laneY;
+        const bands: Band[] = subs.map((sub) => ({
+          height: sub.height,
+          min: minHeightForContainer(sub, els, poolFsNow, laneFsNow2),
+        }));
+        const delta = laneH - bands.reduce((s, b) => s + b.height, 0);
+        const heights = absorbAtEdge(bands, delta, edge);
+        const ys = stackFrom(laneY, heights);
+        const absorbing = edge === "first" ? 0 : subs.length - 1;
         let result = els;
         for (let i = 0; i < subs.length; i++) {
-          const sub = subs[i];
-          let newSubH = Math.max(28, Math.round(laneH * (sub.height / totalSubH)));
-          if (i === subs.length - 1) {
-            newSubH = Math.max(28, laneY + laneH - stackY);
-          }
           const newSubX = laneX + LANE_LW;
           const newSubW = laneW - LANE_LW;
-          const updatedSub: DiagramElement = { ...sub, x: newSubX, y: stackY, width: newSubW, height: newSubH };
-          result = result.map((e) => (e.id === sub.id ? updatedSub : e));
-          result = rescaleSubs(result, sub.id, stackY, newSubH, newSubX, newSubW);
-          stackY += newSubH;
+          const updatedSub: DiagramElement = { ...subs[i], x: newSubX, y: ys[i], width: newSubW, height: heights[i] };
+          result = result.map((e) => (e.id === subs[i].id ? updatedSub : e));
+          // Only the band that actually changed size needs its own stack
+          // re-fitted; the others kept their height, so their dividers are
+          // already where they belong.
+          if (i === absorbing) {
+            result = rescaleSubs(result, subs[i].id, ys[i], heights[i], newSubX, newSubW, edge);
+          } else {
+            result = shiftSublanesBy(result, subs[i].id, ys[i] - subs[i].y, newSubX, newSubW);
+          }
         }
         return result;
       }
-      elements = rescaleSubs(elements, aboveLaneId, above.y, newAboveH, above.x, above.width);
-      elements = rescaleSubs(elements, belowLaneId, newBelowY, newBelowH, below.x, below.width);
+      elements = rescaleSubs(elements, aboveLaneId, above.y, newAboveH, above.x, above.width, "last");
+      elements = rescaleSubs(elements, belowLaneId, newBelowY, newBelowH, below.x, below.width, "first");
       // (Lane membership is re-derived centrally by the reducer wrapper — a
       // divider move can push an element's centre into the adjacent lane.)
 
