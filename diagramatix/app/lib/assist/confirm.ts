@@ -64,8 +64,37 @@ export function needsConfirmation(
     if (!e || (e.type !== "pool" && e.type !== "lane")) continue;
     const parentIsLane = elements.find((p) => p.id === e.parentId)?.type === "lane";
     const kind = e.type === "pool" ? "pool" : parentIsLane ? "sub-lane" : "lane";
-    const inside = elements.filter((x) => x.parentId === e.id).length;
-    return `delete the ${kind} “${e.label?.trim() || kind}”${inside ? ` and the ${plural(inside, "element")} inside it` : ""}`;
+    // WHAT IS INSIDE IS KEPT, and the prompt used to say the opposite.
+    //
+    // Deleting a container cascade-deletes the container SUBTREE and re-homes
+    // every non-container child — tasks, events, gateways, data — to the lane
+    // that absorbs the space, or to the pool. The reducer has always done
+    // this. The prompt said "delete the sub-lane 'domestic' AND THE 7 ELEMENTS
+    // INSIDE IT", so Paul said no (2026-09-21) to an operation that would not
+    // have touched his seven elements.
+    //
+    // A confirmation that overstates the danger is not "being safe": it trains
+    // the user to distrust the prompt, and it stops them doing the thing they
+    // asked for.
+    // Count the real contents ANYWHERE below it, not just the direct children.
+    // A pool's only direct child is usually a lane, so "1 element inside it"
+    // described the lane — true of nothing the user can see, while the two
+    // tasks they are actually worried about went unmentioned.
+    const laneLike = new Set(["lane", "sublane"]);
+    const inside = (() => {
+      const ids = new Set([e.id]);
+      let grew = true;
+      while (grew) {
+        grew = false;
+        for (const x of elements) {
+          if (x.parentId && ids.has(x.parentId) && !ids.has(x.id) && laneLike.has(x.type)) {
+            ids.add(x.id); grew = true;
+          }
+        }
+      }
+      return elements.filter((x) => x.parentId && ids.has(x.parentId) && !laneLike.has(x.type)).length;
+    })();
+    return `delete the ${kind} “${e.label?.trim() || kind}”${inside ? ` — the ${plural(inside, "element")} inside it will be kept` : ""}`;
   }
   return null;
 }

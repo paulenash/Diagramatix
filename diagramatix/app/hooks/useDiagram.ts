@@ -25,6 +25,7 @@ import { gatewayVertex, nudgeGatewayEndpoint, computeWaypoints, recomputeAllConn
 import { planWrapInSubprocess, planUnwrapSubprocess, planWrapInContainer, type WrapIds } from "@/app/lib/diagram/subprocessWrap";
 import { isUmlConnType } from "@/app/lib/diagram/types";
 import { capitaliseFirstWord, needsCapital } from "@/app/lib/diagram/nameCase";
+import { fillLaneWithSublanes } from "@/app/lib/diagram/laneFill";
 import { expandMoveSet } from "@/app/lib/diagram/moveSet";
 import { retypeTasksForSystemFlag, applyTaskTypeChanges } from "@/app/lib/diagram/itSystemTaskTypes";
 import { emieMountProps } from "@/app/lib/diagram/emieLabel";
@@ -2285,7 +2286,13 @@ function uniqueContainerLabel(
       .map((e) => (e.label ?? "").trim().toLowerCase())
       .filter(Boolean),
   );
-  const base = (desired ?? "").trim();
+  // Containers start with a capital too (Paul, 2026-09-21: "lanes are created
+  // without capitalised names"). Done HERE, before the uniqueness pass, because
+  // every container naming path — create, rename, split, voice, AI — comes
+  // through this function, and because the two rules have to compose in this
+  // order: capitalise, then de-duplicate, so "sales" beside "Sales" is caught
+  // as the clash it is rather than slipping past on case.
+  const base = capitaliseFirstWord((desired ?? "").trim());
   const bare = base === "" || base.toLowerCase() === kind.toLowerCase();
   if (bare) {
     let n = 1;
@@ -6721,6 +6728,12 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
               elements = elements.map((e) =>
                 e.id === absorber!.id ? { ...e, y: newY, height: newH } : e,
               );
+              // The absorber may have SUB-LANES, and they were left at their
+              // old sizes — so the lane grew and its bands did not, leaving a
+              // void exactly the height of the deleted lane (Paul, 2026-09-21:
+              // deleting "picking 2" left 257px of empty space inside
+              // "shipping"). The sub-lane nearest the edge that moved takes it.
+              elements = fillLaneWithSublanes(elements, absorber.id);
               elements = elements.map((e) =>
                 orphanIds.has(e.id) ? { ...e, parentId: absorber!.id } : e,
               );

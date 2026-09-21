@@ -96,6 +96,24 @@ export function laneWordIsAttached(ref: string, trailingLaneMatched: boolean): b
  */
 const POSITIONAL = /^(?:between|before|after|instead\s+of|in\s+place\s+of|replacing|replaces?|above|below|under(?:neath)?|over|beside|next\s+to|in\s+front\s+of|behind|onto|into|inside|within|from|to)\b/i;
 
+/**
+ * The same words appearing LATER in an implicit label.
+ *
+ * Anchoring to the start was not enough. "Create a participant box for the
+ * courier above customer" left the implicit label "participant box for the
+ * courier above customer", which does not START with a positional word — so a
+ * TASK was created carrying that whole sentence as its name, parked in
+ * whichever sub-lane was last (Paul, 2026-09-21).
+ *
+ * A phrase in the middle of a name is weaker evidence than one at the front,
+ * so this list is the unambiguous subset: a name really can contain "to" or
+ * "from" ("Send to Customer", "Receive from Supplier"), but "X above Y" and
+ * "X between A and B" are relationships every time. Declining costs nothing —
+ * the AI gets it, and can place the thing properly.
+ */
+const POSITIONAL_INSIDE = /\s(?:between|above|below|under(?:neath)?|beside|next\s+to|in\s+front\s+of|behind|instead\s+of|in\s+place\s+of)\s+\S/i;
+
 export function looksPositionalNotAName(implicitLabel: string): boolean {
-  return POSITIONAL.test(norm(implicitLabel));
+  const s = norm(implicitLabel);
+  return POSITIONAL.test(s) || POSITIONAL_INSIDE.test(s);
 }

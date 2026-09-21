@@ -292,7 +292,13 @@ export function parseCommand(utterance: string): AssistOp[] | null {
 
   // ── Pool / lane container commands ("poll"/"pull"→pool, "line"→lane) ──
   {
-    const P = "(?:pool|poll|pull)";
+    // "Participant box" is what the BPMN spec calls a black-box pool, and it
+    // is what Paul said out loud (2026-09-21). Without it, "create a
+    // participant box for the courier above customer" fell through to the add
+    // rule and became a TASK named "Participant box for the courier above
+    // customer", parked in whichever sub-lane was last. "Participant" on its
+    // own counts too — it is the spec's word for the thing.
+    const P = "(?:pool|poll|pull|participant(?:\\s+box)?)";
     const L = "(?:lanes?|lines?)";
     const ALL = "(?:everything|all(?:\\s+(?:the\\s+)?elements?)?(?:\\s+on\\s+(?:the\\s+)?diagram)?|the\\s+(?:lot|whole\\s+thing|diagram)|it\\s+all)";
 
@@ -420,10 +426,19 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     // Create a NEW pool. The "called <name>" and "above|below <target>" clauses
     // may come in EITHER order, and <target> may be a NAMED pool ("above
     // Customer") or the whole stack ("above existing pools").
-    mm = raw.match(new RegExp(`^(?:add|insert|create|put|make|new|draw)\\s+(?:a\\s+|an\\s+|the\\s+)?(?:new\\s+|another\\s+|empty\\s+)?(black[- ]?box|white[- ]?box)?\\s*${P}\\b(.*)$`, "i"));
+    mm = raw.match(new RegExp(`^(?:add|insert|create|put|make|new|draw)\\s+(?:a\\s+|an\\s+|the\\s+)?(?:new\\s+|another\\s+|empty\\s+)?(black[- ]?box|white[- ]?box)?\\s*(${P})\\b(.*)$`, "i"));
     if (mm) {
-      const poolType = mm[1] ? (/black/i.test(mm[1]) ? "black-box" : "white-box") : undefined;
-      const rest = mm[2].trim();
+      // A PARTICIPANT BOX IS A BLACK-BOX POOL — that is what the spec calls
+      // one, so saying it should not produce a white-box pool with lanes.
+      //
+      // Tested against the POOL WORD only, not the whole match: "add a pool
+      // called Participant above Customer" names a pool Participant, and
+      // reading the name as a type turned an ordinary pool black-box.
+      const saidParticipant = /participant/i.test(mm[2]);
+      const poolType = mm[1]
+        ? (/black/i.test(mm[1]) ? "black-box" : "white-box")
+        : (saidParticipant ? "black-box" as const : undefined);
+      const rest = mm[3].trim();
       // position + target (target runs until a following "called …", or to end)
       const pm = rest.match(/\b(above|below|under(?:neath)?|over)\s+(.+?)(?:\s+called\s+.+)?$/i);
       let position: "above" | "below" | undefined;
@@ -435,9 +450,11 @@ export function parseCommand(utterance: string): AssistOp[] | null {
         // specific pool → leave relativeTo unset (position relative to all).
         if (!/^(?:existing\s+|all\s+|other\s+|the\s+other\s+)?(?:pools?)$/i.test(tgt)) relativeTo = tgt;
       }
-      // name: "called <name>" up to a following position clause or end
-      const cm = rest.match(/\bcalled\s+(.+?)(?:\s+(?:above|below|under(?:neath)?|over)\b.*)?$/i);
-      const label = cm ? clean(cm[1]) : undefined;
+      // name: "called <name>" — and also "for <name>", which is how a person
+      // names a participant box out loud ("a participant box FOR THE COURIER").
+      // Without it the name was dropped and the box arrived unlabelled.
+      const cm = rest.match(/\b(?:called|named|labell?ed|for)\s+(?:the\s+)?(.+?)(?:\s+(?:above|below|under(?:neath)?|over)\b.*)?$/i);
+      const label = cm ? capitaliseFirstWord(clean(cm[1])) : undefined;
       // Trailing text we didn't recognise as a name/position clause → not a clean
       // pool command; let the AI interpret it (matches "add a pool thingy blah").
       const restRecognised = !rest || /^(?:on\s+the\s+diagram)$/i.test(rest);
