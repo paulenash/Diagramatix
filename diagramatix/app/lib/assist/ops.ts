@@ -100,8 +100,19 @@ export const SYMBOL_SYNONYMS: Record<string, { symbolType: SymbolType; eventType
   "expanded sub process": { symbolType: "subprocess-expanded" },
   "expanded sub-process": { symbolType: "subprocess-expanded" },
   "ep": { symbolType: "subprocess-expanded" },
-  "gateway": { symbolType: "gateway", gatewayType: "exclusive" },
-  "decision": { symbolType: "gateway", gatewayType: "exclusive" },
+  // Paul, 2026-09-21: "The default Decision and Merge Gateway marker should be
+  // None." A bare "gateway" or "decision" therefore carries NO marker — the
+  // role (decision / merge) is what the reducer infers and what the reader
+  // needs; the × is a choice, not a default. Say "exclusive gateway" for one.
+  "gateway": { symbolType: "gateway" },
+  "decision": { symbolType: "gateway" },
+  // "Add a merge" made a TASK named "merge" (Paul's log, 2026-09-21) — the
+  // word was in nobody's vocabulary. It is a gateway, and the reducer's
+  // decision/merge inference gives it the right role.
+  "merge": { symbolType: "gateway" },
+  "merge gateway": { symbolType: "gateway" },
+  "join": { symbolType: "gateway" },
+  "join gateway": { symbolType: "gateway" },
   "exclusive gateway": { symbolType: "gateway", gatewayType: "exclusive" },
   "xor": { symbolType: "gateway", gatewayType: "exclusive" },
   "parallel gateway": { symbolType: "gateway", gatewayType: "parallel" },

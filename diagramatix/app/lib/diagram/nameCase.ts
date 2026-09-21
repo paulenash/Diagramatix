@@ -71,3 +71,39 @@ export function wouldCapitalise(name: string): boolean {
   const trimmed = String(name ?? "").trim();
   return trimmed !== "" && capitaliseFirstWord(trimmed) !== trimmed;
 }
+
+/**
+ * A DECISION gateway's label is a question, so it ends in one.
+ *
+ * Paul, 2026-09-21: "Names of Decision Gateways (their labels) should always
+ * have a '?' appended to them." The product already defaulted a new decision
+ * to "Decision?", but any label the user gave it afterwards lost the mark —
+ * "In stock" instead of "In stock?" — so the diagram read inconsistently
+ * depending on how the gateway got its name.
+ *
+ * Only decisions. A MERGE gateway is not asking anything, and a merge labelled
+ * "Approved?" would be a lie about what the shape does.
+ *
+ * Left alone when the label already ends in a question mark, when it is empty
+ * (an unlabelled gateway is normal and a bare "?" would be worse), and when it
+ * ends in other sentence punctuation the user clearly chose.
+ */
+export function decisionLabel(label: string): string {
+  const s = String(label ?? "").trim();
+  if (!s) return s;
+  if (/[?!.]$/.test(s)) return s;
+  return `${s}?`;
+}
+
+/**
+ * Is this element a decision gateway? The role lives in `properties`, and
+ * DEFAULTS to decision — which matches `ROLE_OPTS` in the right-click menu and
+ * the reducer's own inference.
+ */
+export function isDecisionGateway(
+  el: { type?: string; properties?: Record<string, unknown> } | undefined,
+): boolean {
+  if (!el || el.type !== "gateway") return false;
+  const role = el.properties?.gatewayRole;
+  return role === undefined || role === null || role === "decision";
+}

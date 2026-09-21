@@ -20,8 +20,23 @@ describe("parseCommand — add", () => {
   it("add a start event", () => {
     expect(parseCommand("add a start event")).toEqual([{ op: "add", symbolType: "start-event" }]);
   });
-  it("add a decision → exclusive gateway", () => {
-    expect(parseCommand("add a decision")).toEqual([{ op: "add", symbolType: "gateway", gatewayType: "exclusive" }]);
+  it("add a decision → a gateway with NO marker", () => {
+    // 2026-09-21, Paul: "The default Decision and Merge Gateway marker should
+    // be None." A bare "decision" used to carry an exclusive ×; the × is a
+    // choice, not a default, and the ROLE is what the reader needs. Say
+    // "exclusive gateway" to get one.
+    expect(parseCommand("add a decision")).toEqual([{ op: "add", symbolType: "gateway" }]);
+    expect(parseCommand("add a gateway")).toEqual([{ op: "add", symbolType: "gateway" }]);
+    // …and an explicit marker still works.
+    expect(parseCommand("add an exclusive gateway")).toEqual([{ op: "add", symbolType: "gateway", gatewayType: "exclusive" }]);
+  });
+  it("add a merge → a gateway, not a task called “merge”", () => {
+    // Paul's log: "Add a merge" created a TASK named merge, because the word
+    // was in nobody's vocabulary.
+    expect(parseCommand("add a merge")).toEqual([{ op: "add", symbolType: "gateway" }]);
+    expect(parseCommand("add a merge gateway after Pick Items")).toEqual([
+      { op: "add", symbolType: "gateway", afterRef: "Pick Items" },
+    ]);
   });
   it("insert a parallel gateway", () => {
     expect(parseCommand("insert a parallel gateway")).toEqual([{ op: "add", symbolType: "gateway", gatewayType: "parallel" }]);

@@ -24,7 +24,7 @@ import type {
 import { gatewayVertex, nudgeGatewayEndpoint, computeWaypoints, recomputeAllConnectors, consolidateWaypoints, rectifyWaypoints, constrainControlPoint, safeSidePair, selfLoopWaypoints, measureSelfLoopBulge, SELF_LOOP_BULGE, fuseCollinearWaypoints } from "@/app/lib/diagram/routing";
 import { planWrapInSubprocess, planUnwrapSubprocess, planWrapInContainer, type WrapIds } from "@/app/lib/diagram/subprocessWrap";
 import { isUmlConnType } from "@/app/lib/diagram/types";
-import { capitaliseFirstWord, needsCapital } from "@/app/lib/diagram/nameCase";
+import { capitaliseFirstWord, needsCapital, decisionLabel, isDecisionGateway } from "@/app/lib/diagram/nameCase";
 import { fillLaneWithSublanes } from "@/app/lib/diagram/laneFill";
 import { expandMoveSet } from "@/app/lib/diagram/moveSet";
 import { retypeTasksForSystemFlag, applyTaskTypeChanges } from "@/app/lib/diagram/itSystemTaskTypes";
@@ -4049,9 +4049,16 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       // pass through UPDATE_LABEL at all. `label` — the built-in default for
       // the type — is already capitalised, so in practice this only touches a
       // caller-supplied one.
-      const effectiveLabel = needsCapital(action.payload.symbolType)
+      const capitalised = needsCapital(action.payload.symbolType)
         ? capitaliseFirstWord(initial?.label ?? label)
         : (initial?.label ?? label);
+      // A gateway created as a DECISION gets its question mark here too — the
+      // label can arrive with the element ("add a gateway called In stock")
+      // and never pass through UPDATE_LABEL.
+      const effectiveLabel =
+        action.payload.symbolType === "gateway" && smartGatewayRole !== "merge"
+          ? decisionLabel(capitalised)
+          : capitalised;
       const dropX = isPool
         ? (baseX_override ?? action.payload.position.x - 18)  // align with nearest pool, else header at drop
         : action.payload.position.x - effectiveW / 2;
@@ -6096,6 +6103,13 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           //
           // `capitaliseFirstWord` leaves a deliberate capital alone (iPhone,
           // eCommerce, mRNA), so this cannot mangle a real name.
+          // A DECISION gateway's label is a question and ends in one (Paul,
+          // 2026-09-21). A new decision already defaulted to "Decision?", but
+          // renaming it lost the mark — "In stock" instead of "In stock?" — so
+          // the diagram read differently depending on how the gateway got its
+          // name. Merges are untouched: a merge asks nothing.
+          : target && isDecisionGateway(target)
+            ? decisionLabel(capitaliseFirstWord(action.payload.label))
           : target && needsCapital(target.type)
             ? capitaliseFirstWord(action.payload.label)
             : action.payload.label;
@@ -6455,7 +6469,9 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           const connectors = state.connectors.filter(
             (c) => !removedIds.has(c.sourceId) && !removedIds.has(c.targetId),
           );
-          return { ...state, elements, connectors };
+          // Same invariant as the main delete path below: whatever survived,
+          // a pool still spans its lanes and a lane its sub-lanes.
+          return { ...state, elements: ensureContainersEncloseChildren(elements), connectors };
         }
       }
 
@@ -6860,7 +6876,17 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           .map((e) => e.id),
       );
       const typed = updatePoolTypes(afterDelete);
-      const finalElements = justEmptied.size ? resizeEmptyPoolsToHeader(typed, state.poolFontSize ?? 16, justEmptied) : typed;
+      const sized = justEmptied.size ? resizeEmptyPoolsToHeader(typed, state.poolFontSize ?? 16, justEmptied) : typed;
+      // A POOL MUST STILL SPAN ITS LANES AFTERWARDS.
+      //
+      // Deleting inside a container changes lane heights — a sub-lane delete
+      // grows the band that absorbs it, which grows the lane — and nothing
+      // re-fitted the ancestors, so the pool kept its old height while its
+      // lanes ran past the bottom of it. Paul's export (2026-09-21): pool
+      // Warehouse h=435 with lanes reaching 529, "independent of its contents
+      // and behaves weirdly when resized". Every other lane action already
+      // ends this way; the delete path was the one that did not.
+      const finalElements = ensureContainersEncloseChildren(sized);
       return { ...state, elements: finalElements, connectors };
     }
 

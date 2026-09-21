@@ -134,6 +134,28 @@ export function unresolvedMentions(
 }
 
 /**
+ * Replace element ids in a string with the names they stand for.
+ *
+ * The apply layer now RESOLVES a bare id (we handed them to the model, so
+ * honouring one is better than failing) — but the log still printed the AI's
+ * canonical rewrite verbatim, so Paul saw
+ *
+ *     "connect qruut4v9 to ksjm25kj" → connected Back order → Merge
+ *
+ * The command was right; the sentence describing it was written in our
+ * internal vocabulary (Paul, 2026-09-21). An id with no element left is shown
+ * as "something", because printing it is what we are trying to stop.
+ */
+export function humaniseIds(text: string, elements: readonly DiagramElement[]): string {
+  if (!text) return text;
+  const byId = new Map(elements.map((e) => [e.id, (e.label ?? "").trim() || e.type]));
+  return text.replace(/\b[a-z0-9]{8}\b/g, (tok) => {
+    if (!looksLikeElementId(tok)) return tok;
+    return byId.get(tok) ?? "something";
+  });
+}
+
+/**
  * The sentence to show when the AI came back with nothing.
  *
  * Falls back to the old wording when there is no better explanation, because

@@ -53,7 +53,7 @@ import { subtypeFingerprint } from "@/app/lib/diagram/elementSubtypes";
 import { planLabelFill } from "@/app/lib/assist/fillSelection";
 import { findRiskCatalogItem } from "@/app/lib/assist/riskCatalogRef";
 import { parseGhostPick, resolveGhostPick } from "@/app/lib/assist/ghostPick";
-import { looksLikeElementId, notUnderstoodMessage } from "@/app/lib/assist/refMentions";
+import { looksLikeElementId, notUnderstoodMessage, humaniseIds } from "@/app/lib/assist/refMentions";
 import { isMicStopWord, isFlowEndWord } from "@/app/lib/assist/stopWords";
 import { isIncompleteCommand } from "@/app/lib/assist/incompleteCommand";
 import { leadingSpokenNumber } from "@/app/lib/assist/spokenNumber";
@@ -3393,7 +3393,11 @@ export function DiagramEditor({
         if (targets.length === 0) { results.push(`there are no ${itemType}s to rename`); anyFail = true; continue; }
         setMessageFlow(null);
         setRenameFlow({ phase: "pick", itemType, targets });
-        results.push(`pick a ${itemType} by number, then say the new name — say “done” to finish`);
+        // "Say done to finish" reads as "when you have finished renaming",
+        // which is not the sentence someone wants when they are trying to get
+        // OUT. Paul said "undo" three times instead (2026-09-21). Name the way
+        // out explicitly.
+        results.push(`pick a ${itemType} by number, then say the new name — “cancel” to stop, “done” when finished`);
         continue;
       }
 
@@ -3719,6 +3723,16 @@ export function DiagramEditor({
     // "done"/"cancel"/Esc-words end the rename loop (mic stays on); a bare
     // "stop" never reaches here — it stops the mic (stopWords.ts).
     if (isFlowEndWord(low)) { cancelRenameFlow("rename finished"); return; }
+    // "Undo" inside a numbered pick meant "get me out of this", and it was
+    // answered with "say the number of the item to rename" — three times in a
+    // row, in Paul's log (2026-09-21), which is the feature arguing with
+    // someone trying to leave. It now does BOTH: drop the pick, then undo.
+    if (/^undo\b/.test(low)) {
+      cancelRenameFlow("rename cancelled");
+      undo();
+      setVoiceLog((prev) => [...prev, { id: nanoid(), heard: t, summary: "undid the last change", ok: true }]);
+      return;
+    }
     if (flow.phase === "pick") {
       // Leading number (digit, number-word, or a known mishearing of one)
       // selects a badge; trailing text is the name. `leadingSpokenNumber`
@@ -3890,7 +3904,11 @@ export function DiagramEditor({
       // mis-hears + guarantees a valid, documented command); fall back to ops.
       const canonical = typeof j.canonical === "string" ? j.canonical.trim() : "";
       const canonicalOps = canonical ? parseCommand(canonical) : null;
-      if (canonicalOps) { applyOrAsk(canonicalOps, true, `“${canonical}” → `); return; }
+      // The canonical is SHOWN to the user, so it has to be in their
+      // vocabulary. The model answers with ids because we gave it ids, and the
+      // log printed them verbatim — "connect qruut4v9 to ksjm25kj" (Paul,
+      // 2026-09-21). The command was right; the sentence describing it was not.
+      if (canonicalOps) { applyOrAsk(canonicalOps, true, `“${humaniseIds(canonical, data.elements)}” → `); return; }
       const aiOps = validateOps(j.ops);
       if (aiOps.length === 0) {
         // The command was often understood perfectly — it named something that
