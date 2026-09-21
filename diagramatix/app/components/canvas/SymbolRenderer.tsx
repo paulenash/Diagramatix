@@ -1923,8 +1923,11 @@ function PoolShape({ el }: { el: DiagramElement }) {
   return (
     <g>
       <rect x={x} y={y} width={w} height={h} fill={poolBodyTint} stroke="#374151" strokeWidth={1.5} />
+      {/* Grab, not pointer, and on every pool — the header is the handle you
+          move the pool by, so it should say so before you press (Paul,
+          2026-09-21). `isWhiteBox` is now only about the body tint. */}
       <rect x={x} y={y} width={LW} height={h} fill={poolHeaderColour} stroke="#374151" strokeWidth={1.5}
-        style={isWhiteBox ? { cursor: "pointer" } : undefined} />
+        style={{ cursor: "grab" }} />
       <text textAnchor="middle" fontSize={fontSize} fill="#3b1a08"
             transform={`rotate(-90,${cx},${cy})`}
             textRendering="geometricPrecision"
@@ -4135,8 +4138,18 @@ function SymbolRendererInner({
       })()}
       {showConnectionPoints && !isBoundary && element.type !== "lane" && element.type !== "use-case" && element.type !== "process-system" && element.type !== "gateway" && (
         <rect data-interactive
-          x={element.x} y={element.y}
-          width={element.width} height={element.height}
+          {...(element.type === "pool"
+            // THE HEADER IS FOR MOVING, ALWAYS. Paul, 2026-09-21: "clicking on
+            // the Pool header should always just allow pool movement — the
+            // cursor should change to a grab cursor and never go to connector
+            // create mode when the initial click is on the Pool header." It is
+            // the one band that reliably belongs to the pool rather than to
+            // what is drawn inside it, and on a white-box pool it is the ONLY
+            // place you can take hold of it. So the connect overlay starts
+            // where the header ends.
+            ? { x: element.x + containerHeaderWidth(element), width: Math.max(0, element.width - containerHeaderWidth(element)) }
+            : { x: element.x, width: element.width })}
+          y={element.y} height={element.height}
           fill="transparent" stroke="none"
           style={{ cursor: "crosshair" }}
           onDoubleClick={handleShapeBodyDblClick}
@@ -4147,6 +4160,23 @@ function SymbolRendererInner({
               : { x: element.x + element.width / 2, y: element.y + element.height / 2 };
             const side = getClosestSideFromPoint(worldPt, element);
 
+            // MOVE IS THE DEFAULT; CONNECTING IS THE DELIBERATE ONE.
+            //
+            // Paul, 2026-09-21: "If I click on a Task, wait a bit and then
+            // move, the Task moves. It seems with Pools that I can't do that
+            // reliably — they almost immediately go into connector creation
+            // mode." This overlay is why. It covers the whole of a SELECTED
+            // element, and it used to read a 5px movement as "start drawing a
+            // connector" — so dragging a selected shape drew a line instead of
+            // moving it. Pools show it up because a white-box pool suppresses
+            // this overlay entirely while a black-box one does not, so the two
+            // kinds of pool answered the same gesture differently.
+            //
+            // Now: move the mouse and you are MOVING the shape, which is what
+            // a drag means everywhere else on the canvas. Press and HOLD for
+            // 300ms without moving and you are drawing a connector — the same
+            // press-and-hold the connection points already use, and the only
+            // reading that cannot be confused with a drag.
             let fired = false;
             function activate() {
               if (fired) return;
@@ -4158,7 +4188,13 @@ function SymbolRendererInner({
             }
             const holdTimer = setTimeout(activate, 300);
             function onMove(ev: MouseEvent) {
-              if (Math.abs(ev.clientX - e.clientX) > 5 || Math.abs(ev.clientY - e.clientY) > 5) activate();
+              if (fired) return;
+              if (Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) > 4) {
+                clearTimeout(holdTimer);
+                window.removeEventListener("mouseup", onUp);
+                window.removeEventListener("mousemove", onMove);
+                beginElementDrag(e);
+              }
             }
             function onUp() {
               clearTimeout(holdTimer);

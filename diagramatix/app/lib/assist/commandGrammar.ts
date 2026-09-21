@@ -7,7 +7,7 @@ import type { AssistOp } from "./ops";
 import { SYMBOL_SYNONYMS, SYMBOL_PHRASES } from "./ops";
 import { namesNonContainerKind, laneWordIsAttached, looksPositionalNotAName } from "./greedyGuards";
 import { parseRenameType } from "./renameTargets";
-import { parsePoolBoundaryPhrase } from "./poolBoundaryPhrase";
+import { parsePoolBoundaryPhrase, mentionsPoolBoundary } from "./poolBoundaryPhrase";
 import { repairSelectedWord, repairTurnWord } from "./selectedWord";
 import { capitaliseFirstWord } from "../diagram/nameCase";
 import { convertMatches } from "./convertPhrase";
@@ -301,6 +301,21 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     // own counts too — it is the spec's word for the thing.
     const P = "(?:pool|poll|pull|participant(?:\\s+box)?)";
     const L = "(?:lanes?|lines?)";
+
+    // ONE EDGE, not the whole pool — and tried before every other container
+    // rule, because almost all of them are greedier than this sentence.
+    // "Nudge pull lane, left boundary left" reaches the LANE rule otherwise
+    // and fails as "couldn't find pull lane, left boundary"; "move the pool
+    // left boundary" reaches the element move rule, whose step is the
+    // element's own WIDTH, and slides the pool ~900px across the canvas.
+    //
+    // "needs-direction" means the sentence is plainly a boundary move with no
+    // way named. Declining the whole utterance is the point: it goes to the
+    // AI, which can ask, instead of to a rule that will do something large and
+    // confident with it.
+    const mBoundary = parsePoolBoundaryPhrase(raw);
+    if (mBoundary === "needs-direction") return null;
+    if (mBoundary) return [{ op: "movePoolBoundary", ...mBoundary }];
     const ALL = "(?:everything|all(?:\\s+(?:the\\s+)?elements?)?(?:\\s+on\\s+(?:the\\s+)?diagram)?|the\\s+(?:lot|whole\\s+thing|diagram)|it\\s+all)";
 
     // Compress / collapse a pool: "compress the Customer pool", "shrink Sales".
@@ -508,19 +523,18 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     // Nudge a pool up / down by a small step (default 20px). "nudge"/"bump"
     // always mean this; "move/slide <…> up|down" only counts as a pool-nudge
     // when a pool is named (so "move Task 1 up" stays the generic element move).
-    // ONE EDGE, not the whole pool. Tried first: "move the pool's left
-    // boundary right" ends in a direction word just like "move the pool
-    // right" does, and the nudge rule below would happily swallow it and
-    // slide the entire pool — the opposite of what was asked.
-    const mBoundary = parsePoolBoundaryPhrase(raw);
-    if (mBoundary) return [{ op: "movePoolBoundary", ...mBoundary }];
-
     // Any direction, any element, 20 px (Paul, 2026-09-15); a selection nudges as a group.
     let mnudge = raw.match(new RegExp(`^(?:nudge|bump|inch|shift)\\s+(?:the\\s+)?(.*?)\\s*(?:to\\s+the\\s+)?(up|down|left|right)(?:\\s+by\\s+(\\d+)\\s*(?:px|pixels?)?)?$`, "i"));
     if (!mnudge) {
       const mv = raw.match(new RegExp(`^(?:move|slide)\\s+(?:the\\s+)?(.*?)\\s*(?:to\\s+the\\s+)?(up|down|left|right)(?:\\s+by\\s+(\\d+)\\s*(?:px|pixels?)?)?$`, "i"));
       if (mv && new RegExp(`\\b${P}\\b`, "i").test(mv[1] || "")) mnudge = mv;
     }
+    // A sentence that named a boundary is never a whole-pool nudge. It gets
+    // here only when the boundary parser could not act on it — an impossible
+    // pairing like "move the pool left boundary UP", which is refused rather
+    // than guessed — and "…boundary up" still ends in a direction word, so
+    // this rule would happily slide the entire pool instead. Let the AI ask.
+    if (mnudge && mentionsPoolBoundary(raw)) mnudge = null;
     if (mnudge) {
       const rawRef = clean(mnudge[1] || "");
       const ref = rawRef && !new RegExp(`^${P}$`, "i").test(rawRef) ? rawRef : undefined; // bare "pool" → default target
@@ -530,6 +544,12 @@ export function parseCommand(utterance: string): AssistOp[] | null {
 
   // ── Move ──
   m = raw.match(/^move\s+(.+?)\s+(?:(\d+|a|an|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:elements?|steps?|places?|spaces?|cells?)\s+)?(?:to\s+the\s+)?(left|right|up|down)\b/i);
+  // B5 again, and the costliest instance of it. This rule reads "move the pool
+  // left boundary" as "move the pool left" — the word-boundary after the
+  // direction does not care what follows — and then moves it by a whole
+  // element SPAN, which for a pool is its own width: about 900px. Anything
+  // naming a container boundary is not this rule's business.
+  if (m && mentionsPoolBoundary(raw)) m = null;
   if (m) {
     return [{ op: "move", ref: clean(m[1]), direction: m[3].toLowerCase() as "left" | "right" | "up" | "down", count: toCount(m[2]) }];
   }

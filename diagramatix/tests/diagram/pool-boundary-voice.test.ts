@@ -102,8 +102,12 @@ describe("T4645 — an impossible pairing is refused, not guessed", () => {
   });
 
   it("leaves out the words that would mean two things", () => {
-    // "outward" / "inward" reverse meaning between opposite edges.
-    expect(parsePoolBoundaryPhrase("move the pool left boundary outward")).toBeNull();
+    // "outward" / "inward" reverse meaning between opposite edges, so they are
+    // not direction words. The sentence names an edge and no way to move it,
+    // which is the "needs-direction" case — declined either way, and never
+    // acted on.
+    expect(parsePoolBoundaryPhrase("move the pool left boundary outward")).toBe("needs-direction");
+    expect(parseCommand("move the pool left boundary outward")).toBeNull();
   });
 });
 

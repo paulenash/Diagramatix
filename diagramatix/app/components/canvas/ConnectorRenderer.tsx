@@ -5,6 +5,7 @@ import { canvasMemoEqual } from "./memoEqual";
 
 import type { Connector, Point, Side } from "@/app/lib/diagram/types";
 import { isUmlConnType } from "@/app/lib/diagram/types";
+import { dedupeHoles } from "@/app/lib/diagram/hitMask";
 import { buildConstraintText } from "@/app/lib/diagram/umlConstraints";
 import { DisplayModeCtx, ConnectorFontScaleCtx, sketchyFilter } from "@/app/lib/diagram/displayMode";
 import { waypointsToSvgPath, waypointsToCurvePath, waypointsToRoundedPath } from "@/app/lib/diagram/routing";
@@ -1230,11 +1231,18 @@ function ConnectorRendererInner({ connector, selected, onSelect, svgToWorld, onU
           same as the waypoints. */}
       {(isAssocBPMN || isReviewLink) && (sourceBounds || targetBounds || (maskBounds?.length ?? 0) > 0) && (() => {
         const clipId = `assoc-hit-clip-${connector.id}`;
-        const holes = [
+        // DE-DUPLICATED, and that is the whole point. `evenodd` COUNTS
+        // crossings rather than unioning them, so a rectangle listed twice is
+        // inside an even number of subpaths and stops being a hole. The source
+        // and target bounds are passed explicitly AND are already in the shape
+        // mask, so the line stayed clickable inside exactly the two shapes it
+        // belongs to — invisible until the connector re-routed centre to
+        // centre and ran straight under the pointer (Paul, 2026-09-21).
+        const holes = dedupeHoles([
           ...(sourceBounds ? [sourceBounds] : []),
           ...(targetBounds ? [targetBounds] : []),
           ...(maskBounds ?? []),
-        ];
+        ]);
         const rect = (x: number, y: number, w: number, h: number) =>
           `M${x},${y} H${x + w} V${y + h} H${x} Z`;
         const d = [
