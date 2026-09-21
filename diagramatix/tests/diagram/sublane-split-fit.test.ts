@@ -72,11 +72,13 @@ describe("T4623 — a band is never negative, and never hangs out of its lane", 
   });
 
   it("grows the lane only when it has to", () => {
-    // 108 ÷ 3 = 36 each, comfortably over the floor: the lane must not move.
-    const r = split(108, 3);
-    expect(r.elements.find((e) => e.id === "L")!.height).toBe(108);
-    // 40 ÷ 3 cannot fit at 28 each, so the lane becomes 84.
-    expect(split(40, 3).elements.find((e) => e.id === "L")!.height).toBe(84);
+    // The floor stopped being a flat 28 on 2026-09-21 — a band is now at
+    // least as tall as its own rotated name needs (T4634), which for these
+    // two-character labels is laneMetrics' own 40px floor.
+    // 150 over three 40px bands has room to spare: the lane must not move.
+    expect(split(150, 3).elements.find((e) => e.id === "L")!.height).toBe(150);
+    // 40 cannot hold three of them, so the lane becomes 120.
+    expect(split(40, 3).elements.find((e) => e.id === "L")!.height).toBe(120);
   });
 });
 
@@ -106,7 +108,7 @@ describe("T4624 — the growth is carried up, not left hanging", () => {
       require("node:path").join(process.cwd(), "app", "hooks", "useDiagram.ts"), "utf8",
     );
     const at = reducerSrc.indexOf('case "SPLIT_LANE_EVEN"');
-    const body = reducerSrc.slice(at, at + 4000);
+    const body = reducerSrc.slice(at, at + 6000);
     expect(at).toBeGreaterThan(-1);
     // The re-fit may be WRAPPED by a later rule (ensureLeftGap, 2026-09-21);
     // what this guards is that it is still in the chain at all.

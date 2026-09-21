@@ -102,7 +102,40 @@ export function clampRectToContent(
   if (!content) return raw;
   const pad = opts.pad ?? 8;
   const insetLeft = opts.insetLeft ?? 0;
+  return clampRectToLimits(before, raw, {
+    maxLeft: content.x - pad - insetLeft,
+    minRight: content.x + content.width + pad,
+    maxTop: content.y - pad,
+    minBottom: content.y + content.height + pad,
+  });
+}
 
+/**
+ * How far each edge is allowed to travel INWARD, in world coordinates.
+ *
+ * `maxLeft` is the greatest x the left edge may reach, `minRight` the least x
+ * the right edge may reach, and so on. Any of them may be omitted (that edge
+ * is unconstrained) or `Infinity` / `-Infinity` for the same effect.
+ */
+export interface EdgeLimits {
+  maxLeft?: number;
+  minRight?: number;
+  maxTop?: number;
+  minBottom?: number;
+}
+
+/**
+ * The clamp itself, taking limits directly rather than deriving them from one
+ * container's content.
+ *
+ * Separated out because the left and right edges of a WHITE-BOX pool are not
+ * that pool's business alone: the lockstep rule moves every other white-box
+ * pool's matching edge with it, so the gesture has to stop at the first thing
+ * that ANY of them meets, or the pools whose contents are closer get their
+ * boundaries drawn straight through a task. The caller works out that
+ * minimum; this applies it.
+ */
+export function clampRectToLimits(before: Rect, raw: Rect, lim: EdgeLimits): Rect {
   const beforeRight = before.x + before.width;
   const beforeBottom = before.y + before.height;
 
@@ -111,12 +144,13 @@ export function clampRectToContent(
   let right = raw.x + raw.width;
   let bottom = raw.y + raw.height;
 
-  // Left / top move inward by INCREASING; cap them.
-  left = Math.min(left, Math.max(content.x - pad - insetLeft, before.x));
-  top = Math.min(top, Math.max(content.y - pad, before.y));
+  // Left / top move inward by INCREASING; cap them. `Math.max(…, before)` is
+  // what stops an already-overlapping container being yanked back out.
+  if (lim.maxLeft !== undefined) left = Math.min(left, Math.max(lim.maxLeft, before.x));
+  if (lim.maxTop !== undefined) top = Math.min(top, Math.max(lim.maxTop, before.y));
   // Right / bottom move inward by DECREASING; floor them.
-  right = Math.max(right, Math.min(content.x + content.width + pad, beforeRight));
-  bottom = Math.max(bottom, Math.min(content.y + content.height + pad, beforeBottom));
+  if (lim.minRight !== undefined) right = Math.max(right, Math.min(lim.minRight, beforeRight));
+  if (lim.minBottom !== undefined) bottom = Math.max(bottom, Math.min(lim.minBottom, beforeBottom));
 
   return { x: left, y: top, width: right - left, height: bottom - top };
 }

@@ -25,7 +25,7 @@ import { gatewayVertex, nudgeGatewayEndpoint, computeWaypoints, recomputeAllConn
 import { planWrapInSubprocess, planUnwrapSubprocess, planWrapInContainer, type WrapIds } from "@/app/lib/diagram/subprocessWrap";
 import { isUmlConnType } from "@/app/lib/diagram/types";
 import { capitaliseFirstWord, needsCapital, decisionLabel, isDecisionGateway } from "@/app/lib/diagram/nameCase";
-import { contentBoundsOf, clampRectToContent, poolFollowsLanes, leftGapShortfall, MIN_LEFT_GAP } from "@/app/lib/diagram/poolLaneBounds";
+import { contentBoundsOf, clampRectToContent, clampRectToLimits, poolFollowsLanes, leftGapShortfall, MIN_LEFT_GAP } from "@/app/lib/diagram/poolLaneBounds";
 import { fillLaneWithSublanes } from "@/app/lib/diagram/laneFill";
 import { bandOf, mergeTargetSide, facingSide, isMergeGateway } from "@/app/lib/diagram/gatewaySides";
 import { isLabelMove } from "@/app/lib/diagram/labelTether";
@@ -1776,34 +1776,32 @@ function applyPoolBoundaryShift(
     affect.add(p.id);
     for (const id of getAllDescendantIds(elements, p.id)) affect.add(id);
   }
+  // ONLY BOUNDARIES MOVE. Paul, 2026-09-21: "Make sure ONLY the Pool, Lanes
+  // and Sublanes boundaries are affected by the move. Nothing else must be
+  // affected at all." This cascade used to translate every DESCENDANT of the
+  // other pools by dLeft — so nudging one pool's left edge in by 74px slid
+  // every task in every other pool 74px to the right. The lockstep is about
+  // the pools' EDGES staying aligned; what is drawn inside them has nothing
+  // to do with it and stays exactly where the modeller put it. (Same rule the
+  // EP cascade already follows: "Internal contents do NOT translate".)
   const newElements = elements.map((e) => {
     if (!affect.has(e.id)) return e;
     const isStructural =
       e.type === "pool" || e.type === "lane" || e.type === "sublane";
-    return {
-      ...e,
-      x: e.x + dLeft,
-      width: e.width + (isStructural ? widthDelta : 0),
-    };
+    if (!isStructural) return e;
+    return { ...e, x: e.x + dLeft, width: e.width + widthDelta };
   });
-  // Connectors: full-translate when both endpoints moved, recompute
-  // when only one moved, leave alone otherwise. Translation by dLeft
-  // works because non-structural elements all shift by exactly dLeft;
-  // structural pools/lanes also shift their x by dLeft (their width
-  // change is independent of waypoint placement).
+  // Connectors: nothing a connector attaches to has moved unless it attaches
+  // to a pool or lane edge itself (a message flow does). Recompute only
+  // those; a flow between two tasks is untouched because its endpoints are.
+  const structuralIds = new Set(
+    newElements
+      .filter((e) => affect.has(e.id) && (e.type === "pool" || e.type === "lane" || e.type === "sublane"))
+      .map((e) => e.id),
+  );
   const newConnectors = connectors.map((conn) => {
-    const srcIn = affect.has(conn.sourceId);
-    const tgtIn = affect.has(conn.targetId);
-    if (srcIn && tgtIn) {
-      return {
-        ...conn,
-        waypoints: conn.waypoints.map((wp) => ({ x: wp.x + dLeft, y: wp.y })),
-      };
-    }
-    if (srcIn || tgtIn) {
-      return recomputeAllConnectors([conn], newElements)[0] ?? conn;
-    }
-    return conn;
+    if (!structuralIds.has(conn.sourceId) && !structuralIds.has(conn.targetId)) return conn;
+    return recomputeAllConnectors([conn], newElements)[0] ?? conn;
   });
   return { elements: newElements, connectors: newConnectors };
 }
@@ -3122,12 +3120,22 @@ function clampChildrenToLane(elements: DiagramElement[], lane: DiagramElement): 
  *
  * `startId` may be the pool or anything inside it.
  */
-function ensureLeftGap(elements: DiagramElement[], startId: string): DiagramElement[] {
-  const byId = new Map(elements.map((e) => [e.id, e] as const));
-  let pool = byId.get(startId);
-  for (let i = 0; pool && pool.type !== "pool" && pool.parentId && i < 12; i++) pool = byId.get(pool.parentId);
-  if (!pool || pool.type !== "pool") return elements;
-
+/**
+ * How much of a pool's left side is header strip — ALL the way down.
+ *
+ * A pool spends 36px on its own rotated name, each lane another 36 on its,
+ * each sublane another 36 on its. So the first element in a pool-lane-sublane
+ * stack sits 108px in, not 36, and anything that reasons about "where does
+ * the usable space start" has to count every level or it will under-measure
+ * by a header per level of nesting.
+ *
+ * Returns that span, plus the ids of the pool and every lane inside it —
+ * the set that moves together when the left boundary moves.
+ */
+function poolHeaderSpan(
+  elements: DiagramElement[],
+  pool: DiagramElement,
+): { inset: number; containerIds: Set<string> } {
   const kidsOf = new Map<string, DiagramElement[]>();
   for (const e of elements) {
     if (!e.parentId) continue;
@@ -3135,12 +3143,6 @@ function ensureLeftGap(elements: DiagramElement[], startId: string): DiagramElem
     list.push(e);
     kidsOf.set(e.parentId, list);
   }
-  // Measure the DEEPEST header edge against ALL of the pool's content.
-  //
-  // Not per-container-by-parentage: an element added before the lanes were
-  // stays parented to the POOL while sitting geometrically inside a lane, so
-  // a lane-by-lane walk finds no content in the very lane whose header just
-  // crowded the start event — which is exactly the case Paul reported.
   const containerIds = new Set<string>([pool.id]);
   let headerRight = pool.x + getPoolHeaderWidth(pool);
   const walk = (el: DiagramElement, depth: number) => {
@@ -3153,6 +3155,23 @@ function ensureLeftGap(elements: DiagramElement[], startId: string): DiagramElem
     }
   };
   walk(pool, 0);
+  return { inset: headerRight - pool.x, containerIds };
+}
+
+function ensureLeftGap(elements: DiagramElement[], startId: string): DiagramElement[] {
+  const byId = new Map(elements.map((e) => [e.id, e] as const));
+  let pool = byId.get(startId);
+  for (let i = 0; pool && pool.type !== "pool" && pool.parentId && i < 12; i++) pool = byId.get(pool.parentId);
+  if (!pool || pool.type !== "pool") return elements;
+
+  // Measure the DEEPEST header edge against ALL of the pool's content.
+  //
+  // Not per-container-by-parentage: an element added before the lanes were
+  // stays parented to the POOL while sitting geometrically inside a lane, so
+  // a lane-by-lane walk finds no content in the very lane whose header just
+  // crowded the start event — which is exactly the case Paul reported.
+  const { inset, containerIds } = poolHeaderSpan(elements, pool);
+  const headerRight = pool.x + inset;
   const content = contentBoundsOf(elements, pool.id);
   const shift = leftGapShortfall(headerRight, 0, content ? content.x : null);
   if (shift <= 0) return elements;
@@ -5793,13 +5812,41 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         // rest against the first thing it meets — after which the clamps
         // below have nothing left to do and nothing moves.
         {
-          const content = contentBoundsOf(state.elements, id);
-          const laneLW = sortedLanes.length > 0 ? getLaneHeaderWidth(sortedLanes[0]) : 0;
-          const capped = clampRectToContent(
+          // The VERTICAL stop is this pool's own business; the HORIZONTAL one
+          // is not. The white-box lockstep moves every other white-box pool's
+          // left/right edge by the same amount, so the drag has to stop at the
+          // first content ANY of them meets — otherwise the pools whose first
+          // element sits furthest left get a boundary drawn through it.
+          //
+          // Insets count EVERY header level. A pool-lane-sublane stack spends
+          // 108px on headers; measuring only the first lane's 72 let the
+          // sublane header cross the start event, `clampChildrenToLane` pushed
+          // it right, and the content the cap is measured against moved with
+          // it — so the "stopped" boundary crept 18px a tick for as long as
+          // the user dragged. A stop that moves is not a stop.
+          const own = contentBoundsOf(state.elements, id);
+          const locked = !state.relaxedLayout && action.payload.wasWhiteBoxAtResizeStart === true
+            ? state.elements.filter((e) => e.type === "pool")
+            : [target];
+          let maxLeft = Infinity, minRight = -Infinity;
+          for (const p of locked) {
+            const c = p.id === id ? own : contentBoundsOf(state.elements, p.id);
+            if (!c) continue;
+            const inset = poolHeaderSpan(state.elements, p).inset;
+            // Express each pool's own limit as a DELTA, then re-base it on the
+            // dragged pool — the pools do not share an x, only a movement.
+            maxLeft = Math.min(maxLeft, target.x + ((c.x - MIN_LEFT_GAP - inset) - p.x));
+            minRight = Math.max(minRight, (target.x + target.width) + ((c.x + c.width + MIN_LEFT_GAP) - (p.x + p.width)));
+          }
+          const capped = clampRectToLimits(
             { x: target.x, y: target.y, width: target.width, height: target.height },
             { x: newX, y: newY, width: newW, height: newH },
-            content,
-            { insetLeft: POOL_LW + laneLW, pad: MIN_LEFT_GAP },
+            {
+              maxLeft: Number.isFinite(maxLeft) ? maxLeft : undefined,
+              minRight: Number.isFinite(minRight) ? minRight : undefined,
+              maxTop: own ? own.y - MIN_LEFT_GAP : undefined,
+              minBottom: own ? own.y + own.height + MIN_LEFT_GAP : undefined,
+            },
           );
           newX = capped.x; newY = capped.y; newW = capped.width; newH = capped.height;
         }
@@ -9355,13 +9402,33 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       // to fit rather than producing a negative one; the lanes below it move
       // down by the same amount, and `ensureContainersEncloseChildren` at the
       // return carries the growth up through the pool.
+      // A SUB-LANE IS NEVER SHORTER THAN ITS OWN NAME. Paul, 2026-09-21:
+      // "don't let sublanes be vertically minimised past their header width.
+      // Currently they can be narrowed so the name of the Sublanes overshoots
+      // the Sublane horizontal boundaries." The name is drawn ROTATED down the
+      // header strip, so its length is spent on the band's HEIGHT — a flat
+      // 28px floor gave "International" a 28px strip to run down and the text
+      // ran out through the top and bottom edges of its own band.
+      //
+      // Each band therefore claims its own label-driven minimum first; only
+      // what is left over is shared out. Summing the minimums BEFORE choosing
+      // the body height is what keeps the arithmetic exact — the bands always
+      // add up to `bodyH`, so none can be handed a negative remainder.
       const MIN_SUBLANE_H = 28;
-      const bodyH = Math.max(parent.height, MIN_SUBLANE_H * N);
+      const laneFsNow = state.laneFontSize ?? 14;
+      const mins = all.map((l) => Math.max(MIN_SUBLANE_H, laneMetrics(l.label ?? "", laneFsNow).minHeight));
+      const need = mins.reduce((s, m) => s + m, 0);
+      const bodyH = Math.max(parent.height, need);
       const grewBy = bodyH - parent.height;
-      const each = Math.floor(bodyH / N);
+      const surplus = bodyH - need;
+      const bonus = Math.floor(surplus / N);
       let y = parent.y;
       const geo = new Map<string, { y: number; h: number }>();
-      all.forEach((l, i) => { const h = i === N - 1 ? (parent.y + bodyH) - y : each; geo.set(l.id, { y, h }); y += h; });
+      all.forEach((l, i) => {
+        const h = mins[i] + (i === N - 1 ? surplus - bonus * (N - 1) : bonus);
+        geo.set(l.id, { y, h });
+        y += h;
+      });
       const placedNew = newSubs.map((l) => ({ ...l, y: geo.get(l.id)!.y, height: geo.get(l.id)!.h }));
       const firstId = all[0].id;
       // When the lane grew, every LATER sibling lane in the same pool slides
