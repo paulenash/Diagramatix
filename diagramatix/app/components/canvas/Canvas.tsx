@@ -36,6 +36,8 @@ import { messageLabelsHiddenWhileDragging } from "@/app/lib/diagram/labelVisibil
 import { poolGuideNext, type PoolBoundaryGuide, type PoolGuideEvent } from "@/app/lib/diagram/poolGuide";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { canConnect } from "@/app/lib/diagram/canConnect";
+import { edgeIsResizable, type EdgeSide as ResizableSide } from "@/app/lib/diagram/resizeEdges";
+import { connectorTravels } from "@/app/lib/diagram/liftedLayer";
 import { GoldFlashOverlay, type GoldFlashTarget } from "./GoldFlashOverlay";
 import {
   planEditZoomAim,
@@ -3998,17 +4000,27 @@ export function Canvas({
       const selId = [...selectedElementIds][0];
       const el = data.elements.find((el) => el.id === selId);
       if (el) {
-        if (e.key === "ArrowLeft")  { e.preventDefault(); onMoveElement(selId, el.x - NUDGE, el.y); return; }
-        if (e.key === "ArrowRight") { e.preventDefault(); onMoveElement(selId, el.x + NUDGE, el.y); return; }
-        if (e.key === "ArrowUp")    { e.preventDefault(); onMoveElement(selId, el.x, el.y - NUDGE); return; }
-        if (e.key === "ArrowDown")  { e.preventDefault(); onMoveElement(selId, el.x, el.y + NUDGE); return; }
+        // A keystroke is a whole move, not the middle of a drag. Without the
+        // matching END the drag never closes: `moveElement` marks the element
+        // and its descendants as TRAVELLING and nothing ever clears the mark,
+        // so a nudged pool stayed pinned to the top overlay for the rest of
+        // the session — which is what made its lanes and flows vanish behind
+        // it (Paul, 2026-09-21: "I have to click elsewhere and then again on
+        // the Pool header for everything to return to view"). It also leaves
+        // each nudge its own undo entry, which is what Ctrl+Z should mean here.
+        const nudge = (x: number, y: number) => { onMoveElement(selId, x, y); onElementMoveEnd?.(selId); };
+        if (e.key === "ArrowLeft")  { e.preventDefault(); nudge(el.x - NUDGE, el.y); return; }
+        if (e.key === "ArrowRight") { e.preventDefault(); nudge(el.x + NUDGE, el.y); return; }
+        if (e.key === "ArrowUp")    { e.preventDefault(); nudge(el.x, el.y - NUDGE); return; }
+        if (e.key === "ArrowDown")  { e.preventDefault(); nudge(el.x, el.y + NUDGE); return; }
       }
     } else if (selectedElementIds.size > 1 && !editingLabel && onMoveElements) {
       const ids = [...selectedElementIds];
-      if (e.key === "ArrowLeft")  { e.preventDefault(); onMoveElements(ids, -NUDGE, 0); return; }
-      if (e.key === "ArrowRight") { e.preventDefault(); onMoveElements(ids, NUDGE, 0); return; }
-      if (e.key === "ArrowUp")    { e.preventDefault(); onMoveElements(ids, 0, -NUDGE); return; }
-      if (e.key === "ArrowDown")  { e.preventDefault(); onMoveElements(ids, 0, NUDGE); return; }
+      const nudgeAll = (dx: number, dy: number) => { onMoveElements(ids, dx, dy); onElementsMoveEnd?.(); };
+      if (e.key === "ArrowLeft")  { e.preventDefault(); nudgeAll(-NUDGE, 0); return; }
+      if (e.key === "ArrowRight") { e.preventDefault(); nudgeAll(NUDGE, 0); return; }
+      if (e.key === "ArrowUp")    { e.preventDefault(); nudgeAll(0, -NUDGE); return; }
+      if (e.key === "ArrowDown")  { e.preventDefault(); nudgeAll(0, NUDGE); return; }
     }
     // Nudge selected connector or focused endpoint with arrow keys.
     // Skip endpoint nudging when the connector attaches centre-to-centre
@@ -5104,8 +5116,15 @@ export function Canvas({
    * reachable from two places (Paul, 2026-09-18).
    */
   let renderContainerEl: ((el: DiagramElement) => React.ReactNode) | null = null;
+  /** Shared by the normal connector pass and the lifted overlay — a connector
+   *  whose BOTH ends are travelling has to rise with them, or the pool body
+   *  that lifted above everything covers its own sequence flows. */
+  let renderRegularConn: ((conn: Connector) => React.ReactNode) | null = null;
   /** True for anything travelling with the current drag. */
   const isLifted = (id: string) => !!liftedIds && liftedIds.length > 0 && liftedIds.includes(id);
+  /** A connector rises with the drag only when BOTH its ends do — one that
+   *  crosses OUT of the lifted group stays put, so it still reads as leaving. */
+  const isLiftedConn = (c: Connector) => connectorTravels(c, isLifted);
   const isDataArtifactType = (t: string) => t === "data-object" || t === "data-store" || t === "text-annotation";
 
   // Hump geometry for the regular-connector pass, MEMOISED so each connector's
@@ -5729,7 +5748,7 @@ export function Canvas({
               any part of the lane body (which sits above the pool body)
               moves the whole group. Active-group lanes are skipped here
               and re-rendered in the overlay block at the end. */}
-          {lanes.filter(el => !inActiveGroup(el.id)).map((el) => {
+          {lanes.filter(el => !inActiveGroup(el.id) && !isLifted(el.id)).map((el) => {
             // Lane-swap eligibility — any division (a lane or a sub-lane) whose
             // parent is a pool OR another lane gets the ↑/↓ controls, so two
             // adjacent divisions at the SAME level can be swapped at any depth.
@@ -5981,7 +6000,7 @@ export function Canvas({
             // elements (handled by the on-top pass below), so exclude them
             // all here. Elsewhere only associationBPMN/messageBPMN are on top.
             // regularConns / humpVisibleWps / humpIndexById are memoised above.
-            return regularConns.filter(c => c.id !== selectedConnectorId).map((conn) => (
+            renderRegularConn = (conn: Connector) => (
               <ConnectorRenderer
                 key={conn.id}
                 connector={conn}
@@ -6015,7 +6034,10 @@ export function Canvas({
                 onLabelFocusEditStart={(cx, cy, w) => enterFocusModeAt(cx, cy, w, "connector")}
                 onLabelFocusEditEnd={exitFocusMode}
               />
-            ));
+            );
+            return regularConns
+              .filter(c => c.id !== selectedConnectorId && !isLiftedConn(c))
+              .map(renderRegularConn);
           })()}
 
           {/* Debug labels rendered at end of SVG for z-order */}
@@ -6360,6 +6382,20 @@ export function Canvas({
               {renderContainerEl && [...pools, ...vswimlanes, ...otherContainers]
                 .filter(el => isLifted(el.id))
                 .map(renderContainerEl)}
+              {/* Paul, 2026-09-21: "Lanes, sublanes and sequence connectors
+                  disappear, other elements remain visible." They were not
+                  hidden — they were COVERED. A travelling pool is drawn in
+                  this top overlay (his own 2026-09-18 rule: a pool crossing
+                  other pools rides above them), but its own lanes and its own
+                  flows stayed down in the normal passes, behind an opaque pool
+                  body. Its tasks looked fine only because they travel too and
+                  are drawn further down this same overlay. Everything that
+                  travels with the pool rises with it, in the diagram's natural
+                  order: pool, then lanes, then flows, then elements. */}
+              {renderContainerEl && lanes.filter(el => isLifted(el.id)).map(renderContainerEl)}
+              {renderRegularConn && regularConns
+                .filter(c => c.id !== selectedConnectorId && isLiftedConn(c))
+                .map(renderRegularConn)}
               {renderNonContainerEl && nonContainers
                 .filter(el => isLifted(el.id))
                 .map(renderNonContainerEl)}
@@ -6836,8 +6872,7 @@ export function Canvas({
             return (
               <g data-interactive>
                 {edges
-                  // Pools never move their LEFT boundary — drop the west zone.
-                  .filter((edge) => !(el.type === "pool" && edge.side === "w"))
+                  .filter((edge) => edgeIsResizable(el.type, edge.side as ResizableSide))
                   .map((edge) => (
                     <rect
                       key={edge.side}

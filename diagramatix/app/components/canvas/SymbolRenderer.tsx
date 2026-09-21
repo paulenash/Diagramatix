@@ -9,6 +9,7 @@ import { wrapText, computePackageTab } from "@/app/lib/diagram/textMetrics";
 import { holdsInternalLabel, wrapShapeLabel } from "@/app/lib/diagram/shapeFit";
 import { archiNodeDepth } from "@/app/lib/diagram/nodeGeometry";
 import { containerHeaderWidth } from "@/app/lib/diagram/containerHeader";
+import { edgeIsResizable, handleIsResizable, type EdgeSide as ResizableSide } from "@/app/lib/diagram/resizeEdges";
 import { classifyEdgeDrag, edgeBand, type EdgeSide } from "@/app/lib/diagram/edgeGesture";
 import { readableTextOn } from "@/app/lib/diagram/chevronThemes";
 import { isRichText, sanitizeRichText, plainToHtml } from "@/app/lib/diagram/richText";
@@ -2760,11 +2761,11 @@ function SymbolRendererInner({
           const px = wp.x, py = wp.y;
           const inX = px >= element.x - TOL && px <= element.x + element.width + TOL;
           const inY = py >= element.y - TOL && py <= element.y + element.height + TOL;
+          const onLeft   = Math.abs(px - element.x) <= TOL;
           const onRight  = Math.abs(px - (element.x + element.width)) <= TOL;
           const onTop    = Math.abs(py - element.y) <= TOL;
           const onBottom = Math.abs(py - (element.y + element.height)) <= TOL;
-          // Pools never resize their left edge — no onLeft case.
-          if (inX && inY && (onRight || onTop || onBottom)) {
+          if (inX && inY && (onLeft || onRight || onTop || onBottom)) {
             e.stopPropagation();
             // Select, but never TOGGLE OFF here: an edge press may still turn
             // into a drag (the hit-zone decides at the 4px mark, by
@@ -3888,9 +3889,11 @@ function SymbolRendererInner({
       {selected && !multiSelected && canResize && onResizeDragStart &&
         RESIZE_HANDLES
         .filter(({ handle }) => {
-          // Pools never move their LEFT boundary — drop every west-side
-          // handle (w + the nw/sw corners that would drag the left edge).
-          if (element.type === "pool" && (handle === "w" || handle === "nw" || handle === "sw")) return false;
+          // Which boundaries this shape offers is one rule, in resizeEdges.ts.
+          // A pool's LEFT boundary moves again (Paul, 2026-09-21: "I need to
+          // now reintroduce the ability to move the left-hand Pool boundary
+          // left and right") — it had been suppressed in four places at once.
+          if (!handleIsResizable(element.type, handle)) return false;
           // Fork-join: only show handles on the long axis ends
           if (element.type !== "fork-join") return true;
           const isVertical = element.height >= element.width;
@@ -3977,9 +3980,7 @@ function SymbolRendererInner({
         return (
           <g data-interactive>
             {edges
-              // Pools never move their LEFT boundary — suppress the west
-              // edge hit-zone (EPs keep all four).
-              .filter((edge) => !(element.type === "pool" && edge.side === "w"))
+              .filter((edge) => edgeIsResizable(element.type, edge.side as ResizableSide))
               .map((edge) => (
               <g key={edge.side}>
                 <rect
