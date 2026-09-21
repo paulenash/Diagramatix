@@ -5686,6 +5686,16 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         ? minHeightForContainer(target, state.elements, poolFs, laneFs)
         : 0;
       let newH = Math.max(rawNewH, labelMinH);
+      // When that clamp RAISES the height on a TOP-edge drag, the extra has to
+      // come off the top — pin the bottom. Otherwise the bottom edge moves on
+      // a gesture that never touched it, and (worse) the top/bottom test below
+      // then reads the drag as "both edges moved" and falls into the pro-rata
+      // branch, resizing every lane instead of the one the user grabbed.
+      if (target && newH > rawNewH) {
+        const draggedTop = Math.abs(newY - target.y) > 0.5;
+        const draggedBottom = Math.abs((newY + rawNewH) - (target.y + target.height)) > 0.5;
+        if (draggedTop && !draggedBottom) newY = (target.y + target.height) - newH;
+      }
 
       if (target?.type === "pool") {
         // Use the pool's DYNAMIC header width (the rotated label strip
@@ -5767,12 +5777,52 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
             stackY += newLaneH;
           }
         }
+        // ── THE LANES DECIDE THE POOL'S VERTICAL BOUNDS ──────────────────
+        //
+        // Paul, 2026-09-21, having narrowed it himself: "when I move the Pool
+        // boundary upwards and the boundary of the Lane stops at any element,
+        // the Pool boundary keeps moving and is dissociated with the Lanes at
+        // that point." Also reachable by shrinking the bottom lane to its
+        // minimum and then dragging the pool's top edge.
+        //
+        // Every lane above is clamped — `Math.max(40, min, …)`, where `min`
+        // covers its label and its contents — but the pool was then written
+        // with the RAW drag. So the moment a lane refused to shrink further,
+        // the pool carried on alone and the lanes hung out of it.
+        //
+        // A pool with lanes has no height of its own: it is exactly the stack.
+        // `stackY` has accumulated the CLAMPED heights, so it is the honest
+        // answer to "how tall can this actually be".
+        let poolY = newY;
+        let poolH = newH;
+        if (sortedLanes.length > 0 && (topMoved || bottomMoved)) {
+          const stackH = [...laneUpdates.values()].reduce((s, l) => s + l.height, 0);
+          if (topMoved && !bottomMoved) {
+            // Dragging the TOP edge leaves the bottom where it was, so the
+            // pool grows upward from the fixed bottom by however much the
+            // lanes allowed — never past it.
+            const fixedBottom = target.y + target.height;
+            poolY = fixedBottom - stackH;
+            poolH = stackH;
+            // Re-stack the lanes from the settled top.
+            let ry = poolY;
+            for (const lane of sortedLanes) {
+              const u = laneUpdates.get(lane.id)!;
+              laneUpdates.set(lane.id, { ...u, y: ry });
+              ry += u.height;
+            }
+          } else {
+            // The top is where the drag put it; the height is the stack's.
+            poolH = stackH;
+          }
+        }
+
         // Apply pool + lane updates first, then recurse into deeper
         // sub-sublane levels via rescaleSublanesRecursive so a single
         // pool-boundary drag propagates all the way to the leaves of a
         // P-L-SL-SSL hierarchy.
         let elements = state.elements.map((e) =>
-          e.id === id ? { ...e, x: newX, y: newY, width: newW, height: newH }
+          e.id === id ? { ...e, x: newX, y: poolY, width: newW, height: poolH }
           : laneUpdates.has(e.id) ? laneUpdates.get(e.id)!
           : e
         );
