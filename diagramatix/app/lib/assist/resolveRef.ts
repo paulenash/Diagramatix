@@ -197,6 +197,18 @@ export function resolveRef(spoken: string, elements: DiagramElement[], lastAdded
     const id = spoken.slice(ID_REF_PREFIX.length);
     return elements.some((e) => e.id === id) ? { id } : null;
   }
+  // A BARE id, with no prefix. `serializeDiagram` hands the model every
+  // element's id so it can describe relationships, and a model given ids will
+  // sometimes answer with one even though the prompt asks for names. We handed
+  // it over, so honouring it is strictly better than matching it against the
+  // labels, failing, and printing `couldn't find "k3f9a2bx"` at the user
+  // (Paul, 2026-09-21). Checked against the real ids, so it cannot swallow a
+  // name: an element called exactly what an id looks like still resolves here,
+  // to itself.
+  {
+    const exact = elements.find((e) => e.id === spoken.trim());
+    if (exact) return { id: exact.id };
+  }
   const s = norm(spoken);
   if (!s) return null;
 

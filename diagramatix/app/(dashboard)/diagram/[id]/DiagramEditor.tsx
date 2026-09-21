@@ -53,6 +53,7 @@ import { subtypeFingerprint } from "@/app/lib/diagram/elementSubtypes";
 import { planLabelFill } from "@/app/lib/assist/fillSelection";
 import { findRiskCatalogItem } from "@/app/lib/assist/riskCatalogRef";
 import { parseGhostPick, resolveGhostPick } from "@/app/lib/assist/ghostPick";
+import { looksLikeElementId, notUnderstoodMessage } from "@/app/lib/assist/refMentions";
 import { isMicStopWord, isFlowEndWord } from "@/app/lib/assist/stopWords";
 import { isIncompleteCommand } from "@/app/lib/assist/incompleteCommand";
 import { leadingSpokenNumber } from "@/app/lib/assist/spokenNumber";
@@ -2823,6 +2824,11 @@ export function DiagramEditor({
         // misheard, or are on the wrong diagram. The passes above computed the
         // answer and discarded it; `nearestRefs` re-runs them loosely, which is
         // safe because the result only ever becomes a question.
+        // An id that did not resolve is OUR plumbing leaking, not something
+        // the user said — they spoke a name. Echoing `k3f9a2bx` at them is
+        // meaningless (Paul, 2026-09-21), and "did you mean" on an id is
+        // noise, so neither is offered.
+        if (looksLikeElementId(ref)) return { err: "couldn't work out which element that meant — say its name" };
         const near = nearestRefs(ref, els, 3);
         if (!near.length) return { err: `couldn't find “${ref}”` };
         const names = near.map((n) => `“${n.label}”`);
@@ -3886,7 +3892,14 @@ export function DiagramEditor({
       const canonicalOps = canonical ? parseCommand(canonical) : null;
       if (canonicalOps) { applyOrAsk(canonicalOps, true, `“${canonical}” → `); return; }
       const aiOps = validateOps(j.ops);
-      if (aiOps.length === 0) { log({ heard, summary: "didn’t understand that", ok: false, viaAi: true }); return; }
+      if (aiOps.length === 0) {
+        // The command was often understood perfectly — it named something that
+        // is not there. "Add a task before review", with no Review on the
+        // diagram, sent the user off to rephrase a sentence that was fine
+        // (Paul, 2026-09-21). Name the missing thing instead, when we can.
+        log({ heard, summary: notUnderstoodMessage(heard, data.elements), ok: false, viaAi: true });
+        return;
+      }
       applyOrAsk(aiOps, true);
     } catch {
       log({ heard, summary: "command service unavailable", ok: false, viaAi: true });
