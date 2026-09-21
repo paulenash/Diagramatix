@@ -12,6 +12,7 @@ import { connectorLabelBox } from "./checks/layoutViolations";
 import { autoSizeForType, wrapText, externalLabelBox, externalLabelSize, connectorLabelWidth, connectorLabelLines, LINE_HEIGHT, PAD, type AutosizeType } from "./textMetrics";
 import { snapImportedBounds, type Box } from "./importGeometry";
 import { buildTestConnectors } from "./bpmnTestConnectors";
+import { tetherModeOnCreate } from "./labelTether";
 
 /**
  * Connector ids carry the INDEX of the connector within its own array.
@@ -7332,6 +7333,13 @@ function layoutFlat(
       sourceInvisibleLeader: false, targetInvisibleLeader: false,
       waypoints: [] as Point[],
       label: c.label ?? "",
+      // Paul, 2026-09-21: a gateway branch in a GENERATED diagram always shows
+      // its tether. Nobody has placed these labels by hand — R5.12 puts them
+      // wherever they fit — so the leader is the only thing saying which
+      // branch a condition belongs to. It turns itself off for good the moment
+      // the reader moves the label (`labelTether.ts`).
+      ...(tetherModeOnCreate({ sourceIsGateway: src.type === "gateway", generated: true })
+        ? { labelTether: "always" as const } : {}),
     } as Connector);
   }
 

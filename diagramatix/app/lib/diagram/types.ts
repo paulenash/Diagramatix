@@ -256,6 +256,16 @@ export interface Connector {
   labelOffsetX?: number;
   labelOffsetY?: number;
   labelWidth?: number;
+  /**
+   * Whether this connector's label shows its TETHER — the leader back to the
+   * line it names (Paul, 2026-09-21). "always" for a gateway branch in a
+   * generated diagram or one created by a group-selection connect, where
+   * nobody has placed the label by hand; "never" once the user has MOVED the
+   * label, permanently, because they have said where it belongs. Absent = the
+   * automatic rule: show it only when the label has drifted clear of its line.
+   * See `labelTether.ts`.
+   */
+  labelTether?: "always" | "never";
   sourceOffsetAlong?: number;
   targetOffsetAlong?: number;
   // Sticky endpoints: set true when the USER moves/nudges this end. A subsequent

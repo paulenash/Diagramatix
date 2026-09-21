@@ -108,7 +108,9 @@ describe("T4624 — the growth is carried up, not left hanging", () => {
     const at = reducerSrc.indexOf('case "SPLIT_LANE_EVEN"');
     const body = reducerSrc.slice(at, at + 4000);
     expect(at).toBeGreaterThan(-1);
-    expect(body).toMatch(/elements: ensureContainersEncloseChildren\(updatePoolTypes\(\[\.\.\.elements, \.\.\.placedNew\]\)\)/);
+    // The re-fit may be WRAPPED by a later rule (ensureLeftGap, 2026-09-21);
+    // what this guards is that it is still in the chain at all.
+    expect(body).toMatch(/ensureContainersEncloseChildren\(updatePoolTypes\(\[\.\.\.elements, \.\.\.placedNew\]\)\)/);
   });
 
   it("still adopts the lane's loose contents into the first band", () => {

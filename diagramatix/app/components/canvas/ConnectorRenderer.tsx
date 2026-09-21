@@ -532,6 +532,16 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
    */
   const branchLabelAdrift = (() => {
     if (!hasLabel || sourceType !== "gateway") return false;
+    // Paul, 2026-09-21: a generated diagram, and a connector made by a
+    // group-selection connect, show the tether ALWAYS — nobody has placed
+    // those labels by hand, so the leader is what explains them. And once the
+    // user MOVES a label the tether is gone permanently: they have said where
+    // it belongs, and a leader pointing at a decision they already made is
+    // clutter. `never` beats `always`, which is the common case — a generated
+    // connector that was then tidied by hand.
+    const stored = connector.labelTether;
+    if (stored === "never") return false;
+    if (stored === "always") return true;
     const padX = effectiveLWidth / 2 + 6;
     const padY = lHeight / 2 + 6;
     return Math.abs(tetherPoint.x - lCx) > padX || Math.abs(tetherPoint.y - lMidY) > padY;

@@ -25,8 +25,10 @@ import { gatewayVertex, nudgeGatewayEndpoint, computeWaypoints, recomputeAllConn
 import { planWrapInSubprocess, planUnwrapSubprocess, planWrapInContainer, type WrapIds } from "@/app/lib/diagram/subprocessWrap";
 import { isUmlConnType } from "@/app/lib/diagram/types";
 import { capitaliseFirstWord, needsCapital, decisionLabel, isDecisionGateway } from "@/app/lib/diagram/nameCase";
+import { contentBoundsOf, clampRectToContent, poolFollowsLanes, leftGapShortfall, MIN_LEFT_GAP } from "@/app/lib/diagram/poolLaneBounds";
 import { fillLaneWithSublanes } from "@/app/lib/diagram/laneFill";
 import { bandOf, mergeTargetSide, facingSide, isMergeGateway } from "@/app/lib/diagram/gatewaySides";
+import { isLabelMove } from "@/app/lib/diagram/labelTether";
 import { expandMoveSet } from "@/app/lib/diagram/moveSet";
 import { retypeTasksForSystemFlag, applyTaskTypeChanges } from "@/app/lib/diagram/itSystemTaskTypes";
 import { emieMountProps } from "@/app/lib/diagram/emieLabel";
@@ -382,6 +384,11 @@ export type Action =
       targetOffsetAlong?: number;
       force?: boolean;
       initialLabel?: string;
+      /** Paul, 2026-09-21: "always" for a gateway branch created by a
+       *  group-selection connect. Threaded explicitly rather than inferred,
+       *  because "was this connector made by a bulk gesture?" is not
+       *  something the reducer can tell from the geometry. */
+      labelTether?: "always";
     }}
   | { type: "DELETE_CONNECTOR"; payload: { id: string } }
   | { type: "UPDATE_CONNECTOR_ENDPOINT"; payload: {
@@ -2431,7 +2438,14 @@ function ensureContainersEncloseChildren(
       live.x = newLeftX;
     }
   }
-  return elements.map((e) => byId.get(e.id) ?? e);
+  // A POOL IS ITS LANE STACK. The loop above only ever GROWS a container, so
+  // it closes an overflow but never the gap left when a pool keeps a height
+  // its lanes no longer have. Paul has now reported the dissociation three
+  // times from three different gestures, which says the bug is not in any one
+  // of them: a pool's height is written from a dozen places and the invariant
+  // was asserted in none. It is asserted here, on the pass every one of those
+  // places already ends with. Pools without lanes keep their own height.
+  return poolFollowsLanes(elements.map((e) => byId.get(e.id) ?? e));
 }
 
 /**
@@ -3085,6 +3099,66 @@ function clampChildrenToLane(elements: DiagramElement[], lane: DiagramElement): 
     const cy = Math.max(minY, Math.min(el.y, maxY - el.height));
     return (cx === el.x && cy === el.y) ? el : { ...el, x: cx, y: cy };
   });
+}
+
+/**
+ * Give the first element in every lane room to breathe.
+ *
+ * Paul, 2026-09-21: "when surrounding elements manually with a Pool or when
+ * adding Lanes and Sublanes to a Pool with elements inside make sure there is
+ * always a gap of at least 1/2 event width between the left edge of the
+ * left-most element (normally a Start Event) and the right-hand edge of the
+ * new Pool, Lane or Sublane."
+ *
+ * Each level of nesting spends another header strip: a fresh pool leaves 40px
+ * of clear space, then the first lane takes 36 of it and the start event is
+ * suddenly 4px off the lane header. So the gap has to be re-checked as lanes
+ * are ADDED, not just when the pool is drawn.
+ *
+ * The pool and every lane inside it grow LEFTWARDS by the largest shortfall
+ * found at any depth — same shift at every level, so the headers stay nested
+ * and the right edges stay put. Nothing inside moves: this widens the
+ * container around the process, it does not push the process along.
+ *
+ * `startId` may be the pool or anything inside it.
+ */
+function ensureLeftGap(elements: DiagramElement[], startId: string): DiagramElement[] {
+  const byId = new Map(elements.map((e) => [e.id, e] as const));
+  let pool = byId.get(startId);
+  for (let i = 0; pool && pool.type !== "pool" && pool.parentId && i < 12; i++) pool = byId.get(pool.parentId);
+  if (!pool || pool.type !== "pool") return elements;
+
+  const kidsOf = new Map<string, DiagramElement[]>();
+  for (const e of elements) {
+    if (!e.parentId) continue;
+    const list = kidsOf.get(e.parentId) ?? [];
+    list.push(e);
+    kidsOf.set(e.parentId, list);
+  }
+  // Measure the DEEPEST header edge against ALL of the pool's content.
+  //
+  // Not per-container-by-parentage: an element added before the lanes were
+  // stays parented to the POOL while sitting geometrically inside a lane, so
+  // a lane-by-lane walk finds no content in the very lane whose header just
+  // crowded the start event — which is exactly the case Paul reported.
+  const containerIds = new Set<string>([pool.id]);
+  let headerRight = pool.x + getPoolHeaderWidth(pool);
+  const walk = (el: DiagramElement, depth: number) => {
+    if (depth > 12) return;
+    for (const k of kidsOf.get(el.id) ?? []) {
+      if (k.type !== "lane" && k.type !== "sublane") continue;
+      containerIds.add(k.id);
+      headerRight = Math.max(headerRight, k.x + getLaneHeaderWidth(k));
+      walk(k, depth + 1);
+    }
+  };
+  walk(pool, 0);
+  const content = contentBoundsOf(elements, pool.id);
+  const shift = leftGapShortfall(headerRight, 0, content ? content.x : null);
+  if (shift <= 0) return elements;
+  return elements.map((e) =>
+    containerIds.has(e.id) ? { ...e, x: e.x - shift, width: e.width + shift } : e,
+  );
 }
 
 function getBounds(el: DiagramElement): Bounds {
@@ -5705,6 +5779,30 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         const sortedLanes = state.elements
           .filter((e) => e.type === "lane" && e.parentId === id)
           .sort((a, b) => a.y - b.y);
+        // ── A BOUNDARY STOPS, IT DOES NOT SHOVE ──────────────────────────
+        //
+        // Paul, 2026-09-21: "Pool boundary moves should never move elements
+        // up. They should just be prevented from moving when the boundary
+        // hits anything in the pool or lane."
+        //
+        // The lane minimums below cover a lane's LABEL, not its contents, so
+        // an inward drag squeezed the lane past the process inside it and
+        // `clampChildrenToLane` then pushed every element along ahead of the
+        // edge. The user was moving a container and their diagram moved with
+        // it. Cap the drag at the content first and the edge simply comes to
+        // rest against the first thing it meets — after which the clamps
+        // below have nothing left to do and nothing moves.
+        {
+          const content = contentBoundsOf(state.elements, id);
+          const laneLW = sortedLanes.length > 0 ? getLaneHeaderWidth(sortedLanes[0]) : 0;
+          const capped = clampRectToContent(
+            { x: target.x, y: target.y, width: target.width, height: target.height },
+            { x: newX, y: newY, width: newW, height: newH },
+            content,
+            { insetLeft: POOL_LW + laneLW, pad: MIN_LEFT_GAP },
+          );
+          newX = capped.x; newY = capped.y; newW = capped.width; newH = capped.height;
+        }
         const totalLaneH = sortedLanes.reduce((s, l) => s + l.height, 0) || 1;
         // Per-lane minimum (each lane needs at least its own + its
         // sublanes' label-driven minimum).
@@ -7878,9 +7976,21 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
     case "UPDATE_CONNECTOR_LABEL":
       return {
         ...state,
-        connectors: state.connectors.map((c) =>
-          c.id === action.payload.id ? { ...c, ...action.payload } : c
-        ),
+        connectors: state.connectors.map((c) => {
+          if (c.id !== action.payload.id) return c;
+          const next = { ...c, ...action.payload };
+          // Paul, 2026-09-21: "a connector tether on a label should
+          // permanently cease to be displayed as soon as that label has been
+          // manually moved on a diagram." Recorded HERE rather than in the
+          // drag handler so it holds however the label is moved — the mouse,
+          // the Properties panel, a future nudge — and so it survives the
+          // re-route that follows, which a computed rule would not.
+          //
+          // Only a MOVE counts. Typing a condition into a label that has never
+          // been dragged must leave the tether alone, and those arrive through
+          // this same action.
+          return isLabelMove(c, next) ? { ...next, labelTether: "never" as const } : next;
+        }),
       };
 
     case "UPDATE_CONNECTOR_FIELDS": {
@@ -9054,7 +9164,9 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         }
       }
 
-      return { ...state, ...next };
+      // The new lane header eats into the clear space the pool left, so the
+      // half-event gap in front of the first element is re-established here.
+      return { ...state, ...next, elements: ensureLeftGap(next.elements, poolId) };
     }
 
     case "ADD_SUBLANE": {
@@ -9122,7 +9234,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
             next = applyPoolBelowShift(next.elements, next.connectors, topPool.id, oldPoolBottom, growth);
           }
         }
-        return { ...state, ...next };
+        return { ...state, ...next, elements: ensureLeftGap(next.elements, laneId) };
       } else {
         // First time: split parent lane into 2 sublanes
         const sublaneCount = state.elements.filter((e) => e.type === "lane").length;
@@ -9164,7 +9276,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
             next = applyPoolBelowShift(next.elements, next.connectors, topPool.id, oldPoolBottom, growth);
           }
         }
-        return { ...state, ...next };
+        return { ...state, ...next, elements: ensureLeftGap(next.elements, laneId) };
       }
     }
 
@@ -9201,7 +9313,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         const g = geo.get(e.id);
         return g ? { ...e, y: g.y, height: g.h } : e;
       });
-      return { ...state, elements: updatePoolTypes([...elements, ...placedNew]), connectors: state.connectors };
+      return { ...state, elements: ensureLeftGap(updatePoolTypes([...elements, ...placedNew]), poolId), connectors: state.connectors };
     }
 
     // Divide a lane into N equal, named sublanes in one shot (assist "add N
@@ -9275,7 +9387,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       // lane that outgrew its pool left the pool behind.
       return {
         ...state,
-        elements: ensureContainersEncloseChildren(updatePoolTypes([...elements, ...placedNew])),
+        elements: ensureLeftGap(ensureContainersEncloseChildren(updatePoolTypes([...elements, ...placedNew])), laneId),
         connectors: state.connectors,
       };
     }
@@ -9561,7 +9673,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       let next = { elements: ensureContainersEncloseChildren([...shifted, newLane]), connectors: state.connectors };
       next = applyPoolBelowShift(next.elements, next.connectors, poolId, pool.y + pool.height, newH);
       next.connectors = recomputeAllConnectors(next.connectors, next.elements);
-      return { ...state, ...next };
+      return { ...state, ...next, elements: ensureLeftGap(next.elements, poolId) };
     }
 
     case "REORDER_LANE": {
