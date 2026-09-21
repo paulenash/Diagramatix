@@ -5802,56 +5802,13 @@ export function Canvas({
             );
           })}
 
-          {/* Lane boundary drag handles — shown between adjacent lanes in multi-lane pools */}
-          {pools.flatMap((pool) => {
-            const poolLanes = lanes
-              .filter((l) => l.parentId === pool.id)
-              .sort((a, b) => a.y - b.y);
-            if (poolLanes.length < 2) return [];
-            const POOL_LW = 30;
-            return poolLanes.slice(0, -1).map((lane, i) => {
-              const nextLane = poolLanes[i + 1];
-              const boundaryY = lane.y + lane.height;
-              return (
-                <rect
-                  key={`boundary-${lane.id}`}
-                  x={pool.x + POOL_LW}
-                  y={boundaryY - 4}
-                  width={pool.width - POOL_LW}
-                  height={8}
-                  fill="transparent"
-                  style={{ cursor: "ns-resize" }}
-                  onMouseDown={(e) => handleLaneBoundaryDrag(e, lane.id, nextLane.id)}
-                />
-              );
-            });
-          })}
-
-          {/* Sublane boundary drag handles — between adjacent sublanes within a lane */}
-          {lanes.flatMap((parentLane) => {
-            const sublanes = lanes
-              .filter((l) => l.parentId === parentLane.id)
-              .sort((a, b) => a.y - b.y);
-            if (sublanes.length < 2) return [];
-            const LANE_LW = 36;
-            return sublanes.slice(0, -1).map((sub, i) => {
-              const nextSub = sublanes[i + 1];
-              const boundaryY = sub.y + sub.height;
-              return (
-                <rect
-                  key={`subboundary-${sub.id}`}
-                  x={parentLane.x + LANE_LW}
-                  y={boundaryY - 4}
-                  width={parentLane.width - LANE_LW}
-                  height={8}
-                  fill="transparent"
-                  style={{ cursor: "ns-resize" }}
-                  onMouseDown={(e) => handleLaneBoundaryDrag(e, sub.id, nextSub.id)}
-                />
-              );
-            });
-          })}
-
+          {/* The lane / sub-lane divider strips used to be rendered HERE,
+              under the connectors and the elements — which is why grabbing
+              one was intermittent (Paul, 2026-09-21): it worked along an
+              empty stretch of the boundary and did nothing wherever a flow
+              or a task crossed it, because that shape took the mousedown.
+              They are drawn in a top overlay now, below the pool edge-zone
+              overlay that exists for exactly the same reason. */}
           {/* Vertical-swimlane boundary handles — shared dividers between
               columns, the outer left / right edges, and the single shared
               bottom (drags all columns' height together). */}
@@ -6853,6 +6810,67 @@ export function Canvas({
               </g>
             );
           })()}
+
+          {/* Lane / sub-lane divider hit-strips, ABOVE the connector and
+              element layers. A divider runs the full width of its pool, so
+              almost anything in the diagram crosses one somewhere; drawn
+              underneath, the strip only answered where nothing overlapped
+              it. Same fix, and same reason, as the pool edge-zone overlay
+              immediately below. */}
+          {/* Lane boundary drag handles — shown between adjacent lanes in multi-lane pools */}
+          {pools.flatMap((pool) => {
+            const poolLanes = lanes
+              .filter((l) => l.parentId === pool.id)
+              .sort((a, b) => a.y - b.y);
+            if (poolLanes.length < 2) return [];
+            // The pool's OWN header width, not 30. A multi-line pool name
+             // widens the strip, and a hardcoded 30 then started the divider
+             // inside the header — covering the very band you click to select
+             // the pool.
+            const POOL_LW = containerHeaderWidth(pool);
+            return poolLanes.slice(0, -1).map((lane, i) => {
+              const nextLane = poolLanes[i + 1];
+              const boundaryY = lane.y + lane.height;
+              return (
+                <rect
+                  key={`boundary-${lane.id}`}
+                  x={pool.x + POOL_LW}
+                  y={boundaryY - 4}
+                  width={pool.width - POOL_LW}
+                  height={8}
+                  fill="transparent"
+                  style={{ cursor: "ns-resize" }}
+                  onMouseDown={(e) => handleLaneBoundaryDrag(e, lane.id, nextLane.id)}
+                />
+              );
+            });
+          })}
+
+          {/* Sublane boundary drag handles — between adjacent sublanes within a lane */}
+          {lanes.flatMap((parentLane) => {
+            const sublanes = lanes
+              .filter((l) => l.parentId === parentLane.id)
+              .sort((a, b) => a.y - b.y);
+            if (sublanes.length < 2) return [];
+            const LANE_LW = containerHeaderWidth(parentLane);
+            return sublanes.slice(0, -1).map((sub, i) => {
+              const nextSub = sublanes[i + 1];
+              const boundaryY = sub.y + sub.height;
+              return (
+                <rect
+                  key={`subboundary-${sub.id}`}
+                  x={parentLane.x + LANE_LW}
+                  y={boundaryY - 4}
+                  width={parentLane.width - LANE_LW}
+                  height={8}
+                  fill="transparent"
+                  style={{ cursor: "ns-resize" }}
+                  onMouseDown={(e) => handleLaneBoundaryDrag(e, sub.id, nextSub.id)}
+                />
+              );
+            });
+          })}
+
 
           {/* Selected container (pool / EP / process-group) edge-resize
               overlay. Re-renders the four (pools: three) edge hit-zones ABOVE

@@ -117,6 +117,7 @@ The bar can be **dragged by its header**. The Symbols palette and the Properties
 - "add 3 sublanes to the Marketing lane called Manager, Assistant and Staff"
 - "add a lane below Picking called Packing" · "swap Sales with Picking"
 - "compress the Customer pool" · "extend the pools to include all elements"
+- "move the pool left boundary right" · "nudge the Warehouse pool top boundary up by 40" — moves **one edge**, not the pool. A left/right boundary only goes left or right, a top/bottom one only up or down; it stops at the first element it meets, and the lanes follow.
 
 **Messages**
 

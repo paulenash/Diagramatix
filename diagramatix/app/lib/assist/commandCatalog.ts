@@ -46,6 +46,7 @@ export const COMMAND_CATALOG: CatalogFamily[] = [
     { does: "Extend every pool to cover all elements", say: ["extend the pools to include all elements", "widen the pools", "include all elements"] },
     { does: "Compress a pool to its content", say: ["compress the Customer pool", "shrink Sales"] },
     { does: "Nudge a pool", say: ["nudge pool down", "bump Customer down by 40", "nudge the IT System up"] },
+    { does: "Move ONE edge of a pool — a resize, not a move. A left/right boundary only goes left/right, a top/bottom one only up/down; it stops at the first element it meets and the lanes follow", say: ["move the pool left boundary right", "nudge the Warehouse pool's top boundary up by 40", "shift the bottom edge of the Customer pool down"] },
   ] },
   { family: "Lanes and sub-lanes", items: [
     { does: "Add lanes (named or not)", say: ["add a lane to the pool", "add 2 lanes to the middle pool called Sales and Marketing", "add a lane above Lane 2", "insert a lane below Sales called Support"] },
