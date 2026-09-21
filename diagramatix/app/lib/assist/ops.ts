@@ -45,6 +45,14 @@ export type AssistOp =
   | { op: "labelSelected"; label?: string }
   /** "swap top and bottom" on the SELECTED gateway — outgoing points of a decision, incoming of a merge. */
   | { op: "swapGatewayPoints"; a: GatewayPoint; b: GatewayPoint }
+  /**
+   * Move ONE connector from one gateway point to another, on every selected
+   * gateway (Paul, 2026-09-21). The companion to the swap: swap exchanges two
+   * connectors and needs both points occupied, move needs the destination
+   * FREE. Between them they cover every rearrangement without the user having
+   * to think about which is which — the log says when the other one was meant.
+   */
+  | { op: "moveGatewayPoint"; from: GatewayPoint; to: GatewayPoint }
   | { op: "moveLane"; ref: Ref; direction: "up" | "down"; distance?: number }
   | { op: "again" }
   | { op: "addMessage"; fromRef: Ref; toRef: Ref; label?: string }
@@ -245,6 +253,11 @@ export function validateOp(raw: unknown): AssistOp | null {
       const pts = new Set<string>(GATEWAY_POINTS);
       if (!pts.has(o.a as string) || !pts.has(o.b as string) || o.a === o.b) return null;
       return { op: "swapGatewayPoints", a: o.a as GatewayPoint, b: o.b as GatewayPoint };
+    }
+    case "moveGatewayPoint": {
+      const pts = new Set<string>(GATEWAY_POINTS);
+      if (!pts.has(o.from as string) || !pts.has(o.to as string) || o.from === o.to) return null;
+      return { op: "moveGatewayPoint", from: o.from as GatewayPoint, to: o.to as GatewayPoint };
     }
     case "addMessage": {
       if (!isRef(o.fromRef) || !isRef(o.toRef)) return null;

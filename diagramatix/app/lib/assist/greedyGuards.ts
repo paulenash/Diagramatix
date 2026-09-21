@@ -113,7 +113,29 @@ const POSITIONAL = /^(?:between|before|after|instead\s+of|in\s+place\s+of|replac
  */
 const POSITIONAL_INSIDE = /\s(?:between|above|below|under(?:neath)?|beside|next\s+to|in\s+front\s+of|behind|instead\s+of|in\s+place\s+of)\s+\S/i;
 
+/**
+ * An implicit label that is really ANOTHER COMMAND.
+ *
+ * "Put Surround everything with a pool." — the recogniser dropped the pause,
+ * so the add rule took "put", found no symbol word in the rest, and made a
+ * TASK named "Surround everything with a pool" (Paul, 2026-09-21). The
+ * existing container guard is anchored at the start of the remainder, and this
+ * one starts with a verb.
+ *
+ * Only words that are unmistakably instructions, and only when a CONTAINER
+ * word or "everything" appears with them — "Review everything" is a fine name
+ * for a task, and "Surround" on its own might be one. It is the pair that
+ * gives it away.
+ */
+const COMMAND_VERB = /\b(?:surround|enclose|wrap|compress|shrink|extend|widen|split|swap|disconnect|unlink)\b/i;
+const CONTAINER_MENTION = /\b(?:pool|poll|pull|lanes?|sub-?lanes?|everything|all elements|subprocess)\b/i;
+
+export function looksLikeAnotherCommand(implicitLabel: string): boolean {
+  const s = norm(implicitLabel);
+  return COMMAND_VERB.test(s) && CONTAINER_MENTION.test(s);
+}
+
 export function looksPositionalNotAName(implicitLabel: string): boolean {
   const s = norm(implicitLabel);
-  return POSITIONAL.test(s) || POSITIONAL_INSIDE.test(s);
+  return POSITIONAL.test(s) || POSITIONAL_INSIDE.test(s) || looksLikeAnotherCommand(s);
 }

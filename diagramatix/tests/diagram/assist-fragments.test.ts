@@ -39,10 +39,15 @@ describe("a command split at a pause waits for the rest", () => {
 
   it("T4418 — the AI fallback is told about the swap, nudge directions, label and by-number commands", () => {
     const route = read("app", "api", "ai", "command", "route.ts");
-    expect(route).toContain("swap top and bottom (the SELECTED gateway's connection points");
+    // The CLAIM is that the prompt teaches the gateway-point commands and
+    // keeps them apart from a lane swap — not the exact sentence, which gained
+    // the MOVE companion on 2026-09-21.
+    expect(route).toMatch(/swap top and bottom[\s\S]{0,80}SELECTED gateways?['’]? connection points/);
+    expect(route).toContain("move top to bottom");
     expect(route).toContain("NOT a lane swap unless two lane NAMES are given");
     expect(route).toContain("nudge <name> up|down|left|right");
     expect(route).toContain('{ "op":"swapGatewayPoints"');
+    expect(route).toContain('{ "op":"moveGatewayPoint"');
     expect(route).toContain('{ "op":"labelSelected"');
     expect(route).toContain('{ "op":"renameByType"');
   });

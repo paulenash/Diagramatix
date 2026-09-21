@@ -61,7 +61,8 @@ export const COMMAND_CATALOG: CatalogFamily[] = [
     { does: "Message from/to the selected element — numbers its valid counterparts, then say “to 2 labelled Order Placed” or “from 2 labelled …”", say: ["add a message to the selected", "add a message from this"] },
   ] },
   { family: "Gateways (select one or more gateways first)", items: [
-    { does: "Swap two connection points, any pair of top / bottom / middle / left / right — the outgoing points of a decision, the incoming points of a merge; “middle” is the side in the flow direction", say: ["swap top and bottom", "swap bottom and middle", "swap top with centre", "swap middle and top", "swap top and right"] },
+    { does: "Swap two connection points, any pair of top / bottom / middle / left / right — the outgoing points of a decision, the incoming points of a merge; “middle” is the side in the flow direction. Naming the gateway is optional", say: ["swap top and bottom", "swap bottom and middle", "swap selected gateway, top and bottom", "swap top with centre", "swap top and right"] },
+    { does: "Move ONE connector to a free point — the companion to swap, which needs both points taken. Say the other and it tells you", say: ["move top to bottom", "move middle to top", "move selected gateway, bottom to middle"] },
   ] },
   { family: "Pools in order", items: [
     { does: "Move a pool above or below another — the stack is laid out again, so room is made automatically", say: ["move Pool 1 above Pool 2", "put Pool 3 below Pool 1"] },

@@ -140,6 +140,27 @@ Examples: "rename the selected pool to Customer" · "delete these" · "connect t
 - Both take the same phrasings as the subprocess wrap, and both accept what the
   recogniser usually returns instead: "poll"/"pull" for pool, "line" for lane.
 
+## Rearranging a gateway's connection points (21 September 2026)
+
+Select a gateway — or a decision **and** a merge together — then:
+
+- **"swap top and bottom"** — exchanges the two connectors. Needs a connector
+  at **both** points.
+- **"move top to bottom"** — moves one connector to a point that is **free**.
+
+Any pair of **top / bottom / middle / left / right**, in either order. "Middle"
+means the side in the flow direction: the right point of a decision, the left
+of a merge. With two gateways selected, one connector on **each** is affected.
+
+**Naming the gateway is optional but now allowed** — "swap selected gateway,
+top and bottom" works as well as the bare form. It used to fall through to the
+*lane* swap and answer "couldn't find 'selected gateway, top'", which made the
+whole feature look missing.
+
+If you say the wrong one of the pair, the log tells you which you meant: asking
+to move onto an occupied point suggests the swap, and swapping where one point
+is empty says which one.
+
 ## Merge gateways gather the branches (21 September 2026)
 
 A merge reads as a funnel, so a flow **into** one meets the vertex nearest

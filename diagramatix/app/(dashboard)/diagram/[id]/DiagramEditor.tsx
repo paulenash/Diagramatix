@@ -3418,6 +3418,47 @@ export function DiagramEditor({
         continue;
       }
 
+      // MOVE one connector from one gateway point to another, on every selected
+      // gateway (Paul, 2026-09-21). The companion to the swap below, and
+      // deliberately its mirror image: a swap exchanges two connectors and
+      // needs BOTH points occupied, a move needs the destination FREE.
+      //
+      // When the user picks the wrong one of the pair, the log says which they
+      // meant rather than refusing blankly — they are describing the same
+      // rearrangement either way, and having to remember which verb applies is
+      // exactly the kind of thing voice is supposed to remove.
+      if (op.op === "moveGatewayPoint") {
+        const gws = selectedIds.map((id) => els.find((x) => x.id === id)).filter((g): g is DiagramElement => !!g && g.type === "gateway");
+        if (gws.length === 0) { results.push("select a gateway first"); anyFail = true; continue; }
+        const moved: string[] = [];
+        const missed: string[] = [];
+        for (const g of gws) {
+          const outs = data.connectors.filter((c) => c.sourceId === g.id && c.type === "sequence");
+          const ins = data.connectors.filter((c) => c.targetId === g.id && c.type === "sequence");
+          // Same reading of the gateway as the swap: an explicit role wins,
+          // otherwise the shape of its traffic says which it is.
+          const isMerge = (g.properties?.gatewayRole as string | undefined) === "merge" || (ins.length > 1 && outs.length <= 1);
+          const endpoint: "source" | "target" = isMerge ? "target" : "source";
+          const conns = isMerge ? ins : outs;
+          const middle: Side = isMerge ? "left" : "right";
+          const sideOf = (p: typeof op.from): Side => (p === "middle" ? middle : p);
+          const sideAt = (c: (typeof conns)[number]) => (endpoint === "source" ? c.sourceSide : c.targetSide);
+          const sFrom = sideOf(op.from), sTo = sideOf(op.to);
+          const src = conns.find((c) => sideAt(c) === sFrom);
+          if (!src) { missed.push(`${nameOf(g)}: no ${isMerge ? "incoming" : "outgoing"} connector at the ${op.from}`); continue; }
+          const occupied = conns.find((c) => sideAt(c) === sTo);
+          if (occupied) { missed.push(`${nameOf(g)}: the ${op.to} already has one — say “swap ${op.from} and ${op.to}”`); continue; }
+          updateConnectorEndpoint(src.id, endpoint, g.id, sTo, 0.5);
+          moved.push(nameOf(g));
+        }
+        if (moved.length === 0) anyFail = true;
+        results.push(
+          (moved.length ? `moved the ${op.from} connector to the ${op.to} on ${moved.length === 1 ? moved[0] : `${moved.length} gateways`}` : "") +
+          (missed.length ? `${moved.length ? " — " : ""}${missed.join("; ")}` : ""),
+        );
+        continue;
+      }
+
       if (op.op === "swapGatewayPoints") {
         // Swap two connection points on EVERY selected gateway (Paul, 2026-09-15):
         // the outgoing points of a decision, the incoming points of a merge.

@@ -320,7 +320,30 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     // Every combination: top / bottom / middle (centre) / left / right, in either
     // order. "middle" is resolved at apply time to the flow side; left and right
     // are literal sides for people who say them.
-    const sp = raw.match(/^swap\s+(?:the\s+)?(top|bottom|middle|centre|center|left|right)\s+(?:and|with|&)\s+(?:the\s+)?(top|bottom|middle|centre|center|left|right)(?:\s+(?:points?|connectors?|connections?|sides?))?$/i);
+    // The gateway may be NAMED before the two points. "Swap top and bottom"
+    // always worked, but "swap selected gateway, top and bottom" fell through
+    // to the LANE swap below and answered "couldn't find 'selected gateway,
+    // top'" — so the feature looked gone (Paul, 2026-09-21: "What happened to
+    // Swap selected Top and Bottom?"). The target is redundant — the op acts
+    // on the selected gateways either way — but saying it out loud is natural,
+    // and a command that is merely more explicit must not fail.
+    //
+    // The comma matters: "Swap selected, top and bottom" is how the recogniser
+    // punctuates a small pause, and only a comma after the FIRST word is
+    // stripped earlier.
+    // MOVE one connector from one point to another — the companion to the swap
+    // (Paul, 2026-09-21). "Move top to bottom." Same target phrases, and the
+    // same place in the order: before the element `move` rule, which would
+    // otherwise read "top" as the name of a thing to shove sideways.
+    const mp = raw.match(/^move\s+(?:(?:the\s+)?(?:selected|highlighted|these|those|this)\s*)?(?:gateways?(?:'s|s')?\s*)?,?\s*(?:the\s+)?(top|bottom|middle|centre|center|left|right)\s+(?:to|onto|into)\s+(?:the\s+)?(top|bottom|middle|centre|center|left|right)(?:\s+(?:points?|connectors?|connections?|sides?|vert(?:ex|ices)))?$/i);
+    if (mp) {
+      type Pt = "top" | "middle" | "bottom" | "left" | "right";
+      const pt = (w: string): Pt => (/^cent/i.test(w) ? "middle" : (w.toLowerCase() as Pt));
+      const from = pt(mp[1]), to = pt(mp[2]);
+      if (from !== to) return [{ op: "moveGatewayPoint", from, to }];
+    }
+
+    const sp = raw.match(/^swap\s+(?:(?:the\s+)?(?:selected|highlighted|these|those|this)\s*)?(?:gateways?(?:'s|s')?\s*)?,?\s*(?:the\s+)?(top|bottom|middle|centre|center|left|right)\s+(?:and|with|&)\s+(?:the\s+)?(top|bottom|middle|centre|center|left|right)(?:\s+(?:points?|connectors?|connections?|sides?))?$/i);
     if (sp) {
       type Pt = "top" | "middle" | "bottom" | "left" | "right";
       const pt = (w: string): Pt => (/^cent/i.test(w) ? "middle" : (w.toLowerCase() as Pt));

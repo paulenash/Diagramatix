@@ -53,7 +53,7 @@ Canonical forms:
   accept the suggestion   ·   take the <type>   ·   take the second one
   add <n> lanes to <pool> called <A, B and C>   ·   add a lane above|below <lane>   ·   add <n> sublanes to <lane> called <A, B and C>   ·   swap <lane> with <lane>
   compress <pool>   ·   extend the pools to include all elements   ·   nudge <name> up|down|left|right (20px; "nudge these left" for the selection)   ·   move these right (the selection, 100px per step)   ·   again
-  swap top and bottom (the SELECTED gateway's connection points — any pair of top|bottom|middle|left|right; NOT a lane swap unless two lane NAMES are given)
+  swap top and bottom · move top to bottom (the SELECTED gateways' connection points; swap exchanges two, move needs the destination free — any pair of top|bottom|middle|left|right; NOT a lane swap unless two lane NAMES are given)
   surround selected with an expanded subprocess called <name>   (the SELECTED elements become the contents of a new expanded subprocess; needs one flow in and one out)
   unwrap the selected subprocess   ·   delete selected (on an expanded subprocess: dissolves it, the contents stay in the flow)
   label selected <text> (the selected connector)   ·   label connectors (numbers them)   ·   rename tasks|lanes|events… (numbers them)
@@ -96,7 +96,8 @@ Op shapes (use element NAMES for refs — they are resolved against the diagram;
   { "op":"addMessage", "fromRef": <name>, "toRef": <name>, "label"?: string }  // message flow between an activity and a pool/participant
   { "op":"addMessageByNumber", "fromSelection"?: true }  // no ends given: number the candidates and let the user pick
   { "op":"labelSelected", "label"?: string }  // the selected connector
-  { "op":"swapGatewayPoints", "a": "top"|"middle"|"bottom"|"left"|"right", "b": same }  // the selected gateway's points
+  { "op":"swapGatewayPoints", "a": "top"|"middle"|"bottom"|"left"|"right", "b": same }  // the selected gateways' points
+  { "op":"moveGatewayPoint", "from": same, "to": same }  // move ONE connector to a FREE point; swap needs both taken
   { "op":"wrapInSubprocess", "label"?: string }           // surround the SELECTED elements with an expanded subprocess
   { "op":"unwrapSubprocess" }                              // dissolve the SELECTED expanded subprocess back into the flow
   { "op":"renameByType", "itemType": "pool"|"lane"|"message"|"task"|"subprocess"|"gateway"|"event"|"connector" }  // numbers them for a pick

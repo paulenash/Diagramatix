@@ -44,6 +44,27 @@ export function isIncompleteCommand(text: string): boolean {
   if (/^(surround|enclose|wrap)\b/.test(t) && !/\b(with|in|inside|into|within|using)\b\s+\S+/.test(t)) return true;
   // connect / disconnect — missing the second operand ("connect them" is complete).
   if (/^(connect|link|join|disconnect|unlink)\b/.test(t) && !/\b(to|and|with|from)\b\s+\S+/.test(t) && !/^(connect|link|join)\s+(them|these|those|it up|the last two|the previous two)$/.test(t)) return true;
+  // ── "Add two sublanes" … "to shipping called domestic and international." ──
+  //
+  // THE DOUBLE-UP (Paul, 2026-09-21: "slight hesitations produce interrupted
+  // commands that create both a rule based and an AI based outcome. This
+  // double-up must be avoided."). "Add two sublanes" is complete on its own —
+  // it picks the most recent lane and makes two — so it RAN, putting sublanes
+  // in the wrong lane; the tail then reached the AI, which rebuilt it into a
+  // whole command and made two more in the right one. Four sublanes from one
+  // sentence, and the same thing happened with "Add three lanes".
+  //
+  // A count of lanes with NEITHER a target NOR names is under-specified: the
+  // sentence a person actually says names at least one of them. Holding it
+  // costs a grace period and nothing else — if no tail arrives it runs exactly
+  // as before.
+  //
+  // "Add a lane" is deliberately NOT held: it is the one phrasing people
+  // genuinely use on its own, and the default target (the pool) is right.
+  if (/^(?:add|create|insert|put|make|new)\s+(?:\d+|two|three|four|five|six|seven|eight|nine|ten|some|several)\s+(?:sub-?lanes?|lanes?)$/.test(t)) {
+    return true;
+  }
+
   // "add message …": the by-number forms are complete — a bare "add a message" or
   // "add a message to the selected" — anything else needs BOTH a from and a to.
   if (/^(add|create|send|draw|put)\b.*\bmessage\b/.test(t)) {
