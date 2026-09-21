@@ -7,6 +7,7 @@ import type { AssistOp } from "./ops";
 import { SYMBOL_SYNONYMS, SYMBOL_PHRASES } from "./ops";
 import { namesNonContainerKind, laneWordIsAttached, looksPositionalNotAName } from "./greedyGuards";
 import { parseRenameType } from "./renameTargets";
+import { parsePoolBoundaryPhrase } from "./poolBoundaryPhrase";
 import { repairSelectedWord, repairTurnWord } from "./selectedWord";
 import { capitaliseFirstWord } from "../diagram/nameCase";
 import { convertMatches } from "./convertPhrase";
@@ -507,6 +508,13 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     // Nudge a pool up / down by a small step (default 20px). "nudge"/"bump"
     // always mean this; "move/slide <…> up|down" only counts as a pool-nudge
     // when a pool is named (so "move Task 1 up" stays the generic element move).
+    // ONE EDGE, not the whole pool. Tried first: "move the pool's left
+    // boundary right" ends in a direction word just like "move the pool
+    // right" does, and the nudge rule below would happily swallow it and
+    // slide the entire pool — the opposite of what was asked.
+    const mBoundary = parsePoolBoundaryPhrase(raw);
+    if (mBoundary) return [{ op: "movePoolBoundary", ...mBoundary }];
+
     // Any direction, any element, 20 px (Paul, 2026-09-15); a selection nudges as a group.
     let mnudge = raw.match(new RegExp(`^(?:nudge|bump|inch|shift)\\s+(?:the\\s+)?(.*?)\\s*(?:to\\s+the\\s+)?(up|down|left|right)(?:\\s+by\\s+(\\d+)\\s*(?:px|pixels?)?)?$`, "i"));
     if (!mnudge) {

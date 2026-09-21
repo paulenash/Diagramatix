@@ -63,6 +63,7 @@ import { planMovePool, planSwapPools, selectedPools, poolsInOrder } from "@/app/
 import { isContainerType, getAllDescendantIds } from "@/app/hooks/useDiagram";
 import { collectMessageTargets, parseMessageAnswer, type MessagePick } from "@/app/lib/assist/messageTargets";
 import { validateOps, type AssistOp } from "@/app/lib/assist/ops";
+import { boundaryRect } from "@/app/lib/assist/poolBoundaryPhrase";
 import { syntheticElement, withAdded, withDeleted, withLabel } from "@/app/lib/assist/workingSet";
 import { needsConfirmation, parseConfirmation } from "@/app/lib/assist/confirm";
 import { collectRenameTargets, type RenameType, type RenameTarget } from "@/app/lib/assist/renameTargets";
@@ -3283,6 +3284,37 @@ export function DiagramEditor({
       }
 
       if (op.op === "again") { continue; } // handled by substitution above; ignore if stray
+
+      if (op.op === "movePoolBoundary") {
+        // ONE EDGE of the pool. Deliberately routed through the SAME
+        // RESIZE_ELEMENT the mouse uses rather than writing geometry here, so
+        // a spoken boundary move obeys every rule a dragged one does: it
+        // stops at the first content any locked pool meets (T4627/T4633), the
+        // lanes and sublanes follow, the pool stays its lane stack (T4628),
+        // and nothing inside moves. One rule, one place — the reducer's.
+        const dist = op.distance ?? 20;
+        let target: DiagramElement | undefined;
+        if (op.ref) {
+          const r = resolve1(op.ref);
+          if ("err" in r) { results.push(r.err); anyFail = true; continue; }
+          target = r;
+        } else {
+          const pools = els.filter((e) => e.type === "pool");
+          target = pools[pools.length - 1];
+        }
+        if (!target || target.type !== "pool") {
+          results.push(op.ref ? `${nameOf(target!)} isn't a pool` : "there's no pool to resize");
+          anyFail = true; continue;
+        }
+        const before = { x: target.x, y: target.y, width: target.width, height: target.height };
+        const want = boundaryRect(before, op.boundary, op.direction, dist);
+        resizeElement(target.id, want.x, want.y, want.width, want.height);
+        resizeElementEnd(target.id);   // a spoken move is whole; close it, as the mouse does on release
+        setSelectedElementIds(new Set()); // selection protocol
+        voiceLastId.current = target.id;
+        results.push(`moved ${nameOf(target)}'s ${op.boundary} boundary ${op.direction} ${dist}px`);
+        continue;
+      }
 
       if (op.op === "nudgePool") {
         const dist = op.distance ?? 20;

@@ -4,6 +4,7 @@
  * ids at apply time (see resolveRef.ts) so the interpreter never needs ids.
  */
 import type { SymbolType, GatewayType, EventType, ConnectorType } from "../diagram/types";
+import { boundaryTakesDirection, type PoolBoundary } from "./poolBoundaryPhrase";
 
 export type Ref = string;
 
@@ -41,6 +42,9 @@ export type AssistOp =
   | { op: "extendPools" }
   /** A 20px step in any direction — any element, or the whole selection ("nudge these left"). */
   | { op: "nudgePool"; ref?: Ref; direction: "up" | "down" | "left" | "right"; distance?: number }
+  /** Move ONE edge of a pool — a resize, not a move. Paul, 2026-09-21:
+   *  "{Move, Nudge} Pool {left, right, top, bottom} boundary {left, right, up, down}". */
+  | { op: "movePoolBoundary"; ref?: Ref; boundary: PoolBoundary; direction: "up" | "down" | "left" | "right"; distance?: number }
   /** "label selected <text>" — the selected connector; no text → wait for it. */
   | { op: "labelSelected"; label?: string }
   /** "swap top and bottom" on the SELECTED gateway — outgoing points of a decision, incoming of a merge. */
@@ -230,6 +234,21 @@ export function validateOp(raw: unknown): AssistOp | null {
       return isRef(o.poolRef) ? { op: "compressPool", poolRef: (o.poolRef as string).trim() } : null;
     case "extendPools":
       return { op: "extendPools" };
+    case "movePoolBoundary": {
+      // A vertical edge slides sideways and a horizontal one up and down.
+      // "move the pool's left boundary up" is not a small mistake to guess
+      // at — it is two different gestures — so it is refused here and the
+      // speaker is asked again.
+      const b = o.boundary;
+      if (b !== "left" && b !== "right" && b !== "top" && b !== "bottom") return null;
+      const d = o.direction;
+      if (d !== "up" && d !== "down" && d !== "left" && d !== "right") return null;
+      if (!boundaryTakesDirection(b, d)) return null;
+      const op: AssistOp = { op: "movePoolBoundary", boundary: b, direction: d };
+      if (isRef(o.ref)) op.ref = (o.ref as string).trim();
+      if (Number.isFinite(o.distance)) op.distance = Math.max(1, Math.round(Number(o.distance)));
+      return op;
+    }
     case "nudgePool": {
       if (o.direction !== "up" && o.direction !== "down") return null;
       const op: AssistOp = { op: "nudgePool", direction: o.direction };
