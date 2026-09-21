@@ -11,7 +11,7 @@
  * that capital is nearly always deliberate: iPhone, eCommerce, mRNA, XML.
  */
 import { describe, it, expect } from "vitest";
-import { capitaliseFirstWord, wouldCapitalise } from "@/app/lib/assist/nameCase";
+import { capitaliseFirstWord, wouldCapitalise } from "@/app/lib/diagram/nameCase";
 import { parseCommand } from "@/app/lib/assist/commandGrammar";
 
 describe("T4475 — the first word is capitalised", () => {

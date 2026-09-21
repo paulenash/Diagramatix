@@ -56,7 +56,7 @@ import { parseGhostPick, resolveGhostPick } from "@/app/lib/assist/ghostPick";
 import { isMicStopWord, isFlowEndWord } from "@/app/lib/assist/stopWords";
 import { isIncompleteCommand } from "@/app/lib/assist/incompleteCommand";
 import { leadingSpokenNumber } from "@/app/lib/assist/spokenNumber";
-import { capitaliseFirstWord } from "@/app/lib/assist/nameCase";
+import { capitaliseFirstWord, needsCapital } from "@/app/lib/diagram/nameCase";
 import { batchFlashes, isGoldFlashOn, setGoldFlash, goldFlashSummary, flashTargets, type FlashBox } from "@/app/lib/assist/goldFlash";
 import { planMovePool, planSwapPools, selectedPools, poolsInOrder } from "@/app/lib/diagram/poolOrder";
 import { isContainerType, getAllDescendantIds } from "@/app/hooks/useDiagram";
@@ -2869,7 +2869,31 @@ export function DiagramEditor({
       if (op.op === "add") {
         const { w, h } = sizeOf(op.symbolType);
         let anchor: DiagramElement | null = null;
-        if (op.afterRef) { const a = resolve1(op.afterRef); if ("err" in a) { results.push(a.err); anyFail = true; } else anchor = a; }
+        // A NAMED ANCHOR THAT DOES NOT RESOLVE STOPS THE COMMAND.
+        //
+        // This used to report the error and carry straight on to the recency
+        // fallback below, so "add a task called Check Stock after Receive
+        // Order" with two "Receive Order"s on the diagram printed
+        //
+        //   which "receive order"? 2 match … — say the name; added check
+        //   stock after check stock
+        //
+        // — the ambiguity named, and the element added anyway, anchored to
+        // whatever happened to be added last (Paul's log, 2026-09-21). The
+        // recency fallback is right when NO anchor was named; it is never
+        // right when one was named and not found. Failing to find what the
+        // user asked for is not permission to pick something else.
+        if (op.afterRef) {
+          const a = resolve1(op.afterRef, { strict: true });
+          if ("err" in a && a.ambiguous) {
+            // They can see which one they meant — number them and ask, rather
+            // than making them rephrase (R2).
+            const flow = buildPickFlow(ops, op.afterRef, a.ambiguous, els);
+            if (flow) { setPickFlow(flow); results.push(flow.prompt); pickParked = true; break; }
+          }
+          if ("err" in a) { results.push(a.err); anyFail = true; continue; }
+          anchor = a;
+        }
         if (!anchor && voiceLastId.current) anchor = els.find((e) => e.id === voiceLastId.current) ?? null;
         const others = els.filter((e) => e.type !== "pool" && e.type !== "lane" && e.type !== "sublane").map(elBox);
         let center; let srcSide: Side | undefined;
@@ -2929,8 +2953,13 @@ export function DiagramEditor({
         }
         addElementGated(op.symbolType, center, undefined, op.eventType, newId, parentId ? { parentId } : undefined);
         if (op.gatewayType) updateProperties(newId, { gatewayType: op.gatewayType });
-        if (op.label) updateLabel(newId, op.label);
-        const addedEl = syntheticElement(newId, op.symbolType, center, w, h, { label: op.label, parentId, eventType: op.eventType });
+        // The reducer capitalises an activity / gateway / event label, so the
+        // WORKING COPY has to carry the same string — otherwise the log line
+        // and the next command's reference describe a name the diagram does
+        // not have.
+        const addedLabel = op.label && needsCapital(op.symbolType) ? capitaliseFirstWord(op.label) : op.label;
+        if (addedLabel) updateLabel(newId, addedLabel);
+        const addedEl = syntheticElement(newId, op.symbolType, center, w, h, { label: addedLabel, parentId, eventType: op.eventType });
         if (anchor && op.afterRef) {
           // R7 — the explicit `connect` op has always been checked against
           // `canConnect`; this auto-connect never was. So "add a task after

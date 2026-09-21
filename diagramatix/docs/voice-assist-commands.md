@@ -140,6 +140,43 @@ Examples: "rename the selected pool to Customer" · "delete these" · "connect t
 - Both take the same phrasings as the subprocess wrap, and both accept what the
   recogniser usually returns instead: "poll"/"pull" for pool, "line" for lane.
 
+## Saying a command in two breaths (21 September 2026)
+
+Say **"add a task called Receive Order"**, then, as an afterthought,
+**"after the start"** — the task is connected to the start event. A tail on its
+own means *make the thing I just added follow this*; **"before X"** is the
+reverse. This is interpreted by the rules, instantly and free.
+
+Before, a tail like that had no sentence in front of it any more (the first half
+was a complete command and had already run), so it went to the AI — which saw
+the diagram, reconstructed the whole sentence, and added a **second** copy of
+the element. Two commands later there were two things with the same name and
+every reference to it was ambiguous.
+
+A whole sentence that merely begins with the word — "after Review add a task
+called Approve" — is still treated as the command it is.
+
+**A named anchor that cannot be found now stops the command.** "Add a task
+called Check Stock after Receive Order" with two Receive Orders numbers them and
+asks; it no longer reports the ambiguity and then adds the task anyway, anchored
+to whatever happened to be last.
+
+## Names start with a capital (21 September 2026)
+
+**Activity, gateway and event labels always start with a capitalised word.** Say
+"add a task called receive order" and the task is named **Receive order** — so a
+dictated name does not sit on the diagram looking like a typo beside every name
+that was typed.
+
+- **The first word only**, never title case: "Send to customer for approval",
+  not "Send To Customer For Approval".
+- **A deliberate capital is left alone** — iPhone, eCommerce, mRNA stay as they
+  are, and a name starting with a digit ("3rd party check") is untouched.
+- It applies on **every** path — the palette, editing a label in place, a spoken
+  command, an AI apply — because the rule lives in the reducer.
+- **Pools and lanes are not included**: they already have their own rules (never
+  the bare kind word, always unique).
+
 ## Align, and take a suggestion (21 September 2026)
 
 - **"align these"** — tidies the selection, the same as the Alignment ▾ menu's

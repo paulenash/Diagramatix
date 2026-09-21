@@ -21,6 +21,30 @@
  */
 
 /**
+ * WHICH ELEMENTS THE RULE APPLIES TO (Paul, 2026-09-21): "Activity names,
+ * gateway and event labels should always start with a capitalised word."
+ *
+ * Containers are NOT here. Pools, lanes and sub-lanes have their own naming
+ * rules — never the bare kind word, always unique — and those run in the same
+ * reducer branch; stacking a third rule on top would make a rename harder to
+ * predict than it already is. Annotations, review comments and data objects
+ * are free text, not names.
+ */
+export const CAPITALISED_TYPES: ReadonlySet<string> = new Set([
+  // Activities
+  "task", "subprocess", "subprocess-expanded", "call-activity", "transaction",
+  // Gateways
+  "gateway",
+  // Events
+  "start-event", "intermediate-event", "end-event",
+]);
+
+/** True when this element type's label must start with a capital. */
+export function needsCapital(type: string): boolean {
+  return CAPITALISED_TYPES.has(type);
+}
+
+/**
  * Capitalise the first word of an item name, leaving the rest untouched.
  *
  * Safe to apply to anything: a name that is already capitalised, empty, or

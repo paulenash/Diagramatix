@@ -24,6 +24,7 @@ import type {
 import { gatewayVertex, nudgeGatewayEndpoint, computeWaypoints, recomputeAllConnectors, consolidateWaypoints, rectifyWaypoints, constrainControlPoint, safeSidePair, selfLoopWaypoints, measureSelfLoopBulge, SELF_LOOP_BULGE, fuseCollinearWaypoints } from "@/app/lib/diagram/routing";
 import { planWrapInSubprocess, planUnwrapSubprocess, planWrapInContainer, type WrapIds } from "@/app/lib/diagram/subprocessWrap";
 import { isUmlConnType } from "@/app/lib/diagram/types";
+import { capitaliseFirstWord, needsCapital } from "@/app/lib/diagram/nameCase";
 import { expandMoveSet } from "@/app/lib/diagram/moveSet";
 import { retypeTasksForSystemFlag, applyTaskTypeChanges } from "@/app/lib/diagram/itSystemTaskTypes";
 import { emieMountProps } from "@/app/lib/diagram/emieLabel";
@@ -4035,7 +4036,15 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       }
       const effectiveW = baseW;
       const effectiveH = initial?.height ?? def.defaultHeight;
-      const effectiveLabel = initial?.label ?? label;
+      // Same rule as UPDATE_LABEL below: an activity, gateway or event label
+      // starts with a capitalised word. Applied here too because a label can
+      // arrive WITH the element (a template, a paste, an AI apply) and never
+      // pass through UPDATE_LABEL at all. `label` — the built-in default for
+      // the type — is already capitalised, so in practice this only touches a
+      // caller-supplied one.
+      const effectiveLabel = needsCapital(action.payload.symbolType)
+        ? capitaliseFirstWord(initial?.label ?? label)
+        : (initial?.label ?? label);
       const dropX = isPool
         ? (baseX_override ?? action.payload.position.x - 18)  // align with nearest pool, else header at drop
         : action.payload.position.x - effectiveW / 2;
@@ -6071,7 +6080,18 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
               target.type === "pool" ? "Pool" : target.parentId && state.elements.find((e) => e.id === target.parentId)?.type === "lane" ? "Sublane" : "Lane",
               target.id,
             )
-          : action.payload.label;
+          // Paul, 2026-09-21: an activity, gateway or event label always starts
+          // with a capitalised word. Enforced HERE rather than in any one UI so
+          // every path obeys it — the palette, an inline label edit, a spoken
+          // command and an AI apply all end up in this branch. It was applied
+          // on a voice RENAME only, so "add a task called receive order" left a
+          // lower-case name sitting next to every name that was typed.
+          //
+          // `capitaliseFirstWord` leaves a deliberate capital alone (iPhone,
+          // eCommerce, mRNA), so this cannot mangle a real name.
+          : target && needsCapital(target.type)
+            ? capitaliseFirstWord(action.payload.label)
+            : action.payload.label;
       const elements = state.elements.map((el) =>
         el.id === action.payload.id
           ? { ...el, label: nextLabel }

@@ -8,7 +8,7 @@ import { SYMBOL_SYNONYMS, SYMBOL_PHRASES } from "./ops";
 import { namesNonContainerKind, laneWordIsAttached, looksPositionalNotAName } from "./greedyGuards";
 import { parseRenameType } from "./renameTargets";
 import { repairSelectedWord, repairTurnWord } from "./selectedWord";
-import { capitaliseFirstWord } from "./nameCase";
+import { capitaliseFirstWord } from "../diagram/nameCase";
 import { convertMatches } from "./convertPhrase";
 import { parseAlignTail } from "./alignPhrase";
 import { parseGhostPick } from "./ghostPick";
@@ -107,6 +107,40 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   if (m) return [{ op: "connect", fromRef: clean(m[1]), toRef: clean(m[2]) }];
   m = raw.match(/^(.+?)\s+(?:goes to|flows to|connects to|then goes to|leads to)\s+(.+)$/i);
   if (m) return [{ op: "connect", fromRef: clean(m[1]), toRef: clean(m[2]) }];
+
+  // ── A stranded "after X" / "before X" tail ──
+  //
+  // Paul's log, 2026-09-21. He said "Add a task called receive order", which is
+  // a COMPLETE command, so it ran. Then he said "after the start." as an
+  // afterthought — a tail with no sentence in front of it any more.
+  //
+  // The hold rules cannot help: the first half was finished and had already
+  // been applied. So the tail reached the AI, which had the diagram in front of
+  // it, saw "receive order" as the newest element, helpfully reconstructed
+  // "add a task called receive order after Start" — and added a SECOND one.
+  // Two commands later there were two elements with the same name and the next
+  // reference was ambiguous. One stranded tail poisoned everything after it.
+  //
+  // On its own the tail has an obvious and useful meaning: make the thing just
+  // added follow X. Handling it here means it never reaches the AI, costs
+  // nothing, and cannot invent an element.
+  //
+  // Narrow on purpose — the tail must be ONLY the connective and a reference.
+  // "After Review add a task called X" is a whole command and is left alone.
+  {
+    const tail = raw.match(/^(?:and\s+|that'?s\s+|it'?s\s+|put\s+it\s+|goes\s+)?(after|before)\s+(.+)$/i);
+    if (tail) {
+      const ref = clean(tail[2]);
+      const whole = /\b(?:add|insert|create|put|place|new|draw|connect|link|join|delete|remove|rename|relabel|move|nudge|make|turn|wrap|surround)\b/i.test(ref);
+      if (ref && !whole) {
+        // "after X" — X flows into what was just added. "before X" — the
+        // reverse. "the last" is the pronoun the resolver already understands.
+        return tail[1].toLowerCase() === "after"
+          ? [{ op: "connect", fromRef: ref, toRef: "the last" }]
+          : [{ op: "connect", fromRef: "the last", toRef: ref }];
+      }
+    }
+  }
 
   // ── Take a ghost suggestion (M8) ──
   // Before everything, because every form names the ACT of accepting and none
