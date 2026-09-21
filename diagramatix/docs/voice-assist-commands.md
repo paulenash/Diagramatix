@@ -140,6 +140,26 @@ Examples: "rename the selected pool to Customer" · "delete these" · "connect t
 - Both take the same phrasings as the subprocess wrap, and both accept what the
   recogniser usually returns instead: "poll"/"pull" for pool, "line" for lane.
 
+## Merge gateways gather the branches (21 September 2026)
+
+A merge reads as a funnel, so a flow **into** one meets the vertex nearest
+where it came from:
+
+| The branch comes from | It meets |
+|---|---|
+| above the gateway | the **top** point |
+| level with it | the **left** point |
+| below it | the **bottom** point |
+
+This is the mirror of the rule a **decision** gateway's outgoing branches have
+always followed, and it uses the same test, so the two never disagree. Before
+it, every incoming flow landed on the same vertex and the lines crossed each
+other to get there.
+
+It applies to sequence flows, on every path — spoken, drawn by hand, or from
+the AI. An endpoint you deliberately drag to a particular vertex is left where
+you put it.
+
 ## Saying a command in two breaths (21 September 2026)
 
 Say **"add a task called Receive Order"**, then, as an afterthought,

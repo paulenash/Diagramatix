@@ -26,6 +26,7 @@ import { planWrapInSubprocess, planUnwrapSubprocess, planWrapInContainer, type W
 import { isUmlConnType } from "@/app/lib/diagram/types";
 import { capitaliseFirstWord, needsCapital, decisionLabel, isDecisionGateway } from "@/app/lib/diagram/nameCase";
 import { fillLaneWithSublanes } from "@/app/lib/diagram/laneFill";
+import { bandOf, mergeTargetSide, facingSide, isMergeGateway } from "@/app/lib/diagram/gatewaySides";
 import { expandMoveSet } from "@/app/lib/diagram/moveSet";
 import { retypeTasksForSystemFlag, applyTaskTypeChanges } from "@/app/lib/diagram/itSystemTaskTypes";
 import { emieMountProps } from "@/app/lib/diagram/emieLabel";
@@ -6938,6 +6939,43 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       if (connectorType === "sequence" || connectorType === "transition") {
         if (source.type === "intermediate-event" && !source.boundaryHostId) sourceOffsetAlong = 0.5;
         if (target.type === "intermediate-event" && !target.boundaryHostId) targetOffsetAlong = 0.5;
+      }
+
+      // ── The MERGE gateway connection convention (Paul, 2026-09-21) ────────
+      // A merge gathers branches back together, so it reads as a funnel: the
+      // branch that ran above comes down into the TOP point, the one below
+      // comes up into the BOTTOM, and the one carrying straight on arrives at
+      // the LEFT. With nothing choosing, every flow landed on the same vertex
+      // and the lines crossed each other to reach it.
+      //
+      // Here, beside R6.30, for the same reason that rule is here: it must
+      // hold for a hand-drawn connector and for every auto-connect path alike.
+      // Only for a FLOW — an association or a message to a gateway is not part
+      // of this convention.
+      //
+      // ⚠ "Did the caller choose a side?" cannot be asked directly:
+      // `addConnector` defaults `targetSide` to "left" and `sourceSide` to
+      // "right", so the payload always carries a value and a `!targetSide`
+      // test would never fire — the rule would have shipped dead. The default
+      // IS the convention's own answer for a level element, so refining a
+      // "left" to top/bottom is safe and changes nothing that was deliberate
+      // about a level connection. An endpoint explicitly dragged to top,
+      // bottom or right is left alone.
+      if (
+        sourceId !== targetId
+        && (connectorType === "sequence" || connectorType === "transition")
+        && isMergeGateway(target)
+        && targetSide === "left"
+      ) {
+        const band = bandOf(source, target);
+        targetSide = mergeTargetSide(source, target);
+        targetOffsetAlong = 0.5;
+        // …and the other end faces it, so the line leaves towards the gateway
+        // instead of doubling back around the element.
+        if (source.type !== "gateway" && sourceSide === "right") {
+          sourceSide = facingSide(band, "right");
+          sourceOffsetAlong = 0.5;
+        }
       }
 
       // R6.30: a gateway endpoint attaches to a VERTEX, never part-way along a
