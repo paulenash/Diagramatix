@@ -1036,17 +1036,6 @@ export function Canvas({
     };
   }, [bubbleHelpAnchor, hideBubbleHelp]);
 
-  // Drop-preview line:
-  //   "lane"        → bright green  — any LANE insert
-  //   "sublane"     → bright blue   — sublane insert (top/bottom/between
-  //                                   inside a lane that has sublanes,
-  //                                   plus split-lane-into-2-sublanes)
-  //   "subsublane"  → bright purple — split an existing sublane into 2
-  //                                   sub-sublanes (3rd-level nesting)
-  const [poolDropPreview, setPoolDropPreview] = useState<{
-    x1: number; y1: number; x2: number; y2: number;
-    kind: "lane" | "sublane" | "subsublane";
-  } | null>(null);
   const [connectorChoice, setConnectorChoice] = useState<{
     sourceId: string; targetId: string;
     sourceSide: Side; targetSide: Side;
@@ -5283,127 +5272,11 @@ export function Canvas({
           }
         }}
         onWheel={handleWheel}
-        onDrop={(e) => { setPoolDropPreview(null); handleDrop(e); }}
-        onDragOver={(e) => {
-          e.preventDefault();
-          // Pool/Lane drop preview: only when dragging the "pool" symbol
-          // over an existing pool. Computes the insertion line based on
-          // cursor Y exactly as the reducer's drop logic will.
-          if (pendingDragSymbol !== "pool") {
-            if (poolDropPreview) setPoolDropPreview(null);
-            return;
-          }
-          const rect = svgRef.current!.getBoundingClientRect();
-          const wp = svgToWorld(e.clientX - rect.left, e.clientY - rect.top);
-          const target = data.elements.find(
-            (el) =>
-              el.type === "pool" &&
-              wp.x >= el.x && wp.x <= el.x + el.width &&
-              wp.y >= el.y && wp.y <= el.y + el.height,
-          );
-          if (!target) {
-            if (poolDropPreview) setPoolDropPreview(null);
-            return;
-          }
-          const lanes = data.elements
-            .filter((el) => el.type === "lane" && el.parentId === target.id)
-            .sort((a, b) => a.y - b.y);
-          if (lanes.length === 0) {
-            // Will split pool into 2 lanes — no overlay needed.
-            if (poolDropPreview) setPoolDropPreview(null);
-            return;
-          }
-          const TOP_BOTTOM = 20;
-          const SEP = 15;
-          const LANE_EDGE = 10;
-          const dy = wp.y - target.y;
-          const poolBot = target.y + target.height;
-          let preview: typeof poolDropPreview = null;
-          // Outer zones: pool-level insertions
-          if (dy <= TOP_BOTTOM) {
-            preview = { x1: target.x, y1: target.y, x2: target.x + target.width, y2: target.y, kind: "lane" };
-          } else if (poolBot - wp.y <= TOP_BOTTOM) {
-            preview = { x1: target.x, y1: poolBot, x2: target.x + target.width, y2: poolBot, kind: "lane" };
-          } else {
-            // Check pool-level separators (between top-level lanes)
-            let onSep = false;
-            for (let i = 0; i < lanes.length - 1; i++) {
-              const sep = lanes[i].y + lanes[i].height;
-              if (Math.abs(wp.y - sep) <= SEP) {
-                preview = { x1: target.x, y1: sep, x2: target.x + target.width, y2: sep, kind: "lane" };
-                onSep = true;
-                break;
-              }
-            }
-            if (!onSep) {
-              // Cursor inside a specific lane — its sublanes (if any)
-              // determine the next-level zone logic.
-              const cursorLane = lanes.find((ln) => wp.y >= ln.y && wp.y <= ln.y + ln.height);
-              if (cursorLane) {
-                const sublanes = data.elements
-                  .filter((e) => e.type === "lane" && e.parentId === cursorLane.id)
-                  .sort((a, b) => a.y - b.y);
-                if (sublanes.length === 0) {
-                  // No sublanes: middle ⅓ → split (blue), else a green LANE line.
-                  if (wp.y >= cursorLane.y + cursorLane.height / 3 && wp.y <= cursorLane.y + (cursorLane.height * 2) / 3) {
-                    const midY = cursorLane.y + cursorLane.height / 2;
-                    preview = { x1: cursorLane.x, y1: midY, x2: cursorLane.x + cursorLane.width, y2: midY, kind: "sublane" };
-                  } else {
-                    // Single-lane pool → upper region shows the green line at the
-                    // pool TOP (lane above), lower region at the pool BOTTOM (lane
-                    // below); multi-lane keeps the lane-bottom line. Mirrors the
-                    // reducer's ADD_ELEMENT single-lane 3-zone insert.
-                    const insertY = lanes.length === 1
-                      ? (wp.y < cursorLane.y + cursorLane.height / 2 ? cursorLane.y : cursorLane.y + cursorLane.height)
-                      : cursorLane.y + cursorLane.height;
-                    preview = { x1: target.x, y1: insertY, x2: target.x + target.width, y2: insertY, kind: "lane" };
-                  }
-                } else {
-                  // Lane has sublanes — six-zone logic.
-                  const dyInLane = wp.y - cursorLane.y;
-                  const laneBottomDist = cursorLane.y + cursorLane.height - wp.y;
-                  if (dyInLane <= LANE_EDGE) {
-                    preview = { x1: target.x, y1: cursorLane.y, x2: target.x + target.width, y2: cursorLane.y, kind: "lane" };
-                  } else if (laneBottomDist <= LANE_EDGE) {
-                    const ins = cursorLane.y + cursorLane.height;
-                    preview = { x1: target.x, y1: ins, x2: target.x + target.width, y2: ins, kind: "lane" };
-                  } else {
-                    const splitTarget = sublanes.find(
-                      (s) => wp.y >= s.y + s.height / 3 && wp.y <= s.y + (s.height * 2) / 3,
-                    );
-                    if (splitTarget) {
-                      const midY = splitTarget.y + splitTarget.height / 2;
-                      preview = { x1: splitTarget.x, y1: midY, x2: splitTarget.x + splitTarget.width, y2: midY, kind: "subsublane" };
-                    } else if (wp.y <= sublanes[0].y + sublanes[0].height / 3) {
-                      preview = { x1: cursorLane.x, y1: cursorLane.y, x2: cursorLane.x + cursorLane.width, y2: cursorLane.y, kind: "sublane" };
-                    } else {
-                      const lastSub = sublanes[sublanes.length - 1];
-                      if (wp.y >= lastSub.y + (lastSub.height * 2) / 3) {
-                        const ins = cursorLane.y + cursorLane.height;
-                        preview = { x1: cursorLane.x, y1: ins, x2: cursorLane.x + cursorLane.width, y2: ins, kind: "sublane" };
-                      } else {
-                        // Between adjacent sublanes — pick separator on the cursor's half.
-                        const cursorSub = sublanes.find((s) => wp.y >= s.y && wp.y <= s.y + s.height);
-                        if (cursorSub) {
-                          const isUpper = wp.y - cursorSub.y < cursorSub.height / 2;
-                          const sepY = isUpper ? cursorSub.y : cursorSub.y + cursorSub.height;
-                          preview = { x1: cursorLane.x, y1: sepY, x2: cursorLane.x + cursorLane.width, y2: sepY, kind: "sublane" };
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-          // Only update if changed to avoid render thrash.
-          const same = preview && poolDropPreview &&
-            preview.x1 === poolDropPreview.x1 && preview.y1 === poolDropPreview.y1 &&
-            preview.x2 === poolDropPreview.x2 && preview.y2 === poolDropPreview.y2 &&
-            preview.kind === poolDropPreview.kind;
-          if (!same) setPoolDropPreview(preview);
-        }}
-        onDragLeave={() => { if (poolDropPreview) setPoolDropPreview(null); }}
+        onDrop={handleDrop}
+        // No coloured line shows where a dropped Pool/Lane symbol will add a
+        // lane or sublane (Paul, 2026-09-22: "No need for coloured highlights
+        // to indicate Lane or Sublane creation").
+        onDragOver={(e) => e.preventDefault()}
         onKeyDown={handleKeyDown}
         onContextMenu={(e) => {
           // Diagramatix owns right-click on the canvas: never show the native
@@ -7357,26 +7230,6 @@ export function Canvas({
                 offsets={debugLabelOffsets} setOffset={setDebugLabelOffset} />
             ));
           })()}
-
-          {/* Pool/Lane drop preview — shown while dragging the Pool/Lane
-              palette symbol over an existing pool. Green for LANE,
-              blue for SUBLANE, purple for SUB-SUBLANE (split). */}
-          {poolDropPreview && (
-            <line
-              x1={poolDropPreview.x1}
-              y1={poolDropPreview.y1}
-              x2={poolDropPreview.x2}
-              y2={poolDropPreview.y2}
-              stroke={
-                poolDropPreview.kind === "subsublane" ? "#a855f7"
-                : poolDropPreview.kind === "sublane"  ? "#3b82f6"
-                : "#22c55e"
-              }
-              strokeWidth={4 / zoom}
-              strokeLinecap="round"
-              pointerEvents="none"
-            />
-          )}
 
           {/* Scan-issue tint — drawn LAST so it overlays everything. Red for
               errors, orange for warnings. Cleared after the 20s window by

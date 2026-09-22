@@ -2,8 +2,12 @@
  * Single-lane BPMN pools (T0704) — a pool with exactly one lane is now a
  * first-class, stable state. This pins the reducer behaviour:
  *   • dropping the Pool/Lane palette item on an EMPTY pool adds ONE lane;
- *   • on a single-lane pool the drop is a clean 3-zone — top → lane above,
- *     middle → split into two sublanes, bottom → lane below;
+ *   • on a single-lane pool the drop ALWAYS just adds a second lane, within
+ *     the pool — revised 2026-09-22 (Paul: "Dragging the Pool/Lane symbol
+ *     onto a Pool with one single Lane should always just add a second Lane
+ *     to the Pool" … "Never grow the Pool with these Lane and Sublane
+ *     additions"). It was a 3-zone drop: top → lane above, middle → split
+ *     into two sublanes, bottom → lane below, each growing the pool.
  *   • deleting one of two lanes keeps the last lane in the pool (no dissolve);
  *     a further delete removes it (empty pool);
  *   • a lone SUBLANE still dissolves into its lane (unchanged).
@@ -37,25 +41,21 @@ describe("single-lane pool — creation + insertion (T0704)", () => {
     expect(Math.round(lanes[0].height)).toBe(300); // fills the pool body
   });
 
-  it("single-lane pool: top third → new lane ABOVE (original shifts down)", () => {
-    const d = dispatch(singleLane(), drop(150)); // top third of 100..400
-    expect(lanesOf(d, "p")).toHaveLength(2);
-    expect(el(d, "l").y, "original lane should be pushed down by the lane inserted above").toBeGreaterThan(100);
-  });
-
-  it("single-lane pool: bottom third → new lane BELOW (original stays at top)", () => {
-    const d = dispatch(singleLane(), drop(350)); // bottom third
-    const lanes = lanesOf(d, "p");
-    expect(lanes).toHaveLength(2);
-    expect(el(d, "l").y, "original lane should stay at the pool top").toBe(100);
-    expect(Math.max(...lanes.map((l) => l.y)), "the new lane sits below the original").toBeGreaterThan(100);
-  });
-
-  it("single-lane pool: middle third → SPLIT the lane into two sublanes", () => {
-    const d = dispatch(singleLane(), drop(250)); // middle third
-    expect(lanesOf(d, "p"), "still one top-level lane").toHaveLength(1);
-    expect(lanesOf(d, "l"), "the lane now has two sublanes").toHaveLength(2);
-  });
+  // Wherever it lands — top, middle or bottom third — the drop adds a second
+  // lane below the first, carved out of it; the pool keeps its size.
+  for (const [where, y] of [["top third", 150], ["middle third", 250], ["bottom third", 350]] as const) {
+    it(`single-lane pool: ${where} → a second lane, within the pool`, () => {
+      const d = dispatch(singleLane(), drop(y));
+      const lanes = lanesOf(d, "p");
+      expect(lanes).toHaveLength(2);
+      expect(lanesOf(d, "l"), "no sublanes").toHaveLength(0);
+      expect(el(d, "l").y, "the original lane stays at the pool top").toBe(100);
+      expect(el(d, "p").y).toBe(100);
+      expect(el(d, "p").height, "the pool does not grow").toBe(300);
+      const bottom = Math.max(...lanes.map((l) => l.y + l.height));
+      expect(bottom, "the lanes fill the pool exactly").toBe(400);
+    });
+  }
 });
 
 describe("single-lane pool — deletion keeps the last lane (T0704)", () => {

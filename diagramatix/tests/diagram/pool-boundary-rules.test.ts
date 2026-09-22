@@ -166,8 +166,12 @@ describe("T4629 — half an event's clear space in front of the first element", 
     const lane = after.elements.find((e) => e.type === "lane")!;
     const kids = after.elements.filter((e) => e.type === "start-event");
     expect(Math.min(...kids.map((k) => k.x)) - (lane.x + 36)).toBeGreaterThanOrEqual(MIN_LEFT_GAP);
-    // …and the element itself did not budge to make the room.
-    expect(kids[0].x).toBe(340);
+    // Revised 2026-09-22 — "Adding lanes to a Pool should not grow the Pool.
+    // The lanes must be added within the Pool." The room is made by moving
+    // the element right; the pool does not move or grow.
+    expect(at(after, "p").x).toBe(264);
+    expect(at(after, "p").width).toBe(700);
+    expect(kids[0].x).toBeGreaterThan(340);
   });
 
   it("does nothing when the gap is already there", () => {
