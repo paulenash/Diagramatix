@@ -139,3 +139,29 @@ export function looksPositionalNotAName(implicitLabel: string): boolean {
   const s = norm(implicitLabel);
   return POSITIONAL.test(s) || POSITIONAL_INSIDE.test(s) || looksLikeAnotherCommand(s);
 }
+
+/**
+ * Does this text name a LANE or POOL where a symbol's name was expected?
+ *
+ * Paul's log, 2026-09-23: "Add a third lane to pool three." did not match the
+ * lane rule — that rule counts "a/one/two/three…", not "a third" — so it fell
+ * through to the generic add rule, which created a TASK LABELLED "third lane to
+ * pool three" and reported success. A wrong element quietly added is worse than
+ * a sentence the AI never saw: the AI canonicalises this one correctly.
+ *
+ * The lane and pool rules run first, so anything reaching here that still talks
+ * about lanes or pools is a phrasing they could not read. Decline it.
+ *
+ * Checked on the words that would become the NAME, after "called X" has been
+ * taken out, so a task someone deliberately calls "Assembly Line" is untouched.
+ */
+export function namesAContainer(text: string): boolean {
+  const s = norm(text);
+  const container = /(?:^|\s)(?:pools?|polls?|pulls?|lanes?|lines?|sub-?lanes?|sub-?lines?)(?:\s|$)/i.test(s);
+  if (!container) return false;
+  // A container word ALONE is very often part of a name — "Assembly Line",
+  // "Pool cleaning" — and refusing those would send good commands to the AI.
+  // What makes it an instruction rather than a name is the relationship word
+  // that puts the container somewhere: "third lane TO pool three".
+  return /(?:^|\s)(?:to|in|into|inside|on|onto|under|below|above|of|within|from)(?:\s|$)/i.test(s);
+}

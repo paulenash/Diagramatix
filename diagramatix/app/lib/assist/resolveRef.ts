@@ -51,8 +51,15 @@ const NUM_WORDS: Record<string, string> = {
   eight: "8", nine: "9", ten: "10", eleven: "11", twelve: "12", thirteen: "13", fourteen: "14",
   fifteen: "15", sixteen: "16", seventeen: "17", eighteen: "18", nineteen: "19", twenty: "20",
 };
-const numNorm = (s: string) => s.replace(/\b(zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty)\b/g, (m) => NUM_WORDS[m]);
-const norm = (s: string) => numNorm(s.toLowerCase().replace(/[.,!?;:]+$/g, "").trim());
+/**
+ * Speech spells numbers as words; generated names use digits. Exported
+ * because anything COMPARING what was said with what a thing is called has
+ * to do it the same way the resolver does — a check that did not (the
+ * container-delete guard) refused "delete sublane one" against a lane named
+ * "Sublane 1" (Paul's log, 2026-09-23).
+ */
+export const spokenNumbersAsDigits = (s: string) => s.replace(/\b(zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty)\b/g, (m) => NUM_WORDS[m]);
+const norm = (s: string) => spokenNumbersAsDigits(s.toLowerCase().replace(/[.,!?;:]+$/g, "").trim());
 const stripArticle = (s: string) => s.replace(/^(the|a|an)\s+/i, "").trim();
 const tokens = (s: string) => norm(s).split(/\s+/).filter(Boolean);
 
@@ -107,6 +114,28 @@ function stripKind(s: string): string {
     if (s.startsWith(k + " ")) return s.slice(k.length).trim();
   }
   return s;
+}
+
+/**
+ * The kind a phrase NAMES, when it leads with a container word — "pool three",
+ * "lane one", "sub-lane 2". Null when the phrase names no kind, which leaves
+ * matching unconstrained as before.
+ *
+ * Only the CONTAINER words: a leading "task"/"gateway" is already handled by
+ * `typeNoun` and by the symbol passes, and constraining those here would change
+ * how an ordinary name like "Task Force" resolves.
+ */
+function spokenKind(phrase: string): ((e: DiagramElement, all: DiagramElement[]) => boolean) | null {
+  const words = phrase.trim().split(/\s+/);
+  // "sub lane 2" leads with two words; "sublane 2" with one.
+  const two = words.length > 2 ? `${words[0]} ${words[1]}` : "";
+  const first = /^sub$/i.test(words[0] ?? "") && two ? two.replace(/\s+/, "-") : (words[0] ?? "");
+  // A bare kind word on its own is a type noun, not a constraint on a name.
+  if (phrase.trim() === words[0] || (two && phrase.trim() === two)) return null;
+  if (/^pools?$/.test(first)) return (e) => e.type === "pool";
+  if (/^sub-?lanes?$/.test(first)) return (e, all) => isSublane(e, all);
+  if (/^lanes?$/.test(first)) return (e, all) => isTopLevelLane(e, all);
+  return null;
 }
 
 // "the middle pool", "the left lane", "the top pool"… → an element by position.
@@ -261,12 +290,32 @@ export function resolveRef(spoken: string, elements: DiagramElement[], lastAdded
 
   const fullTarget = stripArticle(s);          // "lane 2"
   const target = stripKind(fullTarget);        // "2"
-  const labelled = elements.filter((e) => (e.label ?? "").trim().length > 0);
+  // A SPOKEN KIND WORD IS A CONSTRAINT, not decoration.
+  //
+  // Paul's log, 2026-09-23: "Compact pool three." → `which “three”? 2 match:
+  // “Pool 3”, “Lane 3”`. The kind word had been stripped and then forgotten, so
+  // the remainder "3" matched a lane just as well as the pool, and the user was
+  // asked to choose between two things — one of which they had already ruled
+  // out by saying "pool".
+  //
+  // So when the phrase names a kind, only that kind can answer. If nothing of
+  // that kind matches, the answer is "not found" rather than something of
+  // another kind: "delete sublane one" must never resolve to a LANE.
+  const kindWanted = spokenKind(fullTarget);
+  const named = elements.filter((e) => (e.label ?? "").trim().length > 0);
 
-  // 1. Exact label — try the FULL phrase first ("lane 2" == "Lane 2"), then the
-  //    kind-stripped remainder ("Prepare" from "task Prepare").
-  const exactFull = labelled.filter((e) => norm(e.label!) === fullTarget);
-  if (exactFull.length) return pick(exactFull.map((e) => e.id));
+  // A WHOLE NAME wins over the kind word, because it can only be a name: an
+  // element genuinely called "Pool cleaning" is a task, and nobody says the
+  // whole of it by accident. Everything below this line — fragments, tokens,
+  // how it sounded — is constrained to the kind, which is where guessing
+  // across kinds put "Lane 3" in front of someone who had said "pool".
+  const exactAnyKind = named.filter((e) => norm(e.label!) === fullTarget);
+  if (exactAnyKind.length) return pick(exactAnyKind.map((e) => e.id));
+
+  const labelled = kindWanted ? named.filter((e) => kindWanted(e, elements)) : named;
+
+  // 1. Exact label — the full phrase is handled above, across every kind; this
+  //    is the kind-stripped remainder ("Prepare" from "task Prepare").
   const exact = labelled.filter((e) => norm(e.label!) === target);
   if (exact.length) return pick(exact.map((e) => e.id));
 

@@ -222,13 +222,21 @@ describe("T4689 — with no room, nothing is added and nothing grows", () => {
     expect(at(after, "p").height).toBe(120);
   });
 
-  it("a lane its process fills refuses rather than cover or push the process out", () => {
+  it("a lane its process fills is halved, and the element is left where it is", () => {
+    // Revised 2026-09-23. Paul: "If this is not possible just divide the Pool
+    // in two and let the user resolve the lane divider issue if some elements
+    // now straddle two lanes." Refusing was the old rule; it made a drop do
+    // nothing on exactly the pool a person is most likely to be reorganising.
     const packed = threeLanes();
     packed.elements = packed.elements.map((e) => (e.id === "tc" ? { ...e, y: 430, height: 140 } : e));
     const after = run(packed, "ADD_ELEMENT", drop(595));       // pool bottom → carve from C
-    expect(stackOf(after, "p").length).toBe(3);
-    expect(at(after, "tc")).toMatchObject({ y: 430, parentId: "C" });
-    expect(at(after, "p").height).toBe(600);
+    expect(stackOf(after, "p").length, "a lane was added").toBe(4);
+    expect(at(after, "p").height, "and the pool did not grow").toBe(600);
+    expect(at(after, "tc").y, "the process is not moved to make room").toBe(430);
+    // C was 400..600 with the task at 430..570; halving puts the divider at
+    // 500, so the task straddles it — visible, and the user's to settle.
+    const bands = stackOf(after, "p");
+    expect(bands.map((b) => b.height).reduce((a, b) => a + b, 0)).toBe(600);
   });
 
   it("the drop no longer draws a coloured insertion line", () => {
@@ -247,5 +255,62 @@ describe("T4689 — with no room, nothing is added and nothing grows", () => {
     }
     const drop = src.slice(src.indexOf("// Case B: pool with lanes"), src.indexOf("// ── Vertical swimlane drop intercept"));
     expect(drop).not.toMatch(/height: e\.height \+ NEW_(SUB)?LANE_H/);
+  });
+});
+
+describe("T4701 — empty space first, halve second, refuse only on the name", () => {
+  /** A pool of two lanes: the top one full of task, the bottom one empty. */
+  const lopsided = (): DiagramData => ({
+    elements: [
+      E({ id: "p", type: "pool", label: "Pool 1", x: 0, y: 0, width: 800, height: 400, properties: {} }),
+      E({ id: "A", type: "lane", label: "A", x: 36, y: 0, width: 764, height: 200, parentId: "p", properties: {} }),
+      E({ id: "B", type: "lane", label: "B", x: 36, y: 200, width: 764, height: 200, parentId: "p", properties: {} }),
+      E({ id: "t", type: "task", label: "T", x: 200, y: 10, width: 100, height: 180, parentId: "A", properties: {} }),
+    ],
+    connectors: [], viewport: { x: 0, y: 0, zoom: 1 },
+  }) as unknown as DiagramData;
+
+  it("a lane asked for at the crowded end is placed at the empty one instead", () => {
+    // Paul, 2026-09-23: "always add the new lane by trying to locate it at the
+    // top or the bottom where there are no existing elements, if possible."
+    const before = lopsided();
+    const after = run(before, "ADD_ELEMENT", drop(5));   // the pool TOP, which is full
+    const bands = stackOf(after, "p");
+    expect(bands.length).toBe(3);
+    expect(at(after, "t").y, "the task is not moved").toBe(10);
+    // A is left whole, and the new band comes out of the empty B.
+    expect(at(after, "A")).toMatchObject({ y: 0, height: 200 });
+    expect(bands[bands.length - 1].y + bands[bands.length - 1].height).toBe(400);
+  });
+
+  it("with no empty space anywhere, the neighbour is halved", () => {
+    const full = lopsided();
+    full.elements = [...full.elements, E({ id: "t2", type: "task", label: "T2", x: 200, y: 210, width: 100, height: 180, parentId: "B", properties: {} })];
+    const after = run(full, "ADD_ELEMENT", drop(5));
+    expect(stackOf(after, "p").length, "added anyway — the divider is the user's to move").toBe(3);
+    expect(at(after, "t").y, "and nothing was shifted to make room").toBe(10);
+    expect(at(after, "t2").y).toBe(210);
+    expect(at(after, "p").height).toBe(400);
+  });
+
+  it("the sublane level follows the same rule", () => {
+    // B is 300 tall here (B1 100 over B2 200): a sublane named "Sublane 3"
+    // needs ~92px down its header, and a 100px band could not give that — the
+    // one refusal the rule keeps.
+    const withSubs = {
+      ...lopsided(),
+      elements: [
+        E({ id: "p", type: "pool", label: "Pool 1", x: 0, y: 0, width: 800, height: 500, properties: {} }),
+        E({ id: "A", type: "lane", label: "A", x: 36, y: 0, width: 764, height: 200, parentId: "p", properties: {} }),
+        E({ id: "B", type: "lane", label: "B", x: 36, y: 200, width: 764, height: 300, parentId: "p", properties: {} }),
+        E({ id: "B1", type: "lane", label: "B1", x: 72, y: 200, width: 728, height: 100, parentId: "B", properties: {} }),
+        E({ id: "B2", type: "lane", label: "B2", x: 72, y: 300, width: 728, height: 200, parentId: "B", properties: {} }),
+        E({ id: "t", type: "task", label: "T", x: 200, y: 10, width: 100, height: 180, parentId: "A", properties: {} }),
+      ],
+    } as DiagramData;
+    const after = run(withSubs, "ADD_ELEMENT", drop(460));   // lower third of B2, clear of the pool-bottom zone
+    expect(stackOf(after, "B").length).toBe(3);
+    expect(at(after, "B"), "the lane itself keeps its size").toMatchObject({ y: 200, height: 300 });
+    expect(at(after, "p").height, "and so does the pool").toBe(500);
   });
 });

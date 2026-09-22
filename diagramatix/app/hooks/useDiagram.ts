@@ -27,6 +27,7 @@ import { isUmlConnType } from "@/app/lib/diagram/types";
 import { capitaliseFirstWord, needsCapital, decisionLabel, isDecisionGateway } from "@/app/lib/diagram/nameCase";
 import { contentBoundsOf, clampRectToContent, clampRectToLimits, poolFollowsLanes, leftGapShortfall, MIN_LEFT_GAP } from "@/app/lib/diagram/poolLaneBounds";
 import { getLaneHeaderWidth, getPoolHeaderWidth, laneMetrics, poolMetrics } from "@/app/lib/diagram/containerMetrics";
+import { uniqueContainerLabel } from "@/app/lib/diagram/containerNames";
 import { planCarve, planLaneDrop, type CarvePlan } from "@/app/lib/diagram/laneDropPlan";
 import { labelsFollowTheirSegments, holdGatewayBranchLabels } from "@/app/lib/diagram/labelFollow";
 import { gestureTraceOn, traceGesture, movedElements } from "@/app/lib/debug/gestureTrace";
@@ -2300,41 +2301,6 @@ function poolNameFitSize(label: string, poolFs: number): { width: number; height
   return { width: 36 + 48, height: Math.max(64, Math.round(chars * poolFs * 0.62) + 24) };
 }
 
-// A pool/lane/sublane name must be UNIQUE across every container in the diagram,
-// and must never be the bare kind word ("Pool"/"Lane"/"Sublane"). A blank or bare
-// name becomes "<Kind> N"; a name that collides with an existing container gets a
-// numeric suffix. `excludeId` lets a rename keep its own current label.
-function uniqueContainerLabel(
-  elements: DiagramElement[],
-  desired: string | undefined,
-  kind: "Pool" | "Lane" | "Sublane",
-  excludeId?: string,
-): string {
-  const taken = new Set(
-    elements
-      .filter((e) => (e.type === "pool" || e.type === "lane" || e.type === "sublane") && e.id !== excludeId)
-      .map((e) => (e.label ?? "").trim().toLowerCase())
-      .filter(Boolean),
-  );
-  // Containers start with a capital too (Paul, 2026-09-21: "lanes are created
-  // without capitalised names"). Done HERE, before the uniqueness pass, because
-  // every container naming path — create, rename, split, voice, AI — comes
-  // through this function, and because the two rules have to compose in this
-  // order: capitalise, then de-duplicate, so "sales" beside "Sales" is caught
-  // as the clash it is rather than slipping past on case.
-  const base = capitaliseFirstWord((desired ?? "").trim());
-  const bare = base === "" || base.toLowerCase() === kind.toLowerCase();
-  if (bare) {
-    let n = 1;
-    while (taken.has(`${kind.toLowerCase()} ${n}`)) n++;
-    return `${kind} ${n}`;
-  }
-  if (!taken.has(base.toLowerCase())) return base;
-  let n = 2;
-  while (taken.has(`${base.toLowerCase()} ${n}`)) n++;
-  return `${base} ${n}`;
-}
-
 // Shrink a pool that has NO children (no lanes, no flow) to just fit its name.
 // `onlyIds`, when given, restricts the resize to those pool ids — so a delete
 // only collapses the pool that JUST lost its last lane, and never re-collapses
@@ -3250,8 +3216,8 @@ function refitStackAtEdge(
  * lanes must be added within the Pool." … "Never grow the Pool with these
  * Lane and Sublane additions."
  *
- * WHAT is carved — out of which neighbour, how much it gives, how far its
- * contents slide to allow it — is worked out by `planCarve`, which the canvas
+ * WHAT is carved — out of which neighbour, and how much it gives — is worked
+ * out by `planCarve`, which the canvas
  * also asks so the ghost it draws during the drag is the band that will
  * actually appear. This applies that plan and nothing more.
  */
@@ -3275,13 +3241,11 @@ function applyCarve(state: DiagramData, carve: CarvePlan): { state: DiagramData;
   elements = updatePoolTypes([...elements, band]);
   // Nothing but lanes moved; a connector drawn on a lane's edge re-derives.
   const connectors = recomputeAllConnectors(state.connectors, elements, state.relaxedLayout);
-  let next: DiagramData = { ...state, elements, connectors };
-  if (carve.slide > 0) {
-    // As an ordinary move, so connectors and boundary events travel with it.
-    const ids = state.elements.filter((e) => e.parentId === donor.id && e.type !== "lane").map((e) => e.id);
-    next = reducerImpl(next, { type: "MOVE_ELEMENTS", payload: { ids, dx: 0, dy: carve.edge === "first" ? carve.slide : -carve.slide } });
-  }
-  return { state: next, bandId: band.id };
+  // Nothing is MOVED to make room. The band takes empty space where there is
+  // some and halves its neighbour where there is not (Paul, 2026-09-23), so an
+  // element may end up across the new divider — visible, and the user's to
+  // settle, which is better than the editor quietly shifting their process.
+  return { state: { ...state, elements, connectors }, bandId: band.id };
 }
 
 /** Plan a carve and apply it, for the callers that name the place themselves. */

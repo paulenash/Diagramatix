@@ -17,16 +17,37 @@ import { resolveRef, resolveSelectionRefs } from "./resolveRef";
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
+/**
+ * What the command would destroy, in words — and, when it is one named
+ * element, WHICH one.
+ *
+ * The id matters. The question names a specific thing ("delete the sub-lane
+ * 'Sublane 1'"), and the answer arrives an utterance later, by which time the
+ * selection may have moved and a bare phrase like "selected" or "one" may
+ * resolve differently or not at all. Paul's log, 2026-09-23, is five lines of
+ * exactly that: `Yes.` → `confirmed → which sub-lane? there are 2 — I couldn't
+ * match "one"`. The caller pins the answer to this id, so "yes" acts on the
+ * thing the question named or on nothing.
+ */
+export interface Confirmation {
+  /** The sentence to ask. */
+  what: string;
+  /** The single element the question is about, when it is about one. */
+  targetId?: string;
+  /** The reference in the ops that resolved to it. */
+  ref?: string;
+}
+
 /** A one-line description of what the command would destroy, or null when it may run unasked. */
 export function needsConfirmation(
   ops: readonly AssistOp[],
   elements: readonly DiagramElement[],
   lastAddedId?: string | null,
   selectedIds?: readonly string[],
-): string | null {
+): Confirmation | null {
   for (const op of ops) {
     if (op.op === "clear") {
-      return elements.length ? `clear the whole diagram (${plural(elements.length, "element")})` : null;
+      return elements.length ? { what: `clear the whole diagram (${plural(elements.length, "element")})` } : null;
     }
 
     // "Put a pool around everything" destroys nothing, but when a pool already
@@ -48,15 +69,15 @@ export function needsConfirmation(
       if (loose.length === 0) continue; // nothing to adopt; the editor says so
       const biggest = pools.reduce((a, b) => (a.width * a.height >= b.width * b.height ? a : b));
       const name = biggest.label?.trim() || "the existing pool";
-      return `move ${plural(loose.length, "loose element")} into ${name}`;
+      return { what: `move ${plural(loose.length, "loose element")} into ${name}` };
     }
 
     if (op.op !== "delete") continue;
 
     const sel = resolveSelectionRefs(op.ref, elements as DiagramElement[], selectedIds);
-    if (sel && sel.length > 1) return `delete the ${plural(sel.length, "selected element")}${op.compact ? " and close the gap" : ""}`;
+    if (sel && sel.length > 1) return { what: `delete the ${plural(sel.length, "selected element")}${op.compact ? " and close the gap" : ""}` };
 
-    if (op.compact) return `delete ${op.ref} and close the gap`;
+    if (op.compact) return { what: `delete ${op.ref} and close the gap` };
 
     const r = resolveRef(op.ref, elements as DiagramElement[], lastAddedId, selectedIds);
     if (!r || !("id" in r)) continue;
@@ -94,7 +115,11 @@ export function needsConfirmation(
       }
       return elements.filter((x) => x.parentId && ids.has(x.parentId) && !laneLike.has(x.type)).length;
     })();
-    return `delete the ${kind} “${e.label?.trim() || kind}”${inside ? ` — the ${plural(inside, "element")} inside it will be kept` : ""}`;
+    return {
+      what: `delete the ${kind} “${e.label?.trim() || kind}”${inside ? ` — the ${plural(inside, "element")} inside it will be kept` : ""}`,
+      targetId: e.id,
+      ref: op.ref,
+    };
   }
   return null;
 }

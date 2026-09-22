@@ -46,7 +46,9 @@ import { planWrapInSubprocess, planUnwrapSubprocess, planWrapInContainer } from 
 import { matchIntent, matchAssistRules, type IntentRow } from "@/app/lib/diagram/intentMatch";
 import { canConnect } from "@/app/lib/diagram/canConnect";
 import { parseCommand } from "@/app/lib/assist/commandGrammar";
-import { resolveRef, resolveSelectionRefs, isSelectionRef, nearestRefs, ID_REF_PREFIX } from "@/app/lib/assist/resolveRef";
+import { resolveRef, resolveSelectionRefs, isSelectionRef, nearestRefs, ID_REF_PREFIX, spokenNumbersAsDigits } from "@/app/lib/assist/resolveRef";
+import { isPointerElementRef } from "@/app/lib/assist/pointerRef";
+import { nextContainerLabels } from "@/app/lib/diagram/containerNames";
 import { isAnyLane, laneKindWord, sameKindAs } from "@/app/lib/diagram/laneKind";
 import { convertMatches, matchesForType } from "@/app/lib/assist/convertPhrase";
 import { subtypeFingerprint } from "@/app/lib/diagram/elementSubtypes";
@@ -3061,7 +3063,19 @@ export function DiagramEditor({
           const kindWord = kind === "sub-lane" ? "sub-?lanes?" : `${kind}s?`;
           const named = op.ref.replace(new RegExp(`\\b(?:the|a|an|named|called|${kindWord})\\b`, "gi"), "").trim();
           const siblings = sameKindAs(e, els);
-          if (siblings.length > 1 && (!named || !(e.label ?? "").toLowerCase().includes(named.toLowerCase()))) {
+          // A reference that is not a SPOKEN NAME has nothing to check against.
+          // An `#id:` (the picker's answer, or a pinned confirmation), the
+          // selection, the pointer — each identifies the element exactly, and
+          // the check turned all three into "which lane? there are 3 — I
+          // couldn't match '#id:il8erk8a'" (Paul's log, 2026-09-23), which also
+          // put an internal id in front of the user.
+          const exactRef = op.ref.startsWith(ID_REF_PREFIX) || isSelectionRef(op.ref) || isPointerElementRef(op.ref);
+          // "one" and "1" are the same word said two ways — the resolver knows
+          // that and this check did not, so "delete sublane one" was refused
+          // against a lane called "Sublane 1".
+          const saidLike = spokenNumbersAsDigits(named).toLowerCase();
+          const labelLike = spokenNumbersAsDigits((e.label ?? "")).toLowerCase();
+          if (!exactRef && siblings.length > 1 && (!named || !labelLike.includes(saidLike))) {
             results.push(`which ${kind}? there are ${siblings.length}${named ? ` — I couldn't match “${named}”` : ""}; say its exact name`);
             anyFail = true; continue;
           }
@@ -3270,6 +3284,10 @@ export function DiagramEditor({
 
       if (op.op === "compressPool") {
         const p = resolve1(op.poolRef);
+        if ("err" in p && p.ambiguous) {
+          const flow = buildPickFlow(ops, op.poolRef, p.ambiguous, els);
+          if (flow) { setPickFlow(flow); results.push(flow.prompt); pickParked = true; break; }
+        }
         if ("err" in p) { results.push(p.err); anyFail = true; continue; }
         if (p.type !== "pool") { results.push(`${nameOf(p)} isn't a pool`); anyFail = true; continue; }
         compressPool(p.id);
@@ -3709,19 +3727,50 @@ export function DiagramEditor({
 
       if (op.op === "addLanes") {
         const pool = resolve1(op.poolRef);
+        // Candidates that share a label cannot be told apart by saying the name
+        // — "which “pool three”? 2 match: “Pool 3”, “Pool 3”" (Paul's log,
+        // 2026-09-23). Numbered badges can.
+        if ("err" in pool && pool.ambiguous) {
+          const flow = buildPickFlow(ops, op.poolRef, pool.ambiguous, els);
+          if (flow) { setPickFlow(flow); results.push(flow.prompt); pickParked = true; break; }
+        }
         if ("err" in pool) { results.push(pool.err); anyFail = true; continue; }
         if (pool.type !== "pool") { results.push(`${nameOf(pool)} isn't a pool`); anyFail = true; continue; }
         splitPoolEven(pool.id, op.labels);
-        results.push(`added ${op.labels.length} lane${op.labels.length === 1 ? "" : "s"} to ${nameOf(pool)}: ${op.labels.join(", ")}`);
+        // Say the names the lanes will REALLY have. The reducer numbers a bare
+        // or taken name against the diagram, so reporting what was asked for
+        // named a lane that already existed — "added 1 lane to Pool 3: Lane 1",
+        // twice, in Paul's log of 2026-09-23.
+        const laneNames = nextContainerLabels(els, op.labels, "Lane");
+        results.push(`added ${laneNames.length} lane${laneNames.length === 1 ? "" : "s"} to ${nameOf(pool)}: ${laneNames.join(", ")}`);
         continue;
       }
 
       if (op.op === "addSublanes") {
         const lane = resolve1(op.laneRef);
+        if ("err" in lane && lane.ambiguous) {
+          const flow = buildPickFlow(ops, op.laneRef, lane.ambiguous, els);
+          if (flow) { setPickFlow(flow); results.push(flow.prompt); pickParked = true; break; }
+        }
         if ("err" in lane) { results.push(lane.err); anyFail = true; continue; }
-        if (lane.type !== "lane") { results.push(`${nameOf(lane)} isn't a lane`); anyFail = true; continue; }
-        splitLaneEven(lane.id, op.labels);
-        results.push(`added ${op.labels.length} sublane${op.labels.length === 1 ? "" : "s"} to ${nameOf(lane)}: ${op.labels.join(", ")}`);
+        // "Add a sublane to pool three" names the POOL, because that is how a
+        // person describes where they are looking. Sublanes live in lanes, so
+        // answer with the lane when there is no doubt which, and otherwise say
+        // which lanes there are rather than "Pool 3 isn't a lane" (Paul's log,
+        // 2026-09-23).
+        let target = lane;
+        if (target.type === "pool") {
+          const lanesIn = els.filter((e) => e.type === "lane" && e.parentId === target.id);
+          if (lanesIn.length === 1) target = lanesIn[0];
+          else if (lanesIn.length > 1) {
+            const flow = buildPickFlow(ops, op.laneRef, lanesIn.map((l) => l.id), els);
+            if (flow) { setPickFlow(flow); results.push(`which lane in ${nameOf(target)}? ${flow.prompt}`); pickParked = true; break; }
+          } else { results.push(`${nameOf(target)} has no lanes to put a sublane in`); anyFail = true; continue; }
+        }
+        if (target.type !== "lane") { results.push(`${nameOf(target)} isn't a lane`); anyFail = true; continue; }
+        splitLaneEven(target.id, op.labels);
+        const subNames = nextContainerLabels(els, op.labels, "Sublane");
+        results.push(`added ${subNames.length} sublane${subNames.length === 1 ? "" : "s"} to ${nameOf(target)}: ${subNames.join(", ")}`);
         continue;
       }
     }
@@ -3951,10 +4000,17 @@ export function DiagramEditor({
           ? { op: "wrapInContainer", container: "pool" as const, ...(op.label ? { label: op.label } : {}) } as AssistOp
           : op,
       );
-      const what = needsConfirmation(ops, data.elements, voiceLastId.current, selectedIdsRef.current);
-      if (what) {
-        pendingConfirmRef.current = { ops, what, viaAi };
-        log({ heard, summary: `${prefix}${what}? — say “yes” to confirm`, ok: true, viaAi });
+      const ask = needsConfirmation(ops, data.elements, voiceLastId.current, selectedIdsRef.current);
+      if (ask) {
+        // PIN THE ANSWER TO WHAT WAS ASKED. The question names one element; the
+        // "yes" arrives an utterance later, by which time "selected" or "one"
+        // may resolve to something else or to nothing at all — five lines of
+        // Paul's log, 2026-09-23, are `Yes.` → `confirmed → which sub-lane?`.
+        // Substituting the id is the same trick the picker uses (R2), so the
+        // re-run goes back through the ordinary path.
+        const pinned = ask.targetId && ask.ref ? substituteRef(ops, ask.ref, ask.targetId) : ops;
+        pendingConfirmRef.current = { ops: pinned, what: ask.what, viaAi };
+        log({ heard, summary: `${prefix}${ask.what}? — say “yes” to confirm`, ok: true, viaAi });
         return;
       }
       const r = applyGrouped(ops);

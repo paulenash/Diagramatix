@@ -39,9 +39,8 @@ export interface CarvePlan {
   /** The neighbour that gives the room, and which of its edges gives. */
   donorId: string;
   edge: StackEdge;
-  /** How much height it gives, and how far its contents slide to allow it. */
+  /** How much height it gives up. */
   give: number;
-  slide: number;
   label: string;
   rect: Rect;
 }
@@ -70,14 +69,16 @@ const nextSublaneLabel = (elements: DiagramElement[], offset = 0): string =>
  *
  * The room comes out of the neighbour it goes next to — the band below it for a
  * band on top, the band above it for one at the bottom, and between two bands
- * the taller of them (or `preferDonorId` when that neighbour is named). It
- * takes the empty space at that edge, beyond the neighbour's contents, up to
- * half its height; when that edge is crowded the neighbour's contents slide
- * away from it into its own free space at the far edge. It never takes more
- * than the neighbour's label — and its own sub-lanes' labels — can spare.
+ * the taller of them (or `preferDonorId` when that neighbour is named).
  *
- * `null` when what is left would be too small for the new band's name: the
- * drop would do nothing, which is what turns the pool boundary red.
+ * It takes the EMPTY space at that edge if there is enough of it, or the empty
+ * space at the other end of the stack if that end has it, and otherwise HALVES
+ * the neighbour — which may leave an element across the new divider, for the
+ * user to sort out (Paul, 2026-09-23). It never takes more than the
+ * neighbour's label, or its sub-lanes' labels, can spare.
+ *
+ * `null` only when what is left could not carry the new band's NAME down its
+ * header. That refusal is what turns the pool boundary red.
  */
 export function planCarve(
   elements: DiagramElement[],
@@ -108,28 +109,57 @@ export function planCarve(
     min: Math.max(MIN_BAND, laneMetrics(lane.label ?? "", laneFs).minHeight),
     bands: depth > 12 ? [] : lanesOf(elements, lane.id).map((sub) => bandTree(sub, depth + 1)),
   });
-  const room = shrinkRoom(bandTree(donor), edge);
   const need = Math.max(MIN_BAND, laneMetrics(label, laneFs).minHeight);
-  const half = Math.floor(donor.height / 2);
+  const room = shrinkRoom(bandTree(donor), edge);
   const content = contentBoundsOf(elements, donor.id);
-  // Empty space inside the donor at the edge that gives, and at the far one.
-  const emptyNear = !content ? donor.height
-    : Math.max(0, edge === "last" ? donor.y + donor.height - (content.y + content.height) - MIN_LEFT_GAP
-                                  : content.y - donor.y - MIN_LEFT_GAP);
-  const emptyFar = !content ? 0
-    : Math.max(0, edge === "last" ? content.y - donor.y - MIN_LEFT_GAP
-                                  : donor.y + donor.height - (content.y + content.height) - MIN_LEFT_GAP);
-  // Only a donor with no sub-lanes may slide its contents: sliding them past
-  // fixed sublane dividers would change which sublane they sit in.
-  const hasSubs = lanesOf(elements, donor.id).length > 0;
-  const canSlide = content && !hasSubs ? emptyFar : 0;
-  const give = Math.floor(Math.min(room, half, emptyNear >= need ? emptyNear : emptyNear + canSlide));
+
+  // EMPTY SPACE FIRST, THEN HALVE. Paul, 2026-09-23: "always add the new lane
+  // by trying to locate it at the top or the bottom where there are no
+  // existing elements, if possible. If this is not possible just divide the
+  // Pool in two and let the user resolve the lane divider issue if some
+  // elements now straddle two lanes. … Only reject adding at any level if the
+  // new lane/sublane etc. has not enough space for the name in its header
+  // region."
+  //
+  // So there are exactly two answers and one refusal. The empty space at an
+  // edge is the good answer, and the edge with room is preferred over the edge
+  // the index asked for — a lane added "at the top" of a pool whose top lane is
+  // full, but whose bottom lane is empty, is better placed at the bottom than
+  // refused. Halving is the fallback, and it may leave an element across the
+  // new divider; that is the user's to sort out, and they can see it.
+  const emptyAt = (band: DiagramElement, at: StackEdge): number => {
+    const inside = contentBoundsOf(elements, band.id);
+    if (!inside) return band.height;
+    return Math.max(0, at === "last"
+      ? band.y + band.height - (inside.y + inside.height) - MIN_LEFT_GAP
+      : inside.y - band.y - MIN_LEFT_GAP);
+  };
+
+  let give = Math.floor(Math.min(room, Math.max(need, emptyAt(donor, edge))));
+  let fromEmptySpace = emptyAt(donor, edge) >= need;
+  if (!fromEmptySpace) {
+    // The other end of the stack, when it has the room this end has not.
+    const other = edge === "first" ? bands[bands.length - 1] : bands[0];
+    const otherEdge: StackEdge = edge === "first" ? "last" : "first";
+    if (other && other.id !== donor.id && emptyAt(other, otherEdge) >= need
+        && shrinkRoom(bandTree(other), otherEdge) >= need) {
+      donor = other;
+      edge = otherEdge;
+      give = Math.floor(Math.min(shrinkRoom(bandTree(donor), edge), emptyAt(donor, edge)));
+      fromEmptySpace = true;
+    }
+  }
+  if (!fromEmptySpace) {
+    // Halve the donor. Content may end up straddling the new divider.
+    give = Math.floor(Math.min(room, donor.height / 2));
+  }
+  // The ONLY refusal: what is left could not carry the name down its header.
   if (give < need) return null;
+  void content;
 
   const headerW = parent.type === "pool" ? getPoolHeaderWidth(parent) : getLaneHeaderWidth(parent);
   return {
     parentId, index: at, donorId: donor.id, edge, give,
-    slide: Math.max(0, give - emptyNear),
     label,
     rect: {
       x: parent.x + headerW,

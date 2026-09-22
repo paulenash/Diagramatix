@@ -5,7 +5,7 @@
  */
 import type { AssistOp } from "./ops";
 import { SYMBOL_SYNONYMS, SYMBOL_PHRASES } from "./ops";
-import { namesNonContainerKind, laneWordIsAttached, looksPositionalNotAName } from "./greedyGuards";
+import { namesNonContainerKind, laneWordIsAttached, looksPositionalNotAName, namesAContainer } from "./greedyGuards";
 import { parseRenameType } from "./renameTargets";
 import { parsePoolBoundaryPhrase, mentionsPoolBoundary } from "./poolBoundaryPhrase";
 import { repairSelectedWord, repairTurnWord } from "./selectedWord";
@@ -611,7 +611,12 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   m = raw.match(new RegExp(`^(?:add|insert|create|split)\\s+${COUNT}?\\s*(?:new\\s+|another\\s+|extra\\s+)?(?:sub-?lanes?|sub lanes?|sub-?lines?|sub lines?)(?:\\s+(?:to|in|into|onto|on|under|below|inside)\\s+(.+?))?(?:\\s+(?:called|named|labell?ed)\\s+(.+))?$`, "i"));
   if (m) {
     let labels = m[3] ? splitLabels(m[3]) : [];
-    if (!labels.length) labels = Array.from({ length: Math.max(1, toCount(m[1])) }, (_, i) => `Sublane ${i + 1}`);
+    // The BARE kind word, not "Sublane 1": the grammar cannot see the diagram,
+    // so a number it invents is a name that is probably already taken. Asking
+    // for "Sublane" makes the reducer number it against what exists — which is
+    // why "add another sublane to lane one" used to make "Sublane 1 2"
+    // (Paul's log, 2026-09-23).
+    if (!labels.length) labels = Array.from({ length: Math.max(1, toCount(m[1])) }, () => "Sublane");
     return [{ op: "addSublanes", laneRef: m[2] ? clean(m[2]) : "the lane", labels }];
   }
 
@@ -619,7 +624,9 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   m = raw.match(new RegExp(`^(?:add|insert|create|split)\\s+${COUNT}?\\s*(?:new\\s+|another\\s+|extra\\s+)?(?:lanes?|lines?)(?:\\s+(?:to|in|into|onto|on|inside)\\s+(.+?))?(?:\\s+(?:called|named|labell?ed)\\s+(.+))?$`, "i"));
   if (m) {
     let labels = m[3] ? splitLabels(m[3]) : [];
-    if (!labels.length) labels = Array.from({ length: Math.max(1, toCount(m[1])) }, (_, i) => `Lane ${i + 1}`);
+    // Bare, and numbered by the reducer against the diagram — see the sublane
+    // rule above.
+    if (!labels.length) labels = Array.from({ length: Math.max(1, toCount(m[1])) }, () => "Lane");
     return [{ op: "addLanes", poolRef: m[2] ? clean(m[2]) : "the pool", labels }];
   }
 
@@ -669,6 +676,9 @@ export function parseCommand(utterance: string): AssistOp[] | null {
       // relationship, not a name — decline, and the AI can place it. Only
       // implicit labels: an explicit "called …" is the user's own words.
       if (label && !named && !quoted && looksPositionalNotAName(label)) return null;
+      // Still talking about lanes or pools after the container rules declined it:
+      // a phrasing they could not read, which the AI can. Never a symbol's name.
+      if (label && !named && !quoted && namesAContainer(label)) return null;
       const op: AssistOp = { op: "add", symbolType: sym.symbolType };
       if (sym.eventType) op.eventType = sym.eventType;
       if (sym.gatewayType) op.gatewayType = sym.gatewayType;
@@ -681,6 +691,7 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     if (rest) {
       const implicit = label ?? clean(stripArticle(rest));
       if (!named && !quoted && looksPositionalNotAName(implicit)) return null;
+      if (!named && !quoted && namesAContainer(implicit)) return null;
       const op: AssistOp = { op: "add", symbolType: "task", label: implicit };
       if (afterRef) op.afterRef = afterRef;
       if (atPointer) op.at = "pointer";

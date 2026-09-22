@@ -92,21 +92,21 @@ describe("parseCommand — lanes / sublanes", () => {
   it("add a single lane", () => {
     expect(parseCommand("add a lane to Pool 1 called Finance")).toEqual([{ op: "addLanes", poolRef: "Pool 1", labels: ["Finance"] }]);
   });
-  it("lanes without names → default Lane N labels", () => {
-    expect(parseCommand("add 3 lanes to the pool")).toEqual([{ op: "addLanes", poolRef: "the pool", labels: ["Lane 1", "Lane 2", "Lane 3"] }]);
+  it("lanes without names → the BARE kind, numbered later by the reducer", () => {
+    expect(parseCommand("add 3 lanes to the pool")).toEqual([{ op: "addLanes", poolRef: "the pool", labels: ["Lane", "Lane", "Lane"] }]);
   });
   it("mishearings: 'line' → lane, 'poll' → pool", () => {
     expect(parseCommand("add 2 lines to the pool called A and B")).toEqual([{ op: "addLanes", poolRef: "the pool", labels: ["A", "B"] }]);
     expect(parseCommand("put a poll around all elements")).toEqual([{ op: "wrapInPool" }]);
     expect(parseCommand("wrap all elements in a poll")).toEqual([{ op: "wrapInPool" }]);
   });
-  it("sublanes without names → default Sublane N labels", () => {
-    expect(parseCommand("add 2 sublanes to Sales Team")).toEqual([{ op: "addSublanes", laneRef: "Sales Team", labels: ["Sublane 1", "Sublane 2"] }]);
+  it("sublanes without names → the BARE kind, numbered later by the reducer", () => {
+    expect(parseCommand("add 2 sublanes to Sales Team")).toEqual([{ op: "addSublanes", laneRef: "Sales Team", labels: ["Sublane", "Sublane"] }]);
   });
   it("'new'/adjectives + optional target (defaults 'the pool'/'the lane')", () => {
-    expect(parseCommand("add a new lane to the pool")).toEqual([{ op: "addLanes", poolRef: "the pool", labels: ["Lane 1"] }]);
-    expect(parseCommand("add a new lane")).toEqual([{ op: "addLanes", poolRef: "the pool", labels: ["Lane 1"] }]);
-    expect(parseCommand("add a new sublane")).toEqual([{ op: "addSublanes", laneRef: "the lane", labels: ["Sublane 1"] }]);
+    expect(parseCommand("add a new lane to the pool")).toEqual([{ op: "addLanes", poolRef: "the pool", labels: ["Lane"] }]);
+    expect(parseCommand("add a new lane")).toEqual([{ op: "addLanes", poolRef: "the pool", labels: ["Lane"] }]);
+    expect(parseCommand("add a new sublane")).toEqual([{ op: "addSublanes", laneRef: "the lane", labels: ["Sublane"] }]);
   });
   it("wrap vs extend vs create (bare 'add a pool' is a NEW pool)", () => {
     // "put/wrap a pool around everything" adopts loose elements → wrapInPool
@@ -131,7 +131,7 @@ describe("container maintenance — definitive set", () => {
     expect(parseCommand("create a pool called Finance")).toEqual([{ op: "addPool", label: "Finance" }]);
   });
   it("2. Add Lane to Pool", () => {
-    expect(parseCommand("add a lane to the pool")).toEqual([{ op: "addLanes", poolRef: "the pool", labels: ["Lane 1"] }]);
+    expect(parseCommand("add a lane to the pool")).toEqual([{ op: "addLanes", poolRef: "the pool", labels: ["Lane"] }]);
     expect(parseCommand("add a lane to My Company called Sales")).toEqual([{ op: "addLanes", poolRef: "My Company", labels: ["Sales"] }]);
   });
   it("3. Add Lane above/below a lane", () => {
@@ -145,7 +145,7 @@ describe("container maintenance — definitive set", () => {
   });
   it("5. Add Sublanes to a lane", () => {
     expect(parseCommand("add 3 sublanes to Marketing called A, B and C")).toEqual([{ op: "addSublanes", laneRef: "Marketing", labels: ["A", "B", "C"] }]);
-    expect(parseCommand("add sublanes to the Sales lane")).toEqual([{ op: "addSublanes", laneRef: "the Sales lane", labels: ["Sublane 1"] }]);
+    expect(parseCommand("add sublanes to the Sales lane")).toEqual([{ op: "addSublanes", laneRef: "the Sales lane", labels: ["Sublane"] }]);
   });
   it("6. Extend pools to include all elements (widen + equalise)", () => {
     expect(parseCommand("extend the pool to include all elements on the diagram")).toEqual([{ op: "extendPools" }]);

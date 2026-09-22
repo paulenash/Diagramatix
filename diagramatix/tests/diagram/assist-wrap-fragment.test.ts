@@ -77,7 +77,7 @@ describe("T4503 — growing an existing pool asks first", () => {
   ];
 
   it("asks, naming the pool and the count", () => {
-    const what = needsConfirmation([{ op: "wrapInPool" }], withPool());
+    const what = needsConfirmation([{ op: "wrapInPool" }], withPool())?.what;
     expect(what).toContain("3 loose elements");
     expect(what).toContain("P");
   });
@@ -99,6 +99,6 @@ describe("T4503 — growing an existing pool asks first", () => {
   });
 
   it("has not disturbed the confirmations that were already there", () => {
-    expect(needsConfirmation([{ op: "clear" }], withPool())).toContain("clear the whole diagram");
+    expect(needsConfirmation([{ op: "clear" }], withPool())?.what).toContain("clear the whole diagram");
   });
 });

@@ -93,10 +93,15 @@ describe("T4607 — container names start with a capital too", () => {
   it("is applied BEFORE the uniqueness pass, so case cannot hide a clash", () => {
     // "sales" next to an existing "Sales" must be caught as the duplicate it
     // is, not slip past on case and produce two lanes that read identically.
-    const reducer = require("node:fs").readFileSync(
-      require("node:path").join(process.cwd(), "app", "hooks", "useDiagram.ts"), "utf8",
+    // The naming rules moved to app/lib/diagram/containerNames.ts on
+    // 2026-09-23, so the command log can work out the same names the reducer
+    // will give (T4698).
+    const names = require("node:fs").readFileSync(
+      require("node:path").join(process.cwd(), "app", "lib", "diagram", "containerNames.ts"), "utf8",
     );
-    expect(reducer).toMatch(/const base = capitaliseFirstWord\(\(desired \?\? ""\)\.trim\(\)\);/);
+    expect(names).toMatch(/const base = capitaliseFirstWord\(\(desired \?\? ""\)\.trim\(\)\);/);
+    expect(names.indexOf("capitaliseFirstWord("), "capitalise, THEN de-duplicate")
+      .toBeLessThan(names.indexOf("taken.has(base.toLowerCase())"));
   });
 });
 
@@ -115,7 +120,7 @@ describe("T4608 — the confirmation stops claiming the contents are deleted", (
     // The reducer cascade-deletes the container subtree and re-homes every
     // non-container child. The old prompt said "and the 7 elements inside it",
     // so Paul said no to something that would not have touched them.
-    const msg = needsConfirmation([{ op: "delete", ref: "domestic" }], els, null, []);
+    const msg = needsConfirmation([{ op: "delete", ref: "domestic" }], els, null, [])?.what;
     expect(msg).toBe("delete the sub-lane “domestic” — the 7 elements inside it will be kept");
     expect(msg, "the wording that talked him out of it").not.toMatch(/and the 7 elements inside it$/);
   });
@@ -125,7 +130,7 @@ describe("T4608 — the confirmation stops claiming the contents are deleted", (
   });
 
   it("counts only the real contents, not the sub-lanes", () => {
-    const msg = needsConfirmation([{ op: "delete", ref: "Shipping" }], els, null, []);
+    const msg = needsConfirmation([{ op: "delete", ref: "Shipping" }], els, null, [])?.what;
     // Shipping's only direct child is the "domestic" lane; the seven tasks
     // live one level down. Counting the LANE would read "1 element inside it",
     // true of nothing a user can see — so the count reaches through it to the

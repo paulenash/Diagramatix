@@ -131,9 +131,28 @@ describe("T4693 — 'nothing will happen' is the truth, and it is shown in red",
   });
 
   it("a band that could not fit its own name is never promised", () => {
-    // Two empty 120px lanes: half of one is 60, and "Lane 3" needs 66 down a
-    // vertical header. Room is not the constraint here — the NAME is.
+    // The ONLY refusal left (Paul, 2026-09-23: "Only reject adding at any level
+    // if the new lane/sublane etc. has not enough space for the name in its
+    // header region"). Two 60px lanes whose own names need 40 apiece can spare
+    // 20px between them; "Lane 3" needs 66 down a vertical header.
     const narrow = {
+      ...world(),
+      elements: [
+        E({ id: "p", type: "pool", label: "Pool 1", x: 0, y: 0, width: 800, height: 120, properties: {} }),
+        E({ id: "A", type: "lane", label: "A", x: 36, y: 0, width: 764, height: 60, parentId: "p", properties: {} }),
+        E({ id: "B", type: "lane", label: "B", x: 36, y: 60, width: 764, height: 60, parentId: "p", properties: {} }),
+      ],
+    } as DiagramData;
+    expect(laneMetrics("Lane 3", LANE_FS).minHeight).toBeGreaterThan(20);
+    expect(plan(narrow, 5).kind, "20px is not enough for its name").toBe("none");
+    const after = drop(narrow, 5);
+    expect(after.elements.filter((e) => e.type === "lane").length).toBe(2);
+  });
+
+  it("an empty lane gives more than half, because the space is free", () => {
+    // Two empty 120px lanes: the top one can give 80 and still fit "A", so a
+    // lane needing 66 goes in — the old half-cap refused this.
+    const roomy = {
       ...world(),
       elements: [
         E({ id: "p", type: "pool", label: "Pool 1", x: 0, y: 0, width: 800, height: 240, properties: {} }),
@@ -141,10 +160,11 @@ describe("T4693 — 'nothing will happen' is the truth, and it is shown in red",
         E({ id: "B", type: "lane", label: "B", x: 36, y: 120, width: 764, height: 120, parentId: "p", properties: {} }),
       ],
     } as DiagramData;
-    expect(laneMetrics("Lane 3", LANE_FS).minHeight).toBeGreaterThan(60);
-    expect(plan(narrow, 5).kind, "60px is not enough for its name").toBe("none");
-    const after = drop(narrow, 5);
-    expect(after.elements.filter((e) => e.type === "lane").length).toBe(2);
+    const p = plan(roomy, 5);
+    expect(p.kind).toBe("band");
+    const after = drop(roomy, 5);
+    expect(after.elements.filter((e) => e.type === "lane").length).toBe(3);
+    expect(after.elements.find((e) => e.id === "p")!.height, "and still no growth").toBe(240);
   });
 
   it("outside every pool there is no pool to redden — that drop makes a POOL", () => {

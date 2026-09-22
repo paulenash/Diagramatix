@@ -135,18 +135,18 @@ describe("R1 — destructive commands ask first", () => {
   const els = [pool, lane, t1, t2];
 
   it("T4392 — clear, container deletes, multi-selection deletes and delete+compact ask; a single element does not", () => {
-    expect(needsConfirmation([{ op: "clear" }], els)).toBe("clear the whole diagram (4 elements)");
+    expect(needsConfirmation([{ op: "clear" }], els)?.what).toBe("clear the whole diagram (4 elements)");
     expect(needsConfirmation([{ op: "clear" }], []), "nothing to lose → no question").toBeNull();
-    expect(needsConfirmation([{ op: "delete", ref: "Pick", compact: true }], els)).toBe("delete Pick and close the gap");
+    expect(needsConfirmation([{ op: "delete", ref: "Pick", compact: true }], els)?.what).toBe("delete Pick and close the gap");
     // 2026-09-21: the count is now the real contents ANYWHERE below it, and
     // the wording says they are KEPT — which is what the reducer has always
     // done. "The 1 element inside it" was the lane, true of nothing the user
     // can see, while the two tasks they actually care about went unmentioned;
     // and "and the …" read as a threat to delete them (Paul said no to a
     // sub-lane delete because of it).
-    expect(needsConfirmation([{ op: "delete", ref: "Warehouse" }], els)).toBe("delete the pool “Warehouse” — the 2 elements inside it will be kept");
-    expect(needsConfirmation([{ op: "delete", ref: "Sales" }], els)).toBe("delete the lane “Sales” — the 2 elements inside it will be kept");
-    expect(needsConfirmation([{ op: "delete", ref: "these" }], els, null, ["t1", "t2"])).toBe("delete the 2 selected elements");
+    expect(needsConfirmation([{ op: "delete", ref: "Warehouse" }], els)?.what).toBe("delete the pool “Warehouse” — the 2 elements inside it will be kept");
+    expect(needsConfirmation([{ op: "delete", ref: "Sales" }], els)?.what).toBe("delete the lane “Sales” — the 2 elements inside it will be kept");
+    expect(needsConfirmation([{ op: "delete", ref: "these" }], els, null, ["t1", "t2"])?.what).toBe("delete the 2 selected elements");
     expect(needsConfirmation([{ op: "delete", ref: "Pick" }], els), "one named task deletes at once").toBeNull();
     expect(needsConfirmation([{ op: "rename", ref: "Pick", label: "Pick Items" }], els)).toBeNull();
 
