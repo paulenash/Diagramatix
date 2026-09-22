@@ -4195,12 +4195,13 @@ function SymbolRendererInner({
             : { x: element.x, width: element.width })}
           y={element.y} height={element.height}
           fill="transparent" stroke="none"
-          // ✋ not ✛. Since 77122bb3 a drag on a selected shape MOVES it and
-          // only a still 300ms hold connects, so a crosshair promised the
-          // wrong gesture (Paul, 2026-09-22: "click and press still does not
-          // produce a Grab cursor on elements. It is still an + cursor").
-          // The CLASS, not an inline style, so it can close to ✊ on press.
-          className="dgx-grab"
+          // ✛ — the next press here draws a connector (protocol item 1: "+"
+          // while over the selected element). The "+" Paul saw DURING A MOVE
+          // was a different fault: pressing an unselected element selects it,
+          // this overlay appears under the pointer mid-drag and its crosshair
+          // won. That is handled canvas-wide by `.dgx-dragging`, which puts
+          // ✊ on everything while a move is in progress.
+          style={{ cursor: "crosshair" }}
           onDoubleClick={handleShapeBodyDblClick}
           onMouseDown={(e) => {
             e.stopPropagation();
@@ -4209,23 +4210,24 @@ function SymbolRendererInner({
               : { x: element.x + element.width / 2, y: element.y + element.height / 2 };
             const side = getClosestSideFromPoint(worldPt, element);
 
-            // MOVE IS THE DEFAULT; CONNECTING IS THE DELIBERATE ONE.
+            // THE SECOND PRESS CONNECTS. Paul's protocol, decided 2026-09-22:
             //
-            // Paul, 2026-09-21: "If I click on a Task, wait a bit and then
-            // move, the Task moves. It seems with Pools that I can't do that
-            // reliably — they almost immediately go into connector creation
-            // mode." This overlay is why. It covers the whole of a SELECTED
-            // element, and it used to read a 5px movement as "start drawing a
-            // connector" — so dragging a selected shape drew a line instead of
-            // moving it. Pools show it up because a white-box pool suppresses
-            // this overlay entirely while a black-box one does not, so the two
-            // kinds of pool answered the same gesture differently.
+            //   "1. click and press -> Drag cursor
+            //    2. click, click and press -> this should be connector
+            //       creation mode and when the targets are highlighted, the
+            //       cursor should change to '+'."
             //
-            // Now: move the mouse and you are MOVING the shape, which is what
-            // a drag means everywhere else on the canvas. Press and HOLD for
-            // 300ms without moving and you are drawing a connector — the same
-            // press-and-hold the connection points already use, and the only
-            // reading that cannot be confused with a drag.
+            // This overlay only exists on an element that is ALREADY
+            // selected, so reaching it IS the second press: a drag from here
+            // draws a connector, and so does holding still for 300ms. The
+            // first press on an unselected element never lands here — it
+            // moves the element, through the shape's own handler.
+            //
+            // (77122bb3 briefly made a drag here MOVE the shape instead, to
+            // answer "pools almost immediately go into connector creation
+            // mode". That report was really about the pool HEADER, which this
+            // overlay no longer covers; tasks lost their drag-to-connect for
+            // nothing, and Paul's protocol restores it.)
             let fired = false;
             function activate() {
               if (fired) return;
@@ -4237,13 +4239,7 @@ function SymbolRendererInner({
             }
             const holdTimer = setTimeout(activate, 300);
             function onMove(ev: MouseEvent) {
-              if (fired) return;
-              if (Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) > 4) {
-                clearTimeout(holdTimer);
-                window.removeEventListener("mouseup", onUp);
-                window.removeEventListener("mousemove", onMove);
-                beginElementDrag(e);
-              }
+              if (Math.abs(ev.clientX - e.clientX) > 5 || Math.abs(ev.clientY - e.clientY) > 5) activate();
             }
             function onUp() {
               clearTimeout(holdTimer);

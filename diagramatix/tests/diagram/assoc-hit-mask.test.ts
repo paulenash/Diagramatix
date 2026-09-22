@@ -97,13 +97,17 @@ describe("T4654 — a pool header is a handle, not a connector source", () => {
       .not.toMatch(/style=\{isWhiteBox \? \{ cursor: "pointer" \} : undefined\}/);
   });
 
-  it("a drag on a selected shape MOVES it; only a still hold connects", () => {
-    // The overlay used to read a 5px movement as "start drawing a connector",
-    // so dragging a selected shape drew a line instead of moving it.
-    const at = SYMBOLS.indexOf("MOVE IS THE DEFAULT; CONNECTING IS THE DELIBERATE ONE");
-    expect(at, "the overlay's move-vs-connect rule is gone").toBeGreaterThan(-1);
-    const body = SYMBOLS.slice(at, at + 3000);
-    expect(body, "movement no longer starts a drag").toMatch(/> 4\) \{[\s\S]{0,300}beginElementDrag\(e\)/);
-    expect(body, "the 300ms hold must still connect").toMatch(/setTimeout\(activate, 300\)/);
+  it("a drag on an ALREADY-SELECTED shape draws a connector (protocol item 4)", () => {
+    // Revised 2026-09-22. This test first pinned the opposite — that a drag on
+    // a selected shape MOVES it (77122bb3). Paul's protocol then decided it:
+    // "click, click and press → connector creation mode". The pool header is
+    // excluded from this overlay above, so the report that prompted
+    // 77122bb3 stays fixed without taking drag-to-connect from every task.
+    const at = SYMBOLS.indexOf("THE SECOND PRESS CONNECTS");
+    expect(at, "the overlay's second-press rule is gone").toBeGreaterThan(-1);
+    const body = SYMBOLS.slice(at, at + 2600);
+    expect(body, "movement must start the connector").toMatch(/> 5\) activate\(\)/);
+    expect(body, "and must not start a move").not.toMatch(/beginElementDrag\(e\)/);
+    expect(body, "a still hold connects too").toMatch(/setTimeout\(activate, 300\)/);
   });
 });

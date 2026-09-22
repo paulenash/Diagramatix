@@ -7,9 +7,8 @@ it is a specification for review. Items marked **PROPOSED** differ from what
 ships today; everything else is a description of current behaviour with the
 file and rule that produces it.
 
-One conflict needs a decision before any of it is built: **item 4 contradicts a
-change already shipped**, in `77122bb3`, in response to Paul's own report. It is
-set out in full under [The one conflict](#the-one-conflict).
+**Item 4 was decided on 22 September 2026** (see [The one conflict](#the-one-conflict)):
+the second press on a selected element draws a connector, as drafted.
 
 ---
 
@@ -23,7 +22,9 @@ is why the two live in `app/globals.css` (lines 69–73).
 | | Over | Cursor today | CSS | Draft said | Note |
 |---|---|---|---|---|---|
 | ✋ | An element (unselected) | open hand, closing to ✊ | `grab` / `grabbing` | "Hand" | Agrees. `.dgx-grab` on the element's `<g>`. |
-| ✋ | An element **once selected** | open hand, closing to ✊ | `grab` / `grabbing` | "+" | **Changed 2026-09-22.** Was ✛, which promised a connector — but since `77122bb3` a drag on a selected element MOVES it and only a still 300ms hold connects. The cursor now says what the drag will do. |
+| ✛ | An element **once selected** | crosshair | `crosshair` | "+" | Agrees — the next press here draws a connector (item 4, decided 22 Sep). |
+| ✊ | **Anywhere, while moving** | closed hand | `grabbing` | "Grab" | **Added 2026-09-22** — `.dgx-dragging` on the canvas root for the whole move. Without it, pressing an unselected element selected it, the connect overlay appeared under the pointer mid-drag, and its ✛ won: item 3's "+ during a move". |
+| ✛ | **Anywhere, while drawing a connector** | crosshair | `crosshair` | "+" | **Added 2026-09-22** — `.dgx-connecting` on the canvas root while targets are highlighted. |
 | ✋ | An element or connector **label** | open hand, closing to ✊ | `grab` / `grabbing` | — | **Fixed 2026-09-22.** Was an inline `grab`, which cannot reach `:active` and outranked the body's `grabbing` during a drag. |
 | ✋ | A pool **header strip** | open hand, closing to ✊ | `grab` / `grabbing` | — | **Fixed 2026-09-22.** It was an inline style, which cannot reach `:active`, so it never closed to ✊. Now `.dgx-grab`. |
 | ↖ | A white-box pool **body** | arrow | `default` | — | Deliberate: the body is click-through so you can reach what is inside. |
@@ -128,6 +129,13 @@ an already-selected element beginning a connector, with valid targets
 highlighted — is exactly what shipped **until 21 September 2026**.
 
 ### The one conflict
+
+**DECIDED 2026-09-22 — item 4 as drafted.** Paul: "1. click and press → Drag
+cursor. 2. click, click and press → connector creation mode, and when the
+targets are highlighted, the cursor should change to '+'." The move-on-drag
+rule from `77122bb3` is reverted for selected elements; the pool-header rule
+from the same commit stays, since the header is a handle and never connects.
+What follows is the record of how the question stood.
 
 On 21 September Paul reported:
 

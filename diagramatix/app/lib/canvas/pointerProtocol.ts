@@ -63,7 +63,9 @@ export const POINTER_PROTOCOL: ProtocolSection[] = [
     hover: [
       { over: "An element", cursor: "grab", note: "closes to ✊ while you hold it" },
       { over: "A label", cursor: "grab", note: "drag to reposition it; closes to ✊" },
-      { over: "A selected element", cursor: "grab", note: "drag to move it; hold still for a moment to start a connector" },
+      { over: "A selected element", cursor: "crosshair", note: "press again and drag to draw a connector" },
+      { over: "Anywhere, while moving something", cursor: "grabbing" },
+      { over: "Anywhere, while drawing a connector", cursor: "crosshair", note: "valid targets light up" },
       { over: "A pool header strip", cursor: "grab", note: "the handle you move a pool by" },
       { over: "A white-box pool body", cursor: "default", note: "clicks pass through to what is inside" },
       { over: "A connector", cursor: "pointer" },
@@ -88,7 +90,7 @@ export const POINTER_PROTOCOL: ProtocolSection[] = [
   {
     heading: "Moving",
     gestures: [
-      { does: "Drag an element", result: "Moves it", note: "4px before it counts, so a wobbly click is still a click" },
+      { does: "Press an unselected element and drag", result: "Moves it", note: "✊ for the whole drag; 4px before it counts, so a wobbly click is still a click" },
       { does: "Drag any element of a multi-selection", result: "Moves the whole group" },
       { does: "Drag a pool by its header", result: "Moves the pool and everything in it" },
       { does: "Arrow keys", result: "Nudges 5px — 1px with Shift", note: "each press is its own undo step" },
@@ -108,7 +110,8 @@ export const POINTER_PROTOCOL: ProtocolSection[] = [
   {
     heading: "Connecting",
     gestures: [
-      { does: "Press and hold a selected element, then drag", result: "Draws a connector", note: "valid targets light up as you go; invalid ones never do" },
+      { does: "Click an element, then press it again and drag", result: "Draws a connector", note: "valid targets light up and the cursor becomes ✛; invalid targets never light" },
+      { does: "Click an element, then press it again and hold still", result: "Also starts a connector, after a moment" },
       { does: "Drag from a connection point", result: "Draws a connector from that side" },
       { does: "Release over empty canvas, or press Esc", result: "Cancels it" },
       { does: "Double-click a gateway with 3+ elements selected", result: "Fans them out of the gateway" },

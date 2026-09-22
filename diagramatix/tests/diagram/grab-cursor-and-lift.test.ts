@@ -65,18 +65,23 @@ describe("T4658 — a travelling container is never unmounted mid-drag", () => {
   });
 });
 
-describe("T4659 — a selected element says 'move', not 'connect'", () => {
-  it("carries the grab class on its overlay, not a crosshair", () => {
-    const at = SYMBOLS.indexOf("✋ not ✛. Since 77122bb3 a drag on a selected shape MOVES it");
+describe("T4659 — the cursor follows the GESTURE, not the shape under it", () => {
+  // Revised 2026-09-22 with Paul's decided protocol: "1. click and press →
+  // Drag cursor. 2. click, click and press → connector creation mode, and when
+  // the targets are highlighted, the cursor should change to '+'." The first
+  // version of this test put ✋ on the selected-element overlay, which was
+  // right only while a drag there MOVED the element — no longer the case.
+  it("a selected element shows ✛: the next press there connects", () => {
+    const at = SYMBOLS.indexOf("✛ — the next press here draws a connector");
     expect(at, "the overlay's cursor note is gone").toBeGreaterThan(-1);
-    const overlay = SYMBOLS.slice(at, at + 600);
-    expect(overlay).toMatch(/className="dgx-grab"/);
-    expect(overlay).not.toMatch(/cursor: "crosshair"/);
+    expect(SYMBOLS.slice(at, at + 600)).toMatch(/style=\{\{ cursor: "crosshair" \}\}/);
   });
 
   it("the Help card agrees", () => {
     const rows = POINTER_PROTOCOL.flatMap((s) => s.hover ?? []);
-    expect(rows.find((r) => r.over === "A selected element")?.cursor).toBe("grab");
+    expect(rows.find((r) => r.over === "A selected element")?.cursor).toBe("crosshair");
+    expect(rows.find((r) => r.over === "Anywhere, while moving something")?.cursor).toBe("grabbing");
+    expect(rows.find((r) => r.over === "Anywhere, while drawing a connector")?.cursor).toBe("crosshair");
   });
 });
 

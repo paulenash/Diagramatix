@@ -72,6 +72,13 @@ body {
 .dgx-pan:active  { cursor: grabbing; }
 .dgx-connect-target { cursor: crosshair; }
 
+/* Gesture-wide cursors, set on the canvas root for as long as the gesture
+ * lasts (Paul's protocol, 2026-09-22). `!important` because every shape under
+ * the pointer carries its own cursor, and during a move or a connector draw
+ * the gesture, not the shape, is what the cursor has to describe. */
+.dgx-dragging, .dgx-dragging *     { cursor: grabbing !important; }
+.dgx-connecting, .dgx-connecting * { cursor: crosshair !important; }
+
 /* Dramatic background dim while Claude Sonnet is generating — a vignette that
  * fades in behind the throbber so the canvas recedes and the AI "thinking"
  * moment takes centre stage. */

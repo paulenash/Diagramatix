@@ -5188,7 +5188,13 @@ export function Canvas({
         // dgx-pan applies grab cursor on the canvas background; :active
         // swaps to grabbing while the user is mid-pan-drag. Elements
         // override with their own grabbing cursors via .dgx-grab.
-        className="w-full h-full outline-none dgx-pan"
+        // While a MOVE is in progress everything says ✊; while a CONNECTOR
+        // is being drawn everything says ✛ (Paul's protocol, 2026-09-22).
+        // Canvas-wide on purpose: a cursor set on any one shape loses to
+        // whatever the pointer passes over next — the connect overlay that
+        // appears as a press selects its element, a connector's hit path, a
+        // lane — so neither gesture could hold its cursor from the shape.
+        className={`w-full h-full outline-none dgx-pan${draggingElementId ? " dgx-dragging" : ""}${isDraggingConnector ? " dgx-connecting" : ""}`}
         tabIndex={0}
         // M5 — remember where the mouse is, in world coordinates, so a spoken
         // "put a task here" has somewhere to put it. CAPTURE, so it still fires
