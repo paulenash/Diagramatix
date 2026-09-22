@@ -1291,8 +1291,20 @@ export interface TemplateData {
  *      new values an EPC export would not validate against its own schema, which
  *      is precisely what `tests/xml/xsd-enum-drift.test.ts` exists to catch. It
  *      caught this one.
+ *
+ * 48 — The descriptive objects: 10 more "epc-*" symbols (KPI, risk, product,
+ *      knowledge category, business rule, screen, objective, machine, location,
+ *      requirement). Additive on the same terms as 47. (Recorded here late: the
+ *      bump shipped with the constant, this note did not.)
+ *
+ * 49 — The label tether: Connector gains an OPTIONAL `labelTether`
+ *      ("always" | "never"), the settled answer to whether a drifted label
+ *      shows its leader back to the line it names. Absent — the usual case —
+ *      means decide it automatically. It was already persisted in JSON and in
+ *      the database, so the XML round-trip had been quietly dropping a decision
+ *      the user had made by hand. Additive: every v48 file is a valid v49 file.
  */
-export const SCHEMA_VERSION = "48";
+export const SCHEMA_VERSION = "49";
 
 /**
  * DIAGRAMATIX PRODUCT VERSION — a two-tier `major.minor` product line (currently "2.2"). The
@@ -1375,8 +1387,18 @@ export const SCHEMA_VERSION = "48";
  *   The capability was shipped, tested, correct — and had no door.
  *   The XSD export shape is unchanged (a resource pool is not part of a diagram
  *   export), so SCHEMA_VERSION stays at 47.
+ *
+ * 2.12 — DB: UserAiKey (a user's own AI provider key, encrypted at rest, with a
+ *   hint and an optional base URL), Skill (the org's master skills list),
+ *   Prompt.source / .refinedAt / .fromImage / .modelUsed / .lastUsedAt /
+ *   .useCount, and the co-authoring version column. Operational tables and
+ *   columns: the curated diagram-model DDL in ddlGenerate.ts covers the diagram
+ *   domain only and is unaffected by those.
+ *   SCHEMA_VERSION also moves this release, to 49, for the connector's
+ *   `labelTether` — the two numbers happen to move together here, for
+ *   unrelated reasons, which is exactly why they are two numbers.
  */
-export const PRODUCT_VERSION = "2.11";
+export const PRODUCT_VERSION = "2.12";
 
 /**
  * The structural (XSD) schema version of an export, as a single integer, tolerant of BOTH the

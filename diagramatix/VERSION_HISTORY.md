@@ -15,6 +15,160 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.12.2699 — 2026-09-23 — Lanes stay inside the pool, a ghost of what a drop would do, and SharePoint that fails inside the app
+
+- **Adding a lane never grows the pool.** Paul: "Adding lanes to a Pool should
+  not grow the Pool. The lanes must be added within the Pool … Never grow the
+  Pool with these Lane and Sublane additions." A new lane or sublane is now
+  **carved out of its neighbour's empty space** — up to half of it, sliding that
+  lane's own contents away from the giving edge when the edge is crowded, so no
+  task ever changes lane or ends up outside one. It never takes more than the
+  neighbour's name can spare, and when what is left would be too short for the
+  new lane's name **nothing is added**. The half-event gap in front of the first
+  element, which used to be made by widening the pool leftwards, is now made by
+  moving the pool's **content** right instead — never past the right edge.
+- **A ghost of the lane you would get.** Dragging the Pool/Lane symbol over a
+  pool now draws a dashed band, with its own header strip, exactly where and at
+  the size the new lane would appear — two bands where a lane would split into
+  sublanes. Move up or down and the ghost changes with the answer. When a
+  release would do nothing, the **pool's boundary turns red**. The drop is
+  decided once, as data (`planLaneDrop`), and the canvas draws that plan while
+  the reducer carries out the same one, so the ghost cannot promise what the
+  drop will not do.
+- **Dropping on a single-lane pool always just adds a second lane**, wherever it
+  lands, and the coloured insertion lines are gone.
+- **A SharePoint link on a Data Object can no longer take the editor down.**
+  "Connect SharePoint" used to navigate the whole editor to Microsoft's sign-in;
+  anyone not signed in to Microsoft was left there with the diagram gone. It now
+  opens in a new tab and the editor stays put, retrying by itself when you come
+  back. A token Microsoft refuses reads as "not connected" instead of a raw
+  error; a Graph failure with no usable status no longer makes the route throw;
+  and every SharePoint window sits inside an error boundary.
+- **An unconfigured server says so in a Diagramatix popup.** Linking a file on a
+  server missing `MS_TOKEN_ENC_KEY` answered with a raw JSON page. What decides
+  whether to OFFER SharePoint asked for less than connecting needs, so the menus
+  were live and the last step refused; one shared check now answers both, the
+  window refuses in the app's own error dialog, and the server warns at boot.
+- **A message label only goes while it is in the way.** Hiding them for the
+  whole of every pool drag took the text off moves that could not disturb it;
+  they now go only while the dragged pool actually **overlaps** a pool it
+  exchanges messages with (including messages to that pool's child elements).
+
+Schema: **48 → 49** — `Connector/@labelTether`, which was persisted in JSON and
+in the database but dropped by an XML round-trip. Product: **2.11 → 2.12** —
+`UserAiKey`, `Skill`, the `Prompt` provenance columns and the co-authoring
+version column. The logical DDL also picks up `connector.branch_percent`, in the
+type, the Zod schema and the XSD since schema 46 and missing only there.
+T4682–T4694.
+
+---
+
+## 2.11.2693 — 2026-09-22 — A label belongs to its line, one press is one gesture, and the Canvas Help card
+
+A day of Paul's own testing, mostly about the difference between what a gesture
+means and where it happened to land.
+
+- **A connector label belongs to its line, not to its anchor.** Move a task and
+  the horizontal segment of an L-shaped flow moves with it — the label stayed
+  behind. The rule now runs after **every** route-changing action (a move, a
+  resize, a re-route, an endpoint drag, Re-route all), and the label is PLACED
+  relative to the segment it names rather than nudged, because a midpoint anchor
+  moves only half as far as the segment does. A gateway's branch labels stay put
+  when the gateway moves, except the middle one, which follows its vertex.
+- **One press, one gesture.** A gesture trace Paul captured showed a single
+  press starting a MOVE and a RESIZE at once — every mousemove moving a pool and
+  its eleven elements *and* resizing it. A press inside an edge zone now belongs
+  to that zone alone, and the pool's own header test is bounded on both sides.
+- **The clicking and selecting protocol, written down** (`docs/clicking-and-selecting-protocol-summary.md`)
+  and then implemented: click-and-press drags with a **grab** cursor; click,
+  click and press starts a connector with a **crosshair**; the cursor follows
+  the gesture rather than the pixel under the pointer.
+- **A Canvas Help card** in the status bar, drawing the real cursors as SVG
+  rather than emoji, and the zoom control moved beside Auto-connect so the
+  bottom-right controls are one row. The duplicate status-bar zoom percentage is
+  gone.
+- **A pool's left boundary no longer drags the message flows with it**, and Dev
+  Tools gained a gesture trace (`localStorage dgx.traceGestures`) which is what
+  found the two-gestures-at-once bug.
+- **AI Generate:** Saved Prompts gained a filter on the heading line and twice
+  the height.
+
+Feature-only: `SCHEMA_VERSION` stays **48**. T4627–T4681.
+
+---
+
+## 2.11.2679 — 2026-09-21 — Pools and lanes: a boundary that stops at the content, and dividers you can grab
+
+Three rules from one afternoon of Paul's testing, and the geometry to make them
+hold.
+
+- **A boundary stops, it does not shove.** A lane's minimum height covered its
+  label and not its contents, so an inward drag squeezed the lane past the
+  process inside it and pushed every element along ahead of the edge. The drag
+  is now capped at the content, on all four edges.
+- **A pool is exactly its lane stack.** Three reports from three different
+  gestures said the dissociation was never in any one code path, so the
+  invariant is asserted on the containment pass every path already ends with.
+- **Half an event of clear space** in front of the leftmost element whenever a
+  lane or sublane is added.
+- **The left pool boundary moves again** — it was suppressed in four places in
+  the UI, not in the reducer — and only pool, lane and sublane boundaries are
+  affected, with other white-box pools' matching edges following in lockstep.
+- **Only the dragged divider moves.** Moving the top or bottom boundary of a
+  lane with two or more sublanes used to shift the middle dividers too; the band
+  at the edge that moved now absorbs the change and every other divider stays.
+- **Lane dividers you can actually grab**, and **"Move / Nudge Pool {left,
+  right, top, bottom} boundary"** by voice.
+- **The merge gateway connection convention**, and a sub-lane band that is never
+  negative.
+
+Feature-only: `SCHEMA_VERSION` stays **48**.
+
+---
+
+## 2.11.2669 — 2026-09-21 — Voice Assist: the selection and the pointer as references, and align
+
+- **Fill the selection, and point instead of naming (M4, M5).** "Name these
+  Receive, Check and Ship" over a selection in reading order; "put a task here"
+  at the pointer, and "connect this to that" where *that* is whatever the
+  pointer ended on — which removes the whole class of name-mis-hear failures for
+  the thing being referred to.
+- **Align the selection (M7's first half), the ghost bridge (M8), and the AI
+  prompt's missing ops (B7).**
+- **Read the transcript, not the tidy sentence.** Paul's session logs showed the
+  bar acting on a cleaned-up version of what was said; the grammar now sees what
+  was actually heard, lower-case lane names resolve, element ids never appear in
+  a message, and a failure says what is missing rather than naming an internal
+  id.
+- A stranded tail, an anchor that guessed, a lane void left by a command, and a
+  prompt that described a diagram it had not been given.
+
+Feature-only: `SCHEMA_VERSION` stays **48**.
+
+---
+
+## 2.11.2660 — 2026-09-20 — Voice Assist: the rest of the B and R list, and the first half of the phrase book
+
+- **D1 and D2** — the User Guide chapter, the Technical Notes chapter and the
+  feature rows published (and the seed run on production), and the release-log
+  gap closed.
+- **B8** — an org that forbids cloud voice no longer degrades silently to the
+  browser recogniser; it says so.
+- **M3, R7, B6, R5, R6** — convert an element in place ("make this a user
+  task"), auto-connect respects `canConnect`, the dead sublane checks answer for
+  real sublanes, richer log entries, and failure messages that suggest the name
+  they think you meant.
+- **V3's first half** — every command is now recorded as heard against what it
+  became, so the question "would a personal phrase book help?" can be answered
+  from data rather than argued about. The book itself is deliberately not built
+  yet.
+- **The admin Database tile** now reports what a multi-statement script actually
+  did, statement by statement, instead of a single opaque result.
+
+Feature-only: `SCHEMA_VERSION` stays **48**.
+
+---
+
 ## 2.11.2654 — 2026-09-20 — Voice Assist: a cheaper fallback, a picker instead of a guess, and fewer mis-hears
 
 Five items from the 14 September review, in the order they mattered.

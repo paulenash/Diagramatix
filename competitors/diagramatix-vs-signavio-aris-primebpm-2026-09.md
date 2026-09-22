@@ -1,8 +1,8 @@
 # Diagramatix vs SAP Signavio, ARIS & PRIME BPM — Feature & AI Comparison
 
-**Date: 14 September 2026** · September 2026 edition · product 2.11
+**Date: 14 September 2026** · September 2026 edition · product 2.12
 
-*Diagramatix data read from the current codebase **as at 14 September 2026** (product 2.11, export SCHEMA_VERSION 48). Competitor data from public product pages and documentation accessed May–June 2026 — **re-verify against live competitor pages before quoting externally**; their AI, mining and simulation features move fast and this document does not track them.*
+*Diagramatix data read from the current codebase **as at 14 September 2026**, version stamps refreshed for the 23 September 2026 release (product 2.12, export SCHEMA_VERSION 49) — the releases since are canvas, Voice Assist and SharePoint work that does not change the claims below. Competitor data from public product pages and documentation accessed May–June 2026 — **re-verify against live competitor pages before quoting externally**; their AI, mining and simulation features move fast and this document does not track them.*
 
 ---
 
@@ -329,7 +329,7 @@ Where **not** to compete: **mining scale and connector breadth** (enterprise dat
 
 ## Sources
 
-- **Diagramatix codebase audit** — `c:\Git\Diagramatix\diagramatix\` (current branch, **14 September 2026**, product 2.11): `app/lib/mining/` (discovery, OCEL, XES, xlsx + wide-format + multi-source merge, `filterAnalytics`, `handover`, `teamFlow`, `caseEvidence`, `nextSteps`, `compareRuns`, `alerts`, mining→sim calibration), `app/lib/simulation/` (calendars, skills, queue discipline, significance, sweep, sensitivity, business case, BPSim), `app/lib/sop/`, `app/lib/riskControls/` (RCM), `app/lib/pcf/` (APQC), `app/lib/archimate/`, `app/lib/ai/` (multi-provider models, pricing, metering, readability ratchet), `app/lib/diagram/aris/` (AML import), `app/lib/diagram/translate/epcBpmnMap.ts` + `epcToBpmn.ts`, `docs/eEPC-specification.md`, and `VERSION_HISTORY.md` entries 2.4.2381 → 2.11.2533.
+- **Diagramatix codebase audit** — `c:\Git\Diagramatix\diagramatix\` (current branch, **14 September 2026**; version stamp refreshed at product 2.12): `app/lib/mining/` (discovery, OCEL, XES, xlsx + wide-format + multi-source merge, `filterAnalytics`, `handover`, `teamFlow`, `caseEvidence`, `nextSteps`, `compareRuns`, `alerts`, mining→sim calibration), `app/lib/simulation/` (calendars, skills, queue discipline, significance, sweep, sensitivity, business case, BPSim), `app/lib/sop/`, `app/lib/riskControls/` (RCM), `app/lib/pcf/` (APQC), `app/lib/archimate/`, `app/lib/ai/` (multi-provider models, pricing, metering, readability ratchet), `app/lib/diagram/aris/` (AML import), `app/lib/diagram/translate/epcBpmnMap.ts` + `epcToBpmn.ts`, `docs/eEPC-specification.md`, and `VERSION_HISTORY.md` entries 2.4.2381 → 2.11.2533.
 - Competitor sources (May–June 2026, carried forward — **re-verify before external use**):
   - [SAP Signavio launches AI Process Modeler, Text-to-Process (Mar 2025)](https://news.sap.com/2025/03/sap-signavio-launches-ai-process-modeler-text-to-process/) · [Text-to-Process V2](https://community.sap.com/t5/technology-blog-posts-by-sap/ai-powered-modeling-gets-an-upgrade-text-to-process-v2-in-sap-signavio-lab/ba-p/14263094) · [Signavio Process Modeler](https://www.signavio.com/products/process-modeler/)
   - [ARIS AI Companion](https://aris.com/aris-ai-companion/) · [ARIS re-defines AI Process Intelligence (Nov 2024)](https://newscenter.softwareag.com/en/news-stories/press-releases/2024/1113-aris-redefines-ai-process-intelligence.html)

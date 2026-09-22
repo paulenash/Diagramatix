@@ -508,6 +508,20 @@
     against v47 is a valid v48 file and needs no migration.
     None of them converts to a BPMN object, because BPMN has none — each becomes
     a text annotation attached to its function, prefixed with its kind.
+
+  v49 — The label tether.
+    SHAPE CHANGE: Connector gains an OPTIONAL labelTether ("always" | "never").
+    A connector label that has drifted clear of its line is drawn with a short
+    leader back to it. Normally that is decided automatically, from how far the
+    label sits from the line it names — and the attribute is then absent. It is
+    written only when something has settled the question for good: "always" for
+    a gateway branch in a generated diagram, or one created by connecting a
+    group selection, where nobody has placed the label by hand; "never" once
+    the user has MOVED the label, because they have said where it belongs and
+    a leader would only argue with them.
+    It was already persisted in the JSON export and in the database, so an XML
+    round-trip was quietly losing a decision the user had made. Additive: every
+    file written against v48 is a valid v49 file and needs no migration.
 -->
 
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
@@ -1249,6 +1263,10 @@
     <xs:attribute name="sourceOffsetAlong" type="xs:decimal" use="optional"/>
     <xs:attribute name="targetOffsetAlong" type="xs:decimal" use="optional"/>
     <xs:attribute name="labelAnchor"    type="dgx:LabelAnchorEnum" use="optional"/>
+    <!-- schema 49 — whether the label shows its leader back to the line it
+         names. Absent = decided automatically from how far the label has
+         drifted; "always"/"never" = settled, and not to be second-guessed. -->
+    <xs:attribute name="labelTether"    type="dgx:LabelTetherEnum" use="optional"/>
     <xs:attribute name="arrowAtSource"  type="xs:boolean" use="optional"/>
     <!-- schema 1.38 — uml-containment only: move the circle-with-cross marker
          from the target (containing package) end to the source end. -->
@@ -1435,6 +1453,15 @@
     <xs:restriction base="xs:string">
       <xs:enumeration value="midpoint"/>
       <xs:enumeration value="source"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- schema 49 — a settled answer about the label's leader line. Absent is
+       the third state, and the common one: decide it automatically. -->
+  <xs:simpleType name="LabelTetherEnum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="always"/>
+      <xs:enumeration value="never"/>
     </xs:restriction>
   </xs:simpleType>
 

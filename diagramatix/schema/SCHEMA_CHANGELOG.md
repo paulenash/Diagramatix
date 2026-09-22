@@ -6,7 +6,7 @@ Canonical human-readable changelog for the export schema. Mirrors the inline his
 - **`schemaVersion`** — a standalone **integer** (the XSD schema version). Bumped only when the XSD **export shape** changes (a field/element/enum added, removed, or renamed). Carried on `<xs:schema version="…">`. This changelog tracks THIS number.
 - **`appVersion`** = **`PRODUCT_VERSION`** (`major.middle.patch`) — the Diagramatix *product* version. Its MIDDLE increments on any physical DB change; patch on fixes; major manually. The header badge appends `(build <git-commit-count>)` for display. Product-version history lives in [`../VERSION_HISTORY.md`](../VERSION_HISTORY.md).
 
-**Current XSD schema version:** `48` · **Product version:** `2.9` (split 2026-08-10 — the old single `major.minor` reached `1.45`; the `45` minor became this standalone integer, and the product version restarted at `2.1.1`). Versioning began at **v1.0**; **v1.2** was the first enumerated XSD content; the XSD inline history block starts at **v1.10**.
+**Current XSD schema version:** `49` · **Product version:** `2.12` (split 2026-08-10 — the old single `major.minor` reached `1.45`; the `45` minor became this standalone integer, and the product version restarted at `2.1.1`). Versioning began at **v1.0**; **v1.2** was the first enumerated XSD content; the XSD inline history block starts at **v1.10**.
 
 > **When to bump the schema integer:** ONLY when the **XSD export shape** changes (the original, narrow criterion) — a new first-class element/attribute or a typed-enum value. Physical-DB changes and open-`properties` additions do NOT bump it — they move `PRODUCT_VERSION.middle` instead (recorded in `VERSION_HISTORY.md`, not here). See [`UPDATE_EVERYTHING.md`](UPDATE_EVERYTHING.md) Step 0 (Q1 = DB → product middle; Q2 = XSD → schema integer).
 
@@ -20,6 +20,7 @@ Canonical human-readable changelog for the export schema. Mirrors the inline his
 
 | Version | Title | Schema shape change? |
 |---|---|---|
+| **schema 49** | **The label tether.** `Connector` gains an OPTIONAL `labelTether` (`always` or `never`): whether a label that has drifted clear of its line shows the short leader back to it. Absent — the usual case — means decide automatically from the distance. It is written only when the question is settled: `always` for a gateway branch nobody has placed by hand, `never` once the user has moved the label themselves. | **Yes** — one additive optional attribute (plus its `LabelTetherEnum`). It was already persisted in JSON and in the database, so an XML round-trip had been dropping a decision the user had made; every v48 file is a valid v49 file. |
 | **schema 48** | **The descriptive objects.** `SymbolTypeEnum` + ten more `epc-*` objects (KPI, risk, product / service, knowledge category, business rule, screen, objective, machine / resource, location, requirement). None carries control flow — every one hangs off a function — and the palette keeps them in a section of their own, collapsed by default. | **Yes** — 10 additive enumerations. Every v47 file is a valid v48 file and needs no migration; it bumps only because the enumerations are **closed**. |
 | **schema 47** | **Event-driven Process Chain (ARIS eEPC).** `DiagramTypeEnum` + `epc`; `SymbolTypeEnum` + the ten `epc-*` objects (event, function, the XOR/AND/OR connectors, organisational unit, position, information object, application system, process interface); `ConnectorTypeEnum` + the three `epc-*` arcs (control flow, information flow, organisation assignment). | **Yes** — 14 additive enumerations. Nothing existing changed shape, so every v46 file is a valid v47 file and needs no migration. It bumps because the enumerations are **closed**: without them an EPC export would not validate against its own schema. |
 | **schema 46** | **Enum catch-up — the schema now declares what the exporter already writes.** `SymbolTypeEnum` + `history-state` / `deep-history-state` and the twenty-one `flowchart-*` shapes; `ConnectorTypeEnum` + `flowline` / `flowchart-association`; `DiagramTypeEnum` + `flowchart`. Also formally records `Connector/@branchPercent` (added to the XSD 2026-08-14, bump deferred to this batch). | **Yes** — 24 additive enumerations. They were being **exported without being declared**, so every Standard Flowchart and every history-state State Machine was invalid against the published schema. |
@@ -73,6 +74,39 @@ Canonical human-readable changelog for the export schema. Mirrors the inline his
 ---
 
 ## Details (newest first)
+
+### schema 49 — The label tether  · SHAPE CHANGE (additive)
+
+A connector label that has drifted clear of the line it names is drawn with a
+short leader back to it, so the reader can see which line the words belong to.
+Whether to draw that leader is normally worked out from the distance, and needs
+nothing stored.
+
+Two cases settle it for good, and those are what the attribute records:
+
+- **`always`** — a gateway branch in a generated diagram, or a connector made by
+  connecting a group selection. Nobody has placed those labels by hand, so the
+  tether stays on whatever the automatic rule would say.
+- **`never`** — the user has MOVED the label. They have said where it belongs,
+  and a leader arguing with them is not feedback, it is noise.
+
+Absent is the third state and the common one: decide it from the geometry.
+
+It was persisted in the JSON export and in the database from the day it shipped
+(2026-09-21), but the **XML export dropped it** — so a diagram exported to XML
+and re-imported lost a decision its author had made by hand. Adding it to the
+XSD makes the two export formats carry the same diagram, which is the whole
+point of having a schema:
+
+| Where | What |
+|---|---|
+| `Connector/@labelTether` | Optional, `LabelTetherEnum` = `always` \| `never` |
+| `xmlExport.ts` | Written next to `labelAnchor`; read back through the string-attribute pass |
+| `ddlGenerate.ts` | `connector.label_tether` → `ref_label_tether`; NULL = decide automatically |
+
+Also in the logical DDL this release: **`connector.branch_percent`**, the
+documented branch share recorded in schema 46. It was in the TS type, the Zod
+schema and the XSD, and missing only from the curated DDL — a gap, now closed.
 
 ### schema 48 — The descriptive objects
 

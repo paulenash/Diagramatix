@@ -65,6 +65,7 @@ const refs: RefTable[] = [
   { name: "ref_diagram_status", values: ["draft","final","production"] },
   { name: "ref_display_mode", values: ["normal","hand-drawn"] },
   { name: "ref_label_anchor", values: ["midpoint","source"] },
+  { name: "ref_label_tether", values: ["always","never"] },
   { name: "ref_label_mode", values: ["informal","formal"] },
   { name: "ref_reading_direction", values: ["none","to-source","to-target"] },
   { name: "ref_pool_type", values: ["black-box","white-box"] },
@@ -214,6 +215,10 @@ const entityTables: Table[] = [
     c("cp2_rel_offset_x", T.numeric), c("cp2_rel_offset_y", T.numeric),
     c("label", T.text), c("label_offset_x", T.numeric), c("label_offset_y", T.numeric),
     c("label_width", T.numeric), c("label_anchor", T.text, refFk("ref_label_anchor")),
+    // schema 49: a settled answer about the label's leader line. NULL is the
+    // third state and the usual one — decide it from how far the label sits
+    // from its line.
+    c("label_tether", T.text, refFk("ref_label_tether")),
     c("label_mode", T.text, refFk("ref_label_mode")),
     c("transition_event", T.text), c("transition_guard", T.text), c("transition_actions", T.text),
     c("source_role", T.text), c("source_multiplicity", T.text),
@@ -225,6 +230,11 @@ const entityTables: Table[] = [
     // outgoing edge carries a probability (0..100) OR a condition expression;
     // is_default_flow marks the else edge.
     c("branch_probability", T.numeric), c("branch_condition", T.text), c("is_default_flow", T.bool),
+    // The DOCUMENTED branch share (0..100), deliberately separate from the
+    // simulation's branch_probability above: one is what the process says, the
+    // other is what a run assumes, and they are edited independently.
+    // (Schema 46; missing here until 49.)
+    c("branch_percent", T.numeric),
   ], indexes: [{ name: "idx_connector_diagram", columns: ["diagram_id"] }] },
   { name: "connector_waypoint", columns: [
     c("id", T.bigserial, { pk: true, nn: true, identity: true }),

@@ -154,7 +154,11 @@ export function connectorXml(c: any, ind: string): string {
   // v1.10 round-trip fix: bottleneck (sequence connector "stage" marker)
   // is in types.ts and in ddlGenerate.ts but was previously dropped on
   // XML export. Emit it as an optional boolean attribute.
-  x += `${attr("labelAnchor", c.labelAnchor)}${attr("arrowAtSource", c.arrowAtSource || undefined)}${attr("bottleneck", c.bottleneck || undefined)}`;
+  // schema 49: a settled answer about the label's leader line ("always" /
+  // "never"). Absent means "decide automatically", so nothing is written for
+  // the ordinary case. It was persisted in JSON and in the database from the
+  // start; an XML round-trip used to drop it, losing a user's own decision.
+  x += `${attr("labelAnchor", c.labelAnchor)}${attr("labelTether", c.labelTether)}${attr("arrowAtSource", c.arrowAtSource || undefined)}${attr("bottleneck", c.bottleneck || undefined)}`;
   // v1.25: decision-gateway branch routing (Simulation). Optional + additive.
   x += `${attr("branchProbability", c.branchProbability)}${attr("branchCondition", c.branchCondition)}${attr("isDefaultFlow", c.isDefaultFlow || undefined)}${attr("branchPercent", c.branchPercent)}>\n`;
 
@@ -529,7 +533,7 @@ export function parseDiagramatixXml(xmlText: string): any {
       const v = bool(cEl.getAttribute(a));
       if (v !== undefined) c[a] = v;
     }
-    const strAttrs = ["labelAnchor"];
+    const strAttrs = ["labelAnchor", "labelTether"];
     for (const a of strAttrs) {
       const v = cEl.getAttribute(a);
       if (v != null && v !== "") c[a] = v;
