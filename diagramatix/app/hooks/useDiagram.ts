@@ -26,7 +26,7 @@ import { planWrapInSubprocess, planUnwrapSubprocess, planWrapInContainer, type W
 import { isUmlConnType } from "@/app/lib/diagram/types";
 import { capitaliseFirstWord, needsCapital, decisionLabel, isDecisionGateway } from "@/app/lib/diagram/nameCase";
 import { contentBoundsOf, clampRectToContent, clampRectToLimits, poolFollowsLanes, leftGapShortfall, MIN_LEFT_GAP } from "@/app/lib/diagram/poolLaneBounds";
-import { labelFollowForSegmentDrag, holdGatewayBranchLabels } from "@/app/lib/diagram/labelFollow";
+import { labelsFollowTheirSegments, holdGatewayBranchLabels } from "@/app/lib/diagram/labelFollow";
 import { gestureTraceOn, traceGesture, movedElements } from "@/app/lib/debug/gestureTrace";
 import { baseLabelAnchor } from "@/app/lib/diagram/checks/layoutViolations";
 import { absorbAtEdge, shrinkRoom, stackFrom, type Band, type StackEdge } from "@/app/lib/diagram/laneBands";
@@ -3653,6 +3653,18 @@ const LANE_RECONCILE_ACTIONS = new Set<Action["type"]>([
   "UPDATE_LABEL",
 ]);
 
+/**
+ * Actions that can change a connector's ROUTE, and so move a label's segment
+ * out from under it. Interactive edits only — a whole-diagram replacement
+ * (SET_DATA, an AI layout) places its own labels and is left alone.
+ */
+const ROUTE_CHANGING_ACTIONS = new Set<Action["type"]>([
+  "MOVE_ELEMENT", "MOVE_ELEMENTS", "MOVE_END", "RESIZE_ELEMENT", "RESIZE_END",
+  "UPDATE_CONNECTOR_WAYPOINTS", "UPDATE_CONNECTOR_ENDPOINT",
+  "NUDGE_CONNECTOR", "NUDGE_CONNECTOR_ENDPOINT", "UPDATE_CONNECTOR_FIELDS",
+  "REROUTE_ALL", "CORRECT_ALL_CONNECTORS",
+]);
+
 /** Actions whose element movements the gesture trace reports. */
 const TRACED_MOVES = new Set<Action["type"]>(["MOVE_ELEMENT", "MOVE_ELEMENTS", "MOVE_END", "RESIZE_ELEMENT", "RESIZE_END"]);
 
@@ -3681,6 +3693,14 @@ function reducerWithPasses(state: DiagramData, action: Action): DiagramData {
   if (action.type === "MOVE_ELEMENT" || action.type === "MOVE_ELEMENTS") {
     const held = holdGatewayBranchLabels(state.elements, state.connectors, next.elements, next.connectors);
     if (held !== next.connectors) next = { ...next, connectors: held };
+  }
+  // A sequence-flow label goes with the horizontal segment it sits on, however
+  // the route changed — a segment dragged, the task at one end moved, the
+  // connector re-routed (Paul, 2026-09-22; labelFollow.ts). One pass, after
+  // the gateway-label hold above, over every action that changes a route.
+  if (ROUTE_CHANGING_ACTIONS.has(action.type)) {
+    const placed = labelsFollowTheirSegments(state.connectors, next.connectors);
+    if (placed !== next.connectors) next = { ...next, connectors: placed };
   }
   // Note: this deliberately does NOT skip when the core reducer returned state
   // unchanged. RESIZE_END / MOVE_END are commit markers that often produce no
@@ -8072,14 +8092,10 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         // R6.18: preserve label world position across the waypoint change.
         const fused = fuseCollinearWaypoints(newWaypoints);
         const labelAdj = preserveLabelWorldPos(c, fused);
-        const held = { ...c, waypoints: fused, ...labelAdj };
-        // …unless the label sits on the horizontal segment being dragged, or
-        // that segment has just come up against it — then it goes with the
-        // segment (Paul, 2026-09-22; labelFollow.ts). Compared against the
-        // route BEFORE collinear fusion, where the dragged segment still has
-        // its own two points to be recognised by.
-        const follow = labelFollowForSegmentDrag(c, newWaypoints, held);
-        return follow ? { ...held, ...follow } : held;
+        // …and if it sits on the segment being dragged, the reducer wrapper's
+        // label-follow pass then places it with that segment (labelFollow.ts)
+        // — the same pass every other route change goes through.
+        return { ...c, waypoints: fused, ...labelAdj };
       });
       // Skip obstacle validation entirely. UPDATE_CONNECTOR_WAYPOINTS is
       // only fired by user-initiated waypoint changes (segment drag).

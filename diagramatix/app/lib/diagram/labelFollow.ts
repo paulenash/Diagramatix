@@ -110,6 +110,19 @@ export function labelShiftForSegmentMove(
   return above ? (to.y - gap - box.h) - box.y : (to.y + gap) - box.y;
 }
 
+/**
+ * The route as DRAWN — without the invisible leaders that run from a shape's
+ * edge to its centre. A label sits beside a line the reader can see; a leader
+ * inside a task is not somewhere a label can belong, and counting one let the
+ * rule attach a label to a segment that is never drawn.
+ */
+function drawnRoute(c: Connector): Point[] {
+  let w = c.waypoints ?? [];
+  if (c.sourceInvisibleLeader && w.length > 2) w = w.slice(1);
+  if (c.targetInvisibleLeader && w.length > 2) w = w.slice(0, -1);
+  return w;
+}
+
 /** The label's offset as it is actually drawn — stored or default. */
 function effectiveOffset(c: Connector): { x: number; y: number } | null {
   const box = connectorLabelBox(c);
@@ -118,28 +131,117 @@ function effectiveOffset(c: Connector): { x: number; y: number } | null {
   return { x: box.x + box.w / 2 - anchor.x, y: box.y - anchor.y };
 }
 
+/** The horizontal segment a label is attached to — over or under it and
+ *  within the gap — the nearest if more than one. */
+function homeSegment(box: Box, route: readonly Point[], gap = SEGMENT_ATTACH_GAP): HSeg | null {
+  let best: HSeg | null = null, bestGap = Infinity;
+  for (const s of horizontalSegments(route)) {
+    if (!(box.x < s.x2 && box.x + box.w > s.x1)) continue;
+    const above = box.y + box.h / 2 < s.y;
+    const g = above ? s.y - (box.y + box.h) : box.y - s.y;
+    if (g <= gap && g < bestGap) { best = s; bestGap = g; }
+  }
+  return best;
+}
+
 /**
- * RULE 1 — a segment drag. `before` is the connector as it was; `after` is the
- * same connector with the dragged route, its label already held in place the
- * way the reducer holds it. Returns the offsets to write, or null when the
- * label does not move.
+ * Where the label's home segment went in the new route.
  *
- * Sequence flows only, as asked.
+ * Of the new horizontal segments still over or under the label, prefer those
+ * sharing some of the old home segment's span — it is the same stretch of
+ * line — and of those take the one nearest to where the home segment WOULD be
+ * if it had moved with the label (`expectedY`).
+ *
+ * Nearest-to-expected rather than largest-share, because a re-route can SPLIT
+ * a segment: a gateway's straight middle branch becomes a Z when the gateway
+ * moves up, and both halves share the old span. The label travelled with the
+ * gateway, so the half beside the gateway is where it expects its line to be —
+ * choosing by share would pick whichever half happened to be longer.
  */
-export function labelFollowForSegmentDrag(
+function correspondingSegment(home: HSeg, box: Box, route: readonly Point[], expectedY: number): HSeg | null {
+  const over = horizontalSegments(route).filter((s) => box.x < s.x2 && box.x + box.w > s.x1);
+  const sharing = over.filter((s) => Math.min(s.x2, home.x2) - Math.max(s.x1, home.x1) > 0.5);
+  const pool = sharing.length > 0 ? sharing : over;
+  let best: HSeg | null = null, bestDist = Infinity;
+  for (const s of pool) {
+    const d = Math.abs(s.y - expectedY);
+    if (d < bestDist) { best = s; bestDist = d; }
+  }
+  return best;
+}
+
+/**
+ * RULE 1 — whenever a sequence flow's ROUTE changes, however it changed: a
+ * segment dragged by hand, the task at one end moved, the connector
+ * re-routed. Paul, 2026-09-22, after the segment-drag version shipped:
+ *
+ *   "1. L-shaped connector enters a Task and attaches to the left boundary.
+ *       Move the Task upwards, then the horizontal segment of that connector
+ *       moves up but the label does not.
+ *    2. Re-routing a connector does not move the label with the horizontal
+ *       segment."
+ *
+ * Both were the same gap: the rule ran on ONE action, the segment drag, and a
+ * route changes through a dozen. So it runs on the result of any of them.
+ *
+ * The label is PLACED, not nudged: it ends up the same distance from its home
+ * segment as it was before the change, whatever else moved it. That matters
+ * because the anchor sometimes moves too — a task-to-task label is anchored at
+ * the midpoint of the ends, so moving one end drags it half as far as the
+ * segment it sits on; and a gateway's middle branch carries its label with the
+ * gateway. Placing it relative to the segment gives the right answer in every
+ * one of those cases without having to know which of them happened.
+ *
+ * A label not attached to any segment is picked up only by a segment that
+ * came up to it (`labelShiftForSegmentMove`); otherwise it stays.
+ *
+ * `before` is the connector as it was; `after` is the same connector as the
+ * action left it. Returns the offsets to write, or null. Sequence flows only.
+ */
+export function labelFollowOnRouteChange(
   before: Connector,
-  draggedRoute: readonly Point[],
   after: Connector,
 ): { labelOffsetX: number; labelOffsetY: number } | null {
-  if (after.type !== "sequence") return null;
-  const moved = movedHorizontalSegment(before.waypoints, draggedRoute);
-  if (!moved) return null;
+  if (after.type !== "sequence" || !after.label?.trim()) return null;
+  const oldBox = connectorLabelBox(before);
   const box = connectorLabelBox(after);
   const off = effectiveOffset(after);
-  if (!box || !off) return null;
-  const dy = labelShiftForSegmentMove(box, moved.from, moved.to);
-  if (Math.abs(dy) < 0.1) return null;
-  return { labelOffsetX: off.x, labelOffsetY: off.y + dy };
+  if (!oldBox || !box || !off) return null;
+
+  let wantY: number | null = null;
+  const home = homeSegment(oldBox, drawnRoute(before));
+  if (home) {
+    const now = correspondingSegment(home, box, drawnRoute(after), home.y + (box.y - oldBox.y));
+    if (!now) return null;                       // nothing over or under it any more — leave it
+    wantY = oldBox.y + (now.y - home.y);
+  } else {
+    const moved = movedHorizontalSegment(drawnRoute(before), drawnRoute(after));
+    if (!moved) return null;
+    const dy = labelShiftForSegmentMove(oldBox, moved.from, moved.to);
+    if (Math.abs(dy) < 0.1) return null;
+    wantY = oldBox.y + dy;
+  }
+  const shift = wantY - box.y;
+  if (Math.abs(shift) < 0.1) return null;
+  return { labelOffsetX: off.x, labelOffsetY: off.y + shift };
+}
+
+/**
+ * Apply rule 1 across a whole action: every labelled sequence flow whose route
+ * changed. Returns the SAME array when nothing needed placing.
+ */
+export function labelsFollowTheirSegments(wasConns: readonly Connector[], conns: Connector[]): Connector[] {
+  const was = new Map(wasConns.map((c) => [c.id, c] as const));
+  let changed = false;
+  const out = conns.map((c) => {
+    const b = was.get(c.id);
+    if (!b || b.waypoints === c.waypoints) return c;          // route untouched
+    const follow = labelFollowOnRouteChange(b, c);
+    if (!follow) return c;
+    changed = true;
+    return { ...c, ...follow };
+  });
+  return changed ? out : conns;
 }
 
 /** Is this the branch leaving a gateway's SIDE vertex — the middle one? */
