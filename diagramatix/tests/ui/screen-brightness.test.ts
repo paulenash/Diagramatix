@@ -154,8 +154,12 @@ describe("T4546 — the controls live in System ▸ Display, with a way back", (
     // Moved, not copied — two places to set one thing is how they drift.
     const canvas = read("app", "components", "canvas", "Canvas.tsx");
     expect(canvas).not.toMatch(/brightness/i);
-    expect(canvas, "and the zoom bar is back to being the only pill there")
-      .toContain('right: "calc(0.5rem + 156px + 6px + 130px + 6px)"');
+    // The zoom bar's own position is no longer an offset at all: since
+    // 2026-09-22 the bottom-right controls are one flex row (T4666), so the
+    // check is that the zoom bar is IN that row, with no brightness pill in it.
+    const row = canvas.slice(canvas.indexOf("Bottom-right controls, as ONE row"));
+    expect(row, "the zoom bar is in the bottom-right row").toMatch(/title="Zoom out"/);
+    expect(canvas, "no absolutely-offset pill remains").not.toMatch(/calc\(0\.5rem \+ 156px/);
   });
 });
 

@@ -8396,6 +8396,55 @@ export function Canvas({
         </div>
       )}
 
+      {/* Bottom-right controls, as ONE row: Bubble help · Zoom · Auto-connect.
+
+          Paul, 2026-09-22: "Move the zoom control next to Auto-connect to
+          allow more space." Each of the three used to be absolutely placed
+          with a hard-coded offset — the zoom control's assumed Bubble help was
+          always there ("0.5rem + 156px + 6px + 130px + 6px"), so wherever
+          Bubble help is hidden it stood ~136px out from Auto-connect across an
+          empty gap, and a different label width would have overlapped them.
+          In a flex row each control takes only its own width and a hidden one
+          leaves nothing behind. */}
+      <div className="absolute bottom-2 right-2 flex items-center gap-1.5 z-30">
+      {/* Bubble-help master toggle. ON = show the "Click and Drag to
+          create a connector" cloud each time an element is single-
+          selected (auto-dismiss after 10 s or next mousedown). OFF =
+          never show. Persists across reloads. Editing-only — hidden in
+          the read-only published viewer, and hidden entirely for diagram
+          types that have no bubble-help entries configured, and hidden when the
+          SuperAdmin global master switch is OFF (the feature is off everywhere). */}
+      {!readOnly && bubbleHelpGlobalEnabled && bubbleHelpMap.size > 0 && (
+      <button
+        onClick={toggleBubbleHelp}
+        className={`flex items-center gap-1 rounded-full px-2 py-1 shadow-sm backdrop-blur-sm select-none border text-[11px] font-medium transition-colors ${
+          bubbleHelpEnabled
+            ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
+            : "bg-white/90 text-gray-600 border-gray-300 hover:bg-gray-50"
+        }`}
+        title={
+          bubbleHelpEnabled
+            ? "Bubble help ON — each cloud topic shows up to 3 times per session. Click to turn OFF."
+            : "Bubble help OFF — no help clouds. Click to turn ON (resets per-topic counts)."
+        }
+      >
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 16 16"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M3 5c0-1.1.9-2 2-2h6c1.1 0 2 .9 2 2v4c0 1.1-.9 2-2 2H8l-3 3v-3H5c-1.1 0-2-.9-2-2V5Z" />
+        </svg>
+        Bubble help: {bubbleHelpEnabled ? "ON" : "OFF"}
+      </button>
+      )}
+
       {/* Zoom slider bar at bottom-right of canvas */}
       {(() => {
         const base = baseZoomRef.current ?? zoom;
@@ -8415,8 +8464,7 @@ export function Canvas({
 
         return (
           <div
-            className="absolute bottom-2 flex items-center gap-1.5 bg-white/90 border border-gray-200 rounded-full px-2 py-1 shadow-sm backdrop-blur-sm z-30 select-none"
-            style={{ right: "calc(0.5rem + 156px + 6px + 130px + 6px)" }}
+            className="flex items-center gap-1.5 bg-white/90 border border-gray-200 rounded-full px-2 py-1 shadow-sm backdrop-blur-sm select-none"
           >
             <button
               onClick={() => applyZoomPct(displayPct - 10)}
@@ -8457,7 +8505,7 @@ export function Canvas({
       {!readOnly && (diagramType === "bpmn" || diagramType === "flowchart") && (
       <button
         onClick={() => setAutoConnectMode((m) => m === "off" ? "to-only" : "off")}
-        className={`absolute bottom-2 right-2 flex items-center gap-1 rounded-full px-2 py-1 shadow-sm backdrop-blur-sm z-30 select-none border text-[11px] font-medium transition-colors ${
+        className={`flex items-center gap-1 rounded-full px-2 py-1 shadow-sm backdrop-blur-sm select-none border text-[11px] font-medium transition-colors ${
           autoConnectMode === "off"
             ? "bg-white/90 text-gray-600 border-gray-300 hover:bg-gray-50"
             : "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
@@ -8485,45 +8533,7 @@ export function Canvas({
         Auto-connect: {autoConnectMode === "off" ? "OFF" : "ON"}
       </button>
       )}
-
-      {/* Bubble-help master toggle. ON = show the "Click and Drag to
-          create a connector" cloud each time an element is single-
-          selected (auto-dismiss after 10 s or next mousedown). OFF =
-          never show. Persists across reloads. Editing-only — hidden in
-          the read-only published viewer, and hidden entirely for diagram
-          types that have no bubble-help entries configured, and hidden when the
-          SuperAdmin global master switch is OFF (the feature is off everywhere). */}
-      {!readOnly && bubbleHelpGlobalEnabled && bubbleHelpMap.size > 0 && (
-      <button
-        onClick={toggleBubbleHelp}
-        style={{ right: "calc(0.5rem + 156px + 6px)" }}
-        className={`absolute bottom-2 flex items-center gap-1 rounded-full px-2 py-1 shadow-sm backdrop-blur-sm z-30 select-none border text-[11px] font-medium transition-colors ${
-          bubbleHelpEnabled
-            ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
-            : "bg-white/90 text-gray-600 border-gray-300 hover:bg-gray-50"
-        }`}
-        title={
-          bubbleHelpEnabled
-            ? "Bubble help ON — each cloud topic shows up to 3 times per session. Click to turn OFF."
-            : "Bubble help OFF — no help clouds. Click to turn ON (resets per-topic counts)."
-        }
-      >
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 16 16"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M3 5c0-1.1.9-2 2-2h6c1.1 0 2 .9 2 2v4c0 1.1-.9 2-2 2H8l-3 3v-3H5c-1.1 0-2-.9-2-2V5Z" />
-        </svg>
-        Bubble help: {bubbleHelpEnabled ? "ON" : "OFF"}
-      </button>
-      )}
+      </div>
 
       {pendingArchiConn && (
         <ArchimateConnectorPicker
