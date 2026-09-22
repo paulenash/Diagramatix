@@ -23,7 +23,8 @@ is why the two live in `app/globals.css` (lines 69–73).
 | | Over | Cursor today | CSS | Draft said | Note |
 |---|---|---|---|---|---|
 | ✋ | An element (unselected) | open hand, closing to ✊ | `grab` / `grabbing` | "Hand" | Agrees. `.dgx-grab` on the element's `<g>`. |
-| ✛ | An element **once selected** | crosshair | `crosshair` | "+" | Agrees — and this is why item 3 sees "+" during a drag. The connect overlay covers a selected element. |
+| ✋ | An element **once selected** | open hand, closing to ✊ | `grab` / `grabbing` | "+" | **Changed 2026-09-22.** Was ✛, which promised a connector — but since `77122bb3` a drag on a selected element MOVES it and only a still 300ms hold connects. The cursor now says what the drag will do. |
+| ✋ | An element or connector **label** | open hand, closing to ✊ | `grab` / `grabbing` | — | **Fixed 2026-09-22.** Was an inline `grab`, which cannot reach `:active` and outranked the body's `grabbing` during a drag. |
 | ✋ | A pool **header strip** | open hand, closing to ✊ | `grab` / `grabbing` | — | **Fixed 2026-09-22.** It was an inline style, which cannot reach `:active`, so it never closed to ✊. Now `.dgx-grab`. |
 | ↖ | A white-box pool **body** | arrow | `default` | — | Deliberate: the body is click-through so you can reach what is inside. |
 | 👆 | A connector | pointing finger | `pointer` | "Finger" | Agrees. |

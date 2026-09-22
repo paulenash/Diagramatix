@@ -678,7 +678,11 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
         stroke={(selected || isLabelFocused) && !isEditing ? "#2563eb" : "none"}
         strokeWidth={1} strokeDasharray={(selected || isLabelFocused) && !isEditing ? "4 3" : undefined}
         rx={3}
-        style={{ cursor: onUpdateLabel ? "grab" : "default" }}
+        // ✋ → ✊ via the class (Paul, 2026-09-22: "I'd like the grab cursor
+        // for labels as well"). The inline `grab` never closed: it cannot
+        // reach `:active`, and it outranked the body's "grabbing".
+        className={onUpdateLabel ? "dgx-grab" : undefined}
+        style={onUpdateLabel ? undefined : { cursor: "default" }}
         onMouseDown={handleLabelMouseDown}
         onDoubleClick={handleDoubleClick}
       />

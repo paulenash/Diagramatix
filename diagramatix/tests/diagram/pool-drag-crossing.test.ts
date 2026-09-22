@@ -128,11 +128,28 @@ describe("T4514 — the moving group draws on top of what it crosses", () => {
     expect(liftedPass, "and after the ordinary elements").toBeGreaterThan(nonContainerPass);
   });
 
-  it("holds the lifted elements OUT of their normal passes", () => {
-    // Rendered twice they would be drawn in both places and carry two sets of
-    // event handlers.
-    expect(CANVAS).toContain("!inActiveGroup(el.id) && !isLifted(el.id)");
-    expect(CANVAS).toMatch(/isDataArtifactType\(el\.type\) && !isLifted\(el\.id\)/);
+  it("leaves the lifted elements IN their normal passes, so the drag is never unmounted", () => {
+    // This used to be the opposite rule — "holds the lifted elements OUT of
+    // their normal passes" — and it broke every pool drag. Taking a travelling
+    // container out of its pass and drawing it only in the overlay moves it to
+    // a different place in the tree, so React UNMOUNTED the SymbolRenderer
+    // that owned the drag; its unmount cleanup removed the drag's listeners
+    // after the first mousemove. Mouseup never arrived, move-end never fired,
+    // and the lift and the green alignment guide stayed on. Paul, 2026-09-22:
+    // "I have to click and press on the header region twice in a row to move
+    // it" — the second press worked only because the pool was already stuck
+    // in the overlay, so nothing remounted.
+    expect(CANVAS).not.toContain("!inActiveGroup(el.id) && !isLifted(el.id)");
+    expect(CANVAS).not.toMatch(/isDataArtifactType\(el\.type\) && !isLifted\(el\.id\)/);
+    expect(CANVAS).not.toMatch(/selectedConnectorId && !isLiftedConn\(c\)/);
+  });
+
+  it("makes the lifted copy a picture — it takes no events", () => {
+    // The concern the old rule answered: rendered twice, a thing carries two
+    // sets of handlers. It still would, if the overlay copy could be clicked.
+    // It cannot: the interactive instance is the one underneath, and the drag
+    // itself runs on window listeners.
+    expect(CANVAS).toMatch(/<g data-lifted-drag="true" pointerEvents="none">/);
   });
 
   it("draws containers before the rest inside the lifted pass", () => {

@@ -3519,8 +3519,13 @@ function SymbolRendererInner({
               stroke={selected && !multiSelected ? "#2563eb" : "none"}
               strokeWidth={1}
               strokeDasharray={selected && !multiSelected ? "3 2" : undefined}
+              // ✋ → ✊ via the class. An inline `grab` here could never
+              // close: inline cursor cannot reach `:active`, and it also
+              // beat the body's "grabbing" that the drag sets, because a
+              // cursor on the element under the pointer wins over the body.
+              className={onUpdateProperties ? "dgx-grab" : undefined}
               style={{
-                cursor: onUpdateProperties ? "grab" : "default",
+                cursor: onUpdateProperties ? undefined : "default",
                 // While the inline label editor is open, the rect (which
                 // sits BEHIND the foreignObject) must not steal clicks
                 // from the textarea — SVG hit testing can route a click
@@ -4190,7 +4195,12 @@ function SymbolRendererInner({
             : { x: element.x, width: element.width })}
           y={element.y} height={element.height}
           fill="transparent" stroke="none"
-          style={{ cursor: "crosshair" }}
+          // ✋ not ✛. Since 77122bb3 a drag on a selected shape MOVES it and
+          // only a still 300ms hold connects, so a crosshair promised the
+          // wrong gesture (Paul, 2026-09-22: "click and press still does not
+          // produce a Grab cursor on elements. It is still an + cursor").
+          // The CLASS, not an inline style, so it can close to ✊ on press.
+          className="dgx-grab"
           onDoubleClick={handleShapeBodyDblClick}
           onMouseDown={(e) => {
             e.stopPropagation();

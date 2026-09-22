@@ -5743,7 +5743,19 @@ export function Canvas({
               />
             );
           }; return [...pools, ...vswimlanes, ...otherContainers]
-            .filter(el => !inActiveGroup(el.id) && !isLifted(el.id))
+            // A travelling container STAYS here. It used to be filtered out and
+            // re-rendered only in the lifted overlay, which moves it to a
+            // different place in the tree — React unmounts the SymbolRenderer
+            // that owns the drag, the unmount cleanup removes the drag's
+            // listeners, and the drag dies after its first mousemove. Mouseup
+            // never arrives, so move-end never fires, the lift stays on and
+            // the green alignment guide stays drawn. Paul, 2026-09-22: "I have
+            // to click and press on the header region twice in a row to move
+            // it" — the second press worked only because the pool was already
+            // stuck in the overlay, so nothing remounted. The overlay is now a
+            // visual copy drawn on top; the instance holding the gesture never
+            // moves.
+            .filter(el => !inActiveGroup(el.id))
             .map(renderContainerEl); })()}
 
           {/* Lanes — selectable (for deletion) but not individually draggable.
@@ -5753,7 +5765,7 @@ export function Canvas({
               any part of the lane body (which sits above the pool body)
               moves the whole group. Active-group lanes are skipped here
               and re-rendered in the overlay block at the end. */}
-          {lanes.filter(el => !inActiveGroup(el.id) && !isLifted(el.id)).map((el) => {
+          {lanes.filter(el => !inActiveGroup(el.id)).map((el) => {
             // Lane-swap eligibility — any division (a lane or a sub-lane) whose
             // parent is a pool OR another lane gets the ↑/↓ controls, so two
             // adjacent divisions at the SAME level can be swapped at any depth.
@@ -5998,7 +6010,7 @@ export function Canvas({
               />
             );
             return regularConns
-              .filter(c => c.id !== selectedConnectorId && !isLiftedConn(c))
+              .filter(c => c.id !== selectedConnectorId)
               .map(renderRegularConn);
           })()}
 
@@ -6328,7 +6340,7 @@ export function Canvas({
               renderer; order is preserved from the nonContainers sort (the
               dragged artifact is last, so it stays on top of its peers). */}
           {renderNonContainerEl && nonContainers
-            .filter(el => !inActiveGroup(el.id) && isDataArtifactType(el.type) && !isLifted(el.id))
+            .filter(el => !inActiveGroup(el.id) && isDataArtifactType(el.type))
             .map(renderNonContainerEl)}
 
           {/* THE LIFTED PASS. Everything travelling with the current drag, drawn
@@ -6340,7 +6352,12 @@ export function Canvas({
               as it would have been. Rendered by the very same functions, so the
               elements behave identically while they are up here. */}
           {liftedIds && liftedIds.length > 0 && (
-            <g data-lifted-drag="true">
+            // pointer-events NONE: this is a picture of the travelling group,
+            // drawn on top so it rides over everything it crosses (Paul,
+            // 2026-09-18). The real, interactive copies are still in their
+            // normal passes underneath; the drag itself runs on window
+            // listeners, so nothing here needs to be clickable.
+            <g data-lifted-drag="true" pointerEvents="none">
               {renderContainerEl && [...pools, ...vswimlanes, ...otherContainers]
                 .filter(el => isLifted(el.id))
                 .map(renderContainerEl)}

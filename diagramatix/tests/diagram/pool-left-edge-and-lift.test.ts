@@ -137,9 +137,16 @@ describe("T4639 — the canvas lifts all of it, and a nudge lets go", () => {
     expect(overlay, "elements are not lifted").toMatch(/nonContainers[\s\S]{0,80}isLifted\(el\.id\)/);
   });
 
-  it("holds those flows back from the normal pass, so they draw once", () => {
-    expect(CANVAS).toMatch(/c\.id !== selectedConnectorId && !isLiftedConn\(c\)/);
-    expect(CANVAS).toMatch(/lanes\.filter\(el => !inActiveGroup\(el\.id\) && !isLifted\(el\.id\)\)/);
+  it("draws the lifted flows and lanes AS WELL, not instead — the overlay is a picture", () => {
+    // Reversed on 2026-09-22. Holding lifted things back from their normal
+    // pass (this test's first version) moved them to a different place in the
+    // tree, and for the pool that owns the drag that meant being UNMOUNTED
+    // mid-gesture — the drag died after one mousemove (pool-drag-crossing,
+    // "leaves the lifted elements IN their normal passes"). The overlay is now
+    // an event-free copy drawn on top; the originals stay where they are.
+    expect(CANVAS).not.toMatch(/c\.id !== selectedConnectorId && !isLiftedConn\(c\)/);
+    expect(CANVAS).toMatch(/lanes\.filter\(el => !inActiveGroup\(el\.id\)\)\.map/);
+    expect(CANVAS).toMatch(/<g data-lifted-drag="true" pointerEvents="none">/);
   });
 
   it("ends the move on every arrow-key nudge", () => {

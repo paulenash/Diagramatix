@@ -62,7 +62,8 @@ export const POINTER_PROTOCOL: ProtocolSection[] = [
     heading: "What the cursor is telling you",
     hover: [
       { over: "An element", cursor: "grab", note: "closes to ✊ while you hold it" },
-      { over: "A selected element", cursor: "crosshair", note: "a connector can start here" },
+      { over: "A label", cursor: "grab", note: "drag to reposition it; closes to ✊" },
+      { over: "A selected element", cursor: "grab", note: "drag to move it; hold still for a moment to start a connector" },
       { over: "A pool header strip", cursor: "grab", note: "the handle you move a pool by" },
       { over: "A white-box pool body", cursor: "default", note: "clicks pass through to what is inside" },
       { over: "A connector", cursor: "pointer" },
