@@ -64,18 +64,20 @@ describe("T4656 — the cursor can close to grabbing", () => {
 });
 
 describe("T4657 — the Canvas Help card", () => {
-  it("sits in the status bar, immediately before the zoom readout", () => {
+  it("sits at the end of the status bar — and the percentage is gone", () => {
     // Anchor on the BUTTON, not the words: "Canvas Help" also appears in a
     // comment further up the file, and matching that passed happily while the
     // button itself had been renamed out from under it.
-    const button = CANVAS.indexOf("onClick={() => setShowCanvasHelp((v) => !v)}");
-    const zoom = CANVAS.indexOf("{Math.round(zoom * 100)}%");
-    expect(button, "no Canvas Help button").toBeGreaterThan(-1);
-    expect(zoom, "no zoom readout").toBeGreaterThan(-1);
-    expect(button, "the button must come before the percentage").toBeLessThan(zoom);
-    // …and it must be labelled, in the status bar, between the hints and the %.
-    const bar = CANVAS.slice(CANVAS.indexOf("{/* Status bar */}"), zoom);
-    expect(bar).toMatch(/>\s*Canvas Help\s*<\/button>/);
+    const barStart = CANVAS.indexOf("{/* Status bar */}");
+    const barEnd = CANVAS.indexOf("{showCanvasHelp && (", barStart);
+    expect(barStart, "no status bar").toBeGreaterThan(-1);
+    const bar = CANVAS.slice(barStart, barEnd);
+    expect(bar, "no Canvas Help button").toContain("onClick={() => setShowCanvasHelp((v) => !v)}");
+    expect(bar).toMatch(/>\s*Canvas Help\s*<\/button>\s*<\/div>/);   // the last thing in the bar
+    // Paul, 2026-09-22: "remove the status-bar percentage". It showed the true
+    // scale while the zoom control shows the scale relative to how the diagram
+    // opened, so the two disagreed; the zoom control is the one readout now.
+    expect(bar, "the status bar still shows a percentage").not.toMatch(/zoom \* 100/);
   });
 
   it("is the same draggable window the Voice Assist commands use", () => {

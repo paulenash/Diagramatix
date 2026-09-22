@@ -218,14 +218,28 @@ entry.
 **Read-only and feedback modes** suppress every gesture that would change the
 diagram; selection still works.
 
+**Scrolling and zooming.** Scroll over the canvas zooms the diagram, the same as
+the zoom control at the bottom right. **Ctrl + scroll, or a trackpad pinch,
+over a panel zooms the whole browser page** — every panel around the canvas
+resizes with it. That is the browser's own zoom, not a Diagramatix gesture: the
+canvas keeps scroll for itself, a panel does not, so it reaches the browser.
+**Ctrl + 0** puts the page back. Left as it is on purpose (Paul, 2026-09-22:
+"No change for scrolling over a panel. Just add it to the list of commands so
+users know it exists") and listed in Canvas Help under *Zooming*.
+
+**One zoom readout.** The status bar no longer shows a percentage (removed
+2026-09-22). It showed the true scale while the zoom control shows the scale
+relative to how the diagram opened, so the two disagreed on almost every
+diagram; the zoom control is the one to read.
+
 ---
 
 ## Open questions for Paul
 
-1. **Item 4 versus `77122bb3`** — the table above. Which of the three?
-2. **Item 3's cursor** — if item 4 keeps drag-to-connect, a selected element
-   cannot show `grabbing` on drag, because the drag is not a move. Is the "+"
-   acceptable there, or should the overlay show `grab` until the gesture
-   commits one way or the other?
+1. ~~**Item 4 versus `77122bb3`**~~ — **decided 2026-09-22**: the second press on
+   a selected element draws a connector (item 4 as drafted).
+2. ~~**Item 3's cursor**~~ — **resolved 2026-09-22**: the cursor follows the
+   gesture, not the shape. The canvas shows ✊ for the whole of a move and ✛ for
+   the whole of a connector draw, whatever the pointer passes over.
 3. **A distinct group-drag cursor** — or is inheriting each element's
-   `grab`/`grabbing` enough?
+   `grab`/`grabbing` enough? *Still open.*

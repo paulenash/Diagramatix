@@ -8196,9 +8196,12 @@ export function Canvas({
           : "Drag to pan · Shift+Drag to select · Scroll to zoom · Double-click label · Delete to remove"}
         {" · "}
         {/* Paul, 2026-09-22 — the pointer protocol as a card, in the same
-            draggable window the Voice Assist commands use. Placed just before
-            the zoom readout, which is the live canvas zoom: the same number
-            the zoom control shows and drives, read from the same state. */}
+            draggable window the Voice Assist commands use. The last thing in
+            the status bar: the zoom percentage that used to follow it is gone
+            ("remove the status-bar percentage"). It showed the TRUE scale
+            (zoom × 100) while the zoom control shows the scale relative to
+            how the diagram opened, so the two disagreed on almost every
+            diagram. The zoom control is now the only zoom readout. */}
         <button
           className="underline decoration-dotted underline-offset-2 hover:text-gray-600"
           onMouseDown={(e) => { e.stopPropagation(); }}
@@ -8207,8 +8210,6 @@ export function Canvas({
         >
           Canvas Help
         </button>
-        {" · "}
-        {Math.round(zoom * 100)}%
       </div>
 
       {showCanvasHelp && (
