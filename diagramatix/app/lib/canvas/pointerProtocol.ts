@@ -8,7 +8,7 @@
  * a list.
  *
  * Paul asked for this on 22 September 2026, alongside the written protocol in
- * `docs/clicking-and-selecting protocol summary.md`. That document is the
+ * `docs/clicking-and-selecting-protocol-summary.md`. That document is the
  * specification, including the parts still under review; THIS is a description
  * of what ships today, so the two are deliberately not the same text.
  *
