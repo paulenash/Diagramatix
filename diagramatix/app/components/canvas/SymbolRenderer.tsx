@@ -9,9 +9,9 @@ import { wrapText, computePackageTab } from "@/app/lib/diagram/textMetrics";
 import { holdsInternalLabel, wrapShapeLabel } from "@/app/lib/diagram/shapeFit";
 import { archiNodeDepth } from "@/app/lib/diagram/nodeGeometry";
 import { containerHeaderWidth } from "@/app/lib/diagram/containerHeader";
-import { edgeIsResizable, handleIsResizable, type EdgeSide as ResizableSide } from "@/app/lib/diagram/resizeEdges";
+import { edgeIsResizable, handleIsResizable, resizableSides, type EdgeSide as ResizableSide } from "@/app/lib/diagram/resizeEdges";
 import { traceGesture } from "@/app/lib/debug/gestureTrace";
-import { classifyEdgeDrag, edgeBand, type EdgeSide } from "@/app/lib/diagram/edgeGesture";
+import { classifyEdgeDrag, edgeBand, edgeZoneAt, type EdgeSide } from "@/app/lib/diagram/edgeGesture";
 import { readableTextOn } from "@/app/lib/diagram/chevronThemes";
 import { isRichText, sanitizeRichText, plainToHtml } from "@/app/lib/diagram/richText";
 import { ArchimateShape } from "./ArchimateShape";
@@ -2693,6 +2693,31 @@ function SymbolRendererInner({
   let dragStart: { mouseX: number; mouseY: number; elX: number; elY: number } | null = null;
 
   function handleMouseDown(e: React.MouseEvent) {
+    // A PRESS IN AN EDGE ZONE BELONGS TO THE ZONE — and to nothing else.
+    //
+    // The zones are drawn over this shape and do not stop the press, so it
+    // also reaches this handler. Paul's gesture trace, 2026-09-22: he pressed
+    // 2px LEFT of a pool's left edge; this handler called it a header press and
+    // began a MOVE drag while the zone began a RESIZE, and both ran together —
+    // every mousemove moved the pool and its eleven elements AND resized it.
+    // "Problems when moving left boundary right!!!" So when the press is in a
+    // zone (asked with the zone's own geometry, edgeZoneAt), this only makes
+    // sure the pool is selected — never toggling it OFF, since the press may
+    // yet become a drag — and leaves the zone to decide: across the edge
+    // resizes, along it moves. One gesture per press.
+    if (element.type === "pool" && onResizeDragStart && svgToWorld) {
+      const wp = svgToWorld(e.clientX, e.clientY);
+      const side = wp ? edgeZoneAt(wp, element, resizableSides(element.type)) : null;
+      if (side) {
+        e.stopPropagation();
+        traceGesture("press in an EDGE zone — the zone decides", {
+          id: element.id, label: element.label, side, selected,
+          worldX: Math.round(wp!.x), leftEdge: Math.round(element.x),
+        });
+        if (!selected) onSelect(e);
+        return;
+      }
+    }
     // Header-only selection model (matches PoolShape / LaneShape LW = 36):
     //   - White-box pool: only the 36px left header sidebar selects the pool.
     //     Body clicks bubble so lanes / child elements / bg-deselect can win.
@@ -2718,7 +2743,11 @@ function SymbolRendererInner({
       const HEADER_LW = containerHeaderWidth(element);
       const worldPos = svgToWorld ? svgToWorld(e.clientX, e.clientY) : null;
       if (worldPos) {
-        const headerHit = worldPos.x <= element.x + HEADER_LW;
+        // Bounded on BOTH sides. It used to be `x <= left edge + header`
+        // alone, so a press anywhere LEFT of the container — outside it
+        // altogether — counted as the header and moved the container.
+        const headerHit = worldPos.x >= element.x && worldPos.x <= element.x + HEADER_LW
+          && worldPos.y >= element.y && worldPos.y <= element.y + element.height;
         // White-box pools also accept clicks on or near any of the four
         // boundary edges (per user spec). 8 px tolerance — matches the
         // resize-handle visual extent. Lanes keep header-only selection.

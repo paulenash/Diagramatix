@@ -80,3 +80,37 @@ export function edgeBand(side: EdgeSide, width: number, height: number): { outsi
   const span = isHorizontalEdge(side) ? height : width;
   return { outside: 14, inside: Math.max(4, Math.min(10, Math.floor(span / 12))) };
 }
+
+/**
+ * Which edge zone, if any, a press at `p` lands in — computed with the SAME
+ * bands the zones are drawn with, so the shape's own press handler and the
+ * zone can never disagree about who owns a press.
+ *
+ * Paul's gesture trace, 2026-09-22, is why this exists. He pressed 2px LEFT
+ * of a pool's left edge; the pool's handler called that a header press and
+ * started a MOVE drag, while the left-edge zone underneath started a RESIZE
+ * — and both ran together, every mousemove moving the pool and its eleven
+ * elements AND resizing it. A press in a zone now belongs to the zone alone.
+ *
+ * Where two bands meet at a corner the answer is the zone drawn last, which is
+ * the one on top — the same one the browser gives the press to: s, n, w, e.
+ */
+export function edgeZoneAt(
+  p: { x: number; y: number },
+  r: { x: number; y: number; width: number; height: number },
+  sides: readonly EdgeSide[],
+): EdgeSide | null {
+  const inside = (x0: number, y0: number, w: number, h: number) =>
+    p.x >= x0 && p.x <= x0 + w && p.y >= y0 && p.y <= y0 + h;
+  for (const side of ["s", "n", "w", "e"] as const) {
+    if (!sides.includes(side)) continue;
+    const b = edgeBand(side, r.width, r.height);
+    const hit =
+      side === "e" ? inside(r.x + r.width - b.inside, r.y, b.inside + b.outside, r.height)
+      : side === "w" ? inside(r.x - b.outside, r.y, b.inside + b.outside, r.height)
+      : side === "n" ? inside(r.x, r.y - b.outside, r.width, b.inside + b.outside)
+      : inside(r.x, r.y + r.height - b.inside, r.width, b.inside + b.outside);
+    if (hit) return side;
+  }
+  return null;
+}
