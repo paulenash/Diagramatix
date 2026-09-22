@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
 import { listSites, searchSites, listDrives, listDriveRoot, listFolder, getItem, getMyDrive, listMyDriveRoot, listMyDriveFolder, getPreviewUrl } from "@/app/lib/sharepoint";
 import { getMsAccessTokenForUser } from "@/app/lib/microsoft/getMsAccessTokenForUser";
+import { graphErrorBody, notConnectedBody } from "@/app/lib/microsoft/sharePointOutcome";
 
 /**
  * GET /api/sharepoint?action=sites                          — list all sites
@@ -23,9 +24,10 @@ export async function GET(request: Request) {
   const _pol = await gateOrgPolicy(session, "allowSharePoint");
   if (_pol) return _pol;
 
-  const token = await getMsAccessTokenForUser(session.user.id);
+  // A token lookup that fails is the same, to the user, as having none.
+  const token = await getMsAccessTokenForUser(session.user.id).catch(() => null);
   if (!token) {
-    return NextResponse.json({ error: "Microsoft account not connected" }, { status: 403 });
+    return NextResponse.json(notConnectedBody(), { status: 403 });
   }
 
   const { searchParams } = new URL(request.url);
@@ -90,7 +92,7 @@ export async function GET(request: Request) {
     }
   } catch (err: any) {
     console.error("[sharepoint] API error:", err?.message ?? err);
-    const status = err?.statusCode ?? 500;
-    return NextResponse.json({ error: err?.message ?? "SharePoint request failed" }, { status });
+    const { status, body } = graphErrorBody(err, "SharePoint request failed");
+    return NextResponse.json(body, { status });
   }
 }

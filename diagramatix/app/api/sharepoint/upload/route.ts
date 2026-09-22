@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
 import { uploadToFolder } from "@/app/lib/sharepoint";
 import { getMsAccessTokenForUser } from "@/app/lib/microsoft/getMsAccessTokenForUser";
+import { graphErrorBody, notConnectedBody } from "@/app/lib/microsoft/sharePointOutcome";
 
 /**
  * POST /api/sharepoint/upload  (multipart/form-data)
@@ -22,9 +23,10 @@ export async function POST(request: Request) {
   const _pol = (await gateOrgPolicy(session, "allowSharePoint"))
     ?? (await gateOrgPolicy(session, "allowExternalExport"));
   if (_pol) return _pol;
-  const token = await getMsAccessTokenForUser(session.user.id);
+  // A token lookup that fails is the same, to the user, as having none.
+  const token = await getMsAccessTokenForUser(session.user.id).catch(() => null);
   if (!token) {
-    return NextResponse.json({ error: "Microsoft account not connected" }, { status: 403 });
+    return NextResponse.json(notConnectedBody(), { status: 403 });
   }
 
   let form: FormData;
@@ -57,7 +59,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ id: item.id, name: item.name, webUrl: item.webUrl });
   } catch (err: any) {
     console.error("[sharepoint/upload] error:", err?.message ?? err);
-    const status = err?.statusCode ?? 500;
-    return NextResponse.json({ error: err?.message ?? "Upload failed" }, { status });
+    const { status, body } = graphErrorBody(err, "Upload failed");
+    return NextResponse.json(body, { status });
   }
 }

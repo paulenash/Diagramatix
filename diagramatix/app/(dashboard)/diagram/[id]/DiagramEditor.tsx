@@ -114,6 +114,7 @@ import { AlertDialog } from "@/app/components/AlertDialog";
 import { buildPromptFromDiagram } from "@/app/lib/diagram/prompt-from-diagram";
 import { SharePointPicker } from "@/app/components/SharePointPicker";
 import { SharePointPreview } from "@/app/components/SharePointPreview";
+import { SafeBoundary } from "@/app/components/SafeBoundary";
 import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
 import { checkDiagram, rulesMetadata, type Violation } from "@/app/lib/diagram/checks/diagramChecks";
 import { HistoryPanel } from "./HistoryPanel";
@@ -7255,6 +7256,7 @@ export function DiagramEditor({
         {(spOpenFmt || spSaveFormat) && (() => {
           const ext: Record<"json" | "xml" | "visio" | "bpmn", string> = { json: ".json", xml: ".xml", visio: ".vsdx", bpmn: ".bpmn" };
           return (
+            <SafeBoundary what="The SharePoint window" onClose={() => { setSpOpenFmt(null); setSpSaveFormat(null); }}>
             <SharePointPicker
               mode={spSaveFormat ? "folder" : "file"}
               title={spSaveFormat ? `Save ${spSaveFormat.toUpperCase()} to SharePoint` : `Open a ${spOpenFmt?.toUpperCase()} file from SharePoint`}
@@ -7270,36 +7272,41 @@ export function DiagramEditor({
                 else if (open) void handleOpenFromSharePoint(sel);
               }}
             />
+            </SafeBoundary>
           );
         })()}
 
         {/* SharePoint file-link picker (Data Object / Store) */}
         {spLinkElId && (
-          <SharePointPicker
-            mode="file"
-            title="Link a SharePoint file"
-            confirmLabel="Link"
-            onCancel={() => setSpLinkElId(null)}
-            onPick={(sel) => {
-              const elId = spLinkElId;
-              setSpLinkElId(null);
-              if (!elId || !sel.itemId) return;
-              const link = { driveId: sel.driveId, itemId: sel.itemId, name: sel.name, webUrl: sel.webUrl };
-              updateProperties(elId, { sharepointLink: link });
-              setSpPreview(link);
-            }}
-          />
+          <SafeBoundary what="The SharePoint window" onClose={() => setSpLinkElId(null)}>
+            <SharePointPicker
+              mode="file"
+              title="Link a SharePoint file"
+              confirmLabel="Link"
+              onCancel={() => setSpLinkElId(null)}
+              onPick={(sel) => {
+                const elId = spLinkElId;
+                setSpLinkElId(null);
+                if (!elId || !sel.itemId) return;
+                const link = { driveId: sel.driveId, itemId: sel.itemId, name: sel.name, webUrl: sel.webUrl };
+                updateProperties(elId, { sharepointLink: link });
+                setSpPreview(link);
+              }}
+            />
+          </SafeBoundary>
         )}
 
         {/* Embedded preview of a linked SharePoint file */}
         {spPreview && (
-          <SharePointPreview
-            driveId={spPreview.driveId}
-            itemId={spPreview.itemId}
-            name={spPreview.name}
-            webUrl={spPreview.webUrl}
-            onClose={() => setSpPreview(null)}
-          />
+          <SafeBoundary what="The SharePoint preview" onClose={() => setSpPreview(null)}>
+            <SharePointPreview
+              driveId={spPreview.driveId}
+              itemId={spPreview.itemId}
+              name={spPreview.name}
+              webUrl={spPreview.webUrl}
+              onClose={() => setSpPreview(null)}
+            />
+          </SafeBoundary>
         )}
         {spBusy && (
           <div className="fixed inset-0 bg-black/10 flex items-center justify-center z-[60]">

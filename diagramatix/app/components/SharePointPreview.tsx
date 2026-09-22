@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { classifySharePointFailure } from "@/app/lib/microsoft/sharePointOutcome";
 
 interface Props {
   driveId: string;
@@ -26,9 +27,13 @@ export function SharePointPreview({ driveId, itemId, name, webUrl, onClose }: Pr
       setUrl(null); setError(null);
       try {
         const r = await fetch(`/api/sharepoint?action=preview&driveId=${encodeURIComponent(driveId)}&itemId=${encodeURIComponent(itemId)}`);
-        if (r.status === 403) throw new Error("Microsoft account not connected.");
-        if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? "Could not load preview");
-        const data = await r.json();
+        if (!r.ok) {
+          const o = classifySharePointFailure(r.status, await r.json().catch(() => null));
+          throw new Error(o.kind === "not-connected"
+            ? "Your Microsoft account isn't connected. Link a file again to connect it."
+            : o.message);
+        }
+        const data = await r.json().catch(() => null);
         if (cancelled) return;
         if (data?.url) setUrl(data.url);
         else setError("No preview is available for this file type.");

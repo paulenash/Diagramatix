@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { asList, classifySharePointFailure, connectUrl, MS_NOT_CONNECTED_MESSAGE, type SharePointOutcome } from "@/app/lib/microsoft/sharePointOutcome";
 
 /** What the caller gets back. For a folder pick, `itemId` is the folder id
  *  (null = drive root) and `webUrl` is the folder URL. For a file pick,
@@ -41,12 +42,26 @@ type Crumb =
   | { kind: "drive"; driveId: string; driveName: string; siteId?: string }
   | { kind: "folder"; driveId: string; itemId: string; name: string; webUrl: string };
 
-async function api(qs: string): Promise<any> {
-  const r = await fetch(`/api/sharepoint?${qs}`);
-  if (r.status === 403) throw new Error("__NOT_CONNECTED__");
-  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? "SharePoint request failed");
-  return r.json();
+/** A failed request, already classified for the user. */
+class SharePointFailure extends Error {
+  constructor(readonly outcome: SharePointOutcome) { super(outcome.message); }
 }
+
+async function api(qs: string): Promise<any> {
+  let r: Response;
+  try {
+    r = await fetch(`/api/sharepoint?${qs}`);
+  } catch {
+    throw new SharePointFailure({ kind: "error", message: "Couldn't reach Diagramatix. Check your connection and press Retry." });
+  }
+  if (!r.ok) throw new SharePointFailure(classifySharePointFailure(r.status, await r.json().catch(() => null)));
+  return r.json().catch(() => {
+    throw new SharePointFailure({ kind: "error", message: "SharePoint sent back something unexpected. Press Retry." });
+  });
+}
+
+const outcomeOf = (e: unknown): SharePointOutcome =>
+  e instanceof SharePointFailure ? e.outcome : { kind: "error", message: (e as Error)?.message || "SharePoint request failed" };
 
 export function SharePointPicker({
   mode, title, fileExtensions, confirmLabel, onPick, onCancel,
@@ -56,7 +71,25 @@ export function SharePointPicker({
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notConnected, setNotConnected] = useState(false);
+  // A failure the picker can't browse past — no Microsoft sign-in, the
+  // Diagramatix session ended, or SharePoint is off. Shown in place of the list;
+  // the editor underneath is never touched.
+  const [blocked, setBlocked] = useState<SharePointOutcome | null>(null);
+  // Bumped by Retry (and on returning from the connect tab) to reload.
+  const [attempt, setAttempt] = useState(0);
+  const retry = useCallback(() => { setBlocked(null); setError(null); setAttempt((n) => n + 1); }, []);
+  const fail = useCallback((e: unknown) => {
+    const o = outcomeOf(e);
+    if (o.kind === "error") setError(o.message);
+    else setBlocked(o);
+  }, []);
+
+  // Back from the connect tab → try again without making the user find Retry.
+  useEffect(() => {
+    if (blocked?.kind !== "not-connected" && blocked?.kind !== "signed-out") return;
+    window.addEventListener("focus", retry);
+    return () => window.removeEventListener("focus", retry);
+  }, [blocked, retry]);
 
   const [sites, setSites] = useState<Site[]>([]);
   const [siteQuery, setSiteQuery] = useState("");
@@ -78,21 +111,19 @@ export function SharePointPicker({
       try {
         if (here.kind === "root") {
           const s = await api(`action=sites${siteQuery ? `&q=${encodeURIComponent(siteQuery)}` : ""}`);
-          if (!cancelled) setSites(s);
+          if (!cancelled) setSites(asList<Site>(s));
         } else if (here.kind === "site") {
           const d = await api(`action=drives&siteId=${encodeURIComponent(here.site.id)}`);
-          if (!cancelled) setDrives(d);
+          if (!cancelled) setDrives(asList<Drive>(d));
         } else if (here.kind === "drive") {
           const it = await api(`action=files&driveId=${encodeURIComponent(here.driveId)}`);
-          if (!cancelled) setItems(it);
+          if (!cancelled) setItems(asList<Item>(it));
         } else if (here.kind === "folder") {
           const it = await api(`action=files&driveId=${encodeURIComponent(here.driveId)}&itemId=${encodeURIComponent(here.itemId)}`);
-          if (!cancelled) setItems(it);
+          if (!cancelled) setItems(asList<Item>(it));
         }
-      } catch (e: any) {
-        if (cancelled) return;
-        if (e?.message === "__NOT_CONNECTED__") setNotConnected(true);
-        else setError(e?.message ?? "Failed to load");
+      } catch (e) {
+        if (!cancelled) fail(e);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -100,7 +131,7 @@ export function SharePointPicker({
     load();
     return () => { cancelled = true; };
     // siteQuery only matters at root; including it re-runs the site search.
-  }, [here, siteQuery]);
+  }, [here, siteQuery, attempt, fail]);
 
   const push = (c: Crumb) => setTrail((t) => [...t, c]);
   const goto = (idx: number) => setTrail((t) => t.slice(0, idx + 1));
@@ -110,10 +141,10 @@ export function SharePointPicker({
     setLoading(true); setError(null);
     try {
       const d = await api(`action=mydrive`);
+      if (!d || typeof d.id !== "string") throw new SharePointFailure({ kind: "error", message: "Couldn't open your OneDrive." });
       push({ kind: "drive", driveId: d.id, driveName: d.name ?? "OneDrive" });
-    } catch (e: any) {
-      if (e?.message === "__NOT_CONNECTED__") setNotConnected(true);
-      else setError(e?.message ?? "Failed to open OneDrive");
+    } catch (e) {
+      fail(e);
       setLoading(false);
     }
   }
@@ -178,16 +209,45 @@ export function SharePointPicker({
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-3 min-h-[16rem]">
-          {notConnected ? (
+          {blocked ? (
             <div className="flex flex-col items-center justify-center py-10 text-center">
-              <p className="text-sm text-gray-700 mb-1">Your SharePoint isn&apos;t connected.</p>
-              <p className="text-xs text-gray-500 mb-4">Connect your Microsoft 365 account to browse SharePoint and OneDrive.</p>
-              <button
-                onClick={() => { window.location.href = "/api/microsoft/connect?returnTo=" + encodeURIComponent(window.location.href); }}
-                className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700"
-              >
-                Connect SharePoint
-              </button>
+              {blocked.kind === "not-connected" ? (
+                <>
+                  <p className="text-sm text-gray-700 mb-1">Your SharePoint isn&apos;t connected.</p>
+                  <p className="text-xs text-gray-500 mb-1">
+                    {blocked.message === MS_NOT_CONNECTED_MESSAGE
+                      ? "Connect your Microsoft 365 account to browse SharePoint and OneDrive."
+                      : blocked.message}
+                  </p>
+                  <p className="text-xs text-gray-500 mb-4">The sign-in opens in a new tab — your diagram stays here.</p>
+                  <div className="flex gap-2">
+                    {/* A link, not a navigation of this page: a Microsoft sign-in
+                        that fails must never take the editor with it. */}
+                    <a
+                      href={connectUrl(window.location.origin)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700"
+                    >
+                      Connect SharePoint
+                    </a>
+                    <button onClick={retry}
+                      className="px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-300 rounded hover:bg-gray-50">
+                      Retry
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-gray-700 mb-4">{blocked.message}</p>
+                  {blocked.kind === "signed-out" && (
+                    <button onClick={retry}
+                      className="px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-300 rounded hover:bg-gray-50">
+                      Retry
+                    </button>
+                  )}
+                </>
+              )}
             </div>
           ) : (
             <>
@@ -214,7 +274,13 @@ export function SharePointPicker({
               {loading ? (
                 <p className="text-xs text-gray-400 py-6 text-center">Loading…</p>
               ) : error ? (
-                <p className="text-xs text-red-600 py-6 text-center">{error}</p>
+                <div className="py-6 text-center">
+                  <p className="text-xs text-red-600 mb-3">{error}</p>
+                  <button onClick={retry}
+                    className="px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-300 rounded hover:bg-gray-50">
+                    Retry
+                  </button>
+                </div>
               ) : (
                 <ul className="divide-y divide-gray-50">
                   {here.kind === "root" && sites.map((s) => (
