@@ -36,7 +36,8 @@ import { messageLabelsHiddenWhileDragging } from "@/app/lib/diagram/labelVisibil
 import { poolGuideNext, type PoolBoundaryGuide, type PoolGuideEvent } from "@/app/lib/diagram/poolGuide";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { canConnect } from "@/app/lib/diagram/canConnect";
-import { POINTER_PROTOCOL, CURSOR_GLYPH } from "@/app/lib/canvas/pointerProtocol";
+import { POINTER_PROTOCOL } from "@/app/lib/canvas/pointerProtocol";
+import { CursorIcon } from "./CursorIcon";
 import { FloatingPanel } from "./FloatingPanel";
 import { edgeIsResizable, type EdgeSide as ResizableSide } from "@/app/lib/diagram/resizeEdges";
 import { connectorTravels } from "@/app/lib/diagram/liftedLayer";
@@ -8218,7 +8219,7 @@ export function Canvas({
               <div className="text-[10px] font-semibold uppercase tracking-wide text-purple-700 mb-1">{sec.heading}</div>
               {sec.hover?.map((row) => (
                 <div key={row.over} className="mb-1 flex gap-2 items-baseline">
-                  <span className="text-[13px] leading-none w-4 shrink-0" title={row.cursor}>{CURSOR_GLYPH[row.cursor]}</span>
+                  <span className="w-5 shrink-0 flex justify-center self-center" title={row.cursor}><CursorIcon name={row.cursor} /></span>
                   <span className="text-[11px] text-gray-700">{row.over}</span>
                   <span className="text-[10px] text-gray-400 font-mono">{row.cursor}</span>
                   {row.note && <span className="text-[10px] text-gray-500 italic">— {row.note}</span>}

@@ -19,7 +19,8 @@
 /** The CSS cursor values the canvas actually uses. */
 export type CursorName =
   | "grab" | "grabbing" | "pointer" | "crosshair" | "default" | "move"
-  | "ew-resize" | "ns-resize" | "nesw-resize" | "nwse-resize";
+  | "ew-resize" | "ns-resize" | "nesw-resize" | "nwse-resize"
+  | "nw-resize" | "ne-resize" | "se-resize" | "sw-resize";
 
 /** A reminder of the shape, for a card that cannot show a real cursor. */
 export const CURSOR_GLYPH: Record<CursorName, string> = {
@@ -33,6 +34,10 @@ export const CURSOR_GLYPH: Record<CursorName, string> = {
   "ns-resize": "↕",
   "nesw-resize": "⤢",
   "nwse-resize": "⤡",
+  "nw-resize": "⤡",
+  "se-resize": "⤡",
+  "ne-resize": "⤢",
+  "sw-resize": "⤢",
 };
 
 export interface HoverRow {
@@ -71,7 +76,10 @@ export const POINTER_PROTOCOL: ProtocolSection[] = [
       { over: "A connector", cursor: "pointer" },
       { over: "A message flow", cursor: "ew-resize", note: "its spine slides sideways" },
       { over: "A connector endpoint, waypoint or label", cursor: "grab" },
-      { over: "A pool edge, lane or sub-lane divider", cursor: "ns-resize", note: "↔ on a left or right edge" },
+      { over: "A pool's left or right edge", cursor: "ew-resize" },
+      { over: "A pool's top or bottom edge, or a lane or sub-lane divider", cursor: "ns-resize" },
+      { over: "A top-left or bottom-right corner handle", cursor: "nw-resize" },
+      { over: "A top-right or bottom-left corner handle", cursor: "ne-resize" },
       { over: "A boundary event", cursor: "default", note: "it is pinned to its host's edge" },
       { over: "Empty canvas", cursor: "grab", note: "dragging pans the diagram" },
     ],
@@ -95,6 +103,13 @@ export const POINTER_PROTOCOL: ProtocolSection[] = [
       { does: "Drag a pool by its header", result: "Moves the pool and everything in it" },
       { does: "Arrow keys", result: "Nudges 5px — 1px with Shift", note: "each press is its own undo step" },
       { does: "Drag empty canvas", result: "Pans the diagram" },
+    ],
+  },
+  {
+    heading: "Zooming",
+    gestures: [
+      { does: "Scroll over the canvas", result: "Zooms the diagram", note: "the zoom control at the bottom right does the same in 10% steps" },
+      { does: "Ctrl + scroll, or pinch, over a panel", result: "The BROWSER zooms the whole page — every panel resizes", note: "not a Diagramatix gesture: the canvas keeps scroll for itself, a panel does not, so it reaches the browser. Ctrl + 0 puts it back" },
     ],
   },
   {
