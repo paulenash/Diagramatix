@@ -26,6 +26,8 @@ import { planWrapInSubprocess, planUnwrapSubprocess, planWrapInContainer, type W
 import { isUmlConnType } from "@/app/lib/diagram/types";
 import { capitaliseFirstWord, needsCapital, decisionLabel, isDecisionGateway } from "@/app/lib/diagram/nameCase";
 import { contentBoundsOf, clampRectToContent, clampRectToLimits, poolFollowsLanes, leftGapShortfall, MIN_LEFT_GAP } from "@/app/lib/diagram/poolLaneBounds";
+import { getLaneHeaderWidth, getPoolHeaderWidth, laneMetrics, poolMetrics } from "@/app/lib/diagram/containerMetrics";
+import { planCarve, planLaneDrop, type CarvePlan } from "@/app/lib/diagram/laneDropPlan";
 import { labelsFollowTheirSegments, holdGatewayBranchLabels } from "@/app/lib/diagram/labelFollow";
 import { gestureTraceOn, traceGesture, movedElements } from "@/app/lib/debug/gestureTrace";
 import { baseLabelAnchor } from "@/app/lib/diagram/checks/layoutViolations";
@@ -947,17 +949,6 @@ function updatePoolTypes(elements: DiagramElement[]): DiagramElement[] {
  * Both grow with poolFontSize and shrink when the user breaks the label
  * into more lines (each line gets shorter).
  */
-function poolMetrics(label: string, fontSize: number): { minHeight: number; headerWidth: number } {
-  const lines = (label || "").split("\n");
-  const charPxWidth = fontSize * 0.6;
-  const lineH = fontSize * 1.18;
-  const longestLine = Math.max(1, ...lines.map(l => l.length));
-  const minHeight = Math.max(50, Math.ceil(longestLine * charPxWidth + 20));
-  // Default 36 fits ~2 lines at fontSize 12; widens once 4+ lines need to stack.
-  const stackedH = Math.ceil(lines.length * lineH + 8);
-  const headerWidth = Math.max(36, stackedH);
-  return { minHeight, headerWidth };
-}
 
 /** One-time load heal: bring every pool's header strip up to a width that fits its
  *  (multi-line) label at the pool font. Older diagrams (and any generated before the
@@ -2301,12 +2292,6 @@ function expandEPForBoundaryEntry(
   return { elements: r.elements, connectors: r.connectors, placedX, placedY };
 }
 
-/** Read a pool's effective header width (stored property override, else 36). */
-function getPoolHeaderWidth(pool: DiagramElement): number {
-  const stored = pool.properties?.poolHeaderWidth;
-  return typeof stored === "number" && stored > 0 ? stored : 36;
-}
-
 // The pool name renders as rotated (vertical) text in the left header, so a
 // pool "sized to fit its name" needs HEIGHT ∝ the name length + a small buffer,
 // and only a narrow body. Used for empty/black-box pools + Compress.
@@ -2747,10 +2732,6 @@ function applyPoolAboveShift(
 }
 
 /** Read a lane's effective header width (stored property override, else 36). */
-function getLaneHeaderWidth(lane: DiagramElement): number {
-  const stored = lane.properties?.laneHeaderWidth;
-  return typeof stored === "number" && stored > 0 ? stored : 36;
-}
 
 /**
  * Minimum height required for a pool / lane / sublane such that:
@@ -2874,16 +2855,6 @@ function rescaleSublanesRecursive(
 }
 
 /** Same shape as poolMetrics but tuned for lane labels. */
-function laneMetrics(label: string, fontSize: number): { minHeight: number; headerWidth: number } {
-  const lines = (label || "").split("\n");
-  const charPxWidth = fontSize * 0.6;
-  const lineH = fontSize * 1.2;
-  const longestLine = Math.max(1, ...lines.map(l => l.length));
-  const minHeight = Math.max(40, Math.ceil(longestLine * charPxWidth + 16));
-  const stackedH = Math.ceil(lines.length * lineH + 8);
-  const headerWidth = Math.max(36, stackedH);
-  return { minHeight, headerWidth };
-}
 
 /**
  * Apply auto-sizing to a lane (including sublanes):
@@ -3279,22 +3250,41 @@ function refitStackAtEdge(
  * lanes must be added within the Pool." … "Never grow the Pool with these
  * Lane and Sublane additions."
  *
- * The new band is carved out of the NEIGHBOUR it goes next to — the band
- * below it for a band on top, the band above it for one at the bottom, and
- * between two bands the taller of them. The neighbour gives up the empty
- * space at that edge, beyond its contents, up to half its height, so the
- * process inside it stays in the lane it was in. When that edge is too crowded
- * the donor's content slides away from it, into the donor's own empty space
- * at the far edge — still inside the same lane. It never gives more than its
- * own label (and its own sub-lanes' labels) can spare — the same floor a
- * boundary drag stops at — nor covers any content, and when that leaves too
- * little for the new band's label nothing is added.
- *
- * `index` is where the new band goes in the parent's top-to-bottom stack:
- * 0 = on top, bands.length = at the bottom. Returns null when there is no
- * room, or the parent has no bands yet (a first lane fills its parent, which
- * is its own case).
+ * WHAT is carved — out of which neighbour, how much it gives, how far its
+ * contents slide to allow it — is worked out by `planCarve`, which the canvas
+ * also asks so the ghost it draws during the drag is the band that will
+ * actually appear. This applies that plan and nothing more.
  */
+function applyCarve(state: DiagramData, carve: CarvePlan): { state: DiagramData; bandId: string } | null {
+  const parent = state.elements.find((e) => e.id === carve.parentId);
+  const donor = state.elements.find((e) => e.id === carve.donorId);
+  if (!parent || !donor) return null;
+  const poolFs = state.poolFontSize ?? 16;
+  const laneFs = state.laneFontSize ?? 14;
+
+  // The donor shrinks at that edge; its own stack re-fits there too.
+  const donorY = carve.edge === "first" ? donor.y + carve.give : donor.y;
+  const donorH = donor.height - carve.give;
+  let elements = state.elements.map((e) => (e.id === donor.id ? { ...e, y: donorY, height: donorH } : e));
+  elements = refitStackAtEdge(elements, donor.id, donorY, donorH, donor.x, donor.width, carve.edge, poolFs, laneFs);
+
+  const band: DiagramElement = {
+    id: nanoid(), type: "lane", ...carve.rect,
+    label: carve.label, properties: {}, parentId: carve.parentId,
+  };
+  elements = updatePoolTypes([...elements, band]);
+  // Nothing but lanes moved; a connector drawn on a lane's edge re-derives.
+  const connectors = recomputeAllConnectors(state.connectors, elements, state.relaxedLayout);
+  let next: DiagramData = { ...state, elements, connectors };
+  if (carve.slide > 0) {
+    // As an ordinary move, so connectors and boundary events travel with it.
+    const ids = state.elements.filter((e) => e.parentId === donor.id && e.type !== "lane").map((e) => e.id);
+    next = reducerImpl(next, { type: "MOVE_ELEMENTS", payload: { ids, dx: 0, dy: carve.edge === "first" ? carve.slide : -carve.slide } });
+  }
+  return { state: next, bandId: band.id };
+}
+
+/** Plan a carve and apply it, for the callers that name the place themselves. */
 function carveBandWithin(
   state: DiagramData,
   parentId: string,
@@ -3303,80 +3293,8 @@ function carveBandWithin(
   /** A neighbour to take the room from instead, when it is adjacent. */
   preferDonorId?: string,
 ): { state: DiagramData; bandId: string } | null {
-  const parent = state.elements.find((e) => e.id === parentId);
-  if (!parent || (parent.type !== "pool" && parent.type !== "lane")) return null;
-  const bands = state.elements
-    .filter((e) => e.type === "lane" && e.parentId === parentId)
-    .sort((a, b) => a.y - b.y);
-  if (bands.length === 0) return null;
-  const at = Math.max(0, Math.min(bands.length, index));
-  const poolFs = state.poolFontSize ?? 16;
-  const laneFs = state.laneFontSize ?? 14;
-  const MIN_BAND = 40;
-
-  // Which neighbour gives, and from which of its edges.
-  let donor: DiagramElement;
-  let edge: StackEdge;
-  const preferred = preferDonorId ? bands.findIndex((b) => b.id === preferDonorId) : -1;
-  if (preferred >= 0 && preferred === at) { donor = bands[at]; edge = "first"; }
-  else if (preferred >= 0 && preferred === at - 1) { donor = bands[at - 1]; edge = "last"; }
-  else if (at === 0) { donor = bands[0]; edge = "first"; }
-  else if (at === bands.length) { donor = bands[bands.length - 1]; edge = "last"; }
-  else if (bands[at - 1].height >= bands[at].height) { donor = bands[at - 1]; edge = "last"; }
-  else { donor = bands[at]; edge = "first"; }
-
-  const bandTree = (lane: DiagramElement, depth = 0): Band => ({
-    height: lane.height,
-    min: Math.max(MIN_BAND, laneMetrics(lane.label ?? "", laneFs).minHeight),
-    bands: depth > 12 ? [] : state.elements
-      .filter((e) => e.type === "lane" && e.parentId === lane.id)
-      .sort((a, b) => a.y - b.y)
-      .map((sub) => bandTree(sub, depth + 1)),
-  });
-  const room = shrinkRoom(bandTree(donor), edge);
-  const need = Math.max(MIN_BAND, laneMetrics(label, laneFs).minHeight);
-  const half = Math.floor(donor.height / 2);
-  const content = contentBoundsOf(state.elements, donor.id);
-  // Empty space inside the donor at the edge that gives, and at the far one.
-  const emptyNear = !content ? donor.height
-    : Math.max(0, edge === "last" ? donor.y + donor.height - (content.y + content.height) - MIN_LEFT_GAP
-                                  : content.y - donor.y - MIN_LEFT_GAP);
-  const emptyFar = !content ? 0
-    : Math.max(0, edge === "last" ? content.y - donor.y - MIN_LEFT_GAP
-                                  : donor.y + donor.height - (content.y + content.height) - MIN_LEFT_GAP);
-  // The donor's content may slide away from the giving edge into its empty
-  // space at the far one — never out of the lane it is in. Only a donor with
-  // no sub-lanes: sliding content past fixed sublane dividers would change
-  // which sublane it sits in.
-  const hasSubs = state.elements.some((e) => e.type === "lane" && e.parentId === donor.id);
-  const canSlide = content && !hasSubs ? emptyFar : 0;
-  const give = Math.floor(Math.min(room, half, emptyNear >= need ? emptyNear : emptyNear + canSlide));
-  if (give < need) return null;
-  const slide = Math.max(0, give - emptyNear);
-
-  // The donor shrinks at that edge; its own stack re-fits there too.
-  const donorY = edge === "first" ? donor.y + give : donor.y;
-  const donorH = donor.height - give;
-  let elements = state.elements.map((e) => (e.id === donor.id ? { ...e, y: donorY, height: donorH } : e));
-  elements = refitStackAtEdge(elements, donor.id, donorY, donorH, donor.x, donor.width, edge, poolFs, laneFs);
-
-  const headerW = parent.type === "pool" ? getPoolHeaderWidth(parent) : getLaneHeaderWidth(parent);
-  const band: DiagramElement = {
-    id: nanoid(), type: "lane",
-    x: parent.x + headerW, y: edge === "first" ? donor.y : donor.y + donorH,
-    width: parent.width - headerW, height: give,
-    label, properties: {}, parentId,
-  };
-  elements = updatePoolTypes([...elements, band]);
-  // Nothing but lanes moved; a connector drawn on a lane's edge re-derives.
-  const connectors = recomputeAllConnectors(state.connectors, elements, state.relaxedLayout);
-  let next: DiagramData = { ...state, elements, connectors };
-  if (slide > 0) {
-    // As an ordinary move, so connectors and boundary events travel with it.
-    const ids = state.elements.filter((e) => e.parentId === donor.id && e.type !== "lane").map((e) => e.id);
-    next = reducerImpl(next, { type: "MOVE_ELEMENTS", payload: { ids, dx: 0, dy: edge === "first" ? slide : -slide } });
-  }
-  return { state: next, bandId: band.id };
+  const carve = planCarve(state.elements, parentId, index, label, state.laneFontSize ?? 14, preferDonorId);
+  return carve ? applyCarve(state, carve) : null;
 }
 
 /**
@@ -3911,211 +3829,59 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
 
     case "ADD_ELEMENT": {
       // ── Pool/Lane drop intercept ─────────────────────────────────────
-      // The "Pool/Lane" palette symbol has THREE behaviours:
-      //   1) Drop into empty space  → create a new Pool. If other pools
-      //      already exist on the diagram, match the nearest pool's x +
-      //      width; else use 80% of the catalogue default width.
-      //   2) Drop on an existing Pool that has NO Lanes → add a SINGLE lane
-      //      filling the pool body (a single-lane pool is a valid state).
-      //   3) Drop on an existing Pool with ≥1 Lane → insert a new lane
-      //      based on cursor position:
-      //         · within 20px of pool top      → above all lanes
-      //         · within 20px of pool bottom   → below all lanes
-      //         · within 15px of a lane separator → between adjacent lanes
-      //         · within the middle third of a lane → split into 2 sublanes
-      //         · else, SINGLE-lane pool        → lane above (upper ½) / below (lower ½)
-      //         · else, multi-lane pool         → below the lane the cursor sits in
-      // In every "add lane" case the pool grows downwards and any pools
-      // below get pushed by the same growth amount.
+      // The "Pool/Lane" palette symbol has two behaviours: dropped in empty
+      // space it creates a Pool (below); dropped INSIDE a pool it adds a lane
+      // or sublane, or splits a lane in two.
+      //
+      // Which of those, and exactly where, is decided by `planLaneDrop` — the
+      // same plan the canvas draws as a ghost while the symbol is still being
+      // dragged (Paul, 2026-09-23: "a ghostly image of the new Lane or
+      // Sublanes appears inside the Pool to show what would happen"). Deciding
+      // it here as well would be two answers to one question, and the ghost
+      // would sooner or later promise something the drop did not do.
       if (action.payload.symbolType === "pool") {
-        const dropPos = action.payload.position;
-        const targetPool = state.elements.find(
-          (e) =>
-            e.type === "pool" &&
-            dropPos.x >= e.x && dropPos.x <= e.x + e.width &&
-            dropPos.y >= e.y && dropPos.y <= e.y + e.height,
-        );
-        if (targetPool) {
-          const oldPoolHeight = targetPool.height;
-          const oldPoolBottom = targetPool.y + oldPoolHeight;
-          const POOL_LW = getPoolHeaderWidth(targetPool);
-          const lanes = state.elements
-            .filter((e) => e.type === "lane" && e.parentId === targetPool.id)
-            .sort((a, b) => a.y - b.y);
-          const laneFs = state.laneFontSize ?? 14;
-          const totalLaneCount = state.elements.filter((e) => e.type === "lane").length;
-          const TOP_BOTTOM_THRESHOLD = 20;
-          const SEPARATOR_THRESHOLD = 15;
-
-          // Case A: pool with no lanes → add a SINGLE lane filling the pool
-          // body. A single-lane pool is a valid state; grow it later by
-          // dragging another lane above/below, or split it into sublanes.
-          if (lanes.length === 0) {
+        const laneFs = state.laneFontSize ?? 14;
+        const plan = planLaneDrop(state.elements, action.payload.position, laneFs);
+        if (plan.poolId) {
+          if (plan.kind === "first-lane") {
+            // An empty pool takes ONE lane filling its body; a single-lane
+            // pool is a valid state — add more, or split it, later.
             const lane1: DiagramElement = {
-              id: nanoid(), type: "lane",
-              x: targetPool.x + POOL_LW, y: targetPool.y,
-              width: targetPool.width - POOL_LW, height: targetPool.height,
-              label: `Lane ${totalLaneCount + 1}`, properties: {}, parentId: targetPool.id,
+              id: nanoid(), type: "lane", ...plan.rect,
+              label: plan.label, properties: {}, parentId: plan.poolId,
             };
             let next = { elements: updatePoolTypes([...state.elements, lane1]), connectors: state.connectors };
             next = resizeLaneForLabel(next.elements, next.connectors, lane1.id, laneFs);
             next.elements = ensureContainersEncloseChildren(next.elements);
             return { ...state, ...next };
           }
-
-          // Every lane or sublane a drop adds is carved out of its neighbour;
-          // the pool keeps its size (Paul, 2026-09-22: "Never grow the Pool
-          // with these Lane and Sublane additions"). No room → nothing added.
-          const carveLane = (index: number) => {
-            const carved = carveBandWithin(state, targetPool.id, index, `Lane ${totalLaneCount + 1}`);
-            return carved ? carved.state : state;
-          };
-          const laneIndexAt = (y: number) => lanes.filter((l) => l.y < y - 0.5).length;
-
-          // A pool with ONE lane always just gets a second one (Paul,
-          // 2026-09-22: "Dragging the Pool/Lane symbol onto a Pool with one
-          // single Lane should always just add a second Lane to the Pool").
-          if (lanes.length === 1) return carveLane(1);
-
-          // Case B: pool with lanes — figure out where to insert.
-          const dy = dropPos.y - targetPool.y;
-          const poolBot = targetPool.y + targetPool.height;
-          // B1: near top boundary → insert ABOVE all lanes
-          if (dy <= TOP_BOTTOM_THRESHOLD) return carveLane(0);
-          // B2: near bottom boundary → insert BELOW all lanes
-          if (poolBot - dropPos.y <= TOP_BOTTOM_THRESHOLD) return carveLane(lanes.length);
-          // B3: near a lane separator → insert BETWEEN
-          for (let i = 0; i < lanes.length - 1; i++) {
-            const sep = lanes[i].y + lanes[i].height;
-            if (Math.abs(dropPos.y - sep) <= SEPARATOR_THRESHOLD) return carveLane(i + 1);
+          if (plan.kind === "band") {
+            const carved = applyCarve(state, plan.carve);
+            return carved ? withLeftGap(carved.state, plan.carve.parentId) : state;
           }
-          // B4: cursor inside a particular lane. Behaviour depends on
-          // whether that lane already has sublanes.
-          const cursorLane = lanes.find(
-            (ln) => dropPos.y >= ln.y && dropPos.y <= ln.y + ln.height,
-          );
-          if (cursorLane) {
-            const LANE_LW = getLaneHeaderWidth(cursorLane);
-            const sublanes = state.elements
-              .filter((e) => e.type === "lane" && e.parentId === cursorLane.id)
-              .sort((a, b) => a.y - b.y);
-            const LANE_EDGE = 10;
-
-            // A sublane inside `cursorLane`, or a lane in the pool, at `insertY`
-            // — each carved out of its neighbour, nothing grows.
-            const insertSublaneAt = (insertY: number, labelN: number) => {
-              const carved = carveBandWithin(state, cursorLane.id, sublanes.filter((sl) => sl.y < insertY - 0.5).length, `Sublane ${labelN}`);
-              return carved ? carved.state : state;
+          if (plan.kind === "split") {
+            const target = state.elements.find((e) => e.id === plan.laneId);
+            if (!target) return state;
+            const sub1: DiagramElement = {
+              id: nanoid(), type: "lane", ...plan.rects[0],
+              label: plan.labels[0], properties: {}, parentId: target.id,
             };
-            const insertLaneAt = (insertY: number, _labelN: number) => carveLane(laneIndexAt(insertY));
-
-            // ── Case: lane has NO sublanes ─────────────────────────────
-            if (sublanes.length === 0) {
-              // Middle third → split into 2 sublanes (existing behaviour).
-              if (
-                dropPos.y >= cursorLane.y + cursorLane.height / 3 &&
-                dropPos.y <= cursorLane.y + (cursorLane.height * 2) / 3
-              ) {
-                const halfH = Math.max(40, Math.round(cursorLane.height / 2));
-                const sub1: DiagramElement = {
-                  id: nanoid(), type: "lane",
-                  x: cursorLane.x + LANE_LW, y: cursorLane.y,
-                  width: cursorLane.width - LANE_LW, height: halfH,
-                  label: `Sublane ${totalLaneCount + 1}`, properties: {}, parentId: cursorLane.id,
-                };
-                const sub2: DiagramElement = {
-                  id: nanoid(), type: "lane",
-                  x: cursorLane.x + LANE_LW, y: cursorLane.y + halfH,
-                  width: cursorLane.width - LANE_LW, height: cursorLane.height - halfH,
-                  label: `Sublane ${totalLaneCount + 2}`, properties: {}, parentId: cursorLane.id,
-                };
-                const elements = state.elements.map((e) => {
-                  if (e.parentId === cursorLane.id && e.type !== "lane") return { ...e, parentId: sub1.id };
-                  return e;
-                });
-                let next = { elements: [...elements, sub1, sub2], connectors: state.connectors };
-                next = resizeLaneForLabel(next.elements, next.connectors, sub1.id, laneFs);
-                next = resizeLaneForLabel(next.elements, next.connectors, sub2.id, laneFs);
-                const finalPool = next.elements.find(e => e.id === targetPool.id);
-                if (finalPool) {
-                  const growth = finalPool.height - oldPoolHeight;
-                  next = applyPoolBelowShift(next.elements, next.connectors, targetPool.id, oldPoolBottom, growth);
-                }
-                const enclosed = ensureContainersEncloseChildren(next.elements);
-                return { ...state, elements: updatePoolTypes(enclosed), connectors: next.connectors };
-              }
-              // Otherwise (not the middle third): a sibling LANE below it.
-              return insertLaneAt(cursorLane.y + cursorLane.height, totalLaneCount + 1);
-            }
-
-            // ── Case: lane HAS sublanes — six zones (a–f) ──────────────
-            const dyInLane = dropPos.y - cursorLane.y;
-            const laneBottomDist = (cursorLane.y + cursorLane.height) - dropPos.y;
-
-            // (a) ≤10 px from lane top → LANE above this lane (in pool)
-            if (dyInLane <= LANE_EDGE) {
-              return insertLaneAt(cursorLane.y, totalLaneCount + 1);
-            }
-            // (f) ≤10 px from lane bottom → LANE below this lane (in pool)
-            if (laneBottomDist <= LANE_EDGE) {
-              return insertLaneAt(cursorLane.y + cursorLane.height, totalLaneCount + 1);
-            }
-            // (c) middle third of any sublane → SPLIT that sublane into 2 sub-sublanes
-            const splitTarget = sublanes.find((s) =>
-              dropPos.y >= s.y + s.height / 3 && dropPos.y <= s.y + (s.height * 2) / 3,
-            );
-            if (splitTarget) {
-              const SUB_LW = getLaneHeaderWidth(splitTarget);
-              const halfH = Math.max(40, Math.round(splitTarget.height / 2));
-              const ssub1: DiagramElement = {
-                id: nanoid(), type: "lane",
-                x: splitTarget.x + SUB_LW, y: splitTarget.y,
-                width: splitTarget.width - SUB_LW, height: halfH,
-                label: `Sublane ${totalLaneCount + 1}`, properties: {}, parentId: splitTarget.id,
-              };
-              const ssub2: DiagramElement = {
-                id: nanoid(), type: "lane",
-                x: splitTarget.x + SUB_LW, y: splitTarget.y + halfH,
-                width: splitTarget.width - SUB_LW, height: splitTarget.height - halfH,
-                label: `Sublane ${totalLaneCount + 2}`, properties: {}, parentId: splitTarget.id,
-              };
-              const elements = state.elements.map((e) => {
-                if (e.parentId === splitTarget.id && e.type !== "lane") return { ...e, parentId: ssub1.id };
-                return e;
-              });
-              let next = { elements: [...elements, ssub1, ssub2], connectors: state.connectors };
-              next = resizeLaneForLabel(next.elements, next.connectors, ssub1.id, laneFs);
-              next = resizeLaneForLabel(next.elements, next.connectors, ssub2.id, laneFs);
-              const finalPool = next.elements.find(e => e.id === targetPool.id);
-              if (finalPool) {
-                const growth = finalPool.height - oldPoolHeight;
-                next = applyPoolBelowShift(next.elements, next.connectors, targetPool.id, oldPoolBottom, growth);
-              }
-              const enclosed = ensureContainersEncloseChildren(next.elements);
-              return { ...state, elements: updatePoolTypes(enclosed), connectors: next.connectors };
-            }
-            // (b) upper third of sublane[0] → SUBLANE above all
-            if (dropPos.y <= sublanes[0].y + sublanes[0].height / 3) {
-              return insertSublaneAt(cursorLane.y, totalLaneCount + 1);
-            }
-            // (e/f) lower third of sublane[N] → SUBLANE below all
-            const lastSub = sublanes[sublanes.length - 1];
-            if (dropPos.y >= lastSub.y + (lastSub.height * 2) / 3) {
-              return insertSublaneAt(cursorLane.y + cursorLane.height, totalLaneCount + 1);
-            }
-            // (d) elsewhere → SUBLANE between the nearest pair (cursor in
-            //     upper half of sublane[i] vs lower half decides which separator).
-            const cursorSub = sublanes.find((s) => dropPos.y >= s.y && dropPos.y <= s.y + s.height);
-            if (cursorSub) {
-              const cursorIdx = sublanes.indexOf(cursorSub);
-              const isUpperHalf = dropPos.y - cursorSub.y < cursorSub.height / 2;
-              const sepY = isUpperHalf
-                ? cursorSub.y                                          // separator above cursorSub
-                : cursorSub.y + cursorSub.height;                       // separator below cursorSub
-              return insertSublaneAt(sepY, totalLaneCount + 1);
-            }
-            // No matching insertion zone — fall through to standard pool drop.
+            const sub2: DiagramElement = {
+              id: nanoid(), type: "lane", ...plan.rects[1],
+              label: plan.labels[1], properties: {}, parentId: target.id,
+            };
+            // The lane's loose contents join the first band, as before.
+            const elements = state.elements.map((e) =>
+              e.parentId === target.id && e.type !== "lane" ? { ...e, parentId: sub1.id } : e);
+            let next = { elements: [...elements, sub1, sub2], connectors: state.connectors };
+            next = resizeLaneForLabel(next.elements, next.connectors, sub1.id, laneFs);
+            next = resizeLaneForLabel(next.elements, next.connectors, sub2.id, laneFs);
+            const enclosed = ensureContainersEncloseChildren(next.elements);
+            return withLeftGap({ ...state, elements: updatePoolTypes(enclosed), connectors: next.connectors }, target.id);
           }
+          // Nothing fits here — the drag showed a red pool boundary for this
+          // very position, so the drop quietly does nothing.
+          return state;
         }
       }
 

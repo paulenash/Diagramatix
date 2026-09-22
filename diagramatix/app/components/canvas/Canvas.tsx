@@ -33,6 +33,8 @@ import { isBlackBoxPool } from "@/app/lib/diagram/blackBoxPoolMenu";
 import { containerHeaderWidth, inContainerHeader } from "@/app/lib/diagram/containerHeader";
 import { quickAddSymbols, QUICK_ADD_LABELS } from "@/app/lib/diagram/quickAddSymbols";
 import { messageLabelsHiddenWhileDragging } from "@/app/lib/diagram/labelVisibility";
+import { planLaneDrop, samePlan, type LaneDropPlan } from "@/app/lib/diagram/laneDropPlan";
+import { getLaneHeaderWidth, getPoolHeaderWidth } from "@/app/lib/diagram/containerMetrics";
 import { poolGuideNext, type PoolBoundaryGuide, type PoolGuideEvent } from "@/app/lib/diagram/poolGuide";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { canConnect } from "@/app/lib/diagram/canConnect";
@@ -1036,6 +1038,11 @@ export function Canvas({
     };
   }, [bubbleHelpAnchor, hideBubbleHelp]);
 
+  // What dropping the Pool/Lane symbol right here would do — the very plan the
+  // reducer will carry out, drawn as a ghost so the user can see it before
+  // letting go (Paul, 2026-09-23). null while nothing is being dragged over a
+  // pool; a "none" plan is what turns the pool's boundary red.
+  const [laneDropPlan, setLaneDropPlan] = useState<LaneDropPlan | null>(null);
   const [connectorChoice, setConnectorChoice] = useState<{
     sourceId: string; targetId: string;
     sourceSide: Side; targetSide: Side;
@@ -5272,11 +5279,23 @@ export function Canvas({
           }
         }}
         onWheel={handleWheel}
-        onDrop={handleDrop}
-        // No coloured line shows where a dropped Pool/Lane symbol will add a
-        // lane or sublane (Paul, 2026-09-22: "No need for coloured highlights
-        // to indicate Lane or Sublane creation").
-        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => { setLaneDropPlan(null); handleDrop(e); }}
+        // Dragging the Pool/Lane symbol over a pool shows a ghost of the lane
+        // or sublanes that would appear (Paul, 2026-09-23) — no coloured
+        // insertion line, which said where but not what.
+        onDragOver={(e) => {
+          e.preventDefault();
+          if (pendingDragSymbol !== "pool") {
+            if (laneDropPlan) setLaneDropPlan(null);
+            return;
+          }
+          const rect = svgRef.current!.getBoundingClientRect();
+          const wp = svgToWorld(e.clientX - rect.left, e.clientY - rect.top);
+          const next = planLaneDrop(data.elements, wp, data.laneFontSize ?? 14);
+          // Only re-render when the answer actually changes.
+          setLaneDropPlan((prev) => (samePlan(prev, next) ? prev : next));
+        }}
+        onDragLeave={() => { if (laneDropPlan) setLaneDropPlan(null); }}
         onKeyDown={handleKeyDown}
         onContextMenu={(e) => {
           // Diagramatix owns right-click on the canvas: never show the native
@@ -7229,6 +7248,53 @@ export function Canvas({
               <DebugLabel key={item.id} item={item} svgToWorld={clientToWorld}
                 offsets={debugLabelOffsets} setOffset={setDebugLabelOffset} />
             ));
+          })()}
+
+          {/* Pool/Lane drop ghost — what a release right now would create.
+              Nothing to create (no room) → the pool's own boundary goes red,
+              so the user can move up or down to find a place that works. */}
+          {laneDropPlan && laneDropPlan.poolId && (() => {
+            const pool = data.elements.find((el) => el.id === laneDropPlan.poolId);
+            if (!pool) return null;
+            const rects =
+              laneDropPlan.kind === "first-lane" ? [laneDropPlan.rect]
+              : laneDropPlan.kind === "band" ? [laneDropPlan.carve.rect]
+              : laneDropPlan.kind === "split" ? laneDropPlan.rects
+              : [];
+            if (rects.length === 0) {
+              return (
+                <rect
+                  x={pool.x} y={pool.y} width={pool.width} height={pool.height}
+                  fill="none" stroke="#dc2626" strokeWidth={3 / zoom}
+                  pointerEvents="none" data-lane-drop="blocked"
+                />
+              );
+            }
+            // Each band as it would be drawn: its own header strip on the left,
+            // the body ghosted over whatever is underneath.
+            // A lane's strip is the pool's; a sublane's is its lane's.
+            const owner = laneDropPlan.kind === "split"
+              ? data.elements.find((el) => el.id === laneDropPlan.laneId)
+              : laneDropPlan.kind === "band"
+                ? data.elements.find((el) => el.id === laneDropPlan.carve.parentId)
+                : pool;
+            const headerW = !owner || owner.type === "pool"
+              ? getPoolHeaderWidth(owner ?? pool)
+              : getLaneHeaderWidth(owner);
+            return (
+              <g pointerEvents="none" data-lane-drop="ghost">
+                {rects.map((r, i) => (
+                  <g key={i}>
+                    <rect x={r.x} y={r.y} width={r.width} height={r.height}
+                      fill="#3b82f6" fillOpacity={0.1}
+                      stroke="#2563eb" strokeWidth={2 / zoom} strokeDasharray={`${6 / zoom} ${4 / zoom}`} />
+                    <rect x={r.x - headerW} y={r.y} width={headerW} height={r.height}
+                      fill="#2563eb" fillOpacity={0.18}
+                      stroke="#2563eb" strokeWidth={2 / zoom} strokeDasharray={`${6 / zoom} ${4 / zoom}`} />
+                  </g>
+                ))}
+              </g>
+            );
           })()}
 
           {/* Scan-issue tint — drawn LAST so it overlays everything. Red for
