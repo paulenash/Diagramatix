@@ -50,8 +50,14 @@ describe("cost so far", () => {
     const bar = read("app", "components", "canvas", "VoiceAssistBar.tsx");
     expect(bar).toContain(">Commands</button>");
     expect(bar).toContain("COMMAND_CATALOG.map(");
-    expect(bar, "the reminder card scrolls").toContain('className="overflow-y-auto px-3 py-2"');
-    expect(bar, "and moves by its title bar").toMatch(/onPointerDown=\{onDown\} onPointerMove=\{onMove\} onPointerUp=\{onUp\}/);
+    // The card's window moved to the shared `FloatingPanel` on 2026-09-22, so
+    // the Canvas Help card could be the same object rather than a second one
+    // that drifts from it (T4657). The bar must still USE it; the scrolling
+    // and the drag-by-title-bar are now that component's to keep.
+    expect(bar, "the bar still opens the shared panel").toMatch(/<FloatingPanel title="What you can say"/);
+    const panel = read("app", "components", "canvas", "FloatingPanel.tsx");
+    expect(panel, "the reminder card scrolls").toContain('className="overflow-y-auto px-3 py-2"');
+    expect(panel, "and moves by its title bar").toMatch(/onPointerDown=\{onDown\} onPointerMove=\{onMove\} onPointerUp=\{onUp\}/);
     expect(bar).toContain("formatCostReport(cost.report)");
     expect(bar, "the cost is labelled as an estimate").toContain(">estimate</span>");
 

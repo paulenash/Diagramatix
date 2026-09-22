@@ -11,6 +11,7 @@
  */
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { COMMAND_CATALOG } from "@/app/lib/assist/commandCatalog";
+import { FloatingPanel } from "./FloatingPanel";
 import { formatCostReport, type CostReport } from "@/app/lib/assist/usageCost";
 import { correctionTally, formatCorrectionTally } from "@/app/lib/assist/correctionPairs";
 
@@ -24,35 +25,6 @@ export interface CommandLogEntry {
 }
 
 /** A small floating panel the user can drag by its title bar. */
-function FloatingPanel({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  const [pos, setPos] = useState({ x: 24, y: 88 });
-  const drag = useRef<{ dx: number; dy: number } | null>(null);
-  const onDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    drag.current = { dx: e.clientX - pos.x, dy: e.clientY - pos.y };
-    (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
-  };
-  const onMove = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (!drag.current) return;
-    const x = Math.max(0, Math.min(window.innerWidth - 120, e.clientX - drag.current.dx));
-    const y = Math.max(0, Math.min(window.innerHeight - 40, e.clientY - drag.current.dy));
-    setPos({ x, y });
-  };
-  const onUp = () => { drag.current = null; };
-  return (
-    <div className="fixed z-50 w-[420px] max-w-[92vw] bg-white rounded-xl shadow-2xl border border-purple-200 flex flex-col"
-      style={{ left: pos.x, top: pos.y, maxHeight: "70vh" }}
-      onMouseDown={(e) => e.stopPropagation()}>
-      <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 cursor-move select-none touch-none"
-        onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
-        title="Drag to move">
-        <span className="text-sm font-semibold text-purple-800">{title}</span>
-        <button onClick={onClose} onPointerDown={(e) => e.stopPropagation()} className="text-gray-400 hover:text-gray-600 text-lg leading-none" title="Close">×</button>
-      </div>
-      <div className="overflow-y-auto px-3 py-2">{children}</div>
-    </div>
-  );
-}
-
 export function VoiceAssistBar({
   listening,
   engine,

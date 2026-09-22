@@ -1927,7 +1927,7 @@ function PoolShape({ el }: { el: DiagramElement }) {
           move the pool by, so it should say so before you press (Paul,
           2026-09-21). `isWhiteBox` is now only about the body tint. */}
       <rect x={x} y={y} width={LW} height={h} fill={poolHeaderColour} stroke="#374151" strokeWidth={1.5}
-        style={{ cursor: "grab" }} />
+        className="dgx-grab" />
       <text textAnchor="middle" fontSize={fontSize} fill="#3b1a08"
             transform={`rotate(-90,${cx},${cy})`}
             textRendering="geometricPrecision"
@@ -2747,7 +2747,46 @@ function SymbolRendererInner({
         }
       }
       e.stopPropagation();
-      if (selected) { onSelect(); return; }                        // header re-click — deselect, no drag
+      // A HEADER PRESS IS A HANDLE, WHATEVER THE SELECTION STATE.
+      //
+      // Paul, 2026-09-22: "the cursor remains a hand. It would be good if it
+      // did grab and reliably then move the pool." The unreliability was this
+      // line: on an ALREADY-SELECTED container the press deselected and
+      // returned, so the drag never began. A selected pool could only be moved
+      // by clicking it off first — and since clicking the header is also how
+      // you select it, every other attempt did nothing.
+      //
+      // Deselecting is still available, but as a CLICK rather than a press:
+      // the toggle waits to see whether the mouse moves. Under 4px and it is
+      // a click, so the container deselects as before; past 4px it is a drag,
+      // and the container moves. Same threshold the rest of the canvas uses.
+      if (selected) {
+        const sx = e.clientX, sy = e.clientY;
+        let handled = false;
+        const onPreMove = (ev: MouseEvent) => {
+          if (handled) return;
+          if (Math.hypot(ev.clientX - sx, ev.clientY - sy) > 4) {
+            handled = true;
+            window.removeEventListener("mousemove", onPreMove);
+            window.removeEventListener("mouseup", onPreUp);
+            beginElementDrag(e);
+          }
+        };
+        const onPreUp = () => {
+          if (handled) return;
+          handled = true;
+          window.removeEventListener("mousemove", onPreMove);
+          window.removeEventListener("mouseup", onPreUp);
+          onSelect();                                              // a click, not a drag → deselect
+        };
+        window.addEventListener("mousemove", onPreMove);
+        window.addEventListener("mouseup", onPreUp);
+        gestureCleanupRef.current = () => {
+          window.removeEventListener("mousemove", onPreMove);
+          window.removeEventListener("mouseup", onPreUp);
+        };
+        return;
+      }
     } else if (element.type === "pool") {
       // Black-box pool: clicks on (or within ±10 px of) any edge
       // belong to the edge resize hit-zone. Without this branch the

@@ -86,8 +86,13 @@ describe("T4654 — a pool header is a handle, not a connector source", () => {
     expect(SYMBOLS).toMatch(/element\.type === "pool"[\s\S]{0,700}x: element\.x \+ containerHeaderWidth\(element\)/);
   });
 
-  it("shows a grab cursor there, on every pool", () => {
-    expect(SYMBOLS).toMatch(/fill=\{poolHeaderColour\}[\s\S]{0,120}cursor: "grab"/);
+  it("shows a grab cursor there, on every pool, and closes it on press", () => {
+    // Via the CLASS, not an inline style: inline cursor cannot reach `:active`,
+    // so the grab→grabbing swap needs `.dgx-grab` (the G05 scheme). Paul,
+    // 2026-09-22: "the cursor remains a hand. It would be good if it did grab."
+    expect(SYMBOLS).toMatch(/fill=\{poolHeaderColour\}[\s\S]{0,120}className="dgx-grab"/);
+    expect(SYMBOLS, "an inline cursor here would kill the :active swap")
+      .not.toMatch(/fill=\{poolHeaderColour\}[\s\S]{0,120}cursor: "grab"/);
     expect(SYMBOLS, "the cursor must not depend on the pool's type")
       .not.toMatch(/style=\{isWhiteBox \? \{ cursor: "pointer" \} : undefined\}/);
   });

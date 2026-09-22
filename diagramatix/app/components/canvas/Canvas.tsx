@@ -36,6 +36,8 @@ import { messageLabelsHiddenWhileDragging } from "@/app/lib/diagram/labelVisibil
 import { poolGuideNext, type PoolBoundaryGuide, type PoolGuideEvent } from "@/app/lib/diagram/poolGuide";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { canConnect } from "@/app/lib/diagram/canConnect";
+import { POINTER_PROTOCOL, CURSOR_GLYPH } from "@/app/lib/canvas/pointerProtocol";
+import { FloatingPanel } from "./FloatingPanel";
 import { edgeIsResizable, type EdgeSide as ResizableSide } from "@/app/lib/diagram/resizeEdges";
 import { connectorTravels } from "@/app/lib/diagram/liftedLayer";
 import { GoldFlashOverlay, type GoldFlashTarget } from "./GoldFlashOverlay";
@@ -1139,6 +1141,9 @@ export function Canvas({
   // Right-click quick-add popup: small palette of common BPMN shapes shown
   // at the cursor position. Choosing one places that element at the original
   // right-click world position and runs auto-connect.
+  // Canvas Help card (Paul, 2026-09-22) — the pointer protocol, in the same
+  // draggable window the Voice Assist commands use.
+  const [showCanvasHelp, setShowCanvasHelp] = useState(false);
   const [quickAdd, setQuickAdd] = useState<{
     worldPos: Point;
     screenX: number;
@@ -8164,8 +8169,48 @@ export function Canvas({
           ? "Release over an element to connect · Esc to cancel"
           : "Drag to pan · Shift+Drag to select · Scroll to zoom · Double-click label · Delete to remove"}
         {" · "}
+        {/* Paul, 2026-09-22 — the pointer protocol as a card, in the same
+            draggable window the Voice Assist commands use. Placed just before
+            the zoom readout, which is the live canvas zoom: the same number
+            the zoom control shows and drives, read from the same state. */}
+        <button
+          className="underline decoration-dotted underline-offset-2 hover:text-gray-600"
+          onMouseDown={(e) => { e.stopPropagation(); }}
+          onClick={() => setShowCanvasHelp((v) => !v)}
+          title="What the mouse does, and what the cursor is telling you"
+        >
+          Canvas Help
+        </button>
+        {" · "}
         {Math.round(zoom * 100)}%
       </div>
+
+      {showCanvasHelp && (
+        <FloatingPanel title="Canvas Help — mouse and cursor" onClose={() => setShowCanvasHelp(false)}>
+          <p className="text-[11px] text-gray-500 mb-2">
+            What the pointer does on the diagram. The cursor always says which of these you are about to get.
+          </p>
+          {POINTER_PROTOCOL.map((sec) => (
+            <div key={sec.heading} className="mb-3">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-purple-700 mb-1">{sec.heading}</div>
+              {sec.hover?.map((row) => (
+                <div key={row.over} className="mb-1 flex gap-2 items-baseline">
+                  <span className="text-[13px] leading-none w-4 shrink-0" title={row.cursor}>{CURSOR_GLYPH[row.cursor]}</span>
+                  <span className="text-[11px] text-gray-700">{row.over}</span>
+                  <span className="text-[10px] text-gray-400 font-mono">{row.cursor}</span>
+                  {row.note && <span className="text-[10px] text-gray-500 italic">— {row.note}</span>}
+                </div>
+              ))}
+              {sec.gestures?.map((row) => (
+                <div key={row.does} className="mb-1.5">
+                  <div className="text-[11px] text-gray-700"><strong className="font-medium">{row.does}</strong> → {row.result}</div>
+                  {row.note && <div className="text-[10px] text-gray-500 italic">{row.note}</div>}
+                </div>
+              ))}
+            </div>
+          ))}
+        </FloatingPanel>
+      )}
 
       {/* Connector type choice popup — shown when both sequence and association are valid */}
       {connectorChoice && (
