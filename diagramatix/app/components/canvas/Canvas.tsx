@@ -37,7 +37,7 @@ import { poolGuideNext, type PoolBoundaryGuide, type PoolGuideEvent } from "@/ap
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { canConnect } from "@/app/lib/diagram/canConnect";
 import { POINTER_PROTOCOL } from "@/app/lib/canvas/pointerProtocol";
-import { CursorIcon } from "./CursorIcon";
+import { CursorIcon, NoteWithCursors } from "./CursorIcon";
 import { FloatingPanel } from "./FloatingPanel";
 import { edgeIsResizable, type EdgeSide as ResizableSide } from "@/app/lib/diagram/resizeEdges";
 import { connectorTravels } from "@/app/lib/diagram/liftedLayer";
@@ -8222,13 +8222,13 @@ export function Canvas({
                   <span className="w-5 shrink-0 flex justify-center self-center" title={row.cursor}><CursorIcon name={row.cursor} /></span>
                   <span className="text-[11px] text-gray-700">{row.over}</span>
                   <span className="text-[10px] text-gray-400 font-mono">{row.cursor}</span>
-                  {row.note && <span className="text-[10px] text-gray-500 italic">— {row.note}</span>}
+                  {row.note && <span className="text-[10px] text-gray-500 italic">— <NoteWithCursors text={row.note} /></span>}
                 </div>
               ))}
               {sec.gestures?.map((row) => (
                 <div key={row.does} className="mb-1.5">
                   <div className="text-[11px] text-gray-700"><strong className="font-medium">{row.does}</strong> → {row.result}</div>
-                  {row.note && <div className="text-[10px] text-gray-500 italic">{row.note}</div>}
+                  {row.note && <div className="text-[10px] text-gray-500 italic"><NoteWithCursors text={row.note} /></div>}
                 </div>
               ))}
             </div>

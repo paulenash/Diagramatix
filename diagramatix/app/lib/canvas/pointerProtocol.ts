@@ -40,6 +40,13 @@ export const CURSOR_GLYPH: Record<CursorName, string> = {
   "sw-resize": "⤢",
 };
 
+/**
+ * Notes may name a cursor as `{grabbing}`, `{crosshair}` and so on. The card
+ * draws the real cursor there, inline — a typed emoji is a drawing OF a fist in
+ * its own yellow, not the white-and-black cursor the screen will show (Paul,
+ * 2026-09-22: "2 occurrences of the grab cursor still in yellow in the Canvas
+ * Help"). Keep glyphs out of the text; name the cursor instead.
+ */
 export interface HoverRow {
   /** What the pointer is over. */
   over: string;
@@ -66,8 +73,8 @@ export const POINTER_PROTOCOL: ProtocolSection[] = [
   {
     heading: "What the cursor is telling you",
     hover: [
-      { over: "An element", cursor: "grab", note: "closes to ✊ while you hold it" },
-      { over: "A label", cursor: "grab", note: "drag to reposition it; closes to ✊" },
+      { over: "An element", cursor: "grab", note: "closes to {grabbing} while you hold it" },
+      { over: "A label", cursor: "grab", note: "drag to reposition it; closes to {grabbing}" },
       { over: "A selected element", cursor: "crosshair", note: "press again and drag to draw a connector" },
       { over: "Anywhere, while moving something", cursor: "grabbing" },
       { over: "Anywhere, while drawing a connector", cursor: "crosshair", note: "valid targets light up" },
@@ -98,7 +105,7 @@ export const POINTER_PROTOCOL: ProtocolSection[] = [
   {
     heading: "Moving",
     gestures: [
-      { does: "Press an unselected element and drag", result: "Moves it", note: "✊ for the whole drag; 4px before it counts, so a wobbly click is still a click" },
+      { does: "Press an unselected element and drag", result: "Moves it", note: "{grabbing} for the whole drag; 4px before it counts, so a wobbly click is still a click" },
       { does: "Drag any element of a multi-selection", result: "Moves the whole group" },
       { does: "Drag a pool by its header", result: "Moves the pool and everything in it" },
       { does: "Arrow keys", result: "Nudges 5px — 1px with Shift", note: "each press is its own undo step" },
@@ -125,7 +132,7 @@ export const POINTER_PROTOCOL: ProtocolSection[] = [
   {
     heading: "Connecting",
     gestures: [
-      { does: "Click an element, then press it again and drag", result: "Draws a connector", note: "valid targets light up and the cursor becomes ✛; invalid targets never light" },
+      { does: "Click an element, then press it again and drag", result: "Draws a connector", note: "valid targets light up and the cursor becomes {crosshair}; invalid targets never light" },
       { does: "Click an element, then press it again and hold still", result: "Also starts a connector, after a moment" },
       { does: "Drag from a connection point", result: "Draws a connector from that side" },
       { does: "Release over empty canvas, or press Esc", result: "Cancels it" },

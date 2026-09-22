@@ -146,6 +146,26 @@ function Move() {
   );
 }
 
+/**
+ * A note from the protocol card, with every `{cursor-name}` drawn as the real
+ * cursor, inline and text-sized. Anything in braces that is not a cursor name
+ * is left as written.
+ */
+export function NoteWithCursors({ text }: { text: string }) {
+  const parts = text.split(/\{([a-z-]+)\}/);
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (i % 2 === 0) return part;                       // plain text between tokens
+        const name = part as CursorName;
+        return name in CURSOR_GLYPH
+          ? <span key={i} className="inline-block align-[-2px] mx-px"><CursorIcon name={name} size={12} /></span>
+          : `{${part}}`;
+      })}
+    </>
+  );
+}
+
 export function CursorIcon({ name, size = 18 }: { name: CursorName; size?: number }) {
   if (!DRAWN_CURSORS.includes(name)) {
     return <span className="leading-none" style={{ fontSize: size * 0.78 }} aria-hidden>{CURSOR_GLYPH[name]}</span>;
