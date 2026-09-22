@@ -11,6 +11,7 @@
  */
 import { useMemo, useState } from "react";
 import { AiPanel, type AiTones } from "./AiConsoleChrome";
+import { filterSavedPrompts } from "@/app/lib/ai/savedPromptFilter";
 
 export interface SavedPrompt { id: string; name: string; text: string; }
 
@@ -27,11 +28,8 @@ export function SavedPromptsPanel({
   const [filter, setFilter] = useState("");
   const [confirmId, setConfirmId] = useState<string | null>(null);
 
-  const visible = useMemo(() => {
-    const q = filter.trim().toLowerCase();
-    if (!q) return prompts;
-    return prompts.filter((p) => p.name.toLowerCase().includes(q) || p.text.toLowerCase().includes(q));
-  }, [prompts, filter]);
+  // The same rule as the two sidebar panels (savedPromptFilter.ts).
+  const visible = useMemo(() => filterSavedPrompts(prompts, filter), [prompts, filter]);
 
   return (
     <AiPanel

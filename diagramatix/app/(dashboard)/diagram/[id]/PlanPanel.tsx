@@ -12,6 +12,7 @@
  */
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
+import { filterSavedPrompts } from "@/app/lib/ai/savedPromptFilter";
 import { SUPERUSER_EMAILS } from "@/app/lib/superuser";
 import { AI_MODELS, type AiModel } from "@/app/lib/ai/models";
 import { useSuperAdminChrome } from "@/app/hooks/useSuperAdminChrome";
@@ -348,6 +349,9 @@ export function PlanPanel({
   const [saveName, setSaveName] = useState("");
   const [showSave, setShowSave] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  // Filter for the Saved Prompts list (Paul, 2026-09-22) — name OR text.
+  const [promptFilter, setPromptFilter] = useState("");
+  const visiblePrompts = filterSavedPrompts(savedPrompts, promptFilter);
   const [replacePlanConfirm, setReplacePlanConfirm] = useState(false);
 
   // Raw JSON tab has its own draft so mid-typing doesn't nuke structured state.
@@ -608,7 +612,9 @@ export function PlanPanel({
   // sections re-sizes them. Tabs area starts COLLAPSED so the description
   // gets maximum room; the user expands it with the chevron or by dragging
   // the handle above it.
-  const [savedPromptsH, setSavedPromptsH] = useState(96);
+  // Twice its old 96px (Paul, 2026-09-22: "Allow 2 x the height for the
+  // Saved Prompts"). Still drag-resizable, within the same 40–400 range.
+  const [savedPromptsH, setSavedPromptsH] = useState(192);
   const [tabsH, setTabsH] = useState(280);
   const [tabsExpanded, setTabsExpanded] = useState(false);
   const [structOpen, setStructOpen] = useState(false);
@@ -985,10 +991,28 @@ export function PlanPanel({
         )}
 
         {savedPrompts.length > 0 && (
-          <div className="shrink-0 mb-1" style={{ height: savedPromptsH }}>
-            <p className="text-[10px] text-gray-400 font-medium uppercase mb-1">Saved Prompts</p>
-            <div className="space-y-0.5 overflow-y-auto border border-gray-100 rounded" style={{ height: `calc(100% - 16px)` }}>
-              {savedPrompts.map(sp => (
+          <div className="shrink-0 mb-1 flex flex-col" style={{ height: savedPromptsH }}>
+            {/* Heading and filter on ONE line, filter to the right. The list
+                takes the rest of the section as a flex child, rather than a
+                calc() that assumed the heading was exactly 16px tall — which
+                stopped being true the moment an input sat beside it. */}
+            <div className="flex items-center justify-between gap-2 mb-1 shrink-0">
+              <p className="text-[10px] text-gray-400 font-medium uppercase">Saved Prompts</p>
+              <input
+              type="search"
+              value={promptFilter}
+              onChange={(e) => setPromptFilter(e.target.value)}
+              placeholder="filter…"
+              aria-label="Filter saved prompts"
+              title="Matches the prompt's name or any phrase in its text"
+              className="w-32 text-[10px] px-1.5 py-0.5 border border-gray-300 rounded focus:outline-none focus:border-blue-400"
+            />
+            </div>
+            <div className="space-y-0.5 overflow-y-auto border border-gray-100 rounded flex-1 min-h-0">
+              {visiblePrompts.length === 0 && (
+                <p className="text-[10px] text-gray-400 italic px-1 py-0.5">Nothing matches &ldquo;{promptFilter.trim()}&rdquo;.</p>
+              )}
+              {visiblePrompts.map(sp => (
                 <div key={sp.id} className="flex items-center gap-1 group px-1">
                   {confirmDeleteId === sp.id ? (
                     <>

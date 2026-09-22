@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSession } from "next-auth/react";
+import { filterSavedPrompts } from "@/app/lib/ai/savedPromptFilter";
 import { SUPERUSER_EMAILS } from "@/app/lib/superuser";
 import { useSuperAdminChrome } from "@/app/hooks/useSuperAdminChrome";
 import { arrayBufferToBase64 } from "@/app/lib/base64";
@@ -130,6 +131,9 @@ export function AiPanel({
   const [editingPromptId, setEditingPromptId] = useState<string | null>(null);
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  // Filter for the Saved Prompts list (Paul, 2026-09-22) — name OR text.
+  const [promptFilter, setPromptFilter] = useState("");
+  const visiblePrompts = filterSavedPrompts(savedPrompts, promptFilter);
   // "New" — start a fresh prompt, guarding the current one against loss.
   const [newGuardOpen, setNewGuardOpen] = useState(false);
   const pendingClearRef = useRef(false);
@@ -527,9 +531,26 @@ export function AiPanel({
 
       {savedPrompts.length > 0 && (
         <div className="px-3 py-2 border-b border-gray-100">
-          <p className="text-[10px] text-gray-400 font-medium uppercase mb-1">Saved Prompts</p>
-          <div className="space-y-0.5 max-h-28 overflow-y-auto">
-            {savedPrompts.map(sp => (
+          {/* Heading and filter on ONE line, filter to the right (Paul,
+              2026-09-22). The list is twice its old height — max-h-56 where it
+              was max-h-28 — so a real library fits without scrolling at once. */}
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <p className="text-[10px] text-gray-400 font-medium uppercase">Saved Prompts</p>
+            <input
+              type="search"
+              value={promptFilter}
+              onChange={(e) => setPromptFilter(e.target.value)}
+              placeholder="filter…"
+              aria-label="Filter saved prompts"
+              title="Matches the prompt's name or any phrase in its text"
+              className="w-32 text-[10px] px-1.5 py-0.5 border border-gray-300 rounded focus:outline-none focus:border-blue-400"
+            />
+          </div>
+          {visiblePrompts.length === 0 && (
+            <p className="text-[10px] text-gray-400 italic py-0.5">Nothing matches &ldquo;{promptFilter.trim()}&rdquo;.</p>
+          )}
+          <div className="space-y-0.5 max-h-56 overflow-y-auto">
+            {visiblePrompts.map(sp => (
               <div key={sp.id} className="flex items-center gap-1 group">
                 {confirmDeleteId === sp.id ? (
                   <>
