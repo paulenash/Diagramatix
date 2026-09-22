@@ -9,15 +9,16 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { tryGetCurrentOrgId } from "@/app/lib/auth/orgContext";
 import { getOrgPolicy } from "@/app/lib/auth/orgPolicy";
+import { sharePointServerConfigured } from "@/app/lib/microsoft/serverConfig";
 
 export async function GET() {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const orgId = await tryGetCurrentOrgId(session, await cookies());
   const policy = await getOrgPolicy(orgId ?? "__none__"); // unknown id → all true
-  // Deployment-level SharePoint availability: the Microsoft Entra ID app must be
-  // configured (AZURE_* env) or SharePoint import/export/link can't work at all.
-  // Surfaced so the client can GREY OUT SharePoint menu options when unavailable.
-  const sharePointConfigured = !!process.env.AZURE_CLIENT_ID?.trim() && !!process.env.AZURE_TENANT_ID?.trim();
+  // Deployment-level SharePoint availability — the SAME check the connect route
+  // refuses on, so the menus never offer what the server would then reject
+  // (Paul, 2026-09-22). Surfaced so the client can GREY OUT SharePoint options.
+  const sharePointConfigured = sharePointServerConfigured();
   return NextResponse.json({ policy, sharePointConfigured });
 }

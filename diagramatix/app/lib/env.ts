@@ -70,6 +70,12 @@ export function checkEnv(env: Record<string, string | undefined>): EnvProblem[] 
     problems.push({ key: "AZURE_CLIENT_SECRET", level: "error", message: "is still the .env.example placeholder" });
   }
 
+  // ── An Entra app without the token-encryption key offers SharePoint and then
+  // refuses to connect — Paul hit exactly that on 2026-09-22. Say so at boot. ──
+  if (hasId && !val("MS_TOKEN_ENC_KEY")) {
+    problems.push({ key: "MS_TOKEN_ENC_KEY", level: "warn", message: "is not set, so SharePoint cannot be connected even though AZURE_CLIENT_ID is — generate one with: openssl rand -base64 32" });
+  }
+
   return problems;
 }
 

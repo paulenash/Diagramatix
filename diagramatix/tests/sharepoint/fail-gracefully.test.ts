@@ -104,3 +104,57 @@ describe("T4684 — the editor is never taken down by the SharePoint windows", (
     expect(wrapped.length).toBe(opens.length);
   });
 });
+
+describe("T4690 — a server that can only refuse says so in a Diagramatix popup", () => {
+  it("offering SharePoint asks for everything connecting needs", async () => {
+    const mod = await import("@/app/lib/microsoft/serverConfig");
+    expect([...mod.SHAREPOINT_ENV].sort()).toEqual(
+      ["AZURE_CLIENT_ID", "AZURE_CLIENT_SECRET", "AZURE_TENANT_ID", "MS_TOKEN_ENC_KEY"],
+    );
+    const keep = { ...process.env };
+    try {
+      for (const name of mod.SHAREPOINT_ENV) process.env[name] = name === "MS_TOKEN_ENC_KEY" ? Buffer.alloc(32).toString("base64") : "x";
+      expect(mod.missingSharePointEnv()).toEqual([]);
+      // Paul's case, 2026-09-23: the Entra app was set up, the token key was not.
+      delete process.env.MS_TOKEN_ENC_KEY;
+      expect(mod.missingSharePointEnv()).toEqual(["MS_TOKEN_ENC_KEY"]);
+      expect(mod.sharePointServerConfigured(), "a server that would refuse must not be offered").toBe(false);
+      // A key that is set but not a 32-byte one is no better.
+      process.env.MS_TOKEN_ENC_KEY = "too-short";
+      expect(mod.sharePointServerConfigured()).toBe(false);
+    } finally {
+      for (const name of mod.SHAREPOINT_ENV) { if (keep[name] === undefined) delete process.env[name]; else process.env[name] = keep[name]; }
+    }
+  });
+
+  it("the menus and the connect route ask the SAME question", () => {
+    for (const p of ["app/api/org/policy/route.ts", "app/api/microsoft/status/route.ts", "app/api/microsoft/connect/route.ts"]) {
+      expect(src(p), p).toContain("sharePointServerConfigured()");
+    }
+    // What greys the menus out must not be a weaker check of its own — that is
+    // how a server offered SharePoint everywhere and refused at the last step.
+    for (const p of ["app/api/org/policy/route.ts", "app/api/microsoft/status/route.ts"]) {
+      expect(src(p), p).not.toMatch(/process\.env\.(AZURE_|MS_TOKEN)/);
+    }
+  });
+
+  it("the connect route answers with a page, never a JSON error body", () => {
+    const s = src("app/api/microsoft/connect/route.ts");
+    expect(s).not.toMatch(/NextResponse\.json/);
+    expect(s).toContain('outcome(origin, "unconfigured")');
+    expect(s).toContain('outcome(origin, "not-allowed")');
+    // …and the landing page has words for every marker it can send.
+    const page = src("app/(dashboard)/dashboard/microsoft-connected/page.tsx");
+    for (const marker of ["connected", "error", "unconfigured", "not-allowed"]) {
+      expect(page, marker).toMatch(new RegExp(`"?${marker}"?:`));
+    }
+  });
+
+  it("the picker asks before it offers, and refuses in an AlertDialog", () => {
+    const picker = src("app/components/SharePointPicker.tsx");
+    expect(picker).toContain('fetch("/api/microsoft/status")');
+    expect(picker).toMatch(/st\.configured === false/);
+    expect(picker).toMatch(/st\.allowed === false/);
+    expect(picker).toMatch(/<AlertDialog[\s\S]{0,200}tone="error"/);
+  });
+});

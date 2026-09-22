@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { AlertDialog } from "@/app/components/AlertDialog";
 import { asList, classifySharePointFailure, connectUrl, MS_NOT_CONNECTED_MESSAGE, type SharePointOutcome } from "@/app/lib/microsoft/sharePointOutcome";
 
 /** What the caller gets back. For a folder pick, `itemId` is the folder id
@@ -82,6 +83,27 @@ export function SharePointPicker({
     const o = outcomeOf(e);
     if (o.kind === "error") setError(o.message);
     else setBlocked(o);
+  }, []);
+
+  // Can this server do SharePoint at all, and may this org? Asked once, before
+  // anything is offered; a "no" becomes the error popup below.
+  const [unusable, setUnusable] = useState<string | null>(null);
+  useEffect(() => {
+    let on = true;
+    (async () => {
+      try {
+        const r = await fetch("/api/microsoft/status");
+        if (!r.ok) return;                       // not a config problem — the browse says why
+        const st = await r.json().catch(() => null);
+        if (!on || !st) return;
+        if (st.configured === false) {
+          setUnusable("SharePoint isn't set up on this server, so files can't be linked or browsed. Your system administrator needs to finish the Microsoft 365 setup.");
+        } else if (st.allowed === false) {
+          setUnusable("Your organisation has SharePoint turned off.");
+        }
+      } catch { /* leave it to the browse */ }
+    })();
+    return () => { on = false; };
   }, []);
 
   // Back from the connect tab → try again without making the user find Retry.
@@ -179,6 +201,23 @@ export function SharePointPicker({
 
   const canPickFolderHere = mode === "folder" && (here.kind === "drive" || here.kind === "folder");
   const heading = title ?? (mode === "folder" ? "Choose a SharePoint folder" : "Choose a SharePoint file");
+
+  // A server that could only refuse says so HERE, in a Diagramatix error
+  // popup — it never sends the user off to Microsoft to find out (Paul,
+  // 2026-09-23: "Replace with a Diagramatix Error popup window", after a
+  // connect attempt filled a tab with {"error":"SharePoint is not configured
+  // on this server."}).
+  if (unusable) {
+    return (
+      <AlertDialog
+        title="SharePoint unavailable"
+        tone="error"
+        message={unusable}
+        closeLabel="Close"
+        onClose={onCancel}
+      />
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
