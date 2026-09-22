@@ -26,6 +26,8 @@ import { planWrapInSubprocess, planUnwrapSubprocess, planWrapInContainer, type W
 import { isUmlConnType } from "@/app/lib/diagram/types";
 import { capitaliseFirstWord, needsCapital, decisionLabel, isDecisionGateway } from "@/app/lib/diagram/nameCase";
 import { contentBoundsOf, clampRectToContent, clampRectToLimits, poolFollowsLanes, leftGapShortfall, MIN_LEFT_GAP } from "@/app/lib/diagram/poolLaneBounds";
+import { labelFollowForSegmentDrag, holdGatewayBranchLabels } from "@/app/lib/diagram/labelFollow";
+import { baseLabelAnchor } from "@/app/lib/diagram/checks/layoutViolations";
 import { absorbAtEdge, shrinkRoom, stackFrom, type Band, type StackEdge } from "@/app/lib/diagram/laneBands";
 import { fillLaneWithSublanes } from "@/app/lib/diagram/laneFill";
 import { bandOf, mergeTargetSide, facingSide, isMergeGateway } from "@/app/lib/diagram/gatewaySides";
@@ -214,24 +216,9 @@ function nearestOnSeg(p: Point, a: Point, b: Point): Point {
  * labelOffsetX/Y by the NEGATIVE anchor delta so the label stays put.
  */
 function computeLabelAnchor(conn: Connector, waypoints: Point[]): Point | null {
-  if (waypoints.length < 2) return null;
-  const visStart = conn.sourceInvisibleLeader ? 1 : 0;
-  const visEnd = waypoints.length - 1 - (conn.targetInvisibleLeader ? 1 : 0);
-  if (visEnd < visStart) return null;
-  const visible = waypoints.slice(visStart, visEnd + 1);
-  if (visible.length === 0) return null;
-  if (conn.labelAnchor === "source") return { x: visible[0].x, y: visible[0].y };
-  if (visible.length === 4) {
-    // Cubic bezier midpoint at t = 0.5
-    const [p0, cp1, cp2, p3] = visible;
-    return {
-      x: 0.125 * p0.x + 0.375 * cp1.x + 0.375 * cp2.x + 0.125 * p3.x,
-      y: 0.125 * p0.y + 0.375 * cp1.y + 0.375 * cp2.y + 0.125 * p3.y,
-    };
-  }
-  const p0 = visible[0];
-  const pN = visible[visible.length - 1];
-  return { x: (p0.x + pN.x) / 2, y: (p0.y + pN.y) / 2 };
+  // One rule, one place: the anchor the canvas draws from, shared with the
+  // layout checks and the label-follow rules (layoutViolations.baseLabelAnchor).
+  return baseLabelAnchor({ ...conn, waypoints });
 }
 
 function preserveLabelWorldPos(
@@ -3616,7 +3603,16 @@ const LANE_RECONCILE_ACTIONS = new Set<Action["type"]>([
 ]);
 
 export function reducer(state: DiagramData, action: Action): DiagramData {
-  const next = reducerCore(state, action);
+  let next = reducerCore(state, action);
+  // Gateway branch labels stay put when their gateway moves — except the
+  // middle-vertex branch (Paul, 2026-09-22; see labelFollow.ts). Here in the
+  // wrapper because an element move has a dozen exits and each would
+  // otherwise have to remember it. Runs BEFORE the passes below, which return
+  // early.
+  if (action.type === "MOVE_ELEMENT" || action.type === "MOVE_ELEMENTS") {
+    const held = holdGatewayBranchLabels(state.elements, state.connectors, next.elements, next.connectors);
+    if (held !== next.connectors) next = { ...next, connectors: held };
+  }
   // Note: this deliberately does NOT skip when the core reducer returned state
   // unchanged. RESIZE_END / MOVE_END are commit markers that often produce no
   // state change of their own, yet they are exactly the moment a drag's final
@@ -8010,7 +8006,14 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         // R6.18: preserve label world position across the waypoint change.
         const fused = fuseCollinearWaypoints(newWaypoints);
         const labelAdj = preserveLabelWorldPos(c, fused);
-        return { ...c, waypoints: fused, ...labelAdj };
+        const held = { ...c, waypoints: fused, ...labelAdj };
+        // …unless the label sits on the horizontal segment being dragged, or
+        // that segment has just come up against it — then it goes with the
+        // segment (Paul, 2026-09-22; labelFollow.ts). Compared against the
+        // route BEFORE collinear fusion, where the dragged segment still has
+        // its own two points to be recognised by.
+        const follow = labelFollowForSegmentDrag(c, newWaypoints, held);
+        return follow ? { ...held, ...follow } : held;
       });
       // Skip obstacle validation entirely. UPDATE_CONNECTOR_WAYPOINTS is
       // only fired by user-initiated waypoint changes (segment drag).

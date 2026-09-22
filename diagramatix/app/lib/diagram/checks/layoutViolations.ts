@@ -55,6 +55,36 @@ export function gatewayLabelBox(g: DiagramElement): Box | null {
  * elements are to hand, because a message flow touching a POOL anchors its
  * label 60px along the spine from the pool end rather than at the midpoint.
  */
+/**
+ * The point a connector's label offset is measured from, before the message-
+ * flow special case below — EXACTLY as the renderer measures it
+ * (ConnectorRenderer's `anchor`): the SOURCE point for a source-anchored label
+ * (a gateway branch, a flowline); the cubic-bezier midpoint (t = 0.5) when the
+ * visible route has exactly four points; otherwise the midpoint of the ends.
+ *
+ * The four-point case used to be missing here, so for any four-point route this
+ * measured the label from the midpoint of the ends while the canvas drew it
+ * from the curve's midpoint — a different place. Found 2026-09-22 when the
+ * label-follow rules (labelFollow.ts), which share this, put a label somewhere
+ * the canvas did not. Shared so "where is this label" has one answer.
+ */
+export function baseLabelAnchor(c: Connector): { x: number; y: number } | null {
+  let vis = c.waypoints ?? [];
+  if (vis.length < 2) return null;
+  if (c.sourceInvisibleLeader && vis.length > 2) vis = vis.slice(1);
+  if (c.targetInvisibleLeader && vis.length > 2) vis = vis.slice(0, -1);
+  const sourceAnchored = c.labelAnchor === "source" || c.type === "flowline";
+  if (sourceAnchored) return { x: vis[0].x, y: vis[0].y };
+  if (vis.length === 4) {
+    const [p0, p1, p2, p3] = vis;
+    return {
+      x: 0.125 * p0.x + 0.375 * p1.x + 0.375 * p2.x + 0.125 * p3.x,
+      y: 0.125 * p0.y + 0.375 * p1.y + 0.375 * p2.y + 0.125 * p3.y,
+    };
+  }
+  return { x: (vis[0].x + vis[vis.length - 1].x) / 2, y: (vis[0].y + vis[vis.length - 1].y) / 2 };
+}
+
 export function connectorLabelBox(c: Connector, els?: DiagramElement[]): Box | null {
   if (!c.label || !c.label.trim()) return null;
   let vis = c.waypoints ?? [];
@@ -72,9 +102,7 @@ export function connectorLabelBox(c: Connector, els?: DiagramElement[]): Box | n
   const msgToPool = isMessage && (typeOf(c.sourceId) === "pool" || typeOf(c.targetId) === "pool");
   const moved = c.labelOffsetX != null || c.labelOffsetY != null;
 
-  let anchor = sourceAnchored
-    ? vis[0]
-    : { x: (vis[0].x + vis[vis.length - 1].x) / 2, y: (vis[0].y + vis[vis.length - 1].y) / 2 };
+  let anchor = baseLabelAnchor(c)!;
   if (!moved && msgToPool && !sourceAnchored) {
     const p0 = vis[0], pN = vis[vis.length - 1];
     const poolEnd = typeOf(c.targetId) === "pool" ? pN : p0;
