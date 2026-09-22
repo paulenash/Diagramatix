@@ -10,6 +10,7 @@ import { holdsInternalLabel, wrapShapeLabel } from "@/app/lib/diagram/shapeFit";
 import { archiNodeDepth } from "@/app/lib/diagram/nodeGeometry";
 import { containerHeaderWidth } from "@/app/lib/diagram/containerHeader";
 import { edgeIsResizable, handleIsResizable, type EdgeSide as ResizableSide } from "@/app/lib/diagram/resizeEdges";
+import { traceGesture } from "@/app/lib/debug/gestureTrace";
 import { classifyEdgeDrag, edgeBand, type EdgeSide } from "@/app/lib/diagram/edgeGesture";
 import { readableTextOn } from "@/app/lib/diagram/chevronThemes";
 import { isRichText, sanitizeRichText, plainToHtml } from "@/app/lib/diagram/richText";
@@ -2733,6 +2734,11 @@ function SymbolRendererInner({
           const onBottom = Math.abs(py - (element.y + element.height)) <= TOL;
           boundaryHit = inX && inY && (onLeft || onRight || onTop || onBottom);
         }
+        traceGesture("press on a container", {
+          id: element.id, type: element.type, label: element.label, selected,
+          took: headerHit ? "HEADER (moves the container)" : boundaryHit ? "BOUNDARY band (selects)" : "body (passes through)",
+          worldX: Math.round(worldPos.x), leftEdge: Math.round(element.x), headerRight: Math.round(element.x + HEADER_LW),
+        });
         if (!headerHit && !boundaryHit) return; // body click far from boundary — bubble
         // Boundary-only click: select the pool but don't kick off a
         // pool-move drag. The pool's resize handles sit in the same
@@ -2989,6 +2995,7 @@ function SymbolRendererInner({
   }
 
   function beginElementDrag(e: React.MouseEvent) {
+    traceGesture("MOVE drag starts", { id: element.id, type: element.type, label: element.label, group: !!(multiSelected && onGroupMove) });
 
     // Group drag mode: when multi-selected and clicking a selected element.
     // NB: the group follows the cursor 1:1. There is deliberately NO edge
@@ -4054,9 +4061,13 @@ function SymbolRendererInner({
                       // quarter of a 78px pool could not be dragged at all.
                       // The DIRECTION decides instead — across the edge is a
                       // resize, along it is a move. See edgeGesture.ts.
+                      traceGesture("edge-zone press", { id: element.id, type: element.type, side: edge.side,
+                        dx: ev.clientX - startX, dy: ev.clientY - startY });
                       const intent = classifyEdgeDrag(
                         edge.side as EdgeSide, ev.clientX - startX, ev.clientY - startY);
                       if (intent === "pending") return;
+                      traceGesture("edge-zone decided", { id: element.id, side: edge.side,
+                        intent: intent === "move" ? "MOVE the whole shape (drag ran ALONG the edge)" : "RESIZE (drag ran across the edge)" });
                       started = true;
                       if (intent === "move") { beginElementDrag(reactEvt); return; }
                       setPoolResizeActive(edge.side);

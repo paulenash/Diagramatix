@@ -27,6 +27,7 @@ import { isUmlConnType } from "@/app/lib/diagram/types";
 import { capitaliseFirstWord, needsCapital, decisionLabel, isDecisionGateway } from "@/app/lib/diagram/nameCase";
 import { contentBoundsOf, clampRectToContent, clampRectToLimits, poolFollowsLanes, leftGapShortfall, MIN_LEFT_GAP } from "@/app/lib/diagram/poolLaneBounds";
 import { labelFollowForSegmentDrag, holdGatewayBranchLabels } from "@/app/lib/diagram/labelFollow";
+import { gestureTraceOn, traceGesture, movedElements } from "@/app/lib/debug/gestureTrace";
 import { baseLabelAnchor } from "@/app/lib/diagram/checks/layoutViolations";
 import { absorbAtEdge, shrinkRoom, stackFrom, type Band, type StackEdge } from "@/app/lib/diagram/laneBands";
 import { fillLaneWithSublanes } from "@/app/lib/diagram/laneFill";
@@ -1746,6 +1747,52 @@ const POOL_BUF_H = 33;
  * (fixes issue 1 where a Black-Box Pool moved by cascade left its
  * messageBPMN attachments behind).
  */
+/**
+ * Keep a message flow's POOL-side end where it is in the world while that pool
+ * changes shape.
+ *
+ * A message ending on a pool stores that end as a FRACTION of the pool's width
+ * (`sourceOffsetAlong` / `targetOffsetAlong`), and a recompute turns the
+ * fraction back into a position. So any change to the pool's x or width moves
+ * the end — along the pool, with whichever boundary changed — although nothing
+ * the message connects to has moved. This re-derives the fraction from the
+ * end's position BEFORE the change, against the pool's geometry AFTER it, so
+ * the recompute lands the end exactly where it was.
+ *
+ * Every pool in `changedIds` is handled, at either end — the pool being
+ * resized, and every other pool the white-box lockstep moved with it.
+ *
+ * `orig` is the connector as it was before the action. Non-messages, and ends
+ * not on a changed pool, come back untouched.
+ */
+export function pinPoolMessageEnds(
+  conn: Connector,
+  orig: Connector,
+  oldById: Map<string, DiagramElement>,
+  elements: DiagramElement[],
+  changedIds: Set<string>,
+): Connector {
+  if (conn.type !== "messageBPMN") return conn;
+  let working = conn;
+  const wp = orig.waypoints;
+  for (const end of ["source", "target"] as const) {
+    const endId = end === "source" ? conn.sourceId : conn.targetId;
+    if (!changedIds.has(endId)) continue;
+    const pool = elements.find((e) => e.id === endId);
+    if (!pool || pool.type !== "pool" || !(pool.width > 0)) continue;
+    const was = oldById.get(endId);
+    const offset = end === "source" ? conn.sourceOffsetAlong : conn.targetOffsetAlong;
+    const fallback = was ? was.x + was.width * (offset ?? 0.5) : pool.x + pool.width * (offset ?? 0.5);
+    // A message is vertical: its visible run shares one x. The pool-side end
+    // of that run is the first visible point after the source leader, or the
+    // last before the target leader.
+    const worldX = (end === "source" ? wp[1]?.x : wp[wp.length - 2]?.x) ?? wp[0]?.x ?? fallback;
+    const f = Math.max(0.02, Math.min(0.98, (worldX - pool.x) / pool.width));
+    working = end === "source" ? { ...working, sourceOffsetAlong: f } : { ...working, targetOffsetAlong: f };
+  }
+  return working;
+}
+
 function applyPoolBoundaryShift(
   elements: DiagramElement[],
   connectors: Connector[],
@@ -1787,9 +1834,13 @@ function applyPoolBoundaryShift(
       .filter((e) => affect.has(e.id) && (e.type === "pool" || e.type === "lane" || e.type === "sublane"))
       .map((e) => e.id),
   );
+  // A message ending ON one of those pools keeps its end where it was: the
+  // pool changed shape, the message did not move (pinPoolMessageEnds).
+  const oldById = new Map(elements.map((e) => [e.id, e] as const));
   const newConnectors = connectors.map((conn) => {
     if (!structuralIds.has(conn.sourceId) && !structuralIds.has(conn.targetId)) return conn;
-    return recomputeAllConnectors([conn], newElements)[0] ?? conn;
+    const pinned = pinPoolMessageEnds(conn, conn, oldById, newElements, structuralIds);
+    return recomputeAllConnectors([pinned], newElements)[0] ?? pinned;
   });
   return { elements: newElements, connectors: newConnectors };
 }
@@ -3602,7 +3653,25 @@ const LANE_RECONCILE_ACTIONS = new Set<Action["type"]>([
   "UPDATE_LABEL",
 ]);
 
+/** Actions whose element movements the gesture trace reports. */
+const TRACED_MOVES = new Set<Action["type"]>(["MOVE_ELEMENT", "MOVE_ELEMENTS", "MOVE_END", "RESIZE_ELEMENT", "RESIZE_END"]);
+
 export function reducer(state: DiagramData, action: Action): DiagramData {
+  const next = reducerWithPasses(state, action);
+  // Dev Tools gesture trace (off unless switched on — see gestureTrace.ts):
+  // after every move or resize, which elements moved and by how much. The
+  // answer to "elements move left and sometimes downwards — why?".
+  if (TRACED_MOVES.has(action.type) && gestureTraceOn()) {
+    const moved = movedElements(state.elements, next.elements);
+    if (moved.length > 0) {
+      const p = (action as { payload?: { id?: string; ids?: string[] } }).payload;
+      traceGesture(`${action.type} moved ${moved.length}`, { target: p?.id ?? p?.ids, moved });
+    }
+  }
+  return next;
+}
+
+function reducerWithPasses(state: DiagramData, action: Action): DiagramData {
   let next = reducerCore(state, action);
   // Gateway branch labels stay put when their gateway moves — except the
   // middle-vertex branch (Paul, 2026-09-22; see labelFollow.ts). Here in the
@@ -6078,20 +6147,17 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           // the right boundary). recomputeAllConnectors derives the pool-side
           // x as pool.x + pool.width*offset, so re-derive the offset from the
           // connector's CURRENT world attachment x against the NEW geometry.
-          let working = conn;
+          // …and so do attachments on EVERY OTHER pool this resize changed.
+          // The white-box lockstep moves the other pools' matching edge too,
+          // and a message ending on one of them was left to be recomputed
+          // from its stored fraction of the pool's width — so as the lockstep
+          // widened that pool, the message walked along it with the dragged
+          // boundary (Paul, 2026-09-22: "message connectors FROM other pools
+          // TO elements in the pool whose boundary is being moved move with
+          // the pool's left boundary"). pinPoolMessageEnds covers both.
+          void newPoolForMsg;
           const orig0 = origById.get(conn.id);
-          if (conn.type === "messageBPMN" && newPoolForMsg && newPoolForMsg.width > 0 &&
-              (conn.sourceId === id || conn.targetId === id) && orig0) {
-            // Vertical message → waypoints share one x; the pool-side
-            // attachment x is that shared world x (fallback: old offset).
-            const fallback = target.x + target.width *
-              (conn.sourceId === id ? (conn.sourceOffsetAlong ?? 0.5) : (conn.targetOffsetAlong ?? 0.5));
-            const worldX = orig0.waypoints[1]?.x ?? orig0.waypoints[0]?.x ?? fallback;
-            const f = Math.max(0.02, Math.min(0.98, (worldX - newPoolForMsg.x) / newPoolForMsg.width));
-            working = conn.sourceId === id
-              ? { ...working, sourceOffsetAlong: f }
-              : { ...working, targetOffsetAlong: f };
-          }
+          const working = orig0 ? pinPoolMessageEnds(conn, orig0, oldById, elements, changedIds) : conn;
           const recomputed = recomputeAllConnectors([working], elements, state.relaxedLayout)[0] ?? working;
           const orig = orig0;
           if (!orig) return recomputed;

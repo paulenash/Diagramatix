@@ -37,6 +37,7 @@ import { poolGuideNext, type PoolBoundaryGuide, type PoolGuideEvent } from "@/ap
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { canConnect } from "@/app/lib/diagram/canConnect";
 import { POINTER_PROTOCOL } from "@/app/lib/canvas/pointerProtocol";
+import { traceGesture } from "@/app/lib/debug/gestureTrace";
 import { CursorIcon, NoteWithCursors } from "./CursorIcon";
 import { FloatingPanel } from "./FloatingPanel";
 import { edgeIsResizable, type EdgeSide as ResizableSide } from "@/app/lib/diagram/resizeEdges";
@@ -2211,6 +2212,7 @@ export function Canvas({
   }, [onUpdateConnectorFields]);
 
   function handleResizeDragStart(elementId: string, handle: ResizeHandle, e: React.MouseEvent) {
+    traceGesture("RESIZE drag starts", { id: elementId, handle });
     e.stopPropagation();
     const el = data.elements.find((el) => el.id === elementId);
     if (!el) return;
