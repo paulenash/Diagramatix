@@ -15,7 +15,10 @@
  *   • the resize cursors — thick double-headed arrows in the same white and
  *     black as the hands; the corner ones are the same arrow on the diagonals.
  *
- * `pointer` stays the 👆 emoji: Paul, same message — "the pointer looks great".
+ *   • pointer — the pointing hand, in the same style: index finger up, the
+ *     other three curled to knuckles, thumb on the left. It was the 👆 emoji
+ *     at first ("the pointer looks great"), then brought into line with the
+ *     other hands on Paul's request the same day.
  */
 
 import type { CursorName } from "@/app/lib/canvas/pointerProtocol";
@@ -27,7 +30,7 @@ const SW = 1.15;               // outline width, in the 24-unit box
 
 /** Cursors that are drawn rather than shown as a glyph. */
 export const DRAWN_CURSORS: readonly CursorName[] = [
-  "grab", "grabbing", "default", "crosshair", "move",
+  "grab", "grabbing", "pointer", "default", "crosshair", "move",
   "ew-resize", "ns-resize", "nwse-resize", "nesw-resize",
   "nw-resize", "ne-resize", "se-resize", "sw-resize",
 ];
@@ -84,6 +87,27 @@ function ClosedHand() {
   );
 }
 
+/** The pointing hand: index finger up, the rest curled, thumb on the left. */
+function PointingHand() {
+  return (
+    <g strokeLinejoin="round" strokeLinecap="round">
+      {/* The pointing finger, then three curled ones as knuckles. */}
+      <Finger x={9.6}  top={1.6}  bottom={14} w={3.3} tilt={0} />
+      <Finger x={12.9} top={8.6}  bottom={14} w={3.3} tilt={0} />
+      <Finger x={16.2} top={9.2}  bottom={14} w={3.3} tilt={2} />
+      <Finger x={19.3} top={10.4} bottom={14} w={3.0} tilt={6} />
+      {/* Thumb, drawn before the hand so it reads as attached. */}
+      <rect x={5.0} y={11.8} width={3.2} height={6.2} rx={1.6}
+        transform="rotate(-40 6.6 18.0)" fill={FILL} stroke={INK} strokeWidth={SW} />
+      {/* Back of the hand. */}
+      <path d="M7.9 12.0 L20.8 12.0 L20.8 16.8 Q20.8 22.2 15.4 22.7 L12.0 22.7 Q8.0 22.4 6.8 18.0 Z"
+        fill={FILL} stroke="none" />
+      <path d="M20.8 12.6 L20.8 16.8 Q20.8 22.2 15.4 22.7 L12.0 22.7 Q8.0 22.4 6.8 18.0"
+        fill="none" stroke={INK} strokeWidth={SW} />
+    </g>
+  );
+}
+
 /** The standard arrow. */
 function Arrow() {
   return (
@@ -130,6 +154,7 @@ export function CursorIcon({ name, size = 18 }: { name: CursorName; size?: numbe
     switch (name) {
       case "grab":         return <OpenHand />;
       case "grabbing":     return <ClosedHand />;
+      case "pointer":      return <PointingHand />;
       case "default":      return <Arrow />;
       case "crosshair":    return <Crosshair />;
       case "move":         return <Move />;

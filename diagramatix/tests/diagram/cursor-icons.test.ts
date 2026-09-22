@@ -18,7 +18,9 @@
  *
  * Emoji are drawings OF hands and arrows in their own style; the cursors are
  * white shapes with a black outline. So the card now draws them that way, in
- * `CursorIcon` — every cursor except the pointer, which Paul wanted kept.
+ * `CursorIcon`. The pointer was kept as its emoji at first ("the pointer
+ * looks great!!!"), then drawn to match the other hands the same day ("Change
+ * the pointer to the same style as the other hands").
  *
  * Item 7 is recorded honestly: no Diagramatix code resizes the panels. The
  * canvas keeps scroll for its own zoom; over a panel, Ctrl + scroll or a pinch
@@ -36,22 +38,23 @@ const render = (name: CursorName) => renderToStaticMarkup(createElement(CursorIc
 const hoverRows = () => POINTER_PROTOCOL.flatMap((s) => s.hover ?? []);
 const CANVAS = readFileSync(join(process.cwd(), "app", "components", "canvas", "Canvas.tsx"), "utf8");
 
-describe("T4663 — every cursor on the card is drawn, except the pointer", () => {
+describe("T4663 — every cursor on the card is drawn", () => {
   it("draws each one as an SVG", () => {
     for (const row of hoverRows()) {
-      if (row.cursor === "pointer") continue;
       expect(DRAWN_CURSORS, `${row.cursor} is not drawn`).toContain(row.cursor);
       expect(render(row.cursor), row.cursor).toMatch(/^<svg /);
     }
   });
 
-  it("keeps the pointer as the emoji Paul liked", () => {
-    expect(render("pointer")).toContain("👆");
-    expect(render("pointer")).not.toMatch(/<svg/);
+  it("draws the pointer in the same style as the hands — no emoji left", () => {
+    // Paul first kept the 👆 emoji ("the pointer looks great"), then the same
+    // day: "Change the pointer to the same style as the other hands."
+    expect(render("pointer")).toMatch(/^<svg /);
+    expect(render("pointer")).not.toContain("👆");
   });
 
   it("draws them in the cursors' own colours: white, outlined in black", () => {
-    for (const name of ["grab", "grabbing", "default", "ew-resize", "ns-resize", "nw-resize", "ne-resize"] as const) {
+    for (const name of ["grab", "grabbing", "pointer", "default", "ew-resize", "ns-resize", "nw-resize", "ne-resize"] as const) {
       const svg = render(name);
       expect(svg, `${name} fill`).toMatch(/fill="#ffffff"/);
       expect(svg, `${name} outline`).toMatch(/stroke="#111111"/);
@@ -91,6 +94,15 @@ describe("T4664 — the hands are the right hands", () => {
     // Knuckles are SHORT — curled fingers, not raised ones.
     const heights = [...svg.matchAll(/<rect [^>]*height="([\d.]+)"/g)].slice(0, 4).map((m) => Number(m[1]));
     for (const h of heights) expect(h).toBeLessThan(7);
+  });
+
+  it("the pointing hand points: index finger up, the rest curled, thumb left", () => {
+    const svg = render("pointer");
+    const xs = rectXs(svg);
+    expect(xs).toHaveLength(5);                                   // four fingers, one thumb
+    const tops = [...svg.matchAll(/<rect x="[\d.]+" y="([\d.]+)"/g)].slice(0, 4).map((m) => Number(m[1]));
+    expect(tops[0], "the index finger is the tallest by far").toBeLessThan(Math.min(...tops.slice(1)) - 5);
+    expect(xs[4], "thumb left of the index finger").toBeLessThan(xs[0]);
   });
 
   it("the thumb is drawn before the hand, so it reads as attached", () => {
