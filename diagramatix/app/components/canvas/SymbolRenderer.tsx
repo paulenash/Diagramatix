@@ -62,6 +62,17 @@ const SymbolColorCtx = createContext<SymbolColorConfig | undefined>(undefined);
 /** Set of lane IDs whose parent is also a lane (sublanes) */
 export const SublaneIdsCtx = createContext<Set<string>>(new Set());
 
+/**
+ * Bands whose NAME is currently being shown somewhere else — in the lane-drop
+ * ghost, at the position the name is about to have (Paul, 2026-09-23: "move
+ * the current name of any sibling whose name will be affected, to its new
+ * position … so that new names never appear over the top of old names").
+ *
+ * The band itself keeps its shape and colour; only the text comes off, and
+ * only while the symbol is being dragged over the pool.
+ */
+export const GhostMovedNameIdsCtx = createContext<Set<string>>(new Set());
+
 /** Linear interpolate between two #rrggbb colours. `frac=0` returns `hex`,
  *  `frac=1` returns `toward`. Used to tint pool/lane bodies to a very light
  *  shade of their header colour. */
@@ -1968,7 +1979,12 @@ function LaneShape({ el, isSublane }: { el: DiagramElement; isSublane?: boolean 
   const LW = typeof storedLW === "number" && storedLW > 0 ? storedLW : 36;
   const cx = x + LW / 2 + 3;
   const cy = y + h / 2;
-  const lines = (el.label ?? "").split('\n');
+  // While a lane drop is being previewed, a band whose name is moving has that
+  // name drawn by the GHOST, at the place it is about to be. Drawing it here
+  // as well would put the old and the new one on top of each other, which is
+  // the thing Paul asked to avoid (2026-09-23).
+  const nameIsGhosted = useContext(GhostMovedNameIdsCtx).has(el.id);
+  const lines = nameIsGhosted ? [] : (el.label ?? "").split('\n');
   const fontSize = Math.round(laneFs * 10) / 10;
   const lineH = Math.round(laneFs * 1.2);
   // Lighten fill based on nesting depth beyond direct sublane (depth 1)

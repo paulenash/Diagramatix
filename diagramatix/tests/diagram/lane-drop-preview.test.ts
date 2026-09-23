@@ -18,7 +18,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { reducer } from "@/app/hooks/useDiagram";
-import { planLaneDrop, previewBands, samePlan, type LaneDropPlan } from "@/app/lib/diagram/laneDropPlan";
+import { movedBandIds, movedBands, planLaneDrop, previewBands, samePlan, type LaneDropPlan } from "@/app/lib/diagram/laneDropPlan";
 import { laneMetrics } from "@/app/lib/diagram/containerMetrics";
 import type { DiagramElement, DiagramData } from "@/app/lib/diagram/types";
 
@@ -275,5 +275,97 @@ describe("T4702 — the ghost shows exactly what will be added, named", () => {
     const after = drop(before, 5);
     const added = after.elements.filter((e) => e.type === "lane").find((l) => !before.elements.some((e) => e.id === l.id));
     expect(added!.label).toBe(band.label);
+  });
+});
+
+describe("T4708 — the names that MOVE are shown moving", () => {
+  /** A pool of two lanes, the lower one empty, so a top drop carves from it. */
+  const pair = (): DiagramData => ({
+    elements: [
+      E({ id: "p", type: "pool", label: "Pool 1", x: 0, y: 0, width: 800, height: 400, properties: {} }),
+      E({ id: "A", type: "lane", label: "Alpha", x: 36, y: 0, width: 764, height: 200, parentId: "p", properties: {} }),
+      E({ id: "B", type: "lane", label: "Bravo", x: 36, y: 200, width: 764, height: 200, parentId: "p", properties: {} }),
+    ],
+    connectors: [], viewport: { x: 0, y: 0, zoom: 1 },
+  }) as unknown as DiagramData;
+
+  it("the donor's name is shown where it is going, with its own name", () => {
+    // Paul, 2026-09-23: "move the current name of any sibling whose name will
+    // be affected, to its new position and show in the same ghostly way so
+    // that new names never appear over the top of old names."
+    const before = pair();
+    const p = plan(before, 5);                       // a lane at the pool top
+    expect(p.kind).toBe("band");
+    const moved = movedBands(p, before.elements, LANE_FS);
+    expect(moved.length, "one band gives the room").toBe(1);
+    expect(moved[0].label, "its OWN name, not the new one").toBe("Alpha");
+  });
+
+  it("the box it names is the box the drop really gives it", () => {
+    const before = pair();
+    const p = plan(before, 5);
+    const moved = movedBands(p, before.elements, LANE_FS);
+    const after = drop(before, 5);
+    const real = after.elements.find((e) => e.id === moved[0].id)!;
+    expect({ x: real.x, y: real.y, width: real.width, height: real.height })
+      .toEqual({ x: moved[0].x, y: moved[0].y, width: moved[0].width, height: moved[0].height });
+  });
+
+  it("and its name comes off the canvas while the ghost holds it", () => {
+    const before = pair();
+    const ids = movedBandIds(plan(before, 5), before.elements, LANE_FS);
+    expect(ids.length).toBe(1);
+    const canvas = src("app/components/canvas/Canvas.tsx");
+    expect(canvas).toContain("movedBandIds(laneDropPlan, data.elements");
+    expect(canvas).toContain("<GhostMovedNameIdsCtx.Provider value={ghostMovedNameIds}>");
+    expect(canvas).toContain('data-lane-drop="moved-name"');
+    const renderer = src("app/components/canvas/SymbolRenderer.tsx");
+    expect(renderer).toContain("const nameIsGhosted = useContext(GhostMovedNameIdsCtx).has(el.id);");
+    expect(renderer).toContain('const lines = nameIsGhosted ? [] : (el.label ?? "").split');
+  });
+
+  it("a split moves nobody — the lane keeps its box, so its name stays put", () => {
+    const before = pair();
+    const p = plan(before, 100);                     // middle third of Alpha
+    expect(p.kind).toBe("split");
+    expect(movedBands(p, before.elements, LANE_FS)).toEqual([]);
+    expect(movedBandIds(p, before.elements, LANE_FS)).toEqual([]);
+  });
+
+  it("nothing is ghosted when nothing would happen", () => {
+    const packed = {
+      ...pair(),
+      elements: [
+        E({ id: "p", type: "pool", label: "Pool 1", x: 0, y: 0, width: 800, height: 120, properties: {} }),
+        E({ id: "A", type: "lane", label: "A", x: 36, y: 0, width: 764, height: 60, parentId: "p", properties: {} }),
+        E({ id: "B", type: "lane", label: "B", x: 36, y: 60, width: 764, height: 60, parentId: "p", properties: {} }),
+      ],
+    } as DiagramData;
+    const p = plan(packed, 5);
+    expect(p.kind).toBe("none");
+    expect(movedBands(p, packed.elements, LANE_FS)).toEqual([]);
+  });
+
+  it("a donor with sublanes moves those names too, as the reducer will", () => {
+    const nested = {
+      ...pair(),
+      elements: [
+        E({ id: "p", type: "pool", label: "Pool 1", x: 0, y: 0, width: 800, height: 600, properties: {} }),
+        E({ id: "A", type: "lane", label: "Alpha", x: 36, y: 0, width: 764, height: 300, parentId: "p", properties: {} }),
+        E({ id: "B", type: "lane", label: "Bravo", x: 36, y: 300, width: 764, height: 300, parentId: "p", properties: {} }),
+        E({ id: "B1", type: "lane", label: "Bee One", x: 72, y: 300, width: 728, height: 150, parentId: "B", properties: {} }),
+        E({ id: "B2", type: "lane", label: "Bee Two", x: 72, y: 450, width: 728, height: 150, parentId: "B", properties: {} }),
+      ],
+    } as DiagramData;
+    const p = plan(nested, 595);                     // the pool BOTTOM → carve from Bravo
+    const moved = movedBands(p, nested.elements, LANE_FS);
+    const after = drop(nested, 595);
+    for (const m of moved) {
+      const real = after.elements.find((e) => e.id === m.id)!;
+      expect({ x: real.x, y: real.y, width: real.width, height: real.height },
+        `${m.label} is drawn where it lands`)
+        .toEqual({ x: m.x, y: m.y, width: m.width, height: m.height });
+    }
+    expect(moved.map((m) => m.label)).toContain("Bravo");
   });
 });

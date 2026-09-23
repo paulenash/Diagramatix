@@ -45,3 +45,46 @@ export function laneMetrics(label: string, fontSize: number): { minHeight: numbe
   const headerWidth = Math.max(36, stackedH);
   return { minHeight, headerWidth };
 }
+
+/**
+ * Minimum height required for a pool / lane / sublane such that:
+ *   - its own rotated label fits along its vertical extent
+ *   - its children (lanes / sublanes) each fit their own minimum heights
+ *
+ * Used by RESIZE_ELEMENT to clamp user-driven resizes so labels can never
+ * be cropped past the container boundary.
+ */
+export function minHeightForContainer(
+  el: DiagramElement,
+  elements: DiagramElement[],
+  poolFs: number,
+  laneFs: number,
+): number {
+  if (el.type === "pool") {
+    const own = poolMetrics(el.label, poolFs).minHeight;
+    const lanes = elements.filter(e => e.type === "lane" && e.parentId === el.id);
+    if (lanes.length === 0) return own;
+    const lanesH = lanes.reduce((s, l) => s + minHeightForContainer(l, elements, poolFs, laneFs), 0);
+    return Math.max(own, lanesH);
+  }
+  if (el.type === "lane") {
+    const own = laneMetrics(el.label, laneFs).minHeight;
+    const sublanes = elements.filter(e => e.type === "lane" && e.parentId === el.id);
+    if (sublanes.length === 0) return own;
+    const subH = sublanes.reduce((s, l) => s + minHeightForContainer(l, elements, poolFs, laneFs), 0);
+    return Math.max(own, subH);
+  }
+  return 40;
+}
+
+/**
+ * Recursively proportionally re-stack a parent lane's sublanes to fit its
+ * (already-updated) y/height/x/width. Used when a pool or lane boundary is
+ * dragged so deeper levels (sub-sublanes etc.) also resize to fill their
+ * parent. Uses dynamic header widths and respects each descendant's
+ * label-driven minimum height.
+ *
+ * Returns updated elements (immutable). The caller is expected to have
+ * already applied the new (x, y, width, height) to `parentLane` itself in
+ * `elementsArr`.
+ */

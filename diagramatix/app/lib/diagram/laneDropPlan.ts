@@ -26,6 +26,7 @@ import { contentBoundsOf, MIN_LEFT_GAP } from "./poolLaneBounds";
 import { shrinkRoom, type Band, type StackEdge } from "./laneBands";
 import { getLaneHeaderWidth, getPoolHeaderWidth, laneMetrics } from "./containerMetrics";
 import { uniqueContainerLabel } from "./containerNames";
+import { bandsMovedByCarve } from "./laneStack";
 
 export interface Rect { x: number; y: number; width: number; height: number }
 
@@ -76,6 +77,39 @@ export function previewBands(plan: LaneDropPlan): BandPreview[] {
     return plan.rects.map((r, i) => ({ ...r, headerWidth: plan.headerWidth, label: plan.labels[i] }));
   }
   return [];
+}
+
+/**
+ * The bands that are ALREADY there and will be moved or resized by the drop,
+ * each with the name it already has and the box it is about to have.
+ *
+ * Paul, 2026-09-23: "in addition move the current name of any sibling whose
+ * name will be affected, to its new position and show in the same ghostly way
+ * so that new names never appear over the top of old names."
+ *
+ * The new band takes its room from a neighbour, so that neighbour's name — set
+ * down the middle of its header strip — ends up somewhere else. Drawn where it
+ * is going, and hidden where it is, the two never sit on top of each other and
+ * the whole answer is visible before the mouse is released.
+ *
+ * Only a carve moves anything: a split leaves the lane's own box alone, and a
+ * first lane fills an empty pool.
+ */
+export function movedBands(
+  plan: LaneDropPlan, elements: DiagramElement[], laneFs: number, poolFs = 16,
+): Array<BandPreview & { id: string }> {
+  if (plan.kind !== "band") return [];
+  return bandsMovedByCarve(elements, plan.carve, poolFs, laneFs).map((b) => ({
+    id: b.id, x: b.x, y: b.y, width: b.width, height: b.height,
+    headerWidth: getLaneHeaderWidth(elements.find((e) => e.id === b.id) ?? ({ properties: {} } as DiagramElement)),
+    label: b.label,
+  }));
+}
+
+/** The ids whose real name must come off while the ghost shows it moving. */
+export function movedBandIds(plan: LaneDropPlan, elements: DiagramElement[], laneFs: number, poolFs = 16): string[] {
+  if (plan.kind !== "band") return [];
+  return bandsMovedByCarve(elements, plan.carve, poolFs, laneFs).map((b) => b.id);
 }
 
 const lanesOf = (elements: DiagramElement[], parentId: string): DiagramElement[] =>

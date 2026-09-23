@@ -22,7 +22,7 @@ import { ArchimateConnectorPicker } from "./ArchimateConnectorPicker";
 import { BubbleHelp } from "./BubbleHelp";
 import { EntityNameInput } from "./EntityNameInput";
 import type { ProjectEntityStructure, EntityNodeLevel, EntityListKind } from "@/app/lib/entityLists/types";
-import { SymbolRenderer, SublaneIdsCtx, ProcessGroupDepthCtx, UmlPackageDepthCtx, LaneDepthCtx, DatabaseCtx, ArchimateDepthCtx, ShowPainPointsCtx, ShowPainPointDescCtx, ShowIssuesCtx, ShowIssueDescCtx, ShowReviewCommentsCtx, ReviewCommentColorsCtx, reviewCommentAuthorKey, REVIEW_COMMENT_PALETTE, formatUmlAttribute, formatUmlOperation, compositeRegions, type ResizeHandle } from "./SymbolRenderer";
+import { SymbolRenderer, SublaneIdsCtx, GhostMovedNameIdsCtx, ProcessGroupDepthCtx, UmlPackageDepthCtx, LaneDepthCtx, DatabaseCtx, ArchimateDepthCtx, ShowPainPointsCtx, ShowPainPointDescCtx, ShowIssuesCtx, ShowIssueDescCtx, ShowReviewCommentsCtx, ReviewCommentColorsCtx, reviewCommentAuthorKey, REVIEW_COMMENT_PALETTE, formatUmlAttribute, formatUmlOperation, compositeRegions, type ResizeHandle } from "./SymbolRenderer";
 import { CollabCursors } from "./CollabCursors";
 import { CollabLiveEdits } from "./CollabLiveEdits";
 import { CollabGhosts } from "./CollabGhosts";
@@ -33,7 +33,7 @@ import { isBlackBoxPool } from "@/app/lib/diagram/blackBoxPoolMenu";
 import { containerHeaderWidth, inContainerHeader } from "@/app/lib/diagram/containerHeader";
 import { quickAddSymbols, QUICK_ADD_LABELS } from "@/app/lib/diagram/quickAddSymbols";
 import { messageLabelsHiddenWhileDragging } from "@/app/lib/diagram/labelVisibility";
-import { planLaneDrop, previewBands, samePlan, type LaneDropPlan } from "@/app/lib/diagram/laneDropPlan";
+import { movedBandIds, movedBands, planLaneDrop, previewBands, samePlan, type LaneDropPlan } from "@/app/lib/diagram/laneDropPlan";
 import { getLaneHeaderWidth, getPoolHeaderWidth } from "@/app/lib/diagram/containerMetrics";
 import { poolGuideNext, type PoolBoundaryGuide, type PoolGuideEvent } from "@/app/lib/diagram/poolGuide";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
@@ -1043,6 +1043,12 @@ export function Canvas({
   // letting go (Paul, 2026-09-23). null while nothing is being dragged over a
   // pool; a "none" plan is what turns the pool's boundary red.
   const [laneDropPlan, setLaneDropPlan] = useState<LaneDropPlan | null>(null);
+  // Bands whose name the ghost is currently drawing somewhere else. Empty
+  // unless a Pool/Lane symbol is being dragged over a pool.
+  const ghostMovedNameIds = useMemo(
+    () => new Set(laneDropPlan ? movedBandIds(laneDropPlan, data.elements, data.laneFontSize ?? 14, data.poolFontSize ?? 16) : []),
+    [laneDropPlan, data.elements, data.laneFontSize, data.poolFontSize],
+  );
   const [connectorChoice, setConnectorChoice] = useState<{
     sourceId: string; targetId: string;
     sourceSide: Side; targetSide: Side;
@@ -5170,6 +5176,7 @@ export function Canvas({
       <DescriptionFontSizeCtx.Provider value={(data.descriptionFontSize ?? 14) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
       <ProcessFontSizeCtx.Provider value={(data.processFontSize ?? 16) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
       <SublaneIdsCtx.Provider value={sublaneIds}>
+      <GhostMovedNameIdsCtx.Provider value={ghostMovedNameIds}>
       <ProcessGroupDepthCtx.Provider value={processGroupDepthMap}>
       <UmlPackageDepthCtx.Provider value={umlPackageDepthMap}>
       <ShowPainPointsCtx.Provider value={data.showPainPoints !== false && !exportHide?.painPoints}>
@@ -7269,8 +7276,24 @@ export function Canvas({
               );
             }
             const laneFs = (data.laneFontSize ?? 14) * (displayMode === "hand-drawn" ? 1.3 : 1);
+            // The bands ALREADY there that this drop shifts or resizes: their
+            // own names, drawn where they are going. Their real names are
+            // taken off (GhostMovedNameIdsCtx) so the two never overlap.
+            const moving = movedBands(laneDropPlan, data.elements, data.laneFontSize ?? 14, data.poolFontSize ?? 16);
             return (
               <g pointerEvents="none" data-lane-drop="ghost">
+                {moving.map((band, i) => {
+                  const cx = band.x + band.headerWidth / 2 + 3;
+                  const cy = band.y + band.height / 2;
+                  return band.label && band.height >= band.label.length * laneFs * 0.6 ? (
+                    <text key={`moved-${i}`} x={cx} y={cy} textAnchor="middle" fontSize={laneFs} fill="#1e3a8a"
+                      fillOpacity={0.55} transform={`rotate(-90,${cx},${cy})`}
+                      data-lane-drop="moved-name"
+                      style={{ userSelect: "none", pointerEvents: "none" }}>
+                      {band.label}
+                    </text>
+                  ) : null;
+                })}
                 {bands.map((band, i) => {
                   // The strip sits INSIDE the band at its left edge, exactly as
                   // LaneShape draws it, and the name runs down it.
@@ -7513,6 +7536,7 @@ export function Canvas({
       </ShowPainPointsCtx.Provider>
       </UmlPackageDepthCtx.Provider>
       </ProcessGroupDepthCtx.Provider>
+      </GhostMovedNameIdsCtx.Provider>
       </SublaneIdsCtx.Provider>
       </ProcessFontSizeCtx.Provider>
       </DescriptionFontSizeCtx.Provider>

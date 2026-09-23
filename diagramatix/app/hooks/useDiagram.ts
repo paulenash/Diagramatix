@@ -26,7 +26,8 @@ import { planWrapInSubprocess, planUnwrapSubprocess, planWrapInContainer, type W
 import { isUmlConnType } from "@/app/lib/diagram/types";
 import { capitaliseFirstWord, needsCapital, decisionLabel, isDecisionGateway } from "@/app/lib/diagram/nameCase";
 import { contentBoundsOf, clampRectToContent, clampRectToLimits, poolFollowsLanes, leftGapShortfall, MIN_LEFT_GAP } from "@/app/lib/diagram/poolLaneBounds";
-import { getLaneHeaderWidth, getPoolHeaderWidth, laneMetrics, poolMetrics } from "@/app/lib/diagram/containerMetrics";
+import { getLaneHeaderWidth, getPoolHeaderWidth, laneMetrics, minHeightForContainer, poolMetrics } from "@/app/lib/diagram/containerMetrics";
+import { carveGeometry, refitStackAtEdge, shiftSublanesBy } from "@/app/lib/diagram/laneStack";
 import { uniqueContainerLabel } from "@/app/lib/diagram/containerNames";
 import { planCarve, planLaneDrop, type CarvePlan } from "@/app/lib/diagram/laneDropPlan";
 import { labelsFollowTheirSegments, holdGatewayBranchLabels } from "@/app/lib/diagram/labelFollow";
@@ -2699,82 +2700,6 @@ function applyPoolAboveShift(
 
 /** Read a lane's effective header width (stored property override, else 36). */
 
-/**
- * Minimum height required for a pool / lane / sublane such that:
- *   - its own rotated label fits along its vertical extent
- *   - its children (lanes / sublanes) each fit their own minimum heights
- *
- * Used by RESIZE_ELEMENT to clamp user-driven resizes so labels can never
- * be cropped past the container boundary.
- */
-function minHeightForContainer(
-  el: DiagramElement,
-  elements: DiagramElement[],
-  poolFs: number,
-  laneFs: number,
-): number {
-  if (el.type === "pool") {
-    const own = poolMetrics(el.label, poolFs).minHeight;
-    const lanes = elements.filter(e => e.type === "lane" && e.parentId === el.id);
-    if (lanes.length === 0) return own;
-    const lanesH = lanes.reduce((s, l) => s + minHeightForContainer(l, elements, poolFs, laneFs), 0);
-    return Math.max(own, lanesH);
-  }
-  if (el.type === "lane") {
-    const own = laneMetrics(el.label, laneFs).minHeight;
-    const sublanes = elements.filter(e => e.type === "lane" && e.parentId === el.id);
-    if (sublanes.length === 0) return own;
-    const subH = sublanes.reduce((s, l) => s + minHeightForContainer(l, elements, poolFs, laneFs), 0);
-    return Math.max(own, subH);
-  }
-  return 40;
-}
-
-/**
- * Recursively proportionally re-stack a parent lane's sublanes to fit its
- * (already-updated) y/height/x/width. Used when a pool or lane boundary is
- * dragged so deeper levels (sub-sublanes etc.) also resize to fill their
- * parent. Uses dynamic header widths and respects each descendant's
- * label-driven minimum height.
- *
- * Returns updated elements (immutable). The caller is expected to have
- * already applied the new (x, y, width, height) to `parentLane` itself in
- * `elementsArr`.
- */
-/**
- * Move a lane's whole sub-lane subtree by `dy`, keeping every height, and
- * re-fit it to the lane's x / width.
- *
- * The counterpart to `absorbAtEdge`: a band that did NOT absorb the change
- * keeps its size, so its own dividers must not move either — they simply
- * travel with it. Rescaling it instead is what made every divider in the
- * stack shift when only one boundary was dragged.
- */
-function shiftSublanesBy(
-  elements: DiagramElement[],
-  laneId: string,
-  dy: number,
-  laneX: number,
-  laneW: number,
-): DiagramElement[] {
-  const lane = elements.find((e) => e.id === laneId);
-  if (!lane) return elements;
-  const LANE_LW = getLaneHeaderWidth(lane);
-  const subs = elements.filter((e) => e.type === "lane" && e.parentId === laneId);
-  if (subs.length === 0) return elements;
-  let result = elements;
-  for (const sub of subs) {
-    const updated: DiagramElement = {
-      ...sub,
-      x: laneX + LANE_LW,
-      y: sub.y + dy,
-      width: laneW - LANE_LW,
-    };
-    result = result.map((e) => (e.id === sub.id ? updated : e));
-    result = shiftSublanesBy(result, sub.id, dy, updated.x, updated.width);
-  }
-  return result;
-}
 
 function rescaleSublanesRecursive(
   elementsArr: DiagramElement[],
@@ -3170,45 +3095,6 @@ function poolHeaderSpan(
 }
 
 /**
- * Re-fit a lane's sub-lanes to its (already-updated) y / height / x / width,
- * the band at `edge` taking the whole change. Recurses: a sub-lane that
- * absorbs re-fits its own bands at the SAME edge, because the same edge of it
- * is the one that moved. Every other band keeps its height and simply travels,
- * so its dividers stay put (Paul, 2026-09-21: "Only the boundary should move").
- */
-function refitStackAtEdge(
-  els: DiagramElement[], laneId: string,
-  laneY: number, laneH: number, laneX: number, laneW: number,
-  edge: StackEdge, poolFs: number, laneFs: number,
-): DiagramElement[] {
-  const lane = els.find((e) => e.id === laneId);
-  const LANE_LW = lane ? getLaneHeaderWidth(lane) : 36;
-  const subs = els.filter((e) => e.type === "lane" && e.parentId === laneId).sort((a, b) => a.y - b.y);
-  if (subs.length === 0) return els;
-  const bands: Band[] = subs.map((sub) => ({
-    height: sub.height,
-    min: minHeightForContainer(sub, els, poolFs, laneFs),
-  }));
-  const delta = laneH - bands.reduce((sum, b) => sum + b.height, 0);
-  const heights = absorbAtEdge(bands, delta, edge);
-  const ys = stackFrom(laneY, heights);
-  const absorbing = edge === "first" ? 0 : subs.length - 1;
-  let result = els;
-  for (let i = 0; i < subs.length; i++) {
-    const newSubX = laneX + LANE_LW;
-    const newSubW = laneW - LANE_LW;
-    const updatedSub: DiagramElement = { ...subs[i], x: newSubX, y: ys[i], width: newSubW, height: heights[i] };
-    result = result.map((e) => (e.id === subs[i].id ? updatedSub : e));
-    if (i === absorbing) {
-      result = refitStackAtEdge(result, subs[i].id, ys[i], heights[i], newSubX, newSubW, edge, poolFs, laneFs);
-    } else {
-      result = shiftSublanesBy(result, subs[i].id, ys[i] - subs[i].y, newSubX, newSubW);
-    }
-  }
-  return result;
-}
-
-/**
  * Add a lane to a pool, or a sublane to a lane, WITHIN it — the container
  * never grows.
  *
@@ -3228,11 +3114,10 @@ function applyCarve(state: DiagramData, carve: CarvePlan): { state: DiagramData;
   const poolFs = state.poolFontSize ?? 16;
   const laneFs = state.laneFontSize ?? 14;
 
-  // The donor shrinks at that edge; its own stack re-fits there too.
-  const donorY = carve.edge === "first" ? donor.y + carve.give : donor.y;
-  const donorH = donor.height - carve.give;
-  let elements = state.elements.map((e) => (e.id === donor.id ? { ...e, y: donorY, height: donorH } : e));
-  elements = refitStackAtEdge(elements, donor.id, donorY, donorH, donor.x, donor.width, carve.edge, poolFs, laneFs);
+  // The donor shrinks at that edge and its own stack re-fits there too —
+  // `carveGeometry` (laneStack.ts), which is also what the ghost asks, so the
+  // names it shows moving are the positions this produces.
+  let elements = carveGeometry(state.elements, carve, poolFs, laneFs);
 
   const band: DiagramElement = {
     id: nanoid(), type: "lane", ...carve.rect,
