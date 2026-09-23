@@ -33,7 +33,7 @@ import { isBlackBoxPool } from "@/app/lib/diagram/blackBoxPoolMenu";
 import { containerHeaderWidth, inContainerHeader } from "@/app/lib/diagram/containerHeader";
 import { quickAddSymbols, QUICK_ADD_LABELS } from "@/app/lib/diagram/quickAddSymbols";
 import { messageLabelsHiddenWhileDragging } from "@/app/lib/diagram/labelVisibility";
-import { planLaneDrop, samePlan, type LaneDropPlan } from "@/app/lib/diagram/laneDropPlan";
+import { planLaneDrop, previewBands, samePlan, type LaneDropPlan } from "@/app/lib/diagram/laneDropPlan";
 import { getLaneHeaderWidth, getPoolHeaderWidth } from "@/app/lib/diagram/containerMetrics";
 import { poolGuideNext, type PoolBoundaryGuide, type PoolGuideEvent } from "@/app/lib/diagram/poolGuide";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
@@ -7250,18 +7250,16 @@ export function Canvas({
             ));
           })()}
 
-          {/* Pool/Lane drop ghost — what a release right now would create.
-              Nothing to create (no room) → the pool's own boundary goes red,
-              so the user can move up or down to find a place that works. */}
+          {/* Pool/Lane drop ghost — EXACTLY what a release would create: the
+              new band or bands, each with its own header strip and the name it
+              will be given, and nothing else (Paul, 2026-09-23: the old ghost
+              also lit up the PARENT's header column, which is not what is being
+              added). Nothing to create → the pool's boundary goes red. */}
           {laneDropPlan && laneDropPlan.poolId && (() => {
             const pool = data.elements.find((el) => el.id === laneDropPlan.poolId);
             if (!pool) return null;
-            const rects =
-              laneDropPlan.kind === "first-lane" ? [laneDropPlan.rect]
-              : laneDropPlan.kind === "band" ? [laneDropPlan.carve.rect]
-              : laneDropPlan.kind === "split" ? laneDropPlan.rects
-              : [];
-            if (rects.length === 0) {
+            const bands = previewBands(laneDropPlan);
+            if (bands.length === 0) {
               return (
                 <rect
                   x={pool.x} y={pool.y} width={pool.width} height={pool.height}
@@ -7270,29 +7268,33 @@ export function Canvas({
                 />
               );
             }
-            // Each band as it would be drawn: its own header strip on the left,
-            // the body ghosted over whatever is underneath.
-            // A lane's strip is the pool's; a sublane's is its lane's.
-            const owner = laneDropPlan.kind === "split"
-              ? data.elements.find((el) => el.id === laneDropPlan.laneId)
-              : laneDropPlan.kind === "band"
-                ? data.elements.find((el) => el.id === laneDropPlan.carve.parentId)
-                : pool;
-            const headerW = !owner || owner.type === "pool"
-              ? getPoolHeaderWidth(owner ?? pool)
-              : getLaneHeaderWidth(owner);
+            const laneFs = (data.laneFontSize ?? 14) * (displayMode === "hand-drawn" ? 1.3 : 1);
             return (
               <g pointerEvents="none" data-lane-drop="ghost">
-                {rects.map((r, i) => (
-                  <g key={i}>
-                    <rect x={r.x} y={r.y} width={r.width} height={r.height}
-                      fill="#3b82f6" fillOpacity={0.1}
-                      stroke="#2563eb" strokeWidth={2 / zoom} strokeDasharray={`${6 / zoom} ${4 / zoom}`} />
-                    <rect x={r.x - headerW} y={r.y} width={headerW} height={r.height}
-                      fill="#2563eb" fillOpacity={0.18}
-                      stroke="#2563eb" strokeWidth={2 / zoom} strokeDasharray={`${6 / zoom} ${4 / zoom}`} />
-                  </g>
-                ))}
+                {bands.map((band, i) => {
+                  // The strip sits INSIDE the band at its left edge, exactly as
+                  // LaneShape draws it, and the name runs down it.
+                  const cx = band.x + band.headerWidth / 2 + 3;
+                  const cy = band.y + band.height / 2;
+                  const dash = `${6 / zoom} ${4 / zoom}`;
+                  return (
+                    <g key={i}>
+                      <rect x={band.x} y={band.y} width={band.width} height={band.height}
+                        fill="#3b82f6" fillOpacity={0.1}
+                        stroke="#2563eb" strokeWidth={2 / zoom} strokeDasharray={dash} />
+                      <rect x={band.x} y={band.y} width={band.headerWidth} height={band.height}
+                        fill="#2563eb" fillOpacity={0.18}
+                        stroke="#2563eb" strokeWidth={2 / zoom} strokeDasharray={dash} />
+                      {band.height >= band.label.length * laneFs * 0.6 && (
+                        <text x={cx} y={cy} textAnchor="middle" fontSize={laneFs} fill="#1e3a8a"
+                          transform={`rotate(-90,${cx},${cy})`}
+                          style={{ userSelect: "none", pointerEvents: "none" }}>
+                          {band.label}
+                        </text>
+                      )}
+                    </g>
+                  );
+                })}
               </g>
             );
           })()}

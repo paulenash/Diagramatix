@@ -18,7 +18,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { reducer } from "@/app/hooks/useDiagram";
-import { planLaneDrop, samePlan, type LaneDropPlan } from "@/app/lib/diagram/laneDropPlan";
+import { planLaneDrop, previewBands, samePlan, type LaneDropPlan } from "@/app/lib/diagram/laneDropPlan";
 import { laneMetrics } from "@/app/lib/diagram/containerMetrics";
 import type { DiagramElement, DiagramData } from "@/app/lib/diagram/types";
 
@@ -181,9 +181,14 @@ describe("T4693 — 'nothing will happen' is the truth, and it is shown in red",
     expect(canvas).toContain('data-lane-drop="blocked"');
     expect(canvas, "the blocked outline is red").toContain('stroke="#dc2626"');
     expect(canvas).toContain('data-lane-drop="ghost"');
-    // The ghost is drawn from the plan's own rectangles, not re-derived.
-    expect(canvas).toContain("laneDropPlan.carve.rect");
-    expect(canvas).toContain("laneDropPlan.rects");
+    // The ghost is drawn from the plan's own bands, not re-derived.
+    expect(canvas).toContain("previewBands(laneDropPlan)");
+    // EXACTLY what would be added: each band's own header strip, inside it, and
+    // the name it will be given — never the parent's header column.
+    expect(canvas).toContain("<rect x={band.x} y={band.y} width={band.headerWidth}");
+    expect(canvas).toContain("{band.label}");
+    expect(canvas, "the parent's strip is not part of what is being added")
+      .not.toContain("x={r.x - headerW}");
   });
 });
 
@@ -205,5 +210,70 @@ describe("T4694 — one decision, drawn or done", () => {
     expect(samePlan(null, null)).toBe(true);
     const outside = plan(d, 900, 2000);
     expect(samePlan(outside, plan(d, 950, 2100)), "nothing either way").toBe(true);
+  });
+});
+
+describe("T4702 — the ghost shows exactly what will be added, named", () => {
+  const bands = (d: DiagramData, y: number) => previewBands(plan(d, y));
+
+  it("one band for a lane, two for a split, none for a refusal", () => {
+    expect(bands(world(), 5).length, "a lane at the pool top").toBe(1);
+    expect(bands(world(), 150).length, "the middle third of a lane").toBe(2);
+    const packed = {
+      ...world(),
+      elements: [
+        E({ id: "p", type: "pool", label: "Pool 1", x: 0, y: 0, width: 800, height: 120, properties: {} }),
+        E({ id: "A", type: "lane", label: "A", x: 36, y: 0, width: 764, height: 60, parentId: "p", properties: {} }),
+        E({ id: "B", type: "lane", label: "B", x: 36, y: 60, width: 764, height: 60, parentId: "p", properties: {} }),
+      ],
+    } as DiagramData;
+    expect(bands(packed, 5).length, "nothing to draw — the boundary goes red").toBe(0);
+  });
+
+  it("each band carries its OWN header strip and the name it will be given", () => {
+    const [band] = bands(world(), 5);
+    expect(band.headerWidth, "its own strip, not the parent's").toBe(36);
+    // The fixture's lanes are called "A" and "B", so "Lane 1" is free.
+    expect(band.label).toBe("Lane 1");
+    // The strip is drawn INSIDE the band, at its left edge — so the band's box
+    // starts after the POOL's header, and the strip starts with the band.
+    const pool = world().elements.find((e) => e.id === "p")!;
+    expect(band.x).toBe(pool.x + 36);
+  });
+
+  it("the strip is the BAND's width, even when the parent's differs", () => {
+    // A pool whose own header has been widened to 60 for a long name; its
+    // lanes still use 36. The ghost must show the strip the new lane will
+    // have, not the one it sits beside.
+    const wide = {
+      ...world(),
+      elements: [
+        E({ id: "p", type: "pool", label: "Pool 1", x: 0, y: 0, width: 800, height: 600, properties: { poolHeaderWidth: 60 } }),
+        E({ id: "A", type: "lane", label: "A", x: 60, y: 0, width: 740, height: 300, parentId: "p", properties: {} }),
+        E({ id: "B", type: "lane", label: "B", x: 60, y: 300, width: 740, height: 300, parentId: "p", properties: {} }),
+      ],
+    } as DiagramData;
+    const [band] = bands(wide, 5);
+    expect(band.headerWidth, "the new lane's own strip").toBe(36);
+    expect(band.x, "and it starts after the pool's 60px header").toBe(60);
+  });
+
+  it("a split names both sublanes, and never the same name twice", () => {
+    const two = bands(world(), 150);
+    expect(two.map((b) => b.label)).toEqual(["Sub 1", "Sub 2"]);
+    expect(two[0].headerWidth).toBe(36);
+    // Drawn inside the lane being split, after ITS header strip.
+    const lane = world().elements.find((e) => e.id === "A")!;
+    expect(two[0].x).toBe(lane.x + 36);
+    expect(two[0].y).toBe(lane.y);
+    expect(two[1].y).toBe(lane.y + two[0].height);
+  });
+
+  it("the name in the ghost is the name the drop gives", () => {
+    const before = world();
+    const [band] = bands(before, 5);
+    const after = drop(before, 5);
+    const added = after.elements.filter((e) => e.type === "lane").find((l) => !before.elements.some((e) => e.id === l.id));
+    expect(added!.label).toBe(band.label);
   });
 });

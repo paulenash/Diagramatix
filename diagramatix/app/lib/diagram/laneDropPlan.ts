@@ -25,8 +25,16 @@ import type { DiagramElement } from "./types";
 import { contentBoundsOf, MIN_LEFT_GAP } from "./poolLaneBounds";
 import { shrinkRoom, type Band, type StackEdge } from "./laneBands";
 import { getLaneHeaderWidth, getPoolHeaderWidth, laneMetrics } from "./containerMetrics";
+import { uniqueContainerLabel } from "./containerNames";
 
 export interface Rect { x: number; y: number; width: number; height: number }
+
+/**
+ * A band as it will be drawn: its box, the width of its OWN header strip (the
+ * strip lives inside the box, at its left edge — see `LaneShape`), and the
+ * name that will be written down it.
+ */
+export interface BandPreview extends Rect { headerWidth: number; label: string }
 
 /** The least a band may be, whatever its name. */
 export const MIN_BAND = 40;
@@ -43,26 +51,51 @@ export interface CarvePlan {
   give: number;
   label: string;
   rect: Rect;
+  /** The width of the new band's own header strip. */
+  headerWidth: number;
 }
 
 export type LaneDropPlan =
   /** An empty pool: one lane filling its body. */
-  | { kind: "first-lane"; poolId: string; label: string; rect: Rect }
+  | { kind: "first-lane"; poolId: string; label: string; rect: Rect; headerWidth: number }
   /** A lane in the pool, or a sublane in a lane — carved from a neighbour. */
   | { kind: "band"; poolId: string; band: "lane" | "sublane"; carve: CarvePlan }
   /** A lane with no sublanes, split down the middle into two. */
-  | { kind: "split"; poolId: string; laneId: string; labels: [string, string]; rects: [Rect, Rect] }
+  | { kind: "split"; poolId: string; laneId: string; labels: [string, string]; rects: [Rect, Rect]; headerWidth: number }
   /** Nothing would happen — outside any pool, or no room for a band. */
   | { kind: "none"; poolId: string | null };
+
+/**
+ * The bands a plan would create, ready to draw: box, own header strip, name.
+ * Empty for a plan that would create nothing, which is the red-boundary case.
+ */
+export function previewBands(plan: LaneDropPlan): BandPreview[] {
+  if (plan.kind === "first-lane") return [{ ...plan.rect, headerWidth: plan.headerWidth, label: plan.label }];
+  if (plan.kind === "band") return [{ ...plan.carve.rect, headerWidth: plan.carve.headerWidth, label: plan.carve.label }];
+  if (plan.kind === "split") {
+    return plan.rects.map((r, i) => ({ ...r, headerWidth: plan.headerWidth, label: plan.labels[i] }));
+  }
+  return [];
+}
 
 const lanesOf = (elements: DiagramElement[], parentId: string): DiagramElement[] =>
   elements.filter((e) => e.type === "lane" && e.parentId === parentId).sort((a, b) => a.y - b.y);
 
-/** The next free "Lane N" / "Sublane N", named as the reducer names them. */
+/**
+ * The name the new band will REALLY be given — the reducer's own naming, asked
+ * here so the ghost can show it before the drop (Paul, 2026-09-23: "Just show
+ * the new child or children that will be created with their header regions and
+ * proposed initial names").
+ */
 const nextLaneLabel = (elements: DiagramElement[]): string =>
-  `Lane ${elements.filter((e) => e.type === "lane").length + 1}`;
-const nextSublaneLabel = (elements: DiagramElement[], offset = 0): string =>
-  `Sublane ${elements.filter((e) => e.type === "lane" && e.parentId).length + 1 + offset}`;
+  uniqueContainerLabel(elements, undefined, "Lane");
+const nextSublaneLabel = (elements: DiagramElement[], taken: string[] = []): string =>
+  uniqueContainerLabel(
+    // The names already promised in this same plan count as taken, so a split
+    // never proposes the same name twice.
+    [...elements, ...taken.map((label, i) => ({ id: `__planned_${i}`, type: "lane", label } as unknown as DiagramElement))],
+    undefined, "Sublane",
+  );
 
 /**
  * Can a band be carved into `parentId` at `index`, and what would it look like?
@@ -158,9 +191,11 @@ export function planCarve(
   void content;
 
   const headerW = parent.type === "pool" ? getPoolHeaderWidth(parent) : getLaneHeaderWidth(parent);
+  // Its own strip matches its siblings', which the reducer keeps in step.
+  const ownHeaderW = getLaneHeaderWidth(bands[0]);
   return {
     parentId, index: at, donorId: donor.id, edge, give,
-    label,
+    label, headerWidth: ownHeaderW,
     rect: {
       x: parent.x + headerW,
       y: edge === "first" ? donor.y : donor.y + donor.height - give,
@@ -199,7 +234,7 @@ export function planLaneDrop(
   if (lanes.length === 0) {
     const headerW = getPoolHeaderWidth(pool);
     return {
-      kind: "first-lane", poolId, label: nextLaneLabel(elements),
+      kind: "first-lane", poolId, label: nextLaneLabel(elements), headerWidth: 36,
       rect: { x: pool.x + headerW, y: pool.y, width: pool.width - headerW, height: pool.height },
     };
   }
@@ -234,11 +269,13 @@ export function planLaneDrop(
       const x = cursorLane.x + headerW;
       const width = cursorLane.width - headerW;
       // Both halves must fit their own names, or the split does nothing.
-      const labels: [string, string] = [nextSublaneLabel(elements), nextSublaneLabel(elements, 1)];
+      const first = nextSublaneLabel(elements);
+      const labels: [string, string] = [first, nextSublaneLabel(elements, [first])];
       const needs = labels.map((l) => Math.max(MIN_BAND, laneMetrics(l, laneFs).minHeight));
       if (halfH < needs[0] || cursorLane.height - halfH < needs[1]) return { kind: "none", poolId };
       return {
         kind: "split", poolId, laneId: cursorLane.id, labels,
+        headerWidth: getLaneHeaderWidth(cursorLane),
         rects: [
           { x, y: cursorLane.y, width, height: halfH },
           { x, y: cursorLane.y + halfH, width, height: cursorLane.height - halfH },
@@ -258,11 +295,13 @@ export function planLaneDrop(
   if (splitTarget) {
     const headerW = getLaneHeaderWidth(splitTarget);
     const halfH = Math.max(MIN_BAND, Math.round(splitTarget.height / 2));
-    const labels: [string, string] = [nextSublaneLabel(elements), nextSublaneLabel(elements, 1)];
+    const firstSub = nextSublaneLabel(elements);
+    const labels: [string, string] = [firstSub, nextSublaneLabel(elements, [firstSub])];
     const needs = labels.map((l) => Math.max(MIN_BAND, laneMetrics(l, laneFs).minHeight));
     if (halfH < needs[0] || splitTarget.height - halfH < needs[1]) return { kind: "none", poolId };
     return {
       kind: "split", poolId, laneId: splitTarget.id, labels,
+      headerWidth: getLaneHeaderWidth(splitTarget),
       rects: [
         { x: splitTarget.x + headerW, y: splitTarget.y, width: splitTarget.width - headerW, height: halfH },
         { x: splitTarget.x + headerW, y: splitTarget.y + halfH, width: splitTarget.width - headerW, height: splitTarget.height - halfH },

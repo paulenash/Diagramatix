@@ -20,6 +20,20 @@ import { capitaliseFirstWord } from "./nameCase";
 
 export type ContainerKind = "Pool" | "Lane" | "Sublane";
 
+/**
+ * The word a generated name is built from. A sublane is called "Sub 1", not
+ * "Sublane 1" (Paul, 2026-09-23) — the header strip is 36px wide and the name
+ * is written down it, so every character costs height that the band has to be
+ * given. "Sublane 3" needs about 92px before it will fit; "Sub 3" needs 58,
+ * which is the difference between a sublane that can be added and one that is
+ * refused.
+ */
+const STEM: Record<ContainerKind, string> = { Pool: "Pool", Lane: "Lane", Sublane: "Sub" };
+
+/** The words that mean "no name given" for this kind — the kind itself, or its stem. */
+const isBareFor = (kind: ContainerKind, s: string) =>
+  s === "" || s === kind.toLowerCase() || s === STEM[kind].toLowerCase();
+
 const isContainer = (e: DiagramElement) => e.type === "pool" || e.type === "lane" || e.type === "sublane";
 
 /**
@@ -42,11 +56,11 @@ export function uniqueContainerLabel(
       .filter(Boolean),
   );
   const base = capitaliseFirstWord((desired ?? "").trim());
-  const bare = base === "" || base.toLowerCase() === kind.toLowerCase();
-  if (bare) {
+  if (isBareFor(kind, base.toLowerCase())) {
+    const stem = STEM[kind];
     let n = 1;
-    while (taken.has(`${kind.toLowerCase()} ${n}`)) n++;
-    return `${kind} ${n}`;
+    while (taken.has(`${stem.toLowerCase()} ${n}`)) n++;
+    return `${stem} ${n}`;
   }
   if (!taken.has(base.toLowerCase())) return base;
   let n = 2;

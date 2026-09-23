@@ -106,7 +106,16 @@ describe("T4698 — a new lane is named against the diagram, and reported as nam
   it("the numbering happens where the diagram is in view", () => {
     expect(nextContainerLabels(world(), ["Lane"], "Lane")).toEqual(["Lane 4"]);
     expect(nextContainerLabels(world(), ["Lane", "Lane"], "Lane"), "and within one batch").toEqual(["Lane 4", "Lane 5"]);
-    expect(nextContainerLabels(world(), ["Sublane"], "Sublane")).toEqual(["Sublane 3"]);
+    // A sublane is "Sub N", not "Sublane N" (Paul, 2026-09-23): the name is
+    // written down a 36px header strip, so every character costs the band
+    // height it has to be given — "Sublane 3" needs ~92px, "Sub 3" needs 58.
+    // The fixture's sublanes carry the OLD names, which do not block the new
+    // stem — an existing diagram keeps "Sublane 1", and the next one made is
+    // "Sub 1". Only names of the same stem are counted.
+    expect(nextContainerLabels(world(), ["Sublane"], "Sublane")).toEqual(["Sub 1"]);
+    expect(nextContainerLabels(world(), ["Sub"], "Sublane"), "the stem counts as bare too").toEqual(["Sub 1"]);
+    const withSubs = [...world(), E({ id: "x", type: "lane", label: "Sub 1", parentId: "L1", x: 0, y: 0, width: 10, height: 10, properties: {} })];
+    expect(nextContainerLabels(withSubs, ["Sublane", "Sublane"], "Sublane")).toEqual(["Sub 2", "Sub 3"]);
     // A name the user chose is kept, and only de-duplicated when taken.
     expect(nextContainerLabels(world(), ["Shipping"], "Lane")).toEqual(["Shipping"]);
     expect(uniqueContainerLabel(world(), "Lane 1", "Lane")).toBe("Lane 1 2");
