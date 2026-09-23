@@ -160,11 +160,25 @@ describe("T4671 — the rule itself", () => {
   });
 
   it("uses one gap for 'close' and for where a picked-up label lands", () => {
-    // Box bottom at 214. The line arriving at 223 is 9px off — not yet close.
-    expect(labelShiftForSegmentMove(box(200), seg(300), seg(223))).toBe(0);
-    // At 221 it is 7px off — inside the gap — so the label is picked up and
-    // lands exactly 8px above: top at 221 − 8 − 14 = 199, a shift of −1.
-    expect(labelShiftForSegmentMove(box(200), seg(300), seg(221))).toBe(-1);
+    // Expressed in terms of the gap, not the number it happens to be: the
+    // tolerance was doubled to 16 on 2026-09-23 and the ARITHMETIC is what
+    // this pins — a line just outside is ignored, one just inside picks the
+    // label up and drops it exactly a gap above the line.
+    const bottom = 200 + 14;                        // box(200) is 14 tall
+    const justOutside = bottom + SEGMENT_ATTACH_GAP + 1;
+    const justInside = bottom + SEGMENT_ATTACH_GAP - 1;
+    expect(labelShiftForSegmentMove(box(200), seg(300), seg(justOutside))).toBe(0);
+    expect(labelShiftForSegmentMove(box(200), seg(300), seg(justInside)))
+      .toBe(justInside - SEGMENT_ATTACH_GAP - 14 - 200);
+  });
+
+  it("the tolerance is wide enough for a label nudged off its line by hand", () => {
+    // Paul, 2026-09-23: "Increase the tolerance … by x2". A default label sits
+    // ~6px off; 8px only just covered that, so a label moved a little way up
+    // stopped travelling with its segment. 12px off is now carried.
+    expect(SEGMENT_ATTACH_GAP).toBe(16);
+    const twelveOff = box(300 - 12 - 14);           // bottom 12px above the line
+    expect(labelShiftForSegmentMove(twelveOff, seg(300), seg(340)), "travels with it").toBe(40);
   });
 });
 

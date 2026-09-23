@@ -32,9 +32,18 @@
 import type { Connector, DiagramElement, Point } from "./types";
 import { connectorLabelBox, baseLabelAnchor } from "./checks/layoutViolations";
 
-/** "Very close": a label this near its segment is attached to it. The default
- *  label sits about 6px off its line, so defaults are attached. */
-export const SEGMENT_ATTACH_GAP = 8;
+/** "Very close": a label this near its segment is attached to it, and travels
+ *  with it. The default label sits about 6px off its line, so defaults are
+ *  attached.
+ *
+ *  DOUBLED from 8 to 16 on Paul's instruction, 2026-09-23. 8px only just
+ *  cleared the 6px a default label sits at, so a label nudged a little way off
+ *  its line — which is most labels anyone has tidied by hand — stopped being
+ *  carried by it. Widening the catch costs the case where two horizontal
+ *  segments run within 16px of each other and the label belongs to the further
+ *  one; `homeSegment` already picks the NEAREST, so even then it chooses the
+ *  line the words sit against. */
+export const SEGMENT_ATTACH_GAP = 16;
 
 export interface HSeg { y: number; x1: number; x2: number }
 interface Box { x: number; y: number; w: number; h: number }
