@@ -23,7 +23,9 @@
 import type { DiagramElement } from "../diagram/types";
 import type { AssistOp } from "./ops";
 import { numberTargets, type RenameTarget } from "./renameTargets";
-import { ID_REF_PREFIX } from "./resolveRef";
+import { ID_REF_PREFIX, spokenNumbersAsDigits } from "./resolveRef";
+import { phoneticMatches } from "./phonetic";
+import { leadingContainerWord } from "./containerWords";
 import { leadingSpokenNumber } from "./spokenNumber";
 
 export interface PickFlow {
@@ -65,11 +67,54 @@ export function buildPickFlow(
  * the utterance is not an answer to this question.
  */
 export function parsePickAnswer(utterance: string, flow: PickFlow): RenameTarget | null {
+  // THE NAME IS READ FIRST. The question names the candidates, so answering
+  // with one of them is the obvious thing to do — and the prompt that raised
+  // the picker asked for exactly that (Paul, 2026-09-23: `Pool three.` came
+  // back "didn't understand that" immediately after being asked which "pool
+  // three" was meant).
+  //
+  // Before the number, because `leadingSpokenNumber` forgives a mis-heard
+  // number word, and "lane" is one of the words it forgives — so "Lane 2" was
+  // read as the number ONE and picked the wrong candidate. Reading the name
+  // first costs nothing: a bare number is never a label.
+  //
+  // Safe here in a way it is not in general: the field is two or three known
+  // labels, so a loose match cannot reach anything else on the diagram. A
+  // phrase that fits more than one of them is no answer at all, and the
+  // question stands.
+  const byName = matchTargetByName(utterance, flow.targets);
+  if (byName) return byName;
+
+  // A container word that named none of them in particular — "lane", when the
+  // question was "which lane?" — is not an answer, and must not fall through
+  // to the number pass, which forgives "lane" as a mis-heard "one" and would
+  // pick the first candidate. The question stands instead.
+  if (leadingContainerWord(utterance.trim().toLowerCase())) return null;
+
   // `leadingSpokenNumber` also tolerates a filler prefix ("number 3") and a
   // misheard number word, which is the same forgiveness the rename pick gets.
   const said = leadingSpokenNumber(utterance.trim());
+  return said ? flow.targets.find((t) => t.n === said.n) ?? null : null;
+}
+
+/**
+ * The candidate a spoken phrase names, or null when it names none or more
+ * than one. Exact label first, then a contained phrase, then how it sounds —
+ * the same ladder `resolveRef` climbs, over a field of two or three.
+ */
+export function matchTargetByName(utterance: string, targets: readonly RenameTarget[]): RenameTarget | null {
+  const said = spokenNumbersAsDigits(
+    utterance.trim().toLowerCase().replace(/[.,!?;:]+$/g, "").replace(/^(?:the|a|an|it'?s|that'?s)\s+/i, "").trim(),
+  );
   if (!said) return null;
-  return flow.targets.find((t) => t.n === said.n) ?? null;
+  const labelOf = (t: RenameTarget) => spokenNumbersAsDigits((t.label ?? "").trim().toLowerCase());
+  const only = (hits: RenameTarget[]) => (hits.length === 1 ? hits[0] : null);
+
+  const exact = only(targets.filter((t) => labelOf(t) === said));
+  if (exact) return exact;
+  const contains = only(targets.filter((t) => labelOf(t).includes(said) || said.includes(labelOf(t))));
+  if (contains) return contains;
+  return only(phoneticMatches(said, [...targets], (t) => t.label ?? undefined));
 }
 
 /**

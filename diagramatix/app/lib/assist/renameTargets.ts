@@ -22,6 +22,8 @@ export interface RenameTarget {
    *  of the name (the renderer measures the name so it tracks its length).
    *  Undefined = below. */
   place?: "below" | "above" | "header";
+  /** The item's name, when it has one — how a pick may be answered in words. */
+  label?: string;
 }
 
 /** The badge position rule by element type. */
@@ -52,6 +54,10 @@ export function numberTargets(els: readonly DiagramElement[]): RenameTarget[] {
       id: e.id, n: i + 1, kind: "element" as const,
       x: e.x + e.width / 2, y: e.y + e.height / 2, height: e.height,
       place: badgePlaceFor(e.type),
+      // Carried so a picker can be answered by NAME as well as by number
+      // (disambiguate.ts) — the question shows the names, so saying one back
+      // is the obvious answer.
+      label: e.label ?? undefined,
     }));
 }
 

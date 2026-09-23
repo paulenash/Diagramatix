@@ -8,6 +8,7 @@ import { SYMBOL_SYNONYMS, SYMBOL_PHRASES } from "./ops";
 import { phoneticMatches, soundsLike } from "./phonetic";
 import { isSublane, isTopLevelLane } from "../diagram/laneKind";
 import { elementUnderPointer, isPointerElementRef } from "./pointerRef";
+import { containerWordKind, foldNumberHomophones, leadingContainerWord } from "./containerWords";
 
 export type RefResolution = { id: string } | { ambiguous: string[] } | null;
 
@@ -69,13 +70,16 @@ const tokens = (s: string) => norm(s).split(/\s+/).filter(Boolean);
 // recent element of that container type.
 function containerNoun(spoken: string, elements: DiagramElement[], strict = false): RefResolution {
   const s = stripArticle(norm(spoken));
-  let items: DiagramElement[] | null = null;
-  if (/^pools?$/.test(s)) items = elements.filter((e) => e.type === "pool");
   // B6 — a sub-lane is a nested lane OR a stamped "sublane"; "lane" on its own
   // means a band directly in a pool. The two sets do not overlap, so a
-  // "which one?" count is right either way round.
-  else if (/^sub-?lanes?$/.test(s)) items = elements.filter((e) => isSublane(e, elements));
-  else if (/^lanes?$/.test(s)) items = elements.filter((e) => isTopLevelLane(e, elements));
+  // "which one?" count is right either way round. Every spelling and mis-hear
+  // of the three words lives in containerWords.ts.
+  const kind = containerWordKind(s);
+  const items: DiagramElement[] | null =
+    kind === "pool" ? elements.filter((e) => e.type === "pool")
+    : kind === "sublane" ? elements.filter((e) => isSublane(e, elements))
+    : kind === "lane" ? elements.filter((e) => isTopLevelLane(e, elements))
+    : null;
   if (!items) return null;
   if (!items.length) return null;
   // Destructive: report the candidates rather than taking the newest.
@@ -104,12 +108,13 @@ const KIND_PREFIXES = ["sub lane", "sublane", "lane", "pool", "sub process", "su
   "start event", "end event", "event", "gateway", "decision", "task", "activity", "step"]
   .sort((a, b) => b.length - a.length);
 function stripKind(s: string): string {
-  // Container collective nouns first, allowing PLURAL + hyphen/space variants so
-  // "lanes Sales", "sub-lanes Marketing", "pools Finance" resolve to the bare
-  // name. (Only used as a fallback after the full-phrase exact match, so a lane
-  // literally named "Lane 2" still resolves via its full label first.)
-  const c = s.match(/^(?:sub[-\s]?lanes?|lanes?|pools?)\s+(.+)$/);
-  if (c) return c[1].trim();
+  // Container words first — every spelling and mis-hear of them
+  // (containerWords.ts), so "lanes Sales", "sub-lanes Marketing", "line 2" and
+  // "pools Finance" all reduce to the bare name. (Only used as a fallback
+  // after the full-phrase exact match, so a lane literally named "Lane 2"
+  // still resolves via its full label first.)
+  const lead = leadingContainerWord(s);
+  if (lead && lead.rest) return lead.rest;
   for (const k of KIND_PREFIXES) {
     if (s.startsWith(k + " ")) return s.slice(k.length).trim();
   }
@@ -126,16 +131,12 @@ function stripKind(s: string): string {
  * how an ordinary name like "Task Force" resolves.
  */
 function spokenKind(phrase: string): ((e: DiagramElement, all: DiagramElement[]) => boolean) | null {
-  const words = phrase.trim().split(/\s+/);
-  // "sub lane 2" leads with two words; "sublane 2" with one.
-  const two = words.length > 2 ? `${words[0]} ${words[1]}` : "";
-  const first = /^sub$/i.test(words[0] ?? "") && two ? two.replace(/\s+/, "-") : (words[0] ?? "");
+  const lead = leadingContainerWord(phrase);
   // A bare kind word on its own is a type noun, not a constraint on a name.
-  if (phrase.trim() === words[0] || (two && phrase.trim() === two)) return null;
-  if (/^pools?$/.test(first)) return (e) => e.type === "pool";
-  if (/^sub-?lanes?$/.test(first)) return (e, all) => isSublane(e, all);
-  if (/^lanes?$/.test(first)) return (e, all) => isTopLevelLane(e, all);
-  return null;
+  if (!lead || !lead.rest) return null;
+  if (lead.kind === "pool") return (e) => e.type === "pool";
+  if (lead.kind === "sublane") return (e, all) => isSublane(e, all);
+  return (e, all) => isTopLevelLane(e, all);
 }
 
 // "the middle pool", "the left lane", "the top pool"… → an element by position.
@@ -221,6 +222,72 @@ export function resolveSelectionRefs(spoken: string, elements: DiagramElement[],
 /** An exact-id reference the editor's guided flows hand to the apply layer ("#id:abc"). Never spoken. */
 export const ID_REF_PREFIX = "#id:";
 
+/**
+ * "the top sublane in lane one", "the sublanes in Warehouse" — a reference to
+ * what is INSIDE a container the user has named.
+ *
+ * Paul reported the dangerous shape of this on 2026-09-23: "delete the top
+ * sublane in lane one" resolved to LANE ONE ITSELF, because the words it could
+ * not read were dropped until what was left named the parent. A delete then
+ * asked to remove the lane and everything under it. So this pass reads the
+ * phrase properly, and anything it cannot read resolves to nothing rather than
+ * to the container.
+ *
+ * Returns every match, so "the sublanes in lane one" is a collective: the
+ * caller decides whether a command may act on more than one.
+ */
+export function resolveInsideRefs(
+  spoken: string,
+  elements: DiagramElement[],
+): string[] | null {
+  const s = stripArticle(norm(spoken));
+  // "from" is deliberately not a connective here: it belongs to the message
+  // commands, whose refs the grammar has already split in two.
+  const m = s.match(/^(?:(first|last|left|right|middle|centre|center|top|bottom)\s+)?(.+?)\s+(?:in|inside|of|within|under)\s+(?:the\s+)?(.+)$/);
+  if (!m) return null;
+  const [, where, whatWord, parentRef] = m;
+  const parent = resolveRef(parentRef, elements);
+  if (!parent || !("id" in parent)) return null;  // an unnamed or ambiguous parent settles nothing
+
+  // Everything below the named container, however deep — an element's parent is
+  // the band it sits in, so a pool's process is two levels down.
+  const under = (() => {
+    const ids = new Set([parent.id]);
+    for (let pass = 0; pass < 12; pass++) {
+      const before = ids.size;
+      for (const e of elements) if (e.parentId && ids.has(e.parentId)) ids.add(e.id);
+      if (ids.size === before) break;
+    }
+    ids.delete(parent.id);
+    return elements.filter((e) => ids.has(e.id));
+  })();
+
+  const kind = containerWordKind(whatWord);
+  const singular = whatWord.replace(/(?:es|s)$/, "");
+  const type = typeNoun(whatWord) ?? typeNoun(singular);
+  const inside = under
+    .filter((e) =>
+      kind === "pool" ? e.type === "pool"
+      : kind === "sublane" || kind === "lane" ? isAnyLaneLike(e) && e.parentId === parent.id
+      // "the task in sub one" — by type, or failing that by name. Never the
+      // container itself: a phrase that says "in X" is not a reference TO X,
+      // and resolving it that way is how "delete the top sublane in lane one"
+      // offered to delete the lane (Paul, 2026-09-23).
+      : type ? e.type === type
+      : norm(e.label ?? "") === whatWord || norm(e.label ?? "").includes(whatWord),
+    )
+    .sort((a, b) => a.y - b.y || a.x - b.x);
+  if (!inside.length) return [];
+  if (!where) return inside.map((e) => e.id);
+  const pickOne =
+    where === "first" || where === "top" || where === "left" ? inside[0]
+    : where === "last" || where === "bottom" || where === "right" ? inside[inside.length - 1]
+    : inside[Math.floor((inside.length - 1) / 2)];
+  return [pickOne.id];
+}
+
+/** A band of any depth — the shape a sub-lane takes on either path (see laneKind). */
+const isAnyLaneLike = (e: DiagramElement) => e.type === "lane" || e.type === "sublane";
 export function resolveRef(spoken: string, elements: DiagramElement[], lastAddedId?: string | null, selectedIds?: readonly string[], opts: ResolveOpts = {}): RefResolution {
   if (spoken.startsWith(ID_REF_PREFIX)) {
     const id = spoken.slice(ID_REF_PREFIX.length);
@@ -257,6 +324,13 @@ export function resolveRef(spoken: string, elements: DiagramElement[], lastAdded
 
   const pos = positional(s, elements);
   if (pos) return pos;
+
+  // "the top sublane in lane one" — inside a container the user named. Read
+  // BEFORE the name passes, which used to drop the words they could not
+  // understand until what was left named the PARENT, and then offer to delete
+  // it (Paul, 2026-09-23).
+  const inside = resolveInsideRefs(s, elements);
+  if (inside) return pick(inside);
 
   // Pronouns / recency. Array order reflects add order (adds append), so the
   // last two entries are "it"/"the last" and "the previous".
@@ -364,6 +438,15 @@ export function resolveRef(spoken: string, elements: DiagramElement[], lastAdded
   //    should be the one to choose.
   const heard = phoneticMatches(fullTarget, labelled, (e) => e.label ?? undefined);
   if (heard.length) return pick(heard.map((e) => e.id));
+
+  // NUMBER HOMOPHONES, last of all. "lane won" is "lane one", and the digit in
+  // "Lane 1" gives the phonetic pass nothing to work with — a number has no
+  // sound in a label written with digits. Only tried when every other read has
+  // failed, because each of these words is also ordinary English: an element
+  // someone called "Won" keeps its name, and only a diagram where nothing else
+  // matched ever reaches this line.
+  const folded = foldNumberHomophones(s);
+  if (folded !== s) return resolveRef(folded, elements, lastAddedId, selectedIds, opts);
 
   return null;
 }
