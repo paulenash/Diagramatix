@@ -315,3 +315,36 @@ describe("T4586 — R7: auto-connect obeys the same gauntlet as connect", () => 
       .toMatch(/but left it unconnected/);
   });
 });
+
+// ────────────────────────────────────────────────────────────────────────────
+describe("T4707 — a boundary move flashes, whichever edge moved", () => {
+  const pool = (o: Partial<FlashBox> = {}): FlashBox =>
+    ({ id: "p", x: 100, y: 100, width: 800, height: 400, label: "Company", marks: "", ...o });
+
+  it("the RIGHT boundary — the one that reported nothing", () => {
+    // Paul, 2026-09-23: "No flashing occurred when this command executed:
+    // 'Move company right boundary, right.' → moved Company's right boundary
+    // right 20px." The diff read x and y alone, so a width-only change was
+    // invisible to it.
+    expect(flashTargets([pool()], [pool({ width: 820 })]).map((b) => b.id)).toEqual(["p"]);
+  });
+
+  it("and the bottom, which changes only the height", () => {
+    expect(flashTargets([pool()], [pool({ height: 420 })]).map((b) => b.id)).toEqual(["p"]);
+  });
+
+  it("the left and top still flash — they move the origin, and always did", () => {
+    expect(flashTargets([pool()], [pool({ x: 80, width: 820 })]).map((b) => b.id)).toEqual(["p"]);
+    expect(flashTargets([pool()], [pool({ y: 80, height: 420 })]).map((b) => b.id)).toEqual(["p"]);
+  });
+
+  it("a redraw that changes nothing still flashes nothing", () => {
+    expect(flashTargets([pool()], [pool()])).toEqual([]);
+    // Sub-pixel noise is not a change: the same epsilon as a move.
+    expect(flashTargets([pool()], [pool({ width: 800.2 })])).toEqual([]);
+  });
+
+  it("the op is on the flashing list, so the batch arms the snapshot", () => {
+    expect(opFlashes("movePoolBoundary")).toBe(true);
+  });
+});

@@ -187,13 +187,24 @@ export function flashTargets(
     if (!old) { added.push(e); continue; }
     if ((old.parentId ?? null) !== (e.parentId ?? null)) { reparented.push(e); continue; }
     const movedIt = Math.abs(old.x - e.x) > MOVED_EPSILON || Math.abs(old.y - e.y) > MOVED_EPSILON;
+    // RESIZED COUNTS AS CHANGED. Paul, 2026-09-23: "No flashing occurred when
+    // this command executed: 'Move company right boundary, right.' → moved
+    // Company's right boundary right 20px."
+    //
+    // The diff read x and y alone, so it saw a LEFT or TOP boundary move (which
+    // shifts the pool's origin) and was blind to a RIGHT or BOTTOM one, which
+    // only changes the width or the height. Half the command worked and half of
+    // it silently did not — and a boundary move is precisely the case the flash
+    // exists for, since nothing inside the pool moves.
+    const resized = Math.abs(old.width - e.width) > MOVED_EPSILON
+      || Math.abs(old.height - e.height) > MOVED_EPSILON;
     // A rename is a change to that item as much as a nudge is, and it is the
     // only one of the two that leaves the geometry alone.
     const renamed = (old.label ?? "") !== (e.label ?? "");
     // R5 — so is becoming a user task. A subtype change can leave position,
     // parent and label all identical.
     const remarked = (old.marks ?? "") !== (e.marks ?? "");
-    if (movedIt || renamed || remarked) changed.push(e);
+    if (movedIt || resized || renamed || remarked) changed.push(e);
   }
 
   const chosen = added.length || reparented.length ? [...added, ...reparented] : changed;
