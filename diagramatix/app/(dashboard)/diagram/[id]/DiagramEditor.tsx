@@ -70,6 +70,8 @@ import { syntheticElement, withAdded, withDeleted, withLabel } from "@/app/lib/a
 import { needsConfirmation, parseConfirmation } from "@/app/lib/assist/confirm";
 import { collectRenameTargets, type RenameType, type RenameTarget } from "@/app/lib/assist/renameTargets";
 import { buildPickFlow, parsePickAnswer, substituteRef, type PickFlow } from "@/app/lib/assist/disambiguate";
+import { cardsOf, numberTemplates, offerableTemplates, parseTemplateAnswer, type TemplateCard, type TemplateSection } from "@/app/lib/assist/templatePick";
+import { TemplatePickerWindow } from "@/app/components/canvas/TemplatePickerWindow";
 import { diagramKeyterms } from "@/app/lib/dictation/diagramKeyterms";
 import { VoiceAssistBar, type CommandLogEntry } from "@/app/components/canvas/VoiceAssistBar";
 import { startDictation, type DictationHandle } from "@/app/lib/dictation";
@@ -1976,13 +1978,19 @@ export function DiagramEditor({
     if (usesPlanPanel) { setShowPlanPanel(true); setShowAiPanel(false); }
     else { setShowAiPanel(true); setShowPlanPanel(false); }
   }, [data.aiGeneration, usesPlanPanel]);
-  type TemplateRow = { id: string; name: string; group: string | null; description?: string | null; thumbnailSvg?: string | null; hasContainer?: boolean };
+  type TemplateRow = { id: string; name: string; group: string | null; description?: string | null; thumbnailSvg?: string | null; hasContainer?: boolean; hasWhiteBoxPool?: boolean };
   const [userTemplates, setUserTemplates] = useState<TemplateRow[]>([]);
   const [builtInTemplates, setBuiltInTemplates] = useState<TemplateRow[]>([]);
   // Per-user collapse state, keyed `<scope>:<group-name>` (scope = "user"
   // or "builtin"). true = collapsed. Loaded from /api/templates/group-prefs
   // on mount and updated optimistically on every toggle.
   const [templateGroupCollapsed, setTemplateGroupCollapsed] = useState<Record<string, boolean>>({});
+  // The row the mouse is resting on in the template menu. Paul, 2026-09-24:
+  // "when the user hovers over the small icon in the drop down list display a
+  // larger version to the right to allow the user to see the template in more
+  // detail before choosing it." The list icon is 64×48 — enough to tell a
+  // gateway from a loop, not enough to tell two loops apart.
+  const [templateHover, setTemplateHover] = useState<TemplateRow | null>(null);
   // Which template (if any) is showing a "Move to group..." submenu, and
   // whether it's in the typed-new-group mode.
   const [templateMoveMenu, setTemplateMoveMenu] = useState<{
@@ -2349,22 +2357,22 @@ export function DiagramEditor({
       try {
         const r1 = await fetch("/api/templates?type=user");
         if (r1.ok) {
-          const list = await r1.json() as { id: string; name: string; diagramType: string; group: string | null; description?: string | null; thumbnailSvg?: string | null; hasContainer?: boolean }[];
+          const list = await r1.json() as { id: string; name: string; diagramType: string; group: string | null; description?: string | null; thumbnailSvg?: string | null; hasContainer?: boolean; hasWhiteBoxPool?: boolean }[];
           setUserTemplates(
             list
               .filter((t) => t.diagramType === "bpmn")
-              .map((t) => ({ id: t.id, name: t.name, group: t.group ?? null, description: t.description ?? null, thumbnailSvg: t.thumbnailSvg ?? null, hasContainer: !!t.hasContainer })),
+              .map((t) => ({ id: t.id, name: t.name, group: t.group ?? null, description: t.description ?? null, thumbnailSvg: t.thumbnailSvg ?? null, hasContainer: !!t.hasContainer, hasWhiteBoxPool: !!t.hasWhiteBoxPool })),
           );
         }
       } catch {}
       try {
         const r2 = await fetch("/api/templates?type=builtin");
         if (r2.ok) {
-          const list = await r2.json() as { id: string; name: string; diagramType: string; group: string | null; description?: string | null; thumbnailSvg?: string | null; hasContainer?: boolean }[];
+          const list = await r2.json() as { id: string; name: string; diagramType: string; group: string | null; description?: string | null; thumbnailSvg?: string | null; hasContainer?: boolean; hasWhiteBoxPool?: boolean }[];
           setBuiltInTemplates(
             list
               .filter((t) => t.diagramType === "bpmn")
-              .map((t) => ({ id: t.id, name: t.name, group: t.group ?? null, description: t.description ?? null, thumbnailSvg: t.thumbnailSvg ?? null, hasContainer: !!t.hasContainer })),
+              .map((t) => ({ id: t.id, name: t.name, group: t.group ?? null, description: t.description ?? null, thumbnailSvg: t.thumbnailSvg ?? null, hasContainer: !!t.hasContainer, hasWhiteBoxPool: !!t.hasWhiteBoxPool })),
           );
         }
       } catch {}
@@ -2735,6 +2743,18 @@ export function DiagramEditor({
   //    rename and message flows — the point of R2 was never new UI, it was that
   //    a mechanism the product already had was not reached from the one place
   //    that most needed it.
+  // "Add template" (Paul, 2026-09-24): the numbered window, and the template
+  // currently sitting on the diagram waiting to be kept. The pick is applied
+  // for real so it can be SEEN in place; another number undoes it and applies
+  // the next; only "yes" keeps it.
+  const [templateFlow, setTemplateFlowState] = useState<{
+    sections: TemplateSection[];
+    cards: TemplateCard[];
+    provisional: TemplateCard | null;
+    hiddenInitialCount: number;
+  } | null>(null);
+  const templateFlowRef = useRef<typeof templateFlow>(null);
+  const setTemplateFlow = useCallback((f: typeof templateFlow) => { templateFlowRef.current = f; setTemplateFlowState(f); }, []);
   const [pickFlow, setPickFlowState] = useState<PickFlow | null>(null);
   const pickFlowRef = useRef<PickFlow | null>(null);
   const setPickFlow = useCallback((f: PickFlow | null) => { pickFlowRef.current = f; setPickFlowState(f); }, []);
@@ -3725,6 +3745,11 @@ export function DiagramEditor({
         continue;
       }
 
+      if (op.op === "pickTemplate") {
+        results.push(openTemplateWindowRef.current());
+        continue;
+      }
+
       if (op.op === "addLanes") {
         const pool = resolve1(op.poolRef);
         // Candidates that share a label cannot be told apart by saying the name
@@ -3949,6 +3974,29 @@ export function DiagramEditor({
         return;
       }
     }
+    if (templateFlowRef.current) {
+      const flow = templateFlowRef.current;
+      const answer = parseTemplateAnswer(heard, flow.cards, !!flow.provisional);
+      if (!answer) { log({ heard, summary: "say a number, “yes” to keep it, or “cancel”", ok: false }); return; }
+      if (answer.kind === "cancel") {
+        if (flow.provisional) undo();
+        setTemplateFlow(null);
+        log({ heard, summary: "cancelled — no template added", ok: true });
+        return;
+      }
+      if (answer.kind === "confirm") {
+        const kept = flow.provisional!;
+        setTemplateFlow(null);
+        log({ heard, summary: `added template “${kept.name}”`, ok: true });
+        return;
+      }
+      // A number: show that one instead of whatever is showing now.
+      const ok = await previewTemplateRef.current(answer.card, !!flow.provisional);
+      if (!ok) { log({ heard, summary: `couldn't load “${answer.card.name}”`, ok: false }); return; }
+      setTemplateFlow({ ...flow, provisional: answer.card });
+      log({ heard, summary: `${answer.card.n} → “${answer.card.name}” — say “yes” to keep it`, ok: true });
+      return;
+    }
     if (pickFlowRef.current) {
       const flow = pickFlowRef.current;
       if (isFlowEndWord(heard)) {
@@ -4172,16 +4220,24 @@ export function DiagramEditor({
 
   // Escape cancels a guided pick (rename or message) at any phase.
   useEffect(() => {
-    if (!renameFlow && !messageFlow && !pickFlow) return;
+    if (!renameFlow && !messageFlow && !pickFlow && !templateFlow) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       if (renameFlow) cancelRenameFlow("rename cancelled");
       if (messageFlow) { setMessageFlow(null); setVoiceLog((prev) => [...prev, { id: nanoid(), heard: "", summary: "message cancelled", ok: true }]); }
       if (pickFlow) { setPickFlow(null); setVoiceLog((prev) => [...prev, { id: nanoid(), heard: "", summary: "cancelled", ok: true }]); }
+      // Esc takes the provisional template back off with it — the window is
+      // shut either way, and leaving a half-chosen template behind would be
+      // the one outcome nobody asked for.
+      if (templateFlow) {
+        if (templateFlow.provisional) undo();
+        setTemplateFlow(null);
+        setVoiceLog((prev) => [...prev, { id: nanoid(), heard: "", summary: "cancelled — no template added", ok: true }]);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [renameFlow, messageFlow, pickFlow, cancelRenameFlow, setMessageFlow, setPickFlow]);
+  }, [renameFlow, messageFlow, pickFlow, templateFlow, cancelRenameFlow, setMessageFlow, setPickFlow, setTemplateFlow, undo]);
 
   // Stop the mic when the mode is turned off or the editor unmounts.
   useEffect(() => {
@@ -4997,8 +5053,51 @@ export function DiagramEditor({
     setSelectedConnectorId(null);
   }
 
+  /**
+   * Put a template on the diagram to be LOOKED at. Any previous provisional
+   * one is undone first, so the window always shows exactly one candidate and
+   * the history holds one entry however many numbers were tried.
+   */
+  const previewTemplate = useCallback(async (card: TemplateCard, hadProvisional: boolean): Promise<boolean> => {
+    try {
+      const res = await fetch(`/api/templates/${card.id}`);
+      if (!res.ok) return false;
+      const tmpl = await res.json();
+      if (hadProvisional) undo();
+      const center = getViewportCenterRef.current?.() ?? { x: 200, y: 200 };
+      const { elements, connectors, newIds } = instantiateTemplate(tmpl.data as TemplateData, center.x, center.y);
+      applyTemplate(elements, connectors);
+      setSelectedElementIds(newIds);
+      setSelectedConnectorId(null);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [undo, applyTemplate]);
+
+  /** Open the window: every template this diagram may sensibly take, numbered. */
+  const openTemplateWindowRef = useRef<() => string>(() => "");
+  const previewTemplateRef = useRef<(card: TemplateCard, hadProvisional: boolean) => Promise<boolean>>(async () => false);
+  const openTemplateWindow = useCallback((): string => {
+    const hasWhiteBox = data.elements.some(
+      (e) => e.type === "pool" && (e.properties?.poolType ?? "white-box") === "white-box",
+    );
+    const offerBuiltIn = offerableTemplates(builtInTemplates, hasWhiteBox);
+    const offerUser = offerableTemplates(userTemplates, hasWhiteBox);
+    const hidden = (builtInTemplates.length - offerBuiltIn.length) + (userTemplates.length - offerUser.length);
+    const sections = numberTemplates(offerBuiltIn, offerUser);
+    const cards = cardsOf(sections);
+    if (!cards.length) return "no templates to offer for this diagram";
+    setTemplateFlow({ sections, cards, provisional: null, hiddenInitialCount: hidden });
+    return `${cards.length} templates — say a number${hidden ? `, ${hidden} starter${hidden === 1 ? "" : "s"} hidden` : ""}`;
+  }, [data.elements, builtInTemplates, userTemplates, setTemplateFlow]);
+
+  openTemplateWindowRef.current = openTemplateWindow;
+  previewTemplateRef.current = previewTemplate;
+
   async function handleApplyTemplate(templateId: string) {
     setTemplateDropdownOpen(false);
+    setTemplateHover(null);
     try {
       const res = await fetch(`/api/templates/${templateId}`);
       if (!res.ok) { console.error("Failed to fetch template:", res.status); return; }
@@ -5748,8 +5847,29 @@ export function DiagramEditor({
             >
               Templates {"\u25BE"}
             </button>
+            {templateDropdownOpen && templateHover && (
+              // A LARGER LOOK BEFORE CHOOSING (Paul, 2026-09-24). Beside the
+              // menu rather than to its right: the menu is anchored to the
+              // right-hand edge of the window, so a panel on that side would
+              // be off-screen. Pointer-transparent, so it can never sit
+              // between the mouse and the row it is describing.
+              <div
+                className="absolute top-full mt-1 right-full mr-2 w-[22rem] bg-white border border-gray-200 rounded shadow-lg z-50 p-3 pointer-events-none"
+                data-template-preview="large"
+              >
+                <div className="flex items-center justify-center h-[220px] overflow-hidden">
+                  <TemplateThumbnail templateId={templateHover.id} svg={templateHover.thumbnailSvg} width={330} height={215} />
+                </div>
+                <p className="mt-2 text-xs font-medium text-gray-800">{templateHover.name}</p>
+                {templateHover.group && <p className="text-[11px] text-gray-400">{templateHover.group}</p>}
+                {templateHover.description && <p className="mt-1 text-[11px] text-gray-600">{templateHover.description}</p>}
+              </div>
+            )}
             {templateDropdownOpen && (
-              <div className="absolute right-0 top-full mt-1 w-80 bg-white border border-gray-200 rounded shadow-lg z-50 max-h-96 overflow-y-auto">
+              <div
+                className="absolute right-0 top-full mt-1 w-80 bg-white border border-gray-200 rounded shadow-lg z-50 max-h-96 overflow-y-auto"
+                onMouseLeave={() => setTemplateHover(null)}
+              >
                 {/* Create actions */}
                 <button
                   onClick={() => { setTemplateMode("capturing"); setTemplateDropdownOpen(false); }}
@@ -5794,7 +5914,10 @@ export function DiagramEditor({
                     const showingMove = templateMoveMenu?.templateId === t.id;
                     return (
                       <div key={t.id}>
-                        <div className={`flex items-center ${isDeleting ? "opacity-50" : "hover:bg-gray-50"}`}>
+                        <div
+                          className={`flex items-center ${isDeleting ? "opacity-50" : "hover:bg-gray-50"}`}
+                          onMouseEnter={() => setTemplateHover(t)}
+                        >
                           <button
                             onClick={() => !isDeleting && handleApplyTemplate(t.id)}
                             disabled={isDeleting}
@@ -5892,7 +6015,30 @@ export function DiagramEditor({
                   return (
                     <div key={scope}>
                       <div className="border-t border-gray-100" />
-                      <p className="px-3 py-1.5 text-[10px] text-gray-400 font-semibold uppercase tracking-wide">{scopeLabel}</p>
+                      <div className="flex items-center gap-2 px-3 py-1.5">
+                        <p className="flex-1 text-[10px] text-gray-400 font-semibold uppercase tracking-wide">{scopeLabel}</p>
+                        {groupNames.length > 0 && (() => {
+                          // Paul, 2026-09-24: "a 'collapse all' option on the
+                          // BUILT-IN and USER lines is required." It toggles:
+                          // once everything is shut, the same control opens it
+                          // again, which is the only thing to want next.
+                          const allShut = groupNames.every((g) => templateGroupCollapsed[`${scope}:${g}`]);
+                          return (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                for (const g of groupNames) {
+                                  if (!!templateGroupCollapsed[`${scope}:${g}`] === allShut) toggleTemplateGroupCollapse(scope, g);
+                                }
+                              }}
+                              className="text-[10px] text-gray-400 hover:text-blue-600"
+                              title={allShut ? `Expand every ${scopeLabel} group` : `Collapse every ${scopeLabel} group`}
+                            >
+                              {allShut ? "expand all" : "collapse all"}
+                            </button>
+                          );
+                        })()}
+                      </div>
                       {ungrouped.map((t) => renderItem(t, false))}
                       {groupNames.map((g) => {
                         const collapsed = !!templateGroupCollapsed[`${scope}:${g}`];
@@ -7305,6 +7451,30 @@ export function DiagramEditor({
             message={epCollapseMsg}
             tone="error"
             onClose={() => setEpCollapseMsg(null)}
+          />
+        )}
+
+        {/* "Add template" — the numbered window, answered by voice or mouse. */}
+        {templateFlow && (
+          <TemplatePickerWindow
+            sections={templateFlow.sections}
+            provisionalId={templateFlow.provisional?.id ?? null}
+            hiddenInitialCount={templateFlow.hiddenInitialCount}
+            onPick={async (card) => {
+              const flow = templateFlowRef.current;
+              if (!flow) return;
+              const ok = await previewTemplateRef.current(card, !!flow.provisional);
+              if (ok) setTemplateFlow({ ...flow, provisional: card });
+            }}
+            onConfirm={() => {
+              const kept = templateFlowRef.current?.provisional;
+              setTemplateFlow(null);
+              if (kept) setVoiceLog((prev) => [...prev, { id: nanoid(), heard: "", summary: `added template “${kept.name}”`, ok: true }]);
+            }}
+            onCancel={() => {
+              if (templateFlowRef.current?.provisional) undo();
+              setTemplateFlow(null);
+            }}
           />
         )}
 

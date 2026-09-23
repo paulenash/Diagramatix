@@ -64,6 +64,13 @@ export type AssistOp =
    *  with `fromSelection` → number the selection's valid counterparts, wait for "to/from n labelled X". */
   | { op: "addMessageByNumber"; fromSelection?: boolean }
   | { op: "clear" }
+  /**
+   * "Add template" — open the template window, numbered, and let the user
+   * choose by saying a number (Paul, 2026-09-24). The pick is PROVISIONAL:
+   * the template goes on the diagram to be looked at, another number replaces
+   * it, and only "yes" keeps it. See `templatePick.ts`.
+   */
+  | { op: "pickTemplate" }
   | { op: "export"; format?: "json" }
   | { op: "movePoolTo"; ref: Ref; position: "above" | "below"; relativeTo: Ref }
   | { op: "swapPools"; a?: Ref; b?: Ref }
@@ -290,6 +297,10 @@ export function validateOp(raw: unknown): AssistOp | null {
     }
     case "clear":
       return { op: "clear" };
+    // Opening the template window takes no argument: the window is the
+    // question, and the answer comes back as a number.
+    case "pickTemplate":
+      return { op: "pickTemplate" };
     case "export":
       return { op: "export", format: "json" };
     case "movePoolTo": {

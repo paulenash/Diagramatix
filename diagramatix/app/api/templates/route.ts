@@ -32,7 +32,15 @@ export async function GET(req: Request) {
       result = await pgPool.query(
         `SELECT id, name, "diagramType", "group", description, "thumbnailSvg", "createdAt",
                 EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE(data->'elements', '[]'::jsonb)) e
-                         WHERE e->>'type' IN ('pool','lane','sublane')) AS "hasContainer"
+                         WHERE e->>'type' IN ('pool','lane','sublane')) AS "hasContainer",
+                -- A template that STARTS a diagram: it brings its own white-box
+                -- pool. Read from the template's own data, so it cannot go stale
+                -- the way a tick somebody has to remember would (Paul,
+                -- 2026-09-24). Black-box participant pools do NOT count — those
+                -- are fine to add to a live diagram.
+                EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE(data->'elements', '[]'::jsonb)) e
+                         WHERE e->>'type' = 'pool'
+                           AND e->'properties'->>'poolType' = 'white-box') AS "hasWhiteBoxPool"
          FROM "DiagramTemplate"
          WHERE "templateType" = 'builtin'
          ORDER BY "updatedAt" DESC`
@@ -43,7 +51,15 @@ export async function GET(req: Request) {
       result = await pgPool.query(
         `SELECT id, name, "diagramType", "group", description, "thumbnailSvg", "createdAt",
                 EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE(data->'elements', '[]'::jsonb)) e
-                         WHERE e->>'type' IN ('pool','lane','sublane')) AS "hasContainer"
+                         WHERE e->>'type' IN ('pool','lane','sublane')) AS "hasContainer",
+                -- A template that STARTS a diagram: it brings its own white-box
+                -- pool. Read from the template's own data, so it cannot go stale
+                -- the way a tick somebody has to remember would (Paul,
+                -- 2026-09-24). Black-box participant pools do NOT count — those
+                -- are fine to add to a live diagram.
+                EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE(data->'elements', '[]'::jsonb)) e
+                         WHERE e->>'type' = 'pool'
+                           AND e->'properties'->>'poolType' = 'white-box') AS "hasWhiteBoxPool"
          FROM "DiagramTemplate"
          WHERE "templateType" = 'user' AND "userId" = $1
          ORDER BY "updatedAt" DESC`,

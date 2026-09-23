@@ -102,6 +102,8 @@ Op shapes (use element NAMES for refs — they are resolved against the diagram;
   { "op":"wrapInSubprocess", "label"?: string }           // surround the SELECTED elements with an expanded subprocess
   { "op":"unwrapSubprocess" }                              // dissolve the SELECTED expanded subprocess back into the flow
   { "op":"renameByType", "itemType": "pool"|"lane"|"message"|"task"|"subprocess"|"gateway"|"event"|"connector" }  // numbers them for a pick
+  { "op":"pickTemplate" }   // open the numbered TEMPLATE window; the user then says a number, and "yes" to keep it.
+        // Use for anything that asks to add or see a template WITHOUT naming one. Never invent a template name.
   { "op":"fillLabels", "labels": string[] }  // name every SELECTED element at once, in reading order (rows top to
         // bottom, each row left to right). The counts must match; a mismatch is refused, not truncated.
   { "op":"assignTeam", "team": string }      // put the SELECTED activities in a simulation team

@@ -82,6 +82,17 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     return [{ op: "again" }];
   }
 
+  // ── Templates — open the numbered window (Paul, 2026-09-24) ──
+  //
+  // BEFORE the add rule, which would otherwise read "add template" as a task
+  // to be created and named "template" — the same swallow the lane rules sit
+  // above. Only the bare command: "add a template called X" is somebody
+  // naming a task, and it is left alone.
+  if (/^(?:add|insert|use|show|open|pick|choose)\s+(?:a\s+|the\s+)?templates?$/i.test(lower)
+      || /^templates?$/i.test(lower)) {
+    return [{ op: "pickTemplate" }];
+  }
+
   // ── Clear the whole diagram ──
   if (/^(clear|empty|wipe|reset|blank)\s+(the\s+)?(current\s+|whole\s+|entire\s+)?(diagram|canvas|everything|it all|all|page)\b/.test(lower)
       || /^(start over|start again|new diagram|clear all|delete everything|remove everything)\b/.test(lower)) {

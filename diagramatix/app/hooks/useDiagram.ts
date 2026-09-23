@@ -2758,6 +2758,95 @@ function rescaleSublanesRecursive(
  *
  * Returns the updated elements + connectors.
  */
+/**
+ * Grow a lane so it is at least `minHeight` tall, pushing what is below it
+ * down and taking its ancestors with it.
+ *
+ * This was the inside of `resizeLaneForLabel`, which grew a lane to fit its
+ * NAME. Paul, 2026-09-24: "Note that insert a template may require the current
+ * Lane and Pool to be expanded to accommodate the new template." The same
+ * machinery answers both — what differs is only the height being asked for —
+ * and a second copy of "grow a band and keep the stack tight" is the kind of
+ * duplicate that goes stale in one place.
+ *
+ * Everything that must move, moves: the lane's own contents stay with it, the
+ * siblings below it (and their whole subtrees) go down by the growth, and each
+ * ancestor grows in turn, shifting ITS later siblings too. Returns the same
+ * array when the lane is already tall enough.
+ */
+function growLaneToHeight(
+  baseElements: DiagramElement[],
+  laneId: string,
+  minHeight: number,
+): DiagramElement[] {
+  const lane = baseElements.find((e) => e.id === laneId && e.type === "lane");
+  if (!lane || lane.height >= minHeight) return baseElements;
+  let elements = baseElements;
+  const growBy = minHeight - lane.height;
+
+  const siblings = elements
+    .filter((e) => e.type === "lane" && e.parentId === lane.parentId)
+    .sort((a, b) => a.y - b.y);
+  const idx = siblings.findIndex((sib) => sib.id === laneId);
+  const moveDownIds = new Set(siblings.slice(idx + 1).map((sib) => sib.id));
+
+  // Collect descendants of THIS lane and of every sibling below — they need to
+  // shift down together so contents stay anchored.
+  const descendants = new Set<string>();
+  function collectDesc(rootId: string) {
+    for (const e of elements) {
+      if (e.parentId === rootId || e.boundaryHostId === rootId) {
+        descendants.add(e.id);
+        collectDesc(e.id);
+      }
+    }
+  }
+  for (const sib of siblings.slice(idx + 1)) collectDesc(sib.id);
+
+  elements = elements.map((e) => {
+    if (e.id === lane.id) return { ...e, height: e.height + growBy };
+    if (moveDownIds.has(e.id) || descendants.has(e.id)) return { ...e, y: e.y + growBy };
+    return e;
+  });
+
+  // Propagate the growth UPWARD: a parent lane (if this is a sublane) and the
+  // pool eventually contain more. At each level, shift the just-grown
+  // ancestor's later siblings down so they are not overlapped by it.
+  let cur = elements.find((e) => e.id === lane.parentId);
+  while (cur) {
+    if (cur.type === "pool" || cur.type === "lane") {
+      const grownId = cur.id;
+      const shiftIds = new Set<string>();
+      if (cur.parentId) {
+        const ancestorSibs = elements
+          .filter((e) => e.type === "lane" && e.parentId === cur!.parentId)
+          .sort((a, b) => a.y - b.y);
+        const ai = ancestorSibs.findIndex((sib) => sib.id === grownId);
+        for (const sib of ancestorSibs.slice(ai + 1)) {
+          shiftIds.add(sib.id);
+          const stack = [sib.id];
+          while (stack.length) {
+            const cid = stack.pop()!;
+            for (const e of elements) {
+              if ((e.parentId === cid || e.boundaryHostId === cid) && !shiftIds.has(e.id)) {
+                shiftIds.add(e.id);
+                stack.push(e.id);
+              }
+            }
+          }
+        }
+      }
+      elements = elements.map((e) => {
+        if (e.id === grownId) return { ...e, height: e.height + growBy };
+        if (shiftIds.has(e.id)) return { ...e, y: e.y + growBy };
+        return e;
+      });
+    }
+    cur = cur.parentId ? elements.find((e) => e.id === cur!.parentId) : undefined;
+  }
+  return elements;
+}
+
 function resizeLaneForLabel(
   baseElements: DiagramElement[],
   baseConnectors: Connector[],
@@ -2774,74 +2863,7 @@ function resizeLaneForLabel(
 
   // ── 1. Height: grow this lane if its label demands more vertical space. ──
   const { minHeight: laneMin } = laneMetrics(lane.label, fontSize);
-  if (lane.height < laneMin) {
-    const growBy = laneMin - lane.height;
-    const siblings = elements
-      .filter(e => e.type === "lane" && e.parentId === lane.parentId)
-      .sort((a, b) => a.y - b.y);
-    const idx = siblings.findIndex(s => s.id === laneId);
-    const moveDownIds = new Set(siblings.slice(idx + 1).map(s => s.id));
-
-    // Collect descendants of THIS lane and of every sibling below — they
-    // need to shift down together so contents stay anchored.
-    const descendants = new Set<string>();
-    function collectDesc(rootId: string) {
-      for (const e of elements) {
-        if (e.parentId === rootId || e.boundaryHostId === rootId) {
-          descendants.add(e.id);
-          collectDesc(e.id);
-        }
-      }
-    }
-    collectDesc(lane.id);
-    for (const s of siblings.slice(idx + 1)) collectDesc(s.id);
-
-    elements = elements.map(e => {
-      if (e.id === lane.id) return { ...e, height: e.height + growBy };
-      if (moveDownIds.has(e.id)) return { ...e, y: e.y + growBy };
-      if (descendants.has(e.id)) return { ...e, y: e.y + growBy };
-      return e;
-    });
-
-    // Propagate height growth UPWARD: parent lane (if sublane) and the
-    // pool eventually contain more content. At each level, also shift
-    // the just-grown ancestor's later siblings down so they don't end
-    // up overlapped by the expanded ancestor.
-    let cur = elements.find(e => e.id === lane.parentId);
-    while (cur) {
-      if (cur.type === "pool" || cur.type === "lane") {
-        const grownId = cur.id;
-        // Shift later siblings (only relevant when cur has a parent —
-        // pools have no siblings to shift).
-        const shiftIds = new Set<string>();
-        if (cur.parentId) {
-          const ancestorSibs = elements
-            .filter(e => e.type === "lane" && e.parentId === cur!.parentId)
-            .sort((a, b) => a.y - b.y);
-          const ai = ancestorSibs.findIndex(s => s.id === grownId);
-          for (const sib of ancestorSibs.slice(ai + 1)) {
-            shiftIds.add(sib.id);
-            const stack = [sib.id];
-            while (stack.length) {
-              const cid = stack.pop()!;
-              for (const e of elements) {
-                if ((e.parentId === cid || e.boundaryHostId === cid) && !shiftIds.has(e.id)) {
-                  shiftIds.add(e.id);
-                  stack.push(e.id);
-                }
-              }
-            }
-          }
-        }
-        elements = elements.map(e => {
-          if (e.id === grownId) return { ...e, height: e.height + growBy };
-          if (shiftIds.has(e.id)) return { ...e, y: e.y + growBy };
-          return e;
-        });
-      }
-      cur = cur.parentId ? elements.find(e => e.id === cur!.parentId) : undefined;
-    }
-  }
+  elements = growLaneToHeight(elements, laneId, laneMin);
 
   // ── 2. Header width: sync the max across all sibling lanes of the
   // same parent; shift each sibling's descendants by the per-lane delta.
@@ -9735,14 +9757,51 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       return { ...state, elements };
     }
 
-    case "APPLY_TEMPLATE":
+    case "APPLY_TEMPLATE": {
+      // A TEMPLATE DROPPED INSIDE A POOL BELONGS TO IT, AND THE POOL MAKES ROOM.
+      //
+      // Paul, 2026-09-24: "Note that insert a template may require the current
+      // Lane and Pool to be expanded to accommodate the new template." It did
+      // not: the inserted elements arrived with no parent, so the adoption pass
+      // never saw them, the enclosing pass had nothing to enclose, and a
+      // template larger than the space left simply hung out over the edge of
+      // the pool.
+      //
+      // Three steps, in this order, because each needs the one before it:
+      //   1. ADOPT by geometry — the same rule a dragged element obeys, so a
+      //      template dropped in a lane is in that lane and nowhere else.
+      //   2. GROW the lane it landed in to cover it, pushing the lanes below
+      //      down and taking the pool with them (`growLaneToHeight`).
+      //   3. ENCLOSE, which catches the width and anything not in a lane.
+      const laneFs = state.laneFontSize ?? 14;
+      const merged = reconcileLaneMembership([...state.elements, ...action.payload.elements]);
+      const addedIds = new Set(action.payload.elements.map((e) => e.id));
+      // Deepest first: growing a sub-lane moves its lane, and asking in the
+      // other order would measure the lane before its sub-lane had grown.
+      const depthOf = (el: DiagramElement): number => {
+        let d = 0;
+        let cur: DiagramElement | undefined = el;
+        for (let i = 0; cur?.parentId && i < 12; i++) { d++; cur = merged.find((e) => e.id === cur!.parentId); }
+        return d;
+      };
+      let elements = merged;
+      const hosts = merged
+        .filter((e) => e.type === "lane" && merged.some((k) => addedIds.has(k.id) && k.parentId === e.id))
+        .sort((a, b) => depthOf(b) - depthOf(a));
+      for (const host of hosts) {
+        const lane = elements.find((e) => e.id === host.id);
+        if (!lane) continue;
+        const kids = elements.filter((e) => e.parentId === lane.id && e.type !== "lane" && e.type !== "sublane");
+        if (!kids.length) continue;
+        const needed = Math.max(...kids.map((k) => k.y + k.height)) + 8 - lane.y;
+        elements = growLaneToHeight(elements, lane.id, Math.max(needed, laneMetrics(lane.label ?? "", laneFs).minHeight));
+      }
       return {
         ...state,
-        // Grow any pool/lane around inserted elements that were parented into it
-        // (e.g. a template attached to a task inside a lane).
-        elements: ensureContainersEncloseChildren([...state.elements, ...action.payload.elements]),
+        elements: ensureContainersEncloseChildren(elements),
         connectors: [...state.connectors, ...action.payload.connectors],
       };
+    }
 
     case "ALIGN_ELEMENTS": {
       const { ids, mode } = action.payload;
