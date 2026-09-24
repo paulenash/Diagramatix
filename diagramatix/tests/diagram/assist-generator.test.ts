@@ -232,11 +232,28 @@ describe("T4728 — the scorer names the layer, not just the failure", () => {
     // The single most misleading way to score the audio leg. Counting these as
     // failures makes the recogniser look far worse than it is and hides the
     // mis-hears that actually cost something.
+    //
+    // A genuine mis-hear that still works: "remove" heard for "delete". Both
+    // parse to the same op, so the user got what they asked for even though the
+    // words on the wire were not the words in their mouth.
     const c = one("delete Review", [{ op: "delete", ref: "Review" }], { Review: "t1" });
-    const r = scoreCase(c, "Delete review.", els);
+    const r = scoreCase(c, "Remove review.", els);
     expect(r.outcome).toBe("pass-despite-mishear");
     expect(r.textDiffered).toBe(true);
     expect(isFailure(r.outcome)).toBe(false);
+  });
+
+  it("punctuation and capitals are NOT a mis-hear", () => {
+    // Paul's first batch run came back with all 73 passes labelled
+    // "pass-despite-mishear" and none clean, which reads as "the recogniser
+    // mangled every sentence and we got away with it". It had not:
+    // `smart_format` capitalises and adds a full stop, and a lower-cased string
+    // compare called that a mis-hear one hundred times out of one hundred.
+    // A mis-hear is a changed WORD.
+    const c = one("delete Review", [{ op: "delete", ref: "Review" }], { Review: "t1" });
+    const r = scoreCase(c, "Delete review.", els);
+    expect(r.textDiffered, "same words, different rendering").toBe(false);
+    expect(r.outcome).toBe("pass");
   });
 
   it("refused, and the words were right → the GRAMMAR", () => {
@@ -313,10 +330,10 @@ describe("T4729 — one scorer, two legs", () => {
     const els = world();
     const c = generateCases({ seed: "legs", count: 1, world: els })[0];
     // Same words, different capitalisation and punctuation — which is exactly
-    // what a recogniser returns.
+    // what a recogniser returns, and must NOT be reported as a mis-hear.
     const r = scoreCase(c, `${c.utterance.toUpperCase()}.`, els);
-    expect(r.textDiffered, "trailing punctuation is a difference").toBe(true);
-    expect(["pass", "pass-despite-mishear"]).toContain(r.outcome);
+    expect(r.textDiffered, "rendering is not a mis-hear").toBe(false);
+    expect(r.outcome).toBe("pass");
   });
 });
 

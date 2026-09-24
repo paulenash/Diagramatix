@@ -119,6 +119,27 @@ const canonical = (op: AssistOp): string => {
 const sameShape = (a: AssistOp[], b: AssistOp[]): boolean =>
   a.length === b.length && a.every((op, i) => canonical(op) === canonical(b[i]));
 
+/**
+ * Did the recogniser hear DIFFERENT WORDS, or just punctuate?
+ *
+ * The first batch run over Paul's corpus (2026-09-24) came back with all 73
+ * passes labelled `pass-despite-mishear` and none clean — which reads as "the
+ * recogniser mangled every single sentence and we got away with it". It had
+ * not. `smart_format` capitalises the first word and adds a full stop, so
+ * "delete Review" comes back "Delete review." — and a lower-cased string
+ * comparison called that a mis-hear, in all one hundred cases.
+ *
+ * A mis-hear is a changed WORD. Capitalisation and punctuation are rendering.
+ * Comparing word sequences keeps the label meaning something: a sentence
+ * Deepgram split with an inserted full stop still differs, because "three" and
+ * "3" are different words and the parser genuinely sees them differently.
+ */
+function sameWords(a: string, b: string): boolean {
+  const words = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").split(/\s+/).filter(Boolean);
+  const x = words(a), y = words(b);
+  return x.length === y.length && x.every((w, i) => w === y[i]);
+}
+
 /** Which fields differ, for a readable failure line. */
 function shapeDiff(want: AssistOp, got: AssistOp): string {
   const w = shapeOf(want), g = shapeOf(got);
@@ -177,8 +198,7 @@ export function scoreCase(
   world: readonly DiagramElement[],
 ): CaseResult {
   const heard = (transcript ?? c.utterance).trim();
-  const textDiffered = transcript !== undefined
-    && transcript.trim().toLowerCase() !== c.utterance.trim().toLowerCase();
+  const textDiffered = transcript !== undefined && !sameWords(transcript, c.utterance);
 
   const base = { caseId: c.id, family: c.family, heard, expected: c.ops, textDiffered };
 

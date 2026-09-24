@@ -120,7 +120,13 @@ describe("T4736 — the replay measures the live path, and says where it cannot"
     const src = replay();
     expect(src).toContain("Not a 16-bit mono PCM WAV.");
     expect(src, "org policy and a missing key are states, not exceptions")
-      .toContain("Voice AI is not allowed for this org.");
+      .toContain("Voice AI is not allowed for this org");
+    // And the message must say what to DO. On 2026-09-24 a hundred rows came
+    // back reading "Dictation service unavailable", which was true, useless,
+    // and hid the real answer: the key cannot mint browser tokens, and the
+    // batch leg works with the key that is already there.
+    expect(src, "the 503 names the cause and the way round it").toContain("Deepgram Owner/Admin key");
+    expect(src).toContain("use the Batch leg");
   });
 
   it("the batch leg's blind spots are printed beside its own number", () => {
@@ -157,5 +163,46 @@ describe("T4736 — the replay measures the live path, and says where it cannot"
     expect(batch).toContain("isSuperuser(session)");
     expect(batch, "command bias on, diarisation off — one person, one sentence")
       .toContain("batchParams({ commandBias: true })");
+  });
+});
+
+describe("T4737 — the environment says which recogniser key it has", () => {
+  const route = () => read("app/api/admin/voice-assist-test/recogniser/route.ts");
+
+  it("NEVER returns, logs or embeds the key", () => {
+    // The whole point is to answer "which key is on prod?" from a screen. The
+    // whole risk is answering it with the key. A one-way SHA-256 prefix is
+    // enough to compare two environments and useless to anybody else.
+    const src = route();
+    expect(src).toContain('createHash("sha256").update(key).digest("hex").slice(0, 8)');
+    expect(src, "the value must not be returned under any name")
+      .not.toMatch(/key,\s*$|key:\s*key|value:\s*key|token:\s*key/m);
+    expect(src, "nor logged").not.toMatch(/console\.(log|error|warn)\([^)]*key/);
+    // It may only travel where it belongs: the Authorization header to Deepgram.
+    const uses = [...src.matchAll(/\$\{key\}/g)].length;
+    expect(uses, "exactly one use of the key — the Deepgram Authorization header").toBe(1);
+    expect(src).toContain("Authorization: `Token ${key}`");
+  });
+
+  it("separates 'valid' from 'can mint a browser token' — the distinction that cost an hour", () => {
+    // A restricted key is not an error. It transcribes perfectly well, and the
+    // only symptom is live voice quietly using the browser engine instead. That
+    // is exactly why it has to be STATED rather than thrown.
+    const src = route();
+    expect(src).toContain("/auth/grant");
+    expect(src).toContain("/projects");
+    expect(src).toMatch(/kind = valid !== 200 \? "invalid" : canMintBrowserToken \? "owner" : "restricted"/);
+    expect(src, "and the restricted case explains the symptom and the fix")
+      .toMatch(/falls back to the browser engine/);
+    expect(src).toMatch(/Owner\/Admin key/);
+  });
+
+  it("is SuperAdmin-only and shown on the tile", () => {
+    expect(route()).toContain("isSuperuser(session)");
+    const badge = read("app/(dashboard)/dashboard/admin/voice-assist-test/RecogniserBadge.tsx");
+    expect(badge).toContain("/api/admin/voice-assist-test/recogniser");
+    expect(badge, "owner / restricted / rejected / none are all distinguishable").toMatch(/owner:.*restricted:.*invalid:.*none:/s);
+    expect(read("app/(dashboard)/dashboard/admin/voice-assist-test/VoiceAssistTestClient.tsx"))
+      .toContain("<RecogniserBadge />");
   });
 });

@@ -22,6 +22,7 @@ import { fixtureElements } from "@/app/lib/assist/commandFixture";
 import { DEFAULT_CORPUS_SEED } from "@/app/lib/assist/rng";
 import { RecorderPanel } from "./RecorderPanel";
 import { ReplayPanel } from "./ReplayPanel";
+import { RecogniserBadge } from "./RecogniserBadge";
 
 const OUTCOME_STYLE: Record<Outcome, string> = {
   "pass": "bg-green-100 text-green-800",
@@ -101,6 +102,8 @@ export function VoiceAssistTestClient() {
         <Link href="/dashboard/admin" className="text-xs text-gray-500 hover:text-gray-700">← SuperAdmin</Link>
       </div>
       <h1 className="text-xl font-semibold text-gray-800 mb-1">Test Voice Assist</h1>
+
+      <RecogniserBadge />
 
       <div className="flex items-center gap-1 mb-4 border-b border-gray-200">
         {([["text", "Text leg — free"], ["record", "Record clips"], ["replay", "Replay — the real test"]] as const).map(([k, label]) => (

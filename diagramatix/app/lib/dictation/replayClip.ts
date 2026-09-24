@@ -48,9 +48,19 @@ async function mintToken(): Promise<{ token: string; scheme: string } | { error:
   const res = await fetch("/api/ai/dictation/token", { method: "POST" });
   const body = (await res.json().catch(() => ({}))) as TokenResponse;
   if (!res.ok || !body.token) {
-    // 403 = the org forbids cloud voice; 503 = no key configured. Both are
-    // states a results table should print, not exceptions to swallow.
-    return { error: body.error ?? (res.status === 403 ? "Voice AI is not allowed for this org." : `No recogniser token (${res.status}).`) };
+    // These are states a results table should print, not exceptions to swallow
+    // — and the message has to say what to DO. "Dictation service unavailable"
+    // (2026-09-24) sent a hundred identical rows back saying nothing, when the
+    // real answer was "your key cannot mint browser tokens; use the batch leg".
+    if (res.status === 403) return { error: "Voice AI is not allowed for this org — check allowVoiceAi in Org Settings." };
+    if (res.status === 503) {
+      return {
+        error: "The recogniser key cannot mint short-lived browser tokens, so the live socket cannot open. "
+          + "That needs a Deepgram Owner/Admin key (one that supports /auth/grant). "
+          + "Until then use the Batch leg, which transcribes server-side with the key you have.",
+      };
+    }
+    return { error: body.error ?? `No recogniser token (${res.status}).` };
   }
   return { token: body.token, scheme: body.scheme ?? "token" };
 }

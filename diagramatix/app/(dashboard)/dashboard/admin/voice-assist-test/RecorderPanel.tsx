@@ -39,11 +39,24 @@ export function RecorderPanel() {
   );
 
   const begin = useCallback(() => {
-    const cases = generateCases({ seed, count, world: fixtureElements() });
-    setScript(cases);
-    setAt(0);
-    setSaved({});
-    setErr(null);
+    // Say what went wrong, on the screen. Generating the script is the one step
+    // between pressing the button and having something to read, and a silent
+    // failure here leaves a teleprompter with working buttons and no sentence —
+    // which is indistinguishable, to the person sitting there, from the feature
+    // being broken.
+    try {
+      const cases = generateCases({ seed, count, world: fixtureElements() });
+      if (cases.length === 0) {
+        setErr("The generator produced no sentences for that seed. Try the default seed.");
+        return;
+      }
+      setScript(cases);
+      setAt(0);
+      setSaved({});
+      setErr(null);
+    } catch (e) {
+      setErr(`Could not build the script: ${e instanceof Error ? e.message : "unknown error"}`);
+    }
   }, [seed, count]);
 
   const save = useCallback(async () => {
@@ -122,6 +135,7 @@ export function RecorderPanel() {
           </label>
           <button onClick={begin} className="text-xs text-white bg-purple-600 hover:bg-purple-700 rounded px-3 py-1.5">Start recording session</button>
         </div>
+        {err && <p className="mt-2 text-xs text-red-700">{err}</p>}
       </div>
     );
   }
@@ -137,7 +151,9 @@ export function RecorderPanel() {
       </div>
 
       <div className="min-h-[7rem] flex items-center justify-center text-center px-4 mb-4">
-        <p className="text-2xl text-gray-800 leading-snug">{current?.utterance}</p>
+        {current
+          ? <p className="text-2xl text-gray-800 leading-snug">{current.utterance}</p>
+          : <p className="text-sm text-red-700">No sentence at position {at + 1} of {script.length}. End the session and start it again.</p>}
       </div>
 
       {/* The level meter. A take that never moves it is the session-losing failure. */}
