@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { DiagramData, DiagramElement } from "@/app/lib/diagram/types";
 import { computeBoundaryCrossings } from "@/app/lib/sop/boundaryCrossings";
+import { contentBounds, fitOutputSize, stripSelectionChrome, svgToPng } from "@/app/lib/diagram/canvasSnapshot";
 
 type Scope = "whole" | "lane" | "pool" | "subprocess" | "group";
 
@@ -96,15 +97,10 @@ function drawBoundaryStubs(clone: SVGSVGElement, boxes: StubBox[]) {
   }
 }
 
-/** Remove selection chrome (resize handles + the dashed blue selected-outline) from
- *  a cloned canvas SVG so the SOP figure isn't marred by the editor's selection. */
-function stripSelectionChrome(clone: SVGSVGElement) {
-  clone.querySelectorAll("[data-resize-handle]").forEach((n) => n.remove());
-  clone.querySelectorAll("rect").forEach((r) => {
-    const s = r.getAttribute("stroke");
-    if ((s === "#2563eb" || s === "#3b82f6") && r.getAttribute("stroke-dasharray")) r.setAttribute("stroke", "none");
-  });
-}
+// `stripSelectionChrome` and `svgToPng` moved to
+// `app/lib/diagram/canvasSnapshot.ts` (2026-09-24) when the Voice Assist debug
+// log needed the same picture. One way to rasterise this canvas, one place to
+// fix it — and the pure framing maths is now testable, which it was not here.
 
 /** Dim everything OUTSIDE the selected lane/pool by laying translucent white
  *  strips over the viewBox around the fragment rectangle. Drawn over the diagram
@@ -125,28 +121,6 @@ function dimOutsideScope(clone: SVGSVGElement, vb: { x: number; y: number; w: nu
     r.setAttribute("fill", "#ffffff"); r.setAttribute("fill-opacity", "0.72");
     clone.appendChild(r);
   }
-}
-
-/** Serialise a (viewBox'd) SVG clone to a PNG data URI via an offscreen <img> +
- *  <canvas>. Reliable for our inline-styled canvas SVG — unlike html-to-image's
- *  toPng on a bare <svg>, which fails silently and left SOPs with no figure. */
-async function svgToPng(clone: SVGSVGElement, outW: number, outH: number): Promise<string | undefined> {
-  try {
-    clone.setAttribute("xmlns", SVG_NS);
-    const xml = new XMLSerializer().serializeToString(clone);
-    const src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(xml);
-    const img = new Image();
-    await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = () => rej(new Error("svg load")); img.src = src; });
-    const scale = 2;
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(outW * scale));
-    canvas.height = Math.max(1, Math.round(outH * scale));
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return undefined;
-    ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL("image/png");
-  } catch { return undefined; }
 }
 
 /** Capture the SOP figure: the whole diagram (fit to its content), or — for a
@@ -175,11 +149,11 @@ async function captureFigure(data: DiagramData, scope: Scope, scopeElementId: st
       const M = 12; // outer breathing room around everything
       bx = minX - M; by = minY - M; bw = (maxX - minX) + 2 * M; bh = (maxY - minY) + 2 * M;
     } else if (scope === "whole" || scope === "group") {
-      const els = elements.filter((e) => e.width > 0 && e.height > 0);
-      if (els.length === 0) return undefined;
-      const minX = Math.min(...els.map((e) => e.x)), minY = Math.min(...els.map((e) => e.y));
-      const maxX = Math.max(...els.map((e) => e.x + e.width)), maxY = Math.max(...els.map((e) => e.y + e.height));
-      const M = 30; bx = minX - M; by = minY - M; bw = (maxX - minX) + 2 * M; bh = (maxY - minY) + 2 * M;
+      // Same framing the Voice Assist snapshot uses — shared so a fix to one is
+      // a fix to both.
+      const b = contentBounds(elements, 30);
+      if (!b) return undefined;
+      bx = b.x; by = b.y; bw = b.w; bh = b.h;
     } else {
       return undefined; // linked subprocess → the child diagram isn't on this canvas
     }
@@ -194,8 +168,7 @@ async function captureFigure(data: DiagramData, scope: Scope, scopeElementId: st
     clone.querySelectorAll("foreignObject").forEach((n) => n.remove());
     stripSelectionChrome(clone);
     clone.setAttribute("viewBox", `${bx} ${by} ${bw} ${bh}`);
-    const outW = Math.min(1400, Math.max(320, Math.round(bw)));
-    const outH = Math.max(1, Math.round(bh * (outW / bw)));
+    const { outW, outH } = fitOutputSize({ x: bx, y: by, w: bw, h: bh });
     clone.setAttribute("width", String(outW));
     clone.setAttribute("height", String(outH));
     // Dim everything outside the chosen lane/pool (scoped figures only), then draw

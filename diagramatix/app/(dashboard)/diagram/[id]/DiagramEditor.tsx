@@ -61,6 +61,10 @@ import { isIncompleteCommand } from "@/app/lib/assist/incompleteCommand";
 import { leadingSpokenNumber } from "@/app/lib/assist/spokenNumber";
 import { capitaliseFirstWord, needsCapital } from "@/app/lib/diagram/nameCase";
 import { batchFlashes, isGoldFlashOn, setGoldFlash, goldFlashSummary, flashTargets, type FlashBox } from "@/app/lib/assist/goldFlash";
+import { touchedFor, type TouchBox, type CommandVerdict } from "@/app/lib/assist/commandLog";
+import { isVoiceDebugOn, setVoiceDebug } from "@/app/lib/assist/voiceDebug";
+import { captureCanvasPng } from "@/app/lib/diagram/canvasSnapshot";
+import { buildDebugSessionFile, debugSessionFilename, serialiseDebugSession, type DebugSnapshot } from "@/app/lib/assist/debugSessionFile";
 import { planMovePool, planSwapPools, selectedPools, poolsInOrder } from "@/app/lib/diagram/poolOrder";
 import { isContainerType, getAllDescendantIds } from "@/app/hooks/useDiagram";
 import { collectMessageTargets, parseMessageAnswer, type MessagePick } from "@/app/lib/assist/messageTargets";
@@ -2708,6 +2712,14 @@ export function DiagramEditor({
   // overlay watches — a number, so an unrelated re-render cannot re-trigger it.
   const goldFlashBeforeRef = useRef<FlashBox[] | null>(null);
   const [goldFlash, setGoldFlashState] = useState<{ runId: number; targets: FlashBox[] }>({ runId: 0, targets: [] });
+  // DEBUG RECORDING (Paul, 2026-09-24). A second before-snapshot, armed on every
+  // command rather than only the ones that flash: the evidence wants to know
+  // what a rename or a delete did just as much as what a move did. Costs one
+  // boolean read when the toggle is off, the same discipline as gestureTrace.
+  const [voiceDebugRecording, setVoiceDebugRecording] = useState(false);
+  const debugBeforeRef = useRef<TouchBox[] | null>(null);
+  const [debugSnapshots, setDebugSnapshots] = useState<DebugSnapshot[]>([]);
+  useEffect(() => { setVoiceDebugRecording(isVoiceDebugOn()); }, []);
   // A destructive command waiting for "yes" (confirm.ts): the ops, what they
   // would do in words, and whether the AI interpreted them (for the log badge).
   const pendingConfirmRef = useRef<{ ops: AssistOp[]; what: string; viaAi: boolean } | null>(null);
@@ -2821,6 +2833,17 @@ export function DiagramEditor({
     // here rather than asking each of the thirty-odd op handlers to report what
     // it changed — handlers drift, and a new op would silently stop flashing.
     if (batchFlashes(ops)) armGoldFlash(data.elements);
+    // The same trick again, for the debug log. Armed UNCONDITIONALLY while
+    // recording — `batchFlashes` deliberately skips the ops that change nothing
+    // worth outlining, and those are exactly the ones whose effect a person
+    // cannot see by looking, so they are the ones the evidence needs most.
+    if (voiceDebugRecording) {
+      debugBeforeRef.current = data.elements.map((e) => ({
+        id: e.id, type: e.type, x: e.x, y: e.y, width: e.width, height: e.height,
+        parentId: e.parentId, label: e.label,
+        marks: subtypeFingerprint(e as unknown as Record<string, unknown>),
+      }));
+    }
     // Working copy: each op's effect is threaded back in (workingSet.ts) so a
     // later op in the same batch can refer to what an earlier one created —
     // "add X and connect it to Y". React has not re-rendered mid-loop, so
@@ -3824,6 +3847,77 @@ export function DiagramEditor({
     setGoldFlashState((prev) => ({ runId: prev.runId + 1, targets }));
   }, [data.elements]);
 
+  // The debug half of the same diff. Attaches to the LAST log entry, which is
+  // the one the command just wrote: `applyGrouped` is followed immediately by a
+  // single `log(...)` call, so by the time React has re-rendered with the new
+  // elements, the entry to annotate is the one on the end.
+  useEffect(() => {
+    const before = debugBeforeRef.current;
+    if (!before) return;
+    debugBeforeRef.current = null;
+    const touched = touchedFor(
+      before,
+      data.elements.map((e) => ({
+        id: e.id, type: e.type, x: e.x, y: e.y, width: e.width, height: e.height,
+        parentId: e.parentId, label: e.label,
+        marks: subtypeFingerprint(e as unknown as Record<string, unknown>),
+      })),
+    );
+    if (touched.length === 0) return;
+    setVoiceLog((prev) => (prev.length === 0
+      ? prev
+      : prev.map((e, i) => (i === prev.length - 1 ? { ...e, touched } : e))));
+  }, [data.elements]);
+
+  /** Record what Paul thought of one command. */
+  const annotateCommand = useCallback((id: string, patch: { note?: string; verdict?: CommandVerdict }) => {
+    setVoiceLog((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e)));
+  }, []);
+
+  /**
+   * Take a picture of the canvas, and keep the diagram behind it.
+   *
+   * Both halves, because they answer different questions: the PNG says what
+   * Paul was looking at, the JSON lets the situation be reloaded and replayed.
+   * A failed capture still stores the JSON — evidence with no picture beats no
+   * evidence, and the picture is the half most likely to fail.
+   */
+  const takeDebugSnapshot = useCallback(async (entryId: string | null) => {
+    const shot = await captureCanvasPng(data.elements);
+    const id = nanoid();
+    setDebugSnapshots((prev) => [...prev, {
+      id,
+      entryId,
+      takenAt: Date.now(),
+      ...(shot ? { png: shot.png, width: shot.width, height: shot.height } : {}),
+      diagramJson: { elements: data.elements, connectors: data.connectors },
+      elementCount: data.elements.length,
+      connectorCount: data.connectors.length,
+    }]);
+    if (entryId) setVoiceLog((prev) => prev.map((e) => (e.id === entryId ? { ...e, snapshotId: id } : e)));
+  }, [data.elements, data.connectors]);
+
+  /** The whole session as one file: commands, verdicts, comments, snapshots. */
+  const downloadDebugSession = useCallback(() => {
+    const savedAt = Date.now();
+    const file = buildDebugSessionFile({
+      title: `Voice Assist — ${diagramName || "diagram"}`,
+      diagramId,
+      diagramName,
+      entries: voiceLog,
+      snapshots: debugSnapshots,
+      savedAt,
+      appVersion: PRODUCT_VERSION,
+    });
+    const blob = new Blob([serialiseDebugSession(file)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = debugSessionFilename(diagramName, new Date(savedAt).toISOString());
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [voiceLog, debugSnapshots, diagramName, diagramId]);
+
   // Cancel the guided rename flow and clear any badge/edit state.
   const cancelRenameFlow = useCallback((reason?: string) => {
     setRenameFlow(null);
@@ -3941,7 +4035,9 @@ export function DiagramEditor({
   const runVoiceCommand = useCallback(async (text: string) => {
     const heard = text.trim();
     if (!heard) return;
-    const log = (entry: Omit<CommandLogEntry, "id">) => setVoiceLog((prev) => [...prev, { id: nanoid(), ...entry }]);
+    // `at` is stamped on every entry, recording or not: a session saved later
+    // cannot be read without it, and a timestamp costs nothing.
+    const log = (entry: Omit<CommandLogEntry, "id">) => setVoiceLog((prev) => [...prev, { id: nanoid(), at: Date.now(), ...entry }]);
     // A typed "stop" means the same as a spoken one: the mic, and anything parked, ends.
     if (isMicStopWord(heard)) {
       // "stop" is the brake — it must never queue behind an in-flight call,
@@ -7016,6 +7112,13 @@ export function DiagramEditor({
             onClear={() => setVoiceLog([])}
             onClose={() => { stopAbraListening(); setVoiceAssistOn(false); try { localStorage.setItem(`voice-assist-${diagramId}`, "false"); } catch {} }}
             onCost={fetchAbraCost}
+            isSuperAdmin={isActingAdmin}
+            debugOn={voiceDebugRecording}
+            onToggleDebug={(on) => { setVoiceDebug(on); setVoiceDebugRecording(on); }}
+            onAnnotate={annotateCommand}
+            onSnapshot={(entryId) => { void takeDebugSnapshot(entryId); }}
+            onDownloadSession={downloadDebugSession}
+            snapshotCount={debugSnapshots.length}
           />
         )}
 

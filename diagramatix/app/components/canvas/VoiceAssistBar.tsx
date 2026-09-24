@@ -14,15 +14,12 @@ import { COMMAND_CATALOG } from "@/app/lib/assist/commandCatalog";
 import { FloatingPanel } from "./FloatingPanel";
 import { formatCostReport, type CostReport } from "@/app/lib/assist/usageCost";
 import { correctionTally, formatCorrectionTally } from "@/app/lib/assist/correctionPairs";
+import { describeTouched, type CommandLogEntry as LogEntry, type CommandVerdict as Verdict } from "@/app/lib/assist/commandLog";
 
-export interface CommandLogEntry {
-  id: string;
-  heard: string;
-  summary: string;
-  ok: boolean;
-  /** true = interpreted by the AI fallback (metered); false/undefined = instant local rules. */
-  viaAi?: boolean;
-}
+// The log entry shape moved to `app/lib/assist/commandLog.ts` (2026-09-24) so it
+// could be tested — the suite is node-only with no jsdom, so nothing in a .tsx
+// is reachable from a test. Re-exported here so no import in the tree changed.
+export type { CommandLogEntry, CommandVerdict } from "@/app/lib/assist/commandLog";
 
 /** A small floating panel the user can drag by its title bar. */
 export function VoiceAssistBar({
@@ -37,6 +34,13 @@ export function VoiceAssistBar({
   onClose,
   onCost,
   connecting = false,
+  isSuperAdmin = false,
+  debugOn = false,
+  onToggleDebug,
+  onAnnotate,
+  onSnapshot,
+  onDownloadSession,
+  snapshotCount = 0,
 }: {
   listening: boolean;
   /** Mic pressed but the recogniser not yet live — shown as "connecting…" so
@@ -45,13 +49,23 @@ export function VoiceAssistBar({
   engine: "deepgram" | "browser" | null;
   interim: string;
   busy: boolean;
-  log: CommandLogEntry[];
+  log: LogEntry[];
   onSubmitText: (text: string) => void;
   onToggleListen: () => void;
   onClear: () => void;
   onClose: () => void;
   /** Cost of this session so far (AI fallback calls + microphone minutes). */
   onCost?: () => Promise<CostReport | null>;
+  /** The debug row only exists for a SuperAdmin; the editor decides. */
+  isSuperAdmin?: boolean;
+  debugOn?: boolean;
+  onToggleDebug?: (on: boolean) => void;
+  /** Record the human's opinion of one command. */
+  onAnnotate?: (id: string, patch: { note?: string; verdict?: Verdict }) => void;
+  /** Take a picture of the canvas — for one entry, or ad-hoc when id is null. */
+  onSnapshot?: (entryId: string | null) => void;
+  onDownloadSession?: () => void;
+  snapshotCount?: number;
 }) {
   const [text, setText] = useState("");
   const [showCommands, setShowCommands] = useState(false);
@@ -141,6 +155,11 @@ export function VoiceAssistBar({
                 className="text-[10px] px-1.5 py-0.5 rounded border text-purple-700 border-purple-300 hover:bg-purple-50 disabled:opacity-50"
                 title="What this session has cost so far (AI calls + microphone minutes, at list rates)">{cost.state === "loading" ? "Cost…" : "Cost"}</button>
             )}
+            {isSuperAdmin && onToggleDebug && (
+              <button onClick={() => onToggleDebug(!debugOn)}
+                className={`text-[10px] px-1.5 py-0.5 rounded border ${debugOn ? "bg-amber-500 text-white border-amber-500" : "text-amber-700 border-amber-300 hover:bg-amber-50"}`}
+                title="Record this session: a verdict and a comment beside each command, and snapshots you can download">debug</button>
+            )}
             {log.length > 0 && <button onClick={onClear} className="text-[10px] text-gray-400 hover:text-gray-600" title="Clear the command log">clear</button>}
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none" title="Close">×</button>
           </div>
@@ -179,25 +198,95 @@ export function VoiceAssistBar({
           </div>
         )}
 
+        {/* Debug session bar — only while recording, so the ordinary bar is unchanged. */}
+        {debugOn && isSuperAdmin && (
+          <div className="px-3 py-1.5 border-b border-amber-100 bg-amber-50 text-[11px] text-amber-800 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
+            <span className="flex-1 min-w-0">
+              recording — say what each command did
+              {snapshotCount > 0 && <span className="text-amber-600"> · {snapshotCount} snapshot{snapshotCount === 1 ? "" : "s"}</span>}
+            </span>
+            {onSnapshot && (
+              <button onClick={() => onSnapshot(null)} className="shrink-0 px-1.5 py-0.5 rounded border border-amber-300 hover:bg-amber-100"
+                title="Take a picture of the canvas as it is now">📷 Snapshot</button>
+            )}
+            {onDownloadSession && (
+              <button onClick={onDownloadSession} disabled={log.length === 0}
+                className="shrink-0 px-1.5 py-0.5 rounded border border-amber-300 hover:bg-amber-100 disabled:opacity-40"
+                title="Download this session — every command, your comments, and the snapshots — as one file">Download</button>
+            )}
+          </div>
+        )}
+
         {/* Command log */}
         {log.length > 0 && (
-          <div className="max-h-40 overflow-y-auto px-3 py-2 space-y-1 border-b border-gray-100">
+          <div className={`${debugOn ? "max-h-72" : "max-h-40"} overflow-y-auto px-3 py-2 space-y-1 border-b border-gray-100`}>
             {log.map((e) => (
-              <div key={e.id} className="text-[11px] flex items-start gap-2">
-                <span className={e.ok ? "text-green-600" : "text-amber-600"}>{e.ok ? "✓" : "…"}</span>
-                <span className="flex-1 min-w-0">
-                  {/* Colour-code the interpreter: instant local rule vs metered AI. */}
-                  <span
-                    className={`inline-block mr-1 px-1 rounded text-[8px] uppercase tracking-wide align-middle ${
-                      e.viaAi ? "bg-fuchsia-100 text-fuchsia-700" : "bg-emerald-100 text-emerald-700"
-                    }`}
-                    title={e.viaAi ? "Interpreted by the AI (metered)" : "Instant local rule (free)"}
-                  >
-                    {e.viaAi ? "✨ AI" : "rule"}
+              <div key={e.id} className="text-[11px]">
+                <div className="flex items-start gap-2">
+                  <span className={e.ok ? "text-green-600" : "text-amber-600"}>{e.ok ? "✓" : "…"}</span>
+                  <span className="flex-1 min-w-0">
+                    {/* Colour-code the interpreter: instant local rule vs metered AI. */}
+                    <span
+                      className={`inline-block mr-1 px-1 rounded text-[8px] uppercase tracking-wide align-middle ${
+                        e.viaAi ? "bg-fuchsia-100 text-fuchsia-700" : "bg-emerald-100 text-emerald-700"
+                      }`}
+                      title={e.viaAi ? "Interpreted by the AI (metered)" : "Instant local rule (free)"}
+                    >
+                      {e.viaAi ? "✨ AI" : "rule"}
+                    </span>
+                    {e.heard && <span className="text-gray-400">“{e.heard}” </span>}
+                    <span className="text-gray-700">→ {e.summary}</span>
+                    {/* A DISPUTE is the point of the whole feature: the system
+                        said it worked and the human says it did not. Marked
+                        here so it is visible while still on screen, not only
+                        once the session is opened somewhere else. */}
+                    {e.ok && e.verdict === "wrong" && (
+                      <span className="ml-1 px-1 rounded bg-red-100 text-red-700 text-[8px] uppercase tracking-wide align-middle"
+                        title="Reported success, but you said it did the wrong thing">disputed</span>
+                    )}
                   </span>
-                  {e.heard && <span className="text-gray-400">“{e.heard}” </span>}
-                  <span className="text-gray-700">→ {e.summary}</span>
-                </span>
+                </div>
+
+                {debugOn && isSuperAdmin && (
+                  <div className="ml-5 mt-0.5 mb-1.5 flex items-center gap-1">
+                    {onAnnotate && (["worked", "partly", "wrong"] as const).map((v) => (
+                      <button key={v} onClick={() => onAnnotate(e.id, { verdict: e.verdict === v ? undefined : v })}
+                        className={`px-1 py-0.5 rounded text-[9px] border ${
+                          e.verdict === v
+                            ? (v === "worked" ? "bg-green-600 text-white border-green-600"
+                              : v === "partly" ? "bg-amber-500 text-white border-amber-500"
+                                : "bg-red-600 text-white border-red-600")
+                            : "text-gray-500 border-gray-300 hover:bg-gray-50"
+                        }`}
+                        title={v === "worked" ? "It did what I asked"
+                          : v === "partly" ? "It half worked" : "It did the wrong thing"}>{v}</button>
+                    ))}
+                    {onAnnotate && (
+                      <input
+                        defaultValue={e.note ?? ""}
+                        onBlur={(ev) => onAnnotate(e.id, { note: ev.target.value })}
+                        onKeyDown={(ev) => { if (ev.key === "Enter") (ev.target as HTMLInputElement).blur(); }}
+                        placeholder="what happened…"
+                        className="flex-1 min-w-0 text-[10px] border border-gray-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                      />
+                    )}
+                    {onSnapshot && (
+                      <button onClick={() => onSnapshot(e.id)}
+                        className={`shrink-0 px-1 py-0.5 rounded text-[9px] border ${e.snapshotId ? "bg-amber-100 border-amber-300 text-amber-700" : "text-gray-500 border-gray-300 hover:bg-gray-50"}`}
+                        title={e.snapshotId ? "Snapshot taken for this command — click to replace" : "Take a picture of the canvas for this command"}>📷</button>
+                    )}
+                  </div>
+                )}
+
+                {/* What it actually changed. Only while recording — it is
+                    evidence, not decoration, and it would be noise otherwise. */}
+                {debugOn && isSuperAdmin && e.touched && e.touched.length > 0 && (
+                  <div className="ml-5 mb-1.5 text-[10px] text-gray-400 truncate"
+                    title={e.touched.map(describeTouched).join(", ")}>
+                    changed: {e.touched.map(describeTouched).join(", ")}
+                  </div>
+                )}
               </div>
             ))}
             <div ref={logEnd} />

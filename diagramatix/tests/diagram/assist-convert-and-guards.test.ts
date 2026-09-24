@@ -245,9 +245,21 @@ describe("T4584 — R5: a change that moves nothing still flashes", () => {
   });
 
   it("is carried into BOTH snapshots, or the diff compares a field against nothing", () => {
+    // This counted to 2 while gold flash was the only before/after diff in the
+    // editor. The Voice Assist debug log (2026-09-24) added a second one, and
+    // the literal count went red — the guard working, but on a proxy rather
+    // than on what it means.
+    //
+    // What it MEANS is: every diff has a before and an after, and both sides
+    // must carry the fingerprint, or a subtype change is compared against
+    // nothing and silently reads as "unchanged". Counting sites instead of
+    // asserting a magic number keeps that true for the next diff too.
     const body = read("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
-    const uses = body.match(/marks: subtypeFingerprint\(/g) ?? [];
-    expect(uses.length, "the before snapshot and the after map").toBe(2);
+    const uses = (body.match(/marks: subtypeFingerprint\(/g) ?? []).length;
+    const diffs = (body.match(/\b(?:flashTargets|touchedFor)\(/g) ?? []).length;
+    expect(diffs, "the editor still diffs before against after somewhere").toBeGreaterThan(0);
+    expect(uses, `each of the ${diffs} diffs needs a before and an after carrying marks`)
+      .toBe(diffs * 2);
   });
 });
 
