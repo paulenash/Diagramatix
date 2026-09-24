@@ -102,6 +102,18 @@ const SCOPED_OMITTED = new Set<string>([
   //    It exports through its own bundle instead.
   "ApiKey", "PartnerRequest", "PartnerJob", "HarnessCase",
 
+  // Voice Assist debug sessions — the SAME case as HarnessCase above, and
+  // omitted for the same reason. An annotated session is our own diagnostic
+  // material: it belongs to the environment it was recorded in, it is tied to
+  // no org (its `diagramId` is deliberately a plain String, not a relation, so
+  // it outlives the diagram), and a scoped org backup restoring somebody else's
+  // debug recordings — with snapshots of their canvas in them — would be odd at
+  // best. It has its own portable format instead: the `.dgx-voice.json` file
+  // the bar downloads is exactly what the save route accepts, so a session
+  // moves between environments as a file rather than as backup rows.
+  // The full SuperAdmin backup still takes both, since it reads the live schema.
+  "VoiceDebugSession", "VoiceDebugSnapshot",
+
   // Grant/membership tables (like ProjectShare + the bundle audiences, and now
   // admin-managed team membership) — carried by the full SuperAdmin backup only,
   // deliberately not in the scoped org/user backups.

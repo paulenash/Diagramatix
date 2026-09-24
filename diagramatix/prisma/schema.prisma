@@ -77,7 +77,7 @@ model Org {
   // domain matches one of these auto-joins THIS org on registration / SSO
   // instead of getting a personal org, and cannot create their own. A domain
   // should be claimed by at most one Org (the resolver takes the first match).
-  emailDomains   String[]  @default([])
+  emailDomains   String[] @default([])
   // Role granted to a domain auto-joiner. Null → the code default
   // (DEFAULT_DOMAIN_JOIN_ROLE). Set per-org by a SuperAdmin.
   domainJoinRole OrgRole?
@@ -101,12 +101,12 @@ model Org {
   // Per-org switches an OrgAdmin/SuperAdmin sets so a customer's own policy is
   // enforced by the platform. All default TRUE (backward-compatible; nothing
   // changes until a tenant tightens them). "Enterprise Mode" flips them off.
-  allowAi             Boolean @default(true)  // AI (LLM) features               ENT-05
-  allowCollaboration  Boolean @default(true)  // live diagram co-authoring        ENT-11
-  allowVoiceAi        Boolean @default(true)  // voice → text (Deepgram)         ENT-07
-  allowExternalExport Boolean @default(true)  // push data OUT (SharePoint upload) ENT-10
-  allowSharePoint     Boolean @default(true)  // SharePoint/OneDrive integration E3
-  allowSupportDiagram Boolean @default(true)  // attach diagram to support email ENT-10
+  allowAi             Boolean @default(true) // AI (LLM) features               ENT-05
+  allowCollaboration  Boolean @default(true) // live diagram co-authoring        ENT-11
+  allowVoiceAi        Boolean @default(true) // voice → text (Deepgram)         ENT-07
+  allowExternalExport Boolean @default(true) // push data OUT (SharePoint upload) ENT-10
+  allowSharePoint     Boolean @default(true) // SharePoint/OneDrive integration E3
+  allowSupportDiagram Boolean @default(true) // attach diagram to support email ENT-10
   // Access policy (A3d, ENT-04): when true, members can't sign in with a password —
   // they must use Microsoft single sign-on. Enforced in verifyCredentials.
   requireSso          Boolean @default(false)
@@ -114,24 +114,24 @@ model Org {
   // AI prompt leaves the tenant and restored in the reply. Opt-in (default off).
   aiRedaction         Boolean @default(false)
 
-  members             OrgMember[]
-  memberTeams         OrgMemberTeam[]
-  projects            Project[]
-  diagrams            Diagram[]
-  prompts             Prompt[]
-  diagramRules        DiagramRules[]
-  collaborationGroups CollaborationGroup[]
-  entityLists         EntityList[]
-  sopTemplates        SopTemplate[]
-  entityStructures    EntityStructure[]
+  members              OrgMember[]
+  memberTeams          OrgMemberTeam[]
+  projects             Project[]
+  diagrams             Diagram[]
+  prompts              Prompt[]
+  diagramRules         DiagramRules[]
+  collaborationGroups  CollaborationGroup[]
+  entityLists          EntityList[]
+  sopTemplates         SopTemplate[]
+  entityStructures     EntityStructure[]
   riskControlLibraries RiskControlLibrary[]
-  pcfFrameworks       PcfFramework[]
-  simulationTeams     SimulationTeam[]
-  simulationCalendars SimulationCalendar[]
-  processMiningRuns   ProcessMiningRun[]
-  processDiffRuns     ProcessDiffRun[]
-  apiKeys             ApiKey[]
-  skills           Skill[]
+  pcfFrameworks        PcfFramework[]
+  simulationTeams      SimulationTeam[]
+  simulationCalendars  SimulationCalendar[]
+  processMiningRuns    ProcessMiningRun[]
+  processDiffRuns      ProcessDiffRun[]
+  apiKeys              ApiKey[]
+  skills               Skill[]
 }
 
 model OrgMember {
@@ -178,11 +178,11 @@ model OrgMemberTeam {
 // ────────────────────────────────────────────────────────────────────────────
 
 model User {
-  id                            String                     @id @default(cuid())
-  email                         String                     @unique
+  id                            String                      @id @default(cuid())
+  email                         String                      @unique
   name                          String?
-  password                      String                     @default("")
-  resetToken                    String?                    @unique
+  password                      String                      @default("")
+  resetToken                    String?                     @unique
   resetTokenExpiry              DateTime?
   diagrams                      Diagram[]
   projects                      Project[]
@@ -197,7 +197,7 @@ model User {
   // app/lib/superuser.ts) bypass all limits regardless of this field —
   // the "Administration" tier shown in the UI is derived, not stored.
   subscriptionLevelId           String?
-  subscriptionLevel             SubscriptionLevel?         @relation(fields: [subscriptionLevelId], references: [id])
+  subscriptionLevel             SubscriptionLevel?          @relation(fields: [subscriptionLevelId], references: [id])
   // When the user landed on their current tier. Drives Free-tier trial
   // expiry (30 days from this date for Free). Set on registration and
   // updated by the admin "Change Tier" action.
@@ -207,17 +207,17 @@ model User {
   // scripts/seed-subscriptions.ts so they don't see the picker on
   // their next visit. New sign-ups start at false; the dashboard
   // shows the TierPicker modal until the user picks or skips.
-  hasChosenTier                 Boolean                    @default(false)
+  hasChosenTier                 Boolean                     @default(false)
   // ── Stripe wiring (Subscriptions Phase 2) ────────────────────────────
   // Stripe Customer ID for this user. Created lazily on first Checkout
   // session attempt; reused for all subsequent payments and Portal
   // sessions so cards / invoices stay attached to one Customer.
-  stripeCustomerId              String?                    @unique
+  stripeCustomerId              String?                     @unique
   // Active Stripe Subscription ID. Null while on Free or after a fully-
   // expired cancellation. Set by the `checkout.session.completed`
   // webhook and cleared by `customer.subscription.deleted` once the
   // grace period (subscriptionEndsAt) elapses.
-  stripeSubscriptionId          String?                    @unique
+  stripeSubscriptionId          String?                     @unique
   // Mirror of Stripe's subscription status. Drives UI badges (past_due
   // warning chip, etc.). Values we set: "active" | "trialing" |
   // "past_due" | "canceled" | "incomplete". Null = no Stripe subscription.
@@ -255,7 +255,7 @@ model User {
   // subscription-level matrix for the listed keys only; absent keys inherit.
   // Set from the admin Registered-Users popover. See app/lib/features/availability.ts.
   featureOverrides              Json?
-  createdAt                     DateTime                   @default(now())
+  createdAt                     DateTime                    @default(now())
   // Updated (throttled) from the Auth.js jwt callback to power the
   // admin "online / last seen" indicator. Nullable for legacy rows.
   lastSeenAt                    DateTime?
@@ -265,40 +265,40 @@ model User {
   currentDiagramId              String?
   currentDiagramName            String?
   // Collaboration Groups (Phase 1) back-relations.
-  collaborationGroupsOwned      CollaborationGroup[]       @relation("CollaborationGroupOwner")
-  collaborationGroupMemberships CollaborationGroupMember[] @relation("CollaborationGroupMembership")
-  collaborationGroupInvitesSent CollaborationGroupMember[] @relation("CollaborationGroupInvitesSent")
-  ownershipTransfersFrom        OwnershipTransfer[]        @relation("OwnershipTransferFrom")
-  ownershipTransfersTo          OwnershipTransfer[]        @relation("OwnershipTransferTo")
+  collaborationGroupsOwned      CollaborationGroup[]        @relation("CollaborationGroupOwner")
+  collaborationGroupMemberships CollaborationGroupMember[]  @relation("CollaborationGroupMembership")
+  collaborationGroupInvitesSent CollaborationGroupMember[]  @relation("CollaborationGroupInvitesSent")
+  ownershipTransfersFrom        OwnershipTransfer[]         @relation("OwnershipTransferFrom")
+  ownershipTransfersTo          OwnershipTransfer[]         @relation("OwnershipTransferTo")
   notifications                 Notification[]
   // Phase 2 — Send for Review back-relations.
-  diagramReviewsRequested       DiagramReview[]            @relation("DiagramReviewRequester")
-  diagramReviewerEntries        DiagramReviewer[]          @relation("DiagramReviewerUser")
+  diagramReviewsRequested       DiagramReview[]             @relation("DiagramReviewRequester")
+  diagramReviewerEntries        DiagramReviewer[]           @relation("DiagramReviewerUser")
   // Project-sharing back-relations.
-  projectShares                 ProjectShare[]             @relation("ProjectShareRecipient")
-  diagramsOwned                 Diagram[]                  @relation("DiagramOwner")
+  projectShares                 ProjectShare[]              @relation("ProjectShareRecipient")
+  diagramsOwned                 Diagram[]                   @relation("DiagramOwner")
   diagramPresences              DiagramPresence[]
   // BPMN lifecycle (Phase 1) back-relations.
-  publishedVersionsAuthored     PublishedVersion[]         @relation("PublishedVersionAuthor")
-  diagramFeedbackAuthored       DiagramFeedback[]          @relation("DiagramFeedbackAuthor")
-  diagramFeedbackResolved       DiagramFeedback[]          @relation("DiagramFeedbackResolver")
+  publishedVersionsAuthored     PublishedVersion[]          @relation("PublishedVersionAuthor")
+  diagramFeedbackAuthored       DiagramFeedback[]           @relation("DiagramFeedbackAuthor")
+  diagramFeedbackResolved       DiagramFeedback[]           @relation("DiagramFeedbackResolver")
   // BPMN lifecycle (Phase 2) back-relations.
-  publicationBundlesAuthored    PublicationBundle[]        @relation("PublicationBundleAuthor")
+  publicationBundlesAuthored    PublicationBundle[]         @relation("PublicationBundleAuthor")
   publicationBundleAudience     PublicationBundleAudience[] @relation("PublicationBundleAudienceMember")
   publicationBundleGrantsMade   PublicationBundleAudience[] @relation("PublicationBundleAudienceAdder")
-  pendingBundleInvitesSent      PendingBundleAudience[]    @relation("PendingBundleAudienceInviter")
+  pendingBundleInvitesSent      PendingBundleAudience[]     @relation("PendingBundleAudienceInviter")
   // Simulator (Phase 4) — studies this user created.
-  simulationStudiesCreated      SimulationStudy[]          @relation("SimulationStudyAuthor")
+  simulationStudiesCreated      SimulationStudy[]           @relation("SimulationStudyAuthor")
   // Simulator (Phase 6) — example catalog entries this user authored.
-  simulationExamplesCreated     SimulationExample[]        @relation("SimulationExampleAuthor")
-  miningExamplesCreated         MiningExample[]            @relation("MiningExampleAuthor")
-  processDiffRunsCreated        ProcessDiffRun[]           @relation("ProcessDiffRunAuthor")
+  simulationExamplesCreated     SimulationExample[]         @relation("SimulationExampleAuthor")
+  miningExamplesCreated         MiningExample[]             @relation("MiningExampleAuthor")
+  processDiffRunsCreated        ProcessDiffRun[]            @relation("ProcessDiffRunAuthor")
   // Per-user "bring-your-own SharePoint" OAuth connection (delegated Graph tokens,
   // encrypted at rest). Decoupled from login so any web user can connect their own
   // Microsoft 365. See MicrosoftConnection.
   microsoftConnection           MicrosoftConnection?
-  apiKeysAsService              ApiKey[]                   @relation("ApiKeyServiceUser")
-  aiKeys        UserAiKey[]
+  apiKeysAsService              ApiKey[]                    @relation("ApiKeyServiceUser")
+  aiKeys                        UserAiKey[]
 }
 
 // A single web user's delegated Microsoft 365 connection for SharePoint/OneDrive.
@@ -310,12 +310,12 @@ model MicrosoftConnection {
   id           String   @id @default(cuid())
   userId       String   @unique
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tenantId     String   // connecting org's tenant (id_token `tid`) — selects the refresh endpoint + audit
-  accountUpn   String   // preferred_username / UPN — powers "Connected as …"
-  accountName  String?  // display name, if present
-  scope        String   // granted delegated scopes
-  accessToken  String   // AES-256-GCM ciphertext
-  refreshToken String   // AES-256-GCM ciphertext
+  tenantId     String // connecting org's tenant (id_token `tid`) — selects the refresh endpoint + audit
+  accountUpn   String // preferred_username / UPN — powers "Connected as …"
+  accountName  String? // display name, if present
+  scope        String // granted delegated scopes
+  accessToken  String // AES-256-GCM ciphertext
+  refreshToken String // AES-256-GCM ciphertext
   expiresAt    DateTime // access-token expiry
   source       String   @default("connect") // "connect" | "login" — which flow minted it
   createdAt    DateTime @default(now())
@@ -323,13 +323,13 @@ model MicrosoftConnection {
 }
 
 model Project {
-  id          String    @id @default(cuid())
-  name        String
-  description String    @default("")
-  ownerName   String    @default("")
-  colorConfig Json      @default("{}")
-  fontConfig  Json      @default("{}")
-  folderTree  Json      @default("{}")
+  id                   String               @id @default(cuid())
+  name                 String
+  description          String               @default("")
+  ownerName            String               @default("")
+  colorConfig          Json                 @default("{}")
+  fontConfig           Json                 @default("{}")
+  folderTree           Json                 @default("{}")
   // How the project's diagrams are ordered on the project screen:
   // manual | name-asc | name-desc | modified-asc | modified-desc | type.
   // Was a per-browser localStorage key (`diagram-sort-<projectId>`), so a
@@ -337,48 +337,48 @@ model Project {
   // did not survive moving machine. Now a property OF the project, which is what
   // it always was in intent. The old localStorage value still migrates in on
   // first open when this is null.
-  diagramSort String?
+  diagramSort          String?
   // APQC PCF association — set when the project is generated/seeded from an
   // APQC framework (L2 folder-seed or a Create-APQC-Process diagram), or
   // chosen in the Project Properties panel. Shape:
   //   { frameworkId, frameworkName, variant, version, rootHierarchyId?, rootName?, seededAt? }
-  pcf         Json      @default("{}")
+  pcf                  Json                 @default("{}")
   // Project re-numbering configuration. Shape (app/lib/numbering/renumber.ts):
   //   { mode:"apqc"|"full", prefix:string, applied:boolean, showNonApqc:boolean, lastAppliedAt?:string }
-  numberingConfig Json  @default("{}")
+  numberingConfig      Json                 @default("{}")
   // When this project was created by adopting a ready-made example, which
   // feature it demonstrates ("simulation" | "mining" | "risk-control"). Drives
   // the feature-coloured dashboard tile. Null for ordinary projects.
-  exampleType String?
+  exampleType          String?
   // The example this project was adopted from (SimulationExample / MiningExample
   // / RiskControlExample id). Enforces "one copy per user" — re-adopting the same
   // example overwrites this project. Cleared on rename (it becomes the user's own).
-  sourceExampleId String?
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceExampleId      String?
+  userId               String
+  user                 User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   // Org scoping — required after Phase 0 backfill (scripts/backfill-orgs.ts).
-  orgId       String
-  org         Org       @relation(fields: [orgId], references: [id], onDelete: Restrict)
-  diagrams    Diagram[]
+  orgId                String
+  org                  Org                  @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  diagrams             Diagram[]
   // Users this project is shared with, plus their role (VIEW / EDIT).
-  shares      ProjectShare[]
+  shares               ProjectShare[]
   // BPMN lifecycle (Phase 2) — bundles published from this project.
-  bundles     PublicationBundle[]
+  bundles              PublicationBundle[]
   // Entity Lists (External Participants, Org Structure, IT Systems) — a
   // project's own copy, adopted from an org master and edited independently.
-  entityLists EntityList[]
-  sopTemplates SopTemplate[]
-  sopDocuments SopDocument[]
+  entityLists          EntityList[]
+  sopTemplates         SopTemplate[]
+  sopDocuments         SopDocument[]
   // Risk & Control catalog — project's own copy, adopted from an org master.
   riskControlLibraries RiskControlLibrary[]
-  simulationTeams SimulationTeam[]
-  simulationCalendars SimulationCalendar[]
-  simulationStudies SimulationStudy[]
-  processMiningRuns ProcessMiningRun[]
-  miningSources     MiningSource[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  apiKeys     ApiKey[]
+  simulationTeams      SimulationTeam[]
+  simulationCalendars  SimulationCalendar[]
+  simulationStudies    SimulationStudy[]
+  processMiningRuns    ProcessMiningRun[]
+  miningSources        MiningSource[]
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  apiKeys              ApiKey[]
 
   @@index([orgId])
 }
@@ -404,26 +404,26 @@ model ProjectShare {
 }
 
 model Diagram {
-  id          String           @id @default(cuid())
-  name        String
-  type        String           @default("basic")
-  data        Json             @default("{}")
-  colorConfig Json             @default("{}")
-  displayMode String           @default("normal")
+  id                        String                     @id @default(cuid())
+  name                      String
+  type                      String                     @default("basic")
+  data                      Json                       @default("{}")
+  colorConfig               Json                       @default("{}")
+  displayMode               String                     @default("normal")
   // SuperAdmin "AI Comparison Results": the persisted multi-model generation
   // matrix for this diagram (Opus 4.8 / Sonnet 4.6 / Haiku 4.5 — per-model
   // conformance + the saved per-model diagram IDs). The current diagram's `data`
   // is filled with the Opus 4.8 output. {} = no comparison. A column (not in
   // `data`) so it survives editor save round-trips.
-  aiComparison Json            @default("{}")
-  userId      String
-  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  projectId   String?
-  project     Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  aiComparison              Json                       @default("{}")
+  userId                    String
+  user                      User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId                 String?
+  project                   Project?                   @relation(fields: [projectId], references: [id], onDelete: SetNull)
   // Denormalised from Project for query performance — kept in sync by the
   // application layer. Required after Phase 0 backfill.
-  orgId       String
-  org         Org              @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  orgId                     String
+  org                       Org                        @relation(fields: [orgId], references: [id], onDelete: Restrict)
   // Per-diagram accountability label. Defaults to the project owner at
   // creation; mutable by the project owner only (editors and viewers see
   // it read-only). Distinct from the free-text Process Owner inside the
@@ -431,11 +431,11 @@ model Diagram {
   // an empty owner slot. Nullable so the field can be added to existing
   // rows without a destructive migration (backfilled by
   // scripts/backfill-project-sharing.ts).
-  diagramOwnerId String?
-  diagramOwner   User?         @relation("DiagramOwner", fields: [diagramOwnerId], references: [id], onDelete: SetNull)
-  history     DiagramHistory[]
-  reviews     DiagramReview[]
-  sopDocuments SopDocument[]
+  diagramOwnerId            String?
+  diagramOwner              User?                      @relation("DiagramOwner", fields: [diagramOwnerId], references: [id], onDelete: SetNull)
+  history                   DiagramHistory[]
+  reviews                   DiagramReview[]
+  sopDocuments              SopDocument[]
   // ── BPMN lifecycle (publish + review cadence) ────────────────────────
   // `lifecycle` is the persisted state machine; see DiagramLifecycle enum.
   // `currentPublishedVersionId` points at the latest non-superseded
@@ -445,52 +445,52 @@ model Diagram {
   // the publish dialog can compute nextReviewDate from this.
   // `lastReviewDueNotifiedAt` is the cron-idempotency guard so re-runs
   // don't spam the owner.
-  lifecycle                     DiagramLifecycle    @default(DRAFT)
-  currentPublishedVersionId     String?             @unique
-  currentPublishedVersion       PublishedVersion?   @relation("DiagramCurrentVersion", fields: [currentPublishedVersionId], references: [id], onDelete: SetNull)
-  publishedVersions             PublishedVersion[]  @relation("DiagramAllVersions")
-  feedback                      DiagramFeedback[]
+  lifecycle                 DiagramLifecycle           @default(DRAFT)
+  currentPublishedVersionId String?                    @unique
+  currentPublishedVersion   PublishedVersion?          @relation("DiagramCurrentVersion", fields: [currentPublishedVersionId], references: [id], onDelete: SetNull)
+  publishedVersions         PublishedVersion[]         @relation("DiagramAllVersions")
+  feedback                  DiagramFeedback[]
   // BPMN lifecycle (Phase 2) — every bundle this diagram is a member of
   // (as a root or pulled in via link closure). Used by the access check
   // and the stale-closure detector.
-  bundleMemberships             PublicationBundleDiagram[]
+  bundleMemberships         PublicationBundleDiagram[]
   // Simulator (Phase 4) — studies that pick this diagram as a root.
-  simulationStudyRoots          SimulationStudyRoot[]
-  nextReviewDate                DateTime?
-  reviewCadenceMonths           Int?
-  lastReviewDueNotifiedAt       DateTime?
+  simulationStudyRoots      SimulationStudyRoot[]
+  nextReviewDate            DateTime?
+  reviewCadenceMonths       Int?
+  lastReviewDueNotifiedAt   DateTime?
   // ── Process Portal ───────────────────────────────────────────────────
   // "Primary procedure document" — the written SOP that accompanies this
   // process. A URL (SharePoint webUrl or any link) + a display name. Set in
   // Diagram Properties; surfaced read-only in the Portal + /processes viewer.
-  procedureDocUrl               String?
-  procedureDocName              String?
+  procedureDocUrl           String?
+  procedureDocName          String?
   // Denormalised from DiagramData.pcf (the diagram-level APQC classification)
   // so the Portal's category facet + search are DB-native — no need to load
   // every diagram's `data` JSON. Synced by the diagram save/publish path;
   // backfilled by scripts/backfill-diagram-pcf.ts.
-  pcfId                         Int?
-  pcfHierarchyId                String?
-  pcfName                       String?
+  pcfId                     Int?
+  pcfHierarchyId            String?
+  pcfName                   String?
   // Denormalised entity references used by this diagram (pools/lanes/systems),
   // extracted from `data` on every save — an array of { kind, name } (raw
   // labels). The Portal canonicalises these against the Org Entity Lists at
   // read time to power "which processes use System X / involve Team Y".
-  entityRefs                    Json               @default("[]")
+  entityRefs                Json                       @default("[]")
   // Optimistic-concurrency token for co-authoring. Every data-changing save is
   // a compare-and-swap on this value (PUT /api/diagrams/[id]); a stale client
   // version 409s instead of silently clobbering a concurrent editor's work.
-  version     Int              @default(0)
-  presences   DiagramPresence[]
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  version                   Int                        @default(0)
+  presences                 DiagramPresence[]
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
+  diffRunsA                 ProcessDiffRun[]           @relation("ProcessDiffRunA")
+  diffRunsB                 ProcessDiffRun[]           @relation("ProcessDiffRunB")
 
   @@index([orgId])
   @@index([diagramOwnerId])
   @@index([lifecycle])
   @@index([orgId, lifecycle])
-  diffRunsA ProcessDiffRun[] @relation("ProcessDiffRunA")
-  diffRunsB ProcessDiffRun[] @relation("ProcessDiffRunB")
 }
 
 // Live co-authoring presence: one row per (diagram, user) currently in the
@@ -498,16 +498,16 @@ model Diagram {
 // older than the TTL are treated as gone. `editingElementIds` powers soft
 // element locking; `selection` is informational.
 model DiagramPresence {
-  id               String   @id @default(cuid())
-  diagramId        String
-  diagram          Diagram  @relation(fields: [diagramId], references: [id], onDelete: Cascade)
-  userId           String
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userName         String
-  color            String
+  id                String   @id @default(cuid())
+  diagramId         String
+  diagram           Diagram  @relation(fields: [diagramId], references: [id], onDelete: Cascade)
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userName          String
+  color             String
   editingElementIds String[] @default([])
-  selection        String[] @default([])
-  lastHeartbeatAt  DateTime @default(now())
+  selection         String[] @default([])
+  lastHeartbeatAt   DateTime @default(now())
 
   @@unique([diagramId, userId])
   @@index([diagramId, lastHeartbeatAt])
@@ -529,37 +529,37 @@ model DiagramHistory {
 // Phase 2 of the lifecycle plan). Business users see the latest non-
 // superseded version of any diagram they have bundle-granted access to.
 model PublishedVersion {
-  id            String   @id @default(cuid())
-  diagramId     String
-  diagram       Diagram  @relation("DiagramAllVersions", fields: [diagramId], references: [id], onDelete: Cascade)
+  id                      String            @id @default(cuid())
+  diagramId               String
+  diagram                 Diagram           @relation("DiagramAllVersions", fields: [diagramId], references: [id], onDelete: Cascade)
   // Version number per diagram: 1, 2, 3… Auto-incremented by the publish handler.
-  versionNumber Int
-  publishedAt   DateTime @default(now())
+  versionNumber           Int
+  publishedAt             DateTime          @default(now())
   // Nullable + SetNull so deleting the author doesn't 500 the delete on
   // an FK Restrict (audit DATA-01). The version snapshot is immutable and
   // outlives its author; a null here just means "author account removed".
-  publishedById String?
-  publishedBy   User?    @relation("PublishedVersionAuthor", fields: [publishedById], references: [id], onDelete: SetNull)
+  publishedById           String?
+  publishedBy             User?             @relation("PublishedVersionAuthor", fields: [publishedById], references: [id], onDelete: SetNull)
   // Frozen snapshot — mirrors the DiagramHistory columns. Treat as
   // immutable once written.
-  name          String
-  type          String
-  data          Json
-  colorConfig   Json
-  displayMode   String
+  name                    String
+  type                    String
+  data                    Json
+  colorConfig             Json
+  displayMode             String
   // Owner-supplied notes for this release. Optional.
-  releaseNotes  String?
+  releaseNotes            String?
   // When the next version replaces this one, supersededAt is stamped so
   // we can render "v2 (superseded 2026-12-10)" in the version history.
   // Null on the current version.
-  supersededAt  DateTime?
+  supersededAt            DateTime?
   // Snapshot of the nextReviewDate that was in effect at publish time.
   // Kept for audit even after the live Diagram.nextReviewDate moves.
   nextReviewDateAtPublish DateTime?
   // Back-relation for Diagram.currentPublishedVersionId pointing here.
-  currentForDiagram Diagram? @relation("DiagramCurrentVersion")
+  currentForDiagram       Diagram?          @relation("DiagramCurrentVersion")
   // Feedback filed against this specific version.
-  feedback      DiagramFeedback[]
+  feedback                DiagramFeedback[]
 
   @@unique([diagramId, versionNumber])
   @@index([diagramId, publishedAt(sort: Desc)])
@@ -575,31 +575,31 @@ model PublishedVersion {
 // through. Not present yet because PublicationBundle is added later in
 // the same plan.
 model DiagramFeedback {
-  id                  String           @id @default(cuid())
-  diagramId           String
-  diagram             Diagram          @relation(fields: [diagramId], references: [id], onDelete: Cascade)
-  publishedVersionId  String
-  publishedVersion    PublishedVersion @relation(fields: [publishedVersionId], references: [id], onDelete: Cascade)
+  id                 String             @id @default(cuid())
+  diagramId          String
+  diagram            Diagram            @relation(fields: [diagramId], references: [id], onDelete: Cascade)
+  publishedVersionId String
+  publishedVersion   PublishedVersion   @relation(fields: [publishedVersionId], references: [id], onDelete: Cascade)
   // Bundle the author came in through, when known. Useful for the
   // owner's FeedbackPanel ("filed via 'Q4 Operations release'") and
   // for the cross-bundle audience union when several bundles lead to
   // the same diagram. Nullable for legacy / direct-link entries.
-  bundleId            String?
-  bundle              PublicationBundle? @relation(fields: [bundleId], references: [id], onDelete: SetNull)
-  authorId            String
-  author              User             @relation("DiagramFeedbackAuthor", fields: [authorId], references: [id], onDelete: Cascade)
-  body                String
+  bundleId           String?
+  bundle             PublicationBundle? @relation(fields: [bundleId], references: [id], onDelete: SetNull)
+  authorId           String
+  author             User               @relation("DiagramFeedbackAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  body               String
   // Optional pin to a specific element in the published version's data.
   // The viewer's "attach to element" mode records the element id; the
   // owner's FeedbackPanel uses it to jump to that element on the canvas.
-  attachedElementId   String?
-  status              FeedbackStatus   @default(OPEN)
-  resolvedAt          DateTime?
-  resolvedById        String?
-  resolvedBy          User?            @relation("DiagramFeedbackResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
-  resolutionNote      String?
-  createdAt           DateTime         @default(now())
-  updatedAt           DateTime         @updatedAt
+  attachedElementId  String?
+  status             FeedbackStatus     @default(OPEN)
+  resolvedAt         DateTime?
+  resolvedById       String?
+  resolvedBy         User?              @relation("DiagramFeedbackResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+  resolutionNote     String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
 
   @@index([diagramId, status])
   @@index([publishedVersionId])
@@ -617,26 +617,26 @@ model DiagramFeedback {
 // overlap in members and audience; access is additive. Owner explicitly
 // archives a bundle (sets supersededAt) to revoke its grants.
 model PublicationBundle {
-  id              String                  @id @default(cuid())
-  name            String
-  projectId       String
-  project         Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  publishedAt     DateTime                @default(now())
+  id                      String                      @id @default(cuid())
+  name                    String
+  projectId               String
+  project                 Project                     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  publishedAt             DateTime                    @default(now())
   // Nullable + SetNull (audit DATA-01) — a bundle outlives the account
   // that published it. Ownership checks treat null as "not you".
-  publishedById   String?
-  publishedBy     User?                   @relation("PublicationBundleAuthor", fields: [publishedById], references: [id], onDelete: SetNull)
-  releaseNotes    String?
-  nextReviewDate  DateTime?
+  publishedById           String?
+  publishedBy             User?                       @relation("PublicationBundleAuthor", fields: [publishedById], references: [id], onDelete: SetNull)
+  releaseNotes            String?
+  nextReviewDate          DateTime?
   // Idempotency guard for the review-due cron — see Diagram.lastReviewDueNotifiedAt.
   lastReviewDueNotifiedAt DateTime?
   // Owner archives a bundle to revoke audience grants. Once stamped the
   // access check ignores it. Distinct from per-PublishedVersion supersedure.
-  supersededAt    DateTime?
-  diagrams        PublicationBundleDiagram[]
-  audience        PublicationBundleAudience[]
-  pendingAudience PendingBundleAudience[]
-  feedback        DiagramFeedback[]
+  supersededAt            DateTime?
+  diagrams                PublicationBundleDiagram[]
+  audience                PublicationBundleAudience[]
+  pendingAudience         PendingBundleAudience[]
+  feedback                DiagramFeedback[]
 
   @@index([projectId])
   @@index([publishedById])
@@ -649,13 +649,13 @@ model PublicationBundle {
 // publish — to expand it the owner uses the stale-closure flow to
 // recompute closure in place (no new bundle row).
 model PublicationBundleDiagram {
-  id          String            @id @default(cuid())
-  bundleId    String
-  bundle      PublicationBundle @relation(fields: [bundleId], references: [id], onDelete: Cascade)
-  diagramId   String
-  diagram     Diagram           @relation(fields: [diagramId], references: [id], onDelete: Cascade)
-  isRoot      Boolean           @default(false)
-  addedAt     DateTime          @default(now())
+  id        String            @id @default(cuid())
+  bundleId  String
+  bundle    PublicationBundle @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+  diagramId String
+  diagram   Diagram           @relation(fields: [diagramId], references: [id], onDelete: Cascade)
+  isRoot    Boolean           @default(false)
+  addedAt   DateTime          @default(now())
 
   @@unique([bundleId, diagramId])
   @@index([diagramId])
@@ -665,16 +665,16 @@ model PublicationBundleDiagram {
 // the bundle's member set goes through this row. Unique constraint
 // prevents double-grants.
 model PublicationBundleAudience {
-  id          String            @id @default(cuid())
-  bundleId    String
-  bundle      PublicationBundle @relation(fields: [bundleId], references: [id], onDelete: Cascade)
-  userId      String
-  user        User              @relation("PublicationBundleAudienceMember", fields: [userId], references: [id], onDelete: Cascade)
-  addedAt     DateTime          @default(now())
+  id        String            @id @default(cuid())
+  bundleId  String
+  bundle    PublicationBundle @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User              @relation("PublicationBundleAudienceMember", fields: [userId], references: [id], onDelete: Cascade)
+  addedAt   DateTime          @default(now())
   // Nullable + SetNull (audit DATA-01) — attribution of who granted the
   // access; the grant itself survives the granting admin's deletion.
-  addedById   String?
-  addedBy     User?             @relation("PublicationBundleAudienceAdder", fields: [addedById], references: [id], onDelete: SetNull)
+  addedById String?
+  addedBy   User?             @relation("PublicationBundleAudienceAdder", fields: [addedById], references: [id], onDelete: SetNull)
 
   @@unique([bundleId, userId])
   @@index([userId])
@@ -738,9 +738,9 @@ model DiagramTemplate {
 // last four characters and nothing else, which is enough to recognise a key and
 // not enough to use one.
 model UserAiKey {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   /// Which provider this key is for — must be one Diagramatix can already call.
   provider   String
   /// AES-256-GCM ciphertext ("v1.<iv>.<tag>.<ct>"). NEVER the key itself.
@@ -754,8 +754,8 @@ model UserAiKey {
   /// Set when a generation last used this key, so a key that stopped working is
   /// visible as one that stopped being used.
   lastUsedAt DateTime?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   // One key per provider per person: two would mean choosing between them on
   // every call, with no basis for the choice.
@@ -784,26 +784,26 @@ model Prompt {
   // existed is genuinely unknown, and claiming they were typed would be
   // inventing data about how somebody worked.
   /// "typed" | "dictated"
-  source        String?
+  source    String?
   /// Set when the clarifying-questions Refine pass last contributed to the text.
   /// Distinct from "has been edited", which falls out of createdAt != updatedAt.
-  refinedAt     DateTime?
+  refinedAt DateTime?
   /// True when the prompt was written against an IMAGE attachment (a photo of a
   /// whiteboard, a screenshot, somebody else's diagram). The image itself is not
   /// kept, so this records where the words came from, not a file you can open.
-  fromImage     Boolean   @default(false)
+  fromImage Boolean   @default(false)
 
   // ── What has been done WITH it ──────────────────────────────────────────
   // Recorded at generation rather than scanned out of diagram JSON afterwards:
   // a scan is expensive and answers slowly, and the generation path already
   // knows. scripts/backfill-prompt-usage.ts fills in the history once.
   /// Model id of the last generation from this prompt.
-  modelUsed     String?
-  lastUsedAt    DateTime?
-  useCount      Int       @default(0)
+  modelUsed  String?
+  lastUsedAt DateTime?
+  useCount   Int       @default(0)
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([orgId])
   @@index([userId, diagramType])
@@ -840,46 +840,46 @@ model ValueChainLibrary {
 }
 
 model ValueChainProcess {
-  id      String            @id @default(cuid())
-  chainId String
-  chain   ValueChainLibrary @relation(fields: [chainId], references: [id], onDelete: Cascade)
+  id        String            @id @default(cuid())
+  chainId   String
+  chain     ValueChainLibrary @relation(fields: [chainId], references: [id], onDelete: Cascade)
   /// "V01.03" — renumbered when processes are inserted or removed.
   code      String
   title     String
   sortOrder Int
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
 
   @@unique([chainId, code])
   @@index([chainId, sortOrder])
 }
 
 model ValueChainPrompt {
-  id      String            @id @default(cuid())
-  chainId String
-  chain   ValueChainLibrary @relation(fields: [chainId], references: [id], onDelete: Cascade)
+  id          String            @id @default(cuid())
+  chainId     String
+  chain       ValueChainLibrary @relation(fields: [chainId], references: [id], onDelete: Cascade)
   /// bpmn | value-chain | context | process-context | archimate
-  type String
+  type        String
   /// "V01.03" for a BPMN prompt; EMPTY STRING for a chain-level one. Empty rather
   /// than null because Postgres treats NULLs as distinct in a unique index, so a
   /// nullable column would happily allow two Context prompts on one chain.
-  processCode String @default("")
+  processCode String            @default("")
   /// "V01.03 Check Credit & Pricing" — the diagram name the batch runner uses.
-  name String
+  name        String
 
   prompt          String
   publishedPrompt String?
   /// Which template version produced it, so a regeneration can skip what is current.
-  templateHash String?
+  templateHash    String?
   /// Did it parse back through parseValueChainMd when it was generated?
-  roundTripsOk Boolean   @default(false)
-  generatedAt  DateTime?
+  roundTripsOk    Boolean   @default(false)
+  generatedAt     DateTime?
   /// Which AI model wrote it. NULL means genuinely unknown, not "none": a prompt
   /// imported from a .md was written elsewhere, and a prompt generated before
   /// this column existed cannot be attributed after the fact. Both are stated as
   /// unknown rather than guessed - the difference between Opus and Haiku is
   /// roughly two thirds of the content, so an attribution has to be trustworthy.
-  model        String?
+  model           String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -984,11 +984,11 @@ model SubscriptionLevel {
   hasApqc          Boolean @default(true)
   hasCollaboration Boolean @default(false) // live diagram co-authoring (premium)
 
-  users                User[]
+  users                 User[]
   orgs                  Org[]
   featureAvailabilities FeatureAvailability[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
 }
 
 // Feature Availability matrix — the SuperAdmin-editable "Feature by Subscription
@@ -1001,7 +1001,7 @@ model FeatureAvailability {
   id         String            @id @default(cuid())
   levelId    String
   level      SubscriptionLevel @relation(fields: [levelId], references: [id], onDelete: Cascade)
-  featureKey String            // stable key from FEATURES registry
+  featureKey String // stable key from FEATURES registry
   state      String            @default("hidden") // "available" | "disabled" | "hidden"
   updatedAt  DateTime          @updatedAt
 
@@ -1088,15 +1088,15 @@ model BubbleHelp {
 // in app/lib/diagram/diagramTypeStyles.ts and are used when a row is
 // absent, so the table is purely an override layer.
 model DiagramTypeStyle {
-  id        String   @id @default(cuid())
+  id            String   @id @default(cuid())
   typeKey       String   @unique // "bpmn" | "context" | "process-context" | …
-  code          String   // 2-char badge code, e.g. "BP"
-  bgColor       String   // pastel background hex, e.g. "#dbeafe"
-  textColor     String   // foreground hex, e.g. "#1d4ed8"
+  code          String // 2-char badge code, e.g. "BP"
+  bgColor       String // pastel background hex, e.g. "#dbeafe"
+  textColor     String // foreground hex, e.g. "#1d4ed8"
   boundaryColor String? // boundary/border hex, e.g. "#7f1d1d" (null → code default)
   sortOrder     Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 // Editable catalog for the assist "semantic template suggestion": when the
@@ -1108,13 +1108,13 @@ model DiagramTypeStyle {
 // an input/output Data Object. Injected into the Voice Assist AI prompt too.
 model IntentKeywordMap {
   id                 String   @id @default(cuid())
-  label              String   // shown on the ghost chip, e.g. "Approval" / "Instructions"
+  label              String // shown on the ghost chip, e.g. "Approval" / "Instructions"
   keywords           String[] @default([]) // matched (word-boundary, case-insensitive) against the element name
   action             String   @default("suggest-template") // suggest-template | add-input-data-object | add-output-data-object
   diagramType        String   @default("all") // "all" or a specific notation (bpmn, archimate, …)
-  defaultLabel       String?  // data-object actions: the default object name ("Instructions", "Output Doc")
-  targetCategory     String?  // suggest-template: template group to open the picker at
-  targetTemplateName String?  // suggest-template: exact template name to attach directly (wins over category)
+  defaultLabel       String? // data-object actions: the default object name ("Instructions", "Output Doc")
+  targetCategory     String? // suggest-template: template group to open the picker at
+  targetTemplateName String? // suggest-template: exact template name to attach directly (wins over category)
   sortOrder          Int      @default(0)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
@@ -1226,19 +1226,19 @@ model CollaborationGroupMember {
 // Both feed the virtual "Diagrams Sent / Received for Review" projects —
 // membership is derived from these rows, not Diagram.projectId.
 model DiagramReview {
-  id          String          @id @default(cuid())
+  id          String             @id @default(cuid())
   diagramId   String
-  diagram     Diagram         @relation(fields: [diagramId], references: [id], onDelete: Cascade)
+  diagram     Diagram            @relation(fields: [diagramId], references: [id], onDelete: Cascade)
   groupId     String
   group       CollaborationGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   requesterId String
-  requester   User            @relation("DiagramReviewRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  requester   User               @relation("DiagramReviewRequester", fields: [requesterId], references: [id], onDelete: Cascade)
   objective   String
   dueDate     DateTime
   // "open" | "resubmitted" | "closed"
-  status      String          @default("open")
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  status      String             @default("open")
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
   reviewers   DiagramReviewer[]
 
   @@index([diagramId])
@@ -1387,29 +1387,29 @@ model EntityList {
 }
 
 model EntityNode {
-  id        String          @id @default(cuid())
-  listId    String
-  list      EntityList      @relation(fields: [listId], references: [id], onDelete: Cascade)
+  id           String          @id @default(cuid())
+  listId       String
+  list         EntityList      @relation(fields: [listId], references: [id], onDelete: Cascade)
   // null for flat lists and for the top of a hierarchy.
-  parentId  String?
-  parent    EntityNode?     @relation("EntityNodeTree", fields: [parentId], references: [id], onDelete: Cascade)
-  children  EntityNode[]    @relation("EntityNodeTree")
-  name      String
-  level     EntityNodeLevel
-  sortOrder Int             @default(0)
+  parentId     String?
+  parent       EntityNode?     @relation("EntityNodeTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children     EntityNode[]    @relation("EntityNodeTree")
+  name         String
+  level        EntityNodeLevel
+  sortOrder    Int             @default(0)
   // Document-kind items may link to a SharePoint file. Stored as scalar columns
   // (not JSON) to sidestep the Prisma 7 JSON-write caveat; mirrors the
   // element.properties.sharepointLink shape { driveId, itemId, name, webUrl }.
-  spDriveId String?
-  spItemId  String?
-  spName    String?
-  spWebUrl  String?
+  spDriveId    String?
+  spItemId     String?
+  spName       String?
+  spWebUrl     String?
   // Provenance on a PROJECT COPY node → the master node it was cloned from. Null
   // on masters AND on project-local additions. Drives "Sync updates" (soft
   // pointer, no FK: a master node may be deleted and Sync reconciles).
   sourceNodeId String?
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
 
   @@index([listId, parentId, sortOrder])
   @@index([sourceNodeId])
@@ -1447,63 +1447,63 @@ enum ControlAutomation {
 }
 
 model RiskControlLibrary {
-  id             String              @id @default(cuid())
-  name           String
+  id              String               @id @default(cuid())
+  name            String
   // Exactly one of orgId / projectId is set.
-  orgId          String?
-  org            Org?                @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  projectId      String?
-  project        Project?            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  orgId           String?
+  org             Org?                 @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  projectId       String?
+  project         Project?             @relation(fields: [projectId], references: [id], onDelete: Cascade)
   // The org master this project copy was cloned from (provenance only).
   sourceLibraryId String?
-  sourceLibrary  RiskControlLibrary? @relation("RiskControlLibraryClone", fields: [sourceLibraryId], references: [id], onDelete: SetNull)
-  clones         RiskControlLibrary[] @relation("RiskControlLibraryClone")
-  items          RiskControlItem[]
-  links          RiskControlLink[]
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
+  sourceLibrary   RiskControlLibrary?  @relation("RiskControlLibraryClone", fields: [sourceLibraryId], references: [id], onDelete: SetNull)
+  clones          RiskControlLibrary[] @relation("RiskControlLibraryClone")
+  items           RiskControlItem[]
+  links           RiskControlLink[]
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
 
   @@index([orgId])
   @@index([projectId])
 }
 
 model RiskControlItem {
-  id           String             @id @default(cuid())
-  libraryId    String
-  library      RiskControlLibrary @relation(fields: [libraryId], references: [id], onDelete: Cascade)
-  kind         RiskControlKind
-  code         String             // short handle, e.g. "R-01" / "C-01"
-  name         String
-  description  String?
-  sortOrder    Int                @default(0)
+  id                 String             @id @default(cuid())
+  libraryId          String
+  library            RiskControlLibrary @relation(fields: [libraryId], references: [id], onDelete: Cascade)
+  kind               RiskControlKind
+  code               String // short handle, e.g. "R-01" / "C-01"
+  name               String
+  description        String?
+  sortOrder          Int                @default(0)
   // Risk attributes (kind = Risk)
-  likelihood         Int?         // 1..5 (inherent)
-  impact             Int?         // 1..5 (inherent)
+  likelihood         Int? // 1..5 (inherent)
+  impact             Int? // 1..5 (inherent)
   riskCategory       String?
-  residualLikelihood Int?         // 1..5 (after controls)
-  residualImpact     Int?         // 1..5 (after controls)
+  residualLikelihood Int? // 1..5 (after controls)
+  residualImpact     Int? // 1..5 (after controls)
   // Control attributes (kind = Control)
-  controlType  ControlType?
-  automation   ControlAutomation? // Manual | Automated | IT-dependent
-  frequency    String?            // how often the control runs
-  owner        String?
-  frameworkRef String?            // e.g. "SOX 404", "ISO 27001 A.9"
+  controlType        ControlType?
+  automation         ControlAutomation? // Manual | Automated | IT-dependent
+  frequency          String? // how often the control runs
+  owner              String?
+  frameworkRef       String? // e.g. "SOX 404", "ISO 27001 A.9"
   // Audit / assurance
-  evidence     String?            // what evidence proves the control operated
-  testMethod   String?            // how internal audit tests it
-  testFrequency String?           // how often it is tested
+  evidence           String? // what evidence proves the control operated
+  testMethod         String? // how internal audit tests it
+  testFrequency      String? // how often it is tested
   // Operating effectiveness from mining: the conformance-deviation signature this
   // control guards against (e.g. "undocumented-transition|In Progress|Ready to Pay").
   // When that deviation appears in the project's mining conformance, the control
   // was "bypassed" in that many cases.
-  monitorSignature String?
+  monitorSignature   String?
   // Directed traceability edges where this item is the source / the target.
   // (Control→Risk = mitigates; Policy→Control = governs; Regulation→Policy =
   //  requires; AuditFinding→Control = addresses; KRI→Risk = monitors; …)
-  linksOut     RiskControlLink[]  @relation("LinkSource")
-  linksIn      RiskControlLink[]  @relation("LinkTarget")
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
+  linksOut           RiskControlLink[]  @relation("LinkSource")
+  linksIn            RiskControlLink[]  @relation("LinkTarget")
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
 
   @@index([libraryId, kind, sortOrder])
 }
@@ -1529,16 +1529,16 @@ model RiskControlCodeSequence {
 // so tags survive version bumps.
 model PcfFramework {
   id              String    @id @default(cuid())
-  orgId           String?   // null = global reference; set = org's (imported reference or tailored)
+  orgId           String? // null = global reference; set = org's (imported reference or tailored)
   org             Org?      @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  kind            String    // "reference" | "tailored"
-  familyKey       String    // stable variant identity: "cross-industry" | "telecom" | tailored cuid
+  kind            String // "reference" | "tailored"
+  familyKey       String // stable variant identity: "cross-industry" | "telecom" | tailored cuid
   name            String
-  variant         String    // "Cross-Industry" | "Retail" | …
-  version         String    // "8.0" | "7.21" | tailored rev
+  variant         String // "Cross-Industry" | "Retail" | …
+  version         String // "8.0" | "7.21" | tailored rev
   isCurrent       Boolean   @default(true)
-  sourceKNumber   String?   // provenance of the source workbook, e.g. "K09276"
-  division        String?   // tailored only — optional business-unit scope
+  sourceKNumber   String? // provenance of the source workbook, e.g. "K09276"
+  division        String? // tailored only — optional business-unit scope
   attributionNote String    @default("") // ©APQC notice — travels with copies/exports
   nodes           PcfNode[]
   createdAt       DateTime  @default(now())
@@ -1549,26 +1549,26 @@ model PcfFramework {
 }
 
 model PcfNode {
-  id               String    @id @default(cuid())
-  frameworkId      String
-  framework        PcfFramework @relation(fields: [frameworkId], references: [id], onDelete: Cascade)
-  pcfId            Int       // APQC col A — STABLE across releases (the upgrade key)
-  hierarchyId      String    // dotted code col B — display only, NOT stable
-  name             String
-  description      String?
-  level            Int
-  parentId         String?
-  parent           PcfNode?  @relation("PcfTree", fields: [parentId], references: [id], onDelete: Cascade)
-  children         PcfNode[] @relation("PcfTree")
-  sortOrder        Int       @default(0)
-  metricsAvailable Boolean   @default(false) // flag only, never OSB values
-  changeType       String?   // "NEW" | "RENAMED" from the workbook's Change Details
+  id                String       @id @default(cuid())
+  frameworkId       String
+  framework         PcfFramework @relation(fields: [frameworkId], references: [id], onDelete: Cascade)
+  pcfId             Int // APQC col A — STABLE across releases (the upgrade key)
+  hierarchyId       String // dotted code col B — display only, NOT stable
+  name              String
+  description       String?
+  level             Int
+  parentId          String?
+  parent            PcfNode?     @relation("PcfTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children          PcfNode[]    @relation("PcfTree")
+  sortOrder         Int          @default(0)
+  metricsAvailable  Boolean      @default(false) // flag only, never OSB values
+  changeType        String? // "NEW" | "RENAMED" from the workbook's Change Details
   // tailored-layer fields:
-  isCustom         Boolean   @default(false)
-  active           Boolean   @default(true)
-  orgCode          String?
-  sourceFrameworkId String?  // provenance: reference framework a composed node came from
-  sourcePcfId      Int?      // provenance: the APQC pcfId it was composed from
+  isCustom          Boolean      @default(false)
+  active            Boolean      @default(true)
+  orgCode           String?
+  sourceFrameworkId String? // provenance: reference framework a composed node came from
+  sourcePcfId       Int? // provenance: the APQC pcfId it was composed from
 
   @@index([frameworkId, parentId, sortOrder])
   @@index([frameworkId, hierarchyId])
@@ -1576,14 +1576,14 @@ model PcfNode {
 }
 
 model RiskControlLink {
-  id         String             @id @default(cuid())
-  libraryId  String
-  library    RiskControlLibrary @relation(fields: [libraryId], references: [id], onDelete: Cascade)
-  sourceId   String
-  source     RiskControlItem    @relation("LinkSource", fields: [sourceId], references: [id], onDelete: Cascade)
-  targetId   String
-  target     RiskControlItem    @relation("LinkTarget", fields: [targetId], references: [id], onDelete: Cascade)
-  createdAt  DateTime           @default(now())
+  id        String             @id @default(cuid())
+  libraryId String
+  library   RiskControlLibrary @relation(fields: [libraryId], references: [id], onDelete: Cascade)
+  sourceId  String
+  source    RiskControlItem    @relation("LinkSource", fields: [sourceId], references: [id], onDelete: Cascade)
+  targetId  String
+  target    RiskControlItem    @relation("LinkTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  createdAt DateTime           @default(now())
 
   @@unique([sourceId, targetId])
   @@index([libraryId])
@@ -1596,18 +1596,18 @@ model RiskControlLink {
 // was cloned from. capacity is the pool size N (what makes queues form).
 // ────────────────────────────────────────────────────────────────────────────
 model SimulationTeam {
-  id           String   @id @default(cuid())
+  id           String           @id @default(cuid())
   name         String
   orgId        String?
-  org          Org?     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  org          Org?             @relation(fields: [orgId], references: [id], onDelete: Cascade)
   projectId    String?
-  project      Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project      Project?         @relation(fields: [projectId], references: [id], onDelete: Cascade)
   sourceTeamId String?
   sourceTeam   SimulationTeam?  @relation("SimulationTeamClone", fields: [sourceTeamId], references: [id], onDelete: SetNull)
   clones       SimulationTeam[] @relation("SimulationTeamClone")
-  capacity     Int      @default(1)
+  capacity     Int              @default(1)
   costPerHour  Float?
-  efficiency   Float    @default(1.0)
+  efficiency   Float            @default(1.0)
   // How this team's queue is ordered: "fifo" | "priority" | "shortest-first".
   // NULL = fifo, which is what every team did before disciplines existed.
   //
@@ -1619,8 +1619,8 @@ model SimulationTeam {
   // Priority alone decides who goes NEXT, which is powerless while every person
   // is busy — exactly when an urgent case arrives. Preempt-RESUME: the
   // interrupted case keeps the work already done.
-  preemptive   Boolean  @default(false)
-  calendar     Json     @default("{}")
+  preemptive   Boolean          @default(false)
+  calendar     Json             @default("{}")
   // Working hours: id of the SimulationCalendar this team follows (a plain id
   // reference, not an FK, so a deleted calendar just falls back to always-open).
   calendarId   String?
@@ -1628,13 +1628,13 @@ model SimulationTeam {
   // pool of interchangeable units, exactly as before skills existed. `capacity`
   // still caps how many may work at once (so calendars and interventions are
   // unaffected); members only decide WHO may take WHICH task.
-  members      Json     @default("[]")
+  members      Json             @default("[]")
   // Where the skills were last filled from: { diagramId, diagramName, at }.
   // Recorded because the fill is READ-ONCE and editable afterwards - without
   // provenance nobody can tell a hand-typed matrix from a stale imported one.
-  skillsSource Json     @default("{}")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  skillsSource Json             @default("{}")
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
 
   @@index([orgId])
   @@index([projectId])
@@ -1648,18 +1648,18 @@ model SimulationTeam {
 // closed. t=0 in the sim clock is anchored to Monday 00:00.
 // ────────────────────────────────────────────────────────────────────────────
 model SimulationCalendar {
-  id             String   @id @default(cuid())
-  name           String
-  orgId          String?
-  org            Org?     @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  projectId      String?
-  project        Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id               String               @id @default(cuid())
+  name             String
+  orgId            String?
+  org              Org?                 @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  projectId        String?
+  project          Project?             @relation(fields: [projectId], references: [id], onDelete: Cascade)
   sourceCalendarId String?
-  sourceCalendar SimulationCalendar?  @relation("SimulationCalendarClone", fields: [sourceCalendarId], references: [id], onDelete: SetNull)
-  clones         SimulationCalendar[] @relation("SimulationCalendarClone")
-  pattern        Json     @default("{\"intervals\":[]}")
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  sourceCalendar   SimulationCalendar?  @relation("SimulationCalendarClone", fields: [sourceCalendarId], references: [id], onDelete: SetNull)
+  clones           SimulationCalendar[] @relation("SimulationCalendarClone")
+  pattern          Json                 @default("{\"intervals\":[]}")
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
 
   @@index([orgId])
   @@index([projectId])
@@ -1673,40 +1673,40 @@ model SimulationCalendar {
 // machine diagrams and the calibrated SimulationStudy are referenced by id.
 // ────────────────────────────────────────────────────────────────────────────
 model ProcessMiningRun {
-  id               String   @id @default(cuid())
-  name             String
-  orgId            String?
-  org              Org?     @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  projectId        String?
-  project          Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  createdById      String?
-  mapping          Json     @default("{}")   // column → role
-  stats            Json     @default("{}")   // headline aggregates
-  variants         Json     @default("[]")   // compressed log
-  performance      Json     @default("{}")   // timing/resource aggregates (simulator feed)
-  analytics        Json?                      // RunAnalytics: per-activity/edge metrics, throughput, per-case index (Insights views)
-  kpiConfig        Json?                      // { sla, kpis[] } — KPI/SLA outcome config (on-time vs late)
-  governance       Json?                      // {controls,risks,policies} mined from Control/Risk/Policy IDs on events
-  discoveredBpmnId String?                    // Diagram id
-  discoveredSmId   String?                    // Diagram id
-  referenceSmId    String?                    // Diagram id (user-selected)
-  conformance      Json?                      // {fitness, violations[], transitionStats}
-  studyId          String?                    // SimulationStudy id (calibrated twin)
+  id                    String   @id @default(cuid())
+  name                  String
+  orgId                 String?
+  org                   Org?     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  projectId             String?
+  project               Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdById           String?
+  mapping               Json     @default("{}") // column → role
+  stats                 Json     @default("{}") // headline aggregates
+  variants              Json     @default("[]") // compressed log
+  performance           Json     @default("{}") // timing/resource aggregates (simulator feed)
+  analytics             Json? // RunAnalytics: per-activity/edge metrics, throughput, per-case index (Insights views)
+  kpiConfig             Json? // { sla, kpis[] } — KPI/SLA outcome config (on-time vs late)
+  governance            Json? // {controls,risks,policies} mined from Control/Risk/Policy IDs on events
+  discoveredBpmnId      String? // Diagram id
+  discoveredSmId        String? // Diagram id
+  referenceSmId         String? // Diagram id (user-selected)
+  conformance           Json? // {fitness, violations[], transitionStats}
+  studyId               String? // SimulationStudy id (calibrated twin)
   // A LINKED RUN SERIES. Nobody mines a process once: a snapshot, or a fresh
   // import of the next period, is the SAME process observed again. Without a
   // link the history exists but cannot be assembled except by guessing at name
   // prefixes, which is what the dated snapshot names were reduced to.
-  parentRunId      String?                    // the run this one continues from
+  parentRunId           String? // the run this one continues from
   // OCEL study grouping — an object-centric OCEL import mines one run per object
   // type, tied together by ocelGroupId and to the shared Domain Diagram.
-  ocelGroupId      String?                    // groups the per-object-type runs of one OCEL import
-  objectType       String?                    // the OCEL object type this run's lifecycle is for
-  domainDiagramId  String?                    // the shared Domain Diagram (object model backbone)
+  ocelGroupId           String? // groups the per-object-type runs of one OCEL import
+  objectType            String? // the OCEL object type this run's lifecycle is for
+  domainDiagramId       String? // the shared Domain Diagram (object model backbone)
   // Excluded from org Compliance Monitoring — a throwaway/test run the OrgAdmin
   // (or run owner) doesn't want polluting the effectiveness trend. Default false.
-  excludeFromCompliance Boolean @default(false)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  excludeFromCompliance Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   @@index([orgId])
   @@index([projectId])
@@ -1718,28 +1718,28 @@ model ProcessMiningRun {
 // maxEvents); config/cursor drive pull sources. The webhook key is stored as a
 // sha256 hash only (raw shown once). See app/lib/mining/refreshRun.ts.
 model MiningSource {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   projectId     String
-  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   orgId         String?
   createdById   String?
   name          String
-  kind          String   // "webhook" | "azure-blob" | "sharepoint"
-  apiKeyHash    String?  // sha256 hex of the webhook key
-  apiKeyPrefix  String?  // first 8 chars, for display
-  mapping       Json     @default("{}")   // LogMapping: incoming field → role
-  config        Json     @default("{}")   // { blobListUrl } | { driveId, itemId, folderPath, folderName }
-  cursor        Json     @default("{}")   // watermark for pull: { lastModified, seenNames[] }
-  buffer        Json     @default("[]")   // windowed accumulated event rows (capped)
-  headerFields  Json     @default("[]")   // stable column order for buildEventLog
-  runId         String?  // the live ProcessMiningRun this source maintains
-  maxEvents     Int      @default(100000)
-  autoRefresh   Boolean  @default(true)
+  kind          String // "webhook" | "azure-blob" | "sharepoint"
+  apiKeyHash    String? // sha256 hex of the webhook key
+  apiKeyPrefix  String? // first 8 chars, for display
+  mapping       Json      @default("{}") // LogMapping: incoming field → role
+  config        Json      @default("{}") // { blobListUrl } | { driveId, itemId, folderPath, folderName }
+  cursor        Json      @default("{}") // watermark for pull: { lastModified, seenNames[] }
+  buffer        Json      @default("[]") // windowed accumulated event rows (capped)
+  headerFields  Json      @default("[]") // stable column order for buildEventLog
+  runId         String? // the live ProcessMiningRun this source maintains
+  maxEvents     Int       @default(100000)
+  autoRefresh   Boolean   @default(true)
   lastIngestAt  DateTime?
   lastRefreshAt DateTime?
-  eventCount    Int      @default(0)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  eventCount    Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@index([projectId])
   @@index([kind])
@@ -1750,23 +1750,23 @@ model MiningSource {
 // PublicationBundle / PublicationBundleDiagram: project-scoped, the root set
 // frozen as join rows, the closure recomputed at assembly time.
 model SimulationStudy {
-  id          String                @id @default(cuid())
-  name        String
-  projectId   String
-  project     Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id           String                @id @default(cuid())
+  name         String
+  projectId    String
+  project      Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
   // Nullable + SetNull (audit DATA-01) — the study outlives its author.
-  createdById String?
-  createdBy   User?                 @relation("SimulationStudyAuthor", fields: [createdById], references: [id], onDelete: SetNull)
-  roots       SimulationStudyRoot[]
-  scenarios   SimulationScenario[]
+  createdById  String?
+  createdBy    User?                 @relation("SimulationStudyAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+  roots        SimulationStudyRoot[]
+  scenarios    SimulationScenario[]
   // Business-case inputs the run figures cannot supply: one-off implementation
   // cost, annual case volume, and an OPTIONAL business cost of delay per hour
   // (penalties/lost revenue — never staff cost, which the doing line already
   // carries). All optional; the case reports what it can and names what is
   // missing rather than assuming a zero. See facts/businessCase.ts.
-  businessCase Json       @default("{}")
-  createdAt   DateTime              @default(now())
-  updatedAt   DateTime              @updatedAt
+  businessCase Json                  @default("{}")
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
 
   @@index([projectId])
   @@index([createdById])
@@ -1792,21 +1792,21 @@ model SimulationStudyRoot {
 // `status` is DRAFT | QUEUED | RUNNING | DONE | FAILED (String, not a DB enum,
 // so adding states stays a code change, not a migration).
 model SimulationScenario {
-  id         String          @id @default(cuid())
-  name       String
-  studyId    String
-  study      SimulationStudy @relation(fields: [studyId], references: [id], onDelete: Cascade)
-  isBaseline Boolean         @default(false)
-  runConfig  Json            @default("{}")
-  overrides  Json            @default("{}")
+  id             String          @id @default(cuid())
+  name           String
+  studyId        String
+  study          SimulationStudy @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  isBaseline     Boolean         @default(false)
+  runConfig      Json            @default("{}")
+  overrides      Json            @default("{}")
   // Optional process VARIANT: diagram ids this scenario runs instead of the
   // study's roots — the basis of As-is vs To-be comparison (each scenario can
   // run a structurally different diagram). Empty array = inherit study roots.
-  variantRootIds Json        @default("[]")
-  status     String          @default("DRAFT")
-  runs       SimulationRun[]
-  createdAt  DateTime        @default(now())
-  updatedAt  DateTime        @updatedAt
+  variantRootIds Json            @default("[]")
+  status         String          @default("DRAFT")
+  runs           SimulationRun[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
   @@index([studyId])
 }
@@ -1821,8 +1821,8 @@ model SimulationExample {
   id          String   @id @default(cuid())
   slug        String   @unique
   title       String
-  concept     String   @default("")    // one-line tagline (the lesson)
-  description String   @default("")     // markdown walkthrough
+  concept     String   @default("") // one-line tagline (the lesson)
+  description String   @default("") // markdown walkthrough
   difficulty  String   @default("core") // intro | core | advanced
   sortOrder   Int      @default(0)
   published   Boolean  @default(false)
@@ -1846,9 +1846,9 @@ model MiningExample {
   id          String   @id @default(cuid())
   slug        String   @unique
   title       String
-  concept     String   @default("")     // one-line tagline (the lesson)
-  description String   @default("")      // markdown walkthrough
-  difficulty  String   @default("core")  // intro | core | advanced
+  concept     String   @default("") // one-line tagline (the lesson)
+  description String   @default("") // markdown walkthrough
+  difficulty  String   @default("core") // intro | core | advanced
   sortOrder   Int      @default(0)
   published   Boolean  @default(false)
   package     Json     @default("{}")
@@ -1917,9 +1917,9 @@ model SimulationRun {
 model HelpChapter {
   id         String        @id @default(cuid())
   slug       String
-  collection String        @default("user-guide")   // "user-guide" (the in-app help) | "tech-design" (SuperAdmin design notes)
+  collection String        @default("user-guide") // "user-guide" (the in-app help) | "tech-design" (SuperAdmin design notes)
   title      String
-  category   String?        // optional grouping for the searchable/filterable viewer (e.g. "Diagram Types", "AI Generation"); null = ungrouped
+  category   String? // optional grouping for the searchable/filterable viewer (e.g. "Diagram Types", "AI Generation"); null = ungrouped
   sortOrder  Int           @default(0)
   adminOnly  Boolean       @default(false)
   sections   HelpSection[]
@@ -1934,7 +1934,7 @@ model HelpSection {
   id           String      @id @default(cuid())
   chapterId    String
   chapter      HelpChapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
-  collection   String      @default("user-guide")   // denormalised from the chapter so the PUT's scoped delete needs no join
+  collection   String      @default("user-guide") // denormalised from the chapter so the PUT's scoped delete needs no join
   heading      String?
   bodyMarkdown String      @db.Text
   adminOnly    Boolean     @default(false)
@@ -1976,17 +1976,17 @@ model HelpImage {
 // as the editing underlay (like HelpImage: bytes in the DB, container public/ is
 // read-only). Assigned to element types via AppSetting["archimate.icon.custom"].
 model ArchimateIconLibrary {
-  id           String   @id @default(cuid())
-  name         String
-  category     String?
-  primitives   String
-  defaultWidth  Int?    // preferred corner-glyph box size (px) when assigned; null = category default
+  id            String   @id @default(cuid())
+  name          String
+  category      String?
+  primitives    String
+  defaultWidth  Int? // preferred corner-glyph box size (px) when assigned; null = category default
   defaultHeight Int?
-  sourceBytes  Bytes?
-  sourceMime   String?
-  createdById  String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  sourceBytes   Bytes?
+  sourceMime    String?
+  createdById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   @@index([createdAt])
 }
@@ -2033,12 +2033,12 @@ model SchemaValidationIssue {
 model AuditLog {
   id              String   @id @default(cuid())
   at              DateTime @default(now())
-  actorUserId     String?  // who performed it (null = system / cron)
-  actorEmail      String?  // denormalised, survives user deletion
-  effectiveUserId String?  // impersonation target, when acting as another user
-  orgId           String?  // tenant context, when known
-  action          String   // dotted verb, e.g. "impersonate.start", "export.full-backup"
-  targetType      String?  // "user" | "org" | "diagram" | "project" | "share" | …
+  actorUserId     String? // who performed it (null = system / cron)
+  actorEmail      String? // denormalised, survives user deletion
+  effectiveUserId String? // impersonation target, when acting as another user
+  orgId           String? // tenant context, when known
+  action          String // dotted verb, e.g. "impersonate.start", "export.full-backup"
+  targetType      String? // "user" | "org" | "diagram" | "project" | "share" | …
   targetId        String?
   meta            String   @default("{}") // JSON string — ids/counts/modes/hashes only
   ip              String?
@@ -2090,7 +2090,7 @@ model DictationSession {
   createdAt DateTime @default(now())
   userId    String?
   orgId     String?
-  engine    String   // "deepgram" | "browser"
+  engine    String // "deepgram" | "browser"
   seconds   Int      @default(0)
 
   @@index([createdAt])
@@ -2152,31 +2152,31 @@ model AiModelRate {
 /// the app (TipTap) and exported to .docx (buildDocx), optionally style-adopted
 /// from the resolved SopTemplate's uploaded Word template.
 model SopDocument {
-  id             String       @id @default(cuid())
-  projectId      String
-  project        Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  diagramId      String
-  diagram        Diagram      @relation(fields: [diagramId], references: [id], onDelete: Cascade)
+  id               String       @id @default(cuid())
+  projectId        String
+  project          Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  diagramId        String
+  diagram          Diagram      @relation(fields: [diagramId], references: [id], onDelete: Cascade)
   // "whole" | "lane" | "pool" | "subprocess" | "group"
-  scope          String       @default("whole")
-  scopeElementId String?      // the lane/pool/subprocess element id when scoped
-  scopeLabel     String?      // its label, for display
-  title          String
-  status         String       @default("draft") // draft | published
-  templateId     String?      // the SopTemplate resolved at generation time
-  model          String?      // AI model used for the prose pass
-  generatedAt    DateTime?
-  createdById    String?
+  scope            String       @default("whole")
+  scopeElementId   String? // the lane/pool/subprocess element id when scoped
+  scopeLabel       String? // its label, for display
+  title            String
+  status           String       @default("draft") // draft | published
+  templateId       String? // the SopTemplate resolved at generation time
+  model            String? // AI model used for the prose pass
+  generatedAt      DateTime?
+  createdById      String?
   // One-level undo: the section set (JSON string) captured just before the last
   // regenerate, so a merge can be reverted. String (not Json) per Prisma-7 caveat.
-  prevSectionsJson String?    @db.Text
+  prevSectionsJson String?      @db.Text
   /// Optimistic concurrency, the same contract `Diagram.version` has (DATA-36).
   /// A save deletes and recreates every section, so without this the second of
   /// two people editing one SOP destroys the first's work and gets a 200 for it.
-  version        Int          @default(0)
-  sections       SopSection[]
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  version          Int          @default(0)
+  sections         SopSection[]
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
   @@index([diagramId, scope])
   @@index([projectId])
@@ -2252,21 +2252,21 @@ model SopTemplate {
 // ────────────────────────────────────────────────────────────────────────────
 
 model ApiKey {
-  id            String    @id @default(cuid())
-  name          String // "GETAI — production"
+  id                   String   @id @default(cuid())
+  name                 String // "GETAI — production"
   /// sha256 hex of the raw key. UNIQUE so a presented key is found by an exact
   /// hash lookup — never a prefix lookup followed by a compare. The raw key is
   /// shown once at mint and never stored.
-  keyHash       String    @unique
-  keyPrefix     String // first 12 chars, for display
-  orgId         String
-  org           Org       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  keyHash              String   @unique
+  keyPrefix            String // first 12 chars, for display
+  orgId                String
+  org                  Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
   /// The user every call acts as. MUST NOT be a SuperAdmin, and should hold
   /// ProcessOwner rather than Admin — Admin grants silent owner access to every
   /// project in the org via isAdminElevatedForOrg.
-  serviceUserId String
-  serviceUser   User      @relation("ApiKeyServiceUser", fields: [serviceUserId], references: [id], onDelete: Restrict)
-  scopes        Json      @default("[]")
+  serviceUserId        String
+  serviceUser          User     @relation("ApiKeyServiceUser", fields: [serviceUserId], references: [id], onDelete: Restrict)
+  scopes               Json     @default("[]")
   /// Free text prepended to EVERY prompt this key sends (v2/7). Boroon asked for
   /// "keep it high level" to apply always rather than being resent on every
   /// request. Per-request `instructions` are appended after this, so a caller can
@@ -2274,30 +2274,30 @@ model ApiKey {
   standingInstructions String?
   /// Optional fixed destination project. The harness uses this to keep every
   /// run in one place.
-  projectId     String?
-  project       Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  projectId            String?
+  project              Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
   /// internal | testing | live. Defaults to the most restrictive: a new key
   /// retains nothing extra until somebody deliberately says otherwise.
-  phase         String    @default("live")
+  phase        String    @default("live")
   /// REQUIRED while phase is "testing", and capped at 90 days out, so
   /// "indefinitely" is not reachable by leaving a field blank.
-  captureUntil  DateTime?
+  captureUntil DateTime?
 
-  rateLimitPerMin Int     @default(30)
-  dailyJobLimit   Int     @default(50)
+  rateLimitPerMin Int @default(30)
+  dailyJobLimit   Int @default(50)
 
-  createdById   String?
-  revokedAt     DateTime?
-  expiresAt     DateTime?
-  lastUsedAt    DateTime?
-  lastUsedIp    String?
-  useCount      Int       @default(0)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdById String?
+  revokedAt   DateTime?
+  expiresAt   DateTime?
+  lastUsedAt  DateTime?
+  lastUsedIp  String?
+  useCount    Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  requests      PartnerRequest[]
-  jobs          PartnerJob[]
+  requests PartnerRequest[]
+  jobs     PartnerJob[]
 
   @@index([orgId])
 }
@@ -2412,7 +2412,7 @@ model HarnessCase {
   notes   String? @db.Text
   starred Boolean @default(false)
 
-  description   String  @db.Text @default("")
+  description   String  @default("") @db.Text
   documentBytes Bytes?
   documentName  String?
   documentType  String?
@@ -2430,4 +2430,80 @@ model HarnessCase {
   updatedAt   DateTime  @updatedAt
 
   @@index([starred, updatedAt])
+}
+
+/// An annotated Voice Assist session: what was said, what the system reported,
+/// and what the human watching says actually happened.
+///
+/// Deliberately outside the retention rules, for the same reason HarnessCase is:
+/// this is our OWN diagnostic material, and evidence you cannot go back to is
+/// not evidence. A session recorded in September is what proves, in December,
+/// that a fix held.
+///
+/// `entries` and `tally` are @db.Text rather than Json ON PURPOSE. They are
+/// documents — written whole, read whole, downloaded as a file, never filtered
+/// on — so storing them as text means no pgPool write path at all, and one
+/// fewer Prisma 7 rule to get wrong in a new subsystem. The numbers anyone
+/// would query are lifted out as scalars beside them, which is also what keeps
+/// the listing fast.
+model VoiceDebugSession {
+  id    String @id @default(cuid())
+  title String
+
+  /// Plain Strings, NOT a relation: deleting the diagram must not delete the
+  /// evidence about it. The most useful session is often the one about a
+  /// diagram somebody threw away afterwards.
+  diagramId   String?
+  diagramName String?
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  entryCount   Int @default(0)
+  /// Entries the system itself reported as failures.
+  failureCount Int @default(0)
+  /// ok:true with a human verdict of "wrong" — the silent wrong answers. The
+  /// whole point of the feature, and the column the listing sorts on.
+  disputeCount Int @default(0)
+
+  notes          String? @db.Text
+  appVersion     String?
+  /// Which recogniser configuration produced the `heard` text (Phase 4).
+  asrFingerprint String?
+
+  entries String @db.Text
+  tally   String @default("{}") @db.Text
+
+  snapshots VoiceDebugSnapshot[]
+
+  @@index([createdAt])
+  @@index([disputeCount, createdAt])
+}
+
+/// A picture of the canvas at one moment, and the diagram behind it.
+///
+/// Both halves, because they answer different questions: the PNG says what the
+/// person was looking at, the JSON lets the situation be reloaded and replayed.
+/// A snapshot whose capture failed still keeps the JSON — evidence with no
+/// picture beats no evidence.
+model VoiceDebugSnapshot {
+  id        String            @id @default(cuid())
+  sessionId String
+  session   VoiceDebugSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  /// The log entry this was taken for; null for an ad-hoc snapshot.
+  entryId String?
+  takenAt DateTime @default(now())
+  label   String?
+
+  pngBytes  Bytes?
+  pngWidth  Int?
+  pngHeight Int?
+
+  diagramJson    String @db.Text
+  elementCount   Int    @default(0)
+  connectorCount Int    @default(0)
+
+  @@index([sessionId, takenAt])
 }

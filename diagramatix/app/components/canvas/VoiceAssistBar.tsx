@@ -40,6 +40,8 @@ export function VoiceAssistBar({
   onAnnotate,
   onSnapshot,
   onDownloadSession,
+  onSaveSession,
+  saveState = "idle",
   snapshotCount = 0,
 }: {
   listening: boolean;
@@ -65,6 +67,9 @@ export function VoiceAssistBar({
   /** Take a picture of the canvas — for one entry, or ad-hoc when id is null. */
   onSnapshot?: (entryId: string | null) => void;
   onDownloadSession?: () => void;
+  /** Keep this session — saved to the SuperAdmin list, where it outlives the tab. */
+  onSaveSession?: () => void;
+  saveState?: "idle" | "saving" | "saved" | "error";
   snapshotCount?: number;
 }) {
   const [text, setText] = useState("");
@@ -209,6 +214,17 @@ export function VoiceAssistBar({
             {onSnapshot && (
               <button onClick={() => onSnapshot(null)} className="shrink-0 px-1.5 py-0.5 rounded border border-amber-300 hover:bg-amber-100"
                 title="Take a picture of the canvas as it is now">📷 Snapshot</button>
+            )}
+            {onSaveSession && (
+              <button onClick={onSaveSession} disabled={log.length === 0 || saveState === "saving"}
+                className={`shrink-0 px-1.5 py-0.5 rounded border disabled:opacity-40 ${
+                  saveState === "saved" ? "bg-green-600 text-white border-green-600"
+                    : saveState === "error" ? "bg-red-100 text-red-700 border-red-300"
+                      : "border-amber-300 hover:bg-amber-100"
+                }`}
+                title="Keep this session — it appears in the SuperAdmin Voice Assist Debug Sessions list and outlives this tab">
+                {saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved ✓" : saveState === "error" ? "Save failed" : "Save"}
+              </button>
             )}
             {onDownloadSession && (
               <button onClick={onDownloadSession} disabled={log.length === 0}

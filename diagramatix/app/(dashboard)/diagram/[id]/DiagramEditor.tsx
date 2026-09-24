@@ -3897,10 +3897,15 @@ export function DiagramEditor({
     if (entryId) setVoiceLog((prev) => prev.map((e) => (e.id === entryId ? { ...e, snapshotId: id } : e)));
   }, [data.elements, data.connectors]);
 
-  /** The whole session as one file: commands, verdicts, comments, snapshots. */
-  const downloadDebugSession = useCallback(() => {
-    const savedAt = Date.now();
-    const file = buildDebugSessionFile({
+  /**
+   * The session, built once and used for both destinations.
+   *
+   * Save-to-disk and save-to-database take THE SAME PAYLOAD — the POST route
+   * accepts exactly what the download writes — so a downloaded file can be
+   * posted back and the two shapes cannot drift apart.
+   */
+  const buildDebugSession = useCallback((savedAt: number) =>
+    buildDebugSessionFile({
       title: `Voice Assist — ${diagramName || "diagram"}`,
       diagramId,
       diagramName,
@@ -3908,15 +3913,37 @@ export function DiagramEditor({
       snapshots: debugSnapshots,
       savedAt,
       appVersion: PRODUCT_VERSION,
-    });
-    const blob = new Blob([serialiseDebugSession(file)], { type: "application/json" });
+    }), [voiceLog, debugSnapshots, diagramName, diagramId]);
+
+  const [debugSaveState, setDebugSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const saveDebugSession = useCallback(async () => {
+    setDebugSaveState("saving");
+    try {
+      const res = await fetch("/api/admin/voice-debug/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildDebugSession(Date.now())),
+      });
+      setDebugSaveState(res.ok ? "saved" : "error");
+    } catch {
+      setDebugSaveState("error");
+    }
+    // Back to "Save" after a moment, so a second save later in the session is
+    // obviously available rather than looking already done.
+    setTimeout(() => setDebugSaveState("idle"), 4000);
+  }, [buildDebugSession]);
+
+  /** The whole session as one file: commands, verdicts, comments, snapshots. */
+  const downloadDebugSession = useCallback(() => {
+    const savedAt = Date.now();
+    const blob = new Blob([serialiseDebugSession(buildDebugSession(savedAt))], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = debugSessionFilename(diagramName, new Date(savedAt).toISOString());
     a.click();
     URL.revokeObjectURL(url);
-  }, [voiceLog, debugSnapshots, diagramName, diagramId]);
+  }, [buildDebugSession, diagramName]);
 
   // Cancel the guided rename flow and clear any badge/edit state.
   const cancelRenameFlow = useCallback((reason?: string) => {
@@ -7118,6 +7145,8 @@ export function DiagramEditor({
             onAnnotate={annotateCommand}
             onSnapshot={(entryId) => { void takeDebugSnapshot(entryId); }}
             onDownloadSession={downloadDebugSession}
+            onSaveSession={() => { void saveDebugSession(); }}
+            saveState={debugSaveState}
             snapshotCount={debugSnapshots.length}
           />
         )}
