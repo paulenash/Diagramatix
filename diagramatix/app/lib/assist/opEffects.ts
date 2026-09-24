@@ -245,8 +245,11 @@ export function checkEffect(op: AssistOp, before: DiagramData, after: DiagramDat
     case "wrapInPool": {
       const loose = after.elements.filter((e) => e.type !== "pool" && !isLaneLike(e) && e.type !== "text-annotation" && !inAPool(after, e));
       if (loose.length) return fail(`${loose.length} element${loose.length === 1 ? " is" : "s are"} still outside every pool`);
-      // The sentence NAMED the pool. Something on the diagram must carry that name.
-      if (op.label && !after.elements.some((e) => e.type === "pool" && sameText(e.label, op.label))) {
+      // The sentence NAMED the pool. With no pool before, the new one must carry
+      // that name. With one already there it GROWS and keeps its own (Paul,
+      // 2026-09-25: "grow, ignore the name"), and the log says so.
+      const hadPool = before.elements.some((e) => e.type === "pool");
+      if (op.label && !hadPool && !after.elements.some((e) => e.type === "pool" && sameText(e.label, op.label))) {
         return fail(`no pool is called “${op.label}”`);
       }
       return pass;

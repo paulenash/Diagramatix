@@ -1,5 +1,5 @@
 /**
- * T4748–T4753 — L4: did applying the ops do the right thing?
+ * T4748–T4753, T4757–T4759 — L4: did applying the ops do the right thing?
  *
  * Paul, 2026-09-25, of the harness's last open layer: "The harness doesn't yet
  * check whether the diagram itself came out right." It could not, because the
@@ -20,7 +20,10 @@ import { parseCommand } from "@/app/lib/assist/commandGrammar";
 import { applyAssistOps } from "@/app/lib/assist/applyAssistOps";
 import { headlessDiagram } from "@/app/lib/assist/headlessDiagram";
 import { checkEffect, checkAlign } from "@/app/lib/assist/opEffects";
-import { fixtureElements, fixtureDiagram, fixtureConnectors } from "@/app/lib/assist/commandFixture";
+import { fixtureElements, fixtureDiagram, fixtureConnectors, LANE_LABELS } from "@/app/lib/assist/commandFixture";
+import { reducer } from "@/app/hooks/useDiagram";
+import { laneMetrics } from "@/app/lib/diagram/containerMetrics";
+import { MIN_LEFT_GAP } from "@/app/lib/diagram/poolLaneBounds";
 import { DEFAULT_CORPUS_SEED } from "@/app/lib/assist/rng";
 import type { DiagramData } from "@/app/lib/diagram/types";
 
@@ -118,22 +121,18 @@ describe("T4750 — L4 over the corpus, with its wrong edits frozen", () => {
    * Each line is a finding for Paul, not a defect being tolerated.
    */
   const KNOWN_WRONG_EDITS: Record<string, string> = {
-    "wrapInPool|no pool is called “…”":
-      "With a pool already on the diagram, WRAP_IN_POOL grows the biggest pool to adopt the loose elements and DROPS the name. T4738 made the grammar keep “called X”; the reducer still has nowhere to put it. Needs a decision: rename the grown pool, or draw a new one.",
-    "addLaneAt|the new lane is not above Underwriters":
-      "REDUCER BUG. When the named lane has no room at the edge asked for, the carve borrows from ANOTHER lane and the new lane lands at the bottom of the pool, reported as “added a lane above Underwriters”. Same code as the mouse lane-drop (carveBandWithin), so not changed without Paul.",
-    "addLaneAt|the new lane is not above Claims Team":
-      "The same carve fallback as above.",
-    "addLaneAt|refused: no room below Claims Team for a lane called “…” — it is carved out of Claims Team and the pool does not grow; make Claims Team taller or use a shorter name":
-      "A lane whose sublanes fill it cannot give up room, so nothing can be carved beside it. Was a silent no-op reported as success until 2026-09-25; now it says so.",
-    "addLaneAt|refused: no room above Lane 3 for a lane called “…” — it is carved out of Lane 3 and the pool does not grow; make Lane 3 taller or use a shorter name":
-      "A CORRECT refusal: Pay Claim sits at the top of Lane 3, so there is no room above it. Listed so the case stays visible rather than being generated away.",
-    "moveLane|refused: Underwriters can't move up — Claims Team has no room to give":
-      "MOVE_LANE counts Claims Team's sublanes as contents that reach its bottom, so it can never shrink. Was reported as “moved” until 2026-09-25. A lane with sublanes could give room from its last sublane, as a pool resize does — Paul's call.",
+    // Empty, and that is the ratchet working.
+    //
+    // Its first run (2026-09-25) froze six: a named wrap that dropped the name,
+    // a lane "above Underwriters" carved at the far end of the pool, and lanes
+    // beside sublane-filled neighbours that could not move or be carved. Paul
+    // decided each the same day — grow and SAY the name was not used; refuse a
+    // carve that would land anywhere but where it was named (voice only, the
+    // mouse drop keeps its fallback); keep refusing beside sublanes — and the
+    // corpus now asks only for what the fixture has room for.
   };
-
   const CORPUS = { seed: DEFAULT_CORPUS_SEED, count: 600 };
-  const MAX_WRONG_EDITS = 70;
+  const MAX_WRONG_EDITS = 0;
   const fold = (d: string) => d.replace(/“[^”]*”/g, "“…”");
 
   const run = () => {
@@ -216,8 +215,9 @@ describe("T4752 — a command that changed nothing never says it worked", () => 
 
   it("the room rule is the REDUCER's, asked — not copied into the apply layer", () => {
     const body = src("app", "lib", "assist", "applyAssistOps.ts");
-    expect(body).toContain("return reducer(now, action) !== now;");
-    expect(body).toContain(`wouldChange({ type: "ADD_LANE_AT"`);
+    expect(body).toContain("const next = reducer(now, action);");
+    expect(body).toContain("return next === now ? null : next;");
+    expect(body).toContain(`preview({ type: "ADD_LANE_AT"`);
     expect(body).toContain(`wouldChange({ type: "MOVE_LANE"`);
   });
 });
@@ -232,8 +232,16 @@ describe("T4753 — the corpus asks for things the fixture can do", () => {
     for (const c of ds) expect(joined.has(Object.values(c.refs).join(">")), c.utterance).toBe(true);
   });
 
-  it("a lane moves only if it has a lane on both sides", () => {
-    for (const c of cases().filter((x) => x.family === "moveLane")) expect(Object.values(c.refs), c.utterance).toEqual(["L2"]);
+  it("a lane moves only if it has a lane on both sides, and never toward one its sublanes fill", () => {
+    for (const c of cases().filter((x) => x.family === "moveLane")) {
+      expect(Object.values(c.refs), c.utterance).toEqual(["L2"]);
+      // Claims Team, above, is filled by its sublanes: moving up is refused by decision.
+      expect((c.ops[0] as { direction: string }).direction, c.utterance).toBe("down");
+    }
+  });
+
+  it("a lane is carved only beside a lane with room — never one its sublanes fill", () => {
+    for (const c of cases().filter((x) => x.family === "addLaneAt")) expect(Object.values(c.refs), c.utterance).not.toContain("L1");
   });
 
   it("nothing is added AFTER a start event's flow — nothing flows into one", () => {
@@ -249,5 +257,76 @@ describe("T4753 — the corpus asks for things the fixture can do", () => {
     for (const p of fixtureElements().filter((e) => e.type === "pool")) expect(p.height, p.label).toBeGreaterThanOrEqual(116);
     // And one loose element, so a wrap has something to wrap.
     expect(fixtureElements().some((e) => e.type !== "pool" && !e.parentId)).toBe(true);
+  });
+});
+
+describe("T4757 — the fixture has room for every lane name the corpus can say", () => {
+  it("each LANE_LABELS name fits the empty space above and below Underwriters and Lane 3", () => {
+    // A new lane must be tall enough for its name, which runs up its header.
+    // Without the room the carve goes elsewhere and voice refuses — correctly —
+    // and a correct refusal of an impossible case is noise in the corpus.
+    const els = fixtureElements();
+    for (const laneId of ["L2", "L3"]) {
+      const lane = els.find((e) => e.id === laneId)!;
+      const inside = els.filter((e) => e.parentId === laneId);
+      const top = Math.min(...inside.map((e) => e.y)) - lane.y - MIN_LEFT_GAP;
+      const bottom = lane.y + lane.height - Math.max(...inside.map((e) => e.y + e.height)) - MIN_LEFT_GAP;
+      for (const name of LANE_LABELS) {
+        const need = laneMetrics(name, 14).minHeight;
+        expect(need, `${name} above ${lane.label}`).toBeLessThanOrEqual(top);
+        expect(need, `${name} below ${lane.label}`).toBeLessThanOrEqual(bottom);
+      }
+    }
+  });
+});
+
+describe("T4758 — voice puts a lane where it was named, or nowhere", () => {
+  /** Underwriters with its tasks hard against its top edge: no room above it, plenty at the pool's bottom. */
+  const packedAbove = (): DiagramData => {
+    const d = fixtureDiagram();
+    return { ...d, elements: d.elements.map((e) => (e.parentId === "L2" ? { ...e, y: 318 } : e)) };
+  };
+
+  it("refuses rather than carving at the far end of the pool", () => {
+    const r = say("add a lane above Underwriters called Billing Team", { diagram: packedAbove() });
+    expect(r.ok).toBe(false);
+    expect(r.summary).toMatch(/no room above Underwriters for a lane called “Billing Team”/);
+    expect(r.after.elements.some((e) => e.label === "Billing Team")).toBe(false);
+  });
+
+  it("while the MOUSE drop's fallback is untouched — the reducer still carves at the far end", () => {
+    // Paul, 2026-09-25: refuse by voice only. A drop shows where the lane will
+    // land before you let go; a sentence cannot.
+    const d = packedAbove();
+    const next = reducer(d, { type: "ADD_LANE_AT", payload: { poolId: "p", position: "above", refLaneId: "L2", label: "Billing Team" } } as never);
+    const lane = next.elements.find((e) => e.label === "Billing Team");
+    expect(lane, "the reducer still places it").toBeDefined();
+    expect(lane!.y).toBeGreaterThan(next.elements.find((e) => e.id === "L2")!.y);
+  });
+
+  it("and a lane with room at the named edge is added there, as before", () => {
+    const r = say("add a lane above Underwriters called Billing Team");
+    expect(r.ok, r.summary).toBe(true);
+    const lane = r.after.elements.find((e) => e.label === "Billing Team")!;
+    expect(lane.y + lane.height).toBe(r.after.elements.find((e) => e.id === "L2")!.y);
+  });
+});
+
+describe("T4759 — a named wrap into an existing pool grows it, and says the name was not used", () => {
+  it("the pool keeps its own name, and the log names the one that was dropped", () => {
+    // Paul, 2026-09-25: "grow, ignore the name" — but a name the user SAID
+    // must not vanish without a word.
+    const r = say("put a pool around everything called Accounts Payable");
+    expect(r.ok, r.summary).toBe(true);
+    expect(r.summary).toMatch(/grew Claims Processing to take in 1 loose element — “Accounts Payable” was not used; the pool keeps its name/);
+    expect(r.after.elements.some((e) => e.type === "pool" && e.label === "Accounts Payable")).toBe(false);
+    expect(r.after.elements.find((e) => e.id === "loose")!.parentId).toBeTruthy();
+  });
+
+  it("with NO pool yet, the new pool still takes the name", () => {
+    const d = fixtureDiagram();
+    const bare: DiagramData = { ...d, connectors: [], elements: [d.elements.find((e) => e.id === "loose")!] };
+    const r = say("put a pool around everything called Accounts Payable", { diagram: bare });
+    expect(r.after.elements.find((e) => e.type === "pool")?.label).toBe("Accounts Payable");
   });
 });

@@ -138,6 +138,7 @@ function messageLabelKey(ref: string): string {
 
 const elBox = (e: DiagramElement) => ({ x: e.x, y: e.y, width: e.width, height: e.height });
 const nameOf = (e: DiagramElement) => (e.label?.trim() || e.type);
+const sameName = (a: string | undefined, b: string | undefined) => (a ?? "").trim().toLowerCase() === (b ?? "").trim().toLowerCase();
 /** M7 — how the log says what an align just did. */
 const ALIGN_LABEL: Record<string, string> = {
   smart: "tidily", center: "into a row", vcenter: "into a column",
@@ -176,10 +177,12 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
    * simply stops — and a spoken command must not report success for them. The
    * REDUCER answers, so its room rule is never copied here.
    */
-  const wouldChange = (action: Action): boolean => {
+  const preview = (action: Action): DiagramData | null => {
     const now = { elements: els, connectors: data.connectors, viewport: { x: 0, y: 0, zoom: 1 } } as DiagramData;
-    return reducer(now, action) !== now;
+    const next = reducer(now, action);
+    return next === now ? null : next;
   };
+  const wouldChange = (action: Action): boolean => preview(action) !== null;
   // Multi-modal: "this" / "these" / "the selected task" resolve to the mouse
   // selection — the mouse says WHICH, the voice says WHAT.
   const selectedIds = selectedIdsRef.current;
@@ -610,7 +613,10 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       wrapInPool(op.label);
       if (pools.length > 0) {
         const biggest = pools.reduce((a, b) => (a.width * a.height >= b.width * b.height ? a : b));
-        results.push(`grew ${nameOf(biggest)} to take in ${loose.length} loose element${loose.length === 1 ? "" : "s"}`);
+        // The grown pool keeps its own name (Paul, 2026-09-25: "grow, ignore
+        // the name") — but a name the user SAID must not vanish silently.
+        const unused = op.label && !sameName(op.label, biggest.label) ? ` — “${op.label}” was not used; the pool keeps its name` : "";
+        results.push(`grew ${nameOf(biggest)} to take in ${loose.length} loose element${loose.length === 1 ? "" : "s"}${unused}`);
       } else {
         results.push(`put ${loose.length} element${loose.length === 1 ? "" : "s"} in a new pool`);
       }
@@ -642,7 +648,19 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       // pool, so with no room it adds NOTHING — and this said "added a lane"
       // anyway (found by L4, 2026-09-25). Ask the reducer rather than
       // re-deriving its room rule here.
-      if (!wouldChange({ type: "ADD_LANE_AT", payload: { poolId, position: op.position, refLaneId: ref.id, label: op.label } })) {
+      const carved = preview({ type: "ADD_LANE_AT", payload: { poolId, position: op.position, refLaneId: ref.id, label: op.label } });
+      // Where the carve would REALLY put it. When the named lane has no room
+      // at that edge, the shared carve borrows from another lane — right for a
+      // mouse drop, which shows where the lane will go before you let go, and
+      // wrong for a sentence that named the place: "above Underwriters" landed
+      // at the bottom of the pool (L4, 2026-09-25). Paul, same day: refuse,
+      // by voice only; the mouse drop keeps its fallback.
+      const newLane = carved?.elements.find((e) => e.type === "lane" && e.parentId === poolId && !els.some((o) => o.id === e.id));
+      const refNow = carved?.elements.find((e) => e.id === ref.id);
+      const besideIt = !!newLane && !!refNow && (op.position === "above"
+        ? Math.abs(newLane.y + newLane.height - refNow.y) <= 1
+        : Math.abs(newLane.y - (refNow.y + refNow.height)) <= 1);
+      if (!besideIt) {
         // The new lane must be tall enough for its NAME, which runs up its
         // header — "QA" fits where "Quality Assurance" does not — so say so.
         results.push(`no room ${op.position} ${nameOf(ref)} for a lane${op.label ? ` called “${op.label}”` : ""} — it is carved out of ${nameOf(ref)} and the pool does not grow; make ${nameOf(ref)} taller${op.label ? " or use a shorter name" : ""}`);

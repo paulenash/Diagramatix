@@ -47,15 +47,17 @@ const E = (o: Record<string, unknown>) => o as unknown as DiagramElement;
 /** The elements. A claims department, two teams, an external party and a system. */
 export function fixtureElements(): DiagramElement[] {
   return [
-    E({ id: "p", type: "pool", label: "Claims Processing", x: 0, y: 0, width: 900, height: 900, properties: { poolType: "white-box" } }),
+    E({ id: "p", type: "pool", label: "Claims Processing", x: 0, y: 0, width: 900, height: 1180, properties: { poolType: "white-box" } }),
     E({ id: "L1", type: "lane", label: "Claims Team", x: 36, y: 0, width: 864, height: 300, parentId: "p", properties: {} }),
-    // Underwriters and Lane 3 have ROOM, as a lane being worked on does. A new
+    // Underwriters and Lane 3 have ROOM — 190px of empty space above AND below
+    // their contents, enough for the tallest name in LANE_LABELS (T4757) — as a
+    // lane being worked on does. A new
     // lane is carved out of its neighbour and must be tall enough for its name,
     // so a fixture packed to the last pixel refused every "add a lane below X
     // called Quality Assurance" — correctly, and uselessly (L4, 2026-09-25).
-    E({ id: "L2", type: "lane", label: "Underwriters", x: 36, y: 300, width: 864, height: 320, parentId: "p", properties: {} }),
+    E({ id: "L2", type: "lane", label: "Underwriters", x: 36, y: 300, width: 864, height: 440, parentId: "p", properties: {} }),
     // A lane nobody has renamed yet — the commonest rename target there is.
-    E({ id: "L3", type: "lane", label: "Lane 3", x: 36, y: 620, width: 864, height: 280, parentId: "p", properties: {} }),
+    E({ id: "L3", type: "lane", label: "Lane 3", x: 36, y: 740, width: 864, height: 440, parentId: "p", properties: {} }),
     E({ id: "S1", type: "lane", label: "Sub 1", x: 72, y: 0, width: 828, height: 150, parentId: "L1", properties: {} }),
     E({ id: "S2", type: "lane", label: "Sub 2", x: 72, y: 150, width: 828, height: 150, parentId: "L1", properties: {} }),
 
@@ -64,18 +66,18 @@ export function fixtureElements(): DiagramElement[] {
     E({ id: "t2", type: "task", label: "Check Coverage", x: 360, y: 30, width: 100, height: 60, parentId: "S1", properties: {} }),
     E({ id: "t3", type: "task", label: "Assess Risk", x: 200, y: 180, width: 100, height: 60, parentId: "S2", properties: {} }),
     // Un-renamed, exactly as the editor creates them.
-    E({ id: "t4", type: "task", label: "Task 1", x: 200, y: 330, width: 100, height: 60, parentId: "L2", properties: {} }),
-    E({ id: "t5", type: "task", label: "Task 2", x: 360, y: 330, width: 100, height: 60, parentId: "L2", properties: {} }),
-    E({ id: "sub3", type: "subprocess", label: "Subprocess 3", x: 520, y: 330, width: 120, height: 60, parentId: "L2", properties: {} }),
-    E({ id: "g", type: "gateway", label: "Claim Approved?", x: 700, y: 335, width: 50, height: 50, parentId: "L2", properties: {} }),
+    E({ id: "t4", type: "task", label: "Task 1", x: 200, y: 490, width: 100, height: 60, parentId: "L2", properties: {} }),
+    E({ id: "t5", type: "task", label: "Task 2", x: 360, y: 490, width: 100, height: 60, parentId: "L2", properties: {} }),
+    E({ id: "sub3", type: "subprocess", label: "Subprocess 3", x: 520, y: 490, width: 120, height: 60, parentId: "L2", properties: {} }),
+    E({ id: "g", type: "gateway", label: "Claim Approved?", x: 700, y: 495, width: 50, height: 50, parentId: "L2", properties: {} }),
     // Un-renamed, as the editor creates them (Paul, 2026-09-25): a gateway is
     // born "Decision?" and an expanded subprocess "Expanded 2". Both are
     // common rename targets, and both are awkward — one ends in punctuation
     // the parser strips, the other ends in a digit.
     E({ id: "g2", type: "gateway", label: "Decision?", x: 700, y: 180, width: 50, height: 50, parentId: "S2", properties: {} }),
     E({ id: "ep2", type: "subprocess-expanded", label: "Expanded 2", x: 480, y: 170, width: 180, height: 90, parentId: "S2", properties: {} }),
-    E({ id: "t6", type: "task", label: "Pay Claim", x: 200, y: 640, width: 100, height: 60, parentId: "L3", properties: {} }),
-    E({ id: "end", type: "end-event", label: "Claim Closed", x: 800, y: 648, width: 36, height: 36, parentId: "L3", properties: {} }),
+    E({ id: "t6", type: "task", label: "Pay Claim", x: 200, y: 930, width: 100, height: 60, parentId: "L3", properties: {} }),
+    E({ id: "end", type: "end-event", label: "Claim Closed", x: 800, y: 938, width: 36, height: 36, parentId: "L3", properties: {} }),
 
     // An external participant, and an IT system. Both black-box, and they read
     // very differently in a sentence — worth exercising both.
@@ -84,8 +86,8 @@ export function fixtureElements(): DiagramElement[] {
     // an 80px fixture pool GREW on its first edit, and L4 read "move the bottom
     // boundary up" as moving it down (2026-09-25). A fixture the reducer would
     // correct on contact measures the correction, not the command.
-    E({ id: "cust", type: "pool", label: "Customer", x: 0, y: 1000, width: 900, height: 120, properties: { poolType: "black-box" } }),
-    E({ id: "sys", type: "pool", label: "Salesforce", x: 0, y: 1160, width: 900, height: 120, properties: { poolType: "black-box" } }),
+    E({ id: "cust", type: "pool", label: "Customer", x: 0, y: 1280, width: 900, height: 120, properties: { poolType: "black-box" } }),
+    E({ id: "sys", type: "pool", label: "Salesforce", x: 0, y: 1440, width: 900, height: 120, properties: { poolType: "black-box" } }),
 
     // One element in NO pool — last in the list, so no template's picks shift.
     // Without it "put a pool around everything" had nothing to wrap and was

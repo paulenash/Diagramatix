@@ -71,6 +71,9 @@ export interface World {
   whiteBoxPool(rng: Rng): Named;
   lane(rng: Rng): Named;
   sublane(rng: Rng): Named;
+  /** A lane with no sublanes — one that has room to carve a new lane from.
+   *  A lane its sublanes fill has none, and refusing is decided (2026-09-25). */
+  laneWithoutSublanes(rng: Rng): Named;
   /** Two elements a flow already joins — "disconnect" asks for nothing otherwise. */
   connectedPair(rng: Rng): [Named, Named] | null;
   /** A lane with a neighbour on BOTH sides, and a direction. A lane move trades
@@ -148,6 +151,10 @@ export function worldOf(els: readonly DiagramElement[]): World {
     whiteBoxPool: (rng) => nameIt(rng, pick(rng, white.length ? white : pools), els, "pool"),
     lane: (rng) => nameIt(rng, pick(rng, lanes), els, "lane"),
     sublane: (rng) => nameIt(rng, pick(rng, subs), els, "sub-lane"),
+    laneWithoutSublanes: (rng) => {
+      const free = lanes.filter((l) => !els.some((e) => e.type === "lane" && e.parentId === l.id));
+      return nameIt(rng, pick(rng, free.length ? free : lanes), els, "lane");
+    },
     connectedPair: (rng) => {
       const pairs = fixtureConnectors()
         .map((c) => [els.find((e) => e.id === c.sourceId), els.find((e) => e.id === c.targetId)] as const)
@@ -161,8 +168,17 @@ export function worldOf(els: readonly DiagramElement[]): World {
       // grows the one above and shrinks the one below — so only a lane with a
       // neighbour on BOTH sides can move at all.
       const sorted = [...lanes].sort((a, b) => a.y - b.y);
-      const inner = sorted.length > 2 ? sorted.slice(1, -1) : sorted;
-      return { lane: nameIt(rng, pick(rng, inner), els, "lane"), dir: pick(rng, ["up", "down"] as const) };
+      // And the lane that SHRINKS cannot be one its sublanes fill — it has no
+      // room to give, and refusing is the decided behaviour (Paul, 2026-09-25:
+      // "keep refusing"). So move only toward a neighbour without sublanes.
+      const hasSublanes = (l: DiagramElement) => els.some((e) => e.type === "lane" && e.parentId === l.id);
+      const moves: Array<{ l: DiagramElement; dir: "up" | "down" }> = [];
+      for (let i = 1; i < sorted.length - 1; i++) {
+        if (!hasSublanes(sorted[i - 1])) moves.push({ l: sorted[i], dir: "up" });
+        if (!hasSublanes(sorted[i + 1])) moves.push({ l: sorted[i], dir: "down" });
+      }
+      const m = moves.length ? pick(rng, moves) : { l: sorted[Math.min(1, sorted.length - 1)], dir: "down" as const };
+      return { lane: nameIt(rng, m.l, els, "lane"), dir: m.dir };
     },
     laneNeighbours: (rng) => {
       const sorted = [...lanes].sort((a, b) => a.y - b.y);
@@ -472,7 +488,7 @@ export const GENERATOR_FAMILIES: readonly OpTemplate[] = [
     family: "addLaneAt",
     applicable: (w) => w.has("lane"),
     build: (rng, w) => {
-      const lane = w.lane(rng);
+      const lane = w.laneWithoutSublanes(rng);
       const label = w.laneLabel(rng);
       const where = pick(rng, ["above", "below"] as const);
       return {
