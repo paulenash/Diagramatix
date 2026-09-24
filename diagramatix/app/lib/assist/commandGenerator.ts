@@ -32,7 +32,10 @@
 import type { AssistOp } from "./ops";
 import type { DiagramElement } from "../diagram/types";
 import { makeRng, pick, int, DEFAULT_CORPUS_SEED, type Rng } from "./rng";
-import { FRESH_LABELS } from "./commandFixture";
+import {
+  ACTIVITY_LABELS, LANE_LABELS, POOL_LABELS, PARTICIPANT_LABELS, SYSTEM_LABELS,
+  EVENT_LABELS, BOUNDARY_LABELS, MESSAGE_LABELS, FIXTURE_IDS,
+} from "./commandFixture";
 
 /** An element the sentence can name, and how it will be named. */
 export interface Named {
@@ -61,12 +64,37 @@ export interface World {
   event(rng: Rng): Named;
   pool(rng: Rng): Named;
   blackBoxPool(rng: Rng): Named;
+  /** A pool that can hold things. Lanes inside a black box are a contradiction
+   *  — the notation says its internals are not modelled — and the reducer now
+   *  refuses them outright, so the corpus must not ask for one. */
+  whiteBoxPool(rng: Rng): Named;
   lane(rng: Rng): Named;
   sublane(rng: Rng): Named;
   /** Two distinct lanes that are neighbours, for a swap. */
   laneNeighbours(rng: Rng): [Named, Named];
-  freshLabel(rng: Rng): string;
-  freshLabels(rng: Rng, n: number): string[];
+  /** A NEW name, typed by what is being named — an activity is a verb phrase,
+   *  a lane is a team, a pool is a department. A lane called "Dispatch" and a
+   *  task called "Finance" are both modelling errors, and a corpus full of
+   *  them measures sentences nobody would say (Paul, 2026-09-25). */
+  activityLabel(rng: Rng): string;
+  laneLabel(rng: Rng): string;
+  laneLabels(rng: Rng, n: number): string[];
+  poolLabel(rng: Rng): string;
+  participantLabel(rng: Rng): string;
+  systemLabel(rng: Rng): string;
+  /** An event is a thing that HAS HAPPENED, not a thing to do. */
+  eventLabel(rng: Rng): string;
+  /** A boundary event is an interruption — a timeout, an error. */
+  boundaryLabel(rng: Rng): string;
+  /** A message is a thing sent — a form, an invoice, a notice. */
+  messageLabel(rng: Rng): string;
+  /** The right KIND of new name for whatever this element is: a verb phrase
+   *  for an activity, a team for a lane, a department for a pool. Renaming a
+   *  lane to "Send Invoice" is as wrong as renaming a task to "Finance Team",
+   *  and the rename template cannot know which it drew. */
+  newNameFor(rng: Rng, target: Named): string;
+  /** An element nobody has renamed yet — "Task 1", "Subprocess 3", "Lane 3". */
+  defaultNamed(rng: Rng): Named | null;
   has(kind: "task" | "gateway" | "event" | "pool" | "lane" | "sublane"): boolean;
 }
 
@@ -99,13 +127,18 @@ export function worldOf(els: readonly DiagramElement[]): World {
   const lanes = byType(els, "lane").filter((e) => !isSublane(e, els));
   const subs = byType(els, "lane").filter((e) => isSublane(e, els));
   const black = pools.filter((p) => (p.properties as Record<string, unknown> | undefined)?.poolType === "black-box");
+  const white = pools.filter((p) => !black.includes(p));
 
   return {
     task: (rng) => nameIt(rng, pick(rng, tasks), els, "task"),
     gateway: (rng) => nameIt(rng, pick(rng, gateways), els, "gateway"),
     event: (rng) => nameIt(rng, pick(rng, events), els, "event"),
     pool: (rng) => nameIt(rng, pick(rng, pools), els, "pool"),
-    blackBoxPool: (rng) => ({ id: pick(rng, black).id, spoken: (pick(rng, black).label ?? "").trim() }),
+    // One pick, used for both halves. Picking twice took the id from one pool
+    // and the name from another, so the case asked for "Customer" and expected
+    // Salesforce — a corpus row that can never pass however well it is heard.
+    blackBoxPool: (rng) => { const p = pick(rng, black); return { id: p.id, spoken: (p.label ?? "").trim() }; },
+    whiteBoxPool: (rng) => nameIt(rng, pick(rng, white.length ? white : pools), els, "pool"),
     lane: (rng) => nameIt(rng, pick(rng, lanes), els, "lane"),
     sublane: (rng) => nameIt(rng, pick(rng, subs), els, "sub-lane"),
     laneNeighbours: (rng) => {
@@ -116,12 +149,41 @@ export function worldOf(els: readonly DiagramElement[]): World {
         { id: sorted[i + 1].id, spoken: (sorted[i + 1].label ?? "").trim() },
       ];
     },
-    freshLabel: (rng) => pick(rng, FRESH_LABELS),
-    freshLabels: (rng, n) => {
+    activityLabel: (rng) => pick(rng, ACTIVITY_LABELS),
+    laneLabel: (rng) => pick(rng, LANE_LABELS),
+    laneLabels: (rng, n) => {
       const out: string[] = [];
-      const pool = [...FRESH_LABELS];
-      for (let i = 0; i < n && pool.length; i++) out.push(pool.splice(int(rng, 0, pool.length - 1), 1)[0]);
+      const bag = [...LANE_LABELS];
+      for (let i = 0; i < n && bag.length; i++) out.push(bag.splice(int(rng, 0, bag.length - 1), 1)[0]);
       return out;
+    },
+    poolLabel: (rng) => pick(rng, POOL_LABELS),
+    participantLabel: (rng) => pick(rng, PARTICIPANT_LABELS),
+    systemLabel: (rng) => pick(rng, SYSTEM_LABELS),
+    eventLabel: (rng) => pick(rng, EVENT_LABELS),
+    boundaryLabel: (rng) => pick(rng, BOUNDARY_LABELS),
+    messageLabel: (rng) => pick(rng, MESSAGE_LABELS),
+    newNameFor: (rng, target) => {
+      const e = els.find((x) => x.id === target.id);
+      if (!e) return pick(rng, ACTIVITY_LABELS);
+      if (e.type === "lane") return pick(rng, LANE_LABELS);
+      if (e.type === "pool") {
+        const bb = (e.properties as Record<string, unknown> | undefined)?.poolType === "black-box";
+        // A black box is renamed to a PARTY or a SYSTEM, never a department.
+        return bb
+          ? (rng.next() < 0.5 ? pick(rng, PARTICIPANT_LABELS) : pick(rng, SYSTEM_LABELS))
+          : pick(rng, POOL_LABELS);
+      }
+      return pick(rng, ACTIVITY_LABELS);
+    },
+    defaultNamed: (rng) => {
+      // "Rename Task 1 to Review Email" is the commonest real command there is,
+      // and its reference ends in a DIGIT — the hardest thing for the
+      // recogniser to get right (Paul, 2026-09-25).
+      const cands = els.filter((e) => (FIXTURE_IDS.defaultNamed as readonly string[]).includes(e.id));
+      if (!cands.length) return null;
+      const e = pick(rng, cands);
+      return { id: e.id, spoken: (e.label ?? "").trim() };
     },
     has: (kind) => ({
       task: tasks.length, gateway: gateways.length, event: events.length,
@@ -161,7 +223,8 @@ export const GENERATOR_FAMILIES: readonly OpTemplate[] = [
     applicable: () => true,
     build: (rng, w) => {
       const [word, base] = pick(rng, ELEMENT_WORDS);
-      const label = w.freshLabel(rng);
+      // An event is named for what has happened, an activity for what is done.
+      const label = word.includes("event") ? w.eventLabel(rng) : w.activityLabel(rng);
       if (!w.has("task") || rng.next() < 0.4) {
         return {
           utterance: pick(rng, [`add ${word} called ${label}`, `insert ${word} called ${label}`]),
@@ -224,15 +287,19 @@ export const GENERATOR_FAMILIES: readonly OpTemplate[] = [
     family: "rename",
     applicable: (w) => w.has("task"),
     build: (rng, w) => {
-      const t = rng.next() < 0.5 ? w.task(rng) : w.lane(rng);
-      const label = w.freshLabel(rng);
-      // "call X Y" has no word between the two names, so a target ending in a
-      // digit makes it genuinely ambiguous — "call Lane 1 Quality Check" splits
-      // as either (Lane 1 → Quality Check) or (Lane → 1 Quality Check), and a
-      // person would not say it either. The grammar chooses the second; that is
-      // a defensible reading of an ambiguous sentence rather than a defect, so
-      // the generator does not manufacture the sentence.
-      const safeForBareCall = !/\d\s*$/.test(t.spoken);
+      // RENAME PREFERS A DEFAULT-NAMED TARGET. "Rename Task 1 to Review Email"
+      // is what people actually say, and its reference ends in a digit.
+      const dflt = rng.next() < 0.6 ? w.defaultNamed(rng) : null;
+      const t = dflt ?? (rng.next() < 0.5 ? w.task(rng) : w.lane(rng));
+      const label = w.newNameFor(rng, t);
+      // "call X Y" has no word between the two names, so the split is only
+      // unambiguous when the OLD name is a single word with no digit on the
+      // end. "call Lane 1 Quality Check" splits as either (Lane 1 → Quality
+      // Check) or (Lane → 1 Quality Check); "call Pay Claim Send Invoice" is
+      // worse again. A person would not say either, and the grammar's reading
+      // is a defensible choice between two meanings rather than a defect — so
+      // the generator does not manufacture the sentence at all.
+      const safeForBareCall = !/\d\s*$/.test(t.spoken) && !/\s/.test(t.spoken);
       const forms = safeForBareCall
         ? [`rename ${t.spoken} to ${label}`, `call ${t.spoken} ${label}`]
         : [`rename ${t.spoken} to ${label}`];
@@ -311,7 +378,7 @@ export const GENERATOR_FAMILIES: readonly OpTemplate[] = [
     applicable: (w) => w.has("task"),
     build: (rng, w) => {
       const host = w.task(rng);
-      const label = w.freshLabel(rng);
+      const label = w.boundaryLabel(rng);
       return {
         utterance: `add a boundary event called ${label} to ${host.spoken}`,
         ops: [{ op: "addBoundary", hostRef: host.spoken, label }],
@@ -323,8 +390,12 @@ export const GENERATOR_FAMILIES: readonly OpTemplate[] = [
     family: "addPool",
     applicable: (w) => w.has("pool"),
     build: (rng, w) => {
-      const label = w.freshLabel(rng);
       const kind = pick(rng, ["black box", "white box"] as const);
+      // A black-box pool is an external party or an IT system; a white-box one
+      // is a department.
+      const label = kind === "black box"
+        ? (rng.next() < 0.5 ? w.participantLabel(rng) : w.systemLabel(rng))
+        : w.poolLabel(rng);
       const rel = w.pool(rng);
       const where = pick(rng, ["above", "below"] as const);
       return {
@@ -342,8 +413,8 @@ export const GENERATOR_FAMILIES: readonly OpTemplate[] = [
     family: "addLanes",
     applicable: (w) => w.has("pool"),
     build: (rng, w) => {
-      const pool = w.pool(rng);
-      const labels = w.freshLabels(rng, int(rng, 2, 3));
+      const pool = w.whiteBoxPool(rng);
+      const labels = w.laneLabels(rng, int(rng, 2, 3));
       const n = ["", "", "two", "three"][labels.length];
       const list = labels.length === 2
         ? `${labels[0]} and ${labels[1]}`
@@ -360,7 +431,7 @@ export const GENERATOR_FAMILIES: readonly OpTemplate[] = [
     applicable: (w) => w.has("lane"),
     build: (rng, w) => {
       const lane = w.lane(rng);
-      const labels = w.freshLabels(rng, 2);
+      const labels = w.laneLabels(rng, 2);
       return {
         utterance: `add two sublanes to ${lane.spoken} called ${labels[0]} and ${labels[1]}`,
         ops: [{ op: "addSublanes", laneRef: lane.spoken, labels }],
@@ -373,7 +444,7 @@ export const GENERATOR_FAMILIES: readonly OpTemplate[] = [
     applicable: (w) => w.has("lane"),
     build: (rng, w) => {
       const lane = w.lane(rng);
-      const label = w.freshLabel(rng);
+      const label = w.laneLabel(rng);
       const where = pick(rng, ["above", "below"] as const);
       return {
         utterance: `add a lane ${where} ${lane.spoken} called ${label}`,
@@ -442,7 +513,7 @@ export const GENERATOR_FAMILIES: readonly OpTemplate[] = [
     build: (rng, w) => {
       const from = w.task(rng);
       const to = w.blackBoxPool(rng);
-      const label = w.freshLabel(rng);
+      const label = w.messageLabel(rng);
       return {
         utterance: `add a message from ${from.spoken} to ${to.spoken} labelled ${label}`,
         ops: [{ op: "addMessage", fromRef: from.spoken, toRef: to.spoken, label }],
@@ -468,7 +539,7 @@ export const GENERATOR_FAMILIES: readonly OpTemplate[] = [
     family: "wrapInPool",
     applicable: () => true,
     build: (rng, w) => {
-      const label = w.freshLabel(rng);
+      const label = w.poolLabel(rng);
       return {
         utterance: pick(rng, [`put a pool around everything called ${label}`, `wrap everything in a pool called ${label}`]),
         ops: [{ op: "wrapInPool", label }],

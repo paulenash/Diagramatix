@@ -65,4 +65,7 @@ export function shuffled<T>(rng: Rng, items: readonly T[]): T[] {
 }
 
 /** The corpus everything is measured against unless a caller says otherwise. */
-export const DEFAULT_CORPUS_SEED = "dgx-voice-2026-09";
+// Bumped when the generator's sentences change materially (2026-09-25: realistic
+// BPMN naming). A run against a different seed is a different exam, and the
+// recorded clips carry their own seed, so the two corpora cannot be confused.
+export const DEFAULT_CORPUS_SEED = "dgx-voice-2026-09-realistic";

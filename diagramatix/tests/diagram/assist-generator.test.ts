@@ -19,7 +19,10 @@ import {
 } from "@/app/lib/assist/commandGenerator";
 import { scoreCase, summarise, isFailure } from "@/app/lib/assist/commandScore";
 import { parseCommand } from "@/app/lib/assist/commandGrammar";
-import { fixtureElements, FRESH_LABELS } from "@/app/lib/assist/commandFixture";
+import {
+  fixtureElements, FRESH_LABELS, ACTIVITY_LABELS, LANE_LABELS, POOL_LABELS,
+  PARTICIPANT_LABELS, SYSTEM_LABELS,
+} from "@/app/lib/assist/commandFixture";
 import { makeRng, seedFrom, pick, int, shuffled, DEFAULT_CORPUS_SEED } from "@/app/lib/assist/rng";
 import { resolveRef } from "@/app/lib/assist/resolveRef";
 
@@ -76,13 +79,74 @@ describe("T4724 — the corpus is the same corpus every time", () => {
 
   it("the fixture carries the names this feature has been caught by", () => {
     const labels = world().map((e) => e.label);
-    expect(labels, "a name ending in a digit — 'lane two' and the lane:3 boost").toContain("Lane 2");
+    // The un-renamed defaults, which Paul says are the commonest rename targets
+    // there are — and the hardest to hear, because they end in a digit.
+    expect(labels, "a task nobody has renamed yet").toContain("Task 1");
+    expect(labels, "a subprocess nobody has renamed yet").toContain("Subprocess 3");
+    expect(labels, "a lane nobody has renamed yet").toContain("Lane 3");
+    expect(labels, "a gateway nobody has renamed yet — and it ends in punctuation").toContain("Decision?");
+    expect(labels, "an expanded subprocess nobody has renamed yet").toContain("Expanded 2");
     expect(labels, "the sub-lane naming Paul asked for").toContain("Sub 1");
-    expect(labels, "a bare common word that is also a verb").toContain("Review");
-    expect(labels, "a two-word proper noun starting with a verb").toContain("Pick Items");
-    expect(labels, "homophone-adjacent and under MIN_KEY_FOR_FUZZ").toContain("Sales");
+    // And the properly-named ones, which follow the modelling rules: an
+    // activity is a verb phrase, a lane is a team, a black box is a party or a
+    // system. Each is also an awkward class in its own right.
+    expect(labels, "an activity is a VERB PHRASE, never a noun").toContain("Review Claim");
+    expect(labels, "a lane is a team or a role").toContain("Underwriters");
+    expect(labels, "a black-box participant is an external party").toContain("Customer");
+    expect(labels, "a black-box system is a product name").toContain("Salesforce");
     // And nothing the generator hands out as a NEW name may already be on it.
     for (const fresh of FRESH_LABELS) expect(labels).not.toContain(fresh);
+  });
+
+  it("T4743 — every activity name the generator hands out is a verb phrase", () => {
+    // Paul, 2026-09-25: "Always use Verb phrases for Activities. Don't use
+    // adjectives or Nouns." A noun-phrase task name is a modelling error, so a
+    // corpus full of them measures sentences nobody would ever say. The check
+    // is deliberately crude — a first-word verb list — because the failure it
+    // guards against is somebody adding "Urgent" or "Invoice" to the list.
+    const VERBS = new Set([
+      "review", "approve", "send", "check", "escalate", "verify", "record",
+      "notify", "prepare", "close", "request", "update", "assess", "pay",
+      "receive", "issue", "raise", "confirm", "reject", "archive",
+    ]);
+    for (const label of ACTIVITY_LABELS) {
+      const first = label.split(" ")[0].toLowerCase();
+      expect(VERBS.has(first), `"${label}" does not start with a verb`).toBe(true);
+      expect(label.split(" ").length, `"${label}" is a bare word, not a phrase`).toBeGreaterThan(1);
+    }
+    // …and the names never collide across kinds: a lane called "Send Invoice"
+    // or a task called "Finance Team" is the same modelling error inverted.
+    for (const kind of [LANE_LABELS, POOL_LABELS, PARTICIPANT_LABELS, SYSTEM_LABELS]) {
+      for (const label of kind) expect(ACTIVITY_LABELS).not.toContain(label);
+    }
+  });
+
+  it("T4744 — never asks a black-box pool to hold anything", () => {
+    // A black box is a participant whose internals are deliberately not
+    // modelled, and since 2026-09-25 the reducer refuses to parent anything to
+    // one. A case saying "add three lanes to Customer" therefore cannot pass
+    // however perfectly it is heard — it is a broken exam question, not a
+    // finding about the recogniser.
+    const els = world();
+    const blackBox = new Set(
+      els.filter((e) => e.type === "pool"
+        && (e.properties as Record<string, unknown> | undefined)?.poolType === "black-box")
+        .map((e) => (e.label ?? "").trim()),
+    );
+    // Only the ops that put something INSIDE. "compress Customer" or "move
+    // Salesforce top boundary up" name a black box and are perfectly legal —
+    // they resize it, they do not fill it.
+    const FILLS: Record<string, "poolRef" | "laneRef"> = {
+      addLanes: "poolRef", addSublanes: "laneRef",
+    };
+    for (const c of generateCases({ count: 600, world: els })) {
+      for (const op of c.ops) {
+        const field = FILLS[op.op];
+        if (!field) continue;
+        const holder = (op as unknown as Record<string, string>)[field];
+        if (holder) expect(blackBox.has(holder), `${c.utterance} fills a black box`).toBe(false);
+      }
+    }
   });
 });
 
@@ -282,16 +346,20 @@ describe("T4728 — the scorer names the layer, not just the failure", () => {
   });
 
   it("right shape, wrong element → the REFERENCE, not the grammar", () => {
-    const c = one("delete Review", [{ op: "delete", ref: "Pick Items" }], {});
+    const c = one("delete Review Claim", [{ op: "delete", ref: "Check Coverage" }], {});
     const r = scoreCase(c, undefined, els);
     expect(r.outcome).toBe("wrong-element");
     expect(r.detail).toContain("wanted");
   });
 
   it("refs compare by what they RESOLVE to, never by their text", () => {
-    // "the gateway" and "Approved?" are the same element. A scorer comparing
-    // strings would report a red row for a command that worked perfectly.
-    const c = one("rename the gateway to Checked", [{ op: "rename", ref: "Approved?", label: "Checked" }], {});
+    // "the expanded subprocess" and "Expanded 2" are the same element. A
+    // scorer comparing strings would report a red row for a command that
+    // worked perfectly. (It used to say "the gateway" — the fixture now has
+    // two, one of them the un-renamed "Decision?", so that phrase is genuinely
+    // ambiguous and would open the picker, which is a different test.)
+    const c = one("rename the expanded subprocess to Check Stock",
+      [{ op: "rename", ref: "Expanded 2", label: "Check Stock" }], {});
     expect(scoreCase(c, undefined, els).outcome).toBe("pass");
   });
 
