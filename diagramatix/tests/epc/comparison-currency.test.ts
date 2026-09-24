@@ -18,7 +18,15 @@ import { PRODUCT_VERSION, SCHEMA_VERSION } from "@/app/lib/diagram/types";
 import { PALETTE_BY_DIAGRAM_TYPE } from "@/app/lib/diagram/symbols/definitions";
 import { EDITABLE_DIAGRAM_TYPE_KEYS } from "@/app/lib/diagram/diagramTypeStyles";
 
-const DOC = "../competitors/diagramatix-vs-signavio-aris-primebpm-2026-09.md";
+/**
+ * The CURRENT edition. The folder keeps the older ones (2026-07, 2026-08 and the
+ * three-competitor 2026-09) as dated archives, and this guard deliberately
+ * follows the live document rather than the archive — a stale claim only costs a
+ * deal in the version somebody is quoting from. Re-point this when a new edition
+ * supersedes it. (2026-09-24: Pega, Appian and Microsoft added, so the file name
+ * changed.)
+ */
+const DOC = "../competitors/diagramatix-vs-signavio-aris-primebpm-pega-appian-microsoft-2026-09-24.md";
 const doc = () => readFileSync(DOC, "utf8");
 /** The feature guide is the same kind of document and makes the same claim, so it is pinned too. */
 const FEATURES_DOC = "../competitors/diagramatix-features-2026-09.md";
