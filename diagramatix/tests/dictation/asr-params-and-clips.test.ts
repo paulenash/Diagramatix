@@ -19,6 +19,7 @@ import {
 import {
   encodeWav, decodeWav, floatToInt16, peakLevel, WAV_HEADER_BYTES, SILENT_TAKE_PEAK,
 } from "@/app/lib/dictation/wav";
+import { BOOST_PROFILES, boostProfile } from "@/app/lib/dictation/boostProfiles";
 
 const read = (p: string) => readFileSync(p, "utf8");
 
@@ -247,5 +248,62 @@ describe("T4733 — the corpus survives everything that could lose it", () => {
     expect(panel).toContain('fetch("/api/admin/voice-assist-test/clips", { method: "POST"');
     expect(panel, "the silent take cannot be kept").toMatch(/disabled=\{busy \|\| rec\.clip\.silent\}/);
     expect(panel, "and the fingerprint rides along with every clip").toContain("asrFingerprint");
+  });
+});
+
+describe("T4739 — boost profiles are measurable, and production is not one of them", () => {
+  it("LIVE VOICE always gets the shipped list — a profile is harness-only", () => {
+    // The whole risk of making the boost list selectable is that a measurement
+    // setting leaks into the product. `commandWords` is optional and defaults
+    // to COMMAND_KEYWORDS, and the live dictation path never passes it.
+    const live = readFileSync("app/lib/dictation/index.ts", "utf8");
+    expect(live, "the microphone path takes no profile").toContain("liveStreamParams({ sampleRate: ctx.sampleRate");
+    expect(live).not.toMatch(/commandWords/);
+    expect(liveStreamParams({ sampleRate: 48000 }).getAll("keywords"), "the default is what ships")
+      .toEqual([...COMMAND_KEYWORDS]);
+  });
+
+  it("each profile sends exactly what it claims", () => {
+    for (const p of BOOST_PROFILES) {
+      const sent = batchParams({ commandBias: true, commandWords: p.keywords }).getAll("keywords");
+      expect(sent, `${p.id} sends its own list`).toEqual([...p.keywords]);
+    }
+    expect(boostProfile("none").keywords, "the control sends nothing").toEqual([]);
+    expect(boostProfile("current").keywords, "the baseline IS the shipped list").toEqual([...COMMAND_KEYWORDS]);
+    expect(boostProfile("nonsense").id, "an unknown id falls back to the baseline").toBe("current");
+  });
+
+  it("the alternatives fix the two faults the corpus found", () => {
+    // Fault 1: singular-only entries compete with their own plurals —
+    // "add two sublanes" came back "add two lane".
+    for (const id of ["plural", "tuned"] as const) {
+      const kw = boostProfile(id).keywords;
+      for (const w of ["lane", "lanes", "sublane", "sublanes", "pool", "pools"]) {
+        expect(kw, `${id} must carry ${w}`).toContain(w);
+      }
+      // Fault 2: weight 3 beats words that sound nothing like the boosted one
+      // — "make" → "Lane", "delete" → "Selected".
+      expect(kw.filter((k) => k.includes(":")), `${id} carries no weights`).toEqual([]);
+      expect(kw, `${id} drops 'selected', which was caught eating 'delete'`).not.toContain("selected");
+      expect(kw, `${id} drops 'rename', which was caught eating 'Prepare'`).not.toContain("rename");
+    }
+  });
+
+  it("every profile explains itself and says what to watch for", () => {
+    // A dropdown of four lists nobody can choose between is not a tool.
+    for (const p of BOOST_PROFILES) {
+      expect(p.explain.length, `${p.id} needs a real explanation`).toBeGreaterThan(80);
+      expect(p.watch.length, `${p.id} needs something to watch for`).toBeGreaterThan(40);
+    }
+    const panel = readFileSync("app/(dashboard)/dashboard/admin/voice-assist-test/ReplayPanel.tsx", "utf8");
+    expect(panel, "and both are on the screen, not just in the code").toContain("boostProfile(profileId).explain");
+    expect(panel).toContain("boostProfile(profileId).watch");
+  });
+
+  it("the run records which profile produced it", () => {
+    // Two runs without this are two numbers nobody can attribute to a setting.
+    expect(readFileSync("prisma/schema.prisma", "utf8")).toMatch(/boostProfile\s+String\?/);
+    expect(readFileSync("app/api/admin/voice-assist-test/runs/route.ts", "utf8"))
+      .toContain("boostProfile: body.boostProfile ?? null");
   });
 });

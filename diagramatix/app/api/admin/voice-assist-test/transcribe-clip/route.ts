@@ -19,6 +19,7 @@ import { auth } from "@/auth";
 import { isSuperuser } from "@/app/lib/superuser";
 import { blockReadOnlyImpersonation } from "@/app/lib/routeGuard";
 import { batchParams } from "@/app/lib/dictation/asrParams";
+import { boostProfile } from "@/app/lib/dictation/boostProfiles";
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +47,12 @@ export async function POST(req: Request) {
   if (audio.byteLength > MAX_BYTES) return NextResponse.json({ error: "Clip too large." }, { status: 413 });
 
   // One person, one sentence: command bias ON, diarisation OFF.
-  const params = batchParams({ commandBias: true });
+  //
+  // `?profile=` lets the harness measure an ALTERNATIVE boost list over the
+  // recorded corpus. Absent, it is the shipped list — so a plain replay always
+  // measures what production runs.
+  const profile = boostProfile(new URL(req.url).searchParams.get("profile"));
+  const params = batchParams({ commandBias: true, commandWords: profile.keywords });
   try {
     const dg = await fetch(`${DG}?${params.toString()}`, {
       method: "POST",

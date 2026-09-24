@@ -65,8 +65,18 @@ export const COMMAND_KEYWORDS: readonly string[] = [
  * suffix** — the caller has already filtered them (`diagramKeyterms`), and the
  * cap is applied again here so a careless caller cannot drown the command words.
  */
-function appendKeyterms(p: URLSearchParams, keyterms: readonly string[] | undefined): void {
-  for (const kw of COMMAND_KEYWORDS) p.append("keywords", kw);
+function appendKeyterms(
+  p: URLSearchParams,
+  keyterms: readonly string[] | undefined,
+  /**
+   * The command vocabulary to bias toward. Defaults to the shipped list; the
+   * harness passes an alternative so a profile can be MEASURED over a recorded
+   * corpus rather than argued about (`boostProfiles.ts`). Live voice never
+   * passes this — production always gets the shipped list.
+   */
+  commandWords: readonly string[] = COMMAND_KEYWORDS,
+): void {
+  for (const kw of commandWords) p.append("keywords", kw);
   for (const term of (keyterms ?? []).slice(0, MAX_DIAGRAM_KEYTERMS)) {
     if (term.trim()) p.append("keywords", term.trim());
   }
@@ -76,6 +86,8 @@ function appendKeyterms(p: URLSearchParams, keyterms: readonly string[] | undefi
 export function liveStreamParams(o: {
   sampleRate: number;
   keyterms?: readonly string[];
+  /** Harness only — an alternative command vocabulary to measure. */
+  commandWords?: readonly string[];
 }): URLSearchParams {
   const p = new URLSearchParams({
     model: ASR_MODEL,
@@ -88,7 +100,7 @@ export function liveStreamParams(o: {
     language: ASR_LANGUAGE,
     endpointing: String(ASR_ENDPOINTING_MS),
   });
-  appendKeyterms(p, o.keyterms);
+  appendKeyterms(p, o.keyterms, o.commandWords);
   return p;
 }
 
@@ -115,6 +127,8 @@ export function batchParams(o: {
   keyterms?: readonly string[];
   /** Command bias — on for a replayed clip, off for a meeting. */
   commandBias?: boolean;
+  /** Harness only — an alternative command vocabulary to measure. */
+  commandWords?: readonly string[];
   diarize?: boolean;
   utterances?: boolean;
 } = {}): URLSearchParams {
@@ -126,7 +140,7 @@ export function batchParams(o: {
   });
   if (o.diarize) p.append("diarize", "true");
   if (o.utterances) p.append("utterances", "true");
-  if (o.commandBias) appendKeyterms(p, o.keyterms);
+  if (o.commandBias) appendKeyterms(p, o.keyterms, o.commandWords);
   return p;
 }
 

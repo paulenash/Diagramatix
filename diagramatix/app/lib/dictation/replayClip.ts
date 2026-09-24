@@ -74,7 +74,7 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
  */
 export async function replayClip(
   wav: ArrayBuffer,
-  opts: { keyterms?: readonly string[]; timeoutMs?: number } = {},
+  opts: { keyterms?: readonly string[]; timeoutMs?: number; commandWords?: readonly string[] } = {},
 ): Promise<ReplayResult> {
   const started = Date.now();
   const decoded = decodeWav(wav);
@@ -83,7 +83,7 @@ export async function replayClip(
   const cred = await mintToken();
   if ("error" in cred) return { utterances: [], finals: [], elapsedMs: Date.now() - started, error: cred.error };
 
-  const params = liveStreamParams({ sampleRate: decoded.sampleRate, keyterms: opts.keyterms });
+  const params = liveStreamParams({ sampleRate: decoded.sampleRate, keyterms: opts.keyterms, commandWords: opts.commandWords });
   const finals: Final[] = [];
 
   return new Promise<ReplayResult>((resolve) => {

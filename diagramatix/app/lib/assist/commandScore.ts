@@ -84,6 +84,33 @@ const REF_FIELDS = new Set([
 const refFieldsFor = (op: string): Set<string> =>
   op === "swapPools" ? new Set([...REF_FIELDS, "a", "b"]) : REF_FIELDS;
 
+/**
+ * Fold the spelling differences a recogniser introduces, for COMPARISON only.
+ *
+ * "call Sales Fulfilment" came back as "fulfillment" four times in Paul's
+ * corpus — `language=en-AU` notwithstanding, Deepgram spells it American. The
+ * command worked: a pool was created, with a name one letter off the one in his
+ * mouth. Scoring that as a failure counts a spelling variant as a broken
+ * command and overstates the problem by four points.
+ *
+ * NOT HIDDEN, THOUGH. A case that only differs this way still has
+ * `textDiffered: true`, so it scores `pass-despite-mishear` and stays visible
+ * in the outcome table as something the recogniser changed. Passing it silently
+ * as a clean `pass` would be moving the goalposts; marking it as "worked, but
+ * the words differed" is what actually happened.
+ */
+function foldSpelling(s: string): string {
+  return s
+    .replace(/fulfill?ment/g, "fulfilment")
+    .replace(/\blabell?ed\b/g, "labelled")
+    .replace(/\bcancell?ed\b/g, "cancelled")
+    .replace(/(\w+)ization\b/g, "$1isation")
+    .replace(/(\w+)ize\b/g, "$1ise")
+    .replace(/(\w+)yze\b/g, "$1yse")
+    .replace(/\bcolor\b/g, "colour")
+    .replace(/\bcenter\b/g, "centre");
+}
+
 /** Everything except the refs — the shape the grammar promised to produce. */
 function shapeOf(op: AssistOp): Record<string, unknown> {
   const refs = refFieldsFor(op.op);
@@ -94,8 +121,8 @@ function shapeOf(op: AssistOp): Record<string, unknown> {
     // Labels compare case-insensitively on the first word: the recogniser
     // capitalises sentence-initially and a person does not, and that is not a
     // defect worth a red row.
-    out[k] = typeof v === "string" ? v.trim().toLowerCase()
-      : Array.isArray(v) ? v.map((x) => (typeof x === "string" ? x.trim().toLowerCase() : x))
+    out[k] = typeof v === "string" ? foldSpelling(v.trim().toLowerCase())
+      : Array.isArray(v) ? v.map((x) => (typeof x === "string" ? foldSpelling(x.trim().toLowerCase()) : x))
         : v;
   }
   return out;

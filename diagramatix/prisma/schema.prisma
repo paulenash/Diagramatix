@@ -2574,6 +2574,9 @@ model VoiceTestRun {
 
   /// "text" | "stream" | "batch" — what was actually exercised.
   leg            String
+  /// Which keyword-boost profile was in force (boostProfiles.ts). Without it,
+  /// two runs are two numbers nobody can attribute to a setting.
+  boostProfile   String?
   corpusSeed     String
   /// Null for the text leg, which has no recogniser.
   asrFingerprint String?

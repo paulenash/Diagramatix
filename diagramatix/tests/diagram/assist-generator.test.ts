@@ -18,6 +18,7 @@ import {
   generateCases, GENERATOR_FAMILIES, NOT_GENERATED, FAMILY_NAMES, worldOf,
 } from "@/app/lib/assist/commandGenerator";
 import { scoreCase, summarise, isFailure } from "@/app/lib/assist/commandScore";
+import { parseCommand } from "@/app/lib/assist/commandGrammar";
 import { fixtureElements, FRESH_LABELS } from "@/app/lib/assist/commandFixture";
 import { makeRng, seedFrom, pick, int, shuffled, DEFAULT_CORPUS_SEED } from "@/app/lib/assist/rng";
 import { resolveRef } from "@/app/lib/assist/resolveRef";
@@ -171,13 +172,15 @@ describe("T4727 — the round trip, with its disagreements frozen", () => {
    * Each line is a work queue item, not a defect being tolerated.
    */
   const KNOWN_DISAGREEMENTS: Record<string, string> = {
-    "wrapInPool|misparsed":
-      "The WHOLE-DIAGRAM wrap drops its label: “put a pool around everything called Finance” "
-      + "and “wrap everything in a pool called Finance” both parse to a bare wrapInPool, so the pool "
-      + "is created unnamed and the user has to rename it. The SELECTION wrap keeps it — "
-      + "“wrap these in a pool called Finance” → wrapInContainer{label}. Narrow, real, and a "
-      + "one-line grammar fix; the original review listed a label on wrap-in-pool as something "
-      + "only the AI fallback supplied.",
+    // Empty, and that is the ratchet working.
+    //
+    // It held one entry from 2026-09-24: the whole-diagram wrap dropped its
+    // label, so "put a pool around everything called Finance" made an unnamed
+    // pool. Paul's recorded corpus then found four clips where the recogniser
+    // heard the sentence perfectly and the command still failed, which turned a
+    // curiosity into a priority. Fixed the same day — and THIS TEST failed on
+    // the fix, demanding the entry be deleted, which is precisely what a list
+    // that cannot go stale is for.
   };
 
   /** A fixed seed and count, so the failure set is reproducible by anyone. */
@@ -364,5 +367,53 @@ describe("T4729b — the tile, and what it is allowed to cost", () => {
   it("the tile exists and the page re-guards itself", () => {
     expect(read("app/(dashboard)/dashboard/admin/AdminClient.tsx")).toContain('href: "/dashboard/admin/voice-assist-test"');
     expect(read("app/(dashboard)/dashboard/admin/voice-assist-test/page.tsx")).toContain("isActingSuperuser(session)");
+  });
+});
+
+describe("T4738 — two fixes the recorded corpus paid for", () => {
+  const els = fixtureElements();
+
+  it("the whole-diagram wrap keeps its name", () => {
+    // Four clips in Paul's corpus where the recogniser heard the sentence
+    // EXACTLY right and the command still failed: the pool was created unnamed.
+    // The selection wrap a few lines above had always kept its label.
+    for (const phrase of [
+      "put a pool around everything called Finance",
+      "wrap everything in a pool called Finance",
+      "put a pool around all the elements called Finance",
+      "draw a pool around the lot named Finance",
+    ]) {
+      expect(parseCommand(phrase), phrase).toEqual([{ op: "wrapInPool", label: "Finance" }]);
+    }
+    // …and a wrap with no name is still a wrap with no name.
+    expect(parseCommand("put a pool around everything")).toEqual([{ op: "wrapInPool" }]);
+    // The selection form is untouched — it was never broken.
+    expect(parseCommand("wrap these in a pool called Finance"))
+      .toEqual([{ op: "wrapInContainer", container: "pool", label: "Finance" }]);
+  });
+
+  it("a spelling variant is a pass that still shows as changed", () => {
+    // Deepgram spells it American even under language=en-AU. The command
+    // worked; the pool is one letter off. Counting that as a broken command
+    // overstated the corpus by four points — but passing it SILENTLY would be
+    // moving the goalposts, so it stays visible as pass-despite-mishear.
+    const c = {
+      id: "x#1", family: "rename", refs: {},
+      utterance: "call Sales Fulfilment",
+      ops: [{ op: "rename", ref: "Sales", label: "Fulfilment" }] as Parameters<typeof scoreCase>[0]["ops"],
+    };
+    const r = scoreCase(c, "Call sales fulfillment.", els);
+    expect(r.outcome, "worked, and the words differed").toBe("pass-despite-mishear");
+    expect(r.textDiffered, "it is not hidden").toBe(true);
+    expect(isFailure(r.outcome)).toBe(false);
+  });
+
+  it("does not fold away a genuinely different word", () => {
+    const c = {
+      id: "x#2", family: "rename", refs: {},
+      utterance: "call Sales Dispatch",
+      ops: [{ op: "rename", ref: "Sales", label: "Dispatch" }] as Parameters<typeof scoreCase>[0]["ops"],
+    };
+    expect(scoreCase(c, "Call sales despatch rider.", els).outcome).not.toBe("pass-despite-mishear");
   });
 });

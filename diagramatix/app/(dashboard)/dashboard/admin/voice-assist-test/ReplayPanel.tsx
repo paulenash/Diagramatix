@@ -18,6 +18,7 @@ import { scoreCase, summarise, isFailure, type CaseResult } from "@/app/lib/assi
 import { fixtureElements } from "@/app/lib/assist/commandFixture";
 import { replayClip } from "@/app/lib/dictation/replayClip";
 import { asrFingerprint, liveStreamParams } from "@/app/lib/dictation/asrParams";
+import { BOOST_PROFILES, boostProfile, DEFAULT_BOOST_PROFILE, type BoostProfileId } from "@/app/lib/dictation/boostProfiles";
 import type { GeneratedCase } from "@/app/lib/assist/commandGenerator";
 
 interface ClipRow {
@@ -44,6 +45,7 @@ const BATCH_CAVEATS = [
 export function ReplayPanel() {
   const [clips, setClips] = useState<ClipRow[] | null>(null);
   const [leg, setLeg] = useState<Leg>("stream");
+  const [profileId, setProfileId] = useState<BoostProfileId>(DEFAULT_BOOST_PROFILE);
   const [running, setRunning] = useState(false);
   const [rows, setRows] = useState<Record<string, CaseResult>>({});
   const [heard, setHeard] = useState<Record<string, string>>({});
@@ -99,14 +101,14 @@ export function ReplayPanel() {
         let transcript = "";
         let replayError: string | undefined;
         if (leg === "stream") {
-          const r = await replayClip(wav);
+          const r = await replayClip(wav, { commandWords: boostProfile(profileId).keywords });
           // The stitched utterances ARE the answer: if the buffer would have
           // produced two commands, the first one is what the user's sentence
           // actually became, and scoring the concatenation would hide it.
           transcript = r.utterances[0] ?? "";
           replayError = r.error;
         } else {
-          const res = await fetch("/api/admin/voice-assist-test/transcribe-clip", {
+          const res = await fetch(`/api/admin/voice-assist-test/transcribe-clip?profile=${profileId}`, {
             method: "POST",
             headers: { "Content-Type": "audio/wav" },
             body: wav,
@@ -150,7 +152,7 @@ export function ReplayPanel() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          leg, corpusSeed: todo[0]?.corpusSeed ?? "",
+          leg, corpusSeed: todo[0]?.corpusSeed ?? "", boostProfile: profileId,
           asrFingerprint: asrFingerprint(liveStreamParams({ sampleRate: 48000 })),
           total: s.total, passed: s.passed, failed: s.failed,
           fallbackRate: s.fallbackRate, outcomes: s.byOutcome, families: s.byFamily,
@@ -159,7 +161,7 @@ export function ReplayPanel() {
       });
       setSaved(res.ok ? "run saved" : null);
     } catch { /* the numbers are on screen either way */ }
-  }, [clips, leg]);
+  }, [clips, leg, profileId]);
 
   const results = Object.values(rows);
   const summary = results.length ? summarise(results) : null;
@@ -183,6 +185,36 @@ export function ReplayPanel() {
         {clips && <span className="text-xs text-gray-500">{latest(clips).length} clips</span>}
         {saved && <span className="text-xs text-green-700">{saved}</span>}
         {err && <span className="text-xs text-red-600">{err}</span>}
+      </div>
+
+      {/* THE BOOST PROFILE, with its reasoning attached.
+          The shipped list had never been tested against real audio until this
+          corpus existed, and the first replay found it helping one clip and
+          hurting eight. Rather than pick a replacement by argument, each
+          profile can be run over the same hundred clips and compared. */}
+      <div className="mb-3 p-2 border border-gray-200 rounded bg-gray-50">
+        <div className="flex flex-wrap items-center gap-2 mb-1">
+          <span className="text-xs font-medium text-gray-700">Keyword boosts:</span>
+          <select value={profileId} disabled={running}
+            onChange={(e) => setProfileId(e.target.value as BoostProfileId)}
+            className="border border-gray-300 rounded px-2 py-1 text-xs bg-white disabled:opacity-50">
+            {BOOST_PROFILES.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+          </select>
+          <span className="text-[11px] text-gray-500">
+            {boostProfile(profileId).keywords.length === 0
+              ? "no keywords sent"
+              : `${boostProfile(profileId).keywords.length} keywords`}
+          </span>
+        </div>
+        <p className="text-[11px] text-gray-600 leading-relaxed">{boostProfile(profileId).explain}</p>
+        <p className="text-[11px] text-purple-700 mt-1 leading-relaxed">
+          <strong>Watch for:</strong> {boostProfile(profileId).watch}
+        </p>
+        {boostProfile(profileId).keywords.length > 0 && (
+          <p className="text-[10px] text-gray-400 mt-1 font-mono break-words">
+            {boostProfile(profileId).keywords.join("  ")}
+          </p>
+        )}
       </div>
 
       {leg === "stream" ? (

@@ -456,11 +456,20 @@ export function parseCommand(utterance: string): AssistOp[] | null {
 
     // Wrap all loose (un-pooled) elements INTO a pool (a qualifier is REQUIRED
     // here, so a bare "add a pool" falls through to the create-pool rule below).
-    if (
-      new RegExp(`^(?:put|wrap|draw|add|create|make)\\s+(?:a\\s+)?(?:new\\s+)?${P}\\s+(?:around|round|over|to(?:\\s+include|\\s+cover|\\s+contain)?|including|containing)\\s+${ALL}`, "i").test(raw)
-      || new RegExp(`^wrap\\s+${ALL}\\s+(?:in|with|inside|into)\\s+(?:a\\s+)?${P}\\b`, "i").test(raw)
-    ) {
-      return [{ op: "wrapInPool" }];
+    // THE NAME COMES TOO. Until 2026-09-24 these two patterns were `.test()`,
+    // so "put a pool around everything called Finance" made an UNNAMED pool and
+    // the user had to rename it — while the SELECTION wrap a few lines above
+    // kept its label perfectly well. Found by replaying Paul's recorded corpus:
+    // four clips where the recogniser heard the sentence exactly right and the
+    // command still failed. `wrapInPool(op.label)` already honoured a label;
+    // nothing ever passed it one.
+    const NAMED = "(?:\\s+(?:called|named|labell?ed|titled)\\s+(.+))?";
+    const wrapAll =
+      raw.match(new RegExp(`^(?:put|wrap|draw|add|create|make)\\s+(?:a\\s+)?(?:new\\s+)?${P}\\s+(?:around|round|over|to(?:\\s+include|\\s+cover|\\s+contain)?|including|containing)\\s+${ALL}${NAMED}`, "i"))
+      ?? raw.match(new RegExp(`^wrap\\s+${ALL}\\s+(?:in|with|inside|into)\\s+(?:a\\s+)?${P}\\b${NAMED}`, "i"));
+    if (wrapAll) {
+      const label = clean(wrapAll[1] ?? "");
+      return [{ op: "wrapInPool", ...(label ? { label } : {}) }];
     }
 
     // Extend / widen the pools rightward to include all elements, keeping EVERY

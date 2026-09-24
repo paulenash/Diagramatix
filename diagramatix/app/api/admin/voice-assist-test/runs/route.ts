@@ -49,7 +49,7 @@ export async function POST(req: Request) {
   if (blocked) return blocked;
 
   const body = await req.json().catch(() => null) as {
-    leg?: string; corpusSeed?: string; asrFingerprint?: string;
+    leg?: string; corpusSeed?: string; asrFingerprint?: string; boostProfile?: string;
     total?: number; passed?: number; failed?: number; fallbackRate?: number;
     outcomes?: unknown; families?: unknown; results?: unknown;
     durationMs?: number; notes?: string;
@@ -63,6 +63,7 @@ export async function POST(req: Request) {
     data: {
       leg: body.leg,
       corpusSeed: body.corpusSeed,
+      boostProfile: body.boostProfile ?? null,
       // The text leg has no recogniser, so it has no fingerprint — and a null
       // here is the honest record of that rather than a placeholder that would
       // later look like a configuration.

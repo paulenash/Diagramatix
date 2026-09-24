@@ -161,8 +161,11 @@ describe("T4736 — the replay measures the live path, and says where it cannot"
       .toContain('body.leg === "text" ? null');
     const batch = read("app/api/admin/voice-assist-test/transcribe-clip/route.ts");
     expect(batch).toContain("isSuperuser(session)");
-    expect(batch, "command bias on, diarisation off — one person, one sentence")
-      .toContain("batchParams({ commandBias: true })");
+    // The INTENT, not the literal call — the call gained a `commandWords`
+    // argument when boost profiles landed, and pinning the exact string made a
+    // parameterisation look like a regression.
+    expect(batch, "command bias on — one person, one sentence").toMatch(/batchParams\(\{\s*commandBias: true/);
+    expect(batch, "and no diarisation").not.toMatch(/diarize/);
   });
 });
 
