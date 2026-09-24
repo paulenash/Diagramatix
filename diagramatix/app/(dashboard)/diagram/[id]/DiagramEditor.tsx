@@ -62,6 +62,7 @@ import { leadingSpokenNumber } from "@/app/lib/assist/spokenNumber";
 import { capitaliseFirstWord, needsCapital } from "@/app/lib/diagram/nameCase";
 import { batchFlashes, isGoldFlashOn, setGoldFlash, goldFlashSummary, flashTargets, type FlashBox } from "@/app/lib/assist/goldFlash";
 import { touchedFor, type TouchBox, type CommandVerdict } from "@/app/lib/assist/commandLog";
+import { FRAGMENT_SILENCE_MS, FRAGMENT_CONTINUE_MS, FRAGMENT_MAX_WAITS } from "@/app/lib/assist/fragmentBuffer";
 import { isVoiceDebugOn, setVoiceDebug } from "@/app/lib/assist/voiceDebug";
 import { captureCanvasPng } from "@/app/lib/diagram/canvasSnapshot";
 import { buildDebugSessionFile, debugSessionFilename, serialiseDebugSession, type DebugSnapshot } from "@/app/lib/assist/debugSessionFile";
@@ -4244,9 +4245,11 @@ export function DiagramEditor({
   const voiceBuffer = useRef("");
   const voiceFlushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const voiceWaits = useRef(0);           // how many times we've held an incomplete command
-  const ABRA_SILENCE_MS = 2200;
-  const ABRA_CONTINUE_MS = 3200;         // longer grace while waiting for the rest of a split command
-  const ABRA_MAX_WAITS = 3;
+  // The numbers live in `assist/fragmentBuffer.ts` (2026-09-24) so the live
+  // path and a replayed clip cannot disagree about how long to wait.
+  const ABRA_SILENCE_MS = FRAGMENT_SILENCE_MS;
+  const ABRA_CONTINUE_MS = FRAGMENT_CONTINUE_MS;
+  const ABRA_MAX_WAITS = FRAGMENT_MAX_WAITS;
   // Auto-close after 2 min of no voice — an open Deepgram stream is billed by
   // duration, so an idle mic keeps costing money. Reset on every voice fragment.
   const voiceIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);

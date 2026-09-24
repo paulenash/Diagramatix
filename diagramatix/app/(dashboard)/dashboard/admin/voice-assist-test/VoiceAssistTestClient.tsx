@@ -21,6 +21,7 @@ import { scoreCase, summarise, isFailure, type CaseResult, type Outcome } from "
 import { fixtureElements } from "@/app/lib/assist/commandFixture";
 import { DEFAULT_CORPUS_SEED } from "@/app/lib/assist/rng";
 import { RecorderPanel } from "./RecorderPanel";
+import { ReplayPanel } from "./ReplayPanel";
 
 const OUTCOME_STYLE: Record<Outcome, string> = {
   "pass": "bg-green-100 text-green-800",
@@ -45,7 +46,7 @@ const OUTCOME_MEANS: Record<Outcome, string> = {
 };
 
 export function VoiceAssistTestClient() {
-  const [tab, setTab] = useState<"text" | "record">("text");
+  const [tab, setTab] = useState<"text" | "record" | "replay">("text");
   const [seed, setSeed] = useState(DEFAULT_CORPUS_SEED);
   const [count, setCount] = useState(200);
   const [family, setFamily] = useState<string>("");
@@ -102,7 +103,7 @@ export function VoiceAssistTestClient() {
       <h1 className="text-xl font-semibold text-gray-800 mb-1">Test Voice Assist</h1>
 
       <div className="flex items-center gap-1 mb-4 border-b border-gray-200">
-        {([["text", "Text leg — free"], ["record", "Record clips"]] as const).map(([k, label]) => (
+        {([["text", "Text leg — free"], ["record", "Record clips"], ["replay", "Replay — the real test"]] as const).map(([k, label]) => (
           <button key={k} onClick={() => setTab(k)}
             className={`px-3 py-1.5 text-xs -mb-px border-b-2 ${tab === k ? "border-purple-600 text-purple-700 font-medium" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
             {label}
@@ -110,7 +111,7 @@ export function VoiceAssistTestClient() {
         ))}
       </div>
 
-      {tab === "record" ? <RecorderPanel /> : (
+      {tab === "record" ? <RecorderPanel /> : tab === "replay" ? <ReplayPanel /> : (
       <>
       <p className="text-xs text-gray-500 mb-4 max-w-3xl">
         Generates commands from the op vocabulary, parses each one, and says <strong>which layer</strong> failed.

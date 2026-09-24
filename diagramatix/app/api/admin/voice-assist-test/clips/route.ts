@@ -21,6 +21,9 @@ const MAX_CLIP_BYTES = 8 * 1024 * 1024;
 /** Never the audio in a listing: a hundred clips is sixteen megabytes. */
 const LIST_SELECT = {
   id: true, corpusSeed: true, caseId: true, family: true, utterance: true,
+  // The expected ops travel with the listing: they are a short text field, and
+  // the replay needs them to score without a second round trip per clip.
+  expectedOps: true,
   mimeType: true, sampleRate: true, durationMs: true, byteSize: true,
   peakLevel: true, takeNumber: true, starred: true,
   recordedById: true, recordedAt: true, asrFingerprint: true,

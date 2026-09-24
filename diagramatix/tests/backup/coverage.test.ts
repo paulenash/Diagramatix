@@ -119,6 +119,10 @@ const SCOPED_OMITTED = new Set<string>([
   // and restoring somebody's speech into another tenant's backup is not a thing
   // this product should ever do by accident.
   "VoiceClip",
+  // And the runs scored over that corpus — a measurement of our own product
+  // taken in one environment. Restoring one tenant's accuracy figures into
+  // another would be meaningless at best.
+  "VoiceTestRun",
 
   // Grant/membership tables (like ProjectShare + the bundle audiences, and now
   // admin-managed team membership) — carried by the full SuperAdmin backup only,

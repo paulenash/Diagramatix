@@ -2562,3 +2562,40 @@ model VoiceClip {
   @@index([corpusSeed, caseId])
   @@index([recordedById, recordedAt])
 }
+
+/// One scoring run over the corpus — text, streamed or batch.
+///
+/// The row exists so "this got worse" can be answered by looking. `leg` and
+/// `asrFingerprint` are what make two runs comparable: a stream run and a batch
+/// run measure different things, and a run recorded under different recogniser
+/// settings is not a fair comparison with one recorded before them.
+model VoiceTestRun {
+  id String @id @default(cuid())
+
+  /// "text" | "stream" | "batch" — what was actually exercised.
+  leg            String
+  corpusSeed     String
+  /// Null for the text leg, which has no recogniser.
+  asrFingerprint String?
+
+  total    Int    @default(0)
+  passed   Int    @default(0)
+  failed   Int    @default(0)
+  /// Counts per outcome, and per family — a document, read whole.
+  outcomes String @default("{}") @db.Text
+  families String @default("{}") @db.Text
+  /// Every row, so a run can be reopened rather than re-run.
+  results  String @default("[]") @db.Text
+
+  /// What share of cases the deterministic grammar refused — the AI's bill.
+  fallbackRate Float @default(0)
+
+  notes      String?   @db.Text
+  runById    String?
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  durationMs Int       @default(0)
+
+  @@index([leg, startedAt])
+  @@index([corpusSeed, startedAt])
+}
