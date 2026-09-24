@@ -29,6 +29,7 @@ import {
 } from "@/app/lib/assist/refMentions";
 import { resolveRef } from "@/app/lib/assist/resolveRef";
 import type { DiagramElement } from "@/app/lib/diagram/types";
+import { editorWithApplyLayer } from "./assistApplySource";
 
 const read = (...p: string[]) => readFileSync(join(process.cwd(), ...p), "utf8");
 const el = (id: string, label: string): DiagramElement =>
@@ -62,7 +63,7 @@ describe("T4604 — an element id never reaches the user", () => {
   });
 
   it("says something human when an id does not resolve", () => {
-    const body = read("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
+    const body = editorWithApplyLayer();
     expect(body).toMatch(/if \(looksLikeElementId\(ref\)\) return \{ err: "couldn't work out which element that meant — say its name" \}/);
     // And it is checked BEFORE "did you mean", since suggesting names for an
     // id is noise on top of noise.
@@ -122,7 +123,7 @@ describe("T4605 — name what is missing, instead of blaming the phrasing", () =
   });
 
   it("is what the AI-returned-nothing path actually logs", () => {
-    const body = read("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
+    const body = editorWithApplyLayer();
     expect(body).toMatch(/summary: notUnderstoodMessage\(heard, data\.elements\)/);
   });
 });

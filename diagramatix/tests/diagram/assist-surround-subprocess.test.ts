@@ -16,6 +16,7 @@ import { resolveSelectionRefs } from "@/app/lib/assist/resolveRef";
 import { planWrapInSubprocess, planUnwrapSubprocess, EP_WRAP, type Shape } from "@/app/lib/diagram/subprocessWrap";
 import { reducer } from "@/app/hooks/useDiagram";
 import type { DiagramElement, DiagramData, Connector } from "@/app/lib/diagram/types";
+import { editorWithApplyLayer } from "./assistApplySource";
 
 const read = (...p: string[]) => fs.readFileSync(path.resolve(__dirname, "..", "..", ...p), "utf8");
 const el = (id: string, type: string, label: string, x: number, y: number, w: number, h: number, extra: Record<string, unknown> = {}): DiagramElement =>
@@ -165,7 +166,7 @@ describe("surround the selection with an expanded subprocess", () => {
   });
 
   it("T4422 — the editor wires both: the op handlers, 'delete' routing an EP with contents to the unwrap, the reducer cases, the AI prompt and the card", () => {
-    const ed = read("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
+    const ed = editorWithApplyLayer();
     expect(ed).toContain('if (op.op === "wrapInSubprocess") {');
     expect(ed).toContain("const plan = planWrapInSubprocess({ elements: els, connectors: data.connectors }, selectedIds, label, ids);");
     expect(ed).toContain("wrapInSubprocess([...selectedIds], label, ids);");

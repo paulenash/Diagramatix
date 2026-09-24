@@ -18,9 +18,10 @@ import { numberTargets } from "@/app/lib/assist/renameTargets";
 import { ID_REF_PREFIX, resolveRef } from "@/app/lib/assist/resolveRef";
 import type { AssistOp } from "@/app/lib/assist/ops";
 import type { DiagramElement } from "@/app/lib/diagram/types";
+import { editorWithApplyLayer } from "./assistApplySource";
 
 const read = (...p: string[]) => readFileSync(join(process.cwd(), ...p), "utf8");
-const editor = () => read("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
+const editor = () => editorWithApplyLayer();
 
 const el = (id: string, label: string, x: number, y: number): DiagramElement =>
   ({ id, type: "task", label, x, y, width: 100, height: 60, properties: {} }) as unknown as DiagramElement;

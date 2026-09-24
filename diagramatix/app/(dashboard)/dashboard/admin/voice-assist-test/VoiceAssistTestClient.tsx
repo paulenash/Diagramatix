@@ -18,7 +18,7 @@ import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { generateCases, FAMILY_NAMES, NOT_GENERATED } from "@/app/lib/assist/commandGenerator";
 import { scoreCase, summarise, isFailure, type CaseResult, type Outcome } from "@/app/lib/assist/commandScore";
-import { fixtureElements } from "@/app/lib/assist/commandFixture";
+import { fixtureElements, fixtureDiagram } from "@/app/lib/assist/commandFixture";
 import { DEFAULT_CORPUS_SEED } from "@/app/lib/assist/rng";
 import { RecorderPanel } from "./RecorderPanel";
 import { ReplayPanel } from "./ReplayPanel";
@@ -43,7 +43,7 @@ const OUTCOME_MEANS: Record<Outcome, string> = {
   "misparsed": "the grammar accepted it and built the wrong shape",
   "ambiguous": "the reference named more than one thing; live, the picker opens",
   "wrong-element": "it resolved, to the wrong element",
-  "wrong-edit": "the ops were right and the diagram came out wrong (not measured yet)",
+  "wrong-edit": "the ops were right and the diagram came out wrong",
 };
 
 export function VoiceAssistTestClient() {
@@ -65,7 +65,8 @@ export function VoiceAssistTestClient() {
       world: els,
       ...(family ? { families: [family] } : {}),
     });
-    setResults(cases.map((c) => scoreCase(c, undefined, els)));
+    // L4 too: each case is applied to its own headless copy of the fixture.
+    setResults(cases.map((c) => scoreCase(c, undefined, els, { diagram: fixtureDiagram() })));
     setRanMs(Math.round(performance.now() - t0));
     setExplanations({});
   }, [seed, count, family]);

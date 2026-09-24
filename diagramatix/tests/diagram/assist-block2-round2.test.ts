@@ -23,6 +23,7 @@ import { humaniseIds } from "@/app/lib/assist/refMentions";
 import { decisionLabel, isDecisionGateway } from "@/app/lib/diagram/nameCase";
 import { parseCommand } from "@/app/lib/assist/commandGrammar";
 import type { DiagramElement } from "@/app/lib/diagram/types";
+import { editorWithApplyLayer } from "./assistApplySource";
 
 const read = (...p: string[]) => readFileSync(join(process.cwd(), ...p), "utf8");
 const el = (id: string, label: string, type = "task"): DiagramElement =>
@@ -51,7 +52,7 @@ describe("T4610 — the sentence shown back is in the user's vocabulary", () => 
   });
 
   it("is what the log actually prints", () => {
-    const body = read("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
+    const body = editorWithApplyLayer();
     expect(body).toMatch(/humaniseIds\(canonical, data\.elements\)/);
   });
 });
@@ -109,7 +110,7 @@ describe("T4612 — a decision's label is a question", () => {
 });
 
 describe("T4613 — “undo” inside a numbered pick gets you out", () => {
-  const body = read("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
+  const body = editorWithApplyLayer();
 
   it("cancels the pick AND undoes, rather than arguing", () => {
     // Paul said "undo" three times and was told "say the number of the item to

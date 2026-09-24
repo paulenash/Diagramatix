@@ -16,9 +16,12 @@ import { needsConfirmation, parseConfirmation } from "@/app/lib/assist/confirm";
 import { resolveRef, resolveSelectionRefs, isSelectionRef } from "@/app/lib/assist/resolveRef";
 import { serializeDiagramForCommand } from "@/app/lib/assist/serializeDiagram";
 import type { DiagramElement, DiagramData } from "@/app/lib/diagram/types";
+import { editorWithApplyLayer, applyLayerSrc } from "./assistApplySource";
 
 const src = (...p: string[]) => fs.readFileSync(path.resolve(__dirname, "..", "..", ...p), "utf8");
-const editor = () => src("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
+const editor = () => editorWithApplyLayer();
+/** The apply layer's function body — it left the editor on 2026-09-25 (L4). */
+const applyBody = () => { const s = applyLayerSrc(); const i = s.indexOf("export function applyAssistOps("); expect(i).toBeGreaterThan(-1); return s.slice(i); };
 /** The body of a top-level `const NAME = useCallback(` in the editor, up to its deps array. */
 const callbackBody = (source: string, name: string) => {
   const start = source.indexOf(`const ${name} = useCallback(`);
@@ -79,7 +82,7 @@ describe("B2 — a voice move is committed", () => {
     // sets groupDragging); elementsMoveEnd() pushes the history entry and
     // re-routes connectors. Without it a voice move had no undo, and the next
     // mouse drag's end committed a snapshot from before the voice move.
-    const body = callbackBody(editor(), "applyAssistOps");
+    const body = applyBody();
     const calls = [...body.matchAll(/moveElements\(/g)].map((m) => m.index!);
     expect(calls.length).toBeGreaterThanOrEqual(2); // move + nudgePool
     for (const i of calls) {
@@ -102,7 +105,7 @@ describe("B1 — a batch sees what it has already done", () => {
     expect(withDeleted(added, "a").map((e) => e.id)).toEqual(["c"]);
     expect(base, "pure — the input is untouched").toHaveLength(2);
 
-    const body = callbackBody(editor(), "applyAssistOps");
+    const body = applyBody();
     expect(body, "a WORKING copy, not a one-time snapshot").toContain("let els: DiagramElement[] = data.elements;");
     // The CLAIM is that the newly added element is threaded into the working
     // copy, not the expression that builds it. R7 (2026-09-20) had to build the

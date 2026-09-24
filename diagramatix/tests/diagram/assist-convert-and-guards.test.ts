@@ -22,6 +22,7 @@ import { parseCommand } from "@/app/lib/assist/commandGrammar";
 import { validateOps } from "@/app/lib/assist/ops";
 import { nearestRefs } from "@/app/lib/assist/resolveRef";
 import type { DiagramElement } from "@/app/lib/diagram/types";
+import { editorWithApplyLayer } from "./assistApplySource";
 
 const read = (...p: string[]) => readFileSync(join(process.cwd(), ...p), "utf8");
 
@@ -116,7 +117,7 @@ describe("T4581 — B6: both shapes of a sub-lane count", () => {
   });
 
   it("is what the delete guard uses, so the spoken word is stripped from the name", () => {
-    const body = read("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
+    const body = editorWithApplyLayer();
     expect(body).toContain("const kind = e.type === \"pool\" ? \"pool\" : laneKindWord(e, els);");
     expect(body).toContain("const siblings = sameKindAs(e, els);");
     expect(body, "the old type test would miss the interactive shape")
@@ -203,7 +204,7 @@ describe("T4583 — M3 refuses what it cannot do, by name", () => {
   });
 
   it("the apply branch tells the user which kinds a subtype belongs to", () => {
-    const body = read("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
+    const body = editorWithApplyLayer();
     expect(body).toMatch(/is a \$\{e\.type\} — “\$\{op\.subtype\}” applies to \$\{kinds\}/);
     expect(body, "and writes exactly what the menu writes")
       .toContain("updateProperties(e.id, { [pick.propKey]: pick.value });");
@@ -254,7 +255,7 @@ describe("T4584 — R5: a change that moves nothing still flashes", () => {
     // must carry the fingerprint, or a subtype change is compared against
     // nothing and silently reads as "unchanged". Counting sites instead of
     // asserting a magic number keeps that true for the next diff too.
-    const body = read("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
+    const body = editorWithApplyLayer();
     const uses = (body.match(/marks: subtypeFingerprint\(/g) ?? []).length;
     const diffs = (body.match(/\b(?:flashTargets|touchedFor)\(/g) ?? []).length;
     expect(diffs, "the editor still diffs before against after somewhere").toBeGreaterThan(0);
@@ -294,7 +295,7 @@ describe("T4585 — R6: a failed reference says what it nearly found", () => {
   it("never lets a suggestion become an action", () => {
     // The looseness is the point AND the risk. `nearestRefs` is only ever read
     // into an error message; the resolver itself keeps its one-edit limit.
-    const body = read("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
+    const body = editorWithApplyLayer();
     expect(body).toMatch(/const near = nearestRefs\(ref, els, 3\);/);
     expect(body, "the candidates go into a question, not a resolution")
       .toMatch(/couldn't find “\$\{ref\}” — did you mean \$\{list\}\?/);
@@ -310,19 +311,19 @@ describe("T4586 — R7: auto-connect obeys the same gauntlet as connect", () => 
     // "add a task after Done" drew a sequence flow OUT of an end event and
     // reported it with a green tick, because only the explicit `connect` op was
     // ever checked.
-    const body = read("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
+    const body = editorWithApplyLayer();
     expect(body).toMatch(/if \(!canConnect\(anchor, addedEl, "sequence", withAdded\(els, addedEl\)\)\)/);
   });
 
   it("checks against the state that WILL exist, not the one that does", () => {
     // The new element is not in `els` yet at that point; passing the current
     // list would ask about an element the checker cannot see.
-    const body = read("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
+    const body = editorWithApplyLayer();
     expect(body).toMatch(/canConnect\(anchor, addedEl, "sequence", withAdded\(els, addedEl\)\)/);
   });
 
   it("still adds the element and says why it is unconnected", () => {
-    const body = read("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
+    const body = editorWithApplyLayer();
     expect(body, "refusing the whole command would lose the element the user asked for")
       .toMatch(/but left it unconnected/);
   });

@@ -8,6 +8,7 @@ import path from "node:path";
 import { badgePlaceFor, collectRenameTargets } from "@/app/lib/assist/renameTargets";
 import { collectMessageTargets } from "@/app/lib/assist/messageTargets";
 import type { DiagramElement } from "@/app/lib/diagram/types";
+import { editorWithApplyLayer } from "./assistApplySource";
 
 const read = (...p: string[]) => fs.readFileSync(path.resolve(__dirname, "..", "..", ...p), "utf8");
 const el = (id: string, type: string, label = "", extra: Record<string, unknown> = {}): DiagramElement =>
@@ -53,7 +54,7 @@ describe("where the green numbers sit", () => {
 
 describe("the selection protocol", () => {
   it("T4410 — a rename or move by voice never leaves the item selected", () => {
-    const ed = read("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
+    const ed = editorWithApplyLayer();
     // Rename by number: after the name is applied, selection and connector selection are cleared.
     expect(ed).toMatch(/cancelLabelEdit\(\);\s*\/\/[^\n]*\n[^\n]*\n\s*setSelectedElementIds\(new Set\(\)\);\s*setSelectedConnectorId\(null\);/);
     // Plain rename, move, nudge and lane move all end with nothing selected.

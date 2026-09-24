@@ -14,6 +14,7 @@ import { needsConfirmation } from "@/app/lib/assist/confirm";
 import { nextContainerLabels, uniqueContainerLabel } from "@/app/lib/diagram/containerNames";
 import { namesAContainer } from "@/app/lib/assist/greedyGuards";
 import type { DiagramElement } from "@/app/lib/diagram/types";
+import { editorWithApplyLayer } from "./assistApplySource";
 
 const E = (o: Record<string, unknown>) => o as unknown as DiagramElement;
 const src = (p: string) => readFileSync(p, "utf8");
@@ -73,7 +74,7 @@ describe("T4696 — the confirmation is pinned to the element it named", () => {
   });
 
   it("the editor substitutes that id before parking the question", () => {
-    const ed = src("app/(dashboard)/diagram/[id]/DiagramEditor.tsx");
+    const ed = editorWithApplyLayer();
     expect(ed).toContain("ask.targetId && ask.ref ? substituteRef(ops, ask.ref, ask.targetId) : ops");
     expect(ed).toContain("pendingConfirmRef.current = { ops: pinned");
   });
@@ -86,7 +87,7 @@ describe("T4697 — the delete guard does not fire on a reference that is exact"
   });
 
   it("an #id:, a selection or a pointer reference skips the name check", () => {
-    const ed = src("app/(dashboard)/diagram/[id]/DiagramEditor.tsx");
+    const ed = editorWithApplyLayer();
     expect(ed).toContain("const exactRef = op.ref.startsWith(ID_REF_PREFIX) || isSelectionRef(op.ref) || isPointerElementRef(op.ref);");
     expect(ed).toContain("if (!exactRef && siblings.length > 1");
     // …which is also what stopped an internal id being shown to the user.
@@ -122,7 +123,7 @@ describe("T4698 — a new lane is named against the diagram, and reported as nam
   });
 
   it("the log line says the name the lane will really have", () => {
-    const ed = src("app/(dashboard)/diagram/[id]/DiagramEditor.tsx");
+    const ed = editorWithApplyLayer();
     expect(ed).toContain('const laneNames = nextContainerLabels(els, op.labels, "Lane");');
     expect(ed).toContain('const subNames = nextContainerLabels(els, op.labels, "Sublane");');
     expect(ed, "never the requested labels").not.toMatch(/to \$\{nameOf\(pool\)\}: \$\{op\.labels\.join/);
@@ -153,7 +154,7 @@ describe("T4700 — asking WHICH one in a way that can be answered", () => {
   it("the container commands raise the numbered picker, not “say the name”", () => {
     // The log: `which “pool three”? 2 match: “Pool 3”, “Pool 3” — say the name`.
     // Two things with the same name cannot be told apart by name.
-    const ed = src("app/(dashboard)/diagram/[id]/DiagramEditor.tsx");
+    const ed = editorWithApplyLayer();
     for (const ref of ["op.poolRef", "op.laneRef"]) {
       expect(ed, ref).toContain(`buildPickFlow(ops, ${ref},`);
     }
@@ -161,7 +162,7 @@ describe("T4700 — asking WHICH one in a way that can be answered", () => {
 
   it("a sublane asked of a POOL uses its lane, or asks which lane", () => {
     // The log: `Add sublane to pool` → `Pool 3 isn't a lane`.
-    const ed = src("app/(dashboard)/diagram/[id]/DiagramEditor.tsx");
+    const ed = editorWithApplyLayer();
     expect(ed).toContain("if (lanesIn.length === 1) target = lanesIn[0];");
     expect(ed).toContain("has no lanes to put a sublane in");
     expect(ed).toContain("which lane in ");

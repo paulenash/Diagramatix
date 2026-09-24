@@ -10,9 +10,10 @@ import { parseCommand } from "@/app/lib/assist/commandGrammar";
 import { validateOps } from "@/app/lib/assist/ops";
 import { reducer } from "@/app/hooks/useDiagram";
 import type { DiagramElement, DiagramData } from "@/app/lib/diagram/types";
+import { editorWithApplyLayer } from "./assistApplySource";
 
 const read = (...p: string[]) => fs.readFileSync(path.resolve(__dirname, "..", "..", ...p), "utf8");
-const editor = () => read("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
+const editor = () => editorWithApplyLayer();
 const el = (id: string, type: string, label = "", extra: Record<string, unknown> = {}): DiagramElement =>
   ({ id, type: type as DiagramElement["type"], label, x: 0, y: 0, width: 100, height: 60, properties: {}, ...extra });
 

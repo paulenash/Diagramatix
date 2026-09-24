@@ -21,6 +21,7 @@ import {
 } from "@/app/lib/assist/greedyGuards";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { editorWithApplyLayer } from "./assistApplySource";
 
 const opsOf = (s: string) => (parseCommand(s) ?? []).map((o) => o.op);
 const firstOp = (s: string) => parseCommand(s)?.[0] as Record<string, unknown> | undefined;
@@ -151,8 +152,7 @@ describe("T4570 — the guards themselves", () => {
     // The half the grammar cannot decide: "move Pick Line up" is a lane move
     // if a lane called "Pick" exists, and an element move if what exists is a
     // task called "Pick Line". Only the diagram knows.
-    const editor = readFileSync(
-      join(process.cwd(), "app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx"), "utf8");
+    const editor = editorWithApplyLayer();
     const start = editor.indexOf('if (op.op === "moveLane")');
     // Comments stripped first: the branch's own docblock quotes the phrase
     // "isn't a lane" while explaining why it no longer says it, and matching

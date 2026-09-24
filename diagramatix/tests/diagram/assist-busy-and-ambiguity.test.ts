@@ -19,9 +19,10 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { resolveRef } from "@/app/lib/assist/resolveRef";
 import type { DiagramElement } from "@/app/lib/diagram/types";
+import { editorWithApplyLayer } from "./assistApplySource";
 
 const read = (...p: string[]) => readFileSync(join(process.cwd(), ...p), "utf8");
-const editor = () => read("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
+const editor = () => editorWithApplyLayer();
 
 const el = (id: string, type: string, label: string): DiagramElement =>
   ({ id, type, label, x: 0, y: 0, width: 100, height: 60, properties: {} }) as unknown as DiagramElement;

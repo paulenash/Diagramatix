@@ -20,6 +20,7 @@ import { parseAlignTail } from "@/app/lib/assist/alignPhrase";
 import { parseGhostPick, resolveGhostPick } from "@/app/lib/assist/ghostPick";
 import { parseCommand } from "@/app/lib/assist/commandGrammar";
 import { validateOps } from "@/app/lib/assist/ops";
+import { editorWithApplyLayer } from "./assistApplySource";
 
 const read = (...p: string[]) => readFileSync(join(process.cwd(), ...p), "utf8");
 
@@ -76,7 +77,7 @@ describe("T4597 — M7: align, and the axis word that means two things", () => {
   });
 
   it("dispatches what the Alignment menu dispatches, and needs two elements", () => {
-    const body = read("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
+    const body = editorWithApplyLayer();
     expect(body).toContain("alignElements(ids, op.mode);");
     expect(body, "aligning one element is a no-op worth saying out loud")
       .toMatch(/select two or more elements to align/);
@@ -137,7 +138,7 @@ describe("T4598 — M8: take the ghost, without stealing 'yes'", () => {
   });
 
   it("lists what IS on offer when the pick misses, and uses the live candidates", () => {
-    const body = read("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
+    const body = editorWithApplyLayer();
     expect(body).toContain("const cands = nextStepRef.current.candidates;");
     expect(body, "the ghosts are translucent and easy to misread")
       .toMatch(/that isn't on offer — \$\{cands\.map\(\(c\) => c\.label\)\.join\(", "\)\}/);

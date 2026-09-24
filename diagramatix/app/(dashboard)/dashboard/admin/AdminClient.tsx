@@ -14,6 +14,7 @@ import { safeInternalPath } from "@/app/lib/safeRedirect";
 import { useFeatureColors } from "@/app/lib/theme/useFeatureColors";
 import { tonesFor, readableTextOn, type FeatureColorKey } from "@/app/lib/theme/featureColors";
 import { tileVisibleTo, FUN_TILE_OWNERS } from "@/app/lib/admin/tileVisibility";
+import { readTileFilter, writeTileFilter, sessionStore } from "@/app/lib/admin/tileFilter";
 
 interface UserRow {
   id: string;
@@ -882,7 +883,19 @@ function SuperAdminToolsGrid({ onShowUsers, currentUserEmail }: { onShowUsers: (
   const scheme = useFeatureColors();
   const [order, setOrder] = useState<string[]>(ADMIN_TILES.map(t => t.id));
   const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [filter, setFilter] = useState("");
+  const [filter, setFilterState] = useState("");
+  // Remembered for the tab, so entering a tile and coming back — by browser
+  // Back OR a tile's "← SuperAdmin" link to the bare URL — keeps the filter.
+  // Read after mount, not in the initialiser, so the server render matches.
+  // Written in the setter (not an effect) so the mount can't clear it first.
+  useEffect(() => {
+    const saved = readTileFilter(sessionStore());
+    if (saved) setFilterState(saved);
+  }, []);
+  function setFilter(v: string) {
+    setFilterState(v);
+    writeTileFilter(sessionStore(), v);
+  }
 
   // Load the saved order on mount; merge so newly-added tiles always
   // appear (appended) and removed ids are dropped.

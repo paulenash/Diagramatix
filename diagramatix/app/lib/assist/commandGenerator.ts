@@ -35,6 +35,7 @@ import { makeRng, pick, int, DEFAULT_CORPUS_SEED, type Rng } from "./rng";
 import {
   ACTIVITY_LABELS, LANE_LABELS, POOL_LABELS, PARTICIPANT_LABELS, SYSTEM_LABELS,
   EVENT_LABELS, BOUNDARY_LABELS, MESSAGE_LABELS, FIXTURE_IDS,
+  fixtureConnectors,
 } from "./commandFixture";
 
 /** An element the sentence can name, and how it will be named. */
@@ -70,6 +71,12 @@ export interface World {
   whiteBoxPool(rng: Rng): Named;
   lane(rng: Rng): Named;
   sublane(rng: Rng): Named;
+  /** Two elements a flow already joins — "disconnect" asks for nothing otherwise. */
+  connectedPair(rng: Rng): [Named, Named] | null;
+  /** A lane with a neighbour on BOTH sides, and a direction. A lane move trades
+   *  height between those two, so an edge lane cannot move at all; asking
+   *  measures a refusal, not a move. */
+  laneWithNeighbour(rng: Rng): { lane: Named; dir: "up" | "down" };
   /** Two distinct lanes that are neighbours, for a swap. */
   laneNeighbours(rng: Rng): [Named, Named];
   /** A NEW name, typed by what is being named — an activity is a verb phrase,
@@ -141,6 +148,22 @@ export function worldOf(els: readonly DiagramElement[]): World {
     whiteBoxPool: (rng) => nameIt(rng, pick(rng, white.length ? white : pools), els, "pool"),
     lane: (rng) => nameIt(rng, pick(rng, lanes), els, "lane"),
     sublane: (rng) => nameIt(rng, pick(rng, subs), els, "sub-lane"),
+    connectedPair: (rng) => {
+      const pairs = fixtureConnectors()
+        .map((c) => [els.find((e) => e.id === c.sourceId), els.find((e) => e.id === c.targetId)] as const)
+        .filter((p): p is readonly [DiagramElement, DiagramElement] => !!p[0] && !!p[1] && !!p[0].label && !!p[1].label);
+      if (!pairs.length) return null;
+      const [a, b] = pick(rng, pairs);
+      return [{ id: a.id, spoken: (a.label ?? "").trim() }, { id: b.id, spoken: (b.label ?? "").trim() }];
+    },
+    laneWithNeighbour: (rng) => {
+      // A lane move TRADES height between the lanes either side of it — down
+      // grows the one above and shrinks the one below — so only a lane with a
+      // neighbour on BOTH sides can move at all.
+      const sorted = [...lanes].sort((a, b) => a.y - b.y);
+      const inner = sorted.length > 2 ? sorted.slice(1, -1) : sorted;
+      return { lane: nameIt(rng, pick(rng, inner), els, "lane"), dir: pick(rng, ["up", "down"] as const) };
+    },
     laneNeighbours: (rng) => {
       const sorted = [...lanes].sort((a, b) => a.y - b.y);
       const i = int(rng, 0, Math.max(0, sorted.length - 2));
@@ -225,7 +248,9 @@ export const GENERATOR_FAMILIES: readonly OpTemplate[] = [
       const [word, base] = pick(rng, ELEMENT_WORDS);
       // An event is named for what has happened, an activity for what is done.
       const label = word.includes("event") ? w.eventLabel(rng) : w.activityLabel(rng);
-      if (!w.has("task") || rng.next() < 0.4) {
+      // Nothing flows INTO a start event, so "add a start event after X" asks
+      // for a flow that can never be drawn. Say it without the anchor.
+      if (!w.has("task") || base.symbolType === "start-event" || rng.next() < 0.4) {
         return {
           utterance: pick(rng, [`add ${word} called ${label}`, `insert ${word} called ${label}`]),
           ops: [{ ...base, label }],
@@ -259,8 +284,12 @@ export const GENERATOR_FAMILIES: readonly OpTemplate[] = [
     family: "disconnect",
     applicable: (w) => w.has("task"),
     build: (rng, w) => {
-      const a = w.task(rng), b = w.task(rng);
-      if (a.id === b.id) return null;
+      // Only a pair a flow actually joins. A random pair was refused ("no
+      // connection between …") — correctly — and L4 counted a right answer as
+      // a wrong edit, because the case asked for something impossible.
+      const pair = w.connectedPair(rng);
+      if (!pair) return null;
+      const [a, b] = pair;
       return {
         utterance: `disconnect ${a.spoken} from ${b.spoken}`,
         ops: [{ op: "disconnect", fromRef: a.spoken, toRef: b.spoken }],
@@ -470,8 +499,7 @@ export const GENERATOR_FAMILIES: readonly OpTemplate[] = [
     family: "moveLane",
     applicable: (w) => w.has("lane"),
     build: (rng, w) => {
-      const lane = w.lane(rng);
-      const dir = pick(rng, ["up", "down"] as const);
+      const { lane, dir } = w.laneWithNeighbour(rng);
       return {
         utterance: `move the ${lane.spoken} lane ${dir}`,
         ops: [{ op: "moveLane", ref: lane.spoken, direction: dir }],

@@ -35,6 +35,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseCommand } from "@/app/lib/assist/commandGrammar";
 import { capitaliseFirstWord, needsCapital } from "@/app/lib/diagram/nameCase";
+import { editorWithApplyLayer } from "./assistApplySource";
 
 const read = (...p: string[]) => readFileSync(join(process.cwd(), ...p), "utf8");
 
@@ -78,7 +79,7 @@ describe("T4601 — a stranded 'after X' is a connection, not a new element", ()
 });
 
 describe("T4602 — a named anchor that does not resolve STOPS the command", () => {
-  const body = read("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
+  const body = editorWithApplyLayer();
 
   it("does not fall through to the recency fallback after an error", () => {
     // The defect verbatim: `if ("err" in a) { results.push(a.err); anyFail =
@@ -148,7 +149,7 @@ describe("T4603 — activity, gateway and event labels start with a capital", ()
   it("keeps the assist working copy in step with the reducer", () => {
     // Otherwise the log line and the next command's reference describe a name
     // the diagram does not have.
-    const body = read("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
+    const body = editorWithApplyLayer();
     expect(body).toMatch(/const addedLabel = op\.label && needsCapital\(op\.symbolType\) \? capitaliseFirstWord\(op\.label\) : op\.label;/);
     expect(body).toMatch(/syntheticElement\(newId, op\.symbolType, center, w, h, \{ label: addedLabel,/);
   });

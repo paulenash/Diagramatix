@@ -28,6 +28,7 @@ import { parseCommand } from "@/app/lib/assist/commandGrammar";
 import { validateOps } from "@/app/lib/assist/ops";
 import { resolveRef } from "@/app/lib/assist/resolveRef";
 import type { DiagramElement } from "@/app/lib/diagram/types";
+import { editorWithApplyLayer } from "./assistApplySource";
 
 const read = (...p: string[]) => readFileSync(join(process.cwd(), ...p), "utf8");
 
@@ -172,7 +173,7 @@ describe("T4593 — M4: teams and risks, said once for everything selected", () 
   });
 
   it("insists on a selection and refuses a team on a non-activity", () => {
-    const body = read("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
+    const body = editorWithApplyLayer();
     expect(body, "a command that names nothing must not fall back to recency")
       .toMatch(/op\.op === "fillLabels"[\s\S]{0,400}selectedIds\.map/);
     expect(body, "a team belongs to an activity, and anything else is named")
@@ -299,7 +300,7 @@ describe("T4596 — M5: “put a task here”", () => {
   });
 
   it("refuses rather than dropping one at (0,0) when the mouse was never seen", () => {
-    const body = read("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
+    const body = editorWithApplyLayer();
     expect(body).toMatch(/I don't know where “here” is/);
     // And it still keeps clear of what is already there.
     expect(body).toMatch(/center = findFreeSlot\(pointerWorld\.current, w, h, others\)/);
@@ -311,7 +312,7 @@ describe("T4596 — M5: “put a task here”", () => {
     const canvas = read("app", "components", "canvas", "Canvas.tsx");
     expect(canvas, "capture, so a child that stops the event cannot blind it")
       .toContain("onPointerMoveCapture");
-    const editor = read("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
+    const editor = editorWithApplyLayer();
     expect(editor, "a ref, never state — this fires on every mouse move")
       .toMatch(/const pointerWorld = useRef</);
     expect(editor).toMatch(/onPointerWorld=\{\(p\) => \{ pointerWorld\.current = p; \}\}/);

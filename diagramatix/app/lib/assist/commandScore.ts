@@ -23,7 +23,8 @@ import { parseCommand } from "./commandGrammar";
 import { resolveRef } from "./resolveRef";
 import type { AssistOp } from "./ops";
 import type { GeneratedCase } from "./commandGenerator";
-import type { DiagramElement } from "../diagram/types";
+import type { DiagramData, DiagramElement } from "../diagram/types";
+import { scoreApply } from "./applyScore";
 
 export type Outcome =
   /** Right ops, right elements. */
@@ -44,7 +45,7 @@ export type Outcome =
   | "ambiguous"
   /** L3b — it resolved, to the wrong element. */
   | "wrong-element"
-  /** L4 — the ops were right and the diagram came out wrong. Deferred. */
+  /** L4 — the ops were right and the diagram came out wrong. */
   | "wrong-edit";
 
 export interface CaseResult {
@@ -223,6 +224,8 @@ export function scoreCase(
   c: GeneratedCase,
   transcript: string | undefined,
   world: readonly DiagramElement[],
+  /** Pass the whole diagram (normally `fixtureDiagram()`) to score L4 as well. */
+  opts: { diagram?: DiagramData } = {},
 ): CaseResult {
   const heard = (transcript ?? c.utterance).trim();
   const textDiffered = transcript !== undefined && !sameWords(transcript, c.utterance);
@@ -266,9 +269,13 @@ export function scoreCase(
     };
   }
 
-  // L4 — whether applying these ops produced the right diagram — is deferred
-  // until `applyAssistOps` comes out of the editor component. The field exists
-  // so the shape does not change when it lands.
+  // L4 — apply the ops the grammar produced to a headless copy of the diagram
+  // and check what came out. Only when the caller hands over a whole diagram:
+  // the element list alone cannot be run through the reducer.
+  if (opts.diagram) {
+    const v = scoreApply(actual, opts.diagram, c.needsSelection);
+    if (!v.ok) return { ...base, actual, outcome: "wrong-edit", detail: v.detail };
+  }
   return {
     ...base, actual,
     outcome: textDiffered ? "pass-despite-mishear" : "pass",

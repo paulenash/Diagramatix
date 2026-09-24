@@ -15,8 +15,9 @@ import { reducer } from "@/app/hooks/useDiagram";
 import { validateOps } from "@/app/lib/assist/ops";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-const editorSrc = () => readFileSync(join(process.cwd(), "app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx"), "utf8");
+const editorSrc = () => editorWithApplyLayer();
 import type { DiagramElement, DiagramData } from "@/app/lib/diagram/types";
+import { editorWithApplyLayer } from "./assistApplySource";
 
 const lane = (id: string, y: number, h: number, parentId?: string): DiagramElement =>
   ({ id, type: "lane", label: id, x: 0, y, width: 800, height: h, parentId, properties: {} }) as unknown as DiagramElement;
