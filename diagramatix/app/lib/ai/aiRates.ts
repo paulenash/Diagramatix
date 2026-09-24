@@ -47,6 +47,32 @@ export function defaultRates(): EffectiveRate[] {
   }));
 }
 
+/**
+ * Is this exactly what the built-in default already says?
+ *
+ * The rate table OVERRIDES pricing.ts, so a row that merely COPIES a default is
+ * not a no-op — it is a private copy of a number that can go stale on its own,
+ * and one did. The editable catalog shipped on 2026-07-23 by saving every rate
+ * on the screen, defaults included, which wrote ten such copies in one
+ * transaction. When Anthropic cancelled the scheduled rise of Claude Sonnet 5
+ * from $2/$10 to $3/$15, correcting pricing.ts changed nothing, because the
+ * copy still said $3/$15 and the copy wins. The AI Usage report went on billing
+ * Sonnet 5 at 1.5x its real cost.
+ *
+ * So the table is kept for GENUINE overrides only — see the PUT handler in
+ * app/api/admin/ai-rates/route.ts, which deletes rather than stores a row that
+ * matches. Compared on the numbers, not on identity: "same as the default" has
+ * to mean the same money.
+ */
+export function matchesDefault(
+  provider: string, model: string, inputPer1M: number, outputPer1M: number,
+): boolean {
+  const p = PRICING[model];
+  if (!p) return false;                       // unpriced: any row is a real choice
+  if (providerOf(model) !== provider) return false;
+  return p.in === inputPer1M && p.out === outputPer1M;
+}
+
 /** Defaults overlaid with any DB overrides (DB wins). Never throws — falls back
  *  to defaults if the table is unavailable. */
 export async function effectiveRates(): Promise<EffectiveRate[]> {

@@ -16,7 +16,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isSuperuser } from "@/app/lib/superuser";
-import { effectiveRates } from "@/app/lib/ai/aiRates";
+import { effectiveRates, matchesDefault } from "@/app/lib/ai/aiRates";
 
 interface RateInput {
   provider?: string;
@@ -65,8 +65,25 @@ export async function PUT(req: Request) {
     }
   }
 
-  await prisma.$transaction(
-    incoming.map((r) =>
+  // A rate that equals the built-in default is NOT stored. The table overrides
+  // pricing.ts, so storing a copy of a default freezes today's number against
+  // tomorrow's correction — which is exactly how Sonnet 5 kept being billed at
+  // $3/$15 after the price went back to $2/$10 (see `matchesDefault`). The
+  // screen posts every row it shows, defaults included, so this is where the
+  // distinction has to be made. Setting a row back to the default DELETES it,
+  // rather than leaving a copy that happens to agree for now.
+  const same = (r: RateInput) =>
+    matchesDefault(r.provider!.trim(), r.model!.trim(), r.inputPer1M!, r.outputPer1M!);
+  const toDrop = incoming.filter(same);
+  const toStore = incoming.filter((r) => !same(r));
+
+  await prisma.$transaction([
+    ...toDrop.map((r) =>
+      prisma.aiModelRate.deleteMany({
+        where: { provider: r.provider!.trim(), model: r.model!.trim() },
+      }),
+    ),
+    ...toStore.map((r) =>
       prisma.aiModelRate.upsert({
         where: { provider_model: { provider: r.provider!.trim(), model: r.model!.trim() } },
         create: {
@@ -83,7 +100,7 @@ export async function PUT(req: Request) {
         },
       }),
     ),
-  );
+  ]);
 
   return NextResponse.json({ rates: await effectiveRates() });
 }

@@ -47,6 +47,13 @@ export const AI_MODELS: AiModel[] = [
   // snapshots, not floating aliases — "Fable 5" will never quietly become 5.1.
   { id: "claude-fable-5-1", label: "Fable 5.1", vision: true },
   { id: "claude-fable-5", label: "Fable 5", vision: true },
+  // Opus 5.5 (2026-09-21), added 2026-09-25 after checking /v1/models against
+  // the account's own key rather than trusting a docs page: `claude-opus-5-5`,
+  // 1M input, 128k output, `image_input` supported, and a smoke call answered.
+  // It is both NEWER and CHEAPER than Opus 5 — $4/$20 against $5/$25 — which is
+  // unusual enough to be worth writing down, because it means the cost gate
+  // does not stop an ordinary user reaching it.
+  { id: "claude-opus-5-5", label: "Opus 5.5", vision: true },
   { id: "claude-opus-5", label: "Opus 5", vision: true },
   { id: "claude-opus-4-8", label: "Opus 4.8", vision: true },
   { id: "claude-sonnet-5", label: "Sonnet 5", vision: true },

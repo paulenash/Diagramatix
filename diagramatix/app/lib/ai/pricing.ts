@@ -39,9 +39,18 @@ export const PRICING: Record<string, ModelPrice> = {
   // cost gate rather than raising the ceiling.
   "claude-fable-5-1": { in: 10, out: 50 },
   "claude-fable-5": { in: 10, out: 50 },
+  // Opus 5.5 undercuts Opus 5 — $4/$20 against $5/$25 — so the newer model is
+  // also the cheaper one. Read from platform.claude.com/docs/en/about-claude/pricing
+  // and claude.com/pricing, both 2026-09-25.
+  "claude-opus-5-5": { in: 4, out: 20 },
   "claude-opus-5": { in: 5, out: 25 },
   "claude-opus-4-8": { in: 5, out: 25 },
-  "claude-sonnet-5": { in: 3, out: 15, note: "intro $2 / $10 through 2026-08-31" },
+  // Was recorded here as $3 / $15 with a note calling $2 / $10 an introductory
+  // price "through 2026-08-31". Checked 2026-09-25: the scheduled rise to
+  // $3 / $15 on 1 September WAS CANCELLED and $2 / $10 is now the standard
+  // price, so the number here was not merely stale, it was wrong — the AI Usage
+  // report was billing Sonnet 5 at 1.5x its real cost.
+  "claude-sonnet-5": { in: 2, out: 10 },
   "claude-haiku-4-5-20251001": { in: 1, out: 5 },
   // Kimi / Moonshot — international USD (platform.kimi.ai). These three are the
   // current default lineup; the rest are priced for reference if registered via
