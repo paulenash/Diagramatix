@@ -28,14 +28,19 @@ export interface DictationCallbacks {
   keyterms?: readonly string[];
 }
 import { createPcmQueue, PCM_QUEUE_MAX_CHUNKS } from "./pcmQueue";
-import { MAX_DIAGRAM_KEYTERMS } from "./diagramKeyterms";
+import { liveStreamParams, ASR_LANGUAGE } from "./asrParams";
 import { tokenOutcome, type TokenOutcome } from "./tokenOutcome";
 
 export interface DictationHandle {
   stop(): void;
 }
 
-const LANG = "en-AU";
+// The browser fallback speaks the same language as the cloud recogniser. It
+// named it separately until 2026-09-24, which is exactly the two-places-one-rule
+// drift `asrParams` exists to remove — an AU setting changed in one place and
+// not the other would be invisible until somebody noticed the fallback hearing
+// differently.
+const LANG = ASR_LANGUAGE;
 
 export interface DictationDiagnostics {
   secureContext: boolean;
@@ -178,47 +183,10 @@ async function startDeepgram(token: string, scheme: string, cb: DictationCallbac
   // iOS Safari can start an AudioContext in "suspended" state; resume it (we're
   // inside a user gesture) so the mic actually captures on a phone.
   if (ctx.state === "suspended") { try { await ctx.resume(); } catch { /* best-effort */ } }
-  const params = new URLSearchParams({
-    model: "nova-2",
-    encoding: "linear16",
-    sample_rate: String(Math.round(ctx.sampleRate)),
-    channels: "1",
-    interim_results: "true",
-    smart_format: "true",
-    punctuate: "true",
-    // Australian English — the default "en" leans US and mis-hears AU vowels.
-    language: "en-AU",
-    // Wait ~0.8s of silence before finalising a segment, so one paused sentence
-    // arrives as fewer, larger finals instead of many fragments to re-stitch.
-    endpointing: "800",
-  });
-  // Bias recognition toward the command vocabulary so "lane"≠"line", "pool"≠
-  // "poll"/"pull", etc. (Deepgram `keywords`, with a boost on the confusable ones.)
-  // NUMBER WORDS ARE DELIBERATELY NOT BOOSTED HERE (Paul, 2026-09-18: "Turn is
-  // often heard as Ten"). They were, for one day: `lane:3` was beating "one" on
-  // a numbered pick, so the numbers went in to compete with it. That fixed the
-  // pick and broke ordinary speech everywhere else — boosting "ten" makes the
-  // recogniser reach for it, and "turn on gold flashing" came back as "ten on
-  // gold flashing".
-  //
-  // Numbers matter in exactly one place: while numbered badges are on screen.
-  // Deepgram's keyword list is fixed when the socket opens and a pick flow
-  // starts long after that, so the elevation cannot live here — it lives in the
-  // pick handler instead (assist/spokenNumber.ts), which is only consulted
-  // while a pick is open and is therefore scoped to precisely when the numbers
-  // are being shown. That is also why `lane:3` can stay: the pick handler
-  // undoes it, and nothing else in the language needs protecting from it.
-  for (const kw of ["lane:3", "sublane:3", "pool:3", "gateway:2", "task:2", "subprocess:2",
-    "selected:3", "selection:2",
-    "boundary", "connect", "rename", "delete", "compact", "Voice Assist"]) {
-    params.append("keywords", kw);
-  }
-  // V1: this diagram's own names, after the command words and WITHOUT a boost
-  // suffix. The caller has already filtered them (diagramKeyterms); the cap is
-  // applied again here so a careless caller cannot drown the command words.
-  for (const term of (cb.keyterms ?? []).slice(0, MAX_DIAGRAM_KEYTERMS)) {
-    if (term.trim()) params.append("keywords", term.trim());
-  }
+  // Every recogniser setting — model, language, endpointing, and the keyword
+  // boosts with their long-won reasoning — lives in `asrParams.ts`, so the live
+  // microphone and a replayed clip cannot drift apart. (2026-09-24.)
+  const params = liveStreamParams({ sampleRate: ctx.sampleRate, keyterms: cb.keyterms });
   const ws = new WebSocket(`wss://api.deepgram.com/v1/listen?${params.toString()}`, [scheme, token]);
   ws.binaryType = "arraybuffer";
 

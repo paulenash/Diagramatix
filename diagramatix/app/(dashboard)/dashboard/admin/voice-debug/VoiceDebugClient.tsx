@@ -10,6 +10,7 @@
  * Plain elements and Tailwind, no component library (house rule).
  */
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import type { CommandLogEntry } from "@/app/lib/assist/commandLog";
 import { describeTouched } from "@/app/lib/assist/commandLog";
 
@@ -108,24 +109,34 @@ export function VoiceDebugClient() {
   };
 
   return (
-    <div className="p-6 max-w-6xl">
-      <h1 className="text-xl font-semibold text-gray-800 mb-1">Voice Assist — debug sessions</h1>
-      <p className="text-xs text-gray-500 mb-4 max-w-3xl">
-        Sessions recorded from the editor with <strong>debug</strong> on. A <span className="px-1 rounded bg-red-100 text-red-700">dispute</span> is a
-        command that reported success and was marked <em>wrong</em> by the person watching — the failure no automated test can find,
-        because the system believes it passed.
-      </p>
+    // A COLUMN THAT OWNS THE VIEWPORT. The list and the opened session both
+    // grow without bound, and a page that only scrolls as a whole pushes the
+    // filter and the Back link off the top just when they are wanted. The panel
+    // stays put; everything below it scrolls in its own right.
+    <div className="flex flex-col h-[calc(100vh-4rem)] p-6 max-w-6xl">
+      <div className="shrink-0">
+        <div className="flex items-center gap-3 mb-1">
+          <Link href="/dashboard/admin" className="text-xs text-gray-500 hover:text-gray-700">← SuperAdmin</Link>
+        </div>
+        <h1 className="text-xl font-semibold text-gray-800 mb-1">Voice Assist — debug sessions</h1>
+        <p className="text-xs text-gray-500 mb-4 max-w-3xl">
+          Sessions recorded from the editor with <strong>debug</strong> on. A <span className="px-1 rounded bg-red-100 text-red-700">dispute</span> is a
+          command that reported success and was marked <em>wrong</em> by the person watching — the failure no automated test can find,
+          because the system believes it passed.
+        </p>
 
-      <div className="flex items-center gap-3 mb-3">
-        <label className="flex items-center gap-1.5 text-xs text-gray-700">
-          <input type="checkbox" checked={disputedOnly} onChange={(e) => setDisputedOnly(e.target.checked)} />
-          only sessions with disputes
-        </label>
-        <button onClick={() => { void load(); }} className="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50">Refresh</button>
-        {busy && <span className="text-xs text-gray-400">working…</span>}
-        {err && <span className="text-xs text-red-600">{err}</span>}
+        <div className="flex items-center gap-3 mb-3">
+          <label className="flex items-center gap-1.5 text-xs text-gray-700">
+            <input type="checkbox" checked={disputedOnly} onChange={(e) => setDisputedOnly(e.target.checked)} />
+            only sessions with disputes
+          </label>
+          <button onClick={() => { void load(); }} className="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50">Refresh</button>
+          {busy && <span className="text-xs text-gray-400">working…</span>}
+          {err && <span className="text-xs text-red-600">{err}</span>}
+        </div>
       </div>
 
+      <div className="flex-1 min-h-0 overflow-y-auto pr-1">
       {rows === null ? (
         <p className="text-sm text-gray-400">Loading…</p>
       ) : rows.length === 0 ? (
@@ -236,6 +247,7 @@ export function VoiceDebugClient() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

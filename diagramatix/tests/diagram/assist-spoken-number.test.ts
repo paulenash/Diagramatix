@@ -68,7 +68,9 @@ describe("reading the number off a spoken pick", () => {
     expect(editor, "the pick handler must go through the shared reader").toMatch(/const picked = leadingSpokenNumber\(t\);/);
     expect(editor, "and take the name from the same result").toMatch(/const trailing = picked\.rest;/);
 
-    const dictation = readFileSync(join(process.cwd(), "app/lib/dictation/index.ts"), "utf8");
+    // The keyword list lives in `asrParams.ts` since 2026-09-24 (one rule, one
+    // place, so a replayed clip measures the live configuration).
+    const dictation = readFileSync(join(process.cwd(), "app/lib/dictation/asrParams.ts"), "utf8");
     // The number words are deliberately NOT boosted at the recogniser any more
     // (Paul, 2026-09-18: Turn is often heard as Ten). Boosting them fixed the
     // numbered pick and broke ordinary speech everywhere else. Numbers matter

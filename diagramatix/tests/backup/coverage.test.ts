@@ -113,6 +113,12 @@ const SCOPED_OMITTED = new Set<string>([
   // moves between environments as a file rather than as backup rows.
   // The full SuperAdmin backup still takes both, since it reads the live schema.
   "VoiceDebugSession", "VoiceDebugSnapshot",
+  // The recorded voice corpus. Same argument again, and a stronger one: these
+  // rows are twenty minutes of one person's VOICE, recorded as test material.
+  // They belong to the environment that recorded them, they are tied to no org,
+  // and restoring somebody's speech into another tenant's backup is not a thing
+  // this product should ever do by accident.
+  "VoiceClip",
 
   // Grant/membership tables (like ProjectShare + the bundle audiences, and now
   // admin-managed team membership) — carried by the full SuperAdmin backup only,

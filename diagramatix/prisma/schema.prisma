@@ -2507,3 +2507,58 @@ model VoiceDebugSnapshot {
 
   @@index([sessionId, takenAt])
 }
+
+/// One recorded utterance: a sentence from the generated corpus, said aloud.
+///
+/// Deliberately outside the retention rules, like HarnessCase and
+/// VoiceDebugSession: this is our own test material and **twenty minutes of a
+/// person's voice lives in this table**. A corpus that can be purged is not a
+/// corpus.
+///
+/// `utterance` and `expectedOps` are DENORMALISED onto the clip on purpose.
+/// The obvious design stores a case id and looks the answer up — and the first
+/// time the generator changes, every case id shifts and a hundred clips
+/// silently lose the answers they were recorded against. A self-describing clip
+/// survives a generator change; a reference does not. This is the second
+/// largest hazard in the plan after the capture format, and this field is the
+/// whole mitigation.
+model VoiceClip {
+  id String @id @default(cuid())
+
+  /// Which corpus run this was read from, and which case within it.
+  corpusSeed  String
+  caseId      String
+  family      String @default("")
+  /// The sentence as it was read aloud.
+  utterance   String @db.Text
+  /// The ops it should produce — carried with the clip, not looked up.
+  expectedOps String @db.Text
+
+  /// Raw 16-bit PCM WAV, byte-identical to what the live socket would receive.
+  audioBytes Bytes?
+  mimeType   String @default("audio/wav")
+  sampleRate Int
+  durationMs Int
+  byteSize   Int
+  /// 0–100. Catches the silent take — the likeliest way to lose a session.
+  peakLevel  Int    @default(0)
+
+  /// A retake is take 2, never an overwrite: destroying a good take to store a
+  /// worse one is not a thing this table will do.
+  takeNumber Int     @default(1)
+  starred    Boolean @default(false)
+
+  recordedById   String?
+  recordedAt     DateTime @default(now())
+  /// Which recogniser configuration this was recorded under (asrFingerprint).
+  asrFingerprint String?
+
+  lastTranscript String?   @db.Text
+  lastOutcome    String?
+  lastRunAt      DateTime?
+  runCount       Int       @default(0)
+
+  @@unique([corpusSeed, caseId, takeNumber])
+  @@index([corpusSeed, caseId])
+  @@index([recordedById, recordedAt])
+}

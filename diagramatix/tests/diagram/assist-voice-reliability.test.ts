@@ -100,9 +100,12 @@ describe("T4574 — V1 sends this diagram's names, timidly", () => {
   });
 
   it("is sent AFTER the command words, and capped again at the wire", () => {
-    const src = read("app", "lib", "dictation", "index.ts");
-    const commands = src.indexOf('params.append("keywords", kw)');
-    const terms = src.indexOf("cb.keyterms ?? []");
+    // Both loops moved into `asrParams.appendKeyterms` on 2026-09-24, so the
+    // live socket and a replayed clip build the same list. The ordering rule
+    // is unchanged — only where it is written down.
+    const src = read("app", "lib", "dictation", "asrParams.ts");
+    const commands = src.indexOf('p.append("keywords", kw)');
+    const terms = src.indexOf("keyterms ?? []");
     expect(commands).toBeGreaterThan(-1);
     expect(terms, "diagram names come after the command vocabulary").toBeGreaterThan(commands);
     expect(src, "a careless caller cannot drown the command words")

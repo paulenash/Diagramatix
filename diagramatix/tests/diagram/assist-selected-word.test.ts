@@ -142,7 +142,10 @@ describe("T4469 — the recogniser is told to expect the word", () => {
     // The parser repair is the second line of defence. This is the first: if
     // `connect` is boosted and `selected` is not, the recogniser will keep
     // preferring it and every repair is a guess made after the fact.
-    const src = readFileSync(join(process.cwd(), "app", "lib", "dictation", "index.ts"), "utf8");
+    // The boost list moved to `asrParams.ts` on 2026-09-24, so the live socket
+    // and a replayed clip cannot ask for different things. The rule is the same;
+    // only its address changed.
+    const src = readFileSync(join(process.cwd(), "app", "lib", "dictation", "asrParams.ts"), "utf8");
     const weight = (word: string): number => {
       const m = src.match(new RegExp(`"${word}(?::(\\d+))?"`));
       expect(m, `${word} is not in the keyword boost list`).not.toBeNull();

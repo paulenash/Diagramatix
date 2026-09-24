@@ -10,6 +10,7 @@
  */
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { batchParams } from "@/app/lib/dictation/asrParams";
 import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
 
 const DG = "https://api.deepgram.com/v1/listen";
@@ -41,13 +42,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Audio too large (max 40 MB)." }, { status: 413 });
   }
 
-  const params = new URLSearchParams({
-    model: "nova-2",
-    smart_format: "true",
-    punctuate: "true",
-    diarize: "true",
-    utterances: "true",
-  });
+  // A MEETING RECORDING: speaker-labelled, and no command-word bias — biasing a
+  // discussion about invoicing toward the word "lane" would be actively
+  // harmful. Built from the shared settings so the model and the language
+  // cannot drift from the live microphone's. (2026-09-24.)
+  //
+  // NOTE this now sends `language=en-AU`, which it did not before. Deliberate:
+  // this is an Australian product and Deepgram's default leans US. Named here
+  // and covered by its own test rather than smuggled in with a refactor.
+  const params = batchParams({ diarize: true, utterances: true });
   try {
     const dg = await fetch(`${DG}?${params.toString()}`, {
       method: "POST",
