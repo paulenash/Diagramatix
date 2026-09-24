@@ -5854,7 +5854,20 @@ export function DiagramEditor({
               // be off-screen. Pointer-transparent, so it can never sit
               // between the mouse and the row it is describing.
               <div
-                className="absolute top-full mt-1 right-full mr-2 w-[22rem] bg-white border border-gray-200 rounded shadow-lg z-50 p-3 pointer-events-none"
+                // CLEAR OF THE MENU, ALWAYS. Paul, 2026-09-24: "The hover large
+                // template image appears under the drop down template menu.
+                // This image must always be clear of the drop-down menu itself.
+                // Further to the left is fine."
+                //
+                // `right-full` was not enough: the menu is 20rem wide and
+                // anchored to the RIGHT of this wrapper, so it reaches far to
+                // the left of the wrapper itself and the preview landed behind
+                // it. The offset is measured from the same right edge the menu
+                // is measured from — the menu's own width plus a gap — so the
+                // two cannot overlap however wide the wrapper is. A higher
+                // z-index as well, so it is never painted under.
+                style={{ right: "calc(20rem + 0.75rem)" }}
+                className="absolute top-full mt-1 w-[22rem] bg-white border border-gray-200 rounded shadow-lg z-[60] p-3 pointer-events-none"
                 data-template-preview="large"
               >
                 <div className="flex items-center justify-center h-[220px] overflow-hidden">

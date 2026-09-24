@@ -3659,6 +3659,47 @@ function reducerWithPasses(state: DiagramData, action: Action): DiagramData {
     const placed = labelsFollowTheirSegments(state.connectors, next.connectors);
     if (placed !== next.connectors) next = { ...next, connectors: placed };
   }
+  // A POOL CHANGING WIDTH NEVER DRAGS ITS MESSAGES.
+  //
+  // Paul, 2026-09-23/24, of the right boundary: "any message originating on
+  // pools that were extended to the right also move to the right. This is
+  // incorrect behaviour." Two code paths already pin the attachments — the
+  // resize branch and the white-box lockstep — and both hold up under test.
+  // Neither of us could reproduce it, which is the point of doing it here
+  // instead: a message's x is derived from a FRACTION of the pool's width, so
+  // ANY path that changes that width and then recomputes moves the message,
+  // and there are more of those than the two that remember to pin
+  // (ensureContainersEncloseChildren, Extend pools, a layout re-run, an
+  // import). The rule belongs to the width change, not to the paths.
+  //
+  // A pool that MOVES is the opposite case and is left alone: its messages
+  // travel with it, which is what makes a pool drag work.
+  {
+    const widened: Map<string, DiagramElement> = new Map();
+    for (const after of next.elements) {
+      if (after.type !== "pool") continue;
+      const was = state.elements.find((e) => e.id === after.id);
+      if (!was || was === after) continue;
+      if (was.width !== after.width) widened.set(after.id, was);
+    }
+    if (widened.size) {
+      const oldById = new Map(state.elements.map((e) => [e.id, e] as const));
+      const origById = new Map(state.connectors.map((c) => [c.id, c] as const));
+      const changed = new Set(widened.keys());
+      let touched = false;
+      const pinned = next.connectors.map((conn) => {
+        if (conn.type !== "messageBPMN") return conn;
+        if (!changed.has(conn.sourceId) && !changed.has(conn.targetId)) return conn;
+        const orig = origById.get(conn.id);
+        if (!orig) return conn;
+        const held = pinPoolMessageEnds(conn, orig, oldById, next.elements, changed);
+        const recomputed = recomputeAllConnectors([held], next.elements, next.relaxedLayout)[0] ?? held;
+        if (recomputed !== conn) touched = true;
+        return recomputed;
+      });
+      if (touched) next = { ...next, connectors: pinned };
+    }
+  }
   // Note: this deliberately does NOT skip when the core reducer returned state
   // unchanged. RESIZE_END / MOVE_END are commit markers that often produce no
   // state change of their own, yet they are exactly the moment a drag's final
@@ -3675,7 +3716,12 @@ function reducerWithPasses(state: DiagramData, action: Action): DiagramData {
   if (action.type === "MOVE_END" && action.payload.preDrag) {
     const { elements: wasEls, connectors: wasConns } = action.payload.preDrag;
     const moved = movedElementIds(wasEls, next.elements);
-    const settled = settleMessageLabels(next.connectors, wasConns, moved);
+    // Only a moved POOL carries its message labels with it; a task moving
+    // inside its lane leaves them where they are (Paul, 2026-09-24).
+    const movedPools = new Set(
+      [...moved].filter((id) => next.elements.find((e) => e.id === id)?.type === "pool"),
+    );
+    const settled = settleMessageLabels(next.connectors, wasConns, moved, movedPools);
     if (settled !== next.connectors) return { ...next, connectors: settled };
   }
   return next;

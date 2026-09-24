@@ -124,6 +124,11 @@ export function settleMessageLabels(
   connectors: Connector[],
   beforeConnectors: Connector[],
   movedIds: Set<string>,
+  /**
+   * Which of the moved things are POOLS. A label travels with a pool and with
+   * nothing else — see below.
+   */
+  movedPoolIds: Set<string> = movedIds,
 ): Connector[] {
   if (movedIds.size === 0) return connectors;
   const before = new Map(beforeConnectors.map((c) => [c.id, c]));
@@ -135,15 +140,60 @@ export function settleMessageLabels(
     const srcMoved = movedIds.has(conn.sourceId);
     const tgtMoved = movedIds.has(conn.targetId);
     if (!srcMoved && !tgtMoved) return conn;
-    // Both ends moving is a rigid translation as far as the label is concerned,
-    // and either end gives the same answer; source keeps it deterministic.
-    const offsets = preserveMessageLabel(conn, prev, srcMoved ? "source" : "target");
+    // A LABEL TRAVELS WITH A POOL, AND WITH NOTHING ELSE.
+    //
+    // Paul, 2026-09-24: "Moving a Task up or down, in a white-box pool, that
+    // has messages attached to it causes the message labels to move up or
+    // down. In either of these circumstances the message labels should not
+    // move at all."
+    //
+    // The rule below anchors the label to the end that MOVED, which is right
+    // when the whole participant moves — the pool, its lane, its contents and
+    // the label all travel together, and the label keeps its place on the
+    // pool. It is wrong when a task inside the pool moves: the pool has not
+    // gone anywhere, the label is placed against the pool, and following the
+    // task drags it off the position the modeller chose.
+    //
+    // So the anchor is a moved POOL if there is one, and otherwise the label
+    // holds its world position.
+    const srcPool = movedPoolIds.has(conn.sourceId);
+    const tgtPool = movedPoolIds.has(conn.targetId);
+    const offsets = srcPool || tgtPool
+      ? preserveMessageLabel(conn, prev, srcPool ? "source" : "target")
+      : holdMessageLabel(conn, prev);
     if (!offsets) return conn;
     if (offsets.labelOffsetX === conn.labelOffsetX && offsets.labelOffsetY === conn.labelOffsetY) return conn;
     changed = true;
     return { ...conn, ...offsets };
   });
   return changed ? out : connectors;
+}
+
+/**
+ * Keep a label exactly where it is on the canvas while the line under it
+ * changes — the offset is re-expressed against the new midpoint so the world
+ * position is unchanged.
+ *
+ * This is what a message label does when something OTHER than its pool moves
+ * (Paul, 2026-09-24): a task sliding up or down inside its lane redraws the
+ * message, and the words naming it stay put.
+ */
+export function holdMessageLabel(conn: Connector, before: Connector): LabelOffsets | null {
+  if (!conn.label) return null;
+  if (before.waypoints.length < 2 || conn.waypoints.length < 2) return null;
+  const [bs, bt] = endIndices(before);
+  const [ns, nt] = endIndices(conn);
+  const oldSrc = before.waypoints[bs], oldTgt = before.waypoints[bt];
+  const newSrc = conn.waypoints[ns], newTgt = conn.waypoints[nt];
+  if (!oldSrc || !oldTgt || !newSrc || !newTgt) return null;
+  const oldMidX = (oldSrc.x + oldTgt.x) / 2;
+  const oldMidY = (oldSrc.y + oldTgt.y) / 2;
+  const newMidX = (newSrc.x + newTgt.x) / 2;
+  const newMidY = (newSrc.y + newTgt.y) / 2;
+  return {
+    labelOffsetX: (oldMidX + (before.labelOffsetX ?? 0)) - newMidX,
+    labelOffsetY: (oldMidY + (before.labelOffsetY ?? 0)) - newMidY,
+  };
 }
 
 /** Which elements a gesture actually moved, by comparing before and after. */
