@@ -4322,6 +4322,46 @@ export function DiagramEditor({
           stopAbraListening();
           return;
         }
+        // A RELIABLE WAY OUT, WITHOUT STOPPING THE MICROPHONE.
+        //
+        // Paul, 2026-09-25: "I can't reliably exit the command after it
+        // mis-hears. It keeps adding words like 'stop', 'done', 'cancel' and
+        // 'exit'. The only way out is to stop and restart."
+        //
+        // Exactly so, and here is the mechanism. A mis-hear leaves a half
+        // command in the buffer — "rename Task 8 to" — which `isIncompleteCommand`
+        // then HOLDS, waiting up to three times 3.2s for the rest of the
+        // sentence. Every word said during that hold is appended, including the
+        // one meant to escape: "rename Task 8 to" + "cancel" becomes a complete
+        // command that renames the element to "Cancel". The escape word was
+        // being eaten by the thing it was trying to escape.
+        //
+        // `isMicStopWord` was already checked HERE, at the fragment, before the
+        // buffer can swallow it — which is why "stop" worked and nothing else
+        // did. A flow-end word now gets the same treatment: the buffer is
+        // dropped unexamined, the pending flush is cancelled, and the word goes
+        // on to close whatever is open.
+        if (isFlowEndWord(txt)) {
+          voiceBuffer.current = "";
+          voiceWaits.current = 0;
+          if (voiceFlushTimer.current) { clearTimeout(voiceFlushTimer.current); voiceFlushTimer.current = null; }
+          setVoiceInterim("");
+          const anythingOpen = !!(renameFlowRef.current || messageFlowRef.current
+            || templateFlowRef.current || pickFlowRef.current || pendingConfirmRef.current);
+          if (anythingOpen) {
+            // Let the runner close it properly — each flow has its own tidy-up.
+            void runAbraCommandRef.current(txt);
+          } else {
+            // Nothing open: the half-command is already gone, which IS the
+            // reset. Say so rather than sending a bare "cancel" to the AI,
+            // which would cost a metered call to accomplish nothing.
+            setVoiceLog((prev) => [...prev, {
+              id: nanoid(), at: Date.now(), heard: txt,
+              summary: "cleared — listening for the next command", ok: true,
+            }]);
+          }
+          return;
+        }
         // Accumulate this fragment and restart the silence timer. A fresh
         // fragment may complete a held command, so re-evaluate from scratch.
         voiceBuffer.current = (voiceBuffer.current ? voiceBuffer.current + " " : "") + txt;

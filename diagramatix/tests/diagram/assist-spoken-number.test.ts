@@ -78,8 +78,13 @@ describe("reading the number off a spoken pick", () => {
     // the socket opens, so the elevation lives in the pick handler instead —
     // which is consulted only during a pick, and is therefore scoped to exactly
     // when the numbers are being shown. See T4491.
+    // 2026-09-25: the whole keyword list is now empty — measured at 80% with it
+    // and 92% without — so "number words are not boosted" is true by a stronger
+    // rule: NOTHING is boosted. The pick-handler elevation is what makes a
+    // numbered answer work, and it is tested above.
     expect(dictation, "number words must not be boosted globally").not.toMatch(/"one:3"/);
     expect(dictation, "nor any of the others").not.toMatch(/"ten:2"/);
-    expect(dictation, "but the lane boost still is — the pick handler undoes it").toMatch(/"lane:3"/);
+    const list = dictation.slice(dictation.indexOf("export const COMMAND_KEYWORDS"), dictation.indexOf("function appendKeyterms"));
+    expect(list, "nothing is boosted at all any more").not.toMatch(/"[a-z]+(?::d)?"/i);
   });
 });

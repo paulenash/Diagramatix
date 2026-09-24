@@ -266,7 +266,7 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   m = raw.match(/^label\s+(?:the\s+)?(?:selected|selection|this|that)(?:\s+(?:connector|flow|arrow|line|link))?(?:\s+(?:as|with|to))?(?:\s+(.+))?$/i);
   if (m) return [{ op: "labelSelected", ...(m[1] ? { label: capitaliseFirstWord(clean(m[1])) } : {}) }];
 
-  m = raw.match(/^(?:rename|relabel|edit|label)\s+(?:a\s+|an\s+|the\s+|all\s+)?(pools?|sub-?lanes?|lanes?|messages?|tasks?|activit(?:y|ies)|steps?|subprocess(?:es)?|sub-?process(?:es)?|gateways?|decisions?|events?|connectors?|sequence(?:\s+flows?)?|flows?)\s*$/i);
+  m = raw.match(/^(?:rename|relabel|edit|label)\s+(?:a\s+|an\s+|the\s+|all\s+)?(pools?|polls?|pulls?|sub-?lanes?|sub-?lines?|lanes?|lines?|messages??|sub-?lanes?|lanes?|messages?|tasks?|activit(?:y|ies)|steps?|subprocess(?:es)?|sub-?process(?:es)?|gateways?|decisions?|events?|connectors?|sequence(?:\s+flows?)?|flows?)\s*$/i);
   if (m) {
     const rt = parseRenameType(m[1]);
     if (rt) return [{ op: "renameByType", itemType: rt }];

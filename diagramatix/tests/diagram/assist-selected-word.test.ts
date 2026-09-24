@@ -138,20 +138,23 @@ describe("T4468 — the repaired utterance parses as the user meant it", () => {
 });
 
 describe("T4469 — the recogniser is told to expect the word", () => {
-  it("boosts 'selected' at least as strongly as the word it loses to", () => {
-    // The parser repair is the second line of defence. This is the first: if
-    // `connect` is boosted and `selected` is not, the recogniser will keep
-    // preferring it and every repair is a guess made after the fact.
-    // The boost list moved to `asrParams.ts` on 2026-09-24, so the live socket
-    // and a replayed clip cannot ask for different things. The rule is the same;
-    // only its address changed.
+  it("the parser repair is now the ONLY defence, because boosting made it worse", () => {
+    // This used to assert that `selected` was boosted at least as hard as
+    // `connect` — the recogniser's half of the fix, with the parser repair as
+    // the second line of defence.
+    //
+    // Measured on 2026-09-25 against 100 recorded commands, that half was doing
+    // harm: `selected:3` was caught turning "delete Review" into "SELECTED
+    // review", and the keyword list as a whole scored 80% where an empty list
+    // scored 92%. The boost is gone; the repair stands alone and is tested
+    // above, on real transcripts.
     const src = readFileSync(join(process.cwd(), "app", "lib", "dictation", "asrParams.ts"), "utf8");
-    const weight = (word: string): number => {
-      const m = src.match(new RegExp(`"${word}(?::(\\d+))?"`));
-      expect(m, `${word} is not in the keyword boost list`).not.toBeNull();
-      return m![1] ? Number(m![1]) : 1;
-    };
-    expect(weight("selected")).toBeGreaterThanOrEqual(weight("connect"));
+    const list = src.slice(src.indexOf("export const COMMAND_KEYWORDS"), src.indexOf("function appendKeyterms"));
+    expect(list, "no word may be boosted without a measurement").not.toMatch(/"[a-z]+(?::\d)?"/i);
+    expect(src, "and the reason is recorded where the next person will look")
+      .toMatch(/NO KEYWORDS AT ALL\s+92%/);
+    // The repair itself is what protects the word now.
+    expect(repairSelectedWord("rename connect pool to Finance").corrected, "the repair still fires").toBe(true);
   });
 });
 

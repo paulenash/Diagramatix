@@ -36,28 +36,67 @@ export { MAX_DIAGRAM_KEYTERMS } from "./diagramKeyterms";
 import { MAX_DIAGRAM_KEYTERMS } from "./diagramKeyterms";
 
 /**
- * Bias recognition toward the command vocabulary so "lane" ≠ "line", "pool" ≠
- * "poll"/"pull", and so on.
+ * No keyword bias. **This list is empty because it was measured, and every
+ * version of it made recognition worse.**
  *
- * NUMBER WORDS ARE DELIBERATELY NOT BOOSTED (Paul, 2026-09-18: "Turn is often
- * heard as Ten"). They were, for exactly one day: `lane:3` was beating "one" on
- * a numbered pick, so the numbers went in to compete with it. That fixed the
- * pick and broke ordinary speech everywhere else — boosting "ten" makes the
- * recogniser reach for it, and "turn on gold flashing" came back as "ten on
- * gold flashing".
+ * ─── The measurement (2026-09-25) ──────────────────────────────────────────
  *
- * Numbers matter in exactly one place: while numbered badges are on screen.
- * Deepgram's keyword list is fixed when the socket opens and a pick flow starts
- * long after that, so the elevation cannot live here — it lives in the pick
- * handler instead (`assist/spokenNumber.ts`), which is only consulted while a
- * pick is open and is therefore scoped to precisely when the numbers are being
- * shown. That is also why `lane:3` can stay: the pick handler undoes it, and
- * nothing else in the language needs protecting from it.
+ * 100 recorded commands in Paul's own voice, replayed through Deepgram, scored
+ * four ways. Batch leg, same corpus, same everything else:
+ *
+ *     shipped list (lane:3, selected:3, …)   80%
+ *     containers unweighted, with plurals    88%
+ *     containers + "safe" verbs, unweighted  89%
+ *     NO KEYWORDS AT ALL                     92%
+ *
+ * ─── Why, mechanically ─────────────────────────────────────────────────────
+ *
+ * `keywords=lane:3` does not mean "recognise 'lane' when it is spoken". It
+ * means "be more willing to OUTPUT 'lane'" — so the model reaches for it, and
+ * words that sound nothing like it lose:
+ *
+ *     "make Sales a script task"   → "LANE sales a script task"   (×3)
+ *     "swap Lane 1 with Lane 2"    → "SUBLANE one with lane two"
+ *     "delete Review"              → "SELECTED review"
+ *     "…labelled Quality Check"    → "…LANE quantity check"
+ *     "add two sublanes"           → "add two LANE"  (the singular eats its plural)
+ *
+ * Dropping the weights did NOT fix it: at weight 1 the container nouns still
+ * ate "make", "swap" and "labelled". It is not the weighting, it is the
+ * presence of the words.
+ *
+ * ─── And it never did the job it was added for ─────────────────────────────
+ *
+ * `lane:3` existed to stop "lane" being heard as "line". With it, "rename
+ * lanes" STILL came back "rename lines" — twice. The corpus holds two takes of
+ * that sentence, one heard correctly and one not, which says the lane/line
+ * confusion is a coin-flip on the Australian FACE vowel rather than something a
+ * boost can settle. `language=en-AU`, `en-US`, `en-GB` and `en` all return
+ * identical transcripts, so the locale is not the lever either.
+ *
+ * THE FIX LIVES IN THE PARSER INSTEAD, where it costs nothing and can drag no
+ * other word with it (Paul, 2026-09-25: "the word 'line' is never actually
+ * likely in a business process context — perhaps all 'lines' should just be
+ * interpreted as 'lanes'"). `assist/containerWords.ts` folds line→lane,
+ * poll/pull→pool and the rest AFTER recognition. That is the right layer.
+ *
+ * ─── Before adding anything here again ─────────────────────────────────────
+ *
+ * Measure it. `/dashboard/admin/voice-assist-test` → Replay → the boost-profile
+ * selector runs a candidate list over the recorded corpus in about three
+ * minutes. Every entry that was ever in this list was added in good faith to
+ * fix a real mis-hear, and every one of them was added while local voice was
+ * silently falling back to the BROWSER recogniser — so none had ever met the
+ * recogniser it was configuring.
+ *
+ * (Historical note, kept because it is the same lesson twice: number words were
+ * briefly boosted so "one" could win a numbered pick against `lane:3`. It fixed
+ * the pick and broke ordinary speech — "turn on gold flashing" came back as
+ * "ten on gold flashing". The number elevation lives in `assist/spokenNumber.ts`,
+ * consulted only while a pick is on screen.)
  */
 export const COMMAND_KEYWORDS: readonly string[] = [
-  "lane:3", "sublane:3", "pool:3", "gateway:2", "task:2", "subprocess:2",
-  "selected:3", "selection:2",
-  "boundary", "connect", "rename", "delete", "compact", "Voice Assist",
+  // DELIBERATELY EMPTY — measured, not assumed. See below.
 ];
 
 /**
@@ -95,8 +134,20 @@ export function liveStreamParams(o: {
     sample_rate: String(Math.round(o.sampleRate)),
     channels: "1",
     interim_results: "true",
-    smart_format: "true",
-    punctuate: "true",
+    // NO PROSE FORMATTING ON THE COMMAND PATH (2026-09-25). `smart_format` and
+    // `punctuate` exist to make a transcript READABLE — capitals, full stops,
+    // tidied numbers. A command parser wants none of that, and the corpus
+    // showed the punctuation actively breaking commands: a full stop dropped
+    // mid-sentence ("Move pool three. Top boundary down." — the reference then
+    // resolved to nothing), a comma LOST from a list of lane names, and commas
+    // inserted that made a reference ambiguous. Three of the eight remaining
+    // failures were punctuation rather than words.
+    //
+    // It changes no WORDS: an A/B on the same clip returned the same tokens
+    // with and without, differing only in case and stops. Names are capitalised
+    // by `capitaliseFirstWord` at apply time, which is where that belongs.
+    smart_format: "false",
+    punctuate: "false",
     language: ASR_LANGUAGE,
     endpointing: String(ASR_ENDPOINTING_MS),
   });
@@ -125,6 +176,12 @@ export function liveStreamParams(o: {
  */
 export function batchParams(o: {
   keyterms?: readonly string[];
+  /**
+   * PROSE formatting — capitals, full stops, tidied numbers. On for a meeting
+   * recording, which a person reads; OFF for a command clip, where a stray full
+   * stop splits the sentence and a lost comma breaks a list of names.
+   */
+  prose?: boolean;
   /** Command bias — on for a replayed clip, off for a meeting. */
   commandBias?: boolean;
   /** Harness only — an alternative command vocabulary to measure. */
@@ -135,8 +192,8 @@ export function batchParams(o: {
   const p = new URLSearchParams({
     model: ASR_MODEL,
     language: ASR_LANGUAGE,
-    smart_format: "true",
-    punctuate: "true",
+    smart_format: o.prose ? "true" : "false",
+    punctuate: o.prose ? "true" : "false",
   });
   if (o.diarize) p.append("diarize", "true");
   if (o.utterances) p.append("utterances", "true");

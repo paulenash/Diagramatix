@@ -714,7 +714,27 @@ function reconcileLaneMembership(elements: DiagramElement[]): DiagramElement[] {
       // No lane contains it. Fall back to the pool it sits in, so a released or
       // orphaned element still belongs to its pool rather than floating free
       // (a parentless element exports outside the pool's process entirely).
-      const owner = pools.filter((p) => encloses(p, cx, cy))
+      //
+      // NEVER A BLACK-BOX POOL (Paul, 2026-09-25): "Sometimes a command will by
+      // default add a Task with a name like 'cancel this command!' to a
+      // black-box pool. This should NEVER occur."
+      //
+      // Quite right, and it is not merely untidy — a black-box pool is a
+      // participant whose internals are deliberately NOT modelled. That is the
+      // whole meaning of the notation: you are saying "this party exists and we
+      // exchange messages, and what they do inside is none of our business".
+      // An element inside one is a contradiction, it exports as a process with
+      // hidden content, and here it was arriving from a mis-heard command
+      // landing on whatever the geometry happened to overlap.
+      //
+      // So a black-box pool never adopts. The element stays where it is, owned
+      // by nothing, which renders it outside the pool's process and leaves it
+      // visible and deletable rather than swallowed.
+      const owner = pools
+        // Explicitly black-box only — an absent poolType is ambiguous, and
+        // stranding an element is worse than adopting it (see ADD_ELEMENT).
+        .filter((p) => (p.properties?.poolType as string | undefined) !== "black-box")
+        .filter((p) => encloses(p, cx, cy))
         .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0];
       if (!owner || owner.id === el.parentId) return el;
       changed = true;
@@ -4109,6 +4129,25 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         const containers = state.elements.filter(
           (b) => {
             if (!isContainerType(b.type) || !containerAccepts(b.type, newEl.type)) return false;
+            // A BLACK-BOX POOL ACCEPTS NOTHING (Paul, 2026-09-25): "Sometimes a
+            // command will by default add a Task ... to a black-box pool. This
+            // should NEVER occur."
+            //
+            // Not merely untidy. A black-box pool is a participant whose
+            // internals are deliberately NOT modelled — that is the whole
+            // meaning of the notation. An element inside one is a
+            // contradiction, and it was arriving from a mis-heard command
+            // landing on whatever the geometry happened to overlap.
+            //
+            // `containerAccepts` cannot make this call: it is given TYPES, and
+            // black-box is a property of the instance.
+            // EXPLICITLY black-box only. An absent poolType is ambiguous —
+            // older diagrams and fresh fixtures carry none, and
+            // `updatePoolTypes` derives it from content afterwards. Refusing on
+            // ambiguity would strand elements in a pool that is about to be
+            // called white-box, which is a worse failure than the one being
+            // prevented (it broke two parentage tests on the first attempt).
+            if (b.type === "pool" && (b.properties?.poolType as string | undefined) === "black-box") return false;
             const centreInside = centreInContainer(newCx, newCy, b);
             // For subprocess-expanded: a non-event element placed ON the
             // EP boundary (straddling any edge) is treated as inside, so
@@ -9820,8 +9859,45 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       //      down and taking the pool with them (`growLaneToHeight`).
       //   3. ENCLOSE, which catches the width and anything not in a lane.
       const laneFs = state.laneFontSize ?? 14;
-      const merged = reconcileLaneMembership([...state.elements, ...action.payload.elements]);
       const addedIds = new Set(action.payload.elements.map((e) => e.id));
+      let merged = reconcileLaneMembership([...state.elements, ...action.payload.elements]);
+      // A POOL IS A HORIZONTAL BAND, so overflowing its RIGHT edge does not put
+      // you outside it (Paul, 2026-09-25: "just grow the Pool when the template
+      // is placed", and "assume the template will go on the end of the current
+      // elements").
+      //
+      // `reconcileLaneMembership` adopts by full containment, so a template
+      // dropped past the pool's right edge — which is exactly where "on the
+      // end" puts it — was adopted by nothing. With no parent there were no
+      // children to enclose, so the pool never grew and the template hung
+      // outside it looking like a mistake.
+      //
+      // Vertical position decides membership; horizontal overflow is just a
+      // pool that needs to be longer, and `ensureContainersEncloseChildren`
+      // below already grows width as well as height. Deliberately scoped to
+      // APPLY_TEMPLATE: a DRAGGED element released outside a pool is somebody
+      // deciding it goes outside, and must stay where it was put.
+      {
+        const bandOf = (el: DiagramElement, box: DiagramElement) => {
+          const cy = el.y + el.height / 2;
+          return cy >= box.y && cy < box.y + box.height
+            && el.x >= box.x                       // to the right, not to the left
+            && el.type !== "pool" && el.type !== "lane";
+        };
+        const pools = merged.filter((e) => e.type === "pool"
+          && ((e.properties?.poolType as string | undefined) ?? "black-box") === "white-box");
+        merged = merged.map((el) => {
+          if (!addedIds.has(el.id) || el.parentId) return el;
+          const pool = pools.find((p) => bandOf(el, p));
+          if (!pool) return el;
+          // Prefer the lane at that height, so the template joins a band rather
+          // than floating in the pool behind its own lanes.
+          const lane = merged
+            .filter((e) => e.type === "lane" && e.parentId === pool.id && bandOf(el, e))
+            .sort((a, b) => a.height - b.height)[0];
+          return { ...el, parentId: (lane ?? pool).id };
+        });
+      }
       // Deepest first: growing a sub-lane moves its lane, and asking in the
       // other order would measure the lane before its sub-lane had grown.
       const depthOf = (el: DiagramElement): number => {
@@ -9841,6 +9917,44 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         if (!kids.length) continue;
         const needed = Math.max(...kids.map((k) => k.y + k.height)) + 8 - lane.y;
         elements = growLaneToHeight(elements, lane.id, Math.max(needed, laneMetrics(lane.label ?? "", laneFs).minHeight));
+      }
+      // …AND GROW IT SIDEWAYS, which nothing else will do.
+      //
+      // `ensureContainersEncloseChildren` sizes a pool or a lane from its
+      // STRUCTURAL children only — lanes and sub-lanes. A task never grows its
+      // lane, by design. So a template landing past the right edge was adopted
+      // (above) and then still hung outside, because the only pass that could
+      // have widened the pool was never going to look at a task.
+      {
+        const MARGIN = 40;
+        const poolOfEl = (el: DiagramElement): DiagramElement | undefined => {
+          let cur: DiagramElement | undefined = el;
+          for (let i = 0; cur && i < 12; i++) {
+            if (cur.type === "pool") return cur;
+            cur = cur.parentId ? elements.find((e) => e.id === cur!.parentId) : undefined;
+          }
+          return undefined;
+        };
+        const wanted = new Map<string, number>();
+        for (const el of elements) {
+          if (!addedIds.has(el.id)) continue;
+          const pool = poolOfEl(el);
+          if (!pool) continue;
+          wanted.set(pool.id, Math.max(wanted.get(pool.id) ?? 0, el.x + el.width + MARGIN));
+        }
+        for (const [poolId, right] of wanted) {
+          const pool = elements.find((e) => e.id === poolId);
+          if (!pool || right <= pool.x + pool.width) continue;
+          const width = right - pool.x;
+          elements = elements.map((e) => {
+            if (e.id === pool.id) return { ...e, width };
+            // Lanes span the pool, less whatever header each sits behind.
+            if ((e.type === "lane" || e.type === "sublane") && poolOfEl(e)?.id === pool.id) {
+              return { ...e, width: Math.max(e.width, pool.x + width - e.x) };
+            }
+            return e;
+          });
+        }
       }
       return {
         ...state,

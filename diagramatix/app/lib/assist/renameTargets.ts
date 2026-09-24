@@ -5,6 +5,7 @@
  * spoken type word to a RenameType, and collecting + numbering the targets in
  * reading order (top-to-bottom rows, left-to-right within a row).
  */
+import { containerWordKind } from "./containerWords";
 import type { DiagramElement, Connector } from "../diagram/types";
 
 export type RenameType =
@@ -63,8 +64,17 @@ export function numberTargets(els: readonly DiagramElement[]): RenameTarget[] {
 
 export function parseRenameType(word: string): RenameType | null {
   const w = word.toLowerCase().replace(/[-\s]/g, "").trim();
-  if (/^pools?$/.test(w)) return "pool";
-  if (/^(?:sub)?lanes?$/.test(w)) return "lane";               // lane includes sub-lanes
+  // CONTAINERS GO THROUGH THE SHARED MIS-HEAR TABLE, not a second regex.
+  //
+  // Paul, 2026-09-25: "the word 'line' is never actually likely in a business
+  // process context. Perhaps all 'lines' should just be interpreted as 'lanes'."
+  // Quite right, and `containerWords.ts` already said so — but only
+  // `resolveRef` consulted it, so "rename lines" fell through here and failed.
+  // The corpus caught it twice: a coin-flip on the Australian FACE vowel, where
+  // two recordings of the same sentence came back "lanes" and "lines".
+  const container = containerWordKind(word);
+  if (container === "pool") return "pool";
+  if (container === "lane" || container === "sublane") return "lane"; // lane includes sub-lanes
   if (/^messages?$/.test(w)) return "message";
   if (/^(?:tasks?|activit(?:y|ies)|steps?)$/.test(w)) return "task";
   if (/^subprocess(?:es)?$/.test(w)) return "subprocess";      // includes expanded/collapsed

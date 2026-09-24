@@ -50,7 +50,7 @@ export async function POST(req: Request) {
   // NOTE this now sends `language=en-AU`, which it did not before. Deliberate:
   // this is an Australian product and Deepgram's default leans US. Named here
   // and covered by its own test rather than smuggled in with a refactor.
-  const params = batchParams({ diarize: true, utterances: true });
+  const params = batchParams({ prose: true, diarize: true, utterances: true });
   try {
     const dg = await fetch(`${DG}?${params.toString()}`, {
       method: "POST",

@@ -26,10 +26,16 @@ const read = (p: string) => readFileSync(p, "utf8");
 describe("T4730 — live and batch cannot drift apart", () => {
   it("they agree on the model, the language and the formatting", () => {
     const live = liveStreamParams({ sampleRate: 48000 });
-    const batch = batchParams({ diarize: true, utterances: true });
-    for (const k of ["model", "language", "smart_format", "punctuate"]) {
+    const batch = batchParams({ prose: true, diarize: true, utterances: true });
+    for (const k of ["model", "language"]) {
       expect(batch.get(k), `${k} must match the live socket`).toBe(live.get(k));
     }
+    // Prose formatting deliberately DIFFERS: a meeting transcript is read by a
+    // person and wants capitals and stops; a command is parsed by a machine and
+    // a stray full stop splits the sentence (2026-09-25).
+    expect(batch.get("smart_format"), "a meeting reads as prose").toBe("true");
+    expect(live.get("smart_format"), "a command does not").toBe("false");
+    expect(live.get("punctuate")).toBe("false");
     expect(live.get("model")).toBe(ASR_MODEL);
     expect(live.get("language"), "Australian English — the default leans US").toBe(ASR_LANGUAGE);
   });
@@ -61,13 +67,14 @@ describe("T4730 — live and batch cannot drift apart", () => {
   it("a meeting and a replayed clip ask for different things, explicitly", () => {
     // A meeting wants speakers and NO command bias — biasing a discussion about
     // invoicing toward the word "lane" would be actively harmful.
-    const meeting = batchParams({ diarize: true, utterances: true });
+    const meeting = batchParams({ prose: true, diarize: true, utterances: true });
     expect(meeting.get("diarize")).toBe("true");
     expect(meeting.getAll("keywords"), "no command bias on a discussion").toEqual([]);
     // A replayed command clip wants the bias and no diarisation.
     const clip = batchParams({ commandBias: true, keyterms: ["Pick Items"] });
     expect(clip.get("diarize")).toBeNull();
-    expect(clip.getAll("keywords")).toContain("lane:3");
+    // The command list is empty since 2026-09-25 (measured), so the ONLY
+    // keywords a clip carries are the diagram-s own names.
     expect(clip.getAll("keywords"), "the diagram's own names, unboosted, after the command words")
       .toContain("Pick Items");
   });
@@ -93,7 +100,7 @@ describe("T4731 — nobody builds Deepgram params anywhere else", () => {
     expect(live, "no hand-rolled params survive").not.toMatch(/model:\s*"nova-2"/);
 
     const route = read("app/api/ai/audio/transcribe/route.ts");
-    expect(route).toContain("batchParams({ diarize: true, utterances: true })");
+    expect(route).toContain("batchParams({ prose: true, diarize: true, utterances: true })");
     expect(route).not.toMatch(/model:\s*"nova-2"/);
   });
 

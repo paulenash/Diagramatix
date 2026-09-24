@@ -138,7 +138,18 @@ export function VoiceAssistBar({
       )}
 
       <div ref={barRef}
-        className={`fixed z-40 w-[440px] max-w-[92vw] bg-white rounded-xl shadow-2xl border border-purple-200 ${barPos ? "" : "left-1/2 -translate-x-1/2 bottom-4"}`}
+        // ABOVE THE TEMPLATE WINDOW (Paul, 2026-09-25): "The Voice Assist
+        // window must always be on top of the Templates that are displayed."
+        //
+        // The template picker is a z-[70] overlay with a full-screen backdrop,
+        // so at z-40 the bar was both hidden behind it AND unclickable — the
+        // backdrop swallowed the pointer. Which is a poor arrangement for a
+        // window whose whole job, while that picker is open, is to show you the
+        // numbers you are about to say and the log of what was heard.
+        //
+        // z-[85]: above the picker and above PromptEditPopup at z-[80], below
+        // the z-[10001] toasts that must never be covered by anything.
+        className={`fixed z-[85] w-[440px] max-w-[92vw] bg-white rounded-xl shadow-2xl border border-purple-200 ${barPos ? "" : "left-1/2 -translate-x-1/2 bottom-4"}`}
         style={barPos ? { left: barPos.x, top: barPos.y } : undefined}
         onMouseDown={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 cursor-move select-none touch-none"
