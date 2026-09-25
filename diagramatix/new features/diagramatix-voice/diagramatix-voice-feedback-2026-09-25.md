@@ -1,6 +1,6 @@
 # Diagramatix Voice — where a spoken voice would earn its place
 
-**Date:** 2026-09-25 · **Status:** investigation and plan — nothing built · **Asked by:** Paul
+**Date:** 2026-09-25 · **Status:** plan, all decisions made — nothing built · **Asked by:** Paul
 
 > "Perhaps Diagramatix should have a Deepgram Speak voice!! Investigate where you
 > believe this could be used effectively to enhance the product."
@@ -278,21 +278,18 @@ record, the same way listening does:
 
 ---
 
-## 9. Decisions for Paul
+## 9. Decisions — all made by Paul, 2026-09-25
 
-**Decided 2026-09-25:** who gets it. On for SuperAdmins, off for everyone else, and a
-SuperAdmin switches it on for selected users from the Text to Speech tile (section 6).
-This replaces the earlier question about tiers.
+1. **Who gets it:** on for SuperAdmins, off for everyone else. A SuperAdmin switches it
+   on for selected users from the Text to Speech tile (section 6).
+2. **Default voice: Theia** (`aura-2-theia-en`, Australian, feminine). It can still be
+   changed on the tile, by ear, in the side-by-side comparison.
+3. **Default "how much to say": questions and problems.** Every question that needs an
+   answer, and every refusal. Successes stay silent unless a user chooses "everything".
+4. **No monthly cap per user.** Access is granted by hand and a heavy month costs cents;
+   the tile's usage figures and master switch are the safety net.
+5. **Flux TTS: not now.** Aura-2 everywhere. Flux stays in the side-by-side comparison
+   so it can be judged by ear later; its interruption tracking is the one reason to
+   revisit it for Voice Assist replies (V1).
 
-Still open:
-
-1. **Default voice:** Theia (Australian, feminine) or Hyperion (Australian, masculine)?
-   The side-by-side comparison on the tile lets you hear both before choosing.
-2. **Default "how much to say":** questions and problems (recommended), or questions
-   only?
-3. **A monthly limit per user:** none (recommended while it is SuperAdmin-granted), or
-   a character cap set on the tile?
-4. **Flux TTS:** worth 1.5 times the price of Aura-2? Recommended answer for now: no.
-   Flux has no Australian voice, and it is built for live voice-agent sessions, while
-   five of our six uses are one-off reads. Its interruption tracking could help Voice
-   Assist replies (V1) later. Decide by ear, in the side-by-side comparison.
+Nothing is left open. The plan is ready to build, starting with slice 1.
