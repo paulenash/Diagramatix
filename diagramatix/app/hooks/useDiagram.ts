@@ -9355,10 +9355,10 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         // GROW the white-box pool to take in the loose elements, rather than
         // creating a second pool (assist "extend the pool to include all…").
         // Never a black-box pool — the plan never offers one (2026-09-19).
+        // Each element joins the lane it sits level with (the plan chose it),
+        // and the pool WIDENS to reach them — never taller (Paul, 2026-09-25).
         const pool = state.elements.find((e) => e.id === plan.poolId)!;
-        const lanes = state.elements.filter((e) => e.type === "lane" && e.parentId === pool.id).sort((a, b) => a.y - b.y);
-        const holderId = lanes[0]?.id ?? pool.id; // adopt into the first lane, else the pool
-        const adopted = state.elements.map((e) => (targetIds.has(e.id) && !e.parentId ? { ...e, parentId: holderId } : e));
+        const adopted = state.elements.map((e) => (targetIds.has(e.id) && !e.parentId ? { ...e, parentId: plan.holders[e.id] ?? pool.id } : e));
         // Size the pool and its lanes around what they have just taken in. This
         // used to be left to `ensureContainersEncloseChildren`, which does not
         // do it: for a pool or a lane that pass counts ONLY lane and sub-lane
@@ -9366,7 +9366,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         // about. So the adoption reported success and the pool did not move a
         // pixel, leaving elements owned by a pool drawn nowhere near them
         // (Paul, 2026-09-18).
-        const sized = growPoolToAdopt(adopted, pool.id, holderId, [...targetIds]);
+        const sized = growPoolToAdopt(adopted, pool.id, pool.id, [...targetIds], { widenOnly: true });
         return { ...state, elements: ensureContainersEncloseChildren(sized), connectors: state.connectors };
       }
 

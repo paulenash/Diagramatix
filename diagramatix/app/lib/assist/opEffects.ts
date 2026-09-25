@@ -246,13 +246,24 @@ export function checkEffect(op: AssistOp, before: DiagramData, after: DiagramDat
       // Written from Paul's four cases (2026-09-25), not from the planner the
       // product uses. Refusals (cases 1 and 3) never reach here — the apply
       // layer's own message is the detail. What is checked is the edit.
-      const loose = after.elements.filter((e) => e.type !== "pool" && !isLaneLike(e) && e.type !== "text-annotation" && !inAPool(after, e));
+      // Only the PROCESS is wrapped — events, activities, gateways, data
+      // objects and data stores (Paul, 2026-09-25); annotations stay put.
+      const PROCESS = new Set(["task", "subprocess", "subprocess-expanded", "gateway", "start-event", "intermediate-event", "end-event", "data-object", "data-store"]);
+      const loose = after.elements.filter((e) => PROCESS.has(e.type) && !e.boundaryHostId && !inAPool(after, e));
       if (loose.length) return fail(`${loose.length} element${loose.length === 1 ? " is" : "s are"} still outside every pool`);
       const poolsBefore = before.elements.filter((e) => e.type === "pool");
       const whiteBefore = poolsBefore.some((p) => (p.properties?.poolType as string | undefined) === "white-box"
         || before.elements.some((e) => isLaneLike(e) && e.parentId === p.id));
-      // A white-box pool was there: it grows and keeps its own name.
-      if (whiteBefore) return pass;
+      // A white-box pool was there: it WIDENS and keeps its own name — never
+      // taller (Paul, 2026-09-25: "as long as the elements can be enclosed by
+      // widening the existing pool").
+      if (whiteBefore) {
+        const grown = poolsBefore.map((p) => [p, byId(after, p.id)] as const).find(([b, a]) => a && (a.x !== b.x || a.width !== b.width));
+        if (grown && (grown[1]!.y !== grown[0].y || grown[1]!.height !== grown[0].height)) {
+          return fail(`${nameOf(grown[1])} grew taller — it may only widen`);
+        }
+        return pass;
+      }
       // Otherwise exactly one NEW pool, carrying the name that was said.
       const made = newIn(before, after).filter((e) => e.type === "pool");
       if (made.length !== 1) return fail(`expected one new pool, found ${made.length}`);

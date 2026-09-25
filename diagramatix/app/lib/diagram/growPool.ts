@@ -49,6 +49,10 @@ export function growPoolToAdopt(
   poolId: string,
   holderId: string,
   adoptedIds: readonly string[],
+  /** Grow sideways only. "A pool around everything" may WIDEN a pool, never
+   *  make it taller (Paul, 2026-09-25); the plan has already refused anything
+   *  not level with it, so the top and bottom stay where they are. */
+  opts: { widenOnly?: boolean } = {},
 ): DiagramElement[] {
   const adopted = elements.filter((e) => adoptedIds.includes(e.id));
   const pool = elements.find((e) => e.id === poolId);
@@ -57,9 +61,9 @@ export function growPoolToAdopt(
   const b = boundsOf(adopted);
   // The union of where the pool is and where its new contents are, padded.
   const left = Math.min(pool.x, b.x - ADOPT_PAD - POOL_HEADER_W);
-  const top = Math.min(pool.y, b.y - ADOPT_PAD);
+  const top = opts.widenOnly ? pool.y : Math.min(pool.y, b.y - ADOPT_PAD);
   const right = Math.max(pool.x + pool.width, b.x + b.width + ADOPT_PAD);
-  const bottom = Math.max(pool.y + pool.height, b.y + b.height + ADOPT_PAD);
+  const bottom = opts.widenOnly ? pool.y + pool.height : Math.max(pool.y + pool.height, b.y + b.height + ADOPT_PAD);
 
   const grown: Box = { x: left, y: top, width: right - left, height: bottom - top };
   const dTop = pool.y - grown.y;          // how far the pool's top rose
@@ -119,8 +123,29 @@ export function growPoolToAdopt(
     if (lastLive.y + lastLive.height !== bottomEdge) {
       (lastLive as DiagramElement).height = Math.max(20, bottomEdge - lastLive.y);
     }
-    return out.map((e) => byId.get(e.id) ?? e);
+    return widenNested(out.map((e) => byId.get(e.id) ?? e));
   }
 
-  return out;
+  return widenNested(out);
+
+  /**
+   * Sublanes (and theirs) run to the pool's right edge too. Only the pool's own
+   * lanes were stretched, so a widened pool left its sublanes stopping short —
+   * a band of pool with no lane in it (found 2026-09-25).
+   */
+  function widenNested(els: DiagramElement[]): DiagramElement[] {
+    const right = grown.x + grown.width;
+    const dx = grown.x - pool!.x;
+    const direct = new Set(lanes.map((l) => l.id));
+    const inPool = (e: DiagramElement): boolean => {
+      let cur: DiagramElement | undefined = e;
+      for (let i = 0; cur?.parentId && i < 12; i++) { if (cur.parentId === poolId) return true; cur = els.find((x) => x.id === cur!.parentId); }
+      return false;
+    };
+    return els.map((e) => {
+      if ((e.type !== "lane" && e.type !== "sublane") || direct.has(e.id) || !inPool(e)) return e;
+      const x = e.x + dx;
+      return { ...e, x, width: right - x };
+    });
+  }
 }

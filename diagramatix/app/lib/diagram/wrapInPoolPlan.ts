@@ -18,8 +18,11 @@
  *   4. No pools at all → a new pool around the loose elements, as before.
  *
  * And the case the four do not name — a white-box pool AND elements outside
- * it — keeps its 2026-09-18 behaviour: that pool GROWS to take them in, keeping
- * its own name (Paul, 2026-09-25: "grow, ignore the name"; the log says so).
+ * it: that pool GROWS to take them in, keeping its own name (Paul, 2026-09-25:
+ * "grow, ignore the name"; the log says so) — "as long as the elements can be
+ * enclosed by WIDENING the existing pool". So only elements level with it, to
+ * its left or right; one above, below or across its edge is refused by name.
+ * This replaces 2026-09-18, when the pool grew upward to reach them.
  *
  * A black-box pool is never grown (Paul, 2026-09-19): it says its insides are
  * not modelled, and putting elements in it would contradict that.
@@ -29,7 +32,7 @@
 import type { DiagramElement } from "./types";
 
 export type WrapInPoolPlan =
-  | { kind: "grow"; poolId: string; loose: string[] }
+  | { kind: "grow"; poolId: string; loose: string[]; /** element → the lane it sits level with (or the pool) */ holders: Record<string, string> }
   | { kind: "new"; rect: { x: number; y: number; width: number; height: number }; loose: string[]; widthFrom?: string }
   | { error: string };
 
@@ -38,7 +41,17 @@ export const WRAP_PAD = 40;
 export const WRAP_HEADER_W = 36;
 
 const CONTAINER = new Set<string>(["pool", "lane", "sublane"]);
-const nameOf = (e: DiagramElement) => (e.label?.trim() || "a pool");
+/**
+ * What a pool is drawn around: the PROCESS — events, activities, gateways,
+ * data objects and data stores (Paul, 2026-09-25: "include data stores").
+ * Annotations, groups, review comments and the rest are left where they are,
+ * and a diagram with none of these gets no pool at all.
+ */
+export const PROCESS_TYPES: ReadonlySet<string> = new Set([
+  "task", "subprocess", "subprocess-expanded", "gateway",
+  "start-event", "intermediate-event", "end-event", "data-object", "data-store",
+]);
+const nameOf = (e: DiagramElement) => (e.label?.trim() || (e.type === "pool" ? "a pool" : e.type));
 
 /** A pool is black-box when it says so (or says nothing) and holds no lanes. */
 export function isBlackBoxPool(p: DiagramElement, elements: readonly DiagramElement[]): boolean {
@@ -57,22 +70,45 @@ export function planWrapInPool(elements: readonly DiagramElement[]): WrapInPoolP
     }
     return false;
   };
-  const loose = elements.filter((e) => !CONTAINER.has(e.type) && e.type !== "text-annotation" && !inContainer(e));
+  // A boundary event rides its host, so it is never loose on its own account.
+  const process = elements.filter((e) => PROCESS_TYPES.has(e.type) && !e.boundaryHostId);
+  if (process.length === 0) return { error: "there are no events, activities, gateways, data objects or data stores to put in a pool" };
+  const loose = process.filter((e) => !inContainer(e));
   const pools = elements.filter((e) => e.type === "pool");
   const whites = pools.filter((p) => !isBlackBoxPool(p, elements));
 
   // 1 — nothing outside a pool.
   if (loose.length === 0) {
     if (whites.length === 1) return { error: `everything is already in ${nameOf(whites[0])} — nothing to put in a new pool` };
-    if (whites.length > 1) return { error: "everything is already in a pool — nothing to put in a new pool" };
-    return { error: "there's nothing on the diagram to put in a pool" };
+    return { error: "everything is already in a pool — nothing to put in a new pool" };
   }
   const ids = loose.map((e) => e.id);
 
-  // The unnamed case: a white-box pool is there, and it grows.
+  // The unnamed case: a white-box pool is there, and it WIDENS — never taller.
   if (whites.length > 0) {
     const pool = whites.reduce((a, b) => (a.width * a.height >= b.width * b.height ? a : b));
-    return { kind: "grow", poolId: pool.id, loose: ids };
+    const top = pool.y, bottom = pool.y + pool.height;
+    const off = loose.find((e) => e.y < top || e.y + e.height > bottom);
+    if (off) {
+      const where = off.y + off.height <= top ? "above" : off.y >= bottom ? "below" : "across the edge of";
+      return { error: `can't take ${nameOf(off)} into ${nameOf(pool)} by widening it — it sits ${where} it; move it level with the pool first` };
+    }
+    // Each element joins the lane it sits level with — the DEEPEST one, so a
+    // sublane beats its lane. Not "the first lane": an element beside Lane 3
+    // parented to Lane 1 is the stale parentage that moved a whole diagram.
+    const inPool = (e: DiagramElement): boolean => {
+      let cur: DiagramElement | undefined = e;
+      for (let i = 0; cur?.parentId && i < 12; i++) { if (cur.parentId === pool.id) return true; cur = byId.get(cur.parentId); }
+      return false;
+    };
+    const lanes = elements.filter((e) => (e.type === "lane" || e.type === "sublane") && inPool(e));
+    const holders: Record<string, string> = {};
+    for (const e of loose) {
+      const cy = e.y + e.height / 2;
+      const level = lanes.filter((l) => cy >= l.y && cy <= l.y + l.height).sort((a, b) => a.height - b.height)[0];
+      holders[e.id] = level?.id ?? pool.id;
+    }
+    return { kind: "grow", poolId: pool.id, loose: ids, holders };
   }
 
   const minX = Math.min(...loose.map((e) => e.x));

@@ -75,7 +75,7 @@ describe("T4517 — a black-box pool is never grown to swallow elements", () => 
 describe("T4518 — a white-box pool is still grown, as it was", () => {
   const withWhiteBox = (): DiagramElement[] => [
     el("WB", "pool", { label: "Warehouse", y: 600, properties: { poolType: "white-box" } }),
-    el("a", "task", { x: 200, y: 100, width: 102, height: 65 }),
+    el("a", "task", { x: 700, y: 620, width: 102, height: 65 }), // level with the pool: it may only WIDEN (2026-09-25)
   ];
 
   it("grows it rather than making a second pool", async () => {
@@ -89,7 +89,7 @@ describe("T4518 — a white-box pool is still grown, as it was", () => {
     const laned: DiagramElement[] = [
       el("P", "pool", { label: "Warehouse", y: 600, properties: {} }),
       el("L1", "lane", { parentId: "P", y: 600, height: 100 }),
-      el("a", "task", { x: 200, y: 100, width: 102, height: 65 }),
+      el("a", "task", { x: 700, y: 620, width: 102, height: 65 }), // level with the pool: it may only WIDEN (2026-09-25)
     ];
     const after = await drive(laned);
     expect(poolsOf(after.elements as DiagramElement[])).toHaveLength(1);

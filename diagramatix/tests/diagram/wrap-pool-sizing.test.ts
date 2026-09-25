@@ -128,7 +128,7 @@ describe("T4504 — the pool actually grows around what it adopts", () => {
 });
 
 describe("T4507 — the reducer really sizes the pool it adopts into", () => {
-  it("grows Pool 1 around the elements it takes in", async () => {
+  it("no longer grows Pool 1 upward to reach elements above it (superseded 2026-09-25)", async () => {
     // The helper above is worth nothing if WRAP_IN_POOL keeps handing the job to
     // the enclosure pass that does not do it. This drives the reducer itself.
     const { reducer } = await import("@/app/hooks/useDiagram");
@@ -146,9 +146,15 @@ describe("T4507 — the reducer really sizes the pool it adopts into", () => {
     const pool = after.elements.find((e) => e.id === "P")!;
     const kids = after.elements.filter((e) => e.parentId === "P");
 
-    expect(kids.map((k) => k.id).sort(), "the elements were adopted").toEqual(["a", "b"]);
-    expect(encloses(pool, kids), "and the pool is drawn around them").toBe(true);
-    expect(pool.y, "which means growing upward to reach them").toBeLessThan(788);
+    // SUPERSEDED 2026-09-25. This pinned growing Pool 1 UPWARD to reach
+    // elements above it. Paul: a pool around everything may grow an existing
+    // pool only "as long as the elements can be enclosed by widening" it — so
+    // elements above it are now refused, by name, and nothing changes. The
+    // widening case, and the sizing this test was written to prove, are pinned
+    // by T4765 (wrap-in-pool-scenarios.test.ts).
+    expect(kids, "nothing adopted").toEqual([]);
+    expect(pool.y, "and the pool did not grow upward").toBe(788);
+    void encloses;
   });
 });
 
