@@ -43,7 +43,7 @@ import { expandMoveSet } from "@/app/lib/diagram/moveSet";
 import { retypeTasksForSystemFlag, applyTaskTypeChanges } from "@/app/lib/diagram/itSystemTaskTypes";
 import { emieMountProps } from "@/app/lib/diagram/emieLabel";
 import { BOUNDARY_HOST_TYPES } from "@/app/lib/diagram/boundaryHosts";
-import { settleMessageLabels, movedElementIds } from "@/app/lib/diagram/messageLabel";
+import { settleMessageLabels, movedElementIds, placeMessageLabel, messageLabelSide, healMessageLabels } from "@/app/lib/diagram/messageLabel";
 import { growPoolToAdopt } from "@/app/lib/diagram/growPool";
 import { planWrapInPool } from "@/app/lib/diagram/wrapInPoolPlan";
 import { planMovePool, planSwapPools, type PoolPosition } from "@/app/lib/diagram/poolOrder";
@@ -52,7 +52,7 @@ import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { getElementPoolId } from "@/app/lib/diagram/poolUtil";
 import { CHEVRON_THEMES, chevronReadingOrder } from "@/app/lib/diagram/chevronThemes";
 import { createHistoryGroupGate } from "@/app/lib/diagram/historyGroup";
-import { autoSizeForType, getDefaultSize, wrapText, type AutosizeType } from "@/app/lib/diagram/textMetrics";
+import { autoSizeForType, getDefaultSize, wrapText, connectorLabelSize, type AutosizeType } from "@/app/lib/diagram/textMetrics";
 import { fitShapeToLabel, holdsInternalLabel } from "@/app/lib/diagram/shapeFit";
 import { archiFitSize } from "@/app/lib/diagram/genericLayout";
 import { isArchiNodeIcon, archiNodeFrontRect } from "@/app/lib/diagram/nodeGeometry";
@@ -1000,125 +1000,6 @@ export function healPoolHeaderWidths(d: DiagramData): DiagramData {
     return next;
   });
   return changed ? { ...d, elements } : d;
-}
-
-/**
- * Compute messageBPMN label offsets per the BBP-anchored placement rules.
- *
- *   - Y: place the label 50px FROM the Black-Box Pool boundary INTO the
- *     gap between the BBP and the other end's pool (whether the other
- *     pool is white-box or another black-box).
- *   - X: prefer the LEFT of the connector with a small gap; fall back
- *     to the RIGHT if a sibling label on the same BBP would overlap.
- *
- * If neither end is a BBP (e.g. white-box → white-box), falls back to
- * the legacy "gap centre" placement so existing behaviour is preserved.
- */
-function computeMsgBpmnLabelOffsets(
-  source: DiagramElement,
-  target: DiagramElement,
-  sourceSide: Side,
-  waypoints: Point[],
-  allElements: DiagramElement[],
-  allConnectors: Connector[],
-): { offsetX: number; offsetY: number } {
-  function findPool(el: DiagramElement): DiagramElement | undefined {
-    if (el.type === "pool") return el;
-    let cur = el;
-    for (let i = 0; i < 10; i++) {
-      if (!cur.parentId) break;
-      const parent = allElements.find(e => e.id === cur.parentId);
-      if (!parent) break;
-      if (parent.type === "pool") return parent;
-      cur = parent;
-    }
-    return allElements.find(e => e.type === "pool"
-      && el.x >= e.x && el.x + el.width <= e.x + e.width
-      && el.y >= e.y && el.y + el.height <= e.y + e.height);
-  }
-  const srcPool = findPool(source);
-  const tgtPool = findPool(target);
-  const goingDown = sourceSide === "bottom";
-  if (waypoints.length < 4 || !srcPool || !tgtPool) {
-    return { offsetX: -45, offsetY: 0 };
-  }
-  const srcPoolEdgeY = goingDown ? srcPool.y + srcPool.height : srcPool.y;
-  const tgtPoolEdgeY = goingDown ? tgtPool.y : tgtPool.y + tgtPool.height;
-  const srcIsBlackBox = ((srcPool.properties.poolType as string | undefined) ?? "black-box") !== "white-box";
-  const tgtIsBlackBox = ((tgtPool.properties.poolType as string | undefined) ?? "black-box") !== "white-box";
-
-  // Anchor (Y) — midpoint between source-edge and target-edge waypoints
-  // (matches ConnectorRenderer's messageBPMN anchor with invisible leaders).
-  const anchorY = (waypoints[1].y + waypoints[waypoints.length - 2].y) / 2;
-  const anchorX = (waypoints[1].x + waypoints[waypoints.length - 2].x) / 2;
-
-  // Pick the BBP end. If neither pool is BBP, retain legacy gap-centre.
-  let bbpPool: DiagramElement | null = null;
-  let bbpEdgeY = 0;
-  let otherEdgeY = 0;
-  if (srcIsBlackBox && !tgtIsBlackBox) {
-    bbpPool = srcPool; bbpEdgeY = srcPoolEdgeY; otherEdgeY = tgtPoolEdgeY;
-  } else if (tgtIsBlackBox && !srcIsBlackBox) {
-    bbpPool = tgtPool; bbpEdgeY = tgtPoolEdgeY; otherEdgeY = srcPoolEdgeY;
-  } else if (srcIsBlackBox && tgtIsBlackBox) {
-    // BBP↔BBP — anchor to source pool edge so the label sits 50 below/above it
-    bbpPool = srcPool; bbpEdgeY = srcPoolEdgeY; otherEdgeY = tgtPoolEdgeY;
-  }
-  if (!bbpPool) {
-    // Both white-box: gap-centre Y, label to the LEFT of the connector.
-    const labelY = (srcPoolEdgeY + tgtPoolEdgeY) / 2;
-    return { offsetX: -45, offsetY: labelY - anchorY - 7 };
-  }
-
-  // Direction: +1 if BBP edge is above the other (label drops 50 below
-  // the BBP edge); -1 if BBP edge is below the other (label sits 50 above).
-  const direction = otherEdgeY >= bbpEdgeY ? 1 : -1;
-  const labelCentreY = bbpEdgeY + 50 * direction;
-  const offsetY = labelCentreY - anchorY - 7; // -7 = half line-height for top-Y conversion
-
-  // X: choose right (offset +45) by default; flip to left (-45) if a
-  // sibling label on the same BBP would overlap. Label width assumed 80,
-  // so 45 puts the visible left edge ~5px right of the connector.
-  const LABEL_W = 80;
-  const RIGHT_OFFSET = 45;
-  const LEFT_OFFSET = -45;
-  const Y_BAND = 24;
-  const existingLabels = allConnectors
-    .filter(c =>
-      c.type === "messageBPMN" &&
-      typeof c.label === "string" && c.label.trim().length > 0 &&
-      (c.sourceId === bbpPool!.id || c.targetId === bbpPool!.id) &&
-      c.waypoints.length >= 4
-    )
-    .map(c => {
-      const cAnchorX = (c.waypoints[1].x + c.waypoints[c.waypoints.length - 2].x) / 2;
-      const cAnchorY = (c.waypoints[1].y + c.waypoints[c.waypoints.length - 2].y) / 2;
-      const cx = cAnchorX + (c.labelOffsetX ?? 0);
-      const cy = cAnchorY + (c.labelOffsetY ?? 0) + 7; // shift back to label centre Y
-      return { cx, cy, w: c.labelWidth ?? LABEL_W };
-    });
-
-  function rangeOverlaps(testCentreX: number): boolean {
-    for (const l of existingLabels) {
-      if (Math.abs(l.cy - labelCentreY) > Y_BAND) continue;
-      const aL = testCentreX - LABEL_W / 2;
-      const aR = testCentreX + LABEL_W / 2;
-      const bL = l.cx - l.w / 2;
-      const bR = l.cx + l.w / 2;
-      if (!(aR < bL || bR < aL)) return true;
-    }
-    return false;
-  }
-
-  const rightCentreX = anchorX + RIGHT_OFFSET;
-  const leftCentreX = anchorX + LEFT_OFFSET;
-  // Default a message-flow label to the LEFT of the connector (Paul); only flip
-  // to the RIGHT if a sibling label on the same BBP would overlap on the left.
-  let offsetX = LEFT_OFFSET;
-  if (rangeOverlaps(leftCentreX) && !rangeOverlaps(rightCentreX)) {
-    offsetX = RIGHT_OFFSET;
-  }
-  return { offsetX, offsetY };
 }
 
 /**
@@ -4521,9 +4402,10 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
             const oldTgtX = conn.waypoints[oldTgtIdx]?.x ?? 0;
             const oldTgtY = conn.waypoints[oldTgtIdx]?.y ?? 0;
             const oldMidY = (oldSrcY + oldTgtY) / 2;
-            const LINE_H = 14;
-            const lineCount = ((conn.label ?? "").split("\n").length) || 1;
-            const halfLabelH = (lineCount * LINE_H) / 2;
+            // The DRAWN height — wrapped lines, as messageLabel.ts measures it.
+            // Counting only hard newlines mirrored a two-line label by half its
+            // height and put it inside the pool on a flip.
+            const halfLabelH = connectorLabelSize(conn.label ?? "").h / 2;
             const labelOX = conn.labelOffsetX ?? 0;
             const oldMidX = (oldSrcX + oldTgtX) / 2;
             const oldLabelCentreX = oldMidX + labelOX;
@@ -7434,17 +7316,26 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
                     : isDecisionGatewayOutgoing ? ""
                     : connectorType === "sequence" ? ""
                     : undefined,
+        // A message's label is placed below, once the connector exists.
         labelOffsetX: isFlow ? 0   : isTransition ? 0
-                    : isMsgBpmn ? computeMsgBpmnLabelOffsets(source, target, sourceSide, waypoints, state.elements, state.connectors).offsetX
                     : decisionLabelOffsets ? decisionLabelOffsets.x
                     : connectorType === "sequence" ? 0 : undefined,
         labelOffsetY: isFlow ? -30 : isTransition ? -30
-                    : isMsgBpmn ? computeMsgBpmnLabelOffsets(source, target, sourceSide, waypoints, state.elements, state.connectors).offsetY
                     : decisionLabelOffsets ? decisionLabelOffsets.y
                     : connectorType === "sequence" ? -20 : undefined,
         labelWidth:   isFlow ? 80  : isTransition ? 80  : isMsgBpmn ? 80  : isDecisionGatewayOutgoing ? 60  : connectorType === "sequence" ? 80 : undefined,
         labelAnchor:  isDecisionGatewayOutgoing ? "source" : undefined,
       };
+      if (isMsgBpmn) {
+        // Paul's rule, in messageLabel.ts: in the air gap, attached at the
+        // pool end. The route is final here — the obstacle pass below skips
+        // messages. With no air gap to sit in (pools side by side), the old
+        // left-of-the-midpoint default.
+        const placed = placeMessageLabel(newConnector, state.elements, state.connectors,
+          { fontSize: state.connectorFontSize ?? 10 });
+        newConnector.labelOffsetX = placed ? placed.labelOffsetX : -45;
+        newConnector.labelOffsetY = placed ? placed.labelOffsetY : 0;
+      }
 
       const isSeq = connectorType === "sequence";
       // Determine if the other end of a message connector is a system pool
@@ -7976,12 +7867,20 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       };
     }
 
-    case "UPDATE_CONNECTOR_LABEL":
+    case "UPDATE_CONNECTOR_LABEL": {
+      const { id, ...fields } = action.payload;
+      // A field that is ABSENT (or undefined) means "leave it". The helper used
+      // to send every field, undefined included, and the spread erased the
+      // label's stored position: a voice rename dropped "Request" out of the air
+      // gap and into the pool (Paul, 2026-09-25).
+      const supplied = Object.fromEntries(
+        Object.entries(fields).filter(([, v]) => v !== undefined),
+      ) as Partial<Connector>;
       return {
         ...state,
         connectors: state.connectors.map((c) => {
-          if (c.id !== action.payload.id) return c;
-          const next = { ...c, ...action.payload };
+          if (c.id !== id) return c;
+          const next = { ...c, ...supplied };
           // Paul, 2026-09-21: "a connector tether on a label should
           // permanently cease to be displayed as soon as that label has been
           // manually moved on a diagram." Recorded HERE rather than in the
@@ -7992,9 +7891,22 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           // Only a MOVE counts. Typing a condition into a label that has never
           // been dragged must leave the tether alone, and those arrive through
           // this same action.
-          return isLabelMove(c, next) ? { ...next, labelTether: "never" as const } : next;
+          const moved = isLabelMove(c, next);
+          // A message whose NAME changes is placed by Paul's rule
+          // (messageLabel.ts), whichever path the name came by — voice, the
+          // Properties panel, the canvas editor. A drag, which moves the label
+          // and keeps its text, is left where it was put. Placing is not a
+          // move, so the tether is untouched.
+          if (!moved && supplied.label !== undefined && supplied.label !== c.label) {
+            const fontSize = state.connectorFontSize ?? 10;
+            const placed = placeMessageLabel(next, state.elements, state.connectors,
+              { prefer: messageLabelSide(c, state.elements, fontSize), fontSize });
+            if (placed) return { ...next, labelOffsetX: placed.labelOffsetX, labelOffsetY: placed.labelOffsetY };
+          }
+          return moved ? { ...next, labelTether: "never" as const } : next;
         }),
       };
+    }
 
     case "UPDATE_CONNECTOR_FIELDS": {
       // Changing routingType (e.g. a generalisation's "Direct" toggle), or repairing
@@ -10254,10 +10166,35 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
   }
 }
 
+/**
+ * The UPDATE_CONNECTOR_LABEL payload: the id and ONLY the fields the caller
+ * supplied. The editor's `updateConnectorLabel` and the headless diagram both
+ * build it here, so the payload the harness scores is the payload the editor
+ * sends — they differed once, and the harness kept a label the editor erased.
+ */
+export function connectorLabelPayload(
+  id: string, label?: string, labelOffsetX?: number, labelOffsetY?: number, labelWidth?: number,
+): Extract<Action, { type: "UPDATE_CONNECTOR_LABEL" }>["payload"] {
+  return {
+    id,
+    ...(label !== undefined ? { label } : {}),
+    ...(labelOffsetX !== undefined ? { labelOffsetX } : {}),
+    ...(labelOffsetY !== undefined ? { labelOffsetY } : {}),
+    ...(labelWidth !== undefined ? { labelWidth } : {}),
+  };
+}
+
+/** Load heals, once per open: pool header strips too narrow for their name
+ *  (B32), then message labels that were never placed (messageLabel.ts). Each
+ *  returns the same diagram when it has nothing to do. The headless diagram
+ *  opens with it too, so L4 scores the diagram the editor shows. */
+export const healOnLoad = (d: DiagramData): DiagramData => healMessageLabels(healPoolHeaderWidths(d));
+
 export function useDiagram(initialData: DiagramData) {
   // Heal stale/too-narrow pool header strips once on load so old diagrams stop
-  // tripping the B32 "label overflows the header" warning (no-op for healthy ones).
-  const [data, dispatch] = useReducer(reducer, initialData, healPoolHeaderWidths);
+  // tripping the B32 "label overflows the header" warning (no-op for healthy
+  // ones), and place message labels that have no position at all.
+  const [data, dispatch] = useReducer(reducer, initialData, healOnLoad);
 
   // Build marker so we can confirm the latest build is live.
   if (typeof window !== "undefined" && !(window as unknown as { __DIAGRAMATIX_BUILD?: string }).__DIAGRAMATIX_BUILD) {
@@ -10674,7 +10611,7 @@ export function useDiagram(initialData: DiagramData) {
   const updateConnectorLabel = useCallback(
     (id: string, label?: string, labelOffsetX?: number, labelOffsetY?: number, labelWidth?: number) => {
       pushHistory(snapshotData());
-      dispatch({ type: "UPDATE_CONNECTOR_LABEL", payload: { id, label, labelOffsetX, labelOffsetY, labelWidth } });
+      dispatch({ type: "UPDATE_CONNECTOR_LABEL", payload: connectorLabelPayload(id, label, labelOffsetX, labelOffsetY, labelWidth) });
     }, []
   );
 

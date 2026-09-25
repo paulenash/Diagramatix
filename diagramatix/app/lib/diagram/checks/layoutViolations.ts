@@ -8,7 +8,7 @@
  * surface CONFLICTS between rules as emergent failures.
  */
 import type { DiagramData, DiagramElement, Connector } from "../types";
-import { wrapText, externalLabelBox, connectorLabelWidth, connectorLabelLines } from "../textMetrics";
+import { wrapText, externalLabelBox, connectorLabelSize } from "../textMetrics";
 
 export type Box = { x: number; y: number; w: number; h: number };
 
@@ -85,7 +85,7 @@ export function baseLabelAnchor(c: Connector): { x: number; y: number } | null {
   return { x: (vis[0].x + vis[vis.length - 1].x) / 2, y: (vis[0].y + vis[vis.length - 1].y) / 2 };
 }
 
-export function connectorLabelBox(c: Connector, els?: DiagramElement[]): Box | null {
+export function connectorLabelBox(c: Connector, els?: DiagramElement[], fontSize = 10): Box | null {
   if (!c.label || !c.label.trim()) return null;
   let vis = c.waypoints ?? [];
   if (vis.length < 2) return null;
@@ -93,10 +93,9 @@ export function connectorLabelBox(c: Connector, els?: DiagramElement[]): Box | n
   if (c.targetInvisibleLeader && vis.length > 2) vis = vis.slice(0, -1);
   const sourceAnchored = c.labelAnchor === "source" || c.type === "flowline";
   const isMessage = c.type === "messageBPMN";
-  // The same wrap the renderer applies, so a wrapped label is measured as drawn.
-  const lines = connectorLabelLines(c.label || " ");
-  const measuredWidth = Math.max(30, ...lines.map((l) => l.length * 6 + 12)); // fontSize 10 × 0.6
-  const lHeight = Math.max(14, lines.length * 14);
+  // The renderer's own measure (connectorLabelSize), so a wrapped label, and a
+  // label at the diagram's connector font size, is measured as drawn.
+  const { w: measuredWidth, h: lHeight } = connectorLabelSize(c.label, fontSize);
 
   const typeOf = (id: string) => els?.find((e) => e.id === id)?.type;
   const msgToPool = isMessage && (typeOf(c.sourceId) === "pool" || typeOf(c.targetId) === "pool");

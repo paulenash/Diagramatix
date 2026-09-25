@@ -14,6 +14,7 @@ import { autoSizeForType, wrapText, externalLabelBox, externalLabelSize, connect
 import { snapImportedBounds, type Box } from "./importGeometry";
 import { buildTestConnectors } from "./bpmnTestConnectors";
 import { tetherModeOnCreate } from "./labelTether";
+import { placeMessageLabels } from "./messageLabel";
 
 /**
  * Connector ids carry the INDEX of the connector within its own array.
@@ -3991,12 +3992,6 @@ export function layoutBpmnDiagram(
   // "task → data" stays as a write (arrow into the data element) and
   // "data → task" stays as a read (arrow out of the data element).
   const DATA_ASSOC_TYPES = new Set(["data-store", "data-object", "text-annotation"]);
-  // R05.05: track each message label we place (centre x/y + width, keyed by
-  // the black-box pool it sits on) so the next label on the same pool edge
-  // can be staggered/flipped to avoid overlap. The connectors built here get
-  // their waypoints in a LATER pass, so the previous overlap check (which
-  // read pc.waypoints) never fired — we track placements ourselves instead.
-  const msgLabelTrack: { bbpId: string; cx: number; cy: number; w: number }[] = [];
   for (const c of finalConnections) {
     const src = elMap.get(c.sourceId);
     const tgt = elMap.get(c.targetId);
@@ -4301,9 +4296,8 @@ export function layoutBpmnDiagram(
     // Connector label positioning:
     //   - Decision gateway outgoing → anchor to source edge, offset outward
     //     from whichever face the connector exits (R6.20).
-    //   - Message flow → position the label vertically in the GAP between
-    //     source and target pools so it reads cleanly in the inter-pool
-    //     space (R6.21). Offset relative to connector midpoint.
+    //   - Message flow → nothing here: it is placed from the FINAL routed
+    //     geometry by the one message-label rule (messageLabel.ts), below.
     //   - Other (sequence fallback) → minor offset above the line.
     let labelOffsetX: number | undefined;
     let labelOffsetY: number | undefined;
@@ -4336,91 +4330,7 @@ export function layoutBpmnDiagram(
           case "left":   labelOffsetX = -labelWidth - 8;   labelOffsetY = -6;          break;
           default:       labelOffsetX = 8;                 labelOffsetY = -20;         break;
         }
-      } else if (isMessage) {
-        // BBP-anchored placement: label sits 50px from the Black-Box Pool
-        // boundary (into the gap), right of the connector by default.
-        // If a sibling label on the same BBP would overlap, flip to the
-        // left. Falls back to gap-centre when neither pool is BBP.
-        function containingPool(el: DiagramElement): DiagramElement | undefined {
-          if (el.type === "pool") return el;
-          let cur: DiagramElement | undefined = el;
-          for (let i = 0; i < 10 && cur; i++) {
-            if (!cur.parentId) break;
-            const parent = elements.find(e => e.id === cur!.parentId);
-            if (!parent) break;
-            if (parent.type === "pool") return parent;
-            cur = parent;
-          }
-          return undefined;
-        }
-        const srcPool = containingPool(src);
-        const tgtPool = containingPool(tgt);
-        labelWidth = 80;
-        if (srcPool && tgtPool) {
-          const goingDown = srcSide === "bottom";
-          const srcPoolEdgeY = goingDown ? srcPool.y + srcPool.height : srcPool.y;
-          const tgtPoolEdgeY = goingDown ? tgtPool.y : tgtPool.y + tgtPool.height;
-          const srcY = src.type === "pool" ? srcPoolEdgeY : (srcSide === "bottom" ? src.y + src.height : src.y);
-          const tgtY = tgt.type === "pool" ? tgtPoolEdgeY : (srcSide === "bottom" ? tgt.y : tgt.y + tgt.height);
-          const midY = (srcY + tgtY) / 2;
-          // Approx anchor X (vertical messageBPMN means src and tgt edges share x)
-          const midX = src.x + src.width / 2;
-          const srcIsBlackBox = ((srcPool.properties.poolType as string | undefined) ?? "black-box") !== "white-box";
-          const tgtIsBlackBox = ((tgtPool.properties.poolType as string | undefined) ?? "black-box") !== "white-box";
-          let bbpId: string | null = null;
-          let bbpEdgeY = 0;
-          let otherEdgeY = 0;
-          if (srcIsBlackBox && !tgtIsBlackBox) { bbpId = srcPool.id; bbpEdgeY = srcPoolEdgeY; otherEdgeY = tgtPoolEdgeY; }
-          else if (tgtIsBlackBox && !srcIsBlackBox) { bbpId = tgtPool.id; bbpEdgeY = tgtPoolEdgeY; otherEdgeY = srcPoolEdgeY; }
-          else if (srcIsBlackBox && tgtIsBlackBox) { bbpId = srcPool.id; bbpEdgeY = srcPoolEdgeY; otherEdgeY = tgtPoolEdgeY; }
-          if (bbpId) {
-            // R05.05: a message label sits in the GAP between the two pools,
-            // CENTRED horizontally on its own (vertical) message connector —
-            // never shoved off to the side. Where neighbouring connectors are
-            // close enough that the labels would overlap, the label's text is
-            // offset vertically in HALF-line-height steps (alternating above /
-            // below the gap centre) so they interleave instead of stacking.
-            const LINE_H = 14;             // single-line label height
-            const W = 80;                  // label width
-            const HALF = LINE_H / 2;       // the half-line vertical step
-            // Anchor the label to the Black-Box Pool's GAP-FACING edge, half a
-            // pool-gap into the gap — NOT to the midpoint between the two pool
-            // edges. The other endpoint's pool may be far away (another pool
-            // between them, or shifted by re-sizing), in which case a midpoint
-            // lands inside an intervening pool. Anchoring to the BBP edge keeps
-            // the label in the adjacent gap regardless. Mirrors the runtime
-            // re-anchor in computeMsgBpmnLabelOffsets.
-            const gapDir = otherEdgeY >= bbpEdgeY ? 1 : -1;
-            const baseCentreY = bbpEdgeY + (POOL_GAP / 2) * gapDir;
-            // Horizontally centred on the connector.
-            labelOffsetX = 0;
-            // Count labels already placed on this pool whose connector sits
-            // within a label width of this one — only those can overlap.
-            const xClose = msgLabelTrack.filter(l =>
-              l.bbpId === bbpId && Math.abs(l.cx - midX) < W
-            ).length;
-            // tier 0 → -HALF, 1 → +HALF, 2 → -LINE_H, 3 → +LINE_H, …
-            const dir = xClose % 2 === 0 ? -1 : 1;
-            const mag = (Math.floor(xClose / 2) + 1) * HALF;
-            // Keep the (staggered) label fully inside the adjacent gap so it
-            // can never drift into either pool.
-            const edgeNear = bbpEdgeY + HALF * gapDir;
-            const edgeFar  = bbpEdgeY + (POOL_GAP - HALF) * gapDir;
-            const lo = Math.min(edgeNear, edgeFar), hi = Math.max(edgeNear, edgeFar);
-            const cy = Math.max(lo, Math.min(hi, baseCentreY + dir * mag));
-            labelOffsetY = cy - midY - 7;
-            msgLabelTrack.push({ bbpId, cx: midX, cy, w: W });
-          } else {
-            // Both white-box — legacy gap-centre placement
-            const gapCentreY = (srcPoolEdgeY + tgtPoolEdgeY) / 2;
-            labelOffsetY = gapCentreY - midY - 7;
-            labelOffsetX = 20;
-          }
-        } else {
-          labelOffsetX = 20;
-          labelOffsetY = 0;
-        }
-      } else {
+      } else if (!isMessage) {
         labelOffsetX = 0;
         labelOffsetY = -20;
         labelWidth = 80;
@@ -4458,19 +4368,17 @@ export function layoutBpmnDiagram(
     } as Connector);
   }
 
-  // ── R5.06 / R5.07: message connection-point + label de-overlap ──
+  // ── R5.06: message connection-point de-overlap ──
   // R5.06 — two or more message flows attaching to the SAME element on the same
   // side must not share a connection point: spread their attachment x's so
   // they're ≥10px apart (the classic case is one element that both SENDS and
   // RECEIVES a message — both would otherwise land on its centre). The vertical
   // message line is driven by the NON-pool endpoint's x, so we spread that
   // endpoint's offsetAlong and re-align the pool partner to match.
-  // R5.07 — message labels that would stack at a similar x are offset vertically
-  // in ½-label-height steps so they don't overlap.
+  // (R5.07, which staggered the labels here, went with R05.05: the labels are
+  // placed once, from the final geometry, by the one message-label rule.)
   {
     const MIN_SEP = 24;   // ≥10px point separation, doubled (Paul)
-    const LABEL_H = 22;   // per-tier vertical label stagger — clears the ~16-18px
-                          // rendered message-label height with a small gap
     const msgs = connectors.filter(c => c.type === "messageBPMN");
     // The endpoint that drives the vertical line = the non-pool element.
     const anchorOf = (c: Connector) => {
@@ -4504,40 +4412,6 @@ export function layoutBpmnDiagram(
         }
       });
     }
-    // R5.07 — vertically stagger message labels whose horizontal spans would
-    // overlap. The label x ≈ its connector's attachment x; two labels overlap
-    // when their x's are within LABEL_W of each other. Use a SLIDING-WINDOW
-    // grouping (not fixed buckets — those split an overlapping pair that
-    // straddles a boundary), then offset each member by a full label-height
-    // step (alternating above / below) so the labels clear each other.
-    const labelX = (c: Connector): number | null => {
-      const a = anchorOf(c); if (!a) return null;
-      const off = a.isSource ? (c.sourceOffsetAlong ?? 0.5) : (c.targetOffsetAlong ?? 0.5);
-      return a.el.x + off * a.el.width;
-    };
-    const LABEL_W = 100;      // labels within this x distance can overlap
-    const STEP = LABEL_H;     // per-tier vertical step (= a full label height)
-    const labelled = msgs
-      .filter(c => c.label && c.labelOffsetX !== undefined)
-      .map(c => ({ c, x: labelX(c) }))
-      .filter((o): o is { c: Connector; x: number } => o.x !== null)
-      .sort((a, b) => a.x - b.x);
-    const stagger = (grp: { c: Connector; x: number }[]) => {
-      if (grp.length < 2) return;
-      // ASSIGN a centred spread (don't ADD to each base): adding could overshoot
-      // when the bases already differ and net a gap smaller than a label height,
-      // leaving the labels overlapping. Centring on the group's mean base keeps
-      // them in the inter-pool gap while guaranteeing a full STEP between rows.
-      const baseY = grp.reduce((sum, o) => sum + (o.c.labelOffsetY ?? 0), 0) / grp.length;
-      const n = grp.length;
-      grp.forEach((o, i) => { o.c.labelOffsetY = baseY + (i - (n - 1) / 2) * STEP; });
-    };
-    let group: { c: Connector; x: number }[] = [];
-    for (const o of labelled) {
-      if (group.length === 0 || o.x - group[group.length - 1].x < LABEL_W) group.push(o);
-      else { stagger(group); group = [o]; }
-    }
-    stagger(group);
   }
 
   // ── R8.11 / R8.12: sequence connection-point de-overlap ─────────────────────
@@ -6804,78 +6678,22 @@ export function layoutBpmnDiagram(
     }
   }
 
-  // ── R05.09: message-flow label placement from FINAL routed geometry ──
-  // The build-time label offsets (R05.05) are stale — the L→R sweep, lane hug and
-  // pool restack all move elements AFTER them. Recompute every messageBPMN label
-  // here from its FINAL waypoints: it sits in the gap adjacent to the black-box
-  // pool it attaches to (half a POOL_GAP in, toward the other pool), CENTRED on
-  // its connector (offsetX = 0). Two labels on the same pool sharing a connector-x
-  // stagger in half-line steps. The anchor is the leader midpoint — identical to
-  // the runtime computeMsgBpmnLabelOffsets — so the stored offset renders true.
+  // ── Message-flow labels, from the FINAL routed geometry ──
+  // Paul, 2026-09-25: "The message lable should always be in the air gap
+  // between pools and attached closest to the Pool meesage endpoint diagonally
+  // to the left or right" — "Always — generated too". So a generated label is
+  // placed by the same rule as a drawn or renamed one (messageLabel.ts), which
+  // supersedes the June R05.05 / R05.09 rule that centred it on its line. It
+  // runs here, after the L→R sweep, lane hug and pool restack have moved
+  // everything, one label after another so each keeps clear of the last.
   {
-    const containingPool = (el: DiagramElement): DiagramElement | undefined => {
-      if (el.type === "pool") return el;
-      let cur: DiagramElement | undefined = el;
-      for (let i = 0; i < 10 && cur; i++) {
-        if (!cur.parentId) break;
-        const p = elements.find(e => e.id === cur!.parentId);
-        if (!p) break;
-        if (p.type === "pool") return p;
-        cur = p;
-      }
-      return undefined;
-    };
-    const LINE_H = 14, W = 80, HALF = LINE_H / 2;
-    // Track each placed label's RENDERED width, not the nominal column: two
-    // labels only need staggering when their real boxes would meet.
-    const track: { bbpId: string; cx: number; w: number }[] = [];
-    for (const conn of computedConnectors) {
-      if (conn.type !== "messageBPMN") continue;
-      const wps = conn.waypoints;
-      if (!wps || wps.length < 4) continue;
-      const src = elMap.get(conn.sourceId), tgt = elMap.get(conn.targetId);
-      if (!src || !tgt) continue;
-      const srcPool = containingPool(src), tgtPool = containingPool(tgt);
-      if (!srcPool || !tgtPool) continue;
-      // Anchor = midpoint of the leader endpoints (matches the renderer + the
-      // runtime re-anchor), NOT the far element edges.
-      const anchorY = (wps[1].y + wps[wps.length - 2].y) / 2;
-      const anchorX = (wps[1].x + wps[wps.length - 2].x) / 2;
-      const goingDown = conn.sourceSide === "bottom";
-      const srcPoolEdgeY = goingDown ? srcPool.y + srcPool.height : srcPool.y;
-      const tgtPoolEdgeY = goingDown ? tgtPool.y : tgtPool.y + tgtPool.height;
-      const srcBB = ((srcPool.properties.poolType as string | undefined) ?? "black-box") !== "white-box";
-      const tgtBB = ((tgtPool.properties.poolType as string | undefined) ?? "black-box") !== "white-box";
-      let bbpId: string | null = null, bbpEdgeY = 0, otherEdgeY = 0;
-      if (srcBB && !tgtBB) { bbpId = srcPool.id; bbpEdgeY = srcPoolEdgeY; otherEdgeY = tgtPoolEdgeY; }
-      else if (tgtBB && !srcBB) { bbpId = tgtPool.id; bbpEdgeY = tgtPoolEdgeY; otherEdgeY = srcPoolEdgeY; }
-      else if (srcBB && tgtBB) { bbpId = srcPool.id; bbpEdgeY = srcPoolEdgeY; otherEdgeY = tgtPoolEdgeY; }
-      if (bbpId) {
-        const gapDir = otherEdgeY >= bbpEdgeY ? 1 : -1;
-        const baseCentreY = bbpEdgeY + (POOL_GAP / 2) * gapDir;
-        // Overlap is decided on the two labels' REAL half-widths. Comparing the
-        // centre gap against a fixed 80 said these two were 132px apart and
-        // therefore safe; they are 228px and 210px wide and were drawn one on
-        // top of the other.
-        const myW = connectorLabelWidth(conn.label ?? "");
-        const xClose = track.filter(l =>
-          l.bbpId === bbpId && Math.abs(l.cx - anchorX) < (l.w + myW) / 2).length;
-        const dir = xClose % 2 === 0 ? -1 : 1;
-        const mag = (Math.floor(xClose / 2) + 1) * HALF;
-        const edgeNear = bbpEdgeY + HALF * gapDir;
-        const edgeFar = bbpEdgeY + (POOL_GAP - HALF) * gapDir;
-        const lo = Math.min(edgeNear, edgeFar), hi = Math.max(edgeNear, edgeFar);
-        const cy = Math.max(lo, Math.min(hi, baseCentreY + dir * mag));
-        conn.labelOffsetX = 0;
-        conn.labelOffsetY = cy - anchorY - 7;
-        conn.labelWidth = W;
-        track.push({ bbpId, cx: anchorX, w: myW });
-      } else {
-        const gapCentreY = (srcPoolEdgeY + tgtPoolEdgeY) / 2;
-        conn.labelOffsetX = 20;
-        conn.labelOffsetY = gapCentreY - anchorY - 7;
-      }
-    }
+    const placed = placeMessageLabels(computedConnectors, elements, (c) => c.type === "messageBPMN");
+    placed.forEach((c, i) => {
+      if (c === computedConnectors[i]) return;
+      computedConnectors[i].labelOffsetX = c.labelOffsetX;
+      computedConnectors[i].labelOffsetY = c.labelOffsetY;
+      computedConnectors[i].labelWidth = 80;
+    });
   }
 
   // ── Every edge-mounted intermediate event is INTERRUPTING ──────────────────
@@ -6963,6 +6781,11 @@ export function layoutBpmnDiagram(
     for (const c of finalConnectors) {
       const start = boxes.get(c.id);
       if (!start) continue;
+      // A message label was placed by Paul's rule above, which already keeps it
+      // off shapes and labels where the gap allows. Moving it here could only
+      // move it out of the air gap — into a pool — which that rule forbids.
+      // It still counts as occupied space for the labels moved here.
+      if (c.type === "messageBPMN") continue;
       // Its own horizontal runs, but only for a BRANCH connector — Paul,
       // 2026-09-03: "label over horizontal segment of a connector from a
       // Gateway. To be specific." A label along any other line is masked by its

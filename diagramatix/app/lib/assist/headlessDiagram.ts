@@ -8,8 +8,11 @@
  * action useDiagram's helper of the same name dispatches, with the same
  * payload. The payload shapes are held to the reducer's `Action` union by the
  * compiler; the action TYPE per name is held to useDiagram's source by a guard
- * test. Nothing here decides anything — a helper that did would make L4 score
- * this file instead of the product.
+ * test. A shape is not the keys, though — the editor once sent a connector
+ * label's position as `undefined` where this file left it out, and only the
+ * editor's rename erased it — so that payload is built by useDiagram's own
+ * `connectorLabelPayload` in both. Nothing here decides anything — a helper
+ * that did would make L4 score this file instead of the product.
  *
  * What it deliberately does NOT reproduce:
  * - the element-limit gate (`addElementGated` is a plan limit, not an edit);
@@ -20,7 +23,7 @@
  * The screen half (`ui`) is a recorder. Selection, pickers and prompts change
  * nothing on the diagram, but a case may want to know that a picker opened.
  */
-import { reducer, type Action } from "@/app/hooks/useDiagram";
+import { reducer, connectorLabelPayload, healOnLoad, type Action } from "@/app/hooks/useDiagram";
 import type { DiagramData } from "@/app/lib/diagram/types";
 import type { AssistApplyContext, AssistDiagramActions, AssistUi } from "./applyAssistOps";
 import type { PickFlow } from "./disambiguate";
@@ -37,7 +40,10 @@ export interface HeadlessDiagram {
 }
 
 export function headlessDiagram(initial: DiagramData): HeadlessDiagram {
-  let state = initial;
+  // The editor opens a diagram through the same load heal (useReducer's
+  // initialiser); without it L4 would score a diagram no one ever sees — a
+  // saved label with no position still drawn inside its pool.
+  let state = healOnLoad(initial);
   const past: DiagramData[] = [];
   let staged: DiagramData | null = null;       // a move or resize in progress
   let resizing: string | null = null;
@@ -56,7 +62,7 @@ export function headlessDiagram(initial: DiagramData): HeadlessDiagram {
       sourceSide = "right", targetSide = "left", sourceOffsetAlong, targetOffsetAlong, force, initialLabel) =>
       commit({ type: "ADD_CONNECTOR", payload: { sourceId, targetId, connectorType, directionType, routingType, sourceSide, targetSide, sourceOffsetAlong, targetOffsetAlong, force, initialLabel } }),
     deleteConnector: (id) => commit({ type: "DELETE_CONNECTOR", payload: { id } }),
-    updateConnectorLabel: (id, label) => commit({ type: "UPDATE_CONNECTOR_LABEL", payload: { id, label } }),
+    updateConnectorLabel: (id, label) => commit({ type: "UPDATE_CONNECTOR_LABEL", payload: connectorLabelPayload(id, label) }),
     deleteElement: (id) => commit({ type: "DELETE_ELEMENT", payload: { id } }),
     undo: () => {
       const snap = past.pop();

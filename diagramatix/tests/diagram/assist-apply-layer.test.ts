@@ -1,5 +1,5 @@
 /**
- * T4748–T4753, T4757–T4759 — L4: did applying the ops do the right thing?
+ * T4748–T4753, T4757–T4759, T4832, T4838 — L4: did applying the ops do the right thing?
  *
  * Paul, 2026-09-25, of the harness's last open layer: "The harness doesn't yet
  * check whether the diagram itself came out right." It could not, because the
@@ -21,7 +21,7 @@ import { applyAssistOps } from "@/app/lib/assist/applyAssistOps";
 import { headlessDiagram } from "@/app/lib/assist/headlessDiagram";
 import { checkEffect, checkAlign } from "@/app/lib/assist/opEffects";
 import { fixtureElements, fixtureDiagram, fixtureConnectors, LANE_LABELS } from "@/app/lib/assist/commandFixture";
-import { reducer } from "@/app/hooks/useDiagram";
+import { reducer, connectorLabelPayload, healOnLoad } from "@/app/hooks/useDiagram";
 import { laneMetrics } from "@/app/lib/diagram/containerMetrics";
 import { MIN_LEFT_GAP } from "@/app/lib/diagram/poolLaneBounds";
 import { DEFAULT_CORPUS_SEED } from "@/app/lib/assist/rng";
@@ -97,6 +97,49 @@ describe("T4749 — the headless diagram dispatches what useDiagram dispatches",
       // undo/clear go through SET_DATA; the move/resize pairs through their own.
       expect(types, name).toEqual(want);
     }
+  });
+
+  it("T4832 — and the same PAYLOAD for updateConnectorLabel: one builder, used by both", () => {
+    // The compiler held the payload's shape, not its keys: the editor sent the
+    // position fields as undefined, this file left them out, and the reducer's
+    // spread erased the position for the editor alone — so the harness kept a
+    // label the editor dropped into the pool (Paul's "Request", 2026-09-25).
+    const hook = src("app", "hooks", "useDiagram.ts");
+    const helper = hook.slice(hook.indexOf("const updateConnectorLabel = useCallback("), hook.indexOf("const elementMoveEnd = useCallback("));
+    expect(helper).toContain("payload: connectorLabelPayload(id, label, labelOffsetX, labelOffsetY, labelWidth)");
+    expect(src("app", "lib", "assist", "headlessDiagram.ts")).toContain("payload: connectorLabelPayload(id, label)");
+    // What the editor's two-argument call sends is exactly what the harness sends.
+    expect(connectorLabelPayload("c", "Request", undefined, undefined, undefined)).toEqual(connectorLabelPayload("c", "Request"));
+    expect(Object.keys(connectorLabelPayload("c", "Request", undefined, undefined, undefined))).toEqual(["id", "label"]);
+    // And the diagrams they produce are the same, the stored position kept by both.
+    const d0 = fixtureDiagram();
+    const d: DiagramData = { ...d0, connectors: d0.connectors.map((c, i) =>
+      (i === 0 ? { ...c, label: "old", labelOffsetX: 12, labelOffsetY: -20, labelWidth: 80 } : c)) };
+    const id = d.connectors[0].id;
+    const h = headlessDiagram(d);
+    h.actions.updateConnectorLabel(id, "Renamed");
+    const viaHook = reducer(d, { type: "UPDATE_CONNECTOR_LABEL", payload: connectorLabelPayload(id, "Renamed", undefined, undefined, undefined) });
+    expect(h.data.connectors).toEqual(viaHook.connectors);
+    const c = viaHook.connectors[0];
+    expect([c.label, c.labelOffsetX, c.labelOffsetY, c.labelWidth]).toEqual(["Renamed", 12, -20, 80]);
+  });
+
+  it("T4838 — and it opens the diagram the way the editor does: the same load heal", () => {
+    // The editor heals a diagram as it opens it (useReducer's initialiser); a
+    // headless diagram that did not would score a diagram no one sees — Paul's
+    // saved "Request", with no position, drawn inside My company.
+    const hook = src("app", "hooks", "useDiagram.ts");
+    expect(hook).toContain("useReducer(reducer, initialData, healOnLoad)");
+    expect(src("app", "lib", "assist", "headlessDiagram.ts")).toContain("let state = healOnLoad(initial);");
+    const saved = JSON.parse(src("tests", "fixtures", "block2-test3-add-message.json")) as DiagramData;
+    expect(saved.connectors.find((x) => x.id === "bqdjxqwf")!.labelOffsetX).toBeUndefined();
+    const h = headlessDiagram(saved);
+    expect(h.data).toEqual(healOnLoad(saved));
+    expect(h.data.connectors.find((x) => x.id === "bqdjxqwf")!.labelOffsetX).toBeTypeOf("number");
+    // L4 judges a command against the diagram as opened, so the heal is never
+    // mistaken for the command's effect.
+    const score = src("app", "lib", "assist", "applyScore.ts");
+    expect(score).toContain("const before = structuredClone(h.data);");
   });
 
   it("a staged move is ONE undo entry, committed at its end, as in the editor", () => {

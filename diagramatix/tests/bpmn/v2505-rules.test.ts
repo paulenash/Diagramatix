@@ -128,8 +128,24 @@ describe("B52 — message labels must not be drawn on top of each other", () => 
     expect(v[0].severity).toBe("error");
   });
 
-  it("T3053 — silent once they are staggered by a full line", () => {
-    expect(checkMessageLabelOverlap({ elements: [], connectors: [mk(0), mk(20)] })).toHaveLength(0);
+  it("T3053 — silent once they are staggered by the label's full height", () => {
+    // This label is DRAWN on two lines (28px), so it takes 30px to clear it.
+    expect(checkMessageLabelOverlap({ elements: [], connectors: [mk(0), mk(30)] })).toHaveLength(0);
+  });
+
+  it("T4834 — B52 measures the box the canvas draws: the wrapped height and the connector font count", () => {
+    // 20px apart used to pass, because the check counted one line where the
+    // canvas draws two; the two drawn boxes overlap by 8px.
+    expect(checkMessageLabelOverlap({ elements: [], connectors: [mk(0), mk(20)] })).toHaveLength(1);
+    // A one-line label 20px apart is clear.
+    const one = (offY: number) => ({ ...mk(offY), id: "o" + offY, label: "Order" });
+    expect(checkMessageLabelOverlap({ elements: [], connectors: [one(0), one(20)] })).toHaveLength(0);
+    // …and at the diagram's connector font: "Order details" side by side, 100px
+    // apart centre to centre, is clear at 10px (90 wide) and drawn overlapping
+    // at 12px (105.6 wide).
+    const side = (offX: number) => ({ ...mk(0), id: "s" + offX, label: "Order details", labelOffsetX: offX });
+    expect(checkMessageLabelOverlap({ elements: [], connectors: [side(0), side(100)] })).toHaveLength(0);
+    expect(checkMessageLabelOverlap({ elements: [], connectors: [side(0), side(100)], connectorFontSize: 12 })).toHaveLength(1);
   });
 });
 

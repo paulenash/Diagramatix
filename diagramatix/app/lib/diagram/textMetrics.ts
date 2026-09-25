@@ -280,11 +280,38 @@ export function connectorLabelLines(
   return [words.slice(0, best).join(" "), words.slice(best).join(" ")];
 }
 
+/**
+ * The box a connector label is DRAWN in: its wrapped lines, its width (the
+ * widest line plus 12px of padding, never under 30) and its height (14px a
+ * line).
+ *
+ * The one copy of that measure. ConnectorRenderer draws with it, the checks
+ * (`connectorLabelBox`) measure with it and the message-label placement
+ * (messageLabel.ts) places with it. Three copies of `len × 0.6 × fs + 12` had
+ * already disagreed about the font size: a label placed 6px clear of its line
+ * at 10px is drawn across it at the diagram's 12px.
+ *
+ * The WRAP is always decided at 10px, exactly as the renderer decides it — it
+ * calls `connectorLabelLines` with no font size — and only the width scales
+ * with `fontSize`. Hand-drawn view draws 1.3× wider still; that is a view, not
+ * the diagram, and nothing stored is measured against it.
+ */
+export function connectorLabelSize(
+  label: string,
+  fontSize = 10,
+): { lines: string[]; w: number; h: number } {
+  const lines = connectorLabelLines(label || " ");
+  const avgCharWidth = fontSize * 0.6;
+  return {
+    lines,
+    w: Math.max(30, ...lines.map((l) => l.length * avgCharWidth + 12)),
+    h: Math.max(LINE_HEIGHT, lines.length * LINE_HEIGHT),
+  };
+}
+
 /** The RENDERED width of a connector label — the widest wrapped line. */
 export function connectorLabelWidth(label: string, fontSize = 10): number {
-  const avgCharWidth = fontSize * 0.6;
-  return Math.max(30, ...connectorLabelLines(label, CONNECTOR_LABEL_MAX_W, fontSize)
-    .map((l) => l.length * avgCharWidth + 12));
+  return connectorLabelSize(label, fontSize).w;
 }
 
 /** The types that draw their name OUTSIDE the shape. Mirrors the condition in

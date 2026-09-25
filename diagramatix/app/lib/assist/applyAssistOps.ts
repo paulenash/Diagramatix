@@ -1011,9 +1011,18 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
         const newLabel = parts.slice(k).join(" to ").trim();
         if (!leftRef || !newLabel) continue;
         const e = resolve1(leftRef);
-        if (!("err" in e)) { updateLabel(e.id, newLabel); els = withLabel(els, e.id, newLabel); setSelectedElementIds(new Set()); results.push(`renamed ${nameOf(e)} → ${newLabel}`); done = true; break; }
+        // A connector whose label is EXACTLY what was said — whole ("message
+        // 4", its default name) or after a leading "message"/"connector" noun
+        // ("message Invoice") — beats an element the resolver only matched
+        // loosely: "rename message 4 to Request" renamed the event "Event 4"
+        // (2026-09-25 repro). An element named exactly what was said still wins.
+        const spaced = (s: string | undefined) => (s ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+        const whole = spaced(leftRef.replace(/^["'“”‘’]+|["'“”‘’]+$/g, ""));
         const key = messageLabelKey(leftRef);
-        const conn = data.connectors.find((c) => (c.label ?? "").trim().toLowerCase() === key);
+        const conn = data.connectors.find((c) => spaced(c.label) === whole)
+          ?? (key ? data.connectors.find((c) => spaced(c.label) === key) : undefined);
+        const elementExact = !("err" in e) && spaced(e.label) === whole;
+        if (!("err" in e) && (elementExact || !conn)) { updateLabel(e.id, newLabel); els = withLabel(els, e.id, newLabel); setSelectedElementIds(new Set()); results.push(`renamed ${nameOf(e)} → ${newLabel}`); done = true; break; }
         if (conn) { updateConnectorLabel(conn.id, newLabel); results.push(`renamed connector “${conn.label}” → ${newLabel}`); done = true; break; }
       }
       if (!done) {

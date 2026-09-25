@@ -6620,7 +6620,7 @@ export function Canvas({
                 onUpdateWaypoints={onUpdateConnectorWaypoints}
                 onWaypointsDragEnd={onConnectorWaypointDragEnd ? () => onConnectorWaypointDragEnd(conn.id) : undefined}
                 onUpdateLabel={onUpdateConnectorLabel
-                  ? (label: string, ox: number, oy: number, w: number) => onUpdateConnectorLabel(conn.id, label, ox, oy, w)
+                  ? (label: string, ox?: number, oy?: number, w?: number) => onUpdateConnectorLabel(conn.id, label, ox, oy, w)
                   : undefined}
                 onUpdateCurveHandles={onUpdateCurveHandles}
                 otherConnectorWaypoints={

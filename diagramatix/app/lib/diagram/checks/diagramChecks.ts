@@ -21,7 +21,8 @@
  * in-app scan, and shows up in the admin viewer automatically.
  */
 import type { DiagramElement, Connector } from "../types";
-import { wrapText, externalLabelBox, connectorLabelWidth } from "../textMetrics";
+import { wrapText, externalLabelBox } from "../textMetrics";
+import { connectorLabelBox } from "./layoutViolations";
 import { getRiskControl } from "../riskControl";
 import { canConnect } from "../canConnect";
 import { outerSideOfBox, boundaryOutwardSide, oppositeSide } from "../routing";
@@ -34,6 +35,9 @@ export interface DiagramLike {
    *  every other rule ignores them. Defaults: poolFontSize 16, laneFontSize 14. */
   poolFontSize?: number;
   laneFontSize?: number;
+  /** The diagram's connector label font (default 10). B52 measures message
+   *  labels at it, as the canvas draws them. */
+  connectorFontSize?: number;
   /** "Free-form / imported layout" — when true, the diagram was imported from
    *  another vendor and the pure-geometry rules (pool/lane containment, tiling,
    *  overlap, header overrun, message alignment, container connectors) are
@@ -1715,7 +1719,7 @@ export function checkElementOverlap(d: DiagramLike): Violation[] {
  *
  * Five faults in one generated diagram, four of them the same mistake: the
  * layout measured a SHAPE where the renderer draws a shape PLUS a label. These
- * rules are deliberately measured with `externalLabelBox` / `connectorLabelWidth`
+ * rules are deliberately measured with `externalLabelBox` / `connectorLabelBox`
  * — the renderer's own metrics — so a violation here is something a reader can
  * actually see, not an arithmetic artefact of a nominal label column.
  */
@@ -1952,25 +1956,14 @@ export function checkLabelEscapesSubprocess(d: DiagramLike): Violation[] {
   return out;
 }
 
-/** B52 — two message-flow labels drawn on top of each other. */
+/** B52 — two message-flow labels drawn on top of each other. Measured by
+ *  `connectorLabelBox`, the box the canvas draws — wrapped height, curve anchor,
+ *  the unplaced default and the diagram's connector font included — rather
+ *  than a copy of it. */
 export function checkMessageLabelOverlap(d: DiagramLike): Violation[] {
   const out: Violation[] = [];
-  const box = (c: Connector): Rect | null => {
-    const w = c.waypoints ?? [];
-    const vs = c.sourceInvisibleLeader ? 1 : 0;
-    const ve = c.targetInvisibleLeader ? w.length - 2 : w.length - 1;
-    const vis = w.slice(vs, ve + 1);
-    if (vis.length < 2 || !String(c.label ?? "").trim()) return null;
-    const ax = (vis[0].x + vis[vis.length - 1].x) / 2;
-    const ay = (vis[0].y + vis[vis.length - 1].y) / 2;
-    const width = connectorLabelWidth(c.label ?? "");
-    const lines = String(c.label ?? "").split("\n").length;
-    return {
-      x: ax + (c.labelOffsetX ?? -(width / 2 + 6)) - width / 2,
-      y: ay + (c.labelOffsetY ?? -30),
-      w: width, h: Math.max(14, lines * 14),
-    };
-  };
+  const fontSize = d.connectorFontSize ?? 10;
+  const box = (c: Connector): Rect | null => connectorLabelBox(c, d.elements, fontSize);
   const msgs = d.connectors.filter((c) => c.type === "messageBPMN" && String(c.label ?? "").trim());
   for (let i = 0; i < msgs.length; i++) {
     for (let j = i + 1; j < msgs.length; j++) {
@@ -1980,7 +1973,7 @@ export function checkMessageLabelOverlap(d: DiagramLike): Violation[] {
         rule: "message-label-overlap",
         severity: "error",
         ids: [msgs[i].id, msgs[j].id],
-        message: `Message labels "${msgs[i].label}" and "${msgs[j].label}" are drawn on top of each other — labels on the same pool stagger vertically to interleave.`,
+        message: `Message labels "${msgs[i].label}" and "${msgs[j].label}" are drawn on top of each other — a message label takes the other side of its line, or a row further into the gap, when its place is taken.`,
       });
     }
   }
@@ -2701,7 +2694,7 @@ export const RULES: Rule[] = [
     code: "B52",
     id: "message-label-overlap",
     title: "Two message-flow labels drawn on top of each other",
-    description: "Message labels attaching to the same Pool must stagger vertically so they interleave. Overlap is judged on each label's RENDERED width — a connector label auto-sizes to its text, so comparing against a nominal column width misses labels that plainly collide. (R05.09)",
+    description: "Two message labels must not be drawn over each other. A message label sits in the air gap, attached at its pool end, left of its line or — when that is taken — right of it or a row further into the gap. Overlap is judged on the box each label is DRAWN in (its rendered width and wrapped height), so a nominal column width cannot hide labels that plainly collide.",
     severity: "error",
     category: "bpmn-structure",
     check: checkMessageLabelOverlap,

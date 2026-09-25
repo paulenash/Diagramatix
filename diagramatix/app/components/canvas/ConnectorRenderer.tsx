@@ -9,7 +9,7 @@ import { dedupeHoles } from "@/app/lib/diagram/hitMask";
 import { buildConstraintText } from "@/app/lib/diagram/umlConstraints";
 import { DisplayModeCtx, ConnectorFontScaleCtx, sketchyFilter } from "@/app/lib/diagram/displayMode";
 import { waypointsToSvgPath, waypointsToCurvePath, waypointsToRoundedPath } from "@/app/lib/diagram/routing";
-import { connectorLabelLines } from "@/app/lib/diagram/textMetrics";
+import { connectorLabelSize } from "@/app/lib/diagram/textMetrics";
 import { ArchimateConnectorRenderer, isArchimateConnectorType } from "./ArchimateConnectorRenderer";
 import { ShowReviewCommentsCtx } from "./SymbolRenderer";
 
@@ -20,7 +20,9 @@ interface Props {
   svgToWorld?: (clientX: number, clientY: number) => Point;
   onUpdateWaypoints?: (id: string, waypoints: Point[]) => void;
   onWaypointsDragEnd?: () => void;
-  onUpdateLabel?: (label: string, offsetX: number, offsetY: number, width: number) => void;
+  // Offsets and width are optional: a TEXT edit passes the stored ones (or none),
+  // because typing is not a move — only the drag passes where the label now is.
+  onUpdateLabel?: (label: string, offsetX?: number, offsetY?: number, width?: number) => void;
   onUpdateCurveHandles?: (id: string, waypoints: Point[], cp1Rel: Point, cp2Rel: Point) => void;
   misaligned?: boolean;
   otherConnectorWaypoints?: Point[][];
@@ -348,7 +350,9 @@ interface InteractionLabelProps {
   selected: boolean;
   visibleWaypoints: Point[];
   svgToWorld?: (clientX: number, clientY: number) => Point;
-  onUpdateLabel?: (label: string, offsetX: number, offsetY: number, width: number) => void;
+  // Offsets and width are optional: a TEXT edit passes the stored ones (or none),
+  // because typing is not a move — only the drag passes where the label now is.
+  onUpdateLabel?: (label: string, offsetX?: number, offsetY?: number, width?: number) => void;
   onLabelFocusEditStart?: (centerX: number, centerY: number, worldWidth: number) => void;
   onLabelFocusEditEnd?: () => void;
   // When the source gateway's CURRENT marker is parallel / event-based the
@@ -458,12 +462,9 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
   // A long branch condition is WRAPPED rather than left to sprawl. Uses the
   // shared helper so the width the layout reasons about, the width the checks
   // measure, and the width actually drawn are the same number.
-  const rawLines = connectorLabelLines(label || " ");
-  const measuredWidth = Math.max(30, ...rawLines.map(l => l.length * avgCharWidth + 12));
+  const { lines, w: measuredWidth, h: lHeight } = connectorLabelSize(label, fontSize);
   const effectiveLWidth = measuredWidth;
-  const lines   = rawLines;
   const lineH   = 14;
-  const lHeight = Math.max(lineH, lines.length * lineH);
   // Default label placement (all still draggable): a flowline sits beside the
   // source exit; a MESSAGE flow's label sits to the LEFT of the line by default
   // (its right edge just clear of the spine), per Paul — messageBPMN labels
@@ -605,7 +606,13 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
 
   function commitEdit(newText: string) {
     setIsEditing(false);
-    onUpdateLabel?.(newText, offsetX, offsetY, lWidth);
+    // The STORED position, not the resolved one: a text edit is not a move.
+    // Storing the resolved default fixed a never-placed label at a spot
+    // measured from a different anchor (it jumped), and read as a move, which
+    // switched its tether off for good. A message label is re-placed by the
+    // reducer when its text changes (messageLabel.ts), whichever path the new
+    // name arrives by.
+    onUpdateLabel?.(newText, connector.labelOffsetX, connector.labelOffsetY, connector.labelWidth);
     onLabelFocusEditEnd?.();
   }
 

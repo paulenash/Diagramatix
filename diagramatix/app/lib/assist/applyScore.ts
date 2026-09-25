@@ -46,8 +46,10 @@ export interface ApplyVerdict extends EffectCheck {
  * `selected` is the case's `needsSelection`, standing in for the mouse.
  */
 export function scoreApply(ops: AssistOp[], diagram: DiagramData, selected: string[] = []): ApplyVerdict {
-  const before = structuredClone(diagram);
   const h = headlessDiagram(structuredClone(diagram));
+  // "Before" is the diagram as opened — after the load heal — so a heal is
+  // never mistaken for an effect of the command.
+  const before = structuredClone(h.data);
   const refs = ops.map((op) => resolveAll(op, before));
   const { ok, summary } = applyAssistOps(ops, h.context({ selectedIds: selected }));
   if (h.screen.includes("pick")) return { ok: true, detail: "", summary };   // live, the user picks
