@@ -100,20 +100,43 @@ export function instantiateTemplate(
 }
 
 /**
- * The element a template attaches BY when joined inline to a selected element:
- * the one with no incoming connector. If that's a Start Event with a single
- * outgoing sequence, strip it (and its connector) — the entry becomes that
- * connector's target. Returns the (possibly trimmed) data + the entry element's
- * id (in template-local id space), or null for an empty template.
+ * The elements a sequence flow runs between — what a template can be joined to,
+ * and what it can be joined BY. Data, annotations, pools and lanes are not.
+ */
+export const SEQUENCE_NODE_TYPES: ReadonlySet<string> = new Set([
+  "task", "subprocess", "subprocess-expanded", "gateway", "start-event", "intermediate-event", "end-event",
+]);
+
+/**
+ * The element a template attaches BY when joined inline to a selected element.
+ *
+ * A top-level flow node — not data, an annotation or a container, not mounted
+ * on another element's edge, not an event sub-process (which is started by its
+ * event, never by a flow) — with no incoming SEQUENCE flow. The old rule took
+ * the first element with no incoming connector of ANY kind, so "Data Input /
+ * Output" entered by its data object and "Perform Regular Task" by its event
+ * sub-process, and the join was refused both times with the template already
+ * placed. A loop (every step has a flow in) enters at its leftmost step; a
+ * template with no such step has no entry at all (null).
+ *
+ * If the entry is a Start Event with a single outgoing sequence, it is stripped
+ * (and its connector) — the entry becomes that connector's target. Returns the
+ * (possibly trimmed) data + the entry element's id (in template-local id space).
  */
 export function templateAttachData(
   templateData: TemplateData,
 ): { data: TemplateData; entryId: string } | null {
   const els = templateData.elements;
   if (els.length === 0) return null;
-  const incoming = new Set(templateData.connectors.map((c) => c.targetId));
-  const noIncoming = els.filter((e) => !incoming.has(e.id));
-  let entry = noIncoming[0] ?? [...els].sort((a, b) => a.x - b.x)[0];
+  const ids = new Set(els.map((e) => e.id));
+  const joinable = els.filter((e) =>
+    SEQUENCE_NODE_TYPES.has(e.type)
+    && !(e.parentId && ids.has(e.parentId))
+    && !e.boundaryHostId
+    && !(e.type === "subprocess-expanded" && (e.properties?.subprocessType as string | undefined) === "event"));
+  if (joinable.length === 0) return null;
+  const incoming = new Set(templateData.connectors.filter((c) => c.type === "sequence").map((c) => c.targetId));
+  let entry = joinable.find((e) => !incoming.has(e.id)) ?? [...joinable].sort((a, b) => a.x - b.x)[0];
   let data = templateData;
 
   if (entry.type === "start-event") {

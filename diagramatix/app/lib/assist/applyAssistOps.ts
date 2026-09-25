@@ -51,6 +51,8 @@ import { collectRenameTargets, type RenameType, type RenameTarget } from "./rena
 import { buildPickFlow, type PickFlow } from "./disambiguate";
 import { getRiskControl, riskControlPatch } from "@/app/lib/diagram/riskControl";
 import { simPatch } from "@/app/lib/diagram/simParams";
+import { whyTemplateCantFollow } from "@/app/lib/diagram/templateAttach";
+import { TEMPLATE_BEFORE_REFUSAL } from "./templatePhrase";
 
 /** The guided "rename by number" flow — pick a numbered badge, then say the name. */
 export type RenameFlow =
@@ -121,7 +123,8 @@ export interface AssistApplyContext {
     selectedIdsRef: MutableRefObject<string[]>;
     selectedConnectorIdRef: MutableRefObject<string | null>;
     nextStepRef: MutableRefObject<{ candidates: NextStepCandidate[]; accept: (c: NextStepCandidate) => void }>;
-    openTemplateWindowRef: MutableRefObject<() => string>;
+    /** Opens the numbered window; `anchorId` — each pick goes after it, `at` — at that point. Returns the log line. */
+    openTemplateWindowRef: MutableRefObject<(opts?: { anchorId?: string; at?: { x: number; y: number } }) => string>;
     exportJsonRef: MutableRefObject<(() => void) | null>;
   };
 }
@@ -1189,6 +1192,33 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
     }
 
     if (op.op === "pickTemplate") {
+      // "add template before X" is refused, not guessed: a true "before" is a
+      // splice, and a template often has no single exit to join X by.
+      if (op.beforeRef) { results.push(TEMPLATE_BEFORE_REFUSAL); anyFail = true; continue; }
+      if (op.afterRef) {
+        // The anchor is resolved exactly as the add op resolves its own: an
+        // ambiguous name raises the numbered pick and the answer re-runs this
+        // op with an #id, and a name not found stops the command.
+        const a = resolve1(op.afterRef, { strict: true });
+        if ("err" in a && a.ambiguous) {
+          const flow = buildPickFlow(ops, op.afterRef, a.ambiguous, els);
+          if (flow) { setPickFlow(flow); results.push(flow.prompt); pickParked = true; break; }
+        }
+        if ("err" in a) { results.push(a.err); anyFail = true; continue; }
+        // The window is never opened on an anchor no template could follow.
+        const why = whyTemplateCantFollow(a, els);
+        if (why) { results.push(why); anyFail = true; continue; }
+        results.push(openTemplateWindowRef.current({ anchorId: a.id }));
+        continue;
+      }
+      if (op.at === "pointer") {
+        if (!pointerWorld.current) {
+          results.push("I don't know where “here” is — move the mouse over the canvas first");
+          anyFail = true; continue;
+        }
+        results.push(openTemplateWindowRef.current({ at: { ...pointerWorld.current } }));
+        continue;
+      }
       results.push(openTemplateWindowRef.current());
       continue;
     }

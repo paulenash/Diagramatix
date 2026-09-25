@@ -25,6 +25,7 @@ import { wrapText, externalLabelBox } from "../textMetrics";
 import { connectorLabelBox } from "./layoutViolations";
 import { getRiskControl } from "../riskControl";
 import { canConnect } from "../canConnect";
+import { isLaneUnowned } from "../containment";
 import { outerSideOfBox, boundaryOutwardSide, oppositeSide } from "../routing";
 
 export interface DiagramLike {
@@ -210,9 +211,6 @@ export function checkContainment(d: DiagramLike): Violation[] {
  * centre, preferring an expanded sub-process over a lane over a pool — the same
  * rule the editor applies when lanes are added, resized or deleted.
  */
-/** Elements that are never owned by a lane: markers annotate a shape, and a
- *  text annotation / review comment floats deliberately. */
-const UNOWNED_TYPES = new Set<string>(["uml-pain-point", "uml-issue", "review-comment", "text-annotation"]);
 /** The container types whose ownership this rule reasons about. An element held
  *  by any OTHER container (group, system-boundary, uml-package, composite-state,
  *  collapsed subprocess) is left alone. */
@@ -266,7 +264,7 @@ function resolveParentage(d: DiagramLike): { repairs: ParentageRepair[]; violati
     // free-floating notes stick to what they annotate rather than to a lane; a
     // dangling parent is ref-integrity's business.
     if (el.type === "pool" || el.boundaryHostId) continue;
-    if (UNOWNED_TYPES.has(el.type)) continue;
+    if (isLaneUnowned(el)) continue;
     if (el.parentId && !byId.get(el.parentId)) continue;
     // This rule reasons only about pool / lane / expanded-sub-process ownership.
     // Groups, system boundaries, UML packages, composite states and collapsed

@@ -134,7 +134,14 @@ export function headlessDiagram(initial: DiagramData): HeadlessDiagram {
         selectedIdsRef: { current: opts.selectedIds ?? [] },
         selectedConnectorIdRef: { current: opts.selectedConnectorId ?? null },
         nextStepRef: { current: { candidates: [], accept: () => {} } },
-        openTemplateWindowRef: { current: () => { screen.push("template"); return "opened the template window"; } },
+        // Where the window was asked to put the template is part of what the
+        // command did, so L4 can see it: "template after <id>", "template here".
+        openTemplateWindowRef: {
+          current: (o) => {
+            screen.push(o?.anchorId ? `template after ${o.anchorId}` : o?.at ? "template here" : "template");
+            return "opened the template window";
+          },
+        },
         exportJsonRef: { current: () => { screen.push("export"); } },
       },
     }),

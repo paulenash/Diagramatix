@@ -33,12 +33,16 @@ interface Props {
   onPick: (card: TemplateCard) => void;
   onConfirm: () => void;
   onCancel: () => void;
-  /** Shown when the diagram already has a white-box pool and starters are hidden. */
-  hiddenInitialCount?: number;
+  /** What was hidden and why (templatePick.ts hiddenTemplatesNote); empty when nothing was. */
+  hiddenNote?: string;
+  /** Set when every pick goes AFTER an element: its name, for the heading. */
+  anchorName?: string;
+  /** Why the last pick was refused — the window stays open for another number. */
+  notice?: string | null;
 }
 
 export function TemplatePickerWindow({
-  sections, provisionalId, onPick, onConfirm, onCancel, hiddenInitialCount = 0,
+  sections, provisionalId, onPick, onConfirm, onCancel, hiddenNote = "", anchorName, notice,
 }: Props) {
   const total = sections.reduce((n, s) => n + s.cards.length, 0);
   const bySource = (source: "builtin" | "user") => sections.filter((s) => s.source === source && s.cards.length);
@@ -50,7 +54,9 @@ export function TemplatePickerWindow({
       <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl mx-4 flex flex-col" style={{ maxHeight: "88vh" }}>
         <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-gray-100">
           <div>
-            <h3 className="text-sm font-semibold text-gray-900">Add a template</h3>
+            <h3 className="text-sm font-semibold text-gray-900">
+              {anchorName ? <>Add a template after “{anchorName}”</> : "Add a template"}
+            </h3>
             <p className="text-xs text-gray-500">
               Say a number — {total} to choose from. Then “yes” to keep it, or another number to swap.
             </p>
@@ -124,11 +130,9 @@ export function TemplatePickerWindow({
           <span className="text-[11px] text-gray-500">
             Say a number · “yes” to keep · “cancel” to stop
           </span>
-          {hiddenInitialCount > 0 && (
-            <span className="text-[11px] text-gray-400">
-              {hiddenInitialCount} starter template{hiddenInitialCount === 1 ? "" : "s"} hidden — this diagram already has a pool
-            </span>
-          )}
+          {notice
+            ? <span className="text-[11px] text-red-600">{notice}</span>
+            : hiddenNote && <span className="text-[11px] text-gray-400">{hiddenNote}</span>}
         </div>
       </div>
     </div>

@@ -44,8 +44,10 @@ export function isIncompleteCommand(text: string): boolean {
   if (/^(?:called|named|labell?ed)\b/.test(t)) return true;
   // A bare verb — "Swap." "Rename." "Move." — is the start of something.
   if (VERBS.test(t)) return true;
-  // Ends on a dangling connective / preposition → more is coming.
-  if (/\b(to|as|from|and|with|into|onto|labell?ed|called|named|saying|by|above|below|over|under(?:neath)?|of|for|around|the|a|an)$/.test(t)) return true;
+  // Ends on a dangling connective / preposition → more is coming. "after",
+  // "before" and "following" too: "add template after" … "selected", split at
+  // the pause, ran as a task called "Template after" (2026-09-25).
+  if (/\b(to|as|from|and|with|into|onto|labell?ed|called|named|saying|by|above|below|over|under(?:neath)?|of|for|around|the|a|an|after|before|following)$/.test(t)) return true;
   // rename / relabel / change / call / set — missing its "to <target>". ("rename
   // tasks" — the by-number form — and "label selected" are complete as they are.)
   if (/^(rename|relabel|change|set|call)\b/.test(t) && !/\b(to|as)\b\s+\S+/.test(t) && !/^(rename|relabel)\s+(?:a\s+|an\s+|the\s+|all\s+)?\w+s?$/.test(t)) return true;

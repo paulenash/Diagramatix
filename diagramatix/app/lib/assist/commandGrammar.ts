@@ -5,7 +5,7 @@
  */
 import type { AssistOp } from "./ops";
 import { SYMBOL_SYNONYMS, SYMBOL_PHRASES } from "./ops";
-import { namesNonContainerKind, laneWordIsAttached, looksPositionalNotAName, namesAContainer } from "./greedyGuards";
+import { namesNonContainerKind, laneWordIsAttached, looksPositionalNotAName, namesAContainer, namesOnlyTemplate } from "./greedyGuards";
 import { parseRenameType } from "./renameTargets";
 import { parsePoolBoundaryPhrase, mentionsPoolBoundary } from "./poolBoundaryPhrase";
 import { repairHeardWords } from "./selectedWord";
@@ -17,9 +17,11 @@ import { capitaliseFirstWord } from "../diagram/nameCase";
 import { convertMatches } from "./convertPhrase";
 import { parseAlignTail } from "./alignPhrase";
 import { parseGhostPick } from "./ghostPick";
+import { isBareTemplateCommand, parseTemplateCommand } from "./templatePhrase";
+import { AFTER_WORDS, HERE_WORDS, TAIL_LEAD_IN, cleanRef } from "./placeWords";
 import type { SymbolType, EventType, GatewayType } from "../diagram/types";
 
-const clean = (s: string) => s.trim().replace(/[.,!?;:]+$/g, "").replace(/^["'“”‘’]+|["'“”‘’]+$/g, "").trim();
+const clean = cleanRef;
 const stripArticle = (s: string) => s.replace(/^(a|an|the)\s+/i, "").trim();
 /** "Sales Team and Marketing Team" / "A, B and C" → ["…"] (handles Oxford comma). */
 const splitLabels = (s: string) => s.split(/\s*,\s*(?:and\s+)?|\s+and\s+/i).map(clean).filter(Boolean);
@@ -96,10 +98,21 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   // BEFORE the add rule, which would otherwise read "add template" as a task
   // to be created and named "template" — the same swallow the lane rules sit
   // above. Only the bare command: "add a template called X" is somebody
-  // naming a task, and it is left alone.
-  if (/^(?:add|insert|use|show|open|pick|choose)\s+(?:a\s+|the\s+)?templates?$/i.test(lower)
-      || /^templates?$/i.test(lower)) {
+  // naming a task, and it is left alone. The ask is templatePhrase.ts's one
+  // phrase, the same one the anchored rule below and the add rule's decline read.
+  if (isBareTemplateCommand(lower)) {
     return [{ op: "pickTemplate" }];
+  }
+  // …and "add template after X" opens the same window, anchored: each number
+  // is shown AFTER X, joined to it (Paul, 2026-09-25: "It should allow user to
+  // select a template then place the selected template After the selected
+  // gateway"). Here, above the stranded-tail and ghost-pick rules, because
+  // "use a template after this" is not accepting a suggestion. "Before X" is
+  // carried so the apply layer can refuse it by name; "called X" is not a
+  // place, so "add a template called Intake" still names a task below.
+  {
+    const place = parseTemplateCommand(raw);
+    if (place) return [{ op: "pickTemplate", ...place }];
   }
 
   // ── Clear the whole diagram ──
@@ -157,7 +170,7 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   // whole sentence and sent it to the AI, the very path that invented the
   // duplicate above.
   {
-    const tail = raw.match(/^(?:and\s+|that'?s\s+|it'?s\s+|put\s+it\s+|goes\s+)?(after|before)\s+(.+)$/i);
+    const tail = raw.match(new RegExp(`^(?:${TAIL_LEAD_IN}\\s+)?(after|before)\\s+(.+)$`, "i"));
     if (tail) {
       const ref = clean(tail[2]);
       const whole = hasCommandAfterName(ref);
@@ -693,7 +706,7 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     // word inside the phrase ("boundary timer event").
     if (/\bboundary\s+(?:\w+\s+)?events?\b/i.test(rest.split(/\s+(?:called|named|labell?ed|titled)\s+/i)[0])) return null;
     let afterRef: string | undefined;
-    const after = rest.match(/\s+(?:after|following|behind|next to|onto)\s+(.+)$/i);
+    const after = rest.match(new RegExp(`\\s+${AFTER_WORDS}\\s+(.+)$`, "i"));
     if (after) { afterRef = clean(after[1]); rest = rest.slice(0, after.index).trim(); }
 
     // M5 — "put a task here", "add a gateway over there". Stripped BEFORE the
@@ -702,7 +715,7 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     // nothing after it, so a task someone really does want to call "Here"
     // still works.
     let atPointer = false;
-    const pos = rest.match(/\s+(?:right\s+|over\s+|just\s+)?(?:here|there)$/i);
+    const pos = rest.match(new RegExp(`\\s+${HERE_WORDS}$`, "i"));
     if (pos && pos.index !== undefined) {
       const without = rest.slice(0, pos.index).trim();
       if (without && !/\b(?:called|named|labell?ed|titled)$/i.test(without)) {
@@ -733,6 +746,9 @@ export function parseCommand(utterance: string): AssistOp[] | null {
       // Still talking about lanes or pools after the container rules declined it:
       // a phrasing they could not read, which the AI can. Never a symbol's name.
       if (label && !named && !quoted && namesAContainer(label)) return null;
+      // "add a template to the gateway" — the gateway is where it goes, and the
+      // template rule could not read "to". Never a gateway named "template to the".
+      if (label && !named && !quoted && namesOnlyTemplate(label)) return null;
       const op: AssistOp = { op: "add", symbolType: sym.symbolType };
       if (sym.eventType) op.eventType = sym.eventType;
       if (sym.gatewayType) op.gatewayType = sym.gatewayType;
@@ -746,6 +762,11 @@ export function parseCommand(utterance: string): AssistOp[] | null {
       const implicit = label ?? clean(stripArticle(rest));
       if (!named && !quoted && looksPositionalNotAName(implicit)) return null;
       if (!named && !quoted && namesAContainer(implicit)) return null;
+      // Only the word "template" and where it goes: a template the template
+      // rule could not place ("add a template to the selected", "add template
+      // after" cut off by a pause) is the AI's to read, never a task called
+      // "Template" (Paul, 2026-09-25).
+      if (!named && !quoted && namesOnlyTemplate(implicit)) return null;
       const op: AssistOp = { op: "add", symbolType: "task", label: implicit };
       if (afterRef) op.afterRef = afterRef;
       if (atPointer) op.at = "pointer";

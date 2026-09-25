@@ -25,6 +25,8 @@
  * Pure.
  */
 import { SYMBOL_PHRASES, SYMBOL_SYNONYMS } from "./ops";
+import { AFTER_WORDS, BEFORE_WORDS, HERE_WORDS } from "./placeWords";
+import { TEMPLATE_NOUN } from "./templatePhrase";
 
 /** Lane and pool words, including the mis-hears the grammar accepts. */
 const CONTAINER_WORD = /^(?:pools?|polls?|pulls?|lanes?|lines?|sub-?lanes?|sub-?lines?)$/i;
@@ -94,7 +96,30 @@ export function laneWordIsAttached(ref: string, trailingLaneMatched: boolean): b
  * other. Pre-existing, and barely relevant to a voice feature — you cannot say
  * quote marks — but worth knowing before trusting quotes to force a name.)
  */
-const POSITIONAL = /^(?:between|before|after|instead\s+of|in\s+place\s+of|replacing|replaces?|above|below|under(?:neath)?|over|beside|next\s+to|in\s+front\s+of|behind|onto|into|inside|within|from|to)\b/i;
+const POSITIONAL_WORDS = "between|before|after|instead\\s+of|in\\s+place\\s+of|replacing|replaces?|above|below|under(?:neath)?|over|beside|next\\s+to|in\\s+front\\s+of|behind|onto|into|inside|within|from|to";
+const POSITIONAL = new RegExp(`^(?:${POSITIONAL_WORDS})\\b`, "i");
+
+/**
+ * An implicit name that is only the word "template" — alone ("another
+ * template"), or followed by where it should go ("template to the selected",
+ * "template after", "template ahead"). The template rule reads every placement
+ * it can; one that reaches the add rule is a phrasing it could not, and made a
+ * TASK called "Template" (Paul, 2026-09-25). Only the bare word: "add a task
+ * Template Review" is somebody's name for a task and is left alone.
+ *
+ * Built from the template rule's own noun and place words, so the two cannot
+ * disagree about what "template" or "following" is. "ahead", "at", "on" and
+ * "in" are the extra ones: a placement cut off by a pause, or one the template
+ * rule does not read.
+ */
+const TEMPLATE_WORD_ONLY = new RegExp(
+  `^${TEMPLATE_NOUN}(?:[,;:.]?\\s+(?:${POSITIONAL_WORDS}|${AFTER_WORDS}|${BEFORE_WORDS}|${HERE_WORDS}|ahead|at|on|in)\\b.*)?$`,
+  "i",
+);
+
+export function namesOnlyTemplate(implicitLabel: string): boolean {
+  return TEMPLATE_WORD_ONLY.test(norm(implicitLabel));
+}
 
 /**
  * The same words appearing LATER in an implicit label.

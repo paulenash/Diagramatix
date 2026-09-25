@@ -9,6 +9,7 @@ import {
   SCHEMA_VERSION,
   PRODUCT_VERSION,
   type AiApplyMeta,
+  type Connector,
   type ConnectorType,
   type DiagramData,
   type DiagramElement,
@@ -76,13 +77,16 @@ import { syntheticElement, withAdded, withDeleted, withLabel } from "@/app/lib/a
 import { needsConfirmation, parseConfirmation } from "@/app/lib/assist/confirm";
 import { collectRenameTargets, type RenameType, type RenameTarget } from "@/app/lib/assist/renameTargets";
 import { buildPickFlow, parsePickAnswer, substituteRef, type PickFlow } from "@/app/lib/assist/disambiguate";
-import { cardsOf, numberTemplates, offerableTemplates, parseTemplateAnswer, type TemplateCard, type TemplateSection } from "@/app/lib/assist/templatePick";
+import { cardsOf, numberTemplates, templatesToOffer, canAttachInline, hiddenTemplatesNote, templateWindowSummary, parseTemplateAnswer, type TemplateCard, type TemplateSection } from "@/app/lib/assist/templatePick";
+import { TEMPLATE_BEFORE_REFUSAL } from "@/app/lib/assist/templatePhrase";
+import { planTemplateAttach, checkTemplateAttach, planTemplateShow, whyTemplateCantFollow, anchorNameOf } from "@/app/lib/diagram/templateAttach";
+import type { TemplateIds } from "@/app/lib/diagram/templatePreview";
 import { TemplatePickerWindow } from "@/app/components/canvas/TemplatePickerWindow";
 import { diagramKeyterms } from "@/app/lib/dictation/diagramKeyterms";
 import { VoiceAssistBar, type CommandLogEntry } from "@/app/components/canvas/VoiceAssistBar";
 import { startDictation, type DictationHandle } from "@/app/lib/dictation";
 import { PropertiesPanel } from "@/app/components/canvas/PropertiesPanel";
-import { captureTemplate, instantiateTemplate, templateAttachData, instantiateTemplateAnchored } from "@/app/lib/diagram/templates";
+import { captureTemplate, instantiateTemplate } from "@/app/lib/diagram/templates";
 import { resolvePackageNameLink } from "@/app/lib/diagram/packageLink";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { SimulatorOverlay } from "@/app/components/simulation/SimulatorOverlay";
@@ -253,6 +257,52 @@ export interface SaveConflict {
   conflicts: MergeConflict[];
   currentVersion: number;
   lastEditor: string | null;
+}
+
+/** A template the window has put on the diagram to be looked at (templatePreview.ts). */
+type TemplateShowing = {
+  card: TemplateCard;
+  /** applyTemplate's stamp — asked of templateStillShowing before any swap or cancel. */
+  stamp: number;
+  /** The diagram it was applied to: what a swap restores while it is still showing. */
+  base: { elements: DiagramElement[]; connectors: Connector[] };
+  ids: TemplateIds;
+};
+
+/**
+ * The "add template" window (Paul, 2026-09-24), and where its picks go — after
+ * an element ("add template after X", 2026-09-25), at the pointer, or at the
+ * middle of the screen.
+ */
+type TemplateFlow = {
+  /** A new window is a new id: a pick still loading for an old one is dropped. */
+  openId: string;
+  sections: TemplateSection[];
+  cards: TemplateCard[];
+  provisional: TemplateShowing | null;
+  hiddenInitial: number;
+  hiddenContainer: number;
+  anchorId?: string;
+  anchorName?: string;
+  at?: Point;
+  /** What was selected when the window opened. Once a number is picked the
+   *  preview IS the selection, and "after selected" still means this. */
+  selectionAtOpen: string[];
+  /** Why the last pick was refused; the window stays open. */
+  notice?: string | null;
+};
+
+/** How a template pick reports: one log line, written in the same tick as the change it describes. */
+type TemplateReport = (r: { ok: boolean; summary: string }) => void;
+
+async function fetchTemplateData(id: string): Promise<TemplateData | null> {
+  try {
+    const res = await fetch(`/api/templates/${id}`);
+    if (!res.ok) return null;
+    return ((await res.json()).data as TemplateData | undefined) ?? null;
+  } catch {
+    return null;
+  }
 }
 
 function useAutoSave(
@@ -1172,6 +1222,8 @@ export function DiagramEditor({
     addSelfTransition,
     splitConnector,
     applyTemplate,
+    templateStillShowing,
+    removeTemplate,
     alignElements,
     setData,
     clearDiagram,
@@ -2473,11 +2525,12 @@ export function DiagramEditor({
   // Inline-only templates (no pools/lanes) — the pool candidates for the
   // "Template" ghost + the attach picker.
   const inlineTemplates = useMemo(
-    () => [...builtInTemplates, ...userTemplates].filter((t) => !t.hasContainer),
+    () => [...builtInTemplates, ...userTemplates].filter(canAttachInline),
     [builtInTemplates, userTemplates],
   );
-  // Which element (if any) the template-attach picker is anchored on.
-  const [templatePicker, setTemplatePicker] = useState<{ sourceId: string; category: string | null } | null>(null);
+  // Which element (if any) the template-attach picker is anchored on, and why
+  // the last template picked could not be attached there.
+  const [templatePicker, setTemplatePicker] = useState<{ sourceId: string; category: string | null; error?: string } | null>(null);
 
   // Editable intent→template keyword catalog (assist semantic suggestion).
   const [intentCatalog, setIntentCatalog] = useState<IntentRow[]>([]);
@@ -2494,9 +2547,12 @@ export function DiagramEditor({
   const nextStepCandidates = useMemo(() => {
     if (!(assistEnabled && selectedElement && !readOnly)) return [];
     const base = suggestNextSteps(selectedElement, data, diagramType);
+    // Both template ghosts attach a template after the selection, so both ask
+    // the attach's own question first: after an End, inside an expanded
+    // subprocess or after a data object, the picker could only refuse.
     // Semantic suggestion: if the element's name implies an intent, surface it
     // first (attaches the mapped template / opens the picker at its category).
-    if (inlineTemplates.length > 0) {
+    if (inlineTemplates.length > 0 && !whyTemplateCantFollow(selectedElement, data.elements)) {
       const hit = matchIntent(selectedElement.label, intentCatalog);
       if (hit) {
         base.unshift({
@@ -2517,51 +2573,29 @@ export function DiagramEditor({
     return base;
   }, [assistEnabled, selectedElement, data, diagramType, readOnly, inlineTemplates, intentCatalog]);
 
-  // Attach a template's fragment inline to a source element: strip a leading
-  // Start Event, anchor the entry element 51px to the source's right (centres
-  // aligned), nudge the whole fragment off any overlap, then join source→entry.
+  // Attach a template's fragment after a source element — the placement and
+  // the join are templateAttach.ts's, shared with "add template after X" by
+  // voice. One applyTemplate draws the join too, so the attach is ONE undo
+  // entry: it used to be applyTemplate then addConnector in the same tick,
+  // two entries holding the same stale snapshot, the second a phantom undo.
+  // A template that cannot be attached there is refused with the reason, in
+  // the picker, instead of being placed unjoined.
   const attachTemplate = useCallback(async (templateId: string, sourceId: string) => {
-    const src = data.elements.find((e) => e.id === sourceId);
-    if (!src) return;
-    let tmplData: TemplateData;
-    try {
-      const res = await fetch(`/api/templates/${templateId}`);
-      if (!res.ok) return;
-      tmplData = (await res.json()).data as TemplateData;
-    } catch { return; }
-    const attach = templateAttachData(tmplData);
-    if (!attach) return;
-    const entry = attach.data.elements.find((e) => e.id === attach.entryId);
-    if (!entry) return;
-    const anchorX = src.x + src.width + HALF_TASK_W;
-    const anchorY = (src.y + src.height / 2) - entry.height / 2;
-    const inst = instantiateTemplateAnchored(attach.data, attach.entryId, anchorX, anchorY);
-    // Nudge the whole fragment off any overlap (rule 4) as one box.
-    const minX = Math.min(...inst.elements.map((e) => e.x));
-    const minY = Math.min(...inst.elements.map((e) => e.y));
-    const bw = Math.max(...inst.elements.map((e) => e.x + e.width)) - minX;
-    const bh = Math.max(...inst.elements.map((e) => e.y + e.height)) - minY;
-    const others = data.elements
-      .filter((e) => e.type !== "pool" && e.type !== "lane" && e.type !== "sublane")
-      .map((e) => ({ x: e.x, y: e.y, width: e.width, height: e.height }));
-    const free = findFreeSlot({ x: minX + bw / 2, y: minY + bh / 2 }, bw, bh, others);
-    const dx = free.x - (minX + bw / 2), dy = free.y - (minY + bh / 2);
-    let elements = dx || dy ? inst.elements.map((e) => ({ ...e, x: e.x + dx, y: e.y + dy })) : inst.elements;
-    // If the source sits in a lane/pool, adopt the (parentless) fragment into the
-    // same container so it grows to enclose them (APPLY_TEMPLATE runs the
-    // container-enclose pass). After a boundary event that is the HOST's
-    // container: adopted into the host itself, the subprocess grew round the
-    // fragment and the reducer then refused the entry flow as out of scope.
-    const adoptInto = followOnParentId(src, data.elements);
-    if (adoptInto) elements = elements.map((e) => (e.parentId ? e : { ...e, parentId: adoptInto }));
-    const connectors = dx || dy
-      ? inst.connectors.map((c) => ({ ...c, waypoints: c.waypoints.map((wp) => ({ x: wp.x + dx, y: wp.y + dy })) }))
-      : inst.connectors;
-    applyTemplate(elements, connectors);
-    if (inst.entryNewId) addConnector(src.id, inst.entryNewId, "sequence");
-    setSelectedElementIds(new Set(inst.newIds));
+    const refuse = (error: string) => setTemplatePicker((p) => ({ sourceId, category: p?.category ?? null, error }));
+    const tmplData = await fetchTemplateData(templateId);
+    if (!tmplData) { refuse("couldn't load that template"); return; }
+    const base = { elements: elementsRef.current, connectors: connectorsRef.current };
+    const plan = planTemplateAttach(tmplData, sourceId, base);
+    const src = base.elements.find((e) => e.id === sourceId);
+    const name = [...builtInTemplates, ...userTemplates].find((t) => t.id === templateId)?.name ?? "That template";
+    const cantFollow = (why: string) => `“${name}” can’t follow “${src ? anchorNameOf(src) : "it"}” — ${why}`;
+    if ("error" in plan) { refuse(plan.blame === "anchor" ? plan.error : cantFollow(plan.error)); return; }
+    const checked = checkTemplateAttach({ ...data, ...base }, plan);
+    if ("error" in checked) { refuse(cantFollow(checked.error)); return; }
+    applyTemplate(plan.elements, plan.connectors, { join: plan.join });
+    setSelectedElementIds(new Set(plan.newIds));
     setTemplatePicker(null);
-  }, [data.elements, applyTemplate, addConnector]);
+  }, [data, builtInTemplates, userTemplates, applyTemplate]);
 
   const acceptNextStep = useCallback((c: NextStepCandidate) => {
     if (!selectedElement) return;
@@ -2749,16 +2783,21 @@ export function DiagramEditor({
   //    that most needed it.
   // "Add template" (Paul, 2026-09-24): the numbered window, and the template
   // currently sitting on the diagram waiting to be kept. The pick is applied
-  // for real so it can be SEEN in place; another number undoes it and applies
-  // the next; only "yes" keeps it.
-  const [templateFlow, setTemplateFlowState] = useState<{
-    sections: TemplateSection[];
-    cards: TemplateCard[];
-    provisional: TemplateCard | null;
-    hiddenInitialCount: number;
-  } | null>(null);
-  const templateFlowRef = useRef<typeof templateFlow>(null);
-  const setTemplateFlow = useCallback((f: typeof templateFlow) => { templateFlowRef.current = f; setTemplateFlowState(f); }, []);
+  // for real so it can be SEEN in place; another number replaces it (the
+  // diagram it was applied to goes back, then the next goes on — one undo
+  // entry however many are tried); only "yes" keeps it.
+  const [templateFlow, setTemplateFlowState] = useState<TemplateFlow | null>(null);
+  const templateFlowRef = useRef<TemplateFlow | null>(null);
+  const setTemplateFlow = useCallback((f: TemplateFlow | null) => { templateFlowRef.current = f; setTemplateFlowState(f); }, []);
+  // Every pick (and every close) takes a new number; a pick whose template
+  // arrives after a newer one began — a double click, voice and mouse at once,
+  // or Esc while it loaded — is dropped rather than stacked.
+  const templatePickSeqRef = useRef(0);
+  // Defined with the template window below; reached through refs from the
+  // voice runner and the Esc handler, which are defined before them.
+  const closeTemplateFlowRef = useRef<(keep: boolean) => string>(() => "");
+  const pickTemplateCardRef = useRef<(card: TemplateCard, report: TemplateReport) => Promise<void>>(async () => {});
+  const reanchorTemplateRef = useRef<(ref: string, report: TemplateReport) => Promise<void>>(async () => {});
   const [pickFlow, setPickFlowState] = useState<PickFlow | null>(null);
   const pickFlowRef = useRef<PickFlow | null>(null);
   const setPickFlow = useCallback((f: PickFlow | null) => { pickFlowRef.current = f; setPickFlowState(f); }, []);
@@ -2795,6 +2834,17 @@ export function DiagramEditor({
       marks: subtypeFingerprint(e as unknown as Record<string, unknown>),
     }));
   }, []);
+  /** The debug recording's before-snapshot — the op batch and the template
+   *  window's picks both change the diagram, and both are evidence. */
+  const armDebugBefore = useCallback((elements: DiagramElement[]) => {
+    if (voiceDebugRecording) {
+      debugBeforeRef.current = elements.map((e) => ({
+        id: e.id, type: e.type, x: e.x, y: e.y, width: e.width, height: e.height,
+        parentId: e.parentId, label: e.label,
+        marks: subtypeFingerprint(e as unknown as Record<string, unknown>),
+      }));
+    }
+  }, [voiceDebugRecording]);
   // Apply interpreted ops. The work is in app/lib/assist/applyAssistOps.ts, so the
   // test harness can run the SAME code against a headless diagram (L4); what
   // stays here is editor memory ("again") and the display snapshots taken around it.
@@ -2816,13 +2866,7 @@ export function DiagramEditor({
     // recording — `batchFlashes` deliberately skips the ops that change nothing
     // worth outlining, and those are exactly the ones whose effect a person
     // cannot see by looking, so they are the ones the evidence needs most.
-    if (voiceDebugRecording) {
-      debugBeforeRef.current = data.elements.map((e) => ({
-        id: e.id, type: e.type, x: e.x, y: e.y, width: e.width, height: e.height,
-        parentId: e.parentId, label: e.label,
-        marks: subtypeFingerprint(e as unknown as Record<string, unknown>),
-      }));
-    }
+    armDebugBefore(data.elements);
     return applyAssistOpsTo(ops, {
       elements: data.elements, connectors: data.connectors, riskCatalog,
       actions: {
@@ -2835,7 +2879,7 @@ export function DiagramEditor({
       ui: { setSelectedElementIds, setSelectedConnectorId, setPickFlow, setRenameFlow, setMessageFlow, setGoldFlash },
       refs: { voiceLastId, pointerWorld, selectedIdsRef, selectedConnectorIdRef, nextStepRef, openTemplateWindowRef, exportJsonRef },
     });
-  }, [data.elements, data.connectors, riskCatalog, voiceDebugRecording, armGoldFlash, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, updateConnectorLabel, deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool, wrapInSubprocess, wrapInContainer, unwrapSubprocess, addPool, addLaneAt, compressPool, extendPools, swapLane, moveLane, moveElements, elementsMoveEnd, removeSpace, updateConnectorEndpoint, movePoolTo, swapPools, resizeElement, resizeElementEnd, alignElements, setRenameFlow, setMessageFlow, setPickFlow]);
+  }, [data.elements, data.connectors, riskCatalog, armDebugBefore, armGoldFlash, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, updateConnectorLabel, deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool, wrapInSubprocess, wrapInContainer, unwrapSubprocess, addPool, addLaneAt, compressPool, extendPools, swapLane, moveLane, moveElements, elementsMoveEnd, removeSpace, updateConnectorEndpoint, movePoolTo, swapPools, resizeElement, resizeElementEnd, alignElements, setRenameFlow, setMessageFlow, setPickFlow]);
 
   // Gold flashing, part two: the command has run, React has re-rendered, and
   // `data.elements` is now the after picture. Diff it against the snapshot taken
@@ -3116,23 +3160,17 @@ export function DiagramEditor({
       const flow = templateFlowRef.current;
       const answer = parseTemplateAnswer(heard, flow.cards, !!flow.provisional);
       if (!answer) { log({ heard, summary: "say a number, “yes” to keep it, or “cancel”", ok: false }); return; }
-      if (answer.kind === "cancel") {
-        if (flow.provisional) undo();
-        setTemplateFlow(null);
-        log({ heard, summary: "cancelled — no template added", ok: true });
+      if (answer.kind === "cancel" || answer.kind === "confirm") {
+        log({ heard, summary: closeTemplateFlowRef.current(answer.kind === "confirm"), ok: true });
         return;
       }
-      if (answer.kind === "confirm") {
-        const kept = flow.provisional!;
-        setTemplateFlow(null);
-        log({ heard, summary: `added template “${kept.name}”`, ok: true });
-        return;
-      }
-      // A number: show that one instead of whatever is showing now.
-      const ok = await previewTemplateRef.current(answer.card, !!flow.provisional);
-      if (!ok) { log({ heard, summary: `couldn't load “${answer.card.name}”`, ok: false }); return; }
-      setTemplateFlow({ ...flow, provisional: answer.card });
-      log({ heard, summary: `${answer.card.n} → “${answer.card.name}” — say “yes” to keep it`, ok: true });
+      if (answer.kind === "before") { log({ heard, summary: TEMPLATE_BEFORE_REFUSAL, ok: false }); return; }
+      // A number shows that one instead of whatever is showing now; "after X"
+      // moves the window (and what is showing) to X. Each reports in the same
+      // tick as its change, so the debug recording's "touched" lands on it.
+      const report: TemplateReport = (r) => log({ heard, summary: r.summary, ok: r.ok });
+      if (answer.kind === "anchor") await reanchorTemplateRef.current(answer.ref, report);
+      else await pickTemplateCardRef.current(answer.card, report);
       return;
     }
     if (pickFlowRef.current) {
@@ -3410,14 +3448,13 @@ export function DiagramEditor({
       // shut either way, and leaving a half-chosen template behind would be
       // the one outcome nobody asked for.
       if (templateFlow) {
-        if (templateFlow.provisional) undo();
-        setTemplateFlow(null);
-        setVoiceLog((prev) => [...prev, { id: nanoid(), heard: "", summary: "cancelled — no template added", ok: true }]);
+        const summary = closeTemplateFlowRef.current(false);
+        setVoiceLog((prev) => [...prev, { id: nanoid(), heard: "", summary, ok: true }]);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [renameFlow, messageFlow, pickFlow, templateFlow, cancelRenameFlow, setMessageFlow, setPickFlow, setTemplateFlow, undo]);
+  }, [renameFlow, messageFlow, pickFlow, templateFlow, cancelRenameFlow, setMessageFlow, setPickFlow]);
 
   // Stop the mic when the mode is turned off or the editor unmounts.
   useEffect(() => {
@@ -4234,46 +4271,178 @@ export function DiagramEditor({
   }
 
   /**
-   * Put a template on the diagram to be LOOKED at. Any previous provisional
-   * one is undone first, so the window always shows exactly one candidate and
-   * the history holds one entry however many numbers were tried.
+   * Put a template on the diagram to be LOOKED at — synchronously, once its
+   * data has arrived, so the caller can log in the same tick.
+   *
+   * It is planned on and applied to the diagram WITHOUT whatever was showing
+   * (templatePreview.ts `previewBase`): restored when the old preview is still
+   * exactly as it was left, stripped by its ids when something else has
+   * changed the diagram since, and the plain diagram when Ctrl+Z already took
+   * it off. The swap pushes no second undo entry.
+   *
+   * After an element, the placement is templateAttach.ts's and the reducer
+   * judges it first (a dry run): a template that would hang outside its lane,
+   * land in another pool or not be joined is refused with that reason, and the
+   * window stays open for another number with the old one still showing.
    */
-  const previewTemplate = useCallback(async (card: TemplateCard, hadProvisional: boolean): Promise<boolean> => {
-    try {
-      const res = await fetch(`/api/templates/${card.id}`);
-      if (!res.ok) return false;
-      const tmpl = await res.json();
-      if (hadProvisional) undo();
-      const center = getViewportCenterRef.current?.() ?? { x: 200, y: 200 };
-      const { elements, connectors, newIds } = instantiateTemplate(tmpl.data as TemplateData, center.x, center.y);
-      applyTemplate(elements, connectors);
-      setSelectedElementIds(newIds);
-      setSelectedConnectorId(null);
-      return true;
-    } catch {
-      return false;
+  const showTemplate = useCallback((flow: TemplateFlow, card: TemplateCard, tdata: TemplateData): { ok: boolean; summary: string } => {
+    const now = { ...data, elements: elementsRef.current, connectors: connectorsRef.current };
+    const prov = flow.provisional;
+    const plan = planTemplateShow(tdata, {
+      data: now,
+      provisional: prov,
+      showing: !!prov && templateStillShowing(prov.stamp),
+      ...(flow.anchorId ? { anchorId: flow.anchorId } : {}),
+      at: flow.at ?? getViewportCenterRef.current?.() ?? { x: 200, y: 200 },
+    });
+    if ("refused" in plan) {
+      const summary = plan.blame === "anchor" ? plan.refused
+        : `“${card.name}” can’t follow “${flow.anchorName}” — ${plan.refused}; say another number`;
+      const current = templateFlowRef.current;
+      if (current) setTemplateFlow({ ...current, notice: summary });
+      return { ok: false, summary };
     }
-  }, [undo, applyTemplate]);
+    armGoldFlash(now.elements);
+    armDebugBefore(now.elements);
+    const stamp = applyTemplate(plan.elements, plan.connectors, {
+      ...(plan.join ? { join: plan.join } : {}),
+      ...(plan.over ? { over: plan.over } : {}),
+    });
+    setSelectedElementIds(plan.newIds);
+    setSelectedConnectorId(null);
+    setTemplateFlow({
+      ...flow,
+      notice: null,
+      provisional: {
+        card, stamp, base: plan.base,
+        ids: { elements: [...plan.newIds], connectors: plan.connectors.map((c) => c.id) },
+      },
+    });
+    return { ok: true, summary: `${card.n} → “${card.name}”${flow.anchorName ? ` after “${flow.anchorName}”` : ""} — say “yes” to keep it` };
+  }, [data, templateStillShowing, setTemplateFlow, armGoldFlash, armDebugBefore, applyTemplate]);
+  const showTemplateRef = useRef(showTemplate);
+  showTemplateRef.current = showTemplate;
 
-  /** Open the window: every template this diagram may sensibly take, numbered. */
-  const openTemplateWindowRef = useRef<() => string>(() => "");
-  const previewTemplateRef = useRef<(card: TemplateCard, hadProvisional: boolean) => Promise<boolean>>(async () => false);
-  const openTemplateWindow = useCallback((): string => {
-    const hasWhiteBox = data.elements.some(
+  /** A number (or a click): fetch that template, then show it — unless a newer pick or a close came first. */
+  const pickTemplateCard = useCallback(async (card: TemplateCard, report: TemplateReport) => {
+    const flow = templateFlowRef.current;
+    if (!flow) return;
+    const seq = ++templatePickSeqRef.current;
+    const tdata = await fetchTemplateData(card.id);
+    const current = templateFlowRef.current;
+    if (seq !== templatePickSeqRef.current || !current || current.openId !== flow.openId) return;
+    if (!tdata) { report({ ok: false, summary: `couldn't load “${card.name}”` }); return; }
+    report(showTemplateRef.current(current, card, tdata));
+  }, []);
+
+  /**
+   * Close the window. Kept: nothing to do, it is already on the diagram.
+   * Cancelled: one undo takes it off when it is still exactly as it was
+   * shown; when something else has changed the diagram since, it is taken off
+   * by its ids instead, so the other change survives; when Ctrl+Z already took
+   * it off there is nothing left to do. Voice, Esc and the window's own
+   * buttons all come here.
+   */
+  const closeTemplateFlow = useCallback((keep: boolean): string => {
+    const flow = templateFlowRef.current;
+    templatePickSeqRef.current++;
+    setTemplateFlow(null);
+    const prov = flow?.provisional;
+    if (keep && prov) return `added template “${prov.card.name}”${flow?.anchorName ? ` after “${flow.anchorName}”` : ""}`;
+    if (prov) {
+      if (templateStillShowing(prov.stamp)) undo();
+      else removeTemplate(prov.ids);
+    }
+    return "cancelled — no template added";
+  }, [setTemplateFlow, templateStillShowing, undo, removeTemplate]);
+
+  /** The window's numbered offer, for a plain window or one whose picks go after `anchor`. */
+  const buildTemplateFlow = useCallback((anchor?: DiagramElement, at?: Point): TemplateFlow => {
+    const hasWhiteBoxPool = elementsRef.current.some(
       (e) => e.type === "pool" && (e.properties?.poolType ?? "white-box") === "white-box",
     );
-    const offerBuiltIn = offerableTemplates(builtInTemplates, hasWhiteBox);
-    const offerUser = offerableTemplates(userTemplates, hasWhiteBox);
-    const hidden = (builtInTemplates.length - offerBuiltIn.length) + (userTemplates.length - offerUser.length);
-    const sections = numberTemplates(offerBuiltIn, offerUser);
-    const cards = cardsOf(sections);
-    if (!cards.length) return "no templates to offer for this diagram";
-    setTemplateFlow({ sections, cards, provisional: null, hiddenInitialCount: hidden });
-    return `${cards.length} templates — say a number${hidden ? `, ${hidden} starter${hidden === 1 ? "" : "s"} hidden` : ""}`;
-  }, [data.elements, builtInTemplates, userTemplates, setTemplateFlow]);
+    const opts = { hasWhiteBoxPool, attaching: !!anchor };
+    const b = templatesToOffer(builtInTemplates, opts);
+    const u = templatesToOffer(userTemplates, opts);
+    const sections = numberTemplates(b.offered, u.offered);
+    return {
+      openId: nanoid(),
+      sections,
+      cards: cardsOf(sections),
+      provisional: null,
+      hiddenInitial: b.hiddenInitial + u.hiddenInitial,
+      hiddenContainer: b.hiddenContainer + u.hiddenContainer,
+      ...(anchor ? { anchorId: anchor.id, anchorName: anchorNameOf(anchor) } : {}),
+      ...(at ? { at } : {}),
+      selectionAtOpen: [...selectedIdsRef.current],
+      notice: null,
+    };
+  }, [builtInTemplates, userTemplates]);
+
+  /** Open the window: every template this diagram may sensibly take, numbered. */
+  const openTemplateWindowRef = useRef<(opts?: { anchorId?: string; at?: Point }) => string>(() => "");
+  const openTemplateWindow = useCallback((opts: { anchorId?: string; at?: Point } = {}): string => {
+    const anchor = opts.anchorId ? elementsRef.current.find((e) => e.id === opts.anchorId) : undefined;
+    const flow = buildTemplateFlow(anchor, opts.at);
+    if (!flow.cards.length) return anchor ? `no templates can follow “${anchorNameOf(anchor)}”` : "no templates to offer for this diagram";
+    setTemplateFlow(flow);
+    return templateWindowSummary(flow.cards.length, flow.hiddenInitial, flow.hiddenContainer, flow.anchorName);
+  }, [buildTemplateFlow, setTemplateFlow]);
+
+  /**
+   * "After X", said once the window is open — "Add template." … "After
+   * selected." with a pause between. The picks go after X from now on, and a
+   * template already showing moves there (refused, it stays where it was).
+   * An ambiguous name is refused BY NAME: the window covers the canvas, so
+   * numbered badges could not be seen.
+   */
+  const reanchorTemplate = useCallback(async (ref: string, report: TemplateReport) => {
+    const flow = templateFlowRef.current;
+    if (!flow) return;
+    const mine = new Set(flow.provisional?.ids.elements ?? []);
+    const els = elementsRef.current.filter((e) => !mine.has(e.id));
+    // A picked preview is selected, so it can be seen; "after selected" means
+    // what was selected before it — never the template being moved.
+    const live = selectedIdsRef.current.filter((id) => !mine.has(id));
+    const selection = live.length ? live : flow.selectionAtOpen;
+    const r = resolveRef(ref, els, voiceLastId.current, selection, { strict: true, pointer: pointerWorld.current });
+    if (!r) {
+      report({ ok: false, summary: isSelectionRef(ref) && !selection.length ? "nothing is selected" : `couldn't find “${ref}” — say its name` });
+      return;
+    }
+    if ("ambiguous" in r) {
+      const names = r.ambiguous.map((id) => els.find((e) => e.id === id)).filter((e): e is DiagramElement => !!e).map((e) => `“${anchorNameOf(e)}”`);
+      report({ ok: false, summary: `which “${ref}”? ${names.length} match: ${names.slice(0, 4).join(", ")} — say the name` });
+      return;
+    }
+    const anchor = els.find((e) => e.id === r.id)!;
+    const why = whyTemplateCantFollow(anchor, els);
+    if (why) { report({ ok: false, summary: why }); return; }
+    const next = buildTemplateFlow(anchor);
+    const showing = flow.provisional;
+    if (!showing) {
+      templatePickSeqRef.current++;
+      setTemplateFlow({ ...next, openId: flow.openId, selectionAtOpen: flow.selectionAtOpen });
+      report({ ok: true, summary: templateWindowSummary(next.cards.length, next.hiddenInitial, next.hiddenContainer, next.anchorName) });
+      return;
+    }
+    const card = next.cards.find((c) => c.id === showing.card.id);
+    if (!card) {
+      report({ ok: false, summary: `“${showing.card.name}” brings a pool or lane of its own — it can’t follow “${anchorNameOf(anchor)}”` });
+      return;
+    }
+    const seq = ++templatePickSeqRef.current;
+    const tdata = await fetchTemplateData(card.id);
+    const current = templateFlowRef.current;
+    if (seq !== templatePickSeqRef.current || !current || current.openId !== flow.openId) return;
+    if (!tdata) { report({ ok: false, summary: `couldn't load “${card.name}”` }); return; }
+    report(showTemplateRef.current({ ...next, openId: current.openId, provisional: current.provisional, selectionAtOpen: current.selectionAtOpen }, card, tdata));
+  }, [buildTemplateFlow, setTemplateFlow]);
 
   openTemplateWindowRef.current = openTemplateWindow;
-  previewTemplateRef.current = previewTemplate;
+  closeTemplateFlowRef.current = closeTemplateFlow;
+  pickTemplateCardRef.current = pickTemplateCard;
+  reanchorTemplateRef.current = reanchorTemplate;
 
   async function handleApplyTemplate(templateId: string) {
     setTemplateDropdownOpen(false);
@@ -6220,12 +6389,15 @@ export function DiagramEditor({
                 <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100">
                   <div className="flex items-center gap-2 min-w-0">
                     {cat && (
-                      <button onClick={() => setTemplatePicker({ ...templatePicker, category: null })} className="text-gray-400 hover:text-gray-700 text-sm" title="Back to categories">←</button>
+                      <button onClick={() => setTemplatePicker({ ...templatePicker, category: null, error: undefined })} className="text-gray-400 hover:text-gray-700 text-sm" title="Back to categories">←</button>
                     )}
                     <h3 className="text-sm font-semibold text-purple-800 truncate">{cat ? `Templates · ${cat}` : "Insert a template"}</h3>
                   </div>
                   <button onClick={() => setTemplatePicker(null)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
                 </div>
+                {templatePicker.error && (
+                  <p className="px-4 py-2 text-xs text-red-600 border-b border-gray-100">{templatePicker.error}</p>
+                )}
                 <div className="overflow-y-auto p-2">
                   {!cat ? (
                     cats.length === 0 ? (
@@ -6660,22 +6832,21 @@ export function DiagramEditor({
         {templateFlow && (
           <TemplatePickerWindow
             sections={templateFlow.sections}
-            provisionalId={templateFlow.provisional?.id ?? null}
-            hiddenInitialCount={templateFlow.hiddenInitialCount}
-            onPick={async (card) => {
-              const flow = templateFlowRef.current;
-              if (!flow) return;
-              const ok = await previewTemplateRef.current(card, !!flow.provisional);
-              if (ok) setTemplateFlow({ ...flow, provisional: card });
+            provisionalId={templateFlow.provisional?.card.id ?? null}
+            hiddenNote={hiddenTemplatesNote(templateFlow.hiddenInitial, templateFlow.hiddenContainer)}
+            anchorName={templateFlow.anchorName}
+            notice={templateFlow.notice}
+            onPick={(card) => {
+              void pickTemplateCardRef.current(card, (r) =>
+                setVoiceLog((prev) => [...prev, { id: nanoid(), at: Date.now(), heard: "", summary: r.summary, ok: r.ok }]));
             }}
             onConfirm={() => {
-              const kept = templateFlowRef.current?.provisional;
-              setTemplateFlow(null);
-              if (kept) setVoiceLog((prev) => [...prev, { id: nanoid(), heard: "", summary: `added template “${kept.name}”`, ok: true }]);
+              const summary = closeTemplateFlowRef.current(true);
+              setVoiceLog((prev) => [...prev, { id: nanoid(), at: Date.now(), heard: "", summary, ok: true }]);
             }}
             onCancel={() => {
-              if (templateFlowRef.current?.provisional) undo();
-              setTemplateFlow(null);
+              const summary = closeTemplateFlowRef.current(false);
+              setVoiceLog((prev) => [...prev, { id: nanoid(), at: Date.now(), heard: "", summary, ok: true }]);
             }}
           />
         )}

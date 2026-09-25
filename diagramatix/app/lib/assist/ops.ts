@@ -76,8 +76,12 @@ export type AssistOp =
    * choose by saying a number (Paul, 2026-09-24). The pick is PROVISIONAL:
    * the template goes on the diagram to be looked at, another number replaces
    * it, and only "yes" keeps it. See `templatePick.ts`.
+   *
+   * `afterRef`: every number is shown AFTER that element, joined to it by a
+   * sequence flow (Paul, 2026-09-25). `beforeRef` is carried only so it can
+   * be refused by name. `at: "pointer"` shows each one at the mouse.
    */
-  | { op: "pickTemplate" }
+  | { op: "pickTemplate"; afterRef?: Ref; beforeRef?: Ref; at?: "pointer" }
   | { op: "export"; format?: "json" }
   | { op: "movePoolTo"; ref: Ref; position: "above" | "below"; relativeTo: Ref }
   | { op: "swapPools"; a?: Ref; b?: Ref }
@@ -304,10 +308,15 @@ export function validateOp(raw: unknown): AssistOp | null {
     }
     case "clear":
       return { op: "clear" };
-    // Opening the template window takes no argument: the window is the
-    // question, and the answer comes back as a number.
-    case "pickTemplate":
-      return { op: "pickTemplate" };
+    // The window is the question and the answer comes back as a number; what
+    // travels with it is only WHERE the chosen template goes.
+    case "pickTemplate": {
+      const op: AssistOp = { op: "pickTemplate" };
+      if (isRef(o.afterRef)) op.afterRef = (o.afterRef as string).trim();
+      if (isRef(o.beforeRef)) op.beforeRef = (o.beforeRef as string).trim();
+      if (o.at === "pointer") op.at = "pointer";
+      return op;
+    }
     case "export":
       return { op: "export", format: "json" };
     case "movePoolTo": {

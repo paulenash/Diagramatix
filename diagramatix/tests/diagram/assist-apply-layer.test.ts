@@ -55,7 +55,11 @@ describe("T4748 — the editor delegates; the ops are applied in ONE place", () 
     const body = ed.slice(ed.indexOf("const applyAssistOps = useCallback("), ed.indexOf("return applyAssistOpsTo(ops, {"));
     expect(body).toContain("lastAbraOpsRef.current");
     expect(body).toContain("armGoldFlash(data.elements)");
-    expect(body).toContain("debugBeforeRef.current =");
+    // The debug snapshot is armed by one helper, shared with the template
+    // window's picks, which change the diagram too.
+    expect(body).toContain("armDebugBefore(data.elements)");
+    const arm = ed.slice(ed.indexOf("const armDebugBefore = useCallback("), ed.indexOf("}, [voiceDebugRecording]);"));
+    expect(arm).toContain("debugBeforeRef.current =");
   });
 });
 

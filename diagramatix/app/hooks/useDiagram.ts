@@ -50,8 +50,11 @@ import { planMovePool, planSwapPools, type PoolPosition } from "@/app/lib/diagra
 import { autoResizeUmlElement, sizeUmlNote } from "@/app/lib/diagram/umlAutoSize";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { getElementPoolId } from "@/app/lib/diagram/poolUtil";
+import { isLaneUnowned } from "@/app/lib/diagram/containment";
 import { CHEVRON_THEMES, chevronReadingOrder } from "@/app/lib/diagram/chevronThemes";
 import { createHistoryGroupGate } from "@/app/lib/diagram/historyGroup";
+import type { TemplateJoin } from "@/app/lib/diagram/templateAttach";
+import { noteProduced, isStillShowing, runTemplateApply, runTemplateRemove, type ShownTemplate, type TemplateIds } from "@/app/lib/diagram/templatePreview";
 import { autoSizeForType, getDefaultSize, wrapText, connectorLabelSize, type AutosizeType } from "@/app/lib/diagram/textMetrics";
 import { fitShapeToLabel, holdsInternalLabel } from "@/app/lib/diagram/shapeFit";
 import { archiFitSize } from "@/app/lib/diagram/genericLayout";
@@ -486,7 +489,11 @@ export type Action =
   | { type: "REORDER_LANE"; payload: { laneId: string; direction: "up" | "down" } }
   | { type: "MOVE_LANE"; payload: { laneId: string; direction: "up" | "down"; distance: number } }
   | { type: "MOVE_ELEMENTS"; payload: { ids: string[]; dx: number; dy: number } }
-  | { type: "APPLY_TEMPLATE"; payload: { elements: DiagramElement[]; connectors: Connector[] } }
+  /** `join`: the one sequence flow from the element a template follows into
+   *  its entry — drawn by ADD_CONNECTOR inside this action, after the template
+   *  has been placed and its lane grown, so it gets that case's rules and the
+   *  whole attach is one undo. */
+  | { type: "APPLY_TEMPLATE"; payload: { elements: DiagramElement[]; connectors: Connector[]; join?: TemplateJoin } }
   | { type: "ALIGN_ELEMENTS"; payload: { ids: string[]; mode: "center" | "top" | "bottom" | "vcenter" | "left" | "right" | "smart" } };
 
 export function nanoid(): string {
@@ -674,10 +681,11 @@ function reconcileLaneMembership(elements: DiagramElement[]): DiagramElement[] {
   const out = elements.map((el) => {
     if (el.type === "lane" || el.type === "pool") return el;
     if (el.boundaryHostId) return el; // boundary events follow their host, not a lane
-    if (MARKER_TYPES.has(el.type)) return el; // markers stick to their host shape
-    // Free-floating notes are deliberately unowned — adopting one into a lane
-    // would make it travel with that lane.
-    if (el.type === "text-annotation" || el.type === "review-comment") return el;
+    // Markers stick to their host shape, and free-floating notes are
+    // deliberately unowned — adopting one into a lane would make it travel
+    // with that lane. One list (containment.ts), read by the parentage check
+    // and the template attach too.
+    if (isLaneUnowned(el)) return el;
     const parent = el.parentId ? byId.get(el.parentId) : undefined;
     const cx = el.x + el.width / 2, cy = el.y + el.height / 2;
     // An EP's contents belong to the EP, not to a lane — UNLESS the element no
@@ -9815,7 +9823,15 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       //   3. ENCLOSE, which catches the width and anything not in a lane.
       const laneFs = state.laneFontSize ?? 14;
       const addedIds = new Set(action.payload.elements.map((e) => e.id));
-      let merged = reconcileLaneMembership([...state.elements, ...action.payload.elements]);
+      // A parent the CALLER gave is kept. The attach puts a fragment in the
+      // lane of the element it follows — after a boundary event, the host's
+      // lane (R7.07, "Keep it fully inside the EMIE's own lane") — and the
+      // lane then grows round it. Re-homed by the lane pass instead, a
+      // fragment placed below its anchor's lane joined the lane underneath,
+      // and its join ran down across the lane line.
+      const given = new Map(action.payload.elements.filter((e) => e.parentId).map((e) => [e.id, e.parentId!] as const));
+      let merged = reconcileLaneMembership([...state.elements, ...action.payload.elements])
+        .map((e) => (given.has(e.id) && e.parentId !== given.get(e.id) ? { ...e, parentId: given.get(e.id) } : e));
       // A POOL IS A HORIZONTAL BAND, so overflowing its RIGHT edge does not put
       // you outside it (Paul, 2026-09-25: "just grow the Pool when the template
       // is placed", and "assume the template will go on the end of the current
@@ -9862,16 +9878,28 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         return d;
       };
       let elements = merged;
+      // A POOL WITH NO LANES is its own band and grows like one ("just grow
+      // the Pool when the template is placed"). Without it a template adopted
+      // straight into a lane-less pool hangs out of the pool's bottom, and the
+      // attach's dry run refuses nearly every template there.
+      const lanelessPool = (e: DiagramElement) => e.type === "pool"
+        && !merged.some((k) => k.parentId === e.id && (k.type === "lane" || k.type === "sublane"));
       const hosts = merged
-        .filter((e) => e.type === "lane" && merged.some((k) => addedIds.has(k.id) && k.parentId === e.id))
+        .filter((e) => (e.type === "lane" || lanelessPool(e)) && merged.some((k) => addedIds.has(k.id) && k.parentId === e.id))
         .sort((a, b) => depthOf(b) - depthOf(a));
       for (const host of hosts) {
-        const lane = elements.find((e) => e.id === host.id);
-        if (!lane) continue;
-        const kids = elements.filter((e) => e.parentId === lane.id && e.type !== "lane" && e.type !== "sublane");
+        const band = elements.find((e) => e.id === host.id);
+        if (!band) continue;
+        const kids = elements.filter((e) => e.parentId === band.id && e.type !== "lane" && e.type !== "sublane");
         if (!kids.length) continue;
-        const needed = Math.max(...kids.map((k) => k.y + k.height)) + 8 - lane.y;
-        elements = growLaneToHeight(elements, lane.id, Math.max(needed, laneMetrics(lane.label ?? "", laneFs).minHeight));
+        const needed = Math.max(...kids.map((k) => k.y + k.height)) + 8 - band.y;
+        if (band.type === "pool") {
+          // Nothing inside it to push down; the pools below are the same
+          // question a grown lane leaves (issue 6's one top-down cascade).
+          if (needed > band.height) elements = elements.map((e) => (e.id === band.id ? { ...e, height: needed } : e));
+          continue;
+        }
+        elements = growLaneToHeight(elements, band.id, Math.max(needed, laneMetrics(band.label ?? "", laneFs).minHeight));
       }
       // …AND GROW IT SIDEWAYS, which nothing else will do.
       //
@@ -9911,11 +9939,27 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           });
         }
       }
-      return {
+      const placed: DiagramData = {
         ...state,
         elements: ensureContainersEncloseChildren(elements),
         connectors: [...state.connectors, ...action.payload.connectors],
       };
+      // THE JOIN, drawn last and by ADD_CONNECTOR itself. Concatenated with the
+      // template's own connectors it had no route, no gateway-vertex offset
+      // (R6.30), no merge convention and no legality or scope check; sent as a
+      // second action it was a second undo entry holding the same stale
+      // snapshot as the first. A join the rules refuse is simply not drawn —
+      // the template stays, and the caller's dry run says why.
+      const join = action.payload.join;
+      if (!join) return placed;
+      return reducerImpl(placed, {
+        type: "ADD_CONNECTOR",
+        payload: {
+          sourceId: join.sourceId, targetId: join.targetId,
+          connectorType: "sequence", directionType: "directed", routingType: "rectilinear",
+          sourceSide: "right", targetSide: "left",
+        },
+      });
     }
 
     case "ALIGN_ELEMENTS": {
@@ -10209,6 +10253,11 @@ export function useDiagram(initialData: DiagramData) {
 
   const pastRef   = useRef<Snapshot[]>([]);
   const futureRef = useRef<Snapshot[]>([]);
+  // The template the window last put on the diagram, and the state it
+  // produced — read back here on the render that shows it (templatePreview.ts).
+  const templateShownRef = useRef<ShownTemplate | null>(null);
+  const templateStampRef = useRef(0);
+  noteProduced(templateShownRef.current, data);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
 
@@ -10645,9 +10694,54 @@ export function useDiagram(initialData: DiagramData) {
     dispatch({ type: "SPLIT_CONNECTOR", payload: { symbolType, position, connectorId, taskType, eventType } });
   }, []);
 
-  const applyTemplate = useCallback((elements: DiagramElement[], connectors: Connector[]) => {
-    pushHistory(snapshotData());
-    dispatch({ type: "APPLY_TEMPLATE", payload: { elements, connectors } });
+  /** The undo entry on top of the history: a preview still showing has its own entry here. */
+  function topOfHistory(): Snapshot | undefined {
+    return pastRef.current[pastRef.current.length - 1];
+  }
+
+  /**
+   * Put a template on the diagram; returns a stamp for `templateStillShowing`.
+   *
+   * `join` is the flow from the element it follows (drawn inside the same
+   * action). `over` SWAPS a previewed template: the diagram it was applied to
+   * goes back first, then this one goes on — never `undo()` and then apply in
+   * the same tick, which pushed a history entry read from the last render,
+   * with the previewed template still in it. `entry: "kept"`: the preview's
+   * own entry already holds `over.base`, so nothing is pushed and one undo
+   * still takes everything off. `"new"`: the preview was changed by something
+   * else and has been stripped by its ids; that diagram is the new entry.
+   */
+  const applyTemplate = useCallback((
+    elements: DiagramElement[],
+    connectors: Connector[],
+    opts: { join?: TemplateJoin; over?: { base: Snapshot; entry: "kept" | "new" } } = {},
+  ): number => {
+    const { join, over } = opts;
+    const stamp = ++templateStampRef.current;
+    // The order (push, record, restore, apply) is runTemplateApply's, shared
+    // with the tests that drive the swap; only the wiring to React is here.
+    runTemplateApply(over, stamp, {
+      snapshot: snapshotData,
+      pushHistory,
+      topOfHistory,
+      record: (shown) => { templateShownRef.current = shown; },
+      restore: (s) => dispatch({ type: "SET_DATA", payload: { ...dataRef.current, elements: s.elements, connectors: s.connectors } }),
+      apply: () => dispatch({ type: "APPLY_TEMPLATE", payload: { elements, connectors, ...(join ? { join } : {}) } }),
+    });
+    return stamp;
+  }, []);
+
+  /** Is the template stamped `stamp` still exactly what the diagram shows, its undo entry on top? */
+  const templateStillShowing = useCallback((stamp: number): boolean =>
+    isStillShowing(templateShownRef.current, stamp, dataRef.current, topOfHistory()), []);
+
+  /** Take a previewed template off by its ids, keeping every other change (one undo entry). */
+  const removeTemplate = useCallback((ids: TemplateIds) => {
+    runTemplateRemove(ids, {
+      snapshot: snapshotData,
+      pushHistory,
+      restore: (s) => dispatch({ type: "SET_DATA", payload: { ...dataRef.current, elements: s.elements, connectors: s.connectors } }),
+    });
   }, []);
 
   const alignElements = useCallback((ids: string[], mode: "center" | "top" | "bottom" | "vcenter" | "left" | "right" | "smart") => {
@@ -11105,6 +11199,8 @@ export function useDiagram(initialData: DiagramData) {
     elementMoveEnd,
     splitConnector,
     applyTemplate,
+    templateStillShowing,
+    removeTemplate,
     alignElements,
     setData,
     clearDiagram,

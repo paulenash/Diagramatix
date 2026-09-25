@@ -57,3 +57,17 @@ export function isInside(child: DiagramElement, ancestorId: string, byId: Elemen
   }
   return false;
 }
+
+/**
+ * Elements no lane or pool ever OWNS: a marker (pain point, issue) sticks to
+ * the shape it annotates, and a free-floating note (text annotation, review
+ * comment) is deliberately unowned — adopted into a lane, it would travel with
+ * that lane. The lane pass (useDiagram `reconcileLaneMembership`) skips them,
+ * the parentage check does not expect them to have a lane, and an attached
+ * template leaves them where they land.
+ */
+const LANE_UNOWNED_TYPES: ReadonlySet<string> = new Set(["uml-pain-point", "uml-issue", "text-annotation", "review-comment"]);
+
+export function isLaneUnowned(el: { type: string }): boolean {
+  return LANE_UNOWNED_TYPES.has(el.type);
+}

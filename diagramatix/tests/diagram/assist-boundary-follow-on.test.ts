@@ -297,9 +297,14 @@ describe("T4799 — wiring: one rule, asked from every place that decides it", (
     expect(accept).toMatch(/followOnParentId\(src, data\.elements\)/);
     expect(accept).toMatch(/keepInLane: true/);
     expect(accept).not.toMatch(/src\.parentId/);
+    // The template attach's placement moved to templateAttach.ts (shared with
+    // "add template after X" by voice); the follow-on parent went with it.
     const attach = callbackBody(src, "attachTemplate");
-    expect(attach).toMatch(/followOnParentId\(src, data\.elements\)/);
+    expect(attach).toMatch(/planTemplateAttach\(tmplData, sourceId, base\)/);
     expect(attach).not.toMatch(/src\.parentId/);
+    const planner = code("app", "lib", "diagram", "templateAttach.ts");
+    expect(planner).toMatch(/followOnParentId\(anchor, base\.elements\)/);
+    expect(planner).not.toMatch(/anchor\.parentId/);
   });
 
   it("voice add-after uses the same plan and parent", () => {

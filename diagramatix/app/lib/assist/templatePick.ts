@@ -27,6 +27,7 @@ import { leadingSpokenNumber } from "./spokenNumber";
 import { parseConfirmation } from "./confirm";
 import { phoneticMatches } from "./phonetic";
 import { spokenNumbersAsDigits } from "./resolveRef";
+import { parseTemplateAnswerPlace } from "./templatePhrase";
 
 export interface TemplateRowLike {
   id: string;
@@ -40,6 +41,9 @@ export interface TemplateRowLike {
    * Derived where the templates are listed (`/api/templates`).
    */
   initial?: boolean;
+  /** It brings a pool, lane or sub-lane of its own (`/api/templates`). */
+  hasContainer?: boolean;
+  hasWhiteBoxPool?: boolean;
 }
 
 /** Groups whose templates begin a diagram, whoever owns them. */
@@ -81,6 +85,62 @@ export function offerableTemplates<T extends TemplateRowLike>(
 ): T[] {
   if (!diagramHasWhiteBoxPool) return [...rows];
   return rows.filter((r) => !isInitialTemplate(r));
+}
+
+/**
+ * Can this template be joined INTO a flow after an element? Not one that brings
+ * its own pool or lane — there is nothing inline to join. The mouse's attach
+ * picker (the Assist "Template" ghost) and the voice's anchored window ask this
+ * one question.
+ */
+export function canAttachInline(row: { hasContainer?: boolean }): boolean {
+  return !row.hasContainer;
+}
+
+export interface TemplateOffer<T> {
+  offered: T[];
+  /** Starters and templates with a white-box pool, hidden because the diagram has one. */
+  hiddenInitial: number;
+  /** Templates that bring a pool or lane, hidden because the window is attaching. */
+  hiddenContainer: number;
+}
+
+/**
+ * What the window offers. Paul's initial-template rule always applies; when the
+ * template is to follow an element (`attaching`), templates that bring a pool
+ * or lane are hidden too. Each template is counted once, under the first rule
+ * that hides it.
+ */
+export function templatesToOffer<T extends TemplateRowLike>(
+  rows: readonly T[],
+  opts: { hasWhiteBoxPool: boolean; attaching: boolean },
+): TemplateOffer<T> {
+  const offer: TemplateOffer<T> = { offered: [], hiddenInitial: 0, hiddenContainer: 0 };
+  for (const r of rows) {
+    if (opts.hasWhiteBoxPool && isInitialTemplate(r)) offer.hiddenInitial++;
+    else if (opts.attaching && !canAttachInline(r)) offer.hiddenContainer++;
+    else offer.offered.push(r);
+  }
+  return offer;
+}
+
+/** The window's footer note, and the tail of the log line, for what was hidden. */
+export function hiddenTemplatesNote(hiddenInitial: number, hiddenContainer: number): string {
+  const n = hiddenInitial + hiddenContainer;
+  if (!n) return "";
+  if (!hiddenContainer) return `${n} starter template${n === 1 ? "" : "s"} hidden — this diagram already has a pool`;
+  if (!hiddenInitial) return `${n} template${n === 1 ? " that brings" : "s that bring"} a pool or lane hidden — they can't join a flow`;
+  return `${n} hidden — starters, and templates that bring a pool or lane`;
+}
+
+/** What the log says when the window opens. */
+export function templateWindowSummary(count: number, hiddenInitial: number, hiddenContainer: number, anchorName?: string): string {
+  const hidden = hiddenInitial + hiddenContainer;
+  if (!anchorName) {
+    return `${count} templates — say a number${hiddenInitial ? `, ${hiddenInitial} starter${hiddenInitial === 1 ? "" : "s"} hidden` : ""}`;
+  }
+  const why = [hiddenInitial ? "starters" : "", hiddenContainer ? "templates that bring a pool" : ""].filter(Boolean).join(", and ");
+  return `${count} templates to add after “${anchorName}” — say a number${hidden ? `, ${hidden} hidden (${why})` : ""}`;
 }
 
 /** One card in the window: a template, its number, and where it belongs. */
@@ -162,6 +222,10 @@ export type TemplateAnswer =
   | { kind: "confirm" }
   /** Take it off and close the window. */
   | { kind: "cancel" }
+  /** "after X": the templates go after X from now on (and what is showing moves there). */
+  | { kind: "anchor"; ref: string }
+  /** "before X": refused — a template can only go after something. */
+  | { kind: "before"; ref: string }
   /** Not an answer to this question — the window stays as it is. */
   | null;
 
@@ -187,6 +251,19 @@ export function parseTemplateAnswer(
   if (yesNo === "no") return { kind: "cancel" };
   if (yesNo === "yes" && hasProvisional) return { kind: "confirm" };
 
+  // A template's WHOLE name wins over everything below: a template called
+  // "After Hours Escalation" is that template, not "after “Hours Escalation”".
+  const whole = matchCardByName(said, cards, { exactOnly: true });
+  if (whole) return { kind: "pick", card: whole };
+
+  // "Add template." … "After selected." — the speaker paused, the window
+  // opened on the first half, and the anchor arrives as an answer (verdict-5).
+  // Read before PART names: "after the gateway" must never pick a template
+  // whose name merely contains or sounds like it.
+  const place = parseTemplateAnswerPlace(said);
+  if (place && "afterRef" in place) return { kind: "anchor", ref: place.afterRef };
+  if (place && "beforeRef" in place) return { kind: "before", ref: place.beforeRef };
+
   const byName = matchCardByName(said, cards);
   if (byName) return { kind: "pick", card: byName };
 
@@ -205,7 +282,11 @@ export function parseTemplateAnswer(
  * so this is stricter than the disambiguation picker: a whole name, or a
  * phrase that only one name contains, or one that sounds like exactly one.
  */
-export function matchCardByName(utterance: string, cards: readonly TemplateCard[]): TemplateCard | null {
+export function matchCardByName(
+  utterance: string,
+  cards: readonly TemplateCard[],
+  opts: { exactOnly?: boolean } = {},
+): TemplateCard | null {
   const said = spokenNumbersAsDigits(
     utterance.trim().toLowerCase().replace(/[.,!?;:]+$/g, "")
       .replace(/^(?:the|a|an|use|pick|choose|insert|add|template|number)\s+/i, "")
@@ -217,7 +298,7 @@ export function matchCardByName(utterance: string, cards: readonly TemplateCard[
   const only = (hits: TemplateCard[]) => (hits.length === 1 ? hits[0] : null);
 
   const exact = only(cards.filter((c) => nameOf(c) === said));
-  if (exact) return exact;
+  if (exact || opts.exactOnly) return exact;
   const contains = only(cards.filter((c) => nameOf(c).includes(said)));
   if (contains) return contains;
   return only(phoneticMatches(said, [...cards], (c) => c.name));
