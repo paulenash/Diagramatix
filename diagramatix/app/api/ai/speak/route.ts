@@ -6,15 +6,17 @@
  *
  * Refuses, in this order: 401 signed out · 403 a SuperAdmin viewing another
  * user read-only (speech spends money and writes a usage row, and view mode
- * exists so that nothing does) · 403 the org has turned voice off · 403 speech
- * not granted to this user (`speechAccess.ts` — fails CLOSED) · 400 bad body ·
- * 413 over Deepgram's per-request cap · 503 not configured.
+ * exists so that nothing does) · 503 the master switch on the Text to Speech
+ * tile is off · 403 the org has turned voice off · 403 speech not granted to
+ * this user (`speechAccess.ts` — fails CLOSED) · 400 bad body · 413 over
+ * Deepgram's per-request cap · 403 a comparison play by a non-SuperAdmin ·
+ * 503 not configured.
  *
  * Every call that reaches Deepgram writes one `AiInvocation` row, failures too,
  * so a run of errors shows up in AI Usage rather than only in a log:
  *   provider "deepgram" (the same account and invoice as dictation),
  *   model = the voice (on /v1/speak the voice IS the model),
- *   invocationPoint "voice.reply",
+ *   invocationPoint by use — voice.reply / voice.narration / voice.compare,
  *   inputTokens = CHARACTERS — priced per million by the Aura-2 rows in
  *     pricing.ts, which is how the report costs speech with no special case,
  *   latencyMs = until Deepgram's first byte — the delay a listener waits through.
@@ -25,26 +27,46 @@ import { auth } from "@/auth";
 import { gateOrgPolicy, orgPolicyAllows } from "@/app/lib/auth/orgPolicy";
 import { blockReadOnlyImpersonation } from "@/app/lib/routeGuard";
 import { speechGranted } from "@/app/lib/voice/speechAccess";
-import { speakParams, isValidTtsVoice, isSpeechPurpose, TTS_MAX_CHARS } from "@/app/lib/voice/speakParams";
+import { speakParams, isValidTtsVoice, isSpeechPurpose, TTS_MAX_CHARS, type SpeechPurpose } from "@/app/lib/voice/speakParams";
+import { readTtsSettings } from "@/app/lib/voice/ttsSettings";
+import { isSuperuser } from "@/app/lib/superuser";
 import { recordAiInvocation, enterAiContext, AI_INVOCATION_POINTS } from "@/app/lib/ai/aiTelemetry";
 import { resolveAiRouteContext } from "@/app/lib/ai/aiTelemetryRoute";
 
+/** Which use a sentence is recorded under — see AI_INVOCATION_POINTS. */
+const POINT_FOR: Record<SpeechPurpose, string> = {
+  question: AI_INVOCATION_POINTS.VoiceReply,
+  refusal: AI_INVOCATION_POINTS.VoiceReply,
+  success: AI_INVOCATION_POINTS.VoiceReply,
+  narration: AI_INVOCATION_POINTS.VoiceNarration,
+  compare: AI_INVOCATION_POINTS.VoiceCompare,
+};
+
+const SWITCHED_OFF = "Speech is switched off by a SuperAdmin.";
+
 /**
- * GET /api/ai/speak → `{ available }` — may this user hear Diagramatix speak?
+ * GET /api/ai/speak → `{ available, defaultVoice }` — may this user hear
+ * Diagramatix speak, and in which voice by default?
  *
  * Asked once by a surface before it draws a speech control, so a user without
  * the grant never sees a Narrate switch that could only ever answer 403. The
- * same two checks as POST, and nothing is spent. Read-only impersonation is not
- * refused here — a SuperAdmin viewing as somebody should see what they would see.
+ * same checks as POST — master switch, org policy, grant — and nothing is
+ * spent. Read-only impersonation is not refused here: a SuperAdmin viewing as
+ * somebody should see what they would see.
  */
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const settings = await readTtsSettings();
   const available =
+    settings.enabled &&
     Boolean(process.env.DEEPGRAM_API_KEY) &&
     (await orgPolicyAllows(session, "allowVoiceAi")) &&
     (await speechGranted(session));
-  return NextResponse.json({ available }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json(
+    { available, defaultVoice: settings.defaultVoice },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }
 
 export async function POST(req: NextRequest) {
@@ -53,6 +75,8 @@ export async function POST(req: NextRequest) {
 
   const readOnly = await blockReadOnlyImpersonation(session);
   if (readOnly) return readOnly;
+
+  if (!(await readTtsSettings()).enabled) return NextResponse.json({ error: SWITCHED_OFF }, { status: 503 });
 
   const pol = await gateOrgPolicy(session, "allowVoiceAi");
   if (pol) return pol;
@@ -72,14 +96,18 @@ export async function POST(req: NextRequest) {
   if (text.length > TTS_MAX_CHARS) {
     return NextResponse.json({ error: `text is over ${TTS_MAX_CHARS} characters — split it by sentence` }, { status: 413 });
   }
+  if (body.purpose === "compare" && !isSuperuser(session)) {
+    return NextResponse.json({ error: "The voice comparison is for SuperAdmins." }, { status: 403 });
+  }
   const voice = body.voice;
+  const purpose = body.purpose;
 
   const key = process.env.DEEPGRAM_API_KEY;
   if (!key) return NextResponse.json({ error: "Speech is not configured on this server." }, { status: 503 });
 
   // Entered on this frame, not inside a helper — see aiTelemetryRoute.ts for the
   // bug that taught that: an enterWith inside an awaited helper does not survive.
-  enterAiContext(await resolveAiRouteContext(session, AI_INVOCATION_POINTS.VoiceReply));
+  enterAiContext(await resolveAiRouteContext(session, POINT_FOR[purpose]));
 
   const started = Date.now();
   let res: Response;

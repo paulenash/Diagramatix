@@ -38,7 +38,13 @@ export const AI_INVOCATION_POINTS = {
   DictationRefine: "dictation.refine", // transcript clean-up / anonymise
   LiveCommand: "bpmn.live-command", // Voice Assist: NL edit command → op list (Raw Attempt only)
   VoiceDictation: "voice.dictation", // one row per Deepgram dictation session (provider/model "deepgram")
-  VoiceReply: "voice.reply", // one row per Deepgram TTS reply (provider: "deepgram-tts", model: voice name)
+  // Speech (Deepgram Aura-2): one row per sentence spoken, provider "deepgram",
+  // model = the voice, CHARACTERS in inputTokens. Split by use so the Text to
+  // Speech tile and AI Usage can tell a conversation from a guided tour from a
+  // SuperAdmin auditioning voices — testing must never hide in the real numbers.
+  VoiceReply: "voice.reply", // Voice Assist answering: questions, refusals, successes
+  VoiceNarration: "voice.narration", // Animate reading each shape aloud
+  VoiceCompare: "voice.compare", // the Text to Speech tile's side-by-side comparison
   CollabSession: "collab.session", // one row per Liveblocks collab room join (provider/model "liveblocks")
   IconVectorize: "icon.vectorize", // ArchiMate icon image → editable vector primitives
   // Offline SuperAdmin harness scripts (npm run ai:report / ai:compare). They call
@@ -106,6 +112,8 @@ export const AI_INVOCATION_POINT_LABELS: Record<string, string> = {
   [AI_INVOCATION_POINTS.LiveCommand]: "Live Command (Voice Assist)",
   [AI_INVOCATION_POINTS.VoiceDictation]: "Voice Dictation (Deepgram)",
   [AI_INVOCATION_POINTS.VoiceReply]: "Voice Reply (Deepgram TTS)",
+  [AI_INVOCATION_POINTS.VoiceNarration]: "Animate Narration (Deepgram TTS)",
+  [AI_INVOCATION_POINTS.VoiceCompare]: "Voice Comparison (Deepgram TTS)",
   [AI_INVOCATION_POINTS.CollabSession]: "Collaboration (Liveblocks)",
   [AI_INVOCATION_POINTS.IconVectorize]: "ArchiMate Icon Vectorize",
   [AI_INVOCATION_POINTS.ScriptConformanceReport]: "AI Conformance Report (script)",

@@ -36,12 +36,15 @@ export function AnimateOverlay({ data, diagramName, onClose }: { data: DiagramDa
   const visibleIds = useMemo(() => new Set(order.slice(0, step)), [order, step]);
 
   // ── Narration ──────────────────────────────────────────────────────────────
-  const canSpeak = useSpeechAvailable();
+  const speech = useSpeechAvailable();
+  const canSpeak = speech ? speech.available : null;
   const [narratePref, setNarratePref] = useState(false);
   const [voice, setVoice] = useState<TtsVoice>(DEFAULT_TTS_VOICE);
   const [narrationError, setNarrationError] = useState<string | null>(null);
   // Read after mount, not in the initialiser, so the server render matches.
-  useEffect(() => { setNarratePref(readNarrate()); setVoice(readVoice()); }, []);
+  useEffect(() => { setNarratePref(readNarrate()); }, []);
+  // The user's own pick, else the SuperAdmin's default — known once asked.
+  useEffect(() => { if (speech) setVoice(readVoice(speech.defaultVoice)); }, [speech]);
   const narrate = canSpeak === true && narratePref;
   const setNarrate = (on: boolean) => { setNarratePref(on); writeNarrate(on); setNarrationError(null); };
   /** The line for each shape, worked out once — connectors have none. */

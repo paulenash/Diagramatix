@@ -15,7 +15,6 @@ import { useFeatureColors } from "@/app/lib/theme/useFeatureColors";
 import { tonesFor, readableTextOn, type FeatureColorKey } from "@/app/lib/theme/featureColors";
 import { tileVisibleTo, FUN_TILE_OWNERS } from "@/app/lib/admin/tileVisibility";
 import { readTileFilter, writeTileFilter, sessionStore } from "@/app/lib/admin/tileFilter";
-import { TextToSpeechTile } from "@/app/(dashboard)/dashboard/admin/text-to-speech/TextToSpeechTile";
 
 interface UserRow {
   id: string;
@@ -810,7 +809,6 @@ interface AdminTile {
   href?: string;     // navigation tiles
   ddl?: boolean;     // the special "Generate DDL" tile renders GenerateDdlButton
   users?: boolean;   // the "Registered Users" tile reveals the user table
-  tts?: boolean;     // the Text to Speech tile
   feature?: FeatureColorKey; // Feature Colour; unset → the superAdmin (red) fallback
   /** Exact emails this tile is for; unset = every SuperAdmin. See tileVisibility.ts. */
   onlyFor?: readonly string[];
@@ -818,7 +816,6 @@ interface AdminTile {
 
 const ADMIN_TILES: AdminTile[] = [
   { id: "users", title: "Registered Users", description: "Every registered user — status, subscription, current diagram.", users: true },
-  { id: "text-to-speech", title: "Text to Speech", description: "Spoken replies via Deepgram Aura-2 — test voices, manage access, view usage.", tts: true },
   { id: "ai-rules", title: "AI Rules & Preferences", description: "Geometric + style rules that steer AI BPMN generation.", href: "/dashboard/rules", feature: "ai" },
   { id: "ai-model", title: "AI Models Selection", description: "Choose the model AI diagram generation uses, compare provider pricing (Claude + Kimi).", href: "/dashboard/admin/ai-model", feature: "ai" },
   { id: "ai-usage", title: "AI Usage", description: "AI invocations, tokens, retries & estimated cost across every provider, model, org, user & invocation point — filterable, with an editable cost-rate catalog.", href: "/dashboard/ai-usage", feature: "ai" },
@@ -848,6 +845,7 @@ const ADMIN_TILES: AdminTile[] = [
   { id: "feature-colours", title: "Feature Colours", description: "Set the Background + Text colour for each feature area (Simulator, Mining, AI, Entity Lists, …) — the highlight is a darkened shade. Applied to the dashboard menus, admin tiles, AI controls and the Entity-Drift ring.", href: "/dashboard/admin/feature-colours" },
   { id: "sharing", title: "Project Sharing", description: "Every shared project plus its editors / viewers.", href: "/dashboard/admin/sharing", feature: "projectSharing" },
   { id: "scanner-rules", title: "BPMN Scanner Rules", description: "Rules used by the diagram issue scanner.", href: "/dashboard/admin/scanner-rules" },
+  { id: "text-to-speech", title: "Text to Speech", description: "Diagramatix's spoken voice (Deepgram Aura-2): the master switch, who can hear it — SuperAdmins always, anyone else switched on here — what it has cost, and a side-by-side comparison to choose the default voice by ear.", href: "/dashboard/admin/text-to-speech" },
   { id: "voice-assist-test", title: "Test Voice Assist", description: "Generate commands from the op vocabulary, parse each one, and see WHICH layer failed - recogniser, grammar, or reference. Runs in the browser, costs nothing. Run it before a grammar change and after: the difference is the blast radius.", href: "/dashboard/admin/voice-assist-test" },
   { id: "voice-debug", title: "Voice Assist Debug Sessions", description: "Annotated sessions recorded from the editor — what was said, what the system reported, and what you said actually happened. Leads with the disputes: commands that reported success and were marked wrong, which no automated test can find.", href: "/dashboard/admin/voice-debug" },
   { id: "voice-assist-commands", title: "Voice Assist Commands", description: "Every command the voice / typed editor accepts, by family, with example phrases — read from the code catalogue the tests hold to the grammar. Read-only: phrasings are code; the AI's aliases are editable in the Diagram Rules 'assist' category.", href: "/dashboard/admin/voice-assist-commands" },
@@ -939,11 +937,6 @@ function SuperAdminToolsGrid({ onShowUsers, currentUserEmail }: { onShowUsers: (
   const tiles = q ? ordered.filter(t => (`${t.title} ${t.description}`).toLowerCase().includes(q)) : ordered;
   const filtering = q.length > 0;
 
-  function handleTextToSpeechTest() {
-    // Slice 1: navigate to the test voice button on VoiceAssistTestClient
-    router.push("/dashboard/admin/voice-assist-test?tab=test-voice");
-  }
-
   return (
     <section className="mb-8">
       <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
@@ -982,7 +975,7 @@ function SuperAdminToolsGrid({ onShowUsers, currentUserEmail }: { onShowUsers: (
               onDragStart={() => { if (!filtering) setDraggingId(t.id); }}
               onDragOver={e => e.preventDefault()}
               onDrop={() => { if (!filtering) onDrop(t.id); }}
-              onClick={() => { if (t.users) onShowUsers(); else if (t.tts) handleTextToSpeechTest(); else if (t.href) router.push(t.href); }}
+              onClick={() => { if (t.users) onShowUsers(); else if (t.href) router.push(t.href); }}
               style={fv}
               className={`relative rounded-md p-4 border transition-colors ${
                 t.feature
@@ -999,11 +992,6 @@ function SuperAdminToolsGrid({ onShowUsers, currentUserEmail }: { onShowUsers: (
               {t.ddl && (
                 <div className="mt-2" onClick={e => e.stopPropagation()}>
                   <GenerateDdlButton />
-                </div>
-              )}
-              {t.tts && (
-                <div className="mt-2" onClick={e => e.stopPropagation()}>
-                  <TextToSpeechTile onTestVoice={handleTextToSpeechTest} />
                 </div>
               )}
             </div>

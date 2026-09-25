@@ -19,6 +19,18 @@ export const TTS_VOICES = [
 
 export type TtsVoice = (typeof TTS_VOICES)[number];
 
+/**
+ * How each voice is introduced on screen. Only what Deepgram's documentation
+ * says (read 2026-09-25): it describes the two Australian voices and gives the
+ * British ones no adjectives, so neither does this.
+ */
+export const TTS_VOICE_INFO: Record<TtsVoice, { name: string; accent: string; description: string }> = {
+  "aura-2-theia-en": { name: "Theia", accent: "Australian", description: "feminine — expressive, polite, sincere" },
+  "aura-2-hyperion-en": { name: "Hyperion", accent: "Australian", description: "masculine — caring, warm, empathetic" },
+  "aura-2-pandora-en": { name: "Pandora", accent: "British", description: "feminine" },
+  "aura-2-draco-en": { name: "Draco", accent: "British", description: "masculine" },
+};
+
 /** Theia, Australian and feminine — Paul's choice, 2026-09-25. */
 export const DEFAULT_TTS_VOICE: TtsVoice = "aura-2-theia-en";
 
@@ -42,7 +54,7 @@ export function isValidTtsVoice(v: unknown): v is TtsVoice {
  * a Voice Assist conversation. Listed once: the route validates against this and
  * the speaker's callers are typed by it.
  */
-export const SPEECH_PURPOSES = ["question", "refusal", "success", "narration"] as const;
+export const SPEECH_PURPOSES = ["question", "refusal", "success", "narration", "compare"] as const;
 export type SpeechPurpose = (typeof SPEECH_PURPOSES)[number];
 
 export function isSpeechPurpose(v: unknown): v is SpeechPurpose {

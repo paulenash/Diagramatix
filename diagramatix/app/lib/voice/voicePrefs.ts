@@ -40,9 +40,13 @@ function write(key: string, value: string): void {
   }
 }
 
-export function readVoice(): TtsVoice {
+/**
+ * The voice this browser's user picked, or `fallback` — the SuperAdmin's
+ * default from the Text to Speech tile — when they have not picked one.
+ */
+export function readVoice(fallback: TtsVoice = DEFAULT_TTS_VOICE): TtsVoice {
   const v = read(KEY.voice);
-  return isValidTtsVoice(v) ? v : DEFAULT_TTS_VOICE;
+  return isValidTtsVoice(v) ? v : fallback;
 }
 export function writeVoice(v: TtsVoice): void {
   write(KEY.voice, v);
