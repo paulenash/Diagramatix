@@ -243,14 +243,33 @@ export function checkEffect(op: AssistOp, before: DiagramData, after: DiagramDat
       return null;   // needs the selection the case carries; checked by the caller that has it
 
     case "wrapInPool": {
+      // Written from Paul's four cases (2026-09-25), not from the planner the
+      // product uses. Refusals (cases 1 and 3) never reach here — the apply
+      // layer's own message is the detail. What is checked is the edit.
       const loose = after.elements.filter((e) => e.type !== "pool" && !isLaneLike(e) && e.type !== "text-annotation" && !inAPool(after, e));
       if (loose.length) return fail(`${loose.length} element${loose.length === 1 ? " is" : "s are"} still outside every pool`);
-      // The sentence NAMED the pool. With no pool before, the new one must carry
-      // that name. With one already there it GROWS and keeps its own (Paul,
-      // 2026-09-25: "grow, ignore the name"), and the log says so.
-      const hadPool = before.elements.some((e) => e.type === "pool");
-      if (op.label && !hadPool && !after.elements.some((e) => e.type === "pool" && sameText(e.label, op.label))) {
-        return fail(`no pool is called “${op.label}”`);
+      const poolsBefore = before.elements.filter((e) => e.type === "pool");
+      const whiteBefore = poolsBefore.some((p) => (p.properties?.poolType as string | undefined) === "white-box"
+        || before.elements.some((e) => isLaneLike(e) && e.parentId === p.id));
+      // A white-box pool was there: it grows and keeps its own name.
+      if (whiteBefore) return pass;
+      // Otherwise exactly one NEW pool, carrying the name that was said.
+      const made = newIn(before, after).filter((e) => e.type === "pool");
+      if (made.length !== 1) return fail(`expected one new pool, found ${made.length}`);
+      const p = made[0];
+      if (op.label && !sameText(p.label, op.label)) return fail(`the new pool is called “${nameOf(p)}”, not “${op.label}”`);
+      // Beside black-box pools: as wide as they are, and they are untouched.
+      for (const bb of poolsBefore) {
+        const now = byId(after, bb.id);
+        if (!now || now.x !== bb.x || now.y !== bb.y || now.width !== bb.width || now.height !== bb.height) {
+          return fail(`the black-box pool ${nameOf(bb)} was changed`);
+        }
+      }
+      if (poolsBefore.length) {
+        const widest = poolsBefore.reduce((x, y) => (x.width >= y.width ? x : y));
+        if (p.x > widest.x || p.x + p.width < widest.x + widest.width) return fail(`the new pool is narrower than ${nameOf(widest)}`);
+        const hit = poolsBefore.find((bb) => p.y < bb.y + bb.height && p.y + p.height > bb.y);
+        if (hit) return fail(`the new pool overlaps ${nameOf(hit)}`);
       }
       return pass;
     }

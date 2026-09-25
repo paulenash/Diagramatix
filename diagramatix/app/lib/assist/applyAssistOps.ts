@@ -44,6 +44,7 @@ import { planMovePool, planSwapPools, selectedPools, poolsInOrder } from "@/app/
 import { collectMessageTargets, type MessagePick } from "./messageTargets";
 import type { AssistOp } from "./ops";
 import { boundaryRect } from "./poolBoundaryPhrase";
+import { planWrapInPool } from "@/app/lib/diagram/wrapInPoolPlan";
 import { syntheticElement, withAdded, withDeleted, withLabel } from "./workingSet";
 import { collectRenameTargets, type RenameType, type RenameTarget } from "./renameTargets";
 import { buildPickFlow, type PickFlow } from "./disambiguate";
@@ -595,30 +596,24 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
     }
 
     if (op.op === "wrapInPool") {
-      // Say what will actually happen. With a pool already on the diagram the
-      // reducer GROWS the biggest one to adopt the loose elements rather than
-      // drawing a second pool — which is the right behaviour and looked like a
-      // no-op, because "wrapped everything in a pool" had you searching for a
-      // new pool that was never going to appear (Paul, 2026-09-18).
-      const loose = els.filter((e) => e.type !== "pool" && e.type !== "lane" && e.type !== "sublane"
-        && e.type !== "text-annotation" && !e.parentId);
-      const pools = els.filter((e) => e.type === "pool");
-      if (loose.length === 0) {
-        results.push(pools.length
-          ? "everything is already in a pool"
-          : "there's nothing loose to put in a pool");
-        anyFail = true;
-        continue;
-      }
+      // Say what will actually happen, from the SAME plan the reducer applies
+      // (wrapInPoolPlan.ts) — Paul's four cases, 2026-09-25. Before, this
+      // guessed on its own and, with only black-box pools on the diagram,
+      // reported "grew Customer" while the reducer drew a new pool.
+      const plan = planWrapInPool(els);
+      if ("error" in plan) { results.push(plan.error); anyFail = true; continue; }
       wrapInPool(op.label);
-      if (pools.length > 0) {
-        const biggest = pools.reduce((a, b) => (a.width * a.height >= b.width * b.height ? a : b));
+      const n = plan.loose.length;
+      const things = `${n} element${n === 1 ? "" : "s"}`;
+      if (plan.kind === "grow") {
+        const grown = els.find((e) => e.id === plan.poolId)!;
         // The grown pool keeps its own name (Paul, 2026-09-25: "grow, ignore
         // the name") — but a name the user SAID must not vanish silently.
-        const unused = op.label && !sameName(op.label, biggest.label) ? ` — “${op.label}” was not used; the pool keeps its name` : "";
-        results.push(`grew ${nameOf(biggest)} to take in ${loose.length} loose element${loose.length === 1 ? "" : "s"}${unused}`);
+        const unused = op.label && !sameName(op.label, grown.label) ? ` — “${op.label}” was not used; the pool keeps its name` : "";
+        results.push(`grew ${nameOf(grown)} to take in ${n} loose element${n === 1 ? "" : "s"}${unused}`);
       } else {
-        results.push(`put ${loose.length} element${loose.length === 1 ? "" : "s"} in a new pool`);
+        const called = op.label ? ` “${op.label}”` : "";
+        results.push(`put ${things} in a new pool${called}${plan.widthFrom ? `, as wide as ${plan.widthFrom}` : ""}`);
       }
       continue;
     }

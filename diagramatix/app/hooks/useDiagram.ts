@@ -42,6 +42,7 @@ import { retypeTasksForSystemFlag, applyTaskTypeChanges } from "@/app/lib/diagra
 import { emieMountProps } from "@/app/lib/diagram/emieLabel";
 import { settleMessageLabels, movedElementIds } from "@/app/lib/diagram/messageLabel";
 import { growPoolToAdopt } from "@/app/lib/diagram/growPool";
+import { planWrapInPool } from "@/app/lib/diagram/wrapInPoolPlan";
 import { planMovePool, planSwapPools, type PoolPosition } from "@/app/lib/diagram/poolOrder";
 import { autoResizeUmlElement, sizeUmlNote } from "@/app/lib/diagram/umlAutoSize";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
@@ -9344,37 +9345,17 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
     }
 
     case "WRAP_IN_POOL": {
-      const CONTAINER = new Set<string>(["pool", "lane", "sublane"]);
-      const byId = new Map(state.elements.map((e) => [e.id, e] as const));
-      const inContainer = (e: DiagramElement) => {
-        let cur: DiagramElement | undefined = e;
-        for (let i = 0; cur?.parentId && i < 12; i++) {
-          const p = byId.get(cur.parentId);
-          if (p && CONTAINER.has(p.type)) return true;
-          cur = p;
-        }
-        return false;
-      };
-      const targets = state.elements.filter((e) => !CONTAINER.has(e.type) && e.type !== "text-annotation" && !inContainer(e));
-      if (targets.length === 0) return state;
-      const targetIds = new Set(targets.map((e) => e.id));
+      // What to do is decided by planWrapInPool — the same plan the voice log
+      // reports, so the two cannot disagree (Paul's four cases, 2026-09-25).
+      const plan = planWrapInPool(state.elements);
+      if ("error" in plan) return state;
+      const targetIds = new Set(plan.loose);
 
-      // If a pool already exists, GROW it to include the loose elements rather
-      // than creating a second pool (assist "extend the pool to include all…").
-      //
-      // NEVER a black-box pool (Paul, 2026-09-19: "It is never correct to grow
-      // an existing black-box pool to engulf elements and become a white-box
-      // pool"). A black-box participant is a deliberate statement that its
-      // insides are not being modelled; putting elements in it contradicts the
-      // thing it is there to say, and silently changes its type. With only
-      // black-box pools on the diagram there is nothing to grow, so a new pool
-      // is created instead — which is the right answer anyway.
-      const isBlackBox = (p: DiagramElement) =>
-        ((p.properties?.poolType as string | undefined) ?? "black-box") === "black-box"
-        && !state.elements.some((e) => e.type === "lane" && e.parentId === p.id);
-      const existingPools = state.elements.filter((e) => e.type === "pool" && !isBlackBox(e));
-      if (existingPools.length > 0) {
-        const pool = existingPools.reduce((a, b) => (a.width * a.height >= b.width * b.height ? a : b));
+      if (plan.kind === "grow") {
+        // GROW the white-box pool to take in the loose elements, rather than
+        // creating a second pool (assist "extend the pool to include all…").
+        // Never a black-box pool — the plan never offers one (2026-09-19).
+        const pool = state.elements.find((e) => e.id === plan.poolId)!;
         const lanes = state.elements.filter((e) => e.type === "lane" && e.parentId === pool.id).sort((a, b) => a.y - b.y);
         const holderId = lanes[0]?.id ?? pool.id; // adopt into the first lane, else the pool
         const adopted = state.elements.map((e) => (targetIds.has(e.id) && !e.parentId ? { ...e, parentId: holderId } : e));
@@ -9389,22 +9370,14 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         return { ...state, elements: ensureContainersEncloseChildren(sized), connectors: state.connectors };
       }
 
-      // No pool yet → create ONE pool sized to contain the loose set, and adopt
-      // the elements into it directly. No lane: "add a pool" makes no lane
-      // either, and a lane is a decision the modeller makes by naming a role
-      // (Paul, 2026-09-15 — "adding a pool around everything should not add a
-      // lane as well").
-      const minX = Math.min(...targets.map((e) => e.x));
-      const minY = Math.min(...targets.map((e) => e.y));
-      const maxX = Math.max(...targets.map((e) => e.x + e.width));
-      const maxY = Math.max(...targets.map((e) => e.y + e.height));
-      const PAD = 40, HEADER_W = 36;
+      // A NEW pool at the planned rect, adopting the loose elements directly.
+      // No lane: "add a pool" makes no lane either, and a lane is a decision
+      // the modeller makes by naming a role (Paul, 2026-09-15 — "adding a pool
+      // around everything should not add a lane as well").
       const poolId = nanoid();
       const poolLabel = uniqueContainerLabel(state.elements, action.payload.label, "Pool");
       const pool: DiagramElement = {
-        id: poolId, type: "pool",
-        x: minX - PAD - HEADER_W, y: minY - PAD,
-        width: (maxX - minX) + 2 * PAD + HEADER_W, height: (maxY - minY) + 2 * PAD,
+        id: poolId, type: "pool", ...plan.rect,
         label: poolLabel, properties: { poolType: "white-box" },
       };
       const elements = state.elements.map((e) => (targetIds.has(e.id) && !e.parentId ? { ...e, parentId: poolId } : e));
