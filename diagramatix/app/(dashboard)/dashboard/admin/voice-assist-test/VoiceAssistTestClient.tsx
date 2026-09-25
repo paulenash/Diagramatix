@@ -23,28 +23,9 @@ import { DEFAULT_CORPUS_SEED } from "@/app/lib/assist/rng";
 import { RecorderPanel } from "./RecorderPanel";
 import { ReplayPanel } from "./ReplayPanel";
 import { RecogniserBadge } from "./RecogniserBadge";
+import { FamilyCasesWindow } from "./FamilyCasesWindow";
+import { OUTCOME_STYLE, OUTCOME_MEANS } from "./outcomeStyle";
 
-const OUTCOME_STYLE: Record<Outcome, string> = {
-  "pass": "bg-green-100 text-green-800",
-  "pass-despite-mishear": "bg-green-50 text-green-700",
-  "misheard": "bg-purple-100 text-purple-800",
-  "unparsed": "bg-amber-100 text-amber-800",
-  "misparsed": "bg-orange-100 text-orange-800",
-  "ambiguous": "bg-blue-100 text-blue-800",
-  "wrong-element": "bg-red-100 text-red-800",
-  "wrong-edit": "bg-red-200 text-red-900",
-};
-
-const OUTCOME_MEANS: Record<Outcome, string> = {
-  "pass": "right ops, right elements",
-  "pass-despite-mishear": "the words came back wrong and the answer was right anyway — not a failure",
-  "misheard": "the recogniser — the words arrived wrong",
-  "unparsed": "the grammar refused it; live, this goes to the AI and costs a metered call",
-  "misparsed": "the grammar accepted it and built the wrong shape",
-  "ambiguous": "the reference named more than one thing; live, the picker opens",
-  "wrong-element": "it resolved, to the wrong element",
-  "wrong-edit": "the ops were right and the diagram came out wrong",
-};
 
 export function VoiceAssistTestClient() {
   const [tab, setTab] = useState<"text" | "record" | "replay">("text");
@@ -53,6 +34,7 @@ export function VoiceAssistTestClient() {
   const [family, setFamily] = useState<string>("");
   const [results, setResults] = useState<CaseResult[] | null>(null);
   const [ranMs, setRanMs] = useState(0);
+  const [openFamily, setOpenFamily] = useState<string | null>(null);
   const [failuresOnly, setFailuresOnly] = useState(true);
   const [explaining, setExplaining] = useState<string | null>(null);
   const [explanations, setExplanations] = useState<Record<string, string>>({});
@@ -185,7 +167,10 @@ export function VoiceAssistTestClient() {
             <tbody>
               {Object.entries(summary.byFamily).sort((a, b) => b[1].failed - a[1].failed).map(([f, v]) => (
                 <tr key={f} className={v.failed ? "bg-red-50" : ""}>
-                  <td className="px-2 py-1 border-b border-gray-100">{f}</td>
+                  <td className="px-2 py-1 border-b border-gray-100">
+                    <button onClick={() => setOpenFamily(f)} className="text-purple-700 hover:underline"
+                      title="Show every case in this family and how it scored">{f}</button>
+                  </td>
                   <td className="px-2 py-1 border-b border-gray-100 text-right">{v.total}</td>
                   <td className="px-2 py-1 border-b border-gray-100 text-right">{v.passed}</td>
                   <td className="px-2 py-1 border-b border-gray-100 text-right font-semibold">{v.failed || ""}</td>
@@ -228,6 +213,11 @@ export function VoiceAssistTestClient() {
             {shown.length === 0 && <p className="text-xs text-gray-500">Nothing failed.</p>}
           </div>
         </>
+      )}
+
+      {openFamily && results && (
+        <FamilyCasesWindow family={openFamily} results={results.filter((r) => r.family === openFamily)}
+          onClose={() => setOpenFamily(null)} />
       )}
 
       <details className="mt-6">
