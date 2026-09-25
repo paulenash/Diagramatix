@@ -18,7 +18,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { isSuperuser } from "@/app/lib/superuser";
 import { blockReadOnlyImpersonation } from "@/app/lib/routeGuard";
-import { batchParams } from "@/app/lib/dictation/asrParams";
+import { batchParams, asrFingerprint } from "@/app/lib/dictation/asrParams";
 import { boostProfile } from "@/app/lib/dictation/boostProfiles";
 
 export const dynamic = "force-dynamic";
@@ -51,8 +51,13 @@ export async function POST(req: Request) {
   // `?profile=` lets the harness measure an ALTERNATIVE boost list over the
   // recorded corpus. Absent, it is the shipped list — so a plain replay always
   // measures what production runs.
-  const profile = boostProfile(new URL(req.url).searchParams.get("profile"));
-  const params = batchParams({ commandBias: true, commandWords: profile.keywords });
+  //
+  // `?punctuate=1` turns full stops and commas on WITHOUT the rest of prose
+  // formatting — a measurement, not a setting: live voice is unchanged.
+  const url = new URL(req.url);
+  const profile = boostProfile(url.searchParams.get("profile"));
+  const punctuate = url.searchParams.get("punctuate") === "1";
+  const params = batchParams({ commandBias: true, commandWords: profile.keywords, punctuate });
   try {
     const dg = await fetch(`${DG}?${params.toString()}`, {
       method: "POST",
@@ -69,7 +74,9 @@ export async function POST(req: Request) {
     const transcript = (data?.results?.channels?.[0]?.alternatives?.[0]?.transcript ?? "").trim();
     // No speech is a RESULT, not an error: a silent clip that scores as
     // "misheard" is exactly the finding somebody needs.
-    return NextResponse.json({ transcript });
+    // The fingerprint of what was actually sent, so the run records it rather
+    // than rebuilding it in the browser and hoping the two agree.
+    return NextResponse.json({ transcript, fingerprint: asrFingerprint(params) });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Transcription error" }, { status: 500 });
   }

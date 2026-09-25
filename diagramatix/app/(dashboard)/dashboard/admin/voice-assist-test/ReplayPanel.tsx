@@ -12,13 +12,25 @@
  * next to its number. A green batch result must never be read as a green live
  * result, and the only reliable way to prevent that is to say so on the screen
  * rather than in a document nobody opens.
+ *
+ * WHAT IS MEASURED (2026-09-25). A prod replay failed 12 of 100, seven of them
+ * on the FIRST word, four of those on sentences that passed on another take.
+ * So a run can replay each clip as recorded, with its start padded, with
+ * punctuation on — or all three in one pass, reporting per clip what each
+ * change recovered and broke (`replayCompare.ts`). Every row carries how much
+ * silence came before the voice (`wavTools.ts`).
  */
 import { useCallback, useEffect, useState } from "react";
 import { scoreCase, summarise, isFailure, type CaseResult } from "@/app/lib/assist/commandScore";
 import { fixtureElements } from "@/app/lib/assist/commandFixture";
 import { replayClip } from "@/app/lib/dictation/replayClip";
-import { asrFingerprint, liveStreamParams } from "@/app/lib/dictation/asrParams";
 import { BOOST_PROFILES, boostProfile, DEFAULT_BOOST_PROFILE, type BoostProfileId } from "@/app/lib/dictation/boostProfiles";
+import { leadInMs, deadAirMs, padWavStart } from "@/app/lib/dictation/wavTools";
+import {
+  MEASURE_MODES, VARIANTS, variantsFor, firstWordHeardRight, firstWordFlips, flips, leadStats, possiblyClipped,
+  CLIPPED_MS, SHORT_MS, DEAD_AIR_NOTABLE_MS,
+  type MeasureMode, type Variant, type VariantKey, type Onset,
+} from "@/app/lib/dictation/replayCompare";
 import type { GeneratedCase } from "@/app/lib/assist/commandGenerator";
 
 interface ClipRow {
@@ -42,15 +54,32 @@ const BATCH_CAVEATS = [
   "the command queue — live commands apply against the state the previous one left; batch scores each in isolation",
 ];
 
+/** What a run was, fixed when it starts — so the screen never labels old numbers with new settings. */
+interface RunLabel {
+  leg: Leg;
+  profileId: BoostProfileId;
+  mode: MeasureMode;
+  variants: Variant[];
+}
+
+type ByVariant<T> = Partial<Record<VariantKey, Record<string, T>>>;
+
 export function ReplayPanel() {
   const [clips, setClips] = useState<ClipRow[] | null>(null);
   const [leg, setLeg] = useState<Leg>("stream");
   const [profileId, setProfileId] = useState<BoostProfileId>(DEFAULT_BOOST_PROFILE);
+  const [mode, setMode] = useState<MeasureMode>("recorded");
   const [running, setRunning] = useState(false);
-  const [rows, setRows] = useState<Record<string, CaseResult>>({});
-  const [heard, setHeard] = useState<Record<string, string>>({});
+  const [rows, setRows] = useState<ByVariant<CaseResult>>({});
+  const [heard, setHeard] = useState<ByVariant<string>>({});
+  /** Clips whose replay never reached the recogniser, per variant — excluded from every comparison. */
+  const [errored, setErrored] = useState<Partial<Record<VariantKey, string[]>>>({});
   /** What the script asked for, so a failure row can show both lines. */
   const [said, setSaid] = useState<Record<string, string>>({});
+  const [onset, setOnset] = useState<Record<string, Onset>>({});
+  const [label, setLabel] = useState<RunLabel | null>(null);
+  /** Clips whose AUDIO could not be fetched — they are in no variant, so the totals shrink; this says by how many. */
+  const [skipped, setSkipped] = useState<string[]>([]);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [err, setErr] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
@@ -80,43 +109,63 @@ export function ReplayPanel() {
 
   const run = useCallback(async () => {
     if (!clips?.length) return;
+    // Everything the run depends on is fixed here, so a control touched
+    // afterwards can neither change the run nor relabel its results.
+    const runLabel: RunLabel = { leg, profileId, mode, variants: variantsFor(mode, leg) };
+    setLabel(runLabel);
     setRunning(true);
     setErr(null);
     setSaved(null);
     setRows({});
     setHeard({});
+    setErrored({});
     setSaid({});
+    setOnset({});
+    setSkipped([]);
     const els = fixtureElements();
     const todo = latest(clips);
     setProgress({ done: 0, total: todo.length });
     const started = Date.now();
-    const collected: CaseResult[] = [];
+    const collected: Partial<Record<VariantKey, Array<CaseResult & Onset>>> = {};
+    /** Per variant, clips whose replay never reached the recogniser — left out of the run, named in its notes. */
+    const failedReplays: Partial<Record<VariantKey, string[]>> = {};
+    const fingerprints: Partial<Record<VariantKey, string>> = {};
+
+    /** One clip, one way: the transcript, any transport error, and the fingerprint actually used. */
+    const replayOnce = async (wav: ArrayBuffer, v: Variant) => {
+      const sent = v.padMs ? padWavStart(wav, v.padMs) : wav;
+      let transcript = "";
+      let replayError: string | undefined;
+      let fingerprint: string | undefined;
+      if (runLabel.leg === "stream") {
+        const r = await replayClip(sent, { commandWords: boostProfile(runLabel.profileId).keywords });
+        // The stitched utterances ARE the answer: if the buffer would have
+        // produced two commands, the first one is what the user's sentence
+        // actually became, and scoring the concatenation would hide it.
+        transcript = r.utterances[0] ?? "";
+        replayError = r.error;
+        fingerprint = r.fingerprint;
+      } else {
+        const res = await fetch(
+          `/api/admin/voice-assist-test/transcribe-clip?profile=${runLabel.profileId}${v.punctuate ? "&punctuate=1" : ""}`,
+          { method: "POST", headers: { "Content-Type": "audio/wav" }, body: sent },
+        );
+        const j = await res.json().catch(() => ({}));
+        transcript = typeof j.transcript === "string" ? j.transcript : "";
+        fingerprint = typeof j.fingerprint === "string" ? j.fingerprint : undefined;
+        if (!res.ok) replayError = j.error ?? `transcribe failed (${res.status})`;
+      }
+      return { transcript, replayError, fingerprint };
+    };
 
     for (const clip of todo) {
       try {
         const audioRes = await fetch(`/api/admin/voice-assist-test/clips/${clip.id}`, { cache: "no-store" });
         if (!audioRes.ok) throw new Error(`clip ${clip.caseId}: ${audioRes.status}`);
         const wav = await audioRes.arrayBuffer();
-
-        let transcript = "";
-        let replayError: string | undefined;
-        if (leg === "stream") {
-          const r = await replayClip(wav, { commandWords: boostProfile(profileId).keywords });
-          // The stitched utterances ARE the answer: if the buffer would have
-          // produced two commands, the first one is what the user's sentence
-          // actually became, and scoring the concatenation would hide it.
-          transcript = r.utterances[0] ?? "";
-          replayError = r.error;
-        } else {
-          const res = await fetch(`/api/admin/voice-assist-test/transcribe-clip?profile=${profileId}`, {
-            method: "POST",
-            headers: { "Content-Type": "audio/wav" },
-            body: wav,
-          });
-          const j = await res.json().catch(() => ({}));
-          transcript = typeof j.transcript === "string" ? j.transcript : "";
-          if (!res.ok) replayError = j.error ?? `transcribe failed (${res.status})`;
-        }
+        const clipOnset: Onset = { leadIn: leadInMs(wav), deadAir: deadAirMs(wav) };
+        setOnset((p) => ({ ...p, [clip.caseId]: clipOnset }));
+        setSaid((p) => ({ ...p, [clip.caseId]: clip.utterance }));
 
         // The clip carries its own sentence and its own expected ops — that is
         // exactly why they are denormalised onto it, and why a generator change
@@ -128,43 +177,109 @@ export function ReplayPanel() {
           ops: JSON.parse(clip.expectedOps || "[]"),
           refs: {},
         };
-        const result = scoreCase(asCase, replayError ? "" : transcript, els);
-        collected.push(result);
-        setRows((p) => ({ ...p, [clip.caseId]: result }));
-        setHeard((p) => ({ ...p, [clip.caseId]: replayError ? `⚠ ${replayError}` : transcript }));
-        setSaid((p) => ({ ...p, [clip.caseId]: clip.utterance }));
+
+        for (const v of runLabel.variants) {
+          // Each replay stands alone: a network error on the padded pass must
+          // not throw away the punctuated one, and must not make the variants'
+          // totals disagree.
+          const { transcript, replayError, fingerprint } = await replayOnce(wav, v).catch((e: unknown) => ({
+            transcript: "",
+            replayError: e instanceof Error ? `${e.message} (the request never completed)` : "the request never completed",
+            fingerprint: undefined as string | undefined,
+          }));
+          if (fingerprint && !fingerprints[v.key]) fingerprints[v.key] = fingerprint;
+          const result = scoreCase(asCase, replayError ? "" : transcript, els);
+          // A replay that never reached the recogniser is not a mishear: it is
+          // kept off the pass rate and out of the saved run, and named instead.
+          if (replayError) (failedReplays[v.key] ??= []).push(clip.caseId);
+          else (collected[v.key] ??= []).push({ ...result, ...clipOnset });
+          // MERGE BY caseId, never by index: clips can fail or be skipped, and an
+          // index-keyed table would land every later result on the wrong row —
+          // the bug MdDiagramsClient documents.
+          setRows((p) => ({ ...p, [v.key]: { ...p[v.key], [clip.caseId]: result } }));
+          setHeard((p) => ({ ...p, [v.key]: { ...p[v.key], [clip.caseId]: replayError ? `⚠ ${replayError}` : transcript } }));
+          if (replayError) setErrored((p) => ({ ...p, [v.key]: [...(p[v.key] ?? []), clip.caseId] }));
+        }
       } catch (e) {
         setErr(e instanceof Error ? e.message : "a clip failed");
+        setSkipped((p) => [...p, clip.caseId]);
       } finally {
-        // MERGE BY caseId, never by index: clips can fail or be skipped, and an
-        // index-keyed table would land every later result on the wrong row —
-        // the bug MdDiagramsClient documents.
         setProgress((p) => ({ ...p, done: p.done + 1 }));
       }
     }
 
     setRunning(false);
 
-    // Keep the run, so the next one can be compared with it.
-    try {
-      const s = summarise(collected);
-      const res = await fetch("/api/admin/voice-assist-test/runs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          leg, corpusSeed: todo[0]?.corpusSeed ?? "", boostProfile: profileId,
-          asrFingerprint: asrFingerprint(liveStreamParams({ sampleRate: 48000 })),
-          total: s.total, passed: s.passed, failed: s.failed,
-          fallbackRate: s.fallbackRate, outcomes: s.byOutcome, families: s.byFamily,
-          results: collected, durationMs: Date.now() - started,
-        }),
-      });
-      setSaved(res.ok ? "run saved" : null);
-    } catch { /* the numbers are on screen either way */ }
-  }, [clips, leg, profileId]);
+    // Keep each replay as its own run, so each can be compared with the next —
+    // with the fingerprint the recogniser was ACTUALLY given, and what the
+    // fingerprint cannot hold (padding, the comparison) written in the notes.
+    let kept = 0;
+    for (const v of runLabel.variants) {
+      const results = collected[v.key] ?? [];
+      if (!results.length) continue;
+      try {
+        const s = summarise(results);
+        const lostReplays = failedReplays[v.key] ?? [];
+        const notes = [
+          v.label,
+          runLabel.variants.length > 1 ? `one part of a comparison (${runLabel.variants.map((x) => x.label).join(" / ")})` : "",
+          lostReplays.length ? `${lostReplays.length} replay${lostReplays.length === 1 ? "" : "s"} never reached the recogniser and ${lostReplays.length === 1 ? "is" : "are"} left out: ${lostReplays.join(", ")}` : "",
+        ].filter(Boolean).join("; ");
+        const res = await fetch("/api/admin/voice-assist-test/runs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            leg: runLabel.leg, corpusSeed: todo[0]?.corpusSeed ?? "", boostProfile: runLabel.profileId,
+            asrFingerprint: fingerprints[v.key] ?? null,
+            notes,
+            total: s.total, passed: s.passed, failed: s.failed,
+            fallbackRate: s.fallbackRate, outcomes: s.byOutcome, families: s.byFamily,
+            results, durationMs: Date.now() - started,
+          }),
+        });
+        if (res.ok) kept += 1;
+      } catch { /* the numbers are on screen either way */ }
+    }
+    setSaved(kept ? `${kept === 1 ? "run" : `${kept} runs`} saved` : null);
+  }, [clips, leg, profileId, mode]);
 
-  const results = Object.values(rows);
+  // ── What the screen shows ──────────────────────────────────────────────────
+  const shown: RunLabel = label ?? { leg, profileId, mode, variants: variantsFor(mode, leg) };
+  const baseKey: VariantKey = shown.variants[0]?.key ?? "recorded";
+  const base = rows[baseKey] ?? {};
+  const baseHeard = heard[baseKey] ?? {};
+  const baseErrored = new Set(errored[baseKey] ?? []);
+  /** Scored clips only — a replay that never reached the recogniser is not a mishear. */
+  const scored = (key: VariantKey) => Object.values(rows[key] ?? {}).filter((r) => !(errored[key] ?? []).includes(r.caseId));
+  const results = scored(baseKey);
   const summary = results.length ? summarise(results) : null;
+  const erroredBase = Object.values(base).filter((r) => baseErrored.has(r.caseId));
+  /** The notes and caveats describe the RESULTS on screen, not the controls set up for the next run. */
+  const captionLeg: Leg = summary ? shown.leg : leg;
+
+  // The onset split that tests the clipping theory: first word heard WRONG vs
+  // RIGHT (not fail vs pass), leaving out clips that never reached the recogniser.
+  const leadsWhere = (right: boolean) =>
+    results
+      .filter((r) => firstWordHeardRight(said[r.caseId] ?? "", baseHeard[r.caseId] ?? "") === right)
+      .map((r) => onset[r.caseId])
+      .filter((x): x is Onset => !!x);
+  const wrongFirst = leadStats(leadsWhere(false));
+  const rightFirst = leadStats(leadsWhere(true));
+  const deadAirs = results.map((r) => onset[r.caseId]?.deadAir).filter((x): x is number => typeof x === "number");
+  const typicalDeadAir = leadStats(deadAirs.map((d) => ({ leadIn: d, deadAir: 0 }))).median;
+  const longDeadAir = deadAirs.filter((d) => d > DEAD_AIR_NOTABLE_MS);
+
+  const lines = shown.variants.flatMap((v) => {
+    const r = rows[v.key];
+    const ok = scored(v.key);
+    if (!r || !ok.length) return [];
+    const s = summarise(ok);
+    const excluded = new Set([...(errored[v.key] ?? []), ...baseErrored]);
+    const f = v.key === baseKey ? null : flips(base, r, (o) => isFailure(o as CaseResult["outcome"]), excluded);
+    const fw = v.key === baseKey ? null : firstWordFlips(said, baseHeard, heard[v.key] ?? {}, excluded);
+    return [{ v, passed: s.passed, total: s.total, errored: (errored[v.key] ?? []).length, flips: f, firstWord: fw }];
+  });
 
   return (
     <div>
@@ -217,7 +332,35 @@ export function ReplayPanel() {
         )}
       </div>
 
-      {leg === "stream" ? (
+      {/* WHAT TO MEASURE. One choice, not three switches: a run with padding
+          AND punctuation cannot say which of them moved a clip. */}
+      <div className="mb-3 p-2 border border-gray-200 rounded bg-gray-50 text-xs max-w-3xl">
+        <div className="flex flex-wrap items-center gap-2 mb-1">
+          <span className="font-medium text-gray-700">Measure:</span>
+          <select value={mode} disabled={running} onChange={(e) => setMode(e.target.value as MeasureMode)}
+            className="border border-gray-300 rounded px-2 py-1 bg-white disabled:opacity-50">
+            {MEASURE_MODES.map((m) => (
+              <option key={m.mode} value={m.mode} disabled={m.batchOnly && leg !== "batch"}>
+                {m.label}{m.batchOnly && leg !== "batch" ? " — batch only" : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+        <ul className="list-disc ml-5 space-y-0.5 text-[11px] text-gray-600">
+          <li><strong>Padded start</strong> adds {VARIANTS.padded.padMs} ms of silence before each clip. If first words come back,
+            the recordings were complete and the recogniser wanted a run-up. If not, the first word was lost or recorded too
+            quietly — listen to the failing clips.</li>
+          <li><strong>Punctuation on</strong> (batch) turns full stops and commas back on, formatting still off. They have been
+            off since 25 September, which is why “Billing Team, Quality Assurance and Support Desk” arrives with no commas.
+            Live voice is not changed.</li>
+          <li><strong>All three</strong> replays each clip three ways and lists what each change recovered and broke.</li>
+        </ul>
+        {mode !== "recorded" && variantsFor(mode, leg)[0].key === "recorded" && variantsFor(mode, leg).length === 1 && (
+          <p className="mt-1 text-amber-800">That needs the batch leg; on this leg the run is “as recorded”.</p>
+        )}
+      </div>
+
+      {captionLeg === "stream" ? (
         <p className="text-xs text-gray-600 mb-3 max-w-3xl">
           Each clip goes back through the <strong>same socket with the same settings</strong>, paced in real time and stitched
           by the same silence policy — so this measures the pipeline you ship. It takes about as long as the recording did.
@@ -239,29 +382,116 @@ export function ReplayPanel() {
 
       {summary && (
         <>
-          <div className="flex flex-wrap items-center gap-4 mb-2 text-sm">
-            <span className="font-semibold text-gray-800">
-              {summary.passed}/{summary.total} passed
-              <span className="text-gray-400 font-normal"> ({Math.round((summary.passed / summary.total) * 100)}%)</span>
-            </span>
-            <span className="text-xs text-gray-500">leg: {leg}</span>
-          </div>
-          <div className="space-y-1">
-            {results.filter((r) => isFailure(r.outcome)).map((r) => (
-              <div key={r.caseId} className="border border-red-100 bg-red-50 rounded p-2 text-xs">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="px-1 rounded bg-red-100 text-red-800 text-[10px] shrink-0">{r.outcome}</span>
-                  <span className="text-gray-400 text-[10px] shrink-0">{r.family}</span>
-                </div>
-                {/* Both lines, always. The pair IS the finding: same words and a
-                    red row means the grammar; different words means the ear. */}
-                <div className="text-gray-800">said:&nbsp; “{said[r.caseId] ?? ""}”</div>
-                <div className={heard[r.caseId] === said[r.caseId] ? "text-gray-500" : "text-purple-700"}>
-                  heard: “{heard[r.caseId] ?? ""}”
-                </div>
-                {r.detail && <div className="text-gray-500 mt-0.5">{r.detail}</div>}
+          <p className="text-[11px] text-gray-500 mb-1">
+            These results: {shown.leg} leg · boosts “{boostProfile(shown.profileId).label}” · {shown.variants.map((v) => v.label).join(" + ")}
+          </p>
+          <div className="mb-2 space-y-0.5">
+            {lines.map((l) => (
+              <div key={l.v.key} className="text-sm">
+                <span className={l.v.key === baseKey ? "font-semibold text-gray-800" : "text-gray-800"}>
+                  {l.v.label}: {l.passed}/{l.total} passed
+                  <span className="text-gray-400 font-normal"> ({Math.round((l.passed / l.total) * 100)}%)</span>
+                </span>
+                {l.errored > 0 && <span className="text-xs text-amber-700 ml-2">{l.errored} errored, left out</span>}
+                {l.flips && l.firstWord && (
+                  <span className="text-xs ml-2">
+                    <span className="text-green-700">first word fixed {l.firstWord.fixed.length}</span>
+                    {" · "}
+                    <span className={l.firstWord.lost.length ? "text-red-700 font-semibold" : "text-gray-500"}>first word lost {l.firstWord.lost.length}</span>
+                    {" · "}
+                    <span className="text-green-700">sentence recovered {l.flips.recovered.length}</span>
+                    {" · "}
+                    <span className={l.flips.broke.length ? "text-red-700 font-semibold" : "text-gray-500"}>sentence broke {l.flips.broke.length}</span>
+                    <span className="text-gray-400"> — against the same clips, {VARIANTS[baseKey].label.toLowerCase()}</span>
+                  </span>
+                )}
               </div>
             ))}
+          </div>
+
+          <div className="mb-3 p-2 border border-gray-200 rounded text-xs text-gray-700 max-w-3xl">
+            <div className="font-medium mb-0.5">
+              Silence before the voice, measured on the clips as recorded
+              {baseKey !== "recorded" && ` — first word right/wrong is from the “${VARIANTS[baseKey].label}” replay`}
+            </div>
+            <div>
+              First word heard <strong>wrong</strong>: {wrongFirst.n} clip{wrongFirst.n === 1 ? "" : "s"}, median{" "}
+              <strong>{wrongFirst.median ?? "—"} ms</strong> ({wrongFirst.clipped} possibly clipped,{" "}
+              {wrongFirst.short} under {SHORT_MS} ms)
+            </div>
+            <div>
+              First word heard <strong>right</strong>: {rightFirst.n} clip{rightFirst.n === 1 ? "" : "s"}, median{" "}
+              <strong>{rightFirst.median ?? "—"} ms</strong> ({rightFirst.clipped} possibly clipped,{" "}
+              {rightFirst.short} under {SHORT_MS} ms)
+            </div>
+            <div className="text-gray-500 mt-0.5">
+              {`“Possibly clipped” means the voice began within ${CLIPPED_MS} ms of the microphone waking up. `}
+              {typicalDeadAir !== null && `Clips start with about ${typicalDeadAir} ms of exact silence while it wakes`}
+              {longDeadAir.length > 0 ? `; ${longDeadAir.length} start with more than ${DEAD_AIR_NOTABLE_MS} ms (longest ${Math.max(...longDeadAir)} ms).` : "."}
+              {erroredBase.length > 0 && ` ${erroredBase.length} clip${erroredBase.length === 1 ? "" : "s"} never reached the recogniser and ${erroredBase.length === 1 ? "is" : "are"} left out.`}
+              {skipped.length > 0 && ` ${skipped.length} clip${skipped.length === 1 ? "" : "s"} could not be fetched and ${skipped.length === 1 ? "is" : "are"} in no count.`}
+            </div>
+          </div>
+
+          {erroredBase.length > 0 && (
+            <div className="mb-3 text-xs text-amber-800 max-w-3xl">
+              Never reached the recogniser: {erroredBase.map((r) => `“${said[r.caseId] ?? r.caseId}” (${baseHeard[r.caseId] ?? ""})`).join("; ")}
+            </div>
+          )}
+
+          {lines.filter((l) => l.flips && (l.flips.recovered.length || l.flips.broke.length)).map((l) => (
+            <div key={`flips-${l.v.key}`} className="mb-3 text-xs max-w-3xl">
+              <div className="font-medium text-gray-700 mb-0.5">{l.v.label}</div>
+              {[
+                ...l.flips!.recovered.map((f) => ({ ...f, kind: "recovered" as const })),
+                ...l.flips!.broke.map((f) => ({ ...f, kind: "broke" as const })),
+              ].map((f) => (
+                <div key={`${l.v.key}-${f.caseId}`} className={`ml-2 ${f.kind === "recovered" ? "text-green-800" : "text-red-800"}`}>
+                  {f.kind}: “{said[f.caseId] ?? f.caseId}” — heard “{heard[l.v.key]?.[f.caseId] ?? ""}” ({f.from} → {f.to})
+                </div>
+              ))}
+            </div>
+          ))}
+
+          <div className="space-y-1">
+            {results.filter((r) => isFailure(r.outcome)).map((r) => {
+              const o = onset[r.caseId];
+              return (
+                <div key={r.caseId} className="border border-red-100 bg-red-50 rounded p-2 text-xs">
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                    <span className="px-1 rounded bg-red-100 text-red-800 text-[10px] shrink-0">{r.outcome}</span>
+                    <span className="text-gray-400 text-[10px] shrink-0">{r.family}</span>
+                    {typeof o?.leadIn === "number" && (
+                      <span className={`text-[10px] shrink-0 ${possiblyClipped(o) ? "text-red-700 font-semibold" : o.leadIn < SHORT_MS ? "text-amber-700" : "text-gray-400"}`}
+                        title="Silence before the voice starts, in the clip as recorded">
+                        lead-in {o.leadIn} ms{possiblyClipped(o) ? " — possibly clipped" : ""}
+                      </span>
+                    )}
+                    {typeof o?.deadAir === "number" && o.deadAir > DEAD_AIR_NOTABLE_MS && (
+                      <span className="text-[10px] shrink-0 text-amber-700" title="Exact digital silence at the start — the microphone waking up">
+                        dead air {o.deadAir} ms
+                      </span>
+                    )}
+                    {shown.variants.filter((v) => v.key !== baseKey).map((v) => {
+                      const other = rows[v.key]?.[r.caseId]?.outcome;
+                      if (!other) return null;
+                      return (
+                        <span key={v.key} className={`text-[10px] shrink-0 px-1 rounded ${isFailure(other) ? "bg-gray-100 text-gray-600" : "bg-green-100 text-green-800"}`}>
+                          {v.key === "padded" ? "padded" : "punctuated"}: {other}
+                        </span>
+                      );
+                    })}
+                  </div>
+                  {/* Both lines, always. The pair IS the finding: same words and a
+                      red row means the grammar; different words means the ear. */}
+                  <div className="text-gray-800">said:&nbsp; “{said[r.caseId] ?? ""}”</div>
+                  <div className={baseHeard[r.caseId] === said[r.caseId] ? "text-gray-500" : "text-purple-700"}>
+                    heard: “{baseHeard[r.caseId] ?? ""}”
+                  </div>
+                  {r.detail && <div className="text-gray-500 mt-0.5">{r.detail}</div>}
+                </div>
+              );
+            })}
             {results.every((r) => !isFailure(r.outcome)) && <p className="text-xs text-gray-500">Nothing failed.</p>}
           </div>
         </>

@@ -21,7 +21,7 @@
  * measuring the thing rather than an approximation of it.
  */
 import { decodeWav } from "./wav";
-import { liveStreamParams } from "./asrParams";
+import { liveStreamParams, asrFingerprint } from "./asrParams";
 import { stitchFinals, type Final } from "../assist/fragmentBuffer";
 
 /** Frames of this many samples, matching the live `ScriptProcessor` buffer. */
@@ -34,6 +34,12 @@ export interface ReplayResult {
   finals: Final[];
   /** How long the replay took, in ms. */
   elapsedMs: number;
+  /**
+   * The configuration the socket was ACTUALLY opened with. A run records this
+   * rather than rebuilding it on its own, so a run cannot be filed under a
+   * configuration it never used.
+   */
+  fingerprint?: string;
   error?: string;
 }
 
@@ -97,6 +103,7 @@ export async function replayClip(
         utterances: stitchFinals(finals, Date.now() - audioStart),
         finals,
         elapsedMs: Date.now() - started,
+        fingerprint: asrFingerprint(params),
         ...(error ? { error } : {}),
       });
     };

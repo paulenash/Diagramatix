@@ -182,6 +182,15 @@ export function batchParams(o: {
    * stop splits the sentence and a lost comma breaks a list of names.
    */
   prose?: boolean;
+  /**
+   * HARNESS ONLY — full stops and commas WITHOUT the rest of prose formatting.
+   * Punctuation went off with prose on 2026-09-25, and since then a list of
+   * multi-word names ("Billing Team, Quality Assurance and Support Desk")
+   * arrives with no commas and cannot be split. This lets a replay measure
+   * punctuation on its own, on the real corpus, before anyone changes what
+   * ships. Unset, it follows `prose`, so no existing caller changes.
+   */
+  punctuate?: boolean;
   /** Command bias — on for a replayed clip, off for a meeting. */
   commandBias?: boolean;
   /** Harness only — an alternative command vocabulary to measure. */
@@ -193,7 +202,7 @@ export function batchParams(o: {
     model: ASR_MODEL,
     language: ASR_LANGUAGE,
     smart_format: o.prose ? "true" : "false",
-    punctuate: o.prose ? "true" : "false",
+    punctuate: (o.punctuate ?? o.prose) ? "true" : "false",
   });
   if (o.diarize) p.append("diarize", "true");
   if (o.utterances) p.append("utterances", "true");
