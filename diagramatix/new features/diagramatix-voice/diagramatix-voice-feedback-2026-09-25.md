@@ -137,11 +137,72 @@ unless switched on):
 
 ---
 
-## 6. Slices
+## 6. Who gets it, the SuperAdmin tile, and the cost
 
-1. **Foundation.** The route, the parameters, the speaker, usage and pricing, and a
-   "hear the voices" panel on the SuperAdmin **Test Voice Assist** page to choose
-   between Theia, Hyperion, Pandora and Draco.
+Paul, 2026-09-25: "Include a SuperAdmin tile to manage text to speech usage, and
+include it in the AI costs. In particular SuperAdmin must have control to turn it on
+for selected Users. Default is on for SuperAdmin users, off for everyone else."
+
+### Who gets it: built from what already exists
+
+- A new feature key, **`voice-feedback`**, in `app/lib/features/registry.ts`, set to
+  **off at every subscription level**. That makes it off for everyone by default, and
+  it fails closed like `voice-assist`.
+- **SuperAdmins have it automatically.** `app/lib/features/availability.ts` already
+  gives SuperAdmins every feature, so nothing new is needed for "on for SuperAdmin".
+- **Turning it on for a selected user** uses the existing per-user override,
+  `User.featureOverrides`, written by `app/api/admin/users/[id]/features/route.ts`.
+  The tile is a focused front end for that one key. No new permission model.
+- The speech route checks the same state on every request, so switching a user off
+  takes effect on their next sentence, not their next login.
+- The level rows go to production as an **idempotent SQL file for the Database tile**,
+  proven on `diagramatix_test` first, never a script run against production.
+
+### The SuperAdmin tile: "Text to Speech"
+
+A new tile on the SuperAdmin grid, at `/dashboard/admin/text-to-speech`, with four
+parts:
+
+1. **Master switch.** An `AppSetting` (`tts.enabled`, on by default). Off means nobody
+   hears the Deepgram voice, SuperAdmins included. It is the brake if costs or quality
+   go wrong. The route returns 503, and the browser stays silent rather than falling
+   back to its own voice, so switching it off is never mistaken for a fault.
+2. **Who can hear it.** Every SuperAdmin is listed as "on (SuperAdmin)" and can't be
+   switched off here. Below them, the users switched on individually, each with an
+   off switch, and a search by name or email to add another.
+3. **Usage.** For this month and the last 30 days:
+   - characters spoken and estimated cost, by user and by use (V1 to V6);
+   - how much came from the cache, which is the money not spent.
+4. **Voice.** The default voice, with the "hear the voices" panel so you choose by ear.
+
+### In the AI costs
+
+Speech is billed **per character**, not per token or minute, so it gets its own usage
+record, the same way listening does:
+
+- A new **`SpeechSession`** row per spoken reply, mirroring `DictationSession`. It holds
+  the user, organisation, voice, use (V1 to V6), character count, and whether it came
+  from the cache (a cached reply costs nothing and is recorded as such).
+- An **`AiInvocation`** row as well, as `app/api/ai/dictation/usage/route.ts` does for
+  listening (provider `deepgram-tts`, model = the voice id, invocation point
+  `voice.speak.<use>`). Speech then appears in the **AI Usage** report's by-provider,
+  by-model, by-user and by-organisation breakdowns, and in its totals.
+- **Price:** `DEEPGRAM_TTS_USD_PER_1K_CHARS = 0.030` in `app/lib/ai/pricing.ts`,
+  editable in the AI Usage rate catalog as a **per-1,000-characters** row. The catalog
+  follows the 25 September fix: a row that only copies the default is never stored, so
+  a later price change in `pricing.ts` is not silently shadowed.
+- The Voice Assist **Cost** button includes speech alongside listening.
+
+---
+
+## 7. Slices
+
+1. **Foundation.**
+   - The route, the parameters, the speaker, usage recording and pricing.
+   - The `voice-feedback` key, off at every level, with the production SQL file.
+   - The **Text to Speech** SuperAdmin tile: master switch, who can hear it, usage,
+     and the voices panel to choose between Theia, Hyperion, Pandora and Draco.
+   - Speech in the **AI Usage** report and the Cost button.
 2. **V1.** Voice Assist questions and refusals spoken, with the microphone gate,
    barge-in and the how-much-to-say setting.
 3. **V2.** Animate narration: a switch in the Animate controls, with the pace waiting
@@ -152,32 +213,51 @@ unless switched on):
 
 ---
 
-## 7. How we will know it works
+## 8. How we will know it works
 
-**Automated**
+### Automated
+
 - `spokenText` tests: quotes, arrows, ids and each how-much-to-say level.
 - A guard that no `/v1/speak` string is built outside `speakParams.ts`.
-- Route tests: 403 without the org policy or feature, 413 over the limit, usage
-  recorded.
+- **Who can hear it:**
+  - an ordinary user gets 403 from the speech route;
+  - a SuperAdmin gets audio with no override;
+  - the same ordinary user gets audio once the tile switches them on, and 403 again
+    once it switches them off;
+  - with the master switch off, everyone gets 503, SuperAdmins included.
+- Route tests: 413 over 2,000 characters, and exactly one `SpeechSession` and one
+  `AiInvocation` row per reply (cached replies recorded as cached, at no cost).
+- **Cost:** the AI Usage totals include speech at the catalog rate; a catalog row equal
+  to the default is not stored.
 - Speaker tests with a fake audio element: queueing, `stop()`, and the speaking flag.
 
-**By hand**
+### By hand
+
 - On speakers, not headphones, open a diagram with two tasks and say "delete the
   task". You should hear "which task? say a number…". Say "one": the right task goes,
   and the microphone did not transcribe the voice.
 - Say "stop" halfway through a spoken reply. The voice stops at once.
 - Re-run the recorded corpus on the Replay tab with spoken replies on. It must score
   the same as with them off.
+- In the tile, switch on one test user, sign in as them and hear a reply; switch them
+  off and hear nothing on the next command. Check the characters appear against them
+  in the tile and in AI Usage.
 
 ---
 
-## 8. Decisions for Paul
+## 9. Decisions for Paul
+
+**Decided 2026-09-25:** who gets it. On for SuperAdmins, off for everyone else, and a
+SuperAdmin switches it on for selected users from the Text to Speech tile (section 6).
+This replaces the earlier question about tiers.
+
+Still open:
 
 1. **Default voice:** Theia (Australian, feminine) or Hyperion (Australian, masculine)?
-   The voices panel in slice 1 lets you hear both before choosing.
-2. **Who gets it:** Expert and above, like Voice Assist? Or wider for the read-aloud
-   features (V2, V3), which don't need a microphone?
-3. **Default "how much to say":** questions and problems (recommended), or questions
+   The voices panel on the tile lets you hear both before choosing.
+2. **Default "how much to say":** questions and problems (recommended), or questions
    only?
+3. **A monthly limit per user:** none (recommended while it is SuperAdmin-granted), or
+   a character cap set on the tile?
 4. **Flux TTS:** worth 1.5 times the price of Aura-2, once we've confirmed it's
    available and heard it?
