@@ -208,6 +208,16 @@
       }
     },
     {
+      "key": "voice-feedback",
+      "states": {
+        "free": "hidden",
+        "introductory": "hidden",
+        "professional": "hidden",
+        "expert": "hidden",
+        "enterprise": "hidden"
+      }
+    },
+    {
       "key": "visio-import-bulk",
       "states": {
         "free": "hidden",
