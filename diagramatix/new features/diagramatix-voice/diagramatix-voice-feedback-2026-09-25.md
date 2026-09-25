@@ -173,7 +173,37 @@ parts:
 3. **Usage.** For this month and the last 30 days:
    - characters spoken and estimated cost, by user and by use (V1 to V6);
    - how much came from the cache, which is the money not spent.
-4. **Voice.** The default voice, with the "hear the voices" panel so you choose by ear.
+4. **Voice.** The default voice, chosen by ear in the side-by-side comparison below.
+
+### Side-by-side comparison (Paul, 2026-09-25)
+
+A panel on the tile for hearing two voices say **the same sentence**, one after the
+other, before choosing. SuperAdmin only.
+
+- **What can be compared:** any two of the Aura-2 voices (Theia, Hyperion, Pandora,
+  Draco) and the Flux TTS voices (for example Jack and Rufus, the British ones; Flux has
+  no Australian voice). Flux is included so the question "is Flux worth 1.5 times the
+  price?" is answered by listening, not by reading its brochure.
+- **What they say:** a ready-made set of real Diagramatix lines, and a box to type your
+  own. The ready-made set covers the hard cases: a picker question ("which Review? say
+  a number, one or two, or cancel"), a refusal with names in it ("no room above
+  Underwriters for a lane called Quality Assurance"), element names ending in digits
+  ("rename Task 1 to Review Email"), a code ("attach R-012"), and a paragraph of a Staff
+  Narrative.
+- **How:** play A, play B, or play both one after the other. An optional **blind**
+  mode hides which is which until you pick the one you prefer.
+- **What it shows beside each:** time to first sound (the delay a user would feel),
+  total length, characters, and what that sentence cost.
+- **Choosing:** "use this voice" sets the default from the panel.
+
+**Flux is a different connection.** It is a live streaming session
+(`wss://api.deepgram.com/v2/speak`) built for voice agents, not a one-off request. For
+the comparison only, the server opens a short Flux session, sends the one sentence,
+collects the audio and returns it like an Aura-2 reply, so the panel handles both the
+same way. That path lives in the same `speakParams.ts`, is SuperAdmin-only, and is
+**not** used for users' replies unless Flux is chosen later. Comparison plays are
+recorded in the usage figures under their own use (`voice.speak.compare`), so testing
+never hides in the real numbers.
 
 ### In the AI costs
 
@@ -201,7 +231,7 @@ record, the same way listening does:
    - The route, the parameters, the speaker, usage recording and pricing.
    - The `voice-feedback` key, off at every level, with the production SQL file.
    - The **Text to Speech** SuperAdmin tile: master switch, who can hear it, usage,
-     and the voices panel to choose between Theia, Hyperion, Pandora and Draco.
+     and the side-by-side comparison of the Aura-2 and Flux voices.
    - Speech in the **AI Usage** report and the Cost button.
 2. **V1.** Voice Assist questions and refusals spoken, with the microphone gate,
    barge-in and the how-much-to-say setting.
@@ -225,6 +255,9 @@ record, the same way listening does:
   - the same ordinary user gets audio once the tile switches them on, and 403 again
     once it switches them off;
   - with the master switch off, everyone gets 503, SuperAdmins included.
+- **Comparison:** the Flux path answers SuperAdmins only (403 for anyone else), is
+  never reached by an ordinary reply, and records its plays as `voice.speak.compare`;
+  blind mode does not reveal the voice names until a pick is made.
 - Route tests: 413 over 2,000 characters, and exactly one `SpeechSession` and one
   `AiInvocation` row per reply (cached replies recorded as cached, at no cost).
 - **Cost:** the AI Usage totals include speech at the catalog rate; a catalog row equal
@@ -254,10 +287,12 @@ This replaces the earlier question about tiers.
 Still open:
 
 1. **Default voice:** Theia (Australian, feminine) or Hyperion (Australian, masculine)?
-   The voices panel on the tile lets you hear both before choosing.
+   The side-by-side comparison on the tile lets you hear both before choosing.
 2. **Default "how much to say":** questions and problems (recommended), or questions
    only?
 3. **A monthly limit per user:** none (recommended while it is SuperAdmin-granted), or
    a character cap set on the tile?
-4. **Flux TTS:** worth 1.5 times the price of Aura-2, once we've confirmed it's
-   available and heard it?
+4. **Flux TTS:** worth 1.5 times the price of Aura-2? Recommended answer for now: no.
+   Flux has no Australian voice, and it is built for live voice-agent sessions, while
+   five of our six uses are one-off reads. Its interruption tracking could help Voice
+   Assist replies (V1) later. Decide by ear, in the side-by-side comparison.
