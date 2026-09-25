@@ -25,10 +25,11 @@ import { ReplayPanel } from "./ReplayPanel";
 import { RecogniserBadge } from "./RecogniserBadge";
 import { FamilyCasesWindow } from "./FamilyCasesWindow";
 import { OUTCOME_STYLE, OUTCOME_MEANS } from "./outcomeStyle";
+import { TestVoicePanel } from "./TestVoicePanel";
 
 
 export function VoiceAssistTestClient() {
-  const [tab, setTab] = useState<"text" | "record" | "replay">("text");
+  const [tab, setTab] = useState<"text" | "record" | "replay" | "test-voice">("text");
   const [seed, setSeed] = useState(DEFAULT_CORPUS_SEED);
   const [count, setCount] = useState(200);
   const [family, setFamily] = useState<string>("");
@@ -89,7 +90,7 @@ export function VoiceAssistTestClient() {
       <RecogniserBadge />
 
       <div className="flex items-center gap-1 mb-4 border-b border-gray-200">
-        {([["text", "Text leg — free"], ["record", "Record clips"], ["replay", "Replay — the real test"]] as const).map(([k, label]) => (
+        {([["text", "Text leg — free"], ["record", "Record clips"], ["replay", "Replay — the real test"], ["test-voice", "Test voice"]] as const).map(([k, label]) => (
           <button key={k} onClick={() => setTab(k)}
             className={`px-3 py-1.5 text-xs -mb-px border-b-2 ${tab === k ? "border-purple-600 text-purple-700 font-medium" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
             {label}
@@ -97,7 +98,7 @@ export function VoiceAssistTestClient() {
         ))}
       </div>
 
-      {tab === "record" ? <RecorderPanel /> : tab === "replay" ? <ReplayPanel /> : (
+      {tab === "test-voice" ? <TestVoicePanel /> : tab === "record" ? <RecorderPanel /> : tab === "replay" ? <ReplayPanel /> : (
       <>
       <p className="text-xs text-gray-500 mb-4 max-w-3xl">
         Generates commands from the op vocabulary, parses each one, and says <strong>which layer</strong> failed.

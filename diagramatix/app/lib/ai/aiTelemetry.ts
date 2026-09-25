@@ -38,6 +38,7 @@ export const AI_INVOCATION_POINTS = {
   DictationRefine: "dictation.refine", // transcript clean-up / anonymise
   LiveCommand: "bpmn.live-command", // Voice Assist: NL edit command → op list (Raw Attempt only)
   VoiceDictation: "voice.dictation", // one row per Deepgram dictation session (provider/model "deepgram")
+  VoiceReply: "voice.reply", // one row per Deepgram TTS reply (provider: "deepgram-tts", model: voice name)
   CollabSession: "collab.session", // one row per Liveblocks collab room join (provider/model "liveblocks")
   IconVectorize: "icon.vectorize", // ArchiMate icon image → editable vector primitives
   // Offline SuperAdmin harness scripts (npm run ai:report / ai:compare). They call
@@ -104,6 +105,7 @@ export const AI_INVOCATION_POINT_LABELS: Record<string, string> = {
   [AI_INVOCATION_POINTS.DictationRefine]: "Dictation Refine",
   [AI_INVOCATION_POINTS.LiveCommand]: "Live Command (Voice Assist)",
   [AI_INVOCATION_POINTS.VoiceDictation]: "Voice Dictation (Deepgram)",
+  [AI_INVOCATION_POINTS.VoiceReply]: "Voice Reply (Deepgram TTS)",
   [AI_INVOCATION_POINTS.CollabSession]: "Collaboration (Liveblocks)",
   [AI_INVOCATION_POINTS.IconVectorize]: "ArchiMate Icon Vectorize",
   [AI_INVOCATION_POINTS.ScriptConformanceReport]: "AI Conformance Report (script)",

@@ -21,6 +21,12 @@ export const PRICING_SNAPSHOT_DATE = "2026-07-27";
  */
 export const DEEPGRAM_USD_PER_MINUTE = 0.0059;
 
+/**
+ * Text-to-speech, USD per 1,000 characters — Deepgram Aura-2, pay-as-you-go list rate
+ * (read 2026-09-25). One API request at 2,000 chars costs ~$0.060.
+ */
+export const DEEPGRAM_TTS_USD_PER_1K_CHARS = 0.030;
+
 export interface ModelPrice {
   in: number; // USD per 1M input tokens
   out: number; // USD per 1M output tokens
