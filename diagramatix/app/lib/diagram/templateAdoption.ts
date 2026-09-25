@@ -33,8 +33,10 @@
  *     its pools (or lanes) are stacked below the diagram's lowest pool,
  *     POOL_GAP apart.
  *
- * Boundary events go with their host (its parent is theirs), and the template's
- * notes and markers (`isLaneUnowned`) travel with it without being adopted.
+ * Events on an element's edge go with their host (containment.ts
+ * `edgeEventParentId`: the host's parent, unless they are a sub-process's own
+ * rim start or end), and the template's notes and markers (`isLaneUnowned`)
+ * travel with it without being adopted.
  *
  * Pure: it plans; the reducer moves, grows and settles.
  */
@@ -57,7 +59,7 @@ export interface TemplateAdoptionPlan {
   fragmentIds: Set<string>;
   /** Payload elements the host adopts: the fragment's top level, not boundary-mounted. */
   topLevelIds: Set<string>;
-  /** Boundary events mounted on a payload element with no parent in the payload: their parent becomes their host's. */
+  /** Events on a payload element's edge: once their host is placed, each takes the parent containment.ts `edgeEventParentId` gives it. */
   boundaryIds: Set<string>;
   /**
    * What CHOOSES the host — the fragment less anything mounted on a boundary,
@@ -179,14 +181,11 @@ export function planTemplateAdoption(
   const fragment = payload.filter((e) => !isLaneUnowned(e));
   for (const e of fragment) {
     plan.fragmentIds.add(e.id);
-    const ownParent = !!e.parentId && payloadIds.has(e.parentId);
-    // A start or end event on a sub-process's rim is the sub-process's own
-    // and keeps that parent; an intermediate one on a task goes where the task
-    // goes.
     if (e.boundaryHostId && payloadIds.has(e.boundaryHostId)) {
-      if (!ownParent) plan.boundaryIds.add(e.id);
+      plan.boundaryIds.add(e.id);
       continue;
     }
+    const ownParent = !!e.parentId && payloadIds.has(e.parentId);
     plan.boxIds.add(e.id);
     if (!e.boundaryHostId && !ownParent) plan.topLevelIds.add(e.id);
   }

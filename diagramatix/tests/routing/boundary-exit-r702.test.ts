@@ -356,7 +356,7 @@ describe("T4794 — voice “connect event four to assess work completed” (L4,
     expect(offHost(c.waypoints)).toBe(true);
   });
 
-  it("stays that way after the target is moved (the move ends with CORRECT_ALL)", () => {
+  it("stays that way after the target is moved (the group-move end, ELEMENTS_MOVE_END: re-parent, re-fit, then CORRECT_ALL)", () => {
     const h = headlessDiagram(paulsDiagram());
     applyAssistOps(parseCommand("connect event four to assess work completed")!, h.context());
     h.actions.moveElements(["assess"], 40, 0);

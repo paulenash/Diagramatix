@@ -50,7 +50,7 @@ import { planMovePool, planSwapPools, type PoolPosition } from "@/app/lib/diagra
 import { autoResizeUmlElement, sizeUmlNote } from "@/app/lib/diagram/umlAutoSize";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { getElementPoolId } from "@/app/lib/diagram/poolUtil";
-import { isLaneUnowned } from "@/app/lib/diagram/containment";
+import { isLaneUnowned, edgeEventParentId } from "@/app/lib/diagram/containment";
 import { isBlackBoxPool } from "@/app/lib/diagram/blackBoxPoolMenu";
 import { planTemplateAdoption, boxOf } from "@/app/lib/diagram/templateAdoption";
 import { CHEVRON_THEMES, chevronReadingOrder } from "@/app/lib/diagram/chevronThemes";
@@ -972,11 +972,11 @@ function dragHolderOf(
 }
 
 /**
- * An event on an element's edge belongs where its host does — the mount
- * convention (MOVE_END mounts with `parentId: host.parentId`). Re-applied
- * after a drop has re-parented the hosts in `hostIds`, or the event stays in
- * the host's old lane — and the BPMN export files a flow node under the lane
- * its parentId names.
+ * The events on the edges of the hosts in `hostIds` take the parent
+ * containment.ts `edgeEventParentId` gives them, after a drop has re-parented
+ * those hosts — or an event stays in its host's old lane, and the BPMN export
+ * files a flow node under the lane its parentId names. A sub-process's own rim
+ * start and end keep the sub-process.
  */
 function edgeEventsFollowHosts(elements: DiagramElement[], hostIds: ReadonlySet<string>): DiagramElement[] {
   const hostParent = new Map<string, string | undefined>();
@@ -984,7 +984,7 @@ function edgeEventsFollowHosts(elements: DiagramElement[], hostIds: ReadonlySet<
   if (hostParent.size === 0) return elements;
   return elements.map((e) => {
     if (!e.boundaryHostId || !hostParent.has(e.boundaryHostId)) return e;
-    const parentId = hostParent.get(e.boundaryHostId);
+    const parentId = edgeEventParentId(e, hostParent.get(e.boundaryHostId));
     return parentId === e.parentId ? e : { ...e, parentId };
   });
 }
@@ -9938,10 +9938,9 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       if (host) {
         piece = piece.map((e) => (plan.topLevelIds.has(e.id) && !(e.parentId && existing.some((x) => x.id === e.parentId))
           ? { ...e, parentId: host.id } : e));
-        // A boundary event belongs where its host does (the MOVE_END mount convention).
         piece = piece.map((e) => {
           if (!plan.boundaryIds.has(e.id)) return e;
-          const parentId = piece.find((h) => h.id === e.boundaryHostId)?.parentId;
+          const parentId = edgeEventParentId(e, piece.find((h) => h.id === e.boundaryHostId)?.parentId);
           return parentId === e.parentId ? e : { ...e, parentId };
         });
         // The host was CHOSEN without the events on the piece's edges; the

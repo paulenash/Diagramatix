@@ -18,6 +18,10 @@
  * `planTemplateDrop`), and the end of a group drag asks every moved element
  * the one drop-parent rule a single drag asks (useDiagram `pickDropParent`),
  * then re-fits the containers (`refitContainersAfterMove`).
+ *
+ * T4885 — the edge events a drop moves with their host take the parent the
+ * applied template gives them (containment.ts `edgeEventParentId`): a
+ * sub-process's own rim start and end keep the sub-process.
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
@@ -27,7 +31,9 @@ import { planTemplateDrop, dropBandAt, planTemplateShow } from "@/app/lib/diagra
 import { HALF_TASK_W, LANE_CHILD_PAD } from "@/app/lib/diagram/assistPlacement";
 import { MIN_LEFT_GAP } from "@/app/lib/diagram/poolLaneBounds";
 import { isTemplateContainer } from "@/app/lib/diagram/templateAdoption";
-import { isLaneUnowned } from "@/app/lib/diagram/containment";
+import { isLaneUnowned, edgeEventParentId } from "@/app/lib/diagram/containment";
+import { buildBpmnXml, bpmnRefId } from "@/app/lib/diagram/bpmn/exportBpmnXml";
+import { assembleFromDiagram } from "@/app/lib/simulation/assemble";
 import { canConnect } from "@/app/lib/diagram/canConnect";
 import { headlessDiagram } from "@/app/lib/assist/headlessDiagram";
 import { parseCommand } from "@/app/lib/assist/commandGrammar";
@@ -814,5 +820,120 @@ describe("T4884 — an event on an element's edge goes where its host goes when 
     expect(caseOf("MOVE_END")).toContain("elements = edgeEventsFollowHosts(elements, new Set([id]));");
     expect(caseOf("ELEMENTS_MOVE_END")).toContain("elements = edgeEventsFollowHosts(elements, roots);");
     expect(hook.split("function edgeEventsFollowHosts(").length - 1).toBe(1);
+  });
+});
+
+/** The XML of one exported <bpmn:subProcess>, from its open tag to its matching close. */
+function subProcessBody(xml: string, id: string): string {
+  const open = xml.indexOf(`<bpmn:subProcess id="${bpmnRefId(id)}"`);
+  if (open < 0) return "";
+  const tag = /<bpmn:subProcess\b|<\/bpmn:subProcess>/g;
+  tag.lastIndex = open;
+  let depth = 0;
+  for (let m = tag.exec(xml); m; m = tag.exec(xml)) {
+    depth += m[0].startsWith("</") ? -1 : 1;
+    if (depth === 0) return xml.slice(open, m.index);
+  }
+  return "";
+}
+
+describe("T4885 — a sub-process's own rim start and end keep it as their parent, whatever moves the sub-process", () => {
+  // The two built-ins whose expanded sub-process owns the start and end on its
+  // rim. Adopted into Warehouse, a drag, a group drag or an arrow nudge handed
+  // both events to Warehouse: the export put them outside the <subProcess>
+  // while their flows stayed inside it, and the simulator found no body start.
+  const inserted = (name: string) => {
+    const base = paulsDiagram();
+    const drop = planTemplateDrop(builtinTemplate(name), base, VIEW);
+    const ins = applyT(base, drop);
+    const ids = drop.elements.map((e) => e.id);
+    const ep = ins.elements.find((e) => ids.includes(e.id) && e.type === "subprocess-expanded")!;
+    const rim = (type: string) => ins.elements.find((e) => e.boundaryHostId === ep.id && e.type === type)!;
+    return { ins, ids, ep, start: rim("start-event"), end: rim("end-event") };
+  };
+  const moves: { name: string; move: (d: DiagramData, ep: string, ids: string[]) => DiagramData }[] = [
+    { name: "a drag of the sub-process", move: (d, ep) => singleDragFrames(d, ep, 20, 0) },
+    { name: "an arrow nudge of the sub-process alone", move: (d, ep) => singleDrag(d, ep, 5, 0) },
+    { name: "a group drag of the template", move: (d, _ep, ids) => groupDragFrames(d, ids, 20, 0) },
+    { name: "an arrow nudge of the selected template", move: (d, _ep, ids) => groupDrag(d, ids, 5, 0) },
+  ];
+
+  for (const name of ["Non-Interruptible Process Pattern", "Expanded Subprocess Loop"]) {
+    describe(name, () => {
+      const { ins, ids, ep, start, end } = inserted(name);
+      const owned = (d: DiagramData, why: string) => {
+        const xml = buildBpmnXml(d, "t");
+        const body = subProcessBody(xml, ep.id);
+        expect(body, why).not.toBe("");
+        for (const ev of [start, end]) {
+          expect(at(d, ev.id).parentId, `${why}: ${ev.type}'s parent`).toBe(ep.id);
+          expect(body, `${why}: ${ev.type} exported inside the subProcess`).toContain(`id="${bpmnRefId(ev.id)}"`);
+        }
+        const rimFlows = d.connectors.filter((c) => c.type === "sequence" && [c.sourceId, c.targetId].some((x) => x === start.id || x === end.id));
+        expect(rimFlows.length, why).toBeGreaterThanOrEqual(2);
+        for (const c of rimFlows) expect(body, `${why}: flow ${c.id} exported inside the subProcess`).toContain(`id="${bpmnRefId(c.id)}"`);
+        const sim = assembleFromDiagram(d).nodes.find((n) => n.id === ep.id);
+        expect(sim?.bodyStart, `${why}: the simulator starts the body at the rim start`).toBe(start.id);
+        expect(endsOff(d), why).toEqual([]);
+      };
+
+      it("applied on the end of Warehouse: adopted into Warehouse, and the rim start and end are the sub-process's", () => {
+        expect(ep.parentId).toBe(WAREHOUSE);
+        owned(ins, "applied");
+      });
+
+      for (const m of moves) {
+        it(`${m.name}: still the sub-process's — parent, export and body start`, () => {
+          const after = m.move(ins, ep.id, ids);
+          expect(at(after, ep.id).x).not.toBe(ep.x);
+          expect(at(after, ep.id).parentId).toBe(WAREHOUSE);
+          owned(after, m.name);
+          expect(outsideParent(after, new Set(ids))).toEqual([]);
+        });
+      }
+
+      it("dragged into Front office, alone or with the template: the sub-process's rim start and end stay its own, and any other event on its rim goes to Front office with it", () => {
+        const front = at(ins, FRONT);
+        const dy = cy(front) - cy(ep);
+        for (const [how, after] of [
+          ["alone", singleDragFrames(ins, ep.id, 0, dy)],
+          ["in a group", groupDragFrames(ins, ids, 0, dy)],
+        ] as const) {
+          expect(at(after, ep.id).parentId, how).toBe(FRONT);
+          owned(after, how);
+          for (const e of after.elements.filter((x) => x.boundaryHostId === ep.id && x.type === "intermediate-event")) {
+            expect(e.parentId, `${how}: ${e.label}`).toBe(FRONT);
+          }
+        }
+      });
+    });
+  }
+
+  it("the rule: an event on an edge takes its host's parent — except a start or end its sub-process already owns", () => {
+    const hostParent = "lane";
+    const ev = (type: DiagramElement["type"], parentId: string | undefined) => ({ type, parentId, boundaryHostId: "EP" });
+    expect(edgeEventParentId(ev("start-event", "EP"), hostParent)).toBe("EP");
+    expect(edgeEventParentId(ev("end-event", "EP"), hostParent)).toBe("EP");
+    // A start or end on the rim that the sub-process does not own (the
+    // "More Complex Document Request Loop" convention) goes with the host.
+    expect(edgeEventParentId(ev("start-event", "old lane"), hostParent)).toBe(hostParent);
+    // An intermediate event on the rim is a boundary event of the host: it
+    // belongs beside the host, never inside it.
+    expect(edgeEventParentId(ev("intermediate-event", "EP"), hostParent)).toBe(hostParent);
+    expect(edgeEventParentId(ev("intermediate-event", "old lane"), undefined)).toBeUndefined();
+  });
+
+  it("wiring: one rule — the applied template and the drop both ask edgeEventParentId, and nothing else restates it", () => {
+    const hook = src("app/hooks/useDiagram.ts");
+    const fn = hook.slice(hook.indexOf("function edgeEventsFollowHosts("), hook.indexOf("function segmentIntersectsRect("));
+    expect(fn).toContain("edgeEventParentId(e, hostParent.get(e.boundaryHostId))");
+    const apply = hook.slice(hook.indexOf(`    case "APPLY_TEMPLATE": {`));
+    expect(apply.slice(0, apply.indexOf("\n    case \""))).toContain("edgeEventParentId(e, piece.find((h) => h.id === e.boundaryHostId)?.parentId)");
+    const adoption = src("app/lib/diagram/templateAdoption.ts");
+    expect(adoption).not.toMatch(/parentId\s*===\s*e\.boundaryHostId/);
+    expect(adoption).toContain("plan.boundaryIds.add(e.id);");
+    for (const f of ["app/hooks/useDiagram.ts", "app/lib/diagram/templateAdoption.ts", "app/lib/diagram/containment.ts"]) {
+      expect(src(f).split("function edgeEventParentId(").length - 1, f).toBe(f.endsWith("containment.ts") ? 1 : 0);
+    }
   });
 });
