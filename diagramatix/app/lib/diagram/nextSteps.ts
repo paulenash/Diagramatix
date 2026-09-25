@@ -9,6 +9,7 @@
 import type { DiagramData, DiagramElement, SymbolType, ConnectorType, EventType, GatewayType, FlowType } from "./types";
 import { canConnect } from "./canConnect";
 import { placeBoundaryEvent } from "./assistPlacement";
+import { BOUNDARY_HOST_TYPES } from "./boundaryHosts";
 
 /**
  * What accepting a candidate does:
@@ -37,8 +38,6 @@ export interface NextStepCandidate {
   /** dataobject kind only — "in" (data → element) or "out" (element → data). */
   dataDirection?: "in" | "out";
 }
-
-const BOUNDARY_HOST_TYPES = new Set<string>(["task", "subprocess", "subprocess-expanded"]);
 
 /** Ordered candidate menu per source type (BPMN), most-likely first. */
 function menuFor(sourceType: string): NextStepCandidate[] {

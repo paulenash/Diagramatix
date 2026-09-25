@@ -10,6 +10,8 @@
  * word, understood by one half of the feature and not the other.
  *
  * One list, used by both, so a mis-hear learned anywhere is known everywhere.
+ * The same goes for the few other nouns an add names (participant, black/white
+ * box, message), below.
  *
  * Pure.
  */
@@ -24,6 +26,34 @@ export const SUBLANE_WORDS = [
   "subline", "sublines", "sub-line", "sub-lines", "sub line", "sub lines",
   "sub", "subs",
 ] as const;
+
+/**
+ * The other nouns an "add a …" sentence can name, which are not symbol types
+ * (those are `SYMBOL_SYNONYMS` in ops.ts). The command grammar spells each of
+ * them in its regexes, and the add-word repair (`selectedWord.ts`) needs the
+ * same list to know that "and a participant box …" is an add. One list, read by
+ * both, so a word the grammar learns is a word the repair knows.
+ */
+/** "Participant box" is the spec's name for a black-box pool, and what Paul says (2026-09-21). */
+export const PARTICIPANT_WORDS = ["participant", "participant box"] as const;
+/** Said before the pool word: "a black box pool", "a white-box pool". */
+export const BOX_WORDS = ["black box", "black-box", "blackbox", "white box", "white-box", "whitebox"] as const;
+/** A message flow. Singular — a rule that takes a plural adds the `s` itself. */
+export const MESSAGE_WORDS = ["message", "msg"] as const;
+
+const escRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * A regex alternation (source text, no group) for a word list: longest first,
+ * so "participant box" is tried before "participant", and a space in a phrase
+ * matches any run of whitespace.
+ */
+export function wordAlternation(words: readonly string[]): string {
+  return [...words]
+    .sort((a, b) => b.length - a.length)
+    .map((w) => w.trim().split(/\s+/).map(escRe).join("\\s+"))
+    .join("|");
+}
 
 export type ContainerWordKind = "pool" | "lane" | "sublane";
 

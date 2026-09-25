@@ -40,6 +40,7 @@ import { isLabelMove } from "@/app/lib/diagram/labelTether";
 import { expandMoveSet } from "@/app/lib/diagram/moveSet";
 import { retypeTasksForSystemFlag, applyTaskTypeChanges } from "@/app/lib/diagram/itSystemTaskTypes";
 import { emieMountProps } from "@/app/lib/diagram/emieLabel";
+import { BOUNDARY_HOST_TYPES } from "@/app/lib/diagram/boundaryHosts";
 import { settleMessageLabels, movedElementIds } from "@/app/lib/diagram/messageLabel";
 import { growPoolToAdopt } from "@/app/lib/diagram/growPool";
 import { planWrapInPool } from "@/app/lib/diagram/wrapInPoolPlan";
@@ -89,7 +90,8 @@ function autoSizeForElement(el: DiagramElement): { w: number; h: number } {
 const BPMN_EVENT_TYPES = new Set(["start-event", "intermediate-event", "end-event"]);
 
 // ── Boundary-event geometry ───────────────────────────────────────────────────
-const BOUNDARY_HOST_TYPES = new Set<SymbolType>(["task", "subprocess", "subprocess-expanded"]);
+// BOUNDARY_HOST_TYPES is imported: the voice takes a host from the selection
+// with the same set (boundaryHosts.ts).
 const BOUNDARY_EVENT_TYPES = new Set<SymbolType>(["start-event", "intermediate-event", "end-event"]);
 const BOUNDARY_SNAP_THRESHOLD = 25; // world px
 const BOUNDARY_W = 36;              // same size as a standard event

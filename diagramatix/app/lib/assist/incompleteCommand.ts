@@ -10,10 +10,20 @@
  *
  * Pure, so every rule here is tested; the editor only imports it.
  */
-const VERBS = /^(?:swap|rename|relabel|label|edit|move|slide|nudge|bump|shift|connect|link|join|disconnect|unlink|delete|remove|add|insert|create|put|send|draw|attach|place|compress|shrink|extend|widen|wrap|surround|enclose|unwrap|dissolve|call|change|set)$/;
+import { COMMAND_VERBS } from "./commandVerbs";
+import { repairHeardWords } from "./selectedWord";
+import { parseBoundaryEventPhrase } from "./boundaryEventPhrase";
+import { ADD_MESSAGE_LEAD, MESSAGE_BY_NUMBER, MESSAGE_BY_NUMBER_FROM_SELECTION } from "./messagePhrase";
+
+const VERBS = new RegExp(`^(?:${COMMAND_VERBS.join("|")})$`);
 
 export function isIncompleteCommand(text: string): boolean {
-  const raw = text.trim();
+  // The same repairs the grammar makes, first — so the hold judges the words
+  // the parser will read. "and a message from review" must wait for its "to …"
+  // exactly as "add a message from review" does, or the two halves run as two
+  // commands and both fail (2026-09-25). The repairs keep trailing punctuation,
+  // so the comma rule below still sees a trailing comma.
+  const raw = repairHeardWords(text.trim());
   const t = raw.toLowerCase().replace(/[.?!,]+$/g, "").trim();
   if (!t) return false;
 
@@ -65,10 +75,22 @@ export function isIncompleteCommand(text: string): boolean {
     return true;
   }
 
+  // A boundary-event sentence is never a message sentence, even when its
+  // trigger is one: "add a message boundary event to Review" is complete, and
+  // the message rule below would hold it for a "from" it will never have.
+  //
+  // A boundary event with NO host is deliberately not held either (Paul,
+  // 2026-09-25: "Use the selected task"). With a task selected it is a complete
+  // command, and holding it would delay every selection-hosted boundary event
+  // by the whole grace period (~12 s) just in case a "to <host>" follows.
+  if (parseBoundaryEventPhrase(t) !== null) return false;
+
   // "add message …": the by-number forms are complete — a bare "add a message" or
   // "add a message to the selected" — anything else needs BOTH a from and a to.
-  if (/^(add|create|send|draw|put)\b.*\bmessage\b/.test(t)) {
-    if (/^(?:add|create|send|draw|put)\s+(?:a\s+|new\s+)?(?:message|msg)(?:\s+flow)?(?:\s+(?:to|from|for|with|on)\s+(?:the\s+)?(?:selected(?:\s+\w+)?|selection|this|that|these|it))?$/.test(t)) return false;
+  // Only when the message IS the thing being added (the grammar's own bail
+  // pattern): a task called "Receive Messages" is not waiting for anything.
+  if (ADD_MESSAGE_LEAD.test(t)) {
+    if (MESSAGE_BY_NUMBER.test(t) || MESSAGE_BY_NUMBER_FROM_SELECTION.test(t)) return false;
     if (!(/\bfrom\b\s+\S+/.test(t) && /\bto\b\s+\S+/.test(t))) return true;
   }
   return false;

@@ -30,6 +30,7 @@ import { PromptEditPopup } from "./PromptEditPopup";
 import type { PcfClassification, AiGeneration } from "@/app/lib/diagram/types";
 import { ModelSelect, type AllowedModel } from "@/app/(dashboard)/diagram/[id]/ModelSelect";
 import { isUmlConnType } from "@/app/lib/diagram/types";
+import { BOUNDARY_HOST_TYPES } from "@/app/lib/diagram/boundaryHosts";
 import { umlAttributeTypeList } from "@/app/lib/diagram/umlTypes";
 import { getCachedCatalogue, findShapeByKey, type ArchimateShapeEntry } from "@/app/lib/archimate/catalogue";
 import { getAllowedRelationships, loadCompatibilityMatrix } from "@/app/lib/archimate/compatibility";
@@ -3807,7 +3808,6 @@ export function PropertiesPanel({
         // re-checking the box only succeed when the event is already
         // visually next to a host edge — far-away events stay free.
         const SNAP_THRESHOLD = 15;
-        const HOST_TYPES = new Set(["task", "subprocess", "subprocess-expanded"]);
         // Find the nearest valid host (Task / Subprocess / EP). Pass a cap to
         // limit the range: SNAP_THRESHOLD for the "already adjacent" case, or
         // Infinity so explicitly CHECKING the box always attaches an existing
@@ -3820,7 +3820,7 @@ export function PropertiesPanel({
           let bestId: string | null = null;
           let bestDist = cap;
           for (const h of allElements) {
-            if (!HOST_TYPES.has(h.type)) continue;
+            if (!BOUNDARY_HOST_TYPES.has(h.type)) continue;
             // closest point on the host's bounding rect
             const px = Math.max(h.x, Math.min(h.x + h.width, cx));
             const py = Math.max(h.y, Math.min(h.y + h.height, cy));

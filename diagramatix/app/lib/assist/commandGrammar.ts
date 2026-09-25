@@ -8,7 +8,11 @@ import { SYMBOL_SYNONYMS, SYMBOL_PHRASES } from "./ops";
 import { namesNonContainerKind, laneWordIsAttached, looksPositionalNotAName, namesAContainer } from "./greedyGuards";
 import { parseRenameType } from "./renameTargets";
 import { parsePoolBoundaryPhrase, mentionsPoolBoundary } from "./poolBoundaryPhrase";
-import { repairSelectedWord, repairTurnWord } from "./selectedWord";
+import { repairHeardWords } from "./selectedWord";
+import { hasCommandAfterName } from "./commandVerbs";
+import { PARTICIPANT_WORDS, BOX_WORDS, MESSAGE_WORDS, wordAlternation } from "./containerWords";
+import { parseBoundaryEventPhrase } from "./boundaryEventPhrase";
+import { MESSAGE_VERB, MESSAGE_BY_NUMBER, MESSAGE_BY_NUMBER_FROM_SELECTION, ADD_MESSAGE_LEAD } from "./messagePhrase";
 import { capitaliseFirstWord } from "../diagram/nameCase";
 import { convertMatches } from "./convertPhrase";
 import { parseAlignTail } from "./alignPhrase";
@@ -50,7 +54,12 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   // "Ten on gold flashing" is "turn on gold flashing" — the recogniser reaches
   // for the number. Repaired before the selection word, since both are leading
   // tokens and neither can produce the other (selectedWord.ts).
-  const heard = repairSelectedWord(repairTurnWord(clean(utterance)).text).text;
+  // "and message" and "Handle message" are "add message" (Paul, 2026-09-25:
+  // "Should recognise 'Add'"). His decision: "and" is read as "add" in front of
+  // an add, "handle" only in the bare message command — see repairAddWord.
+  // All three repairs go through repairHeardWords, which the hold
+  // (incompleteCommand.ts) calls too, so the two never read different words.
+  const heard = repairHeardWords(clean(utterance));
   const raw = heard.replace(/^([A-Za-z]+),\s+/, "$1 ");
   if (!raw) return null;
   const lower = raw.toLowerCase();
@@ -139,11 +148,19 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   //
   // Narrow on purpose — the tail must be ONLY the connective and a reference.
   // "After Review add a task called X" is a whole command and is left alone.
+  //
+  // "Is there a second command after the reference?" is answered from the one
+  // verb list (commandVerbs.ts, hasCommandAfterName): any command verb after
+  // the reference's first word. The first word is exempt because the
+  // reference is an activity NAME, and activities are called "Send Invoice"
+  // and "Create Order"; the old private list read "after Create Order" as a
+  // whole sentence and sent it to the AI, the very path that invented the
+  // duplicate above.
   {
     const tail = raw.match(/^(?:and\s+|that'?s\s+|it'?s\s+|put\s+it\s+|goes\s+)?(after|before)\s+(.+)$/i);
     if (tail) {
       const ref = clean(tail[2]);
-      const whole = /\b(?:add|insert|create|put|place|new|draw|connect|link|join|delete|remove|rename|relabel|move|nudge|make|turn|wrap|surround)\b/i.test(ref);
+      const whole = hasCommandAfterName(ref);
       if (ref && !whole) {
         // "after X" — X flows into what was just added. "before X" — the
         // reverse. "the last" is the pronoun the resolver already understands.
@@ -309,8 +326,9 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     // participant box for the courier above customer" fell through to the add
     // rule and became a TASK named "Participant box for the courier above
     // customer", parked in whichever sub-lane was last. "Participant" on its
-    // own counts too — it is the spec's word for the thing.
-    const P = "(?:pool|poll|pull|participant(?:\\s+box)?)";
+    // own counts too — it is the spec's word for the thing. The participant
+    // words are shared with the add-word repair (containerWords.ts).
+    const P = `(?:pool|poll|pull|${wordAlternation(PARTICIPANT_WORDS)})`;
     const L = "(?:lanes?|lines?)";
 
     // ONE EDGE, not the whole pool — and tried before every other container
@@ -485,7 +503,7 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     // Create a NEW pool. The "called <name>" and "above|below <target>" clauses
     // may come in EITHER order, and <target> may be a NAMED pool ("above
     // Customer") or the whole stack ("above existing pools").
-    mm = raw.match(new RegExp(`^(?:add|insert|create|put|make|new|draw)\\s+(?:a\\s+|an\\s+|the\\s+)?(?:new\\s+|another\\s+|empty\\s+)?(black[- ]?box|white[- ]?box)?\\s*(${P})\\b(.*)$`, "i"));
+    mm = raw.match(new RegExp(`^(?:add|insert|create|put|make|new|draw)\\s+(?:a\\s+|an\\s+|the\\s+)?(?:new\\s+|another\\s+|empty\\s+)?(${wordAlternation(BOX_WORDS)})?\\s*(${P})\\b(.*)$`, "i"));
     if (mm) {
       // A PARTICIPANT BOX IS A BLACK-BOX POOL — that is what the spec calls
       // one, so saying it should not produce a white-box pool with lanes.
@@ -593,36 +611,46 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     return [{ op: "delete", ref, ...(compact ? { compact: true } : {}) }];
   }
 
+  // ── Boundary event (before the message rules and the generic add) ──
+  // Above the message bail, which would otherwise take "add a MESSAGE
+  // boundary event to Review" for a message it cannot read. The phrase is read
+  // in one place (boundaryEventPhrase.ts): the trigger word, "non-interrupting"
+  // and the host, which may be absent — the apply layer then uses the
+  // selection (Paul, 2026-09-25: "Use the selected task"). A tail it cannot
+  // read goes to the AI rather than on to the add rule, which made a TASK of
+  // every one of these.
+  {
+    const b = parseBoundaryEventPhrase(raw);
+    if (b === "unreadable") return null;
+    if (b) {
+      return [{
+        op: "addBoundary",
+        ...(b.hostRef ? { hostRef: b.hostRef } : {}),
+        ...(b.label ? { label: b.label } : {}),
+        ...(b.eventType ? { eventType: b.eventType } : {}),
+        ...(b.nonInterrupting ? { nonInterrupting: true } : {}),
+      }];
+    }
+  }
+
   // ── Message flow (before the generic add): "add message from X to Y labelled Z" ──
+  const MSG = wordAlternation(MESSAGE_WORDS);
   const MSGLABEL = "(?:,?\\s+(?:labelled|labeled|called|named|saying|with label|that says)\\s+(.+))?";
-  m = raw.match(new RegExp(`^(?:add|create|draw|put|send)\\s+(?:a\\s+)?message(?:\\s+flow)?\\s+from\\s+(.+?)\\s+to\\s+(.+?)${MSGLABEL}$`, "i"));
+  m = raw.match(new RegExp(`^${MESSAGE_VERB}\\s+(?:a\\s+)?(?:${MSG})(?:\\s+flow)?\\s+from\\s+(.+?)\\s+to\\s+(.+?)${MSGLABEL}$`, "i"));
   if (m) return [{ op: "addMessage", fromRef: clean(m[1]), toRef: clean(m[2]), ...(m[3] ? { label: clean(m[3]) } : {}) }];
-  m = raw.match(new RegExp(`^(?:add|create|draw|put|send)\\s+(?:a\\s+)?message(?:\\s+flow)?\\s+to\\s+(.+?)\\s+from\\s+(.+?)${MSGLABEL}$`, "i"));
+  m = raw.match(new RegExp(`^${MESSAGE_VERB}\\s+(?:a\\s+)?(?:${MSG})(?:\\s+flow)?\\s+to\\s+(.+?)\\s+from\\s+(.+?)${MSGLABEL}$`, "i"));
   if (m) return [{ op: "addMessage", fromRef: clean(m[2]), toRef: clean(m[1]), ...(m[3] ? { label: clean(m[3]) } : {}) }];
   // Message by number (Paul, 2026-09-15). A bare "add a message" numbers every
   // task, collapsed subprocess and black-box pool and waits for "n to m labelled
   // X"; "add a message to the selected" numbers the selection's valid
-  // counterparts and waits for "to/from n labelled X".
-  if (/^(?:add|create|draw|put|send)\s+(?:a\s+|new\s+)?(?:message|msg)(?:\s+flow)?\s*$/i.test(raw)) return [{ op: "addMessageByNumber" }];
-  if (/^(?:add|create|draw|put|send)\s+(?:a\s+|new\s+)?(?:message|msg)(?:\s+flow)?\s+(?:to|from|for|with|on)\s+(?:the\s+)?(?:selected(?:\s+\w+)?|selection|this|that|these|it)\s*$/i.test(raw)) return [{ op: "addMessageByNumber", fromSelection: true }];
+  // counterparts and waits for "to/from n labelled X". The patterns are shared
+  // with the hold (messagePhrase.ts), which must agree on what is complete.
+  if (MESSAGE_BY_NUMBER.test(raw)) return [{ op: "addMessageByNumber" }];
+  if (MESSAGE_BY_NUMBER_FROM_SELECTION.test(raw)) return [{ op: "addMessageByNumber", fromSelection: true }];
   // Any OTHER "message" phrasing must NOT fall through to the generic add
   // (which would make a task called "Message"). Bail to null so it goes to
   // the AI interpreter instead of the add rule below.
-  if (/^(?:add|create|draw|put|send)\s+(?:a\s+)?(?:message|msg)(?:\s+flow)?\b/i.test(raw)) return null;
-
-  // ── Boundary event (before the generic add) ──
-  m = raw.match(/^(?:add|put|attach|create|place)\s+(?:a\s+)?boundary\s+event\s+(.+)$/i);
-  if (m) {
-    const rest = clean(m[1]);
-    const calledTo = rest.match(/^called\s+(.+?)\s+(?:to|on|onto)\s+(.+)$/i);
-    const toCalled = rest.match(/^(?:to|on|onto)\s+(.+?)\s+called\s+(.+)$/i);
-    const onlyTo = rest.match(/^(?:to|on|onto)\s+(.+)$/i);
-    let hostRef: string | undefined, label: string | undefined;
-    if (calledTo) { label = clean(calledTo[1]); hostRef = clean(calledTo[2]); }
-    else if (toCalled) { hostRef = clean(toCalled[1]); label = clean(toCalled[2]); }
-    else if (onlyTo) { hostRef = clean(onlyTo[1]); }
-    if (hostRef) return [{ op: "addBoundary", hostRef, ...(label ? { label } : {}) }];
-  }
+  if (ADD_MESSAGE_LEAD.test(raw)) return null;
 
   const COUNT = "(\\d+|a|an|one|two|three|four|five|six|seven|eight|nine|ten|some)";
   // ── Sublanes (before lanes: "sublanes" must not match the lane rule) ──
@@ -658,6 +686,12 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     // through here it's a malformed phrasing — send it to the AI rather than
     // creating a task literally named "pool to all elements on the diagram".
     if (/^(?:new\s+|another\s+)?(?:pool|poll|pull|lanes?|lines?|sub-?lanes?|sub-?lines?)\b/i.test(rest)) return null;
+    // A boundary event is never a task. The boundary rule above reads every
+    // phrasing it can; one that reaches here ("drop in a boundary event", "new
+    // boundary event called X", "add a big boundary event") is one it could
+    // not, and the AI can. Checked anywhere before the name, with room for one
+    // word inside the phrase ("boundary timer event").
+    if (/\bboundary\s+(?:\w+\s+)?events?\b/i.test(rest.split(/\s+(?:called|named|labell?ed|titled)\s+/i)[0])) return null;
     let afterRef: string | undefined;
     const after = rest.match(/\s+(?:after|following|behind|next to|onto)\s+(.+)$/i);
     if (after) { afterRef = clean(after[1]); rest = rest.slice(0, after.index).trim(); }

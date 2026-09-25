@@ -29,6 +29,7 @@ import { nanoid, isContainerType, getAllDescendantIds, reducer, type Action } fr
 import { sizeOf, placeInline, placeGatewayBranch, placeBoundaryEvent, placeAfterBoundaryEvent, boundaryOuterSide, findFreeSlot, HALF_TASK_W, HALF_TASK_H } from "@/app/lib/diagram/assistPlacement";
 import { planWrapInSubprocess, planUnwrapSubprocess, planWrapInContainer } from "@/app/lib/diagram/subprocessWrap";
 import { canConnect } from "@/app/lib/diagram/canConnect";
+import { isBoundaryHost } from "@/app/lib/diagram/boundaryHosts";
 import { resolveRef, resolveSelectionRefs, isSelectionRef, nearestRefs, ID_REF_PREFIX, spokenNumbersAsDigits } from "./resolveRef";
 import { isPointerElementRef } from "./pointerRef";
 import { nextContainerLabels } from "@/app/lib/diagram/containerNames";
@@ -1119,15 +1120,32 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
     }
 
     if (op.op === "addBoundary") {
-      const host = resolve1(op.hostRef);
-      if ("err" in host) { results.push(host.err); anyFail = true; continue; }
-      if (!["task", "subprocess", "subprocess-expanded"].includes(host.type)) { results.push(`${nameOf(host)} can't host a boundary event`); anyFail = true; continue; }
+      let host: DiagramElement;
+      if (op.hostRef) {
+        const named = resolve1(op.hostRef);
+        if ("err" in named) { results.push(named.err); anyFail = true; continue; }
+        host = named;
+      } else {
+        // No host said. Paul, 2026-09-25: "Use the selected task" — if exactly
+        // one task or subprocess is selected it goes there (the mouse says
+        // which, the voice says what); otherwise refuse and say what to say.
+        // Never a task, never a loose event: the mouse can make neither.
+        const sel = selectedIds.map((id) => els.find((e) => e.id === id)).filter((e): e is DiagramElement => !!e);
+        if (sel.length !== 1 || !isBoundaryHost(sel[0].type)) {
+          const kind = `${op.nonInterrupting ? "non-interrupting " : ""}${op.eventType && op.eventType !== "none" ? `${op.eventType} ` : ""}boundary event`;
+          results.push(`say which task or subprocess it goes on — “add ${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}${op.label ? ` called ${op.label}` : ""} to <name>”`);
+          anyFail = true; continue;
+        }
+        host = sel[0];
+      }
+      if (!isBoundaryHost(host.type)) { results.push(`${nameOf(host)} can't host a boundary event`); anyFail = true; continue; }
       const existing = els.filter((e) => e.boundaryHostId === host.id);
       const spot = placeBoundaryEvent(host, existing);
       if (!spot) { results.push(`no room for another boundary event on ${nameOf(host)}`); anyFail = true; continue; }
       const newId = nanoid();
       addElementGated("intermediate-event", spot, undefined, op.eventType, newId);
       setEventBoundary(newId, host.id);
+      if (op.nonInterrupting) updateProperties(newId, { interruptionType: "non-interrupting" });
       if (op.label) updateLabel(newId, op.label);
       voiceLastId.current = newId;
       setSelectedElementIds(new Set([newId]));

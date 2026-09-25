@@ -144,7 +144,9 @@ export function checkEffect(op: AssistOp, before: DiagramData, after: DiagramDat
     }
 
     case "addBoundary": {
-      const ev = newIn(before, after).filter((e) => e.boundaryHostId === refs.hostRef);
+      // No host said: the sentence promises one event on the selected task,
+      // and the selection is not a ref — so any single new mounted event.
+      const ev = newIn(before, after).filter((e) => (refs.hostRef ? e.boundaryHostId === refs.hostRef : !!e.boundaryHostId));
       if (ev.length !== 1) return fail(`expected one boundary event on ${nameOf(byId(after, refs.hostRef))}, found ${ev.length}`);
       return !op.label || sameText(ev[0].label, op.label) ? pass : fail(`the boundary event is called “${nameOf(ev[0])}”, not “${op.label}”`);
     }

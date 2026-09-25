@@ -32,7 +32,14 @@ export type AssistOp =
   | { op: "wrapInContainer"; container: "pool" | "lane"; label?: string }
   /** "unwrap the selected subprocess" — the reverse; "delete selected" on an EP does the same. */
   | { op: "unwrapSubprocess" }
-  | { op: "addBoundary"; hostRef: Ref; label?: string; eventType?: EventType }
+  /**
+   * `hostRef` is absent only from the grammar, when the speaker named no host:
+   * the apply layer then mounts it on the single selected task or subprocess,
+   * or refuses (Paul, 2026-09-25: "Use the selected task"). The AI must still
+   * name one — `validateOp` insists. `nonInterrupting` is "a non-interrupting
+   * timer boundary event".
+   */
+  | { op: "addBoundary"; hostRef?: Ref; label?: string; eventType?: EventType; nonInterrupting?: boolean }
   | { op: "addPool"; label?: string; poolType?: "black-box" | "white-box"; position?: "above" | "below"; relativeTo?: Ref }
   | { op: "addLanes"; poolRef: Ref; labels: string[] }
   | { op: "addLaneAt"; poolRef: Ref; label?: string; position: "above" | "below"; refLane: Ref }

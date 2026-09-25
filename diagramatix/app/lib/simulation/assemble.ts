@@ -22,6 +22,7 @@
 
 import type { DiagramData, DiagramElement } from "@/app/lib/diagram/types";
 import { getSimParams, type LoopParams } from "@/app/lib/diagram/simParams";
+import { isBoundaryHost } from "@/app/lib/diagram/boundaryHosts";
 import type { SimNetwork, SimNode, SimEdge, SimTeam, NodeKind, Assignment, LoopSpec, EventSub, BoundaryEvent, EventChannel } from "./model";
 import type { SimDist, WorkCalendar } from "./types";
 import type { QueueDiscipline, PoolUnit } from "./resourcePool";
@@ -212,12 +213,14 @@ export function assembleFromDiagram(
   const boundaryByHost = new Map<string, BoundaryEvent[]>();
   const isBoundaryCatch = (el: DiagramElement) =>
     el.type === "intermediate-event" && !!el.boundaryHostId && el.eventType !== "compensation";
-  const RACEABLE_HOSTS = new Set(["task", "subprocess", "subprocess-expanded"]);
+  // Every host a boundary event can be mounted on races it — the editor's own
+  // set (boundaryHosts.ts), so a host the editor accepts is never one the
+  // simulator silently ignores.
   for (const el of data.elements) {
     if (!isBoundaryCatch(el)) continue;
     skip.add(el.id); // reached only via the race, never by sequence flow
     const host = byId.get(el.boundaryHostId!);
-    if (!host || !RACEABLE_HOSTS.has(host.type) || isEventEP(host)) continue;
+    if (!host || !isBoundaryHost(host.type) || isEventEP(host)) continue;
     const bodyStart = firstOutTarget(el.id);
     if (!bodyStart) continue; // no handler flow → nothing to divert to
     const bp = getSimParams(el).boundary;

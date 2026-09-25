@@ -38,6 +38,7 @@ import { getLaneHeaderWidth, getPoolHeaderWidth } from "@/app/lib/diagram/contai
 import { poolGuideNext, type PoolBoundaryGuide, type PoolGuideEvent } from "@/app/lib/diagram/poolGuide";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { canConnect } from "@/app/lib/diagram/canConnect";
+import { BOUNDARY_HOST_TYPES } from "@/app/lib/diagram/boundaryHosts";
 import { POINTER_PROTOCOL } from "@/app/lib/canvas/pointerProtocol";
 import { traceGesture } from "@/app/lib/debug/gestureTrace";
 import { CursorIcon, NoteWithCursors } from "./CursorIcon";
@@ -3352,16 +3353,13 @@ export function Canvas({
     const BOUNDARY_EVENT_TYPES_LOCAL = new Set<SymbolType>([
       "start-event", "intermediate-event", "end-event",
     ]);
-    const BOUNDARY_HOST_TYPES_LOCAL = new Set<SymbolType>([
-      "task", "subprocess", "subprocess-expanded",
-    ]);
     const BOUNDARY_SNAP_THRESHOLD_LOCAL = 25;
     function willBeBoundaryEvent(): boolean {
       if (diagramType !== "bpmn") return false; // no boundary events in state machine
       if (!BOUNDARY_EVENT_TYPES_LOCAL.has(symbolType)) return false;
       const centre = worldPos;
       for (const host of data.elements) {
-        if (!BOUNDARY_HOST_TYPES_LOCAL.has(host.type)) continue;
+        if (!BOUNDARY_HOST_TYPES.has(host.type)) continue;
         const cx = Math.max(host.x, Math.min(host.x + host.width, centre.x));
         const cy = Math.max(host.y, Math.min(host.y + host.height, centre.y));
         const onLeft   = Math.abs(centre.x - host.x);
