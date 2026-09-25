@@ -1553,8 +1553,16 @@ export function Canvas({
 
         const sourcePoolId = sourceEl ? getElementPoolId(sourceEl, data.elements) : null;
         const targetPoolId = getElementPoolId(targetEl, data.elements);
+        // On a BPMN diagram a pool-less element is in the "invisible pool"
+        // (poolId null) — the message rule's and the blue highlight's reading —
+        // so a drop from a floating task onto a task in a pool is a message,
+        // as the blue ring promised, not a sequence flow the pool rule refuses.
+        // A floating review comment is not a participant: its link keeps the
+        // review-link path below.
+        const touchesReviewComment = sourceEl?.type === "review-comment" || targetEl.type === "review-comment";
         const isCrossPool =
-          sourcePoolId !== null && targetPoolId !== null && sourcePoolId !== targetPoolId;
+          (sourcePoolId !== null && targetPoolId !== null && sourcePoolId !== targetPoolId)
+          || (diagramType === "bpmn" && !!sourceEl && !touchesReviewComment && sourcePoolId !== targetPoolId);
         const involvesPool = sourceEl?.type === "pool" || targetEl.type === "pool";
 
         // Resolve ancestor chain (treating boundaryHostId as parent)
@@ -1587,10 +1595,9 @@ export function Canvas({
           // End-event source restrictions
           if (sourceEl?.type === "end-event") {
             if (!sourceEl.boundaryHostId && !isCrossPool && !involvesPool) return;
-            if (sourceEl.boundaryHostId) {
-              if (targetEl.parentId === sourceEl.boundaryHostId) return;
-              if (isCrossPool || involvesPool) return;
-            }
+            // (A boundary end never sends a message either — the message rule
+            // in canConnect refuses it at the message drop below.)
+            if (sourceEl.boundaryHostId && targetEl.parentId === sourceEl.boundaryHostId) return;
           }
 
           // Rule 2: Edge-mounted start event — can only connect to children of its parent subprocess
@@ -1619,11 +1626,6 @@ export function Canvas({
         // path below, matching the purple highlight (was: routed to messageBPMN
         // and then rejected by canConnect, so nothing was created).
         if ((isCrossPool || involvesPool) && !isDataConn) {
-          // Never create messageBPMN between an element and its own containing pool
-          if (targetEl.type === "pool" && targetPoolId === sourcePoolId) return;
-          if (sourceEl?.type === "pool" && sourcePoolId === targetPoolId) return;
-          // Start events cannot send messageBPMN
-          if (sourceEl?.type === "start-event") return;
           const srcCy = sourceEl ? sourceEl.y + sourceEl.height / 2 : 0;
           const tgtCy = targetEl.y + targetEl.height / 2;
           const msgSrcSide: Side = srcCy <= tgtCy ? "bottom" : "top";
@@ -1659,9 +1661,10 @@ export function Canvas({
           const msgSrcOffset = sourceEl && sourceEl.width > 0
             ? Math.max(0, Math.min(1, (chosenX - sourceEl.x) / sourceEl.width))
             : 0.5;
-          // canConnect is the legality authority for the message drop too (e.g. a
-          // messageBPMN may only target a Message-trigger boundary event).
-          if (diagramType === "bpmn" && sourceEl && !canConnect(sourceEl, targetEl, "messageBPMN", data.elements)) {
+          // canConnect is the legality authority for the message drop — its
+          // message rule is the only one (an element and its own pool, a start
+          // event sending, a gateway, a timer: all refused there, not here).
+          if (diagramType === "bpmn" && sourceEl && !canConnect(sourceEl, targetEl, "messageBPMN", data.elements, { connectors: data.connectors })) {
             setDraggingConnector(null);
             window.removeEventListener("mousemove", onMouseMove);
             window.removeEventListener("mouseup", onMouseUp);

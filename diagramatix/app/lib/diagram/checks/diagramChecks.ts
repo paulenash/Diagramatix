@@ -2228,7 +2228,7 @@ export function checkDataObjectRole(d: DiagramLike): Violation[] {
 /**
  * Every connector must satisfy the SAME legality predicate the editor enforces
  * on creation (`canConnect`) — pools, EP scope, the invisible pool, event/data
- * rules, the EMIE message-trigger rule, etc. An INGESTED diagram from another
+ * rules, the message-flow endpoint rule (messageFlowRefusal), etc. An INGESTED diagram from another
  * tool can carry connectors that violate these; this surfaces each one so the
  * scan flags exactly what the editor would have refused to draw. Semantic —
  * runs even under relaxedLayout.
@@ -2236,11 +2236,16 @@ export function checkDataObjectRole(d: DiagramLike): Violation[] {
 export function checkConnectorLegality(d: DiagramLike): Violation[] {
   const out: Violation[] = [];
   const byId = new Map(d.elements.map((e) => [e.id, e] as const));
+  // The whole connector list, the one being checked included: the message rule
+  // asks whether the SOURCE already receives and whether the TARGET already
+  // sends, and a connector only ever makes its source a sender and its target
+  // a receiver — so it never decides its own verdict.
+  const opts = { connectors: d.connectors };
   for (const c of d.connectors) {
     const s = byId.get(c.sourceId);
     const t = byId.get(c.targetId);
     if (!s || !t || s.id === t.id) continue; // dangling → ref-integrity; self-loops elsewhere
-    if (canConnect(s, t, c.type, d.elements)) continue;
+    if (canConnect(s, t, c.type, d.elements, opts)) continue;
     out.push({
       rule: "connector-legality",
       severity: "error",
@@ -2777,7 +2782,7 @@ export const RULES: Rule[] = [
     code: "B42",
     id: "connector-legality",
     title: "Illegal connector (violates a BPMN connection rule)",
-    description: "A connector's source/target/type combination is one the editor would refuse to draw — it crosses a pool or Expanded Sub-Process boundary illegally, targets a non-boundary Start or a non-Message boundary event with a message, wires a data element without an association, etc. Checked with the same canConnect predicate used on creation, so it catches connectors carried in from an ingested diagram.",
+    description: "A connector's source/target/type combination is one the editor would refuse to draw — a sequence flow that crosses a pool or Expanded Sub-Process boundary or runs into a non-boundary Start; a message flow within one pool, or to or from something that cannot carry a message (a gateway, a lane, a white-box pool, data, an event whose trigger is not Message, Multiple or plain, a non-Message boundary event, a start event inside an embedded subprocess, a compensation activity), or in the wrong direction (into an end or throw event, out of a start or catch event, or both into and out of one intermediate event); a data element wired without an association, etc. Checked with the same canConnect predicate used on creation, so it catches connectors carried in from an ingested or generated diagram.",
     severity: "error",
     category: "bpmn-structure",
     check: checkConnectorLegality,

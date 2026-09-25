@@ -640,10 +640,10 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   if (m) return [{ op: "addMessage", fromRef: clean(m[1]), toRef: clean(m[2]), ...(m[3] ? { label: clean(m[3]) } : {}) }];
   m = raw.match(new RegExp(`^${MESSAGE_VERB}\\s+(?:a\\s+)?(?:${MSG})(?:\\s+flow)?\\s+to\\s+(.+?)\\s+from\\s+(.+?)${MSGLABEL}$`, "i"));
   if (m) return [{ op: "addMessage", fromRef: clean(m[2]), toRef: clean(m[1]), ...(m[3] ? { label: clean(m[3]) } : {}) }];
-  // Message by number (Paul, 2026-09-15). A bare "add a message" numbers every
-  // task, collapsed subprocess and black-box pool and waits for "n to m labelled
-  // X"; "add a message to the selected" numbers the selection's valid
-  // counterparts and waits for "to/from n labelled X". The patterns are shared
+  // Message by number (Paul, 2026-09-15). A bare "add a message" numbers
+  // everything the message rule lets a message start or end at (messageTargets.ts)
+  // and waits for "n to m labelled X"; "add a message to the selected" numbers
+  // the selection's valid counterparts and waits for "to/from n labelled X". The patterns are shared
   // with the hold (messagePhrase.ts), which must agree on what is complete.
   if (MESSAGE_BY_NUMBER.test(raw)) return [{ op: "addMessageByNumber" }];
   if (MESSAGE_BY_NUMBER_FROM_SELECTION.test(raw)) return [{ op: "addMessageByNumber", fromSelection: true }];

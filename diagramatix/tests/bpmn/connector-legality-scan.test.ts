@@ -28,18 +28,22 @@ describe("B42 — connector-legality scan (reuses canConnect)", () => {
     expect(checkConnectorLegality(data).some((x) => x.ids.includes("c1"))).toBe(true);
   });
 
+  // A message runs between two pools, so the message cases give each end its own.
+  const p1 = el("p1", "pool", { x: 0, y: 0, width: 400, height: 200, properties: { poolType: "white-box" } });
+  const p2 = el("p2", "pool", { x: 0, y: 300, width: 400, height: 200, properties: { poolType: "white-box" } });
+
   it("flags a messageBPMN onto a NON-Message boundary intermediate event", () => {
-    const host = el("h", "task");
-    const errEmie = el("e", "intermediate-event", { boundaryHostId: "h", eventType: "error" });
-    const data = { elements: [el("a", "task"), host, errEmie], connectors: [conn("c1", "a", "e", "messageBPMN")] };
+    const host = el("h", "task", { parentId: "p2" });
+    const errEmie = el("e", "intermediate-event", { parentId: "p2", boundaryHostId: "h", eventType: "error" });
+    const data = { elements: [p1, p2, el("a", "task", { parentId: "p1" }), host, errEmie], connectors: [conn("c1", "a", "e", "messageBPMN")] };
     expect(checkConnectorLegality(data).some((x) => x.ids.includes("c1"))).toBe(true);
   });
 
   it("does NOT flag legal connectors (same-scope sequence, message to a Message EMIE)", () => {
-    const host = el("h", "task");
-    const msgEmie = el("e", "intermediate-event", { boundaryHostId: "h", eventType: "message" });
+    const host = el("h", "task", { parentId: "p2" });
+    const msgEmie = el("e", "intermediate-event", { parentId: "p2", boundaryHostId: "h", eventType: "message" });
     const data = {
-      elements: [el("a", "task"), el("b", "task"), host, msgEmie],
+      elements: [p1, p2, el("a", "task", { parentId: "p1" }), el("b", "task", { parentId: "p1" }), host, msgEmie],
       connectors: [conn("c1", "a", "b", "sequence"), conn("c2", "a", "e", "messageBPMN")],
     };
     expect(checkConnectorLegality(data)).toHaveLength(0);

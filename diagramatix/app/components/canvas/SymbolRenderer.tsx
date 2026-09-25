@@ -14,6 +14,7 @@ import { traceGesture } from "@/app/lib/debug/gestureTrace";
 import { classifyEdgeDrag, edgeBand, edgeZoneAt, type EdgeSide } from "@/app/lib/diagram/edgeGesture";
 import { readableTextOn } from "@/app/lib/diagram/chevronThemes";
 import { isRichText, sanitizeRichText, plainToHtml } from "@/app/lib/diagram/richText";
+import { isThrowingEvent } from "@/app/lib/diagram/eventDirection";
 import { ArchimateShape } from "./ArchimateShape";
 
 /**
@@ -631,7 +632,7 @@ function IntermediateEventShape({ el }: { el: DiagramElement }) {
       <circle cx={cx} cy={cy} r={r - 3} fill={fill} stroke="#374151" strokeWidth={1.5}
         strokeDasharray={dash} />
       {el.eventType && el.eventType !== "none" &&
-        <EventMarker type={el.eventType} cx={cx} cy={cy} r={r - 4} filled={el.flowType === "throwing" || (el.flowType == null && el.taskType === "send")} />}
+        <EventMarker type={el.eventType} cx={cx} cy={cy} r={r - 4} filled={isThrowingEvent(el)} />}
     </g>
   );
 }

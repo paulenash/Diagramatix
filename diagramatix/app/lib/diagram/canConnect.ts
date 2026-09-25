@@ -4,16 +4,43 @@
  * NON-force connect of `connectorType` from `source` to `target` would be
  * ACCEPTED by the reducer.
  *
- * The reducer calls this (single source of truth) and the AI "assist" / next-step
- * suggestion engine calls it to pre-filter legal candidates BEFORE offering them.
+ * The reducer's gauntlet is a MIRROR of this, held to it by
+ * tests/diagram/can-connect-parity.test.ts — except for message flows, where
+ * the reducer asks `messageFlowRefusal` below itself, so there is one message
+ * rule and not two. The Canvas drop, the drag highlight, the Rules Checker
+ * (B42), the voice commands and the AI "assist" / next-step suggestion engine
+ * all call this to pre-filter legal candidates BEFORE offering them.
  *
  * Scope: this covers exactly the `if (!force) { … }` gauntlet. The pre-gauntlet
  * special cases are handled by the reducer before this runs — review-comment
  * endpoints (coerced to a review link → always allowed, so treated as true here),
  * self-loops (source === target), and the compensation → association coercion.
  */
-import type { DiagramElement, ConnectorType } from "./types";
+import type { DiagramElement, ConnectorType, Connector } from "./types";
 import { getElementPoolId } from "./poolUtil";
+import { isThrowingEvent, isCatchingEvent } from "./eventDirection";
+import { isBlackBoxPool } from "./blackBoxPoolMenu";
+
+export interface CanConnectOptions {
+  /**
+   * A speed-up: "which pool is this in?" from a precomputed map — the drag
+   * highlight asks canConnect for every element on every frame, and
+   * getElementPoolId's walk made that O(n²) (CANVAS-06). It must give the same
+   * answer as getElementPoolId.
+   */
+  poolIdOf?: (el: DiagramElement) => string | null;
+  /**
+   * The diagram's connectors. The message rule needs them for one question:
+   * which way does an intermediate event with no Flow Type already face (see
+   * `messageTraffic`)? Every path that draws or offers a message passes them;
+   * without them only the Flow Type counts.
+   */
+  connectors?: readonly Connector[];
+}
+
+/** Which pool an element is in — the caller's fast resolver when given. */
+const poolLookup = (elements: DiagramElement[], opts?: CanConnectOptions) =>
+  opts?.poolIdOf ?? ((el: DiagramElement) => getElementPoolId(el, elements));
 
 const DATA_ELEMENT_TYPES = new Set<string>(["data-object", "data-store", "text-annotation"]);
 const MARKER_TYPES = new Set<string>(["uml-pain-point", "uml-issue"]);
@@ -113,11 +140,256 @@ function epcCanConnect(
   return true;
 }
 
+// ── Message flows ──────────────────────────────────────────────────────────
+//
+// THE message-flow endpoint rule: which elements may SEND a message, which may
+// RECEIVE one, and which pairs may exchange one. Every path asks it — the mouse
+// drop and the blue drag highlight (through canConnect), the reducer's
+// ADD_CONNECTOR, the voice "add a message" numbering and its answer, the
+// addMessage op, and the Rules Checker's B42 scan. One rule, one place: copies
+// of it drift — voice numbered every task but never "Message 2 Arrives", which
+// the mouse could message, while the mouse took a message onto a timer.
+//
+// Paul, 2026-09-25: "Should allow messages to Receive Intermediate events as
+// well e.g. message 2 arrives" — and later: "Also messages should be allowed
+// FROM Intermediate and End events with trigger Send. Add Messages should
+// include them in the numbered list."
+//
+// Paul, 2026-09-25, on plain (no-trigger) events: "Convertible". A plain event
+// may take a message and becomes a Message event — the reducer's conversion in
+// ADD_CONNECTOR stays. So:
+//   • a plain or Message START event receives (never sends);
+//   • a plain or Message END event sends (never receives);
+//   • a plain or Message INTERMEDIATE event with no Flow Type (or "none") goes
+//     either way; only an explicit "catching" or "throwing" (or the legacy
+//     taskType "send" with no Flow Type — eventDirection.ts) fixes it — or a
+//     message it already has: one that already receives a message catches, one
+//     that already sends throws. An event is a catch or a throw, never both,
+//     and the reducer stamps the Flow Type when the editor draws the first
+//     message; generated and imported diagrams carry the message without the
+//     stamp. Without this, a second message the other way was accepted, the
+//     reducer flipped the event, and its first message became a Rules Checker
+//     error (the seeded O2C example's "Customer Responds");
+//   • a boundary intermediate event receives only, and only when its trigger
+//     is Message (it catches an internal trigger otherwise);
+//   • Multiple and Parallel-multiple triggers are treated as Message (BPMN
+//     lets either carry a message definition);
+//   • tasks, collapsed and expanded subprocesses and black-box pools go both
+//     ways;
+//   • never: gateways, lanes, white-box pools (message what is inside them),
+//     data, annotations, events with any other trigger (timer, error,
+//     escalation, …), a start event inside an embedded subprocess (it is always
+//     a None start), a boundary start or end event, an event subprocess shell,
+//     a compensation activity (only its compensation association reaches it),
+//     anything inside a black-box pool (message the pool);
+//   • the two ends are in different pools. A pool-less element is in the
+//     "invisible pool" (poolId null) — the drag highlight's reading — so a
+//     pool-less element may message an element in a pool, and two pool-less
+//     elements may not message each other.
+//
+// Reasons are returned, not just refusals, because voice has no ring to show:
+// "“Message 1 Arrives” catches a message — it can only receive one" is what
+// tells Paul to say it the other way round.
+
+/** Triggers that carry a message. Plain ("none"/unset) is convertible. */
+const MESSAGE_TRIGGERS = new Set<string>(["message", "multiple", "parallel-multiple"]);
+const isPlainEvent = (el: DiagramElement) => {
+  const t = el.eventType as string | undefined;
+  return t == null || t === "none";
+};
+const takesMessages = (el: DiagramElement) =>
+  isPlainEvent(el) || MESSAGE_TRIGGERS.has(el.eventType as string);
+const wrongTrigger = (el: DiagramElement) => {
+  const t = String(el.eventType).replace(/-/g, " ");
+  // Read aloud by Diagramatix Voice, so "an Error", not "a Error".
+  const article = /^[aeiou]/i.test(t) ? "an" : "a";
+  return `has ${article} ${t.charAt(0).toUpperCase()}${t.slice(1)} trigger — only a Message event (or a plain one, which becomes a Message event) exchanges messages`;
+};
+
+/**
+ * Which elements already send, and which already receive, a message. Built once
+ * per connectors array: the drag highlight asks for every element on every
+ * frame. Connector lists are replaced, never edited in place (React state), so
+ * the array is the key; the length check catches a caller that pushes anyway.
+ */
+const trafficCache = new WeakMap<readonly Connector[], { n: number; sends: Set<string>; receives: Set<string> }>();
+export function messageTraffic(connectors: readonly Connector[]): { sends: ReadonlySet<string>; receives: ReadonlySet<string> } {
+  const hit = trafficCache.get(connectors);
+  if (hit && hit.n === connectors.length) return hit;
+  const t = { n: connectors.length, sends: new Set<string>(), receives: new Set<string>() };
+  for (const c of connectors) {
+    if (c.type !== "messageBPMN") continue;
+    t.sends.add(c.sourceId);
+    t.receives.add(c.targetId);
+  }
+  trafficCache.set(connectors, t);
+  return t;
+}
+const alreadyReceives = (el: DiagramElement, opts?: CanConnectOptions) =>
+  !!opts?.connectors && messageTraffic(opts.connectors).receives.has(el.id);
+const alreadySends = (el: DiagramElement, opts?: CanConnectOptions) =>
+  !!opts?.connectors && messageTraffic(opts.connectors).sends.has(el.id);
+const isEventSubprocess = (el: DiagramElement) =>
+  el.type === "subprocess-expanded" && (el.properties?.subprocessType as string | undefined) === "event";
+const isWhiteBoxPoolElement = (el: DiagramElement) =>
+  el.type === "pool" && ((el.properties?.poolType as string | undefined) ?? "black-box") === "white-box";
+
+const KIND_NOUNS: Record<string, string> = {
+  gateway: "a gateway", lane: "a lane", sublane: "a sub-lane", "data-object": "a data object",
+  "data-store": "a data store", "text-annotation": "a text annotation", "review-comment": "a review comment",
+};
+const kindOf = (el: DiagramElement) => KIND_NOUNS[el.type] ?? `a ${el.type.replace(/-/g, " ")}`;
+
+/** How an element is named in a reason: its label, or what it is. */
+export function messageEndName(el: DiagramElement): string {
+  const l = (el.label ?? "").replace(/\s+/g, " ").trim();
+  return l ? `“${l}”` : `the unnamed ${el.type.replace(/-/g, " ")}`;
+}
+
+/**
+ * Inside a pool marked black-box. A black-box pool's contents are hidden — the
+ * pool shape IS the participant, so the message goes to it (the drag
+ * highlight's long-standing reading). Only an EXPLICIT black-box counts
+ * (blackBoxPoolMenu's definition): a pool with no poolType is ambiguous, and
+ * the reducer re-types every pool from its contents on the next edit anyway.
+ */
+function insideBlackBoxPool(el: DiagramElement, elements: DiagramElement[], opts?: CanConnectOptions): boolean {
+  const pid = poolLookup(elements, opts)(el);
+  if (!pid) return false;
+  const pool = elements.find((e) => e.id === pid);
+  return !!pool && isBlackBoxPool(pool);
+}
+
+/** What rules an element out as a message end in EITHER direction. */
+function whyNeverAMessageEnd(el: DiagramElement, elements: DiagramElement[], opts?: CanConnectOptions): string | null {
+  switch (el.type) {
+    case "task":
+    case "subprocess":
+    case "subprocess-expanded":
+      if (isEventSubprocess(el)) return "is an event subprocess — messages go to and from the elements inside it";
+      if (el.properties?.isForCompensation === true) return "is a compensation activity — only its compensation association reaches it";
+      break;
+    case "pool":
+      return isWhiteBoxPoolElement(el) ? "is a white-box pool — messages go to and from the elements inside it" : null;
+    case "start-event":
+    case "intermediate-event":
+    case "end-event":
+      break;
+    default:
+      return `is ${kindOf(el)} — only tasks, subprocesses, black-box pools and events exchange messages`;
+  }
+  return insideBlackBoxPool(el, elements, opts) ? "is inside a black-box pool — its contents are hidden; message the pool itself" : null;
+}
+
+/** A start event whose nearest Expanded Subprocess is an embedded (non-event)
+ *  one: BPMN gives an embedded subprocess a None start, always. */
+function startsEmbeddedSubprocess(el: DiagramElement, elements: DiagramElement[]): boolean {
+  const scope = containerScopeOf(el, elements);
+  if (!scope) return false;
+  const ep = elements.find((e) => e.id === scope);
+  return !!ep && !isEventSubprocess(ep);
+}
+
+/**
+ * Why `el` can't SEND a message — a phrase that follows its name ("is a start
+ * event — it can only receive a message") — or null when it can.
+ */
+export function whyCantSendMessage(el: DiagramElement, elements: DiagramElement[], opts?: CanConnectOptions): string | null {
+  const never = whyNeverAMessageEnd(el, elements, opts);
+  if (never) return never;
+  switch (el.type) {
+    case "start-event":
+      return "is a start event — it can only receive a message";
+    case "end-event":
+      if (el.boundaryHostId) return "sits on its subprocess's edge — only a free-standing end event sends a message";
+      return takesMessages(el) ? null : wrongTrigger(el);
+    case "intermediate-event":
+      if (el.boundaryHostId) return "is a boundary event — a boundary event only catches, it never sends";
+      if (!takesMessages(el)) return wrongTrigger(el);
+      if (isCatchingEvent(el)) return "catches a message — it can only receive one";
+      if (!isThrowingEvent(el) && alreadyReceives(el, opts)) return "already receives a message, so it catches — it can't send one too";
+      return null;
+    default:
+      return null;
+  }
+}
+
+/**
+ * Why `el` can't RECEIVE a message — a phrase that follows its name — or null
+ * when it can.
+ */
+export function whyCantReceiveMessage(el: DiagramElement, elements: DiagramElement[], opts?: CanConnectOptions): string | null {
+  const never = whyNeverAMessageEnd(el, elements, opts);
+  if (never) return never;
+  switch (el.type) {
+    case "end-event":
+      return "is an end event — it can only send a message";
+    case "start-event":
+      if (el.boundaryHostId) return "sits on its subprocess's edge — only a free-standing start event receives a message";
+      if (startsEmbeddedSubprocess(el, elements)) return "starts an embedded subprocess — that always begins with a plain (None) start event";
+      return takesMessages(el) ? null : wrongTrigger(el);
+    case "intermediate-event":
+      // The EMIE rule: a boundary event catches its host's internal trigger,
+      // not an incoming message flow — unless its trigger IS Message.
+      if (el.boundaryHostId) {
+        return (el.eventType as string | undefined) === "message"
+          ? null
+          : "is a boundary event without a Message trigger — set its trigger to Message first";
+      }
+      if (!takesMessages(el)) return wrongTrigger(el);
+      if (isThrowingEvent(el)) return "throws a message — it can only send one";
+      if (!isCatchingEvent(el) && alreadySends(el, opts)) return "already sends a message, so it throws — it can't receive one too";
+      return null;
+    default:
+      return null;
+  }
+}
+
+/**
+ * Why a message flow from `source` to `target` is refused — a sentence naming
+ * the end at fault — or null when it is legal. The one message rule (see the
+ * block comment above); canConnect's messageBPMN branch is exactly this.
+ */
+export function messageFlowRefusal(
+  source: DiagramElement,
+  target: DiagramElement,
+  elements: DiagramElement[],
+  opts?: CanConnectOptions,
+): string | null {
+  const s = whyCantSendMessage(source, elements, opts);
+  if (s) return `${messageEndName(source)} ${s}`;
+  const t = whyCantReceiveMessage(target, elements, opts);
+  if (t) return `${messageEndName(target)} ${t}`;
+  if (!sameMessageParticipant(source, target, elements, opts)) return null;
+  return poolLookup(elements, opts)(source) === null
+    ? `${messageEndName(source)} and ${messageEndName(target)} are both outside every pool — a message runs between two pools`
+    : `${messageEndName(source)} and ${messageEndName(target)} are in the same pool — join them with a sequence flow, not a message`;
+}
+
+/**
+ * The pair part of the rule on its own: are the two ends ONE participant (the
+ * same pool, or both pool-less)? messageFlowRefusal is exactly "the source can
+ * send, the target can receive, and this is false". Exported so the numbering,
+ * which has already sorted the senders from the receivers, asks only this for
+ * each pair rather than re-running both per-end checks (and building a refusal
+ * sentence) for every one of them.
+ */
+export function sameMessageParticipant(
+  source: DiagramElement,
+  target: DiagramElement,
+  elements: DiagramElement[],
+  opts?: CanConnectOptions,
+): boolean {
+  const poolOf = poolLookup(elements, opts);
+  return poolOf(source) === poolOf(target);
+}
+
 export function canConnect(
   source: DiagramElement,
   target: DiagramElement,
   connectorType: ConnectorType,
   elements: DiagramElement[],
+  opts?: CanConnectOptions,
 ): boolean {
   // Review-comment endpoints are coerced to a (non-directed) review link before
   // the gauntlet runs — always valid.
@@ -167,20 +439,7 @@ export function canConnect(
   const isEventToEvent = EVENT_CONN_TYPES.has(source.type) && EVENT_CONN_TYPES.has(target.type);
   if (!isDataConn && !isEventToEvent && !isCompensationLink && connectorType === "associationBPMN") return false;
 
-  // messageBPMN never onto a white-box pool itself.
-  if (connectorType === "messageBPMN") {
-    const srcWB = source.type === "pool" && ((source.properties.poolType as string | undefined) ?? "black-box") === "white-box";
-    const tgtWB = target.type === "pool" && ((target.properties.poolType as string | undefined) ?? "black-box") === "white-box";
-    if (srcWB || tgtWB) return false;
-    // An edge-mounted (boundary) intermediate event — an "EMIE" — catches an
-    // internal trigger, not an incoming message flow, UNLESS its trigger is
-    // Message. So a messageBPMN may only target a boundary intermediate event
-    // when eventType === "message"; and a boundary event never SENDS a message.
-    const isBoundaryIntermediate = (el: DiagramElement) =>
-      el.type === "intermediate-event" && !!el.boundaryHostId;
-    if (isBoundaryIntermediate(source)) return false;
-    if (isBoundaryIntermediate(target) && (target.eventType as string | undefined) !== "message") return false;
-  }
+  if (connectorType === "messageBPMN" && messageFlowRefusal(source, target, elements, opts) !== null) return false;
 
   // ── BPMN sequence rules ──
   if (connectorType === "sequence") {
@@ -190,7 +449,8 @@ export function canConnect(
     // A sequence flow may never cross a POOL boundary — participants in
     // different pools communicate only via message flows. (Two pool-less
     // top-level elements both resolve to null → same "pool" → allowed.)
-    if (getElementPoolId(source, elements) !== getElementPoolId(target, elements)) return false;
+    const poolOf = poolLookup(elements, opts);
+    if (poolOf(source) !== poolOf(target)) return false;
 
     const isEventExpandedSub = (el: DiagramElement) =>
       el.type === "subprocess-expanded" && (el.properties.subprocessType as string | undefined) === "event";

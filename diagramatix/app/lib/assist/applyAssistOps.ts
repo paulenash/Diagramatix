@@ -28,7 +28,7 @@ import type { RiskCatalogItem } from "@/app/components/canvas/RiskControlSection
 import { nanoid, isContainerType, getAllDescendantIds, reducer, type Action } from "@/app/hooks/useDiagram";
 import { sizeOf, placeInline, placeGatewayBranch, placeBoundaryEvent, planBoundaryFollowOn, followOnParentId, findFreeSlot, HALF_TASK_W, HALF_TASK_H, type BoundaryFollowOn } from "@/app/lib/diagram/assistPlacement";
 import { planWrapInSubprocess, planUnwrapSubprocess, planWrapInContainer } from "@/app/lib/diagram/subprocessWrap";
-import { canConnect } from "@/app/lib/diagram/canConnect";
+import { canConnect, messageFlowRefusal } from "@/app/lib/diagram/canConnect";
 import { isBoundaryHost } from "@/app/lib/diagram/boundaryHosts";
 import { resolveRef, resolveSelectionRefs, isSelectionRef, nearestRefs, ID_REF_PREFIX, spokenNumbersAsDigits } from "./resolveRef";
 import { isPointerElementRef } from "./pointerRef";
@@ -389,7 +389,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       const f = resolve1(op.fromRef), t = resolve1(op.toRef);
       if ("err" in f) { results.push(f.err); anyFail = true; continue; }
       if ("err" in t) { results.push(t.err); anyFail = true; continue; }
-      if (!canConnect(f, t, op.connectorType ?? "sequence", els)) { results.push(`can’t connect ${nameOf(f)} → ${nameOf(t)}`); anyFail = true; continue; }
+      if (!canConnect(f, t, op.connectorType ?? "sequence", els, { connectors: data.connectors })) { results.push(`can’t connect ${nameOf(f)} → ${nameOf(t)}`); anyFail = true; continue; }
       addConnector(f.id, t.id, op.connectorType ?? "sequence");
       results.push(`connected ${nameOf(f)} → ${nameOf(t)}`);
       continue;
@@ -825,6 +825,16 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       const f = resolve1(op.fromRef), t = resolve1(op.toRef);
       if ("err" in f) { results.push(f.err); anyFail = true; continue; }
       if ("err" in t) { results.push(t.err); anyFail = true; continue; }
+      // Ask the message rule first: the reducer refuses an illegal message
+      // silently, so without asking this would report "added message" for a
+      // message that was never drawn — and give no reason. The rule itself,
+      // not canConnect, which says yes to any pair with a review comment in
+      // it (the reducer draws a review link for those, never a message).
+      const whyNot = messageFlowRefusal(f, t, els, { connectors: data.connectors });
+      if (whyNot !== null) {
+        results.push(`can’t add a message ${nameOf(f)} → ${nameOf(t)} — ${whyNot}`);
+        anyFail = true; continue;
+      }
       // #2a — connect the NEAREST facing boundaries (a message runs vertically
       // between an activity and the pool above/below it).
       const fcy = f.y + f.height / 2, tcy = t.y + t.height / 2;
@@ -969,15 +979,21 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
     if (op.op === "addMessageByNumber") {
       // Number the candidates and wait for the pick (messageTargets.ts). The
       // answer arrives as the next utterance, handled by handleMessageUtterance.
-      if (op.fromSelection && selectedIds.length === 0) { results.push("select a task, a collapsed subprocess or a black-box pool first"); anyFail = true; continue; }
+      if (op.fromSelection && selectedIds.length === 0) { results.push("select what the message starts or ends at first"); anyFail = true; continue; }
       if (op.fromSelection && selectedIds.length > 1) { results.push("select just one element for that"); anyFail = true; continue; }
-      const pick = collectMessageTargets(els, op.fromSelection ? selectedIds[0] : null);
+      const pick = collectMessageTargets(els, op.fromSelection ? selectedIds[0] : null, data.connectors);
       if ("error" in pick) { results.push(pick.error); anyFail = true; continue; }
       setRenameFlow(null);
       setMessageFlow(pick);
-      results.push(pick.mode === "pair"
-        ? "numbers on every task, collapsed subprocess and black-box pool — say “<n> to <m> labelled <text>” (or “done”)"
-        : `numbers on the ${pick.anchorIsPool ? "tasks and collapsed subprocesses" : "black-box pools"} — say “to <n> labelled <text>” or “from <n> labelled <text>” (or “done”)`);
+      if (pick.mode === "pair") {
+        results.push("numbers on everything a message can start or end at — say “<n> to <m> labelled <text>” (or “done”)");
+      } else {
+        // Offer only the answers that can work: a receive-only anchor (a catch
+        // event, a start event) is never told to say "to <n>".
+        const anchor = els.find((e) => e.id === pick.anchorId);
+        const forms = [pick.dirs.to ? "“to <n> labelled <text>”" : "", pick.dirs.from ? "“from <n> labelled <text>”" : ""].filter(Boolean);
+        results.push(`numbers on what can exchange a message with ${anchor ? nameOf(anchor) : "the selection"} — say ${forms.join(" or ")} (or “done”)`);
+      }
       continue;
     }
 

@@ -156,7 +156,7 @@ Each of these refuses rather than guessing when it cannot do the job cleanly —
   (5, 'Green numbers — picking from a list', $UG$Some commands are easier by number than by name, especially when several elements are similarly named.
 
 - **"rename tasks"** (or lanes, pools, gateways, events) puts a green number on every element of that kind. Say **"3 Approve Order"** to rename number 3 in one breath, or say **"3"**, wait for it to highlight, then dictate the name.
-- **"add a message"** with no ends numbers every task, collapsed subprocess and black-box pool. Say **"3 to 7 labelled Order Placed"**.
+- **"add a message"** with no ends numbers everything a message can start or end at — tasks, subprocesses, black-box pools and events. Say **"3 to 7 labelled Order Placed"**.
 - **"label connectors"** numbers the connectors; then "3 No".
 - If a name you say matches more than one element, the numbers appear by themselves and you pick — rather than the command guessing and quietly doing the wrong thing.
 

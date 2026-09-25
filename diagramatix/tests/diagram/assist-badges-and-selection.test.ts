@@ -23,20 +23,25 @@ describe("where the green numbers sit", () => {
     expect(badgePlaceFor("pool")).toBe("header");
     expect(badgePlaceFor("lane")).toBe("header");
 
+    // Two participants: a message runs between pools, so one pool alone gives
+    // "add a message" nothing to number.
     const els = [
-      el("p", "pool", "Warehouse", { properties: { poolType: "black-box" } }),
+      el("p", "pool", "Warehouse", { properties: { poolType: "white-box" } }),
       el("l", "lane", "Sales", { parentId: "p" }),
       el("t", "task", "Pick", { parentId: "l" }),
       el("s", "start-event", "Go", { parentId: "l", width: 40, height: 40 }),
+      el("c", "pool", "Customer", { y: 400, properties: { poolType: "black-box" } }),
     ];
     const place = (targets: { id: string; place?: string }[], id: string) => targets.find((x) => x.id === id)?.place;
     expect(place(collectRenameTargets(els, [], "event"), "s")).toBe("above");
     expect(place(collectRenameTargets(els, [], "task"), "t")).toBe("below");
     expect(place(collectRenameTargets(els, [], "pool"), "p")).toBe("header");
+    expect(place(collectRenameTargets(els, [], "pool"), "c")).toBe("header");
     expect(place(collectRenameTargets(els, [], "lane"), "l")).toBe("header");
     const msg = collectMessageTargets(els, null);
-    expect("targets" in msg && place(msg.targets, "p")).toBe("header");
+    expect("targets" in msg && place(msg.targets, "c")).toBe("header");
     expect("targets" in msg && place(msg.targets, "t")).toBe("below");
+    expect("targets" in msg && place(msg.targets, "s"), "a plain start event receives a message").toBe("above");
   });
 
   it("T4409 — the canvas honours the place: above for events, and in the header BEFORE the name for pools and lanes, measuring the name", () => {

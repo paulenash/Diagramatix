@@ -58,7 +58,7 @@ export const COMMAND_CATALOG: CatalogFamily[] = [
     { does: "Rename / delete a message by its label", say: ["rename connector Email Details to Send Invoice", "delete connector Email Details", "remove message Email Details"] },
     { does: "Label the selected connector (no text → it waits for it)", say: ["label selected Yes", "label the selected connector Approved", "label selected"] },
     { does: "Label connectors by number — numbers every sequence flow (or message), then say “3 No”", say: ["label connectors", "label messages", "label flows"] },
-    { does: "Message by number — numbers the tasks, collapsed subprocesses and black-box pools, then say “3 to 7 labelled Order Placed”", say: ["add a message", "send a message"] },
+    { does: "Message by number — numbers everything a message can start or end at (tasks, subprocesses, black-box pools and events), then say “3 to 7 labelled Order Placed”", say: ["add a message", "send a message"] },
     { does: "Message from/to the selected element — numbers its valid counterparts, then say “to 2 labelled Order Placed” or “from 2 labelled …”", say: ["add a message to the selected", "add a message from this"] },
   ] },
   { family: "Gateways (select one or more gateways first)", items: [

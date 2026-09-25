@@ -115,7 +115,10 @@ describe("T4616 — driven through the real reducer", () => {
     expect(c.targetSide, "the convention is about merges").toBe("left");
   });
 
-  it("does NOT touch a message flow to a merge", () => {
+  it("never draws a message flow to a merge — a gateway carries no message", () => {
+    // This used to assert the side of a message to a merge, guarded by
+    // `if (c)` — so once the message rule (canConnect.ts) refused gateways it
+    // silently asserted nothing. Assert the refusal instead.
     const above = el("a", "task", 200, 0);
     const out = reducer(state([above, merge]), {
       type: "ADD_CONNECTOR",
@@ -124,8 +127,7 @@ describe("T4616 — driven through the real reducer", () => {
         routingType: "rectilinear", sourceSide: "right", targetSide: "left",
       },
     } as never);
-    const c = out.connectors[out.connectors.length - 1];
-    if (c) expect(c.targetSide, "only a flow follows the convention").toBe("left");
+    expect(out.connectors).toHaveLength(0);
   });
 
   it("respects an endpoint the user deliberately dragged elsewhere", () => {

@@ -22,7 +22,7 @@ import type {
   SymbolType,
 } from "@/app/lib/diagram/types";
 import { gatewayVertex, nudgeGatewayEndpoint, computeWaypoints, recomputeAllConnectors, consolidateWaypoints, rectifyWaypoints, constrainControlPoint, safeSidePair, selfLoopWaypoints, measureSelfLoopBulge, SELF_LOOP_BULGE, fuseCollinearWaypoints, boundaryEndpointSides, withBoundaryEndpointSides, getBoundaryEventOuterSide, isAxisAligned } from "@/app/lib/diagram/routing";
-import { flowScopeOf } from "@/app/lib/diagram/canConnect";
+import { flowScopeOf, messageFlowRefusal, messageTraffic } from "@/app/lib/diagram/canConnect";
 import { LANE_CHILD_PAD } from "@/app/lib/diagram/assistPlacement";
 import { planWrapInSubprocess, planUnwrapSubprocess, planWrapInContainer, type WrapIds } from "@/app/lib/diagram/subprocessWrap";
 import { isUmlConnType } from "@/app/lib/diagram/types";
@@ -7292,24 +7292,10 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       const isEventToEvent = EVENT_CONN_TYPES.has(source.type) && EVENT_CONN_TYPES.has(target.type);
       if (!isDataConn && !isEventToEvent && !isCompensationLink && connectorType === "associationBPMN") return state;
 
-      // Message flows attach only to black-box pools (or to flow elements
-      // inside any pool). A white-box pool ITSELF is not a valid endpoint —
-      // white-box pools expose internal elements instead. Reject to prevent
-      // orphan connectors that the layout engine can't sensibly render.
-      if (connectorType === "messageBPMN") {
-        const srcIsWhiteBoxPool = source.type === "pool"
-          && ((source.properties.poolType as string | undefined) ?? "black-box") === "white-box";
-        const tgtIsWhiteBoxPool = target.type === "pool"
-          && ((target.properties.poolType as string | undefined) ?? "black-box") === "white-box";
-        if (srcIsWhiteBoxPool || tgtIsWhiteBoxPool) return state;
-        // EMIE rule (mirrors canConnect): a boundary intermediate event catches
-        // an internal trigger, not an incoming message flow — a messageBPMN may
-        // target one only when eventType === "message", and never originate from one.
-        const isBoundaryIntermediate = (el: DiagramElement) =>
-          el.type === "intermediate-event" && !!el.boundaryHostId;
-        if (isBoundaryIntermediate(source)) return state;
-        if (isBoundaryIntermediate(target) && (target.eventType as string | undefined) !== "message") return state;
-      }
+      // Message flows: the one message rule (canConnect.ts), asked here rather
+      // than restated — voice's addMessage lands here without a Canvas drop in
+      // front of it.
+      if (connectorType === "messageBPMN" && messageFlowRefusal(source, target, state.elements, { connectors: state.connectors }) !== null) return state;
 
       // ── BPMN sequence connector rules ──
       const isSeqConn = connectorType === "sequence";
@@ -7488,26 +7474,40 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           return { ...el, properties: { ...el.properties, isForCompensation: true } };
         }
         if (isMsgBpmn) {
+          // "Convertible" (Paul, 2026-09-25): a plain event that takes a
+          // message becomes a Message event, facing the way the message runs.
+          // A Multiple / Parallel-multiple trigger already carries a message
+          // (canConnect.ts accepts it as one) and keeps its own marker.
+          const messageTrigger = (e: DiagramElement): EventType =>
+            e.eventType === "multiple" || e.eventType === "parallel-multiple" ? e.eventType : "message";
+          // A task that already exchanges a message the OTHER way keeps its
+          // marker: a Send task that now also receives is not a Receive task,
+          // and rewriting it would make the marker contradict its first
+          // message. (The message rule already refuses an event that faces
+          // the other way, unless the connect is forced.)
+          const traffic = messageTraffic(state.connectors);
           // For tasks: system pool → "user", non-system pool → "send"/"receive"
           if (el.id === sourceId) {
             if (el.type === "task") {
               // SERVICE GUARD — an automated (Service) task stays Service even
               // when it exchanges messages; don't rewrite its marker.
               if (el.taskType === "service") return el;
+              if (traffic.receives.has(el.id)) return el;
               const otherIsSystem = isSystemPool(target);
               return { ...el, taskType: (otherIsSystem ? "user" : "send") as BpmnTaskType };
             }
-            if (el.type === "end-event")          return { ...el, eventType: "message" as EventType, flowType: "throwing" as FlowType };
-            if (el.type === "intermediate-event") return { ...el, eventType: "message" as EventType, taskType: "send" as BpmnTaskType, flowType: "throwing" as FlowType };
+            if (el.type === "end-event")          return { ...el, eventType: messageTrigger(el), flowType: "throwing" as FlowType };
+            if (el.type === "intermediate-event") return { ...el, eventType: messageTrigger(el), taskType: "send" as BpmnTaskType, flowType: "throwing" as FlowType };
           }
           if (el.id === targetId) {
             if (el.type === "task") {
               if (el.taskType === "service") return el; // SERVICE GUARD (see above)
+              if (traffic.sends.has(el.id)) return el;
               const otherIsSystem = isSystemPool(source);
               return { ...el, taskType: (otherIsSystem ? "user" : "receive") as BpmnTaskType };
             }
-            if (el.type === "start-event")        return { ...el, eventType: "message" as EventType, flowType: "catching" as FlowType };
-            if (el.type === "intermediate-event") return { ...el, eventType: "message" as EventType, flowType: "catching" as FlowType };
+            if (el.type === "start-event")        return { ...el, eventType: messageTrigger(el), flowType: "catching" as FlowType };
+            if (el.type === "intermediate-event") return { ...el, eventType: messageTrigger(el), flowType: "catching" as FlowType };
           }
         } else if (isSeq) {
           // Start events cannot be sequence targets → convert to intermediate (unless boundary-mounted)

@@ -85,11 +85,19 @@ Examples: "rename the selected pool to Customer" · "delete these" · "connect t
 
 ## Messages by number (15 September 2026)
 
-- **"add a message"** (no ends) — green numbers appear on every task, collapsed subprocess and
-  black-box pool. Say **"3 to 7 labelled Order Placed"** (or "from 3 to 7"). "done" walks away.
-- **"add a message to the selected"** / "from this" — select a task or collapsed subprocess and the
-  black-box pools are numbered; select a black-box pool and the tasks / collapsed subprocesses are.
-  Say **"to 2 labelled Order Placed"** or **"from 2 labelled …"**.
+- **"add a message"** (no ends) — green numbers appear on everything a message can start or end at:
+  tasks, subprocesses, black-box pools and events (a Message event, or a plain one, which becomes a
+  Message event). Say **"3 to 7 labelled Order Placed"** (or "from 3 to 7"). "done" walks away.
+- **"add a message to the selected"** / "from this" — select anything a message can start or end at
+  and what can exchange a message with it is numbered. Say **"to 2 labelled Order Placed"** or
+  **"from 2 labelled …"** — only the one that can work is offered for an element that can only send
+  or only receive.
+- The numbers follow the same rule as the mouse (updated 25 September 2026): the two ends are in
+  different pools; a start event only receives and an end event only sends; a catching event (or
+  one with no Flow Type that already receives a message) only receives, and a throwing one (or one
+  that already sends) only sends; gateways, lanes, white-box pools and events with any other
+  trigger never take a message. Said the wrong way round ("12 to 1" where 12 only receives), it is
+  refused with the reason and the numbers stay up.
 - "add a message to IT System" (one named end) still goes to the AI, as before.
 
 ## Nudge, move, label, swap (15 September 2026)

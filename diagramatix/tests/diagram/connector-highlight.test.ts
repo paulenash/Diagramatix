@@ -187,8 +187,13 @@ describe("classifyDragTarget — BLUE (messageBPMN)", () => {
     expect(classify(taskA1, taskB1).message).toBe(true);
     expect(classify(taskA1, taskB1).sequence).toBe(false);
   });
-  it("a pool source → an element in a different white-box pool", () => {
-    expect(classify(poolA, taskB1).message).toBe(true);
+  it("a black-box pool source → an element in a white-box pool", () => {
+    expect(classify(poolC, taskB1).message).toBe(true);
+  });
+  it("a WHITE-box pool is never a message end — it lights nothing blue", () => {
+    // Its contents carry its messages; the drop has always refused it, and
+    // the ring now says the same.
+    for (const t of WORLD) expect(classify(poolA, t).message, t.id).toBe(false);
   });
   it("a BPMN element → a black-box pool", () => {
     expect(classify(topTask, poolC).message).toBe(true);

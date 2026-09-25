@@ -68,7 +68,7 @@ import { captureCanvasPng } from "@/app/lib/diagram/canvasSnapshot";
 import { buildDebugSessionFile, debugSessionFilename, serialiseDebugSession, type DebugSnapshot } from "@/app/lib/assist/debugSessionFile";
 import { planMovePool, planSwapPools, selectedPools, poolsInOrder } from "@/app/lib/diagram/poolOrder";
 import { isContainerType, getAllDescendantIds } from "@/app/hooks/useDiagram";
-import { collectMessageTargets, parseMessageAnswer, type MessagePick } from "@/app/lib/assist/messageTargets";
+import { collectMessageTargets, parseMessageAnswer, resolveMessageAnswer, type MessagePick } from "@/app/lib/assist/messageTargets";
 import { validateOps, type AssistOp } from "@/app/lib/assist/ops";
 import { applyAssistOps as applyAssistOpsTo, type RenameFlow } from "@/app/lib/assist/applyAssistOps";
 import { boundaryRect } from "@/app/lib/assist/poolBoundaryPhrase";
@@ -1340,6 +1340,10 @@ export function DiagramEditor({
   // edit — the mic opener reads it to build V1's keyterms at OPEN time.
   const elementsRef = useRef(data.elements);
   elementsRef.current = data.elements;
+  // Likewise the connectors — the message rule reads which way an event with
+  // no Flow Type already faces from them.
+  const connectorsRef = useRef(data.connectors);
+  connectorsRef.current = data.connectors;
   const [selectedConnectorId, setSelectedConnectorId] = useState<string | null>(null);
   // The selected connector as the command interpreter sees it ("label selected Yes").
   const selectedConnectorIdRef = useRef<string | null>(null);
@@ -3051,14 +3055,17 @@ export function DiagramEditor({
     if (isFlowEndWord(t)) { setMessageFlow(null); log("message cancelled", true); return; }
     const a = parseMessageAnswer(t, flow.mode);
     if (!a) {
-      log(flow.mode === "pair" ? "say “<n> to <m> labelled <text>” — or “done”" : "say “to <n> labelled <text>” or “from <n> labelled <text>” — or “done”", false);
+      // Offer only the forms that can work — a receive-only anchor never "to".
+      const forms = flow.mode === "pair" ? ["“<n> to <m> labelled <text>”"]
+        : [flow.dirs.to ? "“to <n> labelled <text>”" : "", flow.dirs.from ? "“from <n> labelled <text>”" : ""].filter(Boolean);
+      log(`say ${forms.join(" or ")} — or “done”`, false);
       return;
     }
-    const byN = (n: number) => flow.targets.find((x) => x.n === n)?.id;
-    let fromId: string | undefined, toId: string | undefined;
-    if (a.kind === "pair") { fromId = byN(a.from); toId = byN(a.to); }
-    else if (flow.mode === "one") { const other = byN(a.n); fromId = a.dir === "to" ? flow.anchorId : other; toId = a.dir === "to" ? other : flow.anchorId; }
-    if (!fromId || !toId) { log("there’s no badge with that number", false); return; }
+    // A refused answer (no such badge, or said backwards — "12 to 1" where 12
+    // only receives) keeps the numbers up so it can simply be said again.
+    const ends = resolveMessageAnswer(flow, a, elementsRef.current, connectorsRef.current);
+    if ("error" in ends) { log(ends.error, false); return; }
+    const { fromId, toId } = ends;
     setMessageFlow(null);
     const r = applyGrouped([{ op: "addMessage", fromRef: ID_REF_PREFIX + fromId, toRef: ID_REF_PREFIX + toId, ...(a.label ? { label: a.label } : {}) }]);
     log(r.summary, r.ok);

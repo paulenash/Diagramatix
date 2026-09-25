@@ -18,7 +18,16 @@ const add = (s: string, t: string, ct: ConnectorType): Action => ({
   payload: { sourceId: s, targetId: t, connectorType: ct, directionType: "non-directed", routingType: "rectilinear", sourceSide: "right", targetSide: "left" },
 });
 
-const CASES: Array<{ name: string; s: DiagramElement; t: DiagramElement; ct: ConnectorType; expect: boolean }> = [
+// A message runs between two pools (canConnect.ts's message rule), so the
+// message rows put their ends in these — "in A" / "in B" — and add POOLS to the world.
+const POOLS = [
+  el("PA", "pool", { x: 0, y: 0, width: 600, height: 200, properties: { poolType: "white-box" } }),
+  el("PB", "pool", { x: 0, y: 400, width: 600, height: 200, properties: { poolType: "white-box" } }),
+];
+const inA = (extra: Partial<DiagramElement> = {}) => ({ parentId: "PA", ...extra });
+const inB = (extra: Partial<DiagramElement> = {}) => ({ parentId: "PB", ...extra });
+
+const CASES: Array<{ name: string; s: DiagramElement; t: DiagramElement; ct: ConnectorType; expect: boolean; world?: DiagramElement[] }> = [
   { name: "task → task (sequence) allowed", s: el("a", "task"), t: el("b", "task"), ct: "sequence", expect: true },
   { name: "final-state → task rejected (final source)", s: el("a", "final-state"), t: el("b", "task"), ct: "transition", expect: false },
   { name: "task → initial-state rejected", s: el("a", "task"), t: el("b", "initial-state"), ct: "transition", expect: false },
@@ -35,9 +44,19 @@ const CASES: Array<{ name: string; s: DiagramElement; t: DiagramElement; ct: Con
   { name: "intermediate → intermediate (associationBPMN) allowed (event-to-event)", s: el("a", "intermediate-event"), t: el("b", "intermediate-event"), ct: "associationBPMN", expect: true },
   // EMIE message-trigger rule: a boundary intermediate event receives a message
   // only when its trigger is Message, and never sends one.
-  { name: "messageBPMN → boundary Message event allowed", s: el("a", "task"), t: el("b", "intermediate-event", { boundaryHostId: "h", eventType: "message" }), ct: "messageBPMN", expect: true },
+  { name: "messageBPMN → boundary Message event allowed", s: el("a", "task", inA()), t: el("b", "intermediate-event", inB({ boundaryHostId: "h", eventType: "message" })), ct: "messageBPMN", expect: true, world: POOLS },
   { name: "messageBPMN → boundary Error event rejected", s: el("a", "task"), t: el("b", "intermediate-event", { boundaryHostId: "h", eventType: "error" }), ct: "messageBPMN", expect: false },
   { name: "messageBPMN FROM a boundary event rejected", s: el("a", "intermediate-event", { boundaryHostId: "h", eventType: "message" }), t: el("b", "task"), ct: "messageBPMN", expect: false },
+  // The message rule, pinned reducer ≡ canConnect (issue 4, 2026-09-25).
+  { name: "messageBPMN → a gateway rejected", s: el("a", "task", inA()), t: el("b", "gateway", inB()), ct: "messageBPMN", expect: false, world: POOLS },
+  { name: "messageBPMN → a Timer intermediate event rejected", s: el("a", "task", inA()), t: el("b", "intermediate-event", inB({ eventType: "timer" })), ct: "messageBPMN", expect: false, world: POOLS },
+  { name: "messageBPMN FROM a catching Message event rejected", s: el("a", "intermediate-event", inA({ eventType: "message", flowType: "catching" })), t: el("b", "task", inB()), ct: "messageBPMN", expect: false, world: POOLS },
+  { name: "messageBPMN → an end event rejected", s: el("a", "task", inA()), t: el("b", "end-event", inB()), ct: "messageBPMN", expect: false, world: POOLS },
+  { name: "messageBPMN task → task in the SAME pool rejected", s: el("a", "task", inA()), t: el("b", "task", inA()), ct: "messageBPMN", expect: false, world: POOLS },
+  { name: "messageBPMN → a Message catch event allowed", s: el("a", "task", inA()), t: el("b", "intermediate-event", inB({ eventType: "message", flowType: "catching" })), ct: "messageBPMN", expect: true, world: POOLS },
+  { name: "messageBPMN → a plain start event allowed (convertible)", s: el("a", "task", inA()), t: el("b", "start-event", inB()), ct: "messageBPMN", expect: true, world: POOLS },
+  { name: "messageBPMN FROM a plain end event allowed (convertible)", s: el("a", "end-event", inA()), t: el("b", "task", inB()), ct: "messageBPMN", expect: true, world: POOLS },
+  { name: "messageBPMN → a white-box pool rejected", s: el("a", "task", inA()), t: POOLS[1], ct: "messageBPMN", expect: false, world: [POOLS[0]] },
   // An EMIE is triggered by its boundary — it has no INCOMING sequence flow.
   { name: "sequence INTO a boundary intermediate event (EMIE) rejected", s: el("a", "task"), t: el("b", "intermediate-event", { boundaryHostId: "h" }), ct: "sequence", expect: false },
   { name: "sequence OUT of a boundary intermediate event (EMIE) allowed", s: el("a", "intermediate-event", { boundaryHostId: "h" }), t: el("b", "task"), ct: "sequence", expect: true },
@@ -50,7 +69,7 @@ const CASES: Array<{ name: string; s: DiagramElement; t: DiagramElement; ct: Con
 describe("canConnect ≡ ADD_CONNECTOR non-force parity (T2225)", () => {
   for (const c of CASES) {
     it(c.name, () => {
-      const world = base([c.s, c.t]);
+      const world = base([...(c.world ?? []), c.s, c.t]);
       const after = reducer(world, add(c.s.id, c.t.id, c.ct));
       const reducerAccepted = after.connectors.length > 0;
       const predicate = canConnect(c.s, c.t, c.ct, world.elements);

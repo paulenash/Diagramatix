@@ -160,7 +160,9 @@ describe("6 & 7 — messages by number", () => {
   const els = [wb, bb, t1, t2, sp, gw];
 
   it("T4405 — the candidates are numbered by the rules Paul gave, and the answers parse", () => {
-    // Bare: every task, collapsed subprocess and black-box pool — never the white-box pool or a gateway.
+    // Bare: everything the message rule (canConnect.ts) lets a message start or
+    // end at — here the tasks, the subprocess and the black-box pool; never the
+    // white-box pool or a gateway.
     const pair = collectMessageTargets(els, null);
     expect("error" in pair).toBe(false);
     if ("error" in pair) return;
@@ -168,13 +170,13 @@ describe("6 & 7 — messages by number", () => {
     expect(pair.targets.map((t) => t.id), "reading order: rows then left to right").toEqual(["t1", "sp", "t2", "cust"].sort((a, b) => 0) && pair.targets.map((t) => t.id));
     expect(new Set(pair.targets.map((t) => t.id))).toEqual(new Set(["t1", "t2", "sp", "cust"]));
     expect(pair.targets.map((t) => t.n)).toEqual([1, 2, 3, 4]);
-    // a) a task is selected → black-box pools only
+    // a) a task is selected → what is in another pool (here the black-box pool), both ways
     const fromTask = collectMessageTargets(els, "t1");
-    expect(fromTask).toMatchObject({ mode: "one", anchorId: "t1", anchorIsPool: false });
+    expect(fromTask).toMatchObject({ mode: "one", anchorId: "t1", dirs: { to: true, from: true } });
     expect("targets" in fromTask && fromTask.targets.map((t) => t.id)).toEqual(["cust"]);
-    // b) a black-box pool is selected → tasks and collapsed subprocesses only
+    // b) a black-box pool is selected → the tasks and the subprocess in the other pool
     const fromPool = collectMessageTargets(els, "cust");
-    expect(fromPool).toMatchObject({ mode: "one", anchorId: "cust", anchorIsPool: true });
+    expect(fromPool).toMatchObject({ mode: "one", anchorId: "cust", dirs: { to: true, from: true } });
     expect("targets" in fromPool && new Set(fromPool.targets.map((t) => t.id))).toEqual(new Set(["t1", "t2", "sp"]));
     // Neither: a gateway or a white-box pool cannot anchor a message.
     expect(collectMessageTargets(els, "g")).toHaveProperty("error");

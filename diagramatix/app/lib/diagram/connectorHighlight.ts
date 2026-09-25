@@ -12,12 +12,17 @@
  *   • `isSequenceHighlightTarget(source, target)` is the single authority for
  *     the green SEQUENCE highlight — a faithful delegate to `canConnect`, the
  *     same predicate `ADD_CONNECTOR` enforces on commit.
+ *   • `isMessageHighlightTarget(source, target)` is the single authority for
+ *     the blue MESSAGE highlight (BPMN only): the message rule in canConnect.ts,
+ *     which the drop, the reducer and voice's "add a message" numbers also ask.
+ *     No branch below computes blue.
  *
  * These are covered by tests/diagram/connector-highlight.test.ts.
  */
 import type { DiagramElement, Connector, DiagramType } from "./types";
-import { canConnect } from "./canConnect";
+import { canConnect, type CanConnectOptions } from "./canConnect";
 import { getElementPoolId } from "./poolUtil";
+import { isThrowingEvent } from "./eventDirection";
 
 export { getElementPoolId };
 
@@ -83,8 +88,7 @@ export function computeDragContext(
   const fromEdgeMountedEndEvent = source.type === "end-event" && !!source.boundaryHostId;
   const fromEdgeMountedStartEvent = source.type === "start-event" && !!source.boundaryHostId;
   const fromEdgeMountedIntermediateSendEvent =
-    source.type === "intermediate-event" && !!source.boundaryHostId &&
-    (source.flowType === "throwing" || (source.flowType == null && source.taskType === "send"));
+    source.type === "intermediate-event" && !!source.boundaryHostId && isThrowingEvent(source);
   const fromEdgeMountedIntermediateReceiveEvent =
     source.type === "intermediate-event" && !!source.boundaryHostId && source.flowType === "catching";
   const fromEdgeMountedIntermediateEvent =
@@ -149,9 +153,32 @@ export function isSequenceHighlightTarget(
   target: DiagramElement,
   elements: DiagramElement[],
   diagramType: DiagramType,
+  opts?: CanConnectOptions,
 ): boolean {
   if (diagramType !== "bpmn") return true;
-  return canConnect(source, target, "sequence", elements);
+  return canConnect(source, target, "sequence", elements, opts);
+}
+
+/**
+ * The SINGLE authority for the blue MESSAGE highlight on a BPMN diagram: the
+ * message rule canConnect enforces (messageFlowRefusal), so a ring is blue
+ * exactly when a drop there would draw a message — and exactly when voice's
+ * "add a message" would number the pair.
+ *
+ * A review comment is excluded here, not in the rule: canConnect says yes to
+ * any pair with one (the reducer turns it into a review link, which is never
+ * a message), so without this every element would light blue from one.
+ * Pass the diagram's connectors in `opts`: an event with no Flow Type that
+ * already has a message faces that way, and lights only that way.
+ */
+export function isMessageHighlightTarget(
+  source: DiagramElement,
+  target: DiagramElement,
+  elements: DiagramElement[],
+  opts?: CanConnectOptions,
+): boolean {
+  if (source.type === "review-comment" || target.type === "review-comment") return false;
+  return canConnect(source, target, "messageBPMN", elements, opts);
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -184,21 +211,6 @@ function isValidContextFlowPair(sourceType: string, targetType: string): boolean
   return false;
 }
 
-const isWhiteBoxPool = (poolId: string | null, elements: DiagramElement[]): boolean => {
-  if (!poolId) return false;
-  const p = elements.find((e) => e.id === poolId);
-  return ((p?.properties.poolType as string | undefined) ?? "black-box") === "white-box";
-};
-
-// A pool-less element behaves as if wrapped in one shared implicit pool: the
-// "invisible unnamed pool" (poolId === null). It is a real WHITE-BOX participant
-// — its contents are visible and message-targetable, distinct from any named
-// pool. So a message may target a named white-box pool's contents OR any
-// pool-less (invisible-pool) element; a named BLACK-box pool's contents stay
-// hidden (message its pool shape instead).
-const isVisibleParticipant = (poolId: string | null, elements: DiagramElement[]): boolean =>
-  poolId === null || isWhiteBoxPool(poolId, elements);
-
 /**
  * Classify one candidate `target` for a NEW connector drag from `source`.
  * `ctx` must be `computeDragContext(source, …)`. Returns which highlight (if
@@ -229,39 +241,36 @@ export function classifyDragTarget(
   const isBpmnSource = BPMN_TRIGGER_TYPES.has(source.type);
   let out: TargetHighlight;
 
+  // The branches decide green, purple and dark-yellow. Blue is not theirs: it
+  // is set once, below, from the message rule.
   if (target.type === "pool") {
-    out = classifyPoolTarget(target, ctx, isBpmnSource);
+    out = NO_HIGHLIGHT; // a pool takes nothing but a message
   } else if (target.type === "composite-state") {
     out = { ...NO_HIGHLIGHT, sequence: !ctx.sourceIsData && source.parentId !== target.id };
   } else if (NON_TARGET_TYPES.has(target.type)) {
     out = NO_HIGHLIGHT;
   } else if (target.type === "subprocess-expanded") {
     out = classifyEpTarget(target, ctx);
-    // An EP (subprocess) is also a valid messageBPMN target across pools, exactly
-    // like a task — reuse the plain-target message logic (blue). Its sequence /
-    // association / compensation come from classifyEpTarget above.
-    const msg = classifyPlainTarget(source, target, ctx, elements, connectors, diagramType, isBpmnSource, poolOf).message;
-    if (msg) out = { ...out, message: true };
   } else if (target.boundaryHostId) {
-    out = classifyBoundaryTarget(source, target, ctx, elements, connectors, isBpmnSource, poolOf);
+    out = classifyBoundaryTarget(source, target, ctx, elements, isBpmnSource, poolOf);
   } else {
-    out = classifyPlainTarget(source, target, ctx, elements, connectors, diagramType, isBpmnSource, poolOf);
+    out = classifyPlainTarget(source, target, ctx, diagramType, isBpmnSource, poolOf);
   }
 
   // Single authority for the green highlight: canConnect (BPMN) — see
   // isSequenceHighlightTarget. Subsumes the old event-subprocess / non-boundary
   // -start / compensation-activity gates, so they need not be duplicated here.
-  if (out.sequence && !isSequenceHighlightTarget(source, target, elements, diagramType)) {
+  if (out.sequence && !isSequenceHighlightTarget(source, target, elements, diagramType, { poolIdOf: poolOf })) {
     out = { ...out, sequence: false };
   }
-  return out;
-}
-
-function classifyPoolTarget(target: DiagramElement, ctx: DragContext, isBpmnSource: boolean): TargetHighlight {
-  const poolType = (target.properties.poolType as string | undefined) ?? "black-box";
-  const message = isBpmnSource && target.id !== ctx.sourcePoolId && poolType === "black-box"
-    && !ctx.fromEdgeMountedEndEvent && !ctx.fromEdgeMountedStartEvent && !ctx.fromEdgeMountedIntermediateReceiveEvent;
-  return { ...NO_HIGHLIGHT, message };
+  // Single authority for the blue highlight: the message rule itself, so blue
+  // is exactly what a drop, the reducer and voice's "add a message" numbers
+  // accept. Only a BPMN diagram has messages. No branch above computes blue: a
+  // second copy of the message rule drifts (one lit a white-box pool blue that
+  // no drop would take).
+  const message = diagramType === "bpmn"
+    && isMessageHighlightTarget(source, target, elements, { poolIdOf: poolOf, connectors });
+  return message === out.message ? out : { ...out, message };
 }
 
 function classifyEpTarget(target: DiagramElement, ctx: DragContext): TargetHighlight {
@@ -279,28 +288,21 @@ function classifyEpTarget(target: DiagramElement, ctx: DragContext): TargetHighl
 
 function classifyBoundaryTarget(
   source: DiagramElement, target: DiagramElement, ctx: DragContext,
-  elements: DiagramElement[], connectors: Connector[], isBpmnSource: boolean,
+  elements: DiagramElement[], isBpmnSource: boolean,
   poolIdOf: (el: DiagramElement) => string | null,
 ): TargetHighlight {
-  let sequence = false, message = false, association = false;
-  const bEvtIsSendLocked = (target.flowType === "throwing" || target.taskType === "send")
-    && connectors.some((c) => c.type === "messageBPMN" && c.sourceId === target.id);
+  let sequence = false, association = false;
   const poolOf = poolIdOf(target);
   const host = elements.find((e) => e.id === target.boundaryHostId);
-  // An edge-mounted (boundary) intermediate event catches an internal trigger,
-  // not an incoming message flow — it is a messageBPMN target ONLY when its
-  // trigger is Message (canConnect enforces the same on commit).
-  const targetCanReceiveMsg = target.type === "intermediate-event"
-    && (target.eventType as string | undefined) === "message";
 
   if (ctx.fromPool) {
-    if (poolOf && poolOf !== ctx.sourcePoolId && targetCanReceiveMsg && !bEvtIsSendLocked && isWhiteBoxPool(poolOf, elements)) message = true;
+    /* a pool sends only messages — blue is the message rule's */
   } else if ((ctx.fromChildEvent || ctx.fromBoundaryOnChild) && target.boundaryHostId && ctx.sourceAncestorIds.has(target.boundaryHostId)) {
     association = true; // purple — associationBPMN to a boundary event on an ancestor
   } else if (ctx.sourceIsData) {
     association = true;
   } else if (ctx.fromFreeEndEvent) {
-    if (poolOf && targetCanReceiveMsg && !bEvtIsSendLocked && isWhiteBoxPool(poolOf, elements)) message = true;
+    /* a free end event has no outgoing sequence — blue is the message rule's */
   } else if (ctx.fromEdgeMountedEndEvent) {
     if (poolOf === ctx.sourcePoolId && host?.parentId !== ctx.sourceBoundaryHostId) sequence = true;
   } else if (ctx.fromEdgeMountedStartEvent) {
@@ -308,7 +310,6 @@ function classifyBoundaryTarget(
   } else if (ctx.fromEdgeMountedIntermediateSendEvent) {
     if (target.boundaryHostId !== ctx.sourceBoundaryHostId && (!host || host.parentId !== ctx.sourceBoundaryHostId)) {
       if (poolOf === ctx.sourcePoolId) sequence = true;
-      else if (poolOf && poolOf !== ctx.sourcePoolId && targetCanReceiveMsg && !bEvtIsSendLocked && isWhiteBoxPool(poolOf, elements)) message = true;
     }
   } else if (ctx.fromEdgeMountedIntermediateReceiveEvent) {
     /* not a valid target for receive events */
@@ -316,27 +317,23 @@ function classifyBoundaryTarget(
     sequence = true;
   } else {
     if (poolOf === ctx.sourcePoolId) sequence = true;
-    else if (poolOf && poolOf !== ctx.sourcePoolId && targetCanReceiveMsg && !bEvtIsSendLocked && isWhiteBoxPool(poolOf, elements)) message = true;
   }
-  return { sequence, message, association, compensation: false };
+  return { sequence, message: false, association, compensation: false };
 }
 
 function classifyPlainTarget(
   source: DiagramElement, target: DiagramElement, ctx: DragContext,
-  elements: DiagramElement[], connectors: Connector[], diagramType: DiagramType, isBpmnSource: boolean,
+  diagramType: DiagramType, isBpmnSource: boolean,
   poolIdOf: (el: DiagramElement) => string | null,
 ): TargetHighlight {
-  let sequence = false, message = false, association = false, compensation = false;
+  let sequence = false, association = false, compensation = false;
   const elIsData = DATA_ELEMENT_TYPES.has(target.type);
-  const elIsSendLocked = target.type === "end-event"
-    || ((target.taskType === "send" || target.flowType === "throwing")
-        && connectors.some((c) => c.type === "messageBPMN" && c.sourceId === target.id));
   const poolOf = poolIdOf(target);
 
   if (ctx.fromEdgeMountedCompensationEvent) {
     if (ctx.compTargetsAvailable && COMP_ACTIVITY_TYPES.has(target.type) && target.id !== ctx.sourceBoundaryHostId) compensation = true;
   } else if (ctx.fromPool) {
-    if (!elIsData && !elIsSendLocked && poolOf !== ctx.sourcePoolId && isVisibleParticipant(poolOf, elements)) message = true;
+    /* a pool sends only messages — blue is the message rule's */
   } else if (ctx.sourceIsData && !elIsData) {
     association = true;
   } else if (ctx.sourceIsData && elIsData) {
@@ -350,7 +347,7 @@ function classifyPlainTarget(
       sequence = true;
     }
   } else if (ctx.fromFreeEndEvent) {
-    if (!elIsData && !elIsSendLocked && poolOf && isWhiteBoxPool(poolOf, elements)) message = true;
+    /* a free end event has no outgoing sequence — blue is the message rule's */
   } else if (ctx.fromEdgeMountedEndEvent) {
     if ((poolOf === ctx.sourcePoolId || !poolOf) && target.parentId !== ctx.sourceBoundaryHostId) sequence = true;
   } else if (ctx.fromEdgeMountedStartEvent) {
@@ -361,26 +358,19 @@ function classifyPlainTarget(
     // interior — so it targets anything EXCEPT its host activity's own children.
     // canConnect narrows this to the exact outer-scope match.
     if (target.parentId !== ctx.sourceBoundaryHostId) {
-      if (poolOf === ctx.sourcePoolId) sequence = true;
-      else if (poolOf && poolOf !== ctx.sourcePoolId && !elIsData && !elIsSendLocked && isWhiteBoxPool(poolOf, elements)) message = true;
-      else if (!poolOf) sequence = true;
+      if (poolOf === ctx.sourcePoolId || !poolOf) sequence = true;
     }
   } else if (isBpmnSource && !ctx.sourcePoolId) {
-    // Floating BPMN source = the invisible white-box participant. Crossing to a
-    // NAMED pool's visible contents is a message; staying within the invisible
-    // pool is a sequence (canConnect-gated).
-    if (poolOf !== null) {
-      if (!elIsData && !elIsSendLocked && isWhiteBoxPool(poolOf, elements)) message = true;
-    } else {
-      sequence = true;
-    }
+    // Floating BPMN source = the invisible white-box participant. Staying
+    // within the invisible pool is a sequence (canConnect-gated); crossing to a
+    // named pool is a message (the message rule's blue).
+    if (poolOf === null) sequence = true;
   } else if (!isBpmnSource || !ctx.sourcePoolId) {
     sequence = (diagramType === "context" || diagramType === "basic")
       ? isValidContextFlowPair(source.type, target.type)
       : true;
   } else {
     if (poolOf === ctx.sourcePoolId) sequence = true;
-    else if (!elIsData && !elIsSendLocked && isVisibleParticipant(poolOf, elements)) message = true;
   }
-  return { sequence, message, association, compensation };
+  return { sequence, message: false, association, compensation };
 }
