@@ -21,10 +21,10 @@ function looksLikeElementId(s: string): boolean {
 }
 
 /**
- * Normalize quotes: curly quotes → straight, remove them for speech.
+ * Remove quote marks: curly quotes and straight double quotes only (keep apostrophes).
  */
-function normalizeQuotes(s: string): string {
-  return s.replace(/[""]/g, '"').replace(/['']/g, "'");
+function removeQuotes(s: string): string {
+  return s.replace(/[""|]/g, "");
 }
 
 /**
@@ -77,7 +77,7 @@ export function spokenText(text: string, verbosity: SpeechVerbosity): string {
   }
 
   // Transform the text.
-  let result = normalizeQuotes(trimmed);
+  let result = removeQuotes(trimmed);
   result = result.replace(/→/g, " to ");
   result = dropElementIds(result);
   result = readNumbers(result);
