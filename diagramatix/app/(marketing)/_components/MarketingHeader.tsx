@@ -6,7 +6,7 @@ import Link from "next/link";
 const NAV_LINKS = [
   { href: "/features", label: "Features" },
   { href: "/pricing", label: "Pricing" },
-  { href: "/about", label: "About" },
+  { href: "https://www.diagramatix.com.au/about", label: "About" },
 ];
 
 // Client component: the mobile hamburger needs local open/closed state.

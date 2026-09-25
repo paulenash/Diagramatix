@@ -6,7 +6,7 @@ import type { MetadataRoute } from "next";
 const BASE_URL = "https://app.diagramatix.com.au";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const routes = ["/", "/pricing", "/about", "/features", "/terms", "/privacy"];
+  const routes = ["/", "/pricing", "/features", "/terms", "/privacy"];
   return routes.map((route) => ({
     url: `${BASE_URL}${route === "/" ? "" : route}`,
     lastModified: new Date(),
