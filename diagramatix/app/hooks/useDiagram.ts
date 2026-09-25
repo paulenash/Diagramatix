@@ -21,7 +21,9 @@ import type {
   Side,
   SymbolType,
 } from "@/app/lib/diagram/types";
-import { gatewayVertex, nudgeGatewayEndpoint, computeWaypoints, recomputeAllConnectors, consolidateWaypoints, rectifyWaypoints, constrainControlPoint, safeSidePair, selfLoopWaypoints, measureSelfLoopBulge, SELF_LOOP_BULGE, fuseCollinearWaypoints } from "@/app/lib/diagram/routing";
+import { gatewayVertex, nudgeGatewayEndpoint, computeWaypoints, recomputeAllConnectors, consolidateWaypoints, rectifyWaypoints, constrainControlPoint, safeSidePair, selfLoopWaypoints, measureSelfLoopBulge, SELF_LOOP_BULGE, fuseCollinearWaypoints, boundaryEndpointSides, withBoundaryEndpointSides, getBoundaryEventOuterSide, isAxisAligned } from "@/app/lib/diagram/routing";
+import { flowScopeOf } from "@/app/lib/diagram/canConnect";
+import { LANE_CHILD_PAD } from "@/app/lib/diagram/assistPlacement";
 import { planWrapInSubprocess, planUnwrapSubprocess, planWrapInContainer, type WrapIds } from "@/app/lib/diagram/subprocessWrap";
 import { isUmlConnType } from "@/app/lib/diagram/types";
 import { capitaliseFirstWord, needsCapital, decisionLabel, isDecisionGateway } from "@/app/lib/diagram/nameCase";
@@ -358,7 +360,7 @@ function adjustMsgLabelOffset(
 
 export type Action =
   | { type: "SET_DATA"; payload: DiagramData }
-  | { type: "ADD_ELEMENT"; payload: { symbolType: SymbolType; position: Point; taskType?: BpmnTaskType; eventType?: EventType; id?: string; initial?: { properties?: Record<string, unknown>; width?: number; height?: number; label?: string; parentId?: string } } }
+  | { type: "ADD_ELEMENT"; payload: { symbolType: SymbolType; position: Point; taskType?: BpmnTaskType; eventType?: EventType; id?: string; initial?: { properties?: Record<string, unknown>; width?: number; height?: number; label?: string; parentId?: string; keepInLane?: boolean } } }
   | { type: "MOVE_ELEMENT"; payload: { id: string; x: number; y: number; unconstrained?: boolean; travellingIds?: string[] } }
   | { type: "SWAP_LANES_VERTICAL"; payload: { laneId: string; direction: "up" | "down" } }
   | { type: "RESIZE_ELEMENT"; payload: { id: string; x: number; y: number; width: number; height: number; wasWhiteBoxAtResizeStart?: boolean } }
@@ -2870,6 +2872,51 @@ function growLaneToHeight(
   return elements;
 }
 
+/**
+ * Make a lane tall enough to hold a new child spanning [top, bottom] with the
+ * usual 8px round it (LANE_CHILD_PAD — the pad the placement clamps to), pushing everything below down (lanes, pools, their
+ * contents and connectors) and taking the pool with it.
+ *
+ * A child poking out ABOVE the lane cannot be met by growing the lane upward —
+ * the lane above is in the way — so the lane grows at the bottom instead and
+ * its own contents slide down with everything below; `dy` is how far, and the
+ * caller moves the child by the same amount. Null when the child already fits.
+ */
+function makeRoomInLane(
+  elements: DiagramElement[],
+  connectors: Connector[],
+  laneId: string,
+  top: number,
+  bottom: number,
+): { elements: DiagramElement[]; connectors: Connector[]; dy: number } | null {
+  const PAD = LANE_CHILD_PAD;
+  const lane = elements.find((e) => e.id === laneId && (e.type === "lane" || e.type === "sublane"));
+  const parent = lane?.parentId ? elements.find((e) => e.id === lane.parentId) : undefined;
+  if (!lane || !parent) return null;
+  const needTop = Math.max(0, lane.y + PAD - top);
+  const needBottom = Math.max(0, (bottom + needTop) + PAD - (lane.y + lane.height + needTop));
+  if (needTop === 0 && needBottom === 0) return null;
+  // The lane and every container round it stay where they are; they grow.
+  const holds = new Set<string>([lane.id]);
+  for (let p: DiagramElement | undefined = parent; p; p = p.parentId ? elements.find((e) => e.id === p!.parentId) : undefined) {
+    holds.add(p.id);
+  }
+  let els = elements;
+  let conns = connectors;
+  if (needTop > 0) {
+    const r = shiftElementsPastLineWithinSpan(els, conns, "y", lane.y, needTop, parent.x, parent.x + parent.width, holds);
+    els = r.elements; conns = r.connectors;
+  }
+  if (needBottom > 0) {
+    const stays = new Set<string>([...holds, ...getAllDescendantIds(els, lane.id)]);
+    const line = lane.y + lane.height + needTop;
+    const r = shiftElementsPastLineWithinSpan(els, conns, "y", line, needBottom, parent.x, parent.x + parent.width, stays);
+    els = r.elements; conns = r.connectors;
+  }
+  els = els.map((e) => (e.id === lane.id ? { ...e, height: e.height + needTop + needBottom } : e));
+  return { elements: els, connectors: conns, dy: needTop };
+}
+
 function resizeLaneForLabel(
   baseElements: DiagramElement[],
   baseConnectors: Connector[],
@@ -4251,6 +4298,23 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         }
       }
 
+      // A step added after a boundary event stays in its host's own lane —
+      // R7.07: "Keep it fully inside the EMIE's own lane". The placement
+      // (planBoundaryFollowOn) clamps it into the lane when there is room;
+      // when there isn't, the lane makes room here. Without this the lane
+      // reconcile hands the step to whichever lane it overlaps: Paul's "Fix
+      // it" after Event 4 landed in Marketing, below the Sales lane it
+      // belonged to. Only for a caller that asks — an ordinary add is
+      // unchanged.
+      if (initial?.keepInLane && newEl.parentId) {
+        const room = makeRoomInLane(workingElements, workingConnectors, newEl.parentId, newEl.y, newEl.y + newEl.height);
+        if (room) {
+          workingElements = room.elements;
+          workingConnectors = room.connectors;
+          newEl = { ...newEl, y: newEl.y + room.dy };
+        }
+      }
+
       // Auto-grow any container the new element landed inside (Pool /
       // Lane / subprocess-expanded). Without this, dropping a Task
       // inside a tight subprocess-expanded leaves it overlapping the
@@ -4289,9 +4353,15 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           const snapped = nearestPointOnRectBoundary(host, desired);
           const nx = snapped.x - el.width / 2, ny = snapped.y - el.height / 2;
           const elements = state.elements.map((e) => e.id === id ? { ...e, x: nx, y: ny } : e);
+          // Slid round a corner onto another edge: its flows re-take R7.02's
+          // side for the NEW edge — the stored one now lies on the host's
+          // boundary line. On the same edge a deliberately placed end stays.
+          const edgeChanged = getBoundaryEventOuterSide(el, state.elements)
+            !== getBoundaryEventOuterSide(elements.find((e) => e.id === id)!, elements);
           const connectors = state.connectors.map(conn => {
             if (conn.sourceId !== id && conn.targetId !== id) return conn;
-            return recomputeAllConnectors([conn], elements, state.relaxedLayout)[0] ?? conn;
+            const sided = edgeChanged ? withBoundaryEndpointSides(conn, id, elements) : conn;
+            return recomputeAllConnectors([sided], elements, state.relaxedLayout)[0] ?? sided;
           });
           return { ...state, elements, connectors };
         }
@@ -6491,9 +6561,15 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         const mounted = { ...e, x: pt.x - evt.width / 2, y: pt.y - evt.height / 2, boundaryHostId: hostId, parentId: host.parentId };
         return { ...mounted, properties: { ...mounted.properties, ...emieMountProps(host, mounted) } };
       });
+      // Just mounted, or moved to another edge: its flows re-take R7.02's
+      // side. Re-mounted on the same edge, a deliberately placed end stays.
+      const edgeChanged = evt.boundaryHostId !== hostId
+        || getBoundaryEventOuterSide(evt, state.elements)
+          !== getBoundaryEventOuterSide(elements.find((e) => e.id === id)!, elements);
       const connectors = state.connectors.map((conn) => {
         if (conn.sourceId !== id && conn.targetId !== id) return conn;
-        return recomputeAllConnectors([conn], elements, state.relaxedLayout)[0] ?? conn;
+        const sided = edgeChanged ? withBoundaryEndpointSides(conn, id, elements) : conn;
+        return recomputeAllConnectors([sided], elements, state.relaxedLayout)[0] ?? sided;
       });
       return { ...state, elements, connectors };
     }
@@ -7065,6 +7141,20 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         }
       }
 
+      // R7.02 (Paul): "A connector from a boundary-mounted intermediate event
+      // exits from the event's connection point furthest from the host edge the
+      // event is mounted upon." Here, beside R6.30 and after the merge rule, so
+      // it holds for a hand-drawn connector AND every auto-connect path — voice
+      // connect, voice add-after, ghost accept, template attach — all of which
+      // arrive carrying addConnector's "right"/"left" defaults, and which drew
+      // Event 4's flow out of its east point, along the subprocess's bottom
+      // line. Applied under `force` too: force overrides legality, not geometry.
+      {
+        const r702 = boundaryEndpointSides(connectorType, source, target, state.elements);
+        if (r702.sourceSide) { sourceSide = r702.sourceSide; sourceOffsetAlong = 0.5; }
+        if (r702.targetSide) { targetSide = r702.targetSide; targetOffsetAlong = 0.5; }
+      }
+
       // R6.30: a gateway endpoint attaches to a VERTEX, never part-way along a
       // diagonal edge. Applied here rather than at the call sites so it holds
       // for a hand-drawn connector AND for every auto-connect path.
@@ -7231,28 +7321,9 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         // A sequence flow may never cross a POOL boundary (mirrors canConnect).
         if (getElementPoolId(source, state.elements) !== getElementPoolId(target, state.elements)) return state;
 
-        // Scope model (single source of truth — mirrors app/lib/diagram/canConnect.ts).
-        // A sequence flow may not cross an Expanded-Subprocess (EP) boundary. Each
-        // endpoint's "flow scope" is the EP it participates in — normally its
-        // container, but an edge-mounted event redefines it:
-        //   • edge Start on X — source: flows INTO X (scope = X); target: an external
-        //     trigger reached from OUTSIDE X (scope = the scope containing X).
-        //   • edge End on X — target: X's exit, reachable only from INSIDE X (scope =
-        //     X); source: illegal (an End has no outgoing flow).
-        //   • edge (boundary) Intermediate on X: its flow continues in X's own scope.
-        // Legal iff the two effective scopes are equal.
-        const byId = (id?: string) => (id ? state.elements.find(e => e.id === id) : undefined);
-        const containerScope = (el: DiagramElement | undefined): string | null => {
-          let cur = el;
-          for (let i = 0; i < 20 && cur; i++) {
-            if (!cur.parentId) return null;
-            const parent = byId(cur.parentId);
-            if (!parent) return null;
-            if (parent.type === "subprocess-expanded") return parent.id;
-            cur = parent;
-          }
-          return null;
-        };
+        // Scope model: a sequence flow may not cross an Expanded-Subprocess (EP)
+        // boundary. The rule is canConnect.ts's `flowScopeOf`, asked here rather
+        // than restated. Legal iff the two effective scopes are equal.
         const isEventExpandedSub = (el: DiagramElement) =>
           el.type === "subprocess-expanded" &&
           (el.properties.subprocessType as string | undefined) === "event";
@@ -7265,18 +7336,8 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         // An Event Expanded Subprocess is triggered by an event, never sequence flow.
         if (isEventExpandedSub(source) || isEventExpandedSub(target)) return state;
 
-        const flowScope = (el: DiagramElement, role: "source" | "target"): string | null | "illegal" => {
-          if (el.boundaryHostId) {
-            const host = byId(el.boundaryHostId);
-            const outer = host ? containerScope(host) : null;
-            if (el.type === "start-event") return role === "source" ? el.boundaryHostId : outer;
-            if (el.type === "end-event") return role === "source" ? "illegal" : el.boundaryHostId;
-            return role === "target" ? "illegal" : outer; // boundary intermediate (EMIE): outgoing only, no incoming
-          }
-          return containerScope(el);
-        };
-        const sScope = flowScope(source, "source");
-        const tScope = flowScope(target, "target");
+        const sScope = flowScopeOf(source, "source", state.elements);
+        const tScope = flowScopeOf(target, "target", state.elements);
         if (sScope === "illegal" || tScope === "illegal") return state;
         if (sScope !== tScope) return state;
       }
@@ -8576,6 +8637,11 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
     case "CORRECT_ALL_CONNECTORS": {
       const connectors = state.connectors.map((conn) => {
         if (conn.routingType !== "rectilinear" || conn.waypoints.length < 7) return conn;
+        // A route that is already all right angles is left exactly as it is —
+        // not rectified (which doubled a bottom exit back through its own
+        // source) and not consolidated either (which drops a short jog and
+        // leaves a diagonal in its place).
+        if (isAxisAligned(conn.waypoints)) return conn;
         const rectified = rectifyWaypoints(conn.waypoints, conn.sourceSide);
         return { ...conn, waypoints: consolidateWaypoints(rectified) };
       });
@@ -8619,9 +8685,11 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
             };
             return { ...mounted, properties: { ...mounted.properties, ...emieMountProps(host, mounted) } };
           });
+          // Just mounted: a flow drawn while the event was free carries
+          // whatever side it had then — R7.02 decides it now.
           const reconns = state.connectors.map(conn =>
             (conn.sourceId === id || conn.targetId === id)
-              ? recomputeAllConnectors([conn], attachedEls, state.relaxedLayout)[0] ?? conn
+              ? recomputeAllConnectors([withBoundaryEndpointSides(conn, id, attachedEls)], attachedEls, state.relaxedLayout)[0] ?? conn
               : conn);
           return { ...state, elements: updatePoolTypes(attachedEls), connectors: reconns };
         }
@@ -10292,7 +10360,7 @@ export function useDiagram(initialData: DiagramData) {
       taskType?: BpmnTaskType,
       eventType?: EventType,
       id?: string,
-      initial?: { properties?: Record<string, unknown>; width?: number; height?: number; label?: string; parentId?: string },
+      initial?: { properties?: Record<string, unknown>; width?: number; height?: number; label?: string; parentId?: string; keepInLane?: boolean },
     ) => {
       pushHistory(snapshotData());
       dispatch({ type: "ADD_ELEMENT", payload: { symbolType, position, taskType, eventType, id, initial } });

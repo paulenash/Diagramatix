@@ -1,8 +1,11 @@
 /**
  * pickBoundaryEventSide — corner disambiguation (issue 2, 2026-07-29). When an
- * edge-mounted event sits near a host CORNER it is close to two outer edges; the
- * connector must exit the side that FACES its target, not the deterministic
- * nearest-edge, so it doesn't double back around the host.
+ * edge-mounted event's centre sits ON a host corner it is on two outer edges at
+ * once; the connector exits the side that FACES its target, not the
+ * deterministic nearest-edge, so it doesn't double back around the host.
+ *
+ * Only ON the corner (under 1px from both edges). An event merely NEAR a corner
+ * is on one edge and obeys R7.02 — see T4791 (boundary-exit-r702.test.ts).
  */
 import { describe, it, expect } from "vitest";
 import { pickBoundaryEventSide } from "@/app/lib/diagram/routing";

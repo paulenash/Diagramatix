@@ -15,6 +15,8 @@
  */
 import type { DiagramElement, SymbolType } from "./types";
 import { getSymbolDefinition } from "./symbols/definitions";
+import { outerSideOfBox, getBoundaryEventOuterSide, pickBoundaryEventSide, oppositeSide } from "./routing";
+import { flowScopeOf } from "./canConnect";
 
 export const HALF_TASK_W = 51;   // ½ Task width (Task = 102)
 export const HALF_TASK_H = 32;   // ½ Task height (Task = 64) — vertical branch gap
@@ -150,18 +152,145 @@ export function boxFromCenter(c: Center, w: number, h: number): Box {
 
 export type OuterSide = "top" | "bottom" | "left" | "right";
 
-/** Which host edge a boundary event sits on (= the side it faces outward). */
+/** Which host edge a boundary event sits on (= the side it faces outward).
+ *  Routing's geometry, not a copy of it. */
 export function boundaryOuterSide(event: Box, host: Box): OuterSide {
-  const ecx = cxOf(event), ecy = cyOf(event);
-  const dTop = Math.abs(ecy - host.y);
-  const dBottom = Math.abs(ecy - (host.y + host.height));
-  const dLeft = Math.abs(ecx - host.x);
-  const dRight = Math.abs(ecx - (host.x + host.width));
-  const min = Math.min(dTop, dBottom, dLeft, dRight);
-  if (min === dTop) return "top";
-  if (min === dBottom) return "bottom";
-  if (min === dLeft) return "left";
-  return "right";
+  return outerSideOfBox(event, host);
+}
+
+/**
+ * True when a boundary event's outgoing flow runs INTO its host — a Start
+ * mounted on an expanded subprocess's edge. Asked of canConnect's scope rule
+ * (`flowScopeOf`), not restated. Only an expanded subprocess can hold the
+ * step: a Start on a task's edge also scopes its flow to its host, but a task
+ * has no inside, so that step stays outside (and is left unconnected).
+ */
+function flowRunsIntoHost(anchor: DiagramElement, els: DiagramElement[]): boolean {
+  if (!anchor.boundaryHostId || flowScopeOf(anchor, "source", els) !== anchor.boundaryHostId) return false;
+  return els.find((e) => e.id === anchor.boundaryHostId)?.type === "subprocess-expanded";
+}
+
+/**
+ * Where a step that FOLLOWS `anchor` lives — the container its new element
+ * joins, so the flow to it stays in scope. Normally the anchor's own. After a
+ * boundary event it is decided by canConnect's scope rule (`flowScopeOf`): a
+ * boundary intermediate event's flow continues OUTSIDE its host, in the scope
+ * the host itself sits in, so the step joins the HOST's container — never the
+ * host. (A Start on a subprocess's edge flows into the subprocess, so its step
+ * joins the subprocess.)
+ *
+ * The anchor's own parentId is not safe to use here. Paul's Event 4 carried
+ * its host as its parent, so "add a task after event four" made the task a
+ * child of the subprocess: the subprocess grew to swallow it, and the flow was
+ * then refused because the two ends were in different scopes.
+ */
+export function followOnParentId(anchor: DiagramElement, els: DiagramElement[]): string | undefined {
+  if (!anchor.boundaryHostId) return anchor.parentId ?? undefined;
+  const host = els.find((e) => e.id === anchor.boundaryHostId);
+  if (!host) return anchor.parentId && anchor.parentId !== anchor.boundaryHostId ? anchor.parentId : undefined;
+  return flowRunsIntoHost(anchor, els) ? host.id : host.parentId ?? undefined;
+}
+
+/**
+ * R7.07 — keep a boundary event's exit target inside the event's own lane
+ * band ("Keep it fully inside the EMIE's own lane"). Clamping is enough while
+ * the band has room; when it hasn't — or the clamp would pull the target back
+ * over the event (closer than 8px, so no longer recognisably an L) — the target
+ * keeps its wanted spot and `grow` says what the band must grow to contain.
+ *
+ * One rule for both makers: the generated layout (bpmnLayout, which grows its
+ * own band) and the editor's add-after (planBoundaryFollowOn, whose reducer
+ * grows the lane).
+ */
+export function clampExitTargetToBand(
+  ev: Box,
+  side: string | null,
+  targetHeight: number,
+  wantTop: number,
+  band: { y: number; height: number },
+  pad: number,
+): { top: number; grow?: { top: number; bottom: number } } {
+  const lo = band.y + pad;
+  const hi = band.y + band.height - pad - targetHeight;
+  let top = wantTop;
+  if (hi >= lo) top = Math.min(Math.max(top, lo), hi);
+  const minGap = 8;                                // still recognisably an L
+  const overshootsDown = side === "bottom" && top < ev.y + ev.height + minGap;
+  const overshootsUp   = side === "top"    && top + targetHeight > ev.y - minGap;
+  if (hi < lo || overshootsDown || overshootsUp) {
+    return { top: wantTop, grow: { top: wantTop - pad, bottom: wantTop + targetHeight + pad } };
+  }
+  return { top };
+}
+
+/** The gap the editor keeps between a lane's edge and a child — the same 8px
+ *  the reducer's container passes keep. */
+export const LANE_CHILD_PAD = 8;
+
+export interface BoundaryFollowOn {
+  /** Where the new element goes (a CENTER), clear of `others`. */
+  center: Center;
+  /** The side the flow will leave the event by — the reducer's own R7.02
+   *  answer for a target at `center`, so the placement and the flow agree. */
+  side: OuterSide;
+  /** The container the new element joins (followOnParentId). */
+  parentId?: string;
+  /** Set when that container is a lane: the new element must stay in it, and
+   *  the reducer grows the lane when it doesn't fit (ADD_ELEMENT keepInLane). */
+  laneId?: string;
+}
+
+/**
+ * Rule R7 in the editor — place a step after a boundary event (voice "add …
+ * after <event>" and the ghost next-step accept both ask this).
+ *
+ * The side comes from R7.02 as the reducer applies it (routing's
+ * pickBoundaryEventSide — what boundaryEndSide gives every follow-on that can
+ * be connected), asked of the spot the step would take, so the step is placed
+ * for the side the flow will actually leave by. Top/bottom exits are then
+ * clamped into the host's lane (R7.07) before the free-slot nudge.
+ *
+ * `others` are the obstacles the caller sees (every element that is not a pool
+ * or lane). When the step goes INSIDE the host (a Start's), the host is its
+ * container, not an obstacle: counted as one, it pushed every spot inside it
+ * back out, and the subprocess then grew round a step placed below it, with
+ * the flow running down the inside of its edge. Its children still count.
+ */
+export function planBoundaryFollowOn(
+  anchor: DiagramElement,
+  els: DiagramElement[],
+  w: number,
+  h: number,
+  others: Box[],
+): BoundaryFollowOn {
+  // Out of the host's outer face — or, for a Start whose flow runs into its
+  // host, the inner face, so the step lands inside.
+  const outer: OuterSide = getBoundaryEventOuterSide(anchor, els) ?? "bottom";
+  const inside = flowRunsIntoHost(anchor, els);
+  const host = inside ? els.find((e) => e.id === anchor.boundaryHostId) : undefined;
+  const obstacles = host
+    ? others.filter((b) => !(b.x === host.x && b.y === host.y && b.width === host.width && b.height === host.height))
+    : others;
+  let side: OuterSide = inside ? oppositeSide(outer) : outer;
+  let want = placeAfterBoundaryEvent(anchor, side, w, h);
+  const agreed = pickBoundaryEventSide(anchor, boxFromCenter(want, w, h), els);
+  if (agreed && agreed !== side) {
+    side = agreed;
+    want = placeAfterBoundaryEvent(anchor, side, w, h);
+  }
+  const parentId = followOnParentId(anchor, els);
+  const parent = parentId ? els.find((e) => e.id === parentId) : undefined;
+  const lane = parent && (parent.type === "lane" || parent.type === "sublane") ? parent : undefined;
+  if (lane && (side === "top" || side === "bottom")) {
+    const { top } = clampExitTargetToBand(anchor, side, h, want.y - h / 2, lane, LANE_CHILD_PAD);
+    want = { x: want.x, y: top + h / 2 };
+  }
+  return {
+    center: findFreeSlot(want, w, h, obstacles),
+    side,
+    ...(parentId ? { parentId } : {}),
+    ...(lane ? { laneId: lane.id } : {}),
+  };
 }
 
 /**

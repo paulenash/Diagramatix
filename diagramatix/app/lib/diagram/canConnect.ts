@@ -192,20 +192,6 @@ export function canConnect(
     // top-level elements both resolve to null → same "pool" → allowed.)
     if (getElementPoolId(source, elements) !== getElementPoolId(target, elements)) return false;
 
-    const byId = (id?: string) => (id ? elements.find((e) => e.id === id) : undefined);
-    // The innermost Expanded-Subprocess (EP) ancestor's id — the element's flow
-    // "scope" — or null when it lives at the top level (walks past lanes/pools).
-    const containerScope = (el: DiagramElement | undefined): string | null => {
-      let cur = el;
-      for (let i = 0; i < 20 && cur; i++) {
-        if (!cur.parentId) return null;
-        const parent = byId(cur.parentId);
-        if (!parent) return null;
-        if (parent.type === "subprocess-expanded") return parent.id;
-        cur = parent;
-      }
-      return null;
-    };
     const isEventExpandedSub = (el: DiagramElement) =>
       el.type === "subprocess-expanded" && (el.properties.subprocessType as string | undefined) === "event";
 
@@ -217,32 +203,61 @@ export function canConnect(
     // An Event Expanded Subprocess is triggered by an event, never sequence flow.
     if (isEventExpandedSub(source) || isEventExpandedSub(target)) return false;
 
-    // Scope model: a sequence flow may not cross an EP boundary. Each endpoint's
-    // "flow scope" is the EP it participates in — normally its container, but an
-    // edge-mounted event redefines it:
-    //   • edge Start on X — source: flows INTO X (scope = X); target: an external
-    //     trigger reached from OUTSIDE X (scope = the scope containing X).
-    //   • edge End on X — target: X's exit, reachable only from INSIDE X (scope =
-    //     X); source: illegal (an End has no outgoing flow).
-    //   • edge (boundary) Intermediate on X (an EMIE) — source: its outgoing flow
-    //     continues in X's OUTER scope; target: illegal (an EMIE is TRIGGERED by
-    //     its boundary, it has no incoming sequence flow).
+    // Scope model: a sequence flow may not cross an EP boundary (flowScopeOf).
     // A connection is legal iff the two effective scopes are equal.
-    const flowScope = (el: DiagramElement, role: "source" | "target"): string | null | "illegal" => {
-      if (el.boundaryHostId) {
-        const host = byId(el.boundaryHostId);
-        const outer = host ? containerScope(host) : null;
-        if (el.type === "start-event") return role === "source" ? el.boundaryHostId : outer;
-        if (el.type === "end-event") return role === "source" ? "illegal" : el.boundaryHostId;
-        return role === "target" ? "illegal" : outer; // boundary intermediate (EMIE): outgoing only
-      }
-      return containerScope(el);
-    };
-    const sScope = flowScope(source, "source");
-    const tScope = flowScope(target, "target");
+    const sScope = flowScopeOf(source, "source", elements);
+    const tScope = flowScopeOf(target, "target", elements);
     if (sScope === "illegal" || tScope === "illegal") return false;
     if (sScope !== tScope) return false;
   }
 
   return true;
+}
+
+/**
+ * The innermost Expanded-Subprocess (EP) ancestor's id — the element's flow
+ * "scope" — or null when it lives at the top level (walks past lanes/pools).
+ */
+export function containerScopeOf(el: DiagramElement | undefined, elements: DiagramElement[]): string | null {
+  let cur = el;
+  for (let i = 0; i < 20 && cur; i++) {
+    if (!cur.parentId) return null;
+    const parentId: string = cur.parentId;
+    const parent = elements.find((e) => e.id === parentId);
+    if (!parent) return null;
+    if (parent.type === "subprocess-expanded") return parent.id;
+    cur = parent;
+  }
+  return null;
+}
+
+/**
+ * An endpoint's "flow scope" — the EP its sequence flow participates in.
+ * Normally its container's, but an edge-mounted event redefines it:
+ *   • edge Start on X — source: flows INTO X (scope = X); target: an external
+ *     trigger reached from OUTSIDE X (scope = the scope containing X).
+ *   • edge End on X — target: X's exit, reachable only from INSIDE X (scope =
+ *     X); source: illegal (an End has no outgoing flow).
+ *   • edge (boundary) Intermediate on X (an EMIE) — source: its outgoing flow
+ *     continues in X's OUTER scope; target: illegal (an EMIE is TRIGGERED by
+ *     its boundary, it has no incoming sequence flow).
+ *
+ * Exported so that the reducer and the follow-on placement (where a step added
+ * after a boundary event lives — assistPlacement.followOnParentId) ask this
+ * rule instead of restating it.
+ */
+export function flowScopeOf(
+  el: DiagramElement,
+  role: "source" | "target",
+  elements: DiagramElement[],
+): string | null | "illegal" {
+  if (el.boundaryHostId) {
+    const hostId = el.boundaryHostId;
+    const host = elements.find((e) => e.id === hostId);
+    const outer = host ? containerScopeOf(host, elements) : null;
+    if (el.type === "start-event") return role === "source" ? hostId : outer;
+    if (el.type === "end-event") return role === "source" ? "illegal" : hostId;
+    return role === "target" ? "illegal" : outer; // boundary intermediate (EMIE): outgoing only
+  }
+  return containerScopeOf(el, elements);
 }

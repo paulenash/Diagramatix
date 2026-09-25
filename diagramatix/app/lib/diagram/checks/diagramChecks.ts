@@ -24,6 +24,7 @@ import type { DiagramElement, Connector } from "../types";
 import { wrapText, externalLabelBox, connectorLabelWidth } from "../textMetrics";
 import { getRiskControl } from "../riskControl";
 import { canConnect } from "../canConnect";
+import { outerSideOfBox, boundaryOutwardSide, oppositeSide } from "../routing";
 
 export interface DiagramLike {
   elements: DiagramElement[];
@@ -572,25 +573,29 @@ export function checkDataStoreHasAssociation(d: DiagramLike): Violation[] {
   return out;
 }
 
-/** Return the host's side on which an edge-mounted event sits, based on
- *  the event's centre relative to the host's centre. "top"/"bottom"/
- *  "left"/"right" — the side AWAY from the host body, i.e. the outer
- *  attachment side. Used by checkEdgeMountEventOuterRouting. */
+/** Return the host's side on which an edge-mounted event sits — the side
+ *  AWAY from the host body, i.e. the outer attachment side. Routing's
+ *  geometry (outerSideOfBox), not a copy: the checks must read an event's
+ *  edge exactly as the reducer and the canvas do. */
 function outerSideOfEdgeMountEvent(
   e: DiagramElement,
   host: DiagramElement,
 ): "top" | "bottom" | "left" | "right" {
-  const ecx = e.x + e.width / 2;
-  const ecy = e.y + e.height / 2;
-  const distTop    = Math.abs(ecy - host.y);
-  const distBottom = Math.abs(ecy - (host.y + host.height));
-  const distLeft   = Math.abs(ecx - host.x);
-  const distRight  = Math.abs(ecx - (host.x + host.width));
-  const min = Math.min(distTop, distBottom, distLeft, distRight);
-  if (min === distTop) return "top";
-  if (min === distBottom) return "bottom";
-  if (min === distLeft) return "left";
-  return "right";
+  return outerSideOfBox(e, host);
+}
+
+/** The outward side an edge-mounted event's connector must use when its
+ *  other end lies outside the host — R7.02's point, asked of routing's
+ *  boundaryOutwardSide, the call the reducer's own rule rests on. Plain
+ *  "the mounted edge" disagreed with the reducer for an event ON a corner,
+ *  where the reducer takes the outward side facing the other end. */
+function expectedOutwardSide(
+  evt: DiagramElement,
+  host: DiagramElement,
+  other: DiagramElement | undefined,
+  elements: DiagramElement[],
+): "top" | "bottom" | "left" | "right" {
+  return (other ? boundaryOutwardSide(evt, other, elements) : null) ?? outerSideOfEdgeMountEvent(evt, host);
 }
 
 /** Walk an element's parentId chain and return true if `ancestorId`
@@ -625,7 +630,8 @@ export function checkEdgeMountEventOuterRouting(d: DiagramLike): Violation[] {
     if (!tgt || tgt.type !== "intermediate-event" || !tgt.boundaryHostId) continue;
     const host = byId.get(tgt.boundaryHostId);
     if (!host) continue;
-    const outer = outerSideOfEdgeMountEvent(tgt, host);
+    const src = byId.get(c.sourceId);
+    const outer = expectedOutwardSide(tgt, host, src, d.elements);
     if (c.targetSide && c.targetSide !== outer) {
       out.push({
         rule: "edge-mount-event-outer-routing",
@@ -635,7 +641,6 @@ export function checkEdgeMountEventOuterRouting(d: DiagramLike): Violation[] {
       });
       continue;
     }
-    const src = byId.get(c.sourceId);
     if (!src) continue;
     if (src.parentId === host.id || isDescendantOfId(byId, src.parentId, host.id)) {
       out.push({
@@ -723,7 +728,8 @@ export function checkBoundaryStartIncomingOuter(d: DiagramLike): Violation[] {
     if (!tgt || tgt.type !== "start-event" || !tgt.boundaryHostId) continue;
     const host = byId.get(tgt.boundaryHostId);
     if (!host) continue;
-    const outer = outerSideOfEdgeMountEvent(tgt, host);
+    const src = byId.get(c.sourceId);
+    const outer = expectedOutwardSide(tgt, host, src, d.elements);
     if (c.targetSide && c.targetSide !== outer) {
       out.push({
         rule: "boundary-start-incoming-outer",
@@ -733,7 +739,6 @@ export function checkBoundaryStartIncomingOuter(d: DiagramLike): Violation[] {
       });
       continue;
     }
-    const src = byId.get(c.sourceId);
     if (!src) continue;
     if (src.parentId === host.id || isDescendantOfId(byId, src.parentId, host.id)) {
       out.push({
@@ -813,7 +818,12 @@ export function checkEpNoAutoConnectToDescendant(d: DiagramLike): Violation[] {
 /** R8.09 — A sequence connector LEAVING an edge-mounted Intermediate
  *  Event must emit from the OUTER side (the side facing AWAY from the
  *  host EP). Counterpart to B19 which covers INCOMING flow; both ends
- *  attach OUTER so the path never routes through the host body. */
+ *  attach OUTER so the path never routes through the host body.
+ *  Paul's R7.02: "A connector from a boundary-mounted intermediate event
+ *  exits from the event's connection point furthest from the host edge
+ *  the event is mounted upon." The side expected is the reducer's own
+ *  (routing's boundaryOutwardSide), so an event ON a corner is judged by
+ *  the side the reducer gave it, not flagged for it. */
 export function checkBoundaryIntermediateOutgoingOuter(d: DiagramLike): Violation[] {
   const byId = new Map(d.elements.map(e => [e.id, e]));
   const out: Violation[] = [];
@@ -823,7 +833,7 @@ export function checkBoundaryIntermediateOutgoingOuter(d: DiagramLike): Violatio
     if (!src || src.type !== "intermediate-event" || !src.boundaryHostId) continue;
     const host = byId.get(src.boundaryHostId);
     if (!host) continue;
-    const outer = outerSideOfEdgeMountEvent(src, host);
+    const outer = expectedOutwardSide(src, host, byId.get(c.targetId), d.elements);
     if (c.sourceSide && c.sourceSide !== outer) {
       out.push({
         rule: "boundary-intermediate-outgoing-outer",
@@ -834,10 +844,6 @@ export function checkBoundaryIntermediateOutgoingOuter(d: DiagramLike): Violatio
     }
   }
   return out;
-}
-
-function oppositeSide(side: "top" | "bottom" | "left" | "right"): "top" | "bottom" | "left" | "right" {
-  return side === "top" ? "bottom" : side === "bottom" ? "top" : side === "left" ? "right" : "left";
 }
 
 /** B40 — a NON-edge-mounted Intermediate Event must have BOTH an incoming and an

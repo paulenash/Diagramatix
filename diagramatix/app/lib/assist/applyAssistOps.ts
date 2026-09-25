@@ -26,7 +26,7 @@ import type { WrapIds } from "@/app/lib/diagram/subprocessWrap";
 import type { NextStepCandidate } from "@/app/lib/diagram/nextSteps";
 import type { RiskCatalogItem } from "@/app/components/canvas/RiskControlSection";
 import { nanoid, isContainerType, getAllDescendantIds, reducer, type Action } from "@/app/hooks/useDiagram";
-import { sizeOf, placeInline, placeGatewayBranch, placeBoundaryEvent, placeAfterBoundaryEvent, boundaryOuterSide, findFreeSlot, HALF_TASK_W, HALF_TASK_H } from "@/app/lib/diagram/assistPlacement";
+import { sizeOf, placeInline, placeGatewayBranch, placeBoundaryEvent, planBoundaryFollowOn, followOnParentId, findFreeSlot, HALF_TASK_W, HALF_TASK_H, type BoundaryFollowOn } from "@/app/lib/diagram/assistPlacement";
 import { planWrapInSubprocess, planUnwrapSubprocess, planWrapInContainer } from "@/app/lib/diagram/subprocessWrap";
 import { canConnect } from "@/app/lib/diagram/canConnect";
 import { isBoundaryHost } from "@/app/lib/diagram/boundaryHosts";
@@ -62,7 +62,7 @@ export type AlignMode = "center" | "top" | "bottom" | "vcenter" | "left" | "righ
 /** The diagram edits — useDiagram's helpers, by the same names and signatures. */
 export interface AssistDiagramActions {
   /** The editor passes its element-limit-gated wrapper; headless, the plain add. */
-  addElementGated(symbolType: SymbolType, position: { x: number; y: number }, taskType?: BpmnTaskType, eventType?: EventType, id?: string, initial?: { properties?: Record<string, unknown>; width?: number; height?: number; label?: string; parentId?: string }): void;
+  addElementGated(symbolType: SymbolType, position: { x: number; y: number }, taskType?: BpmnTaskType, eventType?: EventType, id?: string, initial?: { properties?: Record<string, unknown>; width?: number; height?: number; label?: string; parentId?: string; keepInLane?: boolean }): void;
   updateProperties(id: string, properties: Record<string, unknown>): void;
   updateLabel(id: string, label: string): void;
   addConnector(sourceId: string, targetId: string, connectorType?: ConnectorType, directionType?: DirectionType, routingType?: RoutingType, sourceSide?: Side, targetSide?: Side, sourceOffsetAlong?: number, targetOffsetAlong?: number, force?: boolean, initialLabel?: string): void;
@@ -286,6 +286,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       if (!anchor && voiceLastId.current) anchor = els.find((e) => e.id === voiceLastId.current) ?? null;
       const others = els.filter((e) => e.type !== "pool" && e.type !== "lane" && e.type !== "sublane").map(elBox);
       let center; let srcSide: Side | undefined;
+      let followOn: BoundaryFollowOn | null = null;
       // M5 — "put a task here". The pointer beats every placement rule below,
       // because the user has said exactly where they want it; `findFreeSlot`
       // still nudges it clear of anything already there, so "here" cannot
@@ -304,11 +305,12 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
         // the anchor is dropped and no connector is drawn.
         anchor = null;
       } else if (anchor && anchor.boundaryHostId) {
-        // R7: task after a boundary event → bottom/top-right, connector exits the outer face.
-        const host = els.find((e) => e.id === anchor!.boundaryHostId);
-        const side = host ? boundaryOuterSide(anchor, host) : "bottom";
-        center = findFreeSlot(placeAfterBoundaryEvent(anchor, side, w, h), w, h, others);
-        srcSide = side;
+        // R7: a step after a boundary event goes where the flow leaves it —
+        // the side is R7.02's, the same call the reducer makes when it draws
+        // the flow, so no side is passed to addConnector below — and stays in
+        // the host's own lane (R7.07).
+        followOn = planBoundaryFollowOn(anchor, els, w, h, others);
+        center = followOn.center;
       } else if (anchor) {
         const isGw = anchor.type === "gateway";
         const bi = isGw ? data.connectors.filter((cn) => cn.sourceId === anchor!.id).length : 0;
@@ -332,7 +334,8 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       // it isn't connected (Paul). Prefer the anchor's own lane/pool; else the
       // white-box pool's first lane, else the pool itself. The pool then grows
       // to enclose it (ensureContainersEncloseChildren in the reducer).
-      let parentId: string | undefined = anchor?.parentId ?? undefined;
+      // After a boundary event that is the HOST's container, never the host.
+      let parentId: string | undefined = followOn ? followOn.parentId : anchor ? followOnParentId(anchor, els) : undefined;
       if (!parentId) {
         const wb = els.find((e) => e.type === "pool" && (((e.properties?.poolType as string | undefined) ?? "white-box") === "white-box"));
         if (wb) {
@@ -340,7 +343,8 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
           parentId = firstLane?.id ?? wb.id;
         }
       }
-      addElementGated(op.symbolType, center, undefined, op.eventType, newId, parentId ? { parentId } : undefined);
+      addElementGated(op.symbolType, center, undefined, op.eventType, newId,
+        parentId ? { parentId, ...(followOn?.laneId ? { keepInLane: true } : {}) } : undefined);
       if (op.gatewayType) updateProperties(newId, { gatewayType: op.gatewayType });
       // The reducer capitalises an activity / gateway / event label, so the
       // WORKING COPY has to carry the same string — otherwise the log line
@@ -349,6 +353,11 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       const addedLabel = op.label && needsCapital(op.symbolType) ? capitaliseFirstWord(op.label) : op.label;
       if (addedLabel) updateLabel(newId, addedLabel);
       const addedEl = syntheticElement(newId, op.symbolType, center, w, h, { label: addedLabel, parentId, eventType: op.eventType });
+      // One line per add. A refused auto-connect says so and nothing else:
+      // it used to be followed by "added X after Y" as well, so the log
+      // contradicted itself ("left it unconnected …; added Fix it after
+      // Event 4").
+      let leftUnconnected = false;
       if (anchor && op.afterRef) {
         // R7 — the explicit `connect` op has always been checked against
         // `canConnect`; this auto-connect never was. So "add a task after
@@ -358,6 +367,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
         // element is not in `els` yet.
         if (!canConnect(anchor, addedEl, "sequence", withAdded(els, addedEl))) {
           results.push(`added ${nameOf(addedEl)} but left it unconnected — a sequence flow from ${nameOf(anchor)} isn’t legal`);
+          leftUnconnected = true;
         } else if (srcSide) {
           addConnector(anchor.id, newId, "sequence", "directed", "rectilinear", srcSide, "left");
         } else {
@@ -371,7 +381,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       voiceLastId.current = newId;
       els = withAdded(els, addedEl);
       setSelectedElementIds(new Set([newId]));
-      results.push(`added ${op.label ?? op.symbolType}${anchor && op.afterRef ? ` after ${nameOf(anchor)}` : ""}`);
+      if (!leftUnconnected) results.push(`added ${op.label ?? op.symbolType}${anchor && op.afterRef ? ` after ${nameOf(anchor)}` : ""}`);
       continue;
     }
 

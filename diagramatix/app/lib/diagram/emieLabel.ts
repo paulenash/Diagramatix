@@ -40,6 +40,7 @@
  * Pure — the reducer merges what this returns into the element's properties.
  */
 import type { DiagramElement } from "./types";
+import { outerSideOfBox } from "./routing";
 
 /** The renderer's fallback label width (`properties.labelWidth ?? 80`). */
 export const DEFAULT_LABEL_WIDTH = 80;
@@ -59,20 +60,13 @@ export interface LabelOffsets {
 
 /**
  * Which edge of `host` the event has been dropped on, from the event's centre.
- * A tie goes to the horizontal edges: top and bottom are the ordinary mount,
- * and a corner drop reads as "on the top" far more often than "on the side".
+ * Routing's geometry (outerSideOfBox), not a copy — the stored side and the
+ * label must name the same edge the flow's R7.02 point is taken from. Its ties
+ * go to the horizontal edges: top and bottom are the ordinary mount, and a
+ * corner drop reads as "on the top" far more often than "on the side".
  */
 export function boundarySideOf(host: DiagramElement, ev: DiagramElement): BoundarySide {
-  const cx = ev.x + ev.width / 2;
-  const cy = ev.y + ev.height / 2;
-  const toTop = Math.abs(cy - host.y);
-  const toBottom = Math.abs(cy - (host.y + host.height));
-  const toLeft = Math.abs(cx - host.x);
-  const toRight = Math.abs(cx - (host.x + host.width));
-  const horizontal = Math.min(toTop, toBottom);
-  const vertical = Math.min(toLeft, toRight);
-  if (horizontal <= vertical) return toTop <= toBottom ? "top" : "bottom";
-  return toLeft <= toRight ? "left" : "right";
+  return outerSideOfBox(ev, host);
 }
 
 /** Is this a vertical (left/right) host edge — the case with its own rule? */

@@ -1,6 +1,7 @@
 import type { Bounds, Connector, DiagramData, DiagramElement, Point, RoutingType, Side } from "./types";
 import { isUmlConnType } from "./types";
 import { computePackageTab } from "./textMetrics";
+import { flowScopeOf } from "./canConnect";
 
 /* ── UML (Domain-diagram) connector routing mode ─────────────────────────
  * Live-toggleable from the editor (bottom-centre switch on Domain diagrams).
@@ -426,19 +427,16 @@ function getOffsetAlong(el: DiagramElement, side: Side, pt: Point): number {
 }
 
 /**
- * Returns the side of the host EP that a boundary event is mounted on (= its
- * outer face), or null when the element isn't a boundary event or its host
- * can't be located.
+ * Which edge of `host` a box sitting on its rim is mounted upon — the edge its
+ * centre is nearest to, which is also the side the event faces OUTWARD.
+ *
+ * The one geometry for "which edge": `getBoundaryEventOuterSide` asks it of a
+ * diagram element, and the assist placement (`boundaryOuterSide`) asks it of
+ * plain boxes. Ties go top, bottom, left, right.
  */
-export function getBoundaryEventOuterSide(
-  el: DiagramElement,
-  allElements: DiagramElement[],
-): Side | null {
-  if (!el.boundaryHostId) return null;
-  const host = allElements.find((h) => h.id === el.boundaryHostId);
-  if (!host) return null;
-  const ecx = el.x + el.width / 2;
-  const ecy = el.y + el.height / 2;
+export function outerSideOfBox(evt: Bounds, host: Bounds): Side {
+  const ecx = evt.x + evt.width / 2;
+  const ecy = evt.y + evt.height / 2;
   const distTop    = Math.abs(ecy - host.y);
   const distBottom = Math.abs(ecy - (host.y + host.height));
   const distLeft   = Math.abs(ecx - host.x);
@@ -450,6 +448,21 @@ export function getBoundaryEventOuterSide(
   return "right";
 }
 
+/**
+ * Returns the side of the host EP that a boundary event is mounted on (= its
+ * outer face), or null when the element isn't a boundary event or its host
+ * can't be located.
+ */
+export function getBoundaryEventOuterSide(
+  el: DiagramElement,
+  allElements: DiagramElement[],
+): Side | null {
+  if (!el.boundaryHostId) return null;
+  const host = allElements.find((h) => h.id === el.boundaryHostId);
+  if (!host) return null;
+  return outerSideOfBox(el, host);
+}
+
 /** Opposite side helper — used to flip outer→inner for boundary events. */
 export function oppositeSide(s: Side): Side {
   if (s === "top")    return "bottom";
@@ -459,15 +472,60 @@ export function oppositeSide(s: Side): Side {
 }
 
 /**
- * Pick the correct attachment side on a boundary (edge-mounted) event for a
- * connector whose other endpoint is `other`. Returns the OUTER face when
- * `other` lies outside the host EP; the INNER (opposite) face when it lies
- * inside. Never returns one of the two perpendicular sides that sit ON the
- * EP boundary itself. Returns null when the element isn't a boundary event.
+ * THE side a connector takes on a boundary (edge-mounted) event whose other end
+ * is `other` — Paul's R7.02, verbatim from the User Guide:
+ *
+ *   "A connector from a boundary-mounted intermediate event exits from the
+ *    event's connection point furthest from the host edge the event is mounted
+ *    upon."
+ *
+ * So the OUTER face when `other` lies outside the host (boundaryOutwardSide),
+ * and the INNER (opposite) face when it lies inside. Never one of the two
+ * perpendicular points: those sit ON the host's edge line, and a flow leaving
+ * one runs along the host's boundary before it can turn away. That is the look
+ * Paul rejected on 2026-09-25 ("connector must leave event on the southmost
+ * point not on the point on the Expanded Subprocess boundary").
+ *
+ * Returns null when the element isn't a boundary event. A connector END asks
+ * boundaryEndSide, which adds the boundary Start / End roles to this.
  */
 export function pickBoundaryEventSide(
   evt: DiagramElement,
-  other: DiagramElement,
+  other: Bounds,
+  allElements: DiagramElement[],
+): Side | null {
+  const outer = getBoundaryEventOuterSide(evt, allElements);
+  if (!outer) return null;
+  const host = allElements.find((h) => h.id === evt.boundaryHostId);
+  if (!host) return outer;
+  const ocx = other.x + other.width / 2;
+  const ocy = other.y + other.height / 2;
+  const otherInsideHost =
+    ocx > host.x && ocx < host.x + host.width &&
+    ocy > host.y && ocy < host.y + host.height;
+  if (otherInsideHost) return oppositeSide(outer);
+  return boundaryOutwardSide(evt, other, allElements);
+}
+
+/**
+ * R7.02's outward point — the side a flow takes on a boundary event when its
+ * other end (`other`) lies OUTSIDE the host: the edge the event is mounted upon.
+ *
+ * The only exception is an event whose centre is genuinely ON a corner (under
+ * 1px from both edges), where "the host edge the event is mounted upon" has no
+ * single answer: there the outward side facing `other` is taken. An event
+ * merely NEAR a corner is still on one edge and obeys the rule — the assist
+ * mounts its first event 36px from a corner, which the old 36px "corner" test
+ * swallowed, sending the flow along the host's bottom line (Event 4).
+ *
+ * pickBoundaryEventSide asks this, and so do the diagram checks that expect an
+ * outward attachment (R8.06, R8.09/B27 and the edge-mount incoming check) — so
+ * the checker expects exactly the side the reducer draws, corner included.
+ * Returns null when the element isn't a boundary event.
+ */
+export function boundaryOutwardSide(
+  evt: DiagramElement,
+  other: Bounds,
   allElements: DiagramElement[],
 ): Side | null {
   const outer = getBoundaryEventOuterSide(evt, allElements);
@@ -477,24 +535,101 @@ export function pickBoundaryEventSide(
   const ecx = evt.x + evt.width / 2, ecy = evt.y + evt.height / 2;
   const ocx = other.x + other.width / 2;
   const ocy = other.y + other.height / 2;
-  const otherInsideHost =
-    ocx > host.x && ocx < host.x + host.width &&
-    ocy > host.y && ocy < host.y + host.height;
-  if (otherInsideHost) return oppositeSide(outer);
-  // Corner disambiguation: when the event sits near a host CORNER it is close to
-  // BOTH a horizontal (top/bottom) and a vertical (left/right) outer edge, so
-  // `outer` (nearest-edge, deterministic order) may face away from the target and
-  // force the connector to double back around the host. Pick the outer side whose
-  // axis the target lies farther along, so the connector exits TOWARD its target.
-  const TOL = Math.max(evt.width, evt.height);
-  const nearH = Math.min(Math.abs(ecy - host.y), Math.abs(ecy - (host.y + host.height))) <= TOL;
-  const nearV = Math.min(Math.abs(ecx - host.x), Math.abs(ecx - (host.x + host.width))) <= TOL;
-  if (nearH && nearV) {
+  const ON_CORNER = 1;
+  const dH = Math.min(Math.abs(ecy - host.y), Math.abs(ecy - (host.y + host.height)));
+  const dV = Math.min(Math.abs(ecx - host.x), Math.abs(ecx - (host.x + host.width)));
+  if (dH < ON_CORNER && dV < ON_CORNER) {
     const hOut: Side = Math.abs(ecy - host.y) <= Math.abs(ecy - (host.y + host.height)) ? "top" : "bottom";
     const vOut: Side = Math.abs(ecx - host.x) <= Math.abs(ecx - (host.x + host.width)) ? "left" : "right";
     return Math.abs(ocx - ecx) >= Math.abs(ocy - ecy) ? vOut : hOut;
   }
   return outer;
+}
+
+/**
+ * The connectors R7.02 governs: a sequence flow, and the compensation
+ * association that leaves an edge-mounted Compensation event (BPMN gives that
+ * event an association instead of a flow, but it leaves the event the same way).
+ */
+function followsBoundaryExitRule(connectorType: string, source: DiagramElement): boolean {
+  if (connectorType === "sequence") return true;
+  return connectorType === "associationBPMN"
+    && !!source.boundaryHostId
+    && (source.eventType as string | undefined) === "compensation";
+}
+
+/**
+ * The side ONE end of a connector takes on a boundary event, by its role.
+ *
+ * A boundary Start's outgoing flow and a boundary End's incoming flow run
+ * INSIDE the host — canConnect's scope rule gives the host itself as their
+ * scope (flowScopeOf) — so they take the inner point wherever the other end
+ * is. Every other end is pickBoundaryEventSide's (R7.02). Asked by geometry
+ * alone, a Start → End flow on one subprocess read each event as OUTSIDE the
+ * other (an event's centre sits ON the host's edge line, and "inside" is
+ * strict) and ran round the outside of the host.
+ *
+ * The reducer (boundaryEndpointSides) and the canvas's drag preview, drop and
+ * endpoint re-attach all ask this. Null when `evt` isn't a boundary event.
+ */
+export function boundaryEndSide(
+  evt: DiagramElement,
+  role: "source" | "target",
+  other: Bounds,
+  allElements: DiagramElement[],
+): Side | null {
+  const outer = getBoundaryEventOuterSide(evt, allElements);
+  if (!outer) return null;
+  if (flowScopeOf(evt, role, allElements) === evt.boundaryHostId) return oppositeSide(outer);
+  return pickBoundaryEventSide(evt, other, allElements);
+}
+
+/**
+ * R7.02 applied to both ends of one connector: the side each end takes where it
+ * sits on a boundary event, and nothing for an end that doesn't. One helper so
+ * that creating a connector (ADD_CONNECTOR) and re-routing one after its event
+ * was mounted or slid to another edge give the same answer.
+ */
+export function boundaryEndpointSides(
+  connectorType: string,
+  source: DiagramElement,
+  target: DiagramElement,
+  allElements: DiagramElement[],
+): { sourceSide?: Side; targetSide?: Side } {
+  if (source.id === target.id || !followsBoundaryExitRule(connectorType, source)) return {};
+  const sourceSide = boundaryEndSide(source, "source", target, allElements) ?? undefined;
+  const targetSide = boundaryEndSide(target, "target", source, allElements) ?? undefined;
+  return {
+    ...(sourceSide ? { sourceSide } : {}),
+    ...(targetSide ? { targetSide } : {}),
+  };
+}
+
+/**
+ * The same, for a connector that already exists: its ends on `eventId` (the
+ * event that was just mounted or moved to another edge) re-take their R7.02
+ * side, centred. The other end is left as it is, so a deliberate placement
+ * there survives. Returns the connector itself when nothing changes.
+ */
+export function withBoundaryEndpointSides(
+  conn: Connector,
+  eventId: string,
+  allElements: DiagramElement[],
+): Connector {
+  const source = allElements.find((e) => e.id === conn.sourceId);
+  const target = allElements.find((e) => e.id === conn.targetId);
+  if (!source || !target) return conn;
+  const sides = boundaryEndpointSides(conn.type, source, target, allElements);
+  let next = conn;
+  if (conn.sourceId === eventId && sides.sourceSide
+      && (sides.sourceSide !== conn.sourceSide || conn.sourceOffsetAlong !== 0.5)) {
+    next = { ...next, sourceSide: sides.sourceSide, sourceOffsetAlong: 0.5 };
+  }
+  if (conn.targetId === eventId && sides.targetSide
+      && (sides.targetSide !== conn.targetSide || conn.targetOffsetAlong !== 0.5)) {
+    next = { ...next, targetSide: sides.targetSide, targetOffsetAlong: 0.5 };
+  }
+  return next;
 }
 
 /**
@@ -1672,6 +1807,25 @@ export function rectifyWaypoints(waypoints: Point[], sourceSide: Side): Point[] 
   }
 
   return result;
+}
+
+/**
+ * True when every VISIBLE segment of a route — edge point to edge point; the
+ * centre leaders at each end are never drawn — runs horizontally or vertically.
+ *
+ * Such a route needs no rectifying, and `rectifyWaypoints` must not be given
+ * one: it assumes the segment after the exit stub keeps the stub's direction,
+ * while `computeWaypoints` turns at right angles there. For a top or bottom
+ * exit whose target lies back across the exit it rewrote a clean L into a
+ * route that doubled back through its own source — the south exit from Event 4
+ * went straight back up through the event into the subprocess.
+ */
+export function isAxisAligned(wps: Point[], tol = 0.5): boolean {
+  for (let i = 2; i <= wps.length - 2; i++) {
+    const a = wps[i - 1], b = wps[i];
+    if (Math.abs(a.x - b.x) > tol && Math.abs(a.y - b.y) > tol) return false;
+  }
+  return true;
 }
 
 // Removes interior waypoints that are within 8px of the previous point.

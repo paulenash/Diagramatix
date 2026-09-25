@@ -2,6 +2,7 @@
 
 import React, { useRef, useState, useCallback, useEffect, useMemo } from "react";
 import { findDrillBackAnchor } from "@/app/lib/diagram/drillBackAnchor";
+import { getBoundaryEventOuterSide, oppositeSide, boundaryEndSide } from "@/app/lib/diagram/routing";
 import { nanoid } from "nanoid";
 import type {
   ArchimateConnectorType,
@@ -501,32 +502,6 @@ function pointToBoundaryOffset(p: Point, el: DiagramElement): { side: Side; offs
   if (min === distBottom) return { side: "bottom", offsetAlong: clamp((p.x - el.x) / el.width) };
   if (min === distLeft)   return { side: "left",   offsetAlong: clamp((p.y - el.y) / el.height) };
   return                         { side: "right",  offsetAlong: clamp((p.y - el.y) / el.height) };
-}
-
-/** Returns the side of the host subprocess that this boundary event is mounted on (= its outer side), or null. */
-function getBoundaryEventOuterSide(el: DiagramElement, allElements: DiagramElement[]): Side | null {
-  if (!el.boundaryHostId) return null;
-  const host = allElements.find(h => h.id === el.boundaryHostId);
-  if (!host) return null;
-  const ecx = el.x + el.width / 2;
-  const ecy = el.y + el.height / 2;
-  const distTop    = Math.abs(ecy - host.y);
-  const distBottom = Math.abs(ecy - (host.y + host.height));
-  const distLeft   = Math.abs(ecx - host.x);
-  const distRight  = Math.abs(ecx - (host.x + host.width));
-  const min = Math.min(distTop, distBottom, distLeft, distRight);
-  if (min === distTop)    return "top";
-  if (min === distBottom) return "bottom";
-  if (min === distLeft)   return "left";
-  return "right";
-}
-
-/** Returns the opposite of a Side (used to get the inward-facing side of a boundary event). */
-function oppositeSide(s: Side): Side {
-  if (s === "top")    return "bottom";
-  if (s === "bottom") return "top";
-  if (s === "left")   return "right";
-  return "left";
 }
 
 /** Returns the midpoint of the specified outer face of an element. */
@@ -1448,9 +1423,16 @@ export function Canvas({
 
   function handleConnectionPointDragStart(elementId: string, side: Side, worldPos: Point) {
     const sourceEl = data.elements.find(e => e.id === elementId);
-    const outerSide = sourceEl ? getBoundaryEventOuterSide(sourceEl, data.elements) : null;
-    const effectiveSide = outerSide ?? side;
-    const effectiveWorldPos = (outerSide && sourceEl) ? sideMidpoint(sourceEl, outerSide) : worldPos;
+    // R7.02 — from a boundary event the rubber band starts at the point the
+    // flow will leave by: the reducer's own call (boundaryEndSide), asked of
+    // the pointer as the other end, and asked again as it moves.
+    const boundaryStart = (p: Point): { side: Side; pos: Point } | null => {
+      const s = sourceEl ? boundaryEndSide(sourceEl, "source", { x: p.x, y: p.y, width: 0, height: 0 }, data.elements) : null;
+      return s && sourceEl ? { side: s, pos: sideMidpoint(sourceEl, s) } : null;
+    };
+    const startOnBoundary = boundaryStart(worldPos);
+    const effectiveSide = startOnBoundary?.side ?? side;
+    const effectiveWorldPos = startOnBoundary?.pos ?? worldPos;
     const drag: DraggingConnector = {
       fromId: elementId,
       fromSide: effectiveSide,
@@ -1476,7 +1458,10 @@ export function Canvas({
 
     function onMouseMove(ev: MouseEvent) {
       const pos = liveClientToWorld(ev.clientX, ev.clientY);
-      setDraggingConnector((prev) => prev ? { ...prev, currentPos: pos } : null);
+      const from = boundaryStart(pos);
+      setDraggingConnector((prev) => prev
+        ? { ...prev, currentPos: pos, ...(from ? { fromSide: from.side, fromPos: from.pos } : {}) }
+        : null);
     }
 
     function onMouseUp(ev: MouseEvent) {
@@ -1690,30 +1675,20 @@ export function Canvas({
           );
         } else {
           if (targetEl.type === "lane") return;  // pool already handled above
-          const targetOuterSide = getBoundaryEventOuterSide(targetEl, data.elements);
-          // For edge-mounted events: use inner side if target is inside the host, outer side if outside
-          let seqSourceSide: Side;
-          if (outerSide && sourceEl?.boundaryHostId) {
-            const targetIsInsideHost = targetEl.parentId === sourceEl.boundaryHostId;
-            seqSourceSide = targetIsInsideHost ? oppositeSide(outerSide) : outerSide;
-          } else {
-            seqSourceSide = outerSide ? oppositeSide(outerSide) : effectiveSide;
-          }
-          // Boundary START event as target → connection comes from OUTSIDE
-          // the host EP, so attach at the OUTER side.
-          // Boundary END event as target → connection comes from INSIDE the
-          // host EP, so attach at the INNER side.
-          let seqTargetSide: Side;
-          if (targetOuterSide) {
-            seqTargetSide = targetEl.type === "start-event" ? targetOuterSide : oppositeSide(targetOuterSide);
-          } else {
-            seqTargetSide = getClosestSide(pos, targetEl);
-          }
+          // Edge-mounted events (R7.02): the same call the reducer makes — the
+          // point furthest from the host edge when the other end is outside
+          // the host, the inner point when it is inside — and always the inner
+          // point for a boundary START's outgoing and a boundary END's
+          // incoming flow, which run inside the host.
+          const srcBoundarySide = sourceEl ? boundaryEndSide(sourceEl, "source", targetEl, data.elements) : null;
+          const tgtBoundarySide = boundaryEndSide(targetEl, "target", sourceEl ?? targetEl, data.elements);
+          let seqSourceSide: Side = srcBoundarySide ?? effectiveSide;
+          let seqTargetSide: Side = tgtBoundarySide ?? getClosestSide(pos, targetEl);
 
           // Source: nearest boundary point to initial click; Target: nearest to release point
           let seqSourceOffsetAlong: number | undefined;
           let seqTargetOffsetAlong: number | undefined;
-          if (sourceEl && !outerSide && !targetOuterSide) {
+          if (sourceEl && !srcBoundarySide && !tgtBoundarySide) {
             const srcBound = pointToBoundaryOffset(effectiveWorldPos, sourceEl);
             seqSourceSide = srcBound.side;
             seqSourceOffsetAlong = srcBound.offsetAlong;
@@ -1972,24 +1947,17 @@ export function Canvas({
           window.removeEventListener("mouseup", onMouseUp);
           return;
         }
-        // Side selection for boundary events:
-        //   - Boundary START event as TARGET → OUTER (incoming flow comes
-        //     from outside the host EP).
-        //   - Boundary START event as SOURCE → INNER (emits into the EP).
-        //   - Boundary END event → INNER both ways (received from inside,
-        //     and end events don't emit).
-        const targetOuterSide = getBoundaryEventOuterSide(innerTarget, data.elements);
-        if (!targetOuterSide && (conn?.type === "flow" || conn?.type === "transition")) {
+        // Side selection for boundary events is R7.02, asked of the
+        // connector's OTHER end — the reducer's own call. It used to pick the
+        // INNER point for any source end, so re-attaching a flow's source to an
+        // intermediate boundary event pointed it into the host.
+        const fixedInner = data.elements.find(e => e.id === (endpoint === "source" ? conn?.targetId : conn?.sourceId));
+        const innerBoundarySide = boundaryEndSide(innerTarget, endpoint, fixedInner ?? innerTarget, data.elements);
+        if (!innerBoundarySide && (conn?.type === "flow" || conn?.type === "transition")) {
           const bound = pointToBoundaryOffset(pos, innerTarget);
           onUpdateConnectorEndpoint(connectorId, endpoint, innerTarget.id, bound.side, bound.offsetAlong);
         } else {
-          let newSide: Side;
-          if (targetOuterSide) {
-            const isStartTarget = innerTarget.type === "start-event" && endpoint === "target";
-            newSide = isStartTarget ? targetOuterSide : oppositeSide(targetOuterSide);
-          } else {
-            newSide = getClosestSide(pos, innerTarget);
-          }
+          const newSide: Side = innerBoundarySide ?? getClosestSide(pos, innerTarget);
           onUpdateConnectorEndpoint(connectorId, endpoint, innerTarget.id, newSide, 0.5);
         }
         onSelectConnector(connectorId); // keep selected — session ends only on click-elsewhere
@@ -2106,20 +2074,15 @@ export function Canvas({
           } else if (targetEl.type === "pool") {
             // silently abort — only messageBPMN connectors may attach to a pool
           } else {
-            const targetOuterSide = getBoundaryEventOuterSide(targetEl, data.elements);
-            if (!targetOuterSide && (conn?.type === "flow" || conn?.type === "transition")) {
+            // Boundary events: R7.02 against the connector's OTHER end — the
+            // reducer's own call (see the inner-target branch above).
+            const fixedEl = data.elements.find(e => e.id === (endpoint === "source" ? conn?.targetId : conn?.sourceId));
+            const boundarySide = boundaryEndSide(targetEl, endpoint, fixedEl ?? targetEl, data.elements);
+            if (!boundarySide && (conn?.type === "flow" || conn?.type === "transition")) {
               const bound = pointToBoundaryOffset(pos, targetEl);
               onUpdateConnectorEndpoint(connectorId, endpoint, targetEl.id, bound.side, bound.offsetAlong);
             } else {
-              // Boundary events: target-of-start = OUTER (from outside the
-              // EP); everything else (including target-of-end) = INNER.
-              let newSide: Side;
-              if (targetOuterSide) {
-                const isStartTarget = targetEl.type === "start-event" && endpoint === "target";
-                newSide = isStartTarget ? targetOuterSide : oppositeSide(targetOuterSide);
-              } else {
-                newSide = getClosestSide(pos, targetEl);
-              }
+              const newSide: Side = boundarySide ?? getClosestSide(pos, targetEl);
               onUpdateConnectorEndpoint(connectorId, endpoint, targetEl.id, newSide, 0.5);
             }
           }
@@ -2818,10 +2781,9 @@ export function Canvas({
         }
         // Edge-mounted start events: emit from the inner side (opposite
         // to the host edge they sit on), regardless of the new element's
-        // relative geometry.
+        // relative geometry — the reducer's own per-end call.
         if (src.type === "start-event" && src.boundaryHostId) {
-          const outer = getBoundaryEventOuterSide(src, data.elements);
-          if (outer) srcSide = oppositeSide(outer);
+          srcSide = boundaryEndSide(src, "source", { x: newX, y: newY, width: newW, height: newH }, data.elements) ?? srcSide;
         }
         return { source: src, srcSide, tgtSide };
       };
@@ -2945,8 +2907,7 @@ export function Canvas({
         // the connector always leaves through that "inner" side (e.g.
         // right-hand point for a left-edge mount).
         if (el.type === "start-event" && el.boundaryHostId) {
-          const outer = getBoundaryEventOuterSide(el, data.elements);
-          if (outer) srcSide = oppositeSide(outer);
+          srcSide = boundaryEndSide(el, "source", { x: newX, y: newY, width: newW, height: newH }, data.elements) ?? srcSide;
         }
 
         // Distance metric: sideMidpoint (source) → sideMidpoint (synthetic

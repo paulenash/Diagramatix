@@ -41,7 +41,7 @@ import { CollabSyncSignal } from "@/app/components/canvas/CollabSyncSignal";
 import { CollabFlushOnLeave } from "@/app/components/canvas/CollabFlushOnLeave";
 import { CollabDebug } from "@/app/components/canvas/CollabDebug";
 import { suggestNextSteps, type NextStepCandidate } from "@/app/lib/diagram/nextSteps";
-import { sizeOf, placeInline, placeGatewayBranch, placeBoundaryEvent, placeAfterBoundaryEvent, boundaryOuterSide, findFreeSlot, HALF_TASK_W, HALF_TASK_H } from "@/app/lib/diagram/assistPlacement";
+import { sizeOf, placeInline, placeGatewayBranch, placeBoundaryEvent, planBoundaryFollowOn, followOnParentId, findFreeSlot, HALF_TASK_W, HALF_TASK_H } from "@/app/lib/diagram/assistPlacement";
 import { planWrapInSubprocess, planUnwrapSubprocess, planWrapInContainer } from "@/app/lib/diagram/subprocessWrap";
 import { matchIntent, matchAssistRules, type IntentRow } from "@/app/lib/diagram/intentMatch";
 import { canConnect } from "@/app/lib/diagram/canConnect";
@@ -2545,8 +2545,11 @@ export function DiagramEditor({
     let elements = dx || dy ? inst.elements.map((e) => ({ ...e, x: e.x + dx, y: e.y + dy })) : inst.elements;
     // If the source sits in a lane/pool, adopt the (parentless) fragment into the
     // same container so it grows to enclose them (APPLY_TEMPLATE runs the
-    // container-enclose pass).
-    if (src.parentId) elements = elements.map((e) => (e.parentId ? e : { ...e, parentId: src.parentId }));
+    // container-enclose pass). After a boundary event that is the HOST's
+    // container: adopted into the host itself, the subprocess grew round the
+    // fragment and the reducer then refused the entry flow as out of scope.
+    const adoptInto = followOnParentId(src, data.elements);
+    if (adoptInto) elements = elements.map((e) => (e.parentId ? e : { ...e, parentId: adoptInto }));
     const connectors = dx || dy
       ? inst.connectors.map((c) => ({ ...c, waypoints: c.waypoints.map((wp) => ({ x: wp.x + dx, y: wp.y + dy })) }))
       : inst.connectors;
@@ -2614,24 +2617,19 @@ export function DiagramEditor({
       .filter((e) => e.id !== src.id && e.type !== "pool" && e.type !== "lane" && e.type !== "sublane")
       .map((e) => ({ x: e.x, y: e.y, width: e.width, height: e.height }));
 
-    let wanted: { x: number; y: number };
     let srcSide: Side | undefined;
     const isGw = src.type === "gateway";
-    if (src.boundaryHostId) {
-      const host = data.elements.find((e) => e.id === src.boundaryHostId);
-      const side = host ? boundaryOuterSide(src, host) : "bottom";
-      wanted = placeAfterBoundaryEvent(src, side, w, h);
-      srcSide = side;
-    } else if (isGw) {
-      wanted = placeGatewayBranch(src, data.connectors.filter((cn) => cn.sourceId === src.id).length, w, h);
-    } else {
-      wanted = placeInline(src, w, h);
-    }
+    // After a boundary event the step goes where the flow leaves it and stays
+    // in the host's lane — the same plan voice "add … after" uses. No side is
+    // passed to addConnector for it: R7.02 is the reducer's to apply.
+    const followOn = src.boundaryHostId ? planBoundaryFollowOn(src, data.elements, w, h, others) : null;
     // Gateway branches sit ½ Task height apart — match the clearance so the
     // fan-out isn't blown apart by the default 51px (#5).
-    const center = findFreeSlot(wanted, w, h, others, isGw ? HALF_TASK_H : HALF_TASK_W);
+    const center = followOn ? followOn.center
+      : findFreeSlot(isGw ? placeGatewayBranch(src, data.connectors.filter((cn) => cn.sourceId === src.id).length, w, h) : placeInline(src, w, h),
+        w, h, others, isGw ? HALF_TASK_H : HALF_TASK_W);
     // #5: gateway branch exits by position — above→top, same row→right, below→bottom.
-    if (isGw && !srcSide) {
+    if (isGw) {
       srcSide = center.y + h / 2 <= src.y ? "top"
         : center.y - h / 2 >= src.y + src.height ? "bottom"
         : "right";
@@ -2639,8 +2637,9 @@ export function DiagramEditor({
 
     const newId = nanoid();
     // A ghost-added task also joins the white-box pool (anchor's lane/pool, else
-    // the white-box pool's first lane/pool) so it never lands outside.
-    let parentId: string | undefined = src.parentId ?? undefined;
+    // the white-box pool's first lane/pool) so it never lands outside. After a
+    // boundary event that is the HOST's container, never the host.
+    let parentId: string | undefined = followOnParentId(src, data.elements);
     if (!parentId) {
       const wb = data.elements.find((e) => e.type === "pool" && (((e.properties?.poolType as string | undefined) ?? "white-box") === "white-box"));
       if (wb) {
@@ -2648,7 +2647,8 @@ export function DiagramEditor({
         parentId = firstLane?.id ?? wb.id;
       }
     }
-    addElementGated(c.symbolType, center, undefined, c.eventType, newId, parentId ? { parentId } : undefined);
+    addElementGated(c.symbolType, center, undefined, c.eventType, newId,
+      parentId ? { parentId, ...(followOn?.laneId ? { keepInLane: true } : {}) } : undefined);
     if (c.gatewayType) updateProperties(newId, { gatewayType: c.gatewayType });
     if (c.flowType) updateProperties(newId, { flowType: c.flowType });
     if (srcSide) addConnector(src.id, newId, c.connectorType, "directed", "rectilinear", srcSide, "left");

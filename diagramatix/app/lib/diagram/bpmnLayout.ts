@@ -7,6 +7,7 @@ import type { DiagramData, DiagramElement, Connector, Point } from "./types";
 import { getSymbolDefinition } from "./symbols/definitions";
 import { closeFlowVoids } from "./closeFlowVoids";
 import { computeWaypoints, recomputeAllConnectors, pickBoundaryEventSide } from "./routing";
+import { clampExitTargetToBand } from "./assistPlacement";
 import { analysePaths } from "./bpmnPaths";
 import { connectorLabelBox } from "./checks/layoutViolations";
 import { autoSizeForType, wrapText, externalLabelBox, externalLabelSize, connectorLabelWidth, connectorLabelLines, LINE_HEIGHT, PAD, type AutosizeType } from "./textMetrics";
@@ -5490,18 +5491,13 @@ export function layoutBpmnDiagram(
         // Keep it fully inside the EMIE's own lane. Clamping is enough while
         // the band has room; when it hasn't, the lane grows rather than the
         // target being shoved back over the host it just exited.
+        // The clamp is the shared R7.07 rule (assistPlacement), which the
+        // editor's add-after uses too.
         const band = laneBandFor(ev);
         if (band) {
-          const lo = band.y + LANE_EDGE_PAD;
-          const hi = band.y + band.height - LANE_EDGE_PAD - tgt.height;
-          if (hi >= lo) tgt.y = Math.min(Math.max(tgt.y, lo), hi);
-          const minGap = 8;                                // still recognisably an L
-          const overshootsDown = side === "bottom" && tgt.y < ev.y + ev.height + minGap;
-          const overshootsUp   = side === "top"    && tgt.y + tgt.height > ev.y - minGap;
-          if (hi < lo || overshootsDown || overshootsUp) {
-            tgt.y = wantCy - tgt.height / 2;
-            growLaneBandToContain(band, tgt.y - LANE_EDGE_PAD, tgt.y + tgt.height + LANE_EDGE_PAD);
-          }
+          const kept = clampExitTargetToBand(ev, side, tgt.height, tgt.y, band, LANE_EDGE_PAD);
+          tgt.y = kept.top;
+          if (kept.grow) growLaneBandToContain(band, kept.grow.top, kept.grow.bottom);
         }
 
         // R7.07(b) — and its label sits to the RIGHT of it. The general
