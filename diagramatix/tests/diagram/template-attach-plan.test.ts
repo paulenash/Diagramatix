@@ -360,7 +360,7 @@ function windowModel(hook: ReturnType<typeof hookModel>, anchorId?: string) {
     pick(t: TemplateData): string | null {
       const p = planTemplateShow(t, {
         data: hook.data, provisional: prov, showing: !!prov && hook.stillShowing(prov.stamp),
-        ...(anchorId ? { anchorId } : {}), at: { x: 1500, y: 700 },
+        ...(anchorId ? { anchorId } : {}), viewCentre: { x: 1500, y: 700 },
       });
       if ("refused" in p) return p.refused;
       const stamp = hook.applyTemplate(p.elements, p.connectors, { ...(p.join ? { join: p.join } : {}), ...(p.over ? { over: p.over } : {}) });
@@ -474,7 +474,7 @@ describe("T4853 — one undo entry per window, and nothing left behind (the swap
     let showing = false;
     const oldPick = (t: TemplateData) => {
       if (showing) old.undo();
-      const p = planTemplateShow(t, { data: old.data, provisional: null, showing: false, at: { x: 1500, y: 700 } });
+      const p = planTemplateShow(t, { data: old.data, provisional: null, showing: false, viewCentre: { x: 1500, y: 700 } });
       if ("refused" in p) throw new Error(p.refused);
       old.applyTemplate(p.elements, p.connectors);
       old.render();
@@ -674,7 +674,7 @@ describe("T4856 — a white-box pool with no lanes grows round an attached templ
       const d = world(h);
       attached[h] = 0;
       for (const t of builtinTemplates()) {
-        const shown = planTemplateShow(t.data, { data: d, provisional: null, showing: false, anchorId: "A", at: { x: 0, y: 0 } });
+        const shown = planTemplateShow(t.data, { data: d, provisional: null, showing: false, anchorId: "A", viewCentre: { x: 0, y: 0 } });
         if (!("refused" in shown)) { attached[h]++; continue; }
         // What is left has nothing inline to join. One reaching ABOVE the
         // pool's top used to be refused too; the pool now grows at its top

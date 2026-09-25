@@ -2376,9 +2376,11 @@ export const CHAPTERS: HelpChapter[] = [
               (yours only).
             </li>
             <li>
-              Click a template name to stamp it onto the canvas at the
-              current viewport centre. The new elements are automatically
-              selected so you can immediately drag them into position.
+              Click a template name to put it on the end of the current
+              elements: after the last element of the lane in the middle of
+              the screen, level with it (on an empty diagram, in the middle
+              of the screen). The new elements are automatically selected so
+              you can immediately drag them into position.
             </li>
           </ol>
         ),

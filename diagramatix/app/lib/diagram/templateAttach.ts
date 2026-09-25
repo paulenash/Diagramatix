@@ -27,16 +27,23 @@
  * the nudge steps by half the fragment's box, so on a busy diagram a template
  * can land well below its anchor and the lane grows to reach it.
  *
+ * A template picked with nothing to follow — the plain window, the toolbar's
+ * template list — goes ON THE END of the current elements (`planTemplateDrop`),
+ * by rules 1, 3 and 4 with no join.
+ *
  * Pure, apart from the dry run, which asks the real reducer.
  */
 import type { Connector, DiagramData, DiagramElement, TemplateData } from "./types";
 import { reducer } from "@/app/hooks/useDiagram";
-import { SEQUENCE_NODE_TYPES, instantiateTemplate, instantiateTemplateAnchored, templateAttachData } from "./templates";
-import { HALF_TASK_W, findFreeSlot, followOnParentId, planBoundaryFollowOn } from "./assistPlacement";
+import { SEQUENCE_NODE_TYPES, instantiateTemplate, instantiateTemplateAnchored, isProcessStep, templateAttachData, templateEntryOf } from "./templates";
+import { findFreeSlot, followOnParentId, placeInline, planBoundaryFollowOn, type Box, type Center } from "./assistPlacement";
 import { canConnect, containerScopeOf, flowScopeOf } from "./canConnect";
 import { getElementPoolId } from "./poolUtil";
 import { isLaneUnowned } from "./containment";
-import { isTemplateContainer } from "./templateAdoption";
+import { boxOf, isTemplateContainer } from "./templateAdoption";
+import { isBlackBoxPool } from "./blackBoxPoolMenu";
+import { getLaneHeaderWidth, getPoolHeaderWidth } from "./containerMetrics";
+import { MIN_LEFT_GAP } from "./poolLaneBounds";
 import { previewBase, type TemplateIds, type TemplateSnapshot } from "./templatePreview";
 
 /** The sequence flow that joins a template to the element it follows. */
@@ -107,40 +114,19 @@ export function planTemplateAttach(
   const entry = attach && attach.data.elements.find((e) => e.id === attach.entryId);
   if (!attach || !entry) return { error: "it has no step a sequence flow can enter", blame: "template" };
 
-  let anchorX: number, anchorY: number;
-  if (anchor.boundaryHostId) {
-    // R7: where a step after this event goes, as voice add-after and the ghost
-    // accept place one. No obstacles here — the whole fragment is nudged below.
-    const c = planBoundaryFollowOn(anchor, base.elements, entry.width, entry.height, []).center;
-    anchorX = c.x - entry.width / 2;
-    anchorY = c.y - entry.height / 2;
-  } else {
-    anchorX = anchor.x + anchor.width + HALF_TASK_W;
-    anchorY = (anchor.y + anchor.height / 2) - entry.height / 2;
-  }
-  const inst = instantiateTemplateAnchored(attach.data, attach.entryId, anchorX, anchorY);
+  // Rule 1 — or, after a BOUNDARY event, R7: where a step after this event
+  // goes, as voice add-after and the ghost accept place one. No obstacles
+  // here — the whole fragment is nudged below.
+  const c = anchor.boundaryHostId
+    ? planBoundaryFollowOn(anchor, base.elements, entry.width, entry.height, []).center
+    : placeInline(anchor, entry.width, entry.height);
+  const inst = instantiateTemplateAnchored(attach.data, attach.entryId, c.x - entry.width / 2, c.y - entry.height / 2);
   if (!inst.entryNewId) return { error: "it has no step a sequence flow can enter", blame: "template" };
 
-  // Rule 4, the whole fragment as one box.
-  const minX = Math.min(...inst.elements.map((e) => e.x));
-  const minY = Math.min(...inst.elements.map((e) => e.y));
-  const bw = Math.max(...inst.elements.map((e) => e.x + e.width)) - minX;
-  const bh = Math.max(...inst.elements.map((e) => e.y + e.height)) - minY;
-  const others = base.elements
-    .filter((e) => e.type !== "pool" && e.type !== "lane" && e.type !== "sublane")
-    .map((e) => ({ x: e.x, y: e.y, width: e.width, height: e.height }));
-  const free = findFreeSlot({ x: minX + bw / 2, y: minY + bh / 2 }, bw, bh, others);
-  const dx = free.x - (minX + bw / 2), dy = free.y - (minY + bh / 2);
-  let elements = dx || dy ? inst.elements.map((e) => ({ ...e, x: e.x + dx, y: e.y + dy })) : inst.elements;
   // A step after a boundary event joins the HOST's container, never the host:
   // adopted into the host, the subprocess grew round the fragment and the
-  // entry flow was refused as out of scope. Notes stay unowned, as the lane
-  // pass leaves them: a note adopted into a lane travels with the lane.
-  const adoptInto = followOnParentId(anchor, base.elements);
-  if (adoptInto) elements = elements.map((e) => (e.parentId || isLaneUnowned(e) ? e : { ...e, parentId: adoptInto }));
-  const connectors = dx || dy
-    ? inst.connectors.map((c) => ({ ...c, waypoints: c.waypoints.map((wp) => ({ x: wp.x + dx, y: wp.y + dy })) }))
-    : inst.connectors;
+  // entry flow was refused as out of scope.
+  const { elements, connectors } = nudgeAndAdopt(inst, base.elements, followOnParentId(anchor, base.elements));
   return {
     elements,
     connectors,
@@ -148,6 +134,190 @@ export function planTemplateAttach(
     entryId: inst.entryNewId,
     join: { sourceId: anchor.id, targetId: inst.entryNewId },
   };
+}
+
+type Placed = { elements: DiagramElement[]; connectors: Connector[] };
+
+function translated(p: Placed, dx: number, dy: number): Placed {
+  if (!dx && !dy) return p;
+  return {
+    elements: p.elements.map((e) => ({ ...e, x: e.x + dx, y: e.y + dy })),
+    connectors: p.connectors.map((c) => ({ ...c, waypoints: c.waypoints.map((wp) => ({ x: wp.x + dx, y: wp.y + dy })) })),
+  };
+}
+
+/** templateAdoption.ts `boxOf`, as the width × height box findFreeSlot takes. Callers pass at least one element. */
+function boxOfPlaced(els: readonly DiagramElement[]): Box {
+  const b = boxOf(els)!;
+  return { x: b.x, y: b.y, width: b.right - b.x, height: b.bottom - b.y };
+}
+
+/**
+ * Every drawn segment of these connectors' SEQUENCE flows (not the hidden
+ * leaders into shapes' centres), as a zero-thickness box. Message flows are
+ * left out: a message runs from pool to pool through every lane between, and
+ * hopping clear of those lines threw templates out of their lane (Paul's Good
+ * team, under his two messages to Pool 1).
+ */
+function flowSegments(connectors: readonly Connector[]): Box[] {
+  const out: Box[] = [];
+  for (const c of connectors) {
+    if (c.type !== "sequence") continue;
+    const w = c.waypoints ?? [];
+    const from = c.sourceInvisibleLeader ? 1 : 0;
+    const to = c.targetInvisibleLeader ? w.length - 2 : w.length - 1;
+    for (let i = from; i < to; i++) {
+      const p = w[i], q = w[i + 1];
+      out.push({ x: Math.min(p.x, q.x), y: Math.min(p.y, q.y), width: Math.abs(q.x - p.x), height: Math.abs(q.y - p.y) });
+    }
+  }
+  return out;
+}
+
+/**
+ * Rules 3 and 4, shared by the attach and the drop: the whole fragment is
+ * nudged clear of other elements — and of the sequence flows among `flows`,
+ * which it must not land on — as ONE box (findFreeSlot), and its
+ * parentless elements join `adoptInto`. Notes stay unowned, as the lane pass
+ * leaves them: a note adopted into a lane travels with the lane.
+ */
+function nudgeAndAdopt(inst: Placed, existing: readonly DiagramElement[], adoptInto: string | undefined, flows: readonly Connector[] = []): Placed {
+  const b = boxOfPlaced(inst.elements);
+  const others = [
+    ...existing
+      .filter((e) => e.type !== "pool" && e.type !== "lane" && e.type !== "sublane")
+      .map((e) => ({ x: e.x, y: e.y, width: e.width, height: e.height })),
+    ...flowSegments(flows),
+  ];
+  const centre = { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+  const free = findFreeSlot(centre, b.width, b.height, others);
+  const moved = translated(inst, free.x - centre.x, free.y - centre.y);
+  if (!adoptInto) return moved;
+  return { ...moved, elements: moved.elements.map((e) => (e.parentId || isLaneUnowned(e) ? e : { ...e, parentId: adoptInto })) };
+}
+
+/**
+ * A band a dropped template can go on the end of: a lane or sub-lane with none
+ * below it, or a white-box pool with no lanes (`hostId`), or — `hostId`
+ * undefined — the flow elements that sit in no pool at all.
+ */
+export interface DropBand {
+  hostId?: string;
+  /** Where the band lies, for "under the middle of the screen": a lane across its whole pool, header included. */
+  box: Box;
+  /** The lane or pool itself — what its elements sit in. */
+  body: Box;
+  /** Where an empty lane's content starts: the header's right edge plus the half-event gap. */
+  contentLeft?: number;
+  /** Its last element: the flow node furthest right. */
+  last?: DiagramElement;
+}
+
+const inBox = (b: Box, p: Center) => p.x >= b.x && p.x <= b.x + b.width && p.y >= b.y && p.y <= b.y + b.height;
+const distToBox = (b: Box, p: Center) =>
+  Math.hypot(Math.max(b.x - p.x, 0, p.x - (b.x + b.width)), Math.max(b.y - p.y, 0, p.y - (b.y + b.height)));
+
+/**
+ * The band under `at` — failing that, the band nearest it — with its last
+ * element. Null when the diagram has no band at all (no white-box pool and no
+ * flow element outside a pool).
+ */
+export function dropBandAt(elements: readonly DiagramElement[], at: Center): DropBand | null {
+  const els = elements as DiagramElement[];
+  const byId = new Map(els.map((e) => [e.id, e] as const));
+  // The steps of the process (`isProcessStep`, the rule a template's first
+  // step is chosen by), less the steps inside a subprocess — the subprocess
+  // is the step.
+  const steps = els.filter((e) => isProcessStep(e) && byId.get(e.parentId ?? "")?.type !== "subprocess-expanded");
+  const centreOf = (e: DiagramElement): Center => ({ x: e.x + e.width / 2, y: e.y + e.height / 2 });
+  const lastOf = (held: DiagramElement[]) => [...held].sort((a, b) =>
+    ((b.x + b.width) - (a.x + a.width))
+    || (Math.abs(centreOf(a).y - at.y) - Math.abs(centreOf(b).y - at.y)))[0];
+
+  const bands: DropBand[] = [];
+  for (const pool of els) {
+    if (pool.type !== "pool" || isBlackBoxPool(pool)) continue;
+    const lanes = els.filter((l) => (l.type === "lane" || l.type === "sublane") && getElementPoolId(l, els) === pool.id);
+    const leaves = lanes.filter((l) => !lanes.some((k) => k.parentId === l.id));
+    if (leaves.length === 0) {
+      bands.push({ hostId: pool.id, box: pool, body: pool, contentLeft: pool.x + getPoolHeaderWidth(pool) + MIN_LEFT_GAP });
+    }
+    for (const l of leaves) {
+      bands.push({
+        hostId: l.id, body: l, contentLeft: l.x + getLaneHeaderWidth(l) + MIN_LEFT_GAP,
+        box: { x: pool.x, y: l.y, width: pool.width, height: l.height },
+      });
+    }
+  }
+  for (const b of bands) b.last = lastOf(steps.filter((e) => inBox(b.body, centreOf(e))));
+  const loose = steps.filter((e) => getElementPoolId(e, els) === null);
+  if (loose.length) {
+    const box = boxOfPlaced(loose);
+    bands.push({ box, body: box, last: lastOf(loose) });
+  }
+  if (bands.length === 0) return null;
+  const area = (b: DropBand) => b.box.width * b.box.height;
+  const under = bands.filter((b) => b.hostId && inBox(b.box, at)).sort((a, b) => area(a) - area(b))[0]
+    ?? bands.find((b) => !b.hostId && inBox(b.box, at));
+  return under ?? [...bands].sort((a, b) => distToBox(a.box, at) - distToBox(b.box, at))[0];
+}
+
+/**
+ * Where a template picked with nothing to follow goes — the plain template
+ * window and the toolbar's template list.
+ *
+ * Paul, 2026-09-25: "assume the template will go on the end of the current
+ * elements". Centred on the middle of the screen instead, his template landed
+ * on top of his process, and the drag he made to get it off left it outside
+ * his pool, still owned by his lanes (issue 6).
+ *
+ *   1. the band: the lane (or sub-lane, or white-box pool with no lanes)
+ *      under the middle of the screen — failing that, the band nearest it
+ *      (`dropBandAt`); the flow elements in no pool are a band of their own;
+ *   2. the template's first step (templates.ts `templateEntryOf`) sits ½ Task
+ *      width right of that band's last element, level with it — rule 1, with
+ *      no join; in a lane with nothing in it, at the lane's left, clear of its
+ *      header by the half-event gap and level with its middle;
+ *   3. the whole fragment is nudged clear as ONE box — of the elements, and
+ *      of the sequence flows too, or it could land on the flow the last
+ *      element sends down to the next lane — and joins the band (rules 3 and
+ *      4). APPLY_TEMPLATE then makes the room.
+ * Level is where it is PLANNED. A template that would reach above its lane's
+ * top is then lowered into the lane by APPLY_TEMPLATE, just far enough, and
+ * the lane's own content stays where it is — with no join, only the template
+ * is lowered (the issue 6 decision; carrying the lane's content down with it
+ * is for a joined template, whose join must stay level).
+ * An empty diagram, and a template that brings pools or lanes of its own
+ * (APPLY_TEMPLATE stacks those under the diagram's pools), go where they
+ * always went: centred on the middle of the screen.
+ *
+ * `base` must be the diagram WITHOUT any template still being previewed.
+ */
+export function planTemplateDrop(
+  templateData: TemplateData,
+  base: { elements: DiagramElement[]; connectors: Connector[] },
+  viewCentre: Center,
+): { elements: DiagramElement[]; connectors: Connector[]; newIds: Set<string> } {
+  const centred = instantiateTemplate(templateData, viewCentre.x, viewCentre.y);
+  if (centred.elements.length === 0 || templateData.elements.some(isTemplateContainer)) return centred;
+  const band = dropBandAt(base.elements, viewCentre);
+  if (!band) return { ...nudgeAndAdopt(centred, base.elements, undefined, base.connectors), newIds: centred.newIds };
+
+  // What lines up with the band: the template's first step, else its box.
+  const entry = templateEntryOf(templateData);
+  const entryNow = entry ? centred.elements[templateData.elements.indexOf(entry)] : undefined;
+  const lead = entryNow ?? boxOfPlaced(centred.elements);
+  const box = boxOfPlaced(centred.elements);
+  let dx: number, dy: number;
+  if (band.last) {
+    const c = placeInline(band.last, lead.width, lead.height);
+    dx = c.x - lead.width / 2 - lead.x;
+    dy = c.y - lead.height / 2 - lead.y;
+  } else {
+    dx = (band.contentLeft ?? box.x) - box.x;
+    dy = (band.body.y + band.body.height / 2) - (lead.y + lead.height / 2);
+  }
+  return { ...nudgeAndAdopt(translated(centred, dx, dy), base.elements, band.hostId, base.connectors), newIds: centred.newIds };
 }
 
 /** Which edge of `box` the element sticks out of, or null when it is inside (1px slack). */
@@ -226,8 +396,10 @@ export interface TemplateShowRequest {
   showing: boolean;
   /** Each pick goes AFTER this element… */
   anchorId?: string;
-  /** …or is centred here (the pointer, or the middle of the screen). */
-  at: { x: number; y: number };
+  /** …or is centred on the pointer ("add template here")… */
+  at?: { x: number; y: number };
+  /** …or goes on the end of the current elements, in the lane under the middle of the screen (`planTemplateDrop`). */
+  viewCentre: { x: number; y: number };
 }
 
 export type TemplateShowPlan =
@@ -260,6 +432,6 @@ export function planTemplateShow(tdata: TemplateData, req: TemplateShowRequest):
     if ("error" in checked) return { refused: checked.error, blame: "template" };
     return { elements: plan.elements, connectors: plan.connectors, newIds: plan.newIds, join: plan.join, ...(over ? { over } : {}), base: pb.base };
   }
-  const placed = instantiateTemplate(tdata, req.at.x, req.at.y);
+  const placed = req.at ? instantiateTemplate(tdata, req.at.x, req.at.y) : planTemplateDrop(tdata, pb.base, req.viewCentre);
   return { ...placed, ...(over ? { over } : {}), base: pb.base };
 }

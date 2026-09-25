@@ -47,6 +47,7 @@ export function headlessDiagram(initial: DiagramData): HeadlessDiagram {
   const past: DiagramData[] = [];
   let staged: DiagramData | null = null;       // a move or resize in progress
   let resizing: string | null = null;
+  let groupMoved = new Set<string>();           // every id the staged group move carried
   const screen: string[] = [];
 
   const run = (a: Action) => { state = reducer(state, a); };
@@ -82,10 +83,17 @@ export function headlessDiagram(initial: DiagramData): HeadlessDiagram {
     extendPools: () => commit({ type: "EXTEND_POOLS", payload: {} }),
     swapLane: (laneId, direction) => commit({ type: "SWAP_LANES_VERTICAL", payload: { laneId, direction } }),
     moveLane: (laneId, direction, distance = 32) => commit({ type: "MOVE_LANE", payload: { laneId, direction, distance } }),
-    moveElements: (ids, dx, dy) => { staged ??= state; run({ type: "MOVE_ELEMENTS", payload: { ids, dx, dy } }); },
+    moveElements: (ids, dx, dy) => {
+      staged ??= state;
+      if (dx !== 0 || dy !== 0) for (const id of ids) groupMoved.add(id);
+      run({ type: "MOVE_ELEMENTS", payload: { ids, dx, dy } });
+    },
     elementsMoveEnd: () => {
       if (staged) { past.push(staged); staged = null; }
-      run({ type: "CORRECT_ALL_CONNECTORS" });
+      const ids = [...groupMoved];
+      groupMoved = new Set();
+      if (ids.length > 0) run({ type: "ELEMENTS_MOVE_END", payload: { ids } });
+      else run({ type: "CORRECT_ALL_CONNECTORS" });
     },
     removeSpace: (zone) => commit({ type: "REMOVE_SPACE", payload: { zone } }),
     updateConnectorEndpoint: (connectorId, endpoint, newElementId, newSide, newOffsetAlong) =>

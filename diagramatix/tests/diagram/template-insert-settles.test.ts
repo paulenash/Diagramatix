@@ -970,8 +970,12 @@ describe("T4874 — wiring: one cascade, one settle, geometry first", () => {
     expect(hook).not.toMatch(/function applyPoolBelowShift|function applyPoolAboveShift|applyPoolBelowShift\(|applyPoolAboveShift\(/);
     // …and so is its unused sideways copy, a second 100-px rule.
     expect(hook).not.toContain("applyPoolRightShift");
-    expect(caseOf("MOVE_ELEMENT")).toContain("elements = cascadePoolsBelow(elementsBefore, elements, state.relaxedLayout);");
-    expect(hook.match(/cascadePoolsBelow\(/g)!.length, "defined once, called by settleGrowth and MOVE_ELEMENT").toBe(3);
+    // MOVE_ELEMENT re-fits through the move re-fit (issue 6b: the end of a
+    // group drag runs the same one), and that re-fit pushes with the cascade.
+    expect(caseOf("MOVE_ELEMENT")).toContain("refitContainersAfterMove(elements, connectors, state.relaxedLayout)");
+    const refit = hook.slice(hook.indexOf("function refitContainersAfterMove("), hook.indexOf("\n}\n", hook.indexOf("function refitContainersAfterMove(")));
+    expect(refit).toContain("elements = cascadePoolsBelow(elementsBefore, elements, relaxed);");
+    expect(hook.match(/cascadePoolsBelow\(/g)!.length, "defined once, called by settleGrowth and the move re-fit").toBe(3);
   });
 
   it("every case that grows a lane settles ONCE, after its geometry", () => {

@@ -79,7 +79,7 @@ import { collectRenameTargets, type RenameType, type RenameTarget } from "@/app/
 import { buildPickFlow, parsePickAnswer, substituteRef, type PickFlow } from "@/app/lib/assist/disambiguate";
 import { cardsOf, numberTemplates, templatesToOffer, canAttachInline, diagramHasWhiteBoxPool, hiddenTemplatesNote, templateWindowSummary, parseTemplateAnswer, type TemplateCard, type TemplateSection } from "@/app/lib/assist/templatePick";
 import { TEMPLATE_BEFORE_REFUSAL } from "@/app/lib/assist/templatePhrase";
-import { planTemplateAttach, checkTemplateAttach, planTemplateShow, whyTemplateCantFollow, anchorNameOf } from "@/app/lib/diagram/templateAttach";
+import { planTemplateAttach, checkTemplateAttach, planTemplateShow, planTemplateDrop, whyTemplateCantFollow, anchorNameOf } from "@/app/lib/diagram/templateAttach";
 import type { TemplateIds } from "@/app/lib/diagram/templatePreview";
 import { TemplatePickerWindow } from "@/app/components/canvas/TemplatePickerWindow";
 import { diagramKeyterms } from "@/app/lib/dictation/diagramKeyterms";
@@ -271,8 +271,9 @@ type TemplateShowing = {
 
 /**
  * The "add template" window (Paul, 2026-09-24), and where its picks go — after
- * an element ("add template after X", 2026-09-25), at the pointer, or at the
- * middle of the screen.
+ * an element ("add template after X", 2026-09-25), at the pointer, or on the
+ * end of the current elements in the lane under the middle of the screen
+ * (templateAttach.ts `planTemplateDrop`).
  */
 type TemplateFlow = {
   /** A new window is a new id: a pick still loading for an old one is dropped. */
@@ -4293,7 +4294,8 @@ export function DiagramEditor({
       provisional: prov,
       showing: !!prov && templateStillShowing(prov.stamp),
       ...(flow.anchorId ? { anchorId: flow.anchorId } : {}),
-      at: flow.at ?? getViewportCenterRef.current?.() ?? { x: 200, y: 200 },
+      ...(flow.at ? { at: flow.at } : {}),
+      viewCentre: getViewportCenterRef.current?.() ?? { x: 200, y: 200 },
     });
     if ("refused" in plan) {
       const summary = plan.blame === "anchor" ? plan.refused
@@ -4451,7 +4453,8 @@ export function DiagramEditor({
       const tmpl = await res.json();
       const templateData = tmpl.data as TemplateData;
       const center = getViewportCenterRef.current?.() ?? { x: 200, y: 200 };
-      const { elements, connectors, newIds } = instantiateTemplate(templateData, center.x, center.y);
+      // On the end of the current elements, as the template window puts one.
+      const { elements, connectors, newIds } = planTemplateDrop(templateData, { elements: elementsRef.current, connectors: connectorsRef.current }, center);
       applyTemplate(elements, connectors);
       setSelectedElementIds(newIds);
       setSelectedConnectorId(null);

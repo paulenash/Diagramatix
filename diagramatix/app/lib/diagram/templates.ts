@@ -108,35 +108,54 @@ export const SEQUENCE_NODE_TYPES: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * The element a template attaches BY when joined inline to a selected element.
+ * A STEP OF THE PROCESS: a flow node — not data, an annotation or a container
+ * — that is not mounted on another element's edge and is not an event
+ * sub-process (started by its event, never by a flow). What a template's first
+ * step is chosen from (`templateEntryOf`) and what a lane's last element is
+ * chosen from (templateAttach.ts `dropBandAt`), so the two are judged alike.
+ */
+export function isProcessStep(e: DiagramElement): boolean {
+  return SEQUENCE_NODE_TYPES.has(e.type)
+    && !e.boundaryHostId
+    && !(e.type === "subprocess-expanded" && (e.properties?.subprocessType as string | undefined) === "event");
+}
+
+/**
+ * A template's first step — what it is joined BY when attached after an
+ * element, and what is lined up with the last element when it is dropped on
+ * the end of a lane (templateAttach.ts).
  *
- * A top-level flow node — not data, an annotation or a container, not mounted
- * on another element's edge, not an event sub-process (which is started by its
- * event, never by a flow) — with no incoming SEQUENCE flow. The old rule took
+ * A top-level step of the process (`isProcessStep`) with no incoming SEQUENCE
+ * flow. The old rule took
  * the first element with no incoming connector of ANY kind, so "Data Input /
  * Output" entered by its data object and "Perform Regular Task" by its event
  * sub-process, and the join was refused both times with the template already
  * placed. A loop (every step has a flow in) enters at its leftmost step; a
  * template with no such step has no entry at all (null).
- *
- * If the entry is a Start Event with a single outgoing sequence, it is stripped
- * (and its connector) — the entry becomes that connector's target. Returns the
- * (possibly trimmed) data + the entry element's id (in template-local id space).
+ */
+export function templateEntryOf(templateData: TemplateData): DiagramElement | null {
+  const els = templateData.elements;
+  const ids = new Set(els.map((e) => e.id));
+  const joinable = els.filter((e) => isProcessStep(e) && !(e.parentId && ids.has(e.parentId)));
+  if (joinable.length === 0) return null;
+  const incoming = new Set(templateData.connectors.filter((c) => c.type === "sequence").map((c) => c.targetId));
+  return joinable.find((e) => !incoming.has(e.id)) ?? [...joinable].sort((a, b) => a.x - b.x)[0];
+}
+
+/**
+ * The element a template attaches BY when joined inline to a selected element:
+ * its entry (`templateEntryOf`). If the entry is a Start Event with a single
+ * outgoing sequence, it is stripped (and its connector) — the entry becomes
+ * that connector's target. Returns the (possibly trimmed) data + the entry
+ * element's id (in template-local id space).
  */
 export function templateAttachData(
   templateData: TemplateData,
 ): { data: TemplateData; entryId: string } | null {
   const els = templateData.elements;
-  if (els.length === 0) return null;
-  const ids = new Set(els.map((e) => e.id));
-  const joinable = els.filter((e) =>
-    SEQUENCE_NODE_TYPES.has(e.type)
-    && !(e.parentId && ids.has(e.parentId))
-    && !e.boundaryHostId
-    && !(e.type === "subprocess-expanded" && (e.properties?.subprocessType as string | undefined) === "event"));
-  if (joinable.length === 0) return null;
-  const incoming = new Set(templateData.connectors.filter((c) => c.type === "sequence").map((c) => c.targetId));
-  let entry = joinable.find((e) => !incoming.has(e.id)) ?? [...joinable].sort((a, b) => a.x - b.x)[0];
+  const first = templateEntryOf(templateData);
+  if (!first) return null;
+  let entry: DiagramElement = first;
   let data = templateData;
 
   if (entry.type === "start-event") {

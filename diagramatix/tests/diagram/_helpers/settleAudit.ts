@@ -125,6 +125,26 @@ export function newCrossings(before: DiagramData, after: DiagramData): string[] 
   });
 }
 
+/**
+ * Flows that were on the diagram before the insert (`base`) whose route now
+ * runs through one of the template's elements (`ids`). Judged on `after`
+ * alone: `newCrossings` against the naive state cannot see a template PLANNED
+ * on top of a flow, because the naive state already has it there.
+ */
+export function existingFlowsThrough(base: DiagramData, after: DiagramData, ids: Set<string>): string[] {
+  const was = new Set(base.connectors.map((c) => c.id));
+  const A = byId(after);
+  const conn = new Map(after.connectors.map((c) => [c.id, c] as const));
+  return [...crossings(after)].filter((k) => {
+    const [cid, eid] = k.split("|");
+    return was.has(cid) && ids.has(eid);
+  }).map((k) => {
+    const [cid, eid] = k.split("|");
+    const c = conn.get(cid)!;
+    return `${cid} ${nm(A.get(c.sourceId))}→${nm(A.get(c.targetId))} through ${nm(A.get(eid))}`;
+  });
+}
+
 /** Pairs of pools that overlap (and did not before, when `before` is given). */
 export function poolOverlaps(d: DiagramData, before?: DiagramData): string[] {
   const pools = d.elements.filter((e) => e.type === "pool");

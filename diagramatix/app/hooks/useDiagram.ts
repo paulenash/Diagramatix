@@ -495,6 +495,10 @@ export type Action =
   | { type: "REORDER_LANE"; payload: { laneId: string; direction: "up" | "down" } }
   | { type: "MOVE_LANE"; payload: { laneId: string; direction: "up" | "down"; distance: number } }
   | { type: "MOVE_ELEMENTS"; payload: { ids: string[]; dx: number; dy: number } }
+  /** The end of a group drag (or nudge): `ids` are every id the gesture's
+   *  MOVE_ELEMENTS moved. (A gesture that moved nothing ends with
+   *  CORRECT_ALL_CONNECTORS, as every group drag once did.) */
+  | { type: "ELEMENTS_MOVE_END"; payload: { ids: string[] } }
   /** `join`: the one sequence flow from the element a template follows into
    *  its entry — drawn by ADD_CONNECTOR inside this action, after the template
    *  has been placed and its lane grown, so it gets that case's rules and the
@@ -896,6 +900,93 @@ function wouldCreateCycle(elements: DiagramElement[], elementId: string, candida
     cur = el?.parentId ?? "";
   }
   return false;
+}
+
+/**
+ * THE DROP-PARENT RULE: the container an element whose centre is at (cx, cy)
+ * belongs to, or undefined when no container encloses it (dropped outside
+ * every container, it is released). Read on every frame of a drag
+ * (MOVE_ELEMENT), at the drop (MOVE_END) and at the end of a GROUP drag
+ * (ELEMENTS_MOVE_END) — one rule for one element and for many. A selection
+ * dragged out of Paul's pool kept its lanes as parents while a single element
+ * dragged the same way was released (issue 6).
+ *
+ * `within`: only that container and the containers inside it may take the
+ * element — for an element a drag cannot take out of its container
+ * (`dragHolderOf`).
+ */
+function pickDropParent(
+  elements: DiagramElement[],
+  el: { id: string; type: SymbolType },
+  cx: number,
+  cy: number,
+  within?: DiagramElement,
+): DiagramElement | undefined {
+  const inside = within ? new Set([within.id, ...getAllDescendantIds(elements, within.id)]) : null;
+  const candidates = elements.filter((b) =>
+    isContainerType(b.type) &&
+    containerAccepts(b.type, el.type) &&
+    b.id !== el.id &&
+    (!inside || inside.has(b.id)) &&
+    !wouldCreateCycle(elements, el.id, b.id) &&
+    centreInContainer(cx, cy, b),
+  );
+  const smallest = (type: SymbolType) => candidates.filter((b) => b.type === type)
+    .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0];
+  // Prefer the innermost (smallest) expanded subprocess, then ArchiMate
+  // shape, then the smallest lane (so a sub-lane wins over its parent lane —
+  // issue 1), then the pool, then the innermost process group, then the
+  // innermost UML package (grandparent → parent → child nesting reparents to
+  // the deepest package — issue #13).
+  return smallest("subprocess-expanded") ??
+    smallest("archimate-shape") ??
+    smallest("lane") ??
+    candidates.find((b) => b.type === "pool") ??
+    smallest("process-group") ??
+    smallest("uml-package") ??
+    candidates[0];
+}
+
+/**
+ * THE CONTAINER A DRAG CANNOT TAKE AN ELEMENT OUT OF (Shift aside):
+ *   • the expanded subprocess it is a step of — the subprocess grows to
+ *     follow it instead (user spec: "an element moving inside an EP should
+ *     not cause sibling EP or any of their contents to be affected");
+ *   • the process group it sits in — a single drag keeps it inside.
+ * Data is never held: it re-parents at the drop. Asked on every frame of a
+ * single drag (MOVE_ELEMENT) and at the end of a group drag
+ * (ELEMENTS_MOVE_END), where only a container inside the holder may take the
+ * element (`pickDropParent`'s `within`) — the answer MOVE_END's drop gives
+ * once the subprocess has grown round it. Released from its subprocess by a
+ * group drag, a step's flows crossed the subprocess's edge, which BPMN
+ * forbids (review of issue 6b).
+ */
+function dragHolderOf(
+  elements: DiagramElement[],
+  el: DiagramElement,
+  unconstrained?: boolean,
+): DiagramElement | undefined {
+  if (unconstrained || !el.parentId || DATA_ELEMENT_TYPES.has(el.type)) return undefined;
+  const parent = elements.find((p) => p.id === el.parentId);
+  return parent && (parent.type === "subprocess-expanded" || parent.type === "process-group") ? parent : undefined;
+}
+
+/**
+ * An event on an element's edge belongs where its host does — the mount
+ * convention (MOVE_END mounts with `parentId: host.parentId`). Re-applied
+ * after a drop has re-parented the hosts in `hostIds`, or the event stays in
+ * the host's old lane — and the BPMN export files a flow node under the lane
+ * its parentId names.
+ */
+function edgeEventsFollowHosts(elements: DiagramElement[], hostIds: ReadonlySet<string>): DiagramElement[] {
+  const hostParent = new Map<string, string | undefined>();
+  for (const e of elements) if (hostIds.has(e.id)) hostParent.set(e.id, e.parentId);
+  if (hostParent.size === 0) return elements;
+  return elements.map((e) => {
+    if (!e.boundaryHostId || !hostParent.has(e.boundaryHostId)) return e;
+    const parentId = hostParent.get(e.boundaryHostId);
+    return parentId === e.parentId ? e : { ...e, parentId };
+  });
 }
 
 function segmentIntersectsRect(
@@ -2590,6 +2681,119 @@ function settleOptsOf(state: DiagramData): { relaxed: boolean; fontSize: number 
   return { relaxed: !!state.relaxedLayout, fontSize: state.connectorFontSize ?? 10 };
 }
 
+/**
+ * THE CONTAINERS RE-FIT AFTER A MOVE: every expanded subprocess encloses its
+ * children (its edge events re-snapped to the edges that moved), a lane that
+ * grew pushes the lanes below it, a pool that grew pushes the pools below it
+ * (the one cascade), a pool that widened widens the pools aligned with it and
+ * its lanes span it again, and the connectors whose ends changed are
+ * re-routed. Run on every frame of a single drag (MOVE_ELEMENT) and once at
+ * the end of a GROUP drag (ELEMENTS_MOVE_END), so one element and many are
+ * fitted alike.
+ */
+function refitContainersAfterMove(
+  elementsIn: DiagramElement[],
+  connectorsIn: Connector[],
+  relaxed?: boolean,
+): { elements: DiagramElement[]; connectors: Connector[] } {
+  // Issue 2 auto-grow path: capture the pre-enclose snapshot so we
+  // can push siblings below each grown lane / sublane.
+  const elementsBefore = elementsIn;
+  let elements = ensureContainersEncloseChildren(elementsIn);
+  let connectors = connectorsIn;
+  // EP-rect-diff resnap — when ensureContainersEncloseChildren
+  // silently grows an EP because an internal child sticks past
+  // its bounds (most visibly TOP edge upward, since EP children
+  // are excluded from non-EP parents but still count for the EP
+  // itself), the EP's own boundary events would otherwise be
+  // left at the OLD edges. Compare every EP's pre/post rect and
+  // re-snap its boundary events on every side that actually
+  // moved. Symmetric with the explicit applyEPBoundaryChange
+  // path that already does this when its `changed` guard fires.
+  for (const before of elementsBefore) {
+    if (before.type !== "subprocess-expanded") continue;
+    const after = elements.find((e) => e.id === before.id);
+    if (!after) continue;
+    if (before.x === after.x && before.y === after.y &&
+        before.width === after.width && before.height === after.height) continue;
+    const ms = new Set<"top" | "bottom" | "left" | "right">();
+    if (after.y !== before.y) ms.add("top");
+    if (after.x !== before.x) ms.add("left");
+    if (after.y + after.height !== before.y + before.height) ms.add("bottom");
+    if (after.x + after.width !== before.x + before.width) ms.add("right");
+    if (ms.size > 0) {
+      elements = resnapEPBoundaryEvents(elements, after, before, ms);
+    }
+  }
+  const pushed = pushPastLaneGrowth(elementsBefore, elements, connectors);
+  elements = pushed.elements;
+  connectors = pushed.connectors;
+  // A pool that grew pushes the pools below it: THE one top-down cascade
+  // (cascadePoolsBelow — in a relaxed layout only the pools it would
+  // cover). Geometry only; the recompute at the end of this block
+  // re-routes whatever it moved.
+  elements = cascadePoolsBelow(elementsBefore, elements, relaxed);
+  // Free-form / imported diagrams keep pools at independent sizes and
+  // positions (may sit side-by-side), so the full-width cross-pool
+  // cascade below is suppressed — each pool only re-fits its own
+  // children, and other pools stay put.
+  if (!relaxed) {
+    // Issues 5 + 6: cascade pool L/R growth to OTHER aligned pools
+    // and snap every pool's child lanes to the new L/R bounds. When
+    // ensureContainersEncloseChildren widens a pool because an EP /
+    // task got pushed to its right (or extends past the left), only
+    // that pool's outer rect grew — sibling lanes inside still had
+    // the old width, and other pools didn't follow.
+    for (const oldEl of elementsBefore) {
+      if (oldEl.type !== "pool") continue;
+      const newPool = elements.find((e) => e.id === oldEl.id);
+      if (!newPool) continue;
+      const dX_right = (newPool.x + newPool.width) - (oldEl.x + oldEl.width); // > 0 when right edge moved out (rightward)
+      // Only cascade RIGHT-edge growth to the other pools. The
+      // LEFT-edge cascade is deliberately suppressed — when an EP
+      // child is pushed past the EP's left and
+      // ensureContainersEncloseChildren extends the pool leftward,
+      // visibly shifting every other pool / element left feels like
+      // the whole diagram is sliding. User spec: leftward growth
+      // must NOT move anything else on the canvas. (Other
+      // directions — right, top, bottom — keep their existing
+      // cascade behaviour.)
+      if (dX_right !== 0) {
+        const r = applyPoolBoundaryShift(elements, connectors, oldEl.id, 0, dX_right);
+        elements = r.elements; connectors = r.connectors;
+      }
+    }
+    // Snap every pool's child lanes to the pool's current L/R.
+    for (const el of elements) {
+      if (el.type === "pool") {
+        elements = syncLanesToPool(elements, el.id);
+      }
+    }
+  }
+  // Only recompute connectors whose source or target's rect
+  // actually changed during the cascade above. Recomputing
+  // every connector on every move tick produced spurious
+  // re-routes for unrelated connectors far from the moved
+  // element, causing visible "snap" jitter and burning CPU.
+  const beforeById = new Map(elementsBefore.map((e) => [e.id, e]));
+  const changedElIds = new Set<string>();
+  for (const after of elements) {
+    const before = beforeById.get(after.id);
+    if (!before) { changedElIds.add(after.id); continue; }
+    if (before.x !== after.x || before.y !== after.y
+        || before.width !== after.width || before.height !== after.height) {
+      changedElIds.add(after.id);
+    }
+  }
+  if (changedElIds.size > 0) {
+    connectors = connectors.map((conn) => {
+      if (!changedElIds.has(conn.sourceId) && !changedElIds.has(conn.targetId)) return conn;
+      return recomputeAllConnectors([conn], elements, relaxed)[0] ?? conn;
+    });
+  }
+  return { elements, connectors };
+}
+
 /** Read a lane's effective header width (stored property override, else 36). */
 
 
@@ -3552,7 +3756,7 @@ const LANE_RECONCILE_ACTIONS = new Set<Action["type"]>([
   // changes which lane encloses what, just as much as adding or deleting one.
   // Hooked at the END of the gesture (not every intermediate frame) so the pass
   // runs once per change.
-  "RESIZE_END", "MOVE_END",
+  "RESIZE_END", "MOVE_END", "ELEMENTS_MOVE_END",
   // RENAMING a lane changes no geometry, but an auto-filled team is DERIVED
   // FROM THE LANE'S NAME — without this every task keeps the old name (and a
   // typo survives its own correction), so the simulator goes on reporting a
@@ -3570,7 +3774,7 @@ const ROUTE_CHANGING_ACTIONS = new Set<Action["type"]>([
   "MOVE_ELEMENT", "MOVE_ELEMENTS", "MOVE_END", "RESIZE_ELEMENT", "RESIZE_END",
   "UPDATE_CONNECTOR_WAYPOINTS", "UPDATE_CONNECTOR_ENDPOINT",
   "NUDGE_CONNECTOR", "NUDGE_CONNECTOR_ENDPOINT", "UPDATE_CONNECTOR_FIELDS",
-  "REROUTE_ALL", "CORRECT_ALL_CONNECTORS",
+  "REROUTE_ALL", "CORRECT_ALL_CONNECTORS", "ELEMENTS_MOVE_END",
 ]);
 
 /** Actions whose element movements the gesture trace reports. */
@@ -4472,13 +4676,11 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
 
       // CASE B + C: Normal move (host elements also carry their boundary events)
       // Clamp child elements within their process-group parent (unless unconstrained via Shift+drag)
+      const holder = dragHolderOf(state.elements, el, unconstrained);
       let effectiveX = x, effectiveY = y;
-      if (el.parentId && !unconstrained) {
-        const parent = state.elements.find(p => p.id === el.parentId);
-        if (parent?.type === "process-group") {
-          effectiveX = Math.max(parent.x, Math.min(parent.x + parent.width - el.width, x));
-          effectiveY = Math.max(parent.y, Math.min(parent.y + parent.height - el.height, y));
-        }
+      if (holder?.type === "process-group") {
+        effectiveX = Math.max(holder.x, Math.min(holder.x + holder.width - el.width, x));
+        effectiveY = Math.max(holder.y, Math.min(holder.y + holder.height - el.height, y));
       }
       const dx = effectiveX - el.x, dy = effectiveY - el.y;
       const movingIsContainer = isContainerType(el.type);
@@ -4520,8 +4722,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       // Then we want the parent to re-detect every frame so the moved
       // element can cross EP boundaries freely — visually it leaves
       // the EP rather than dragging the EP with it.
-      const currentParent = state.elements.find(p => p.id === el.parentId);
-      const lockParentToEP = !unconstrained && currentParent?.type === "subprocess-expanded";
+      const lockParentToEP = holder?.type === "subprocess-expanded";
 
       let elements = state.elements.map((e) => {
         if (e.id === id) {
@@ -4538,36 +4739,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           if (!lockParentToEP) {
             const cx = effectiveX + e.width / 2;
             const cy = effectiveY + e.height / 2;
-            const potentialParents = state.elements.filter(
-              (b) =>
-                isContainerType(b.type) &&
-                containerAccepts(b.type, e.type) &&
-                b.id !== id &&
-                !wouldCreateCycle(state.elements, id, b.id) &&
-                centreInContainer(cx, cy, b)
-            );
-            // Prefer innermost (smallest) container by type priority.
-            // For lanes, also pick smallest so a sublane wins over its
-            // parent lane (issue 1).
-            const potentialParent =
-              // subprocess-expanded: pick smallest (innermost)
-              (potentialParents.filter(b => b.type === "subprocess-expanded")
-                .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0]) ??
-              // archimate-shape: pick smallest (innermost)
-              (potentialParents.filter(b => b.type === "archimate-shape")
-                .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0]) ??
-              // lane / sublane: pick smallest (innermost) — sublane wins
-              (potentialParents.filter(b => b.type === "lane")
-                .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0]) ??
-              potentialParents.find(b => b.type === "pool") ??
-              // process-groups: pick smallest (innermost)
-              (potentialParents.filter(b => b.type === "process-group")
-                .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0]) ??
-              // uml-packages: pick smallest (innermost) so grandparent→parent→child
-              // recursive nesting reparents to the deepest package (issue #13).
-              (potentialParents.filter(b => b.type === "uml-package")
-                .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0]) ??
-              potentialParents[0];
+            const potentialParent = pickDropParent(state.elements, e, cx, cy);
             if (potentialParent !== undefined || state.elements.some(b => isContainerType(b.type) && containerAccepts(b.type, e.type))) {
               parentId = potentialParent?.id;
             }
@@ -4827,103 +4999,9 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       // behaviour Shift is meant to bypass. Containers re-fit at
       // MOVE_END if the final placement requires it.
       if (!epGrown && !unconstrained) {
-        // Issue 2 auto-grow path: capture the pre-enclose snapshot so we
-        // can push siblings below each grown lane / sublane.
-        const elementsBefore = elements;
-        elements = ensureContainersEncloseChildren(elements);
-        // EP-rect-diff resnap — when ensureContainersEncloseChildren
-        // silently grows an EP because an internal child sticks past
-        // its bounds (most visibly TOP edge upward, since EP children
-        // are excluded from non-EP parents but still count for the EP
-        // itself), the EP's own boundary events would otherwise be
-        // left at the OLD edges. Compare every EP's pre/post rect and
-        // re-snap its boundary events on every side that actually
-        // moved. Symmetric with the explicit applyEPBoundaryChange
-        // path that already does this when its `changed` guard fires.
-        for (const before of elementsBefore) {
-          if (before.type !== "subprocess-expanded") continue;
-          const after = elements.find((e) => e.id === before.id);
-          if (!after) continue;
-          if (before.x === after.x && before.y === after.y &&
-              before.width === after.width && before.height === after.height) continue;
-          const ms = new Set<"top" | "bottom" | "left" | "right">();
-          if (after.y !== before.y) ms.add("top");
-          if (after.x !== before.x) ms.add("left");
-          if (after.y + after.height !== before.y + before.height) ms.add("bottom");
-          if (after.x + after.width !== before.x + before.width) ms.add("right");
-          if (ms.size > 0) {
-            elements = resnapEPBoundaryEvents(elements, after, before, ms);
-          }
-        }
-        const pushed = pushPastLaneGrowth(elementsBefore, elements, connectors);
-        elements = pushed.elements;
-        connectors = pushed.connectors;
-        // A pool that grew pushes the pools below it: THE one top-down cascade
-        // (cascadePoolsBelow — in a relaxed layout only the pools it would
-        // cover). Geometry only; the recompute at the end of this block
-        // re-routes whatever it moved.
-        elements = cascadePoolsBelow(elementsBefore, elements, state.relaxedLayout);
-        // Free-form / imported diagrams keep pools at independent sizes and
-        // positions (may sit side-by-side), so the full-width cross-pool
-        // cascade below is suppressed — each pool only re-fits its own
-        // children, and other pools stay put.
-        if (!state.relaxedLayout) {
-        // Issues 5 + 6: cascade pool L/R growth to OTHER aligned pools
-        // and snap every pool's child lanes to the new L/R bounds. When
-        // ensureContainersEncloseChildren widens a pool because an EP /
-        // task got pushed to its right (or extends past the left), only
-        // that pool's outer rect grew — sibling lanes inside still had
-        // the old width, and other pools didn't follow.
-        for (const oldEl of elementsBefore) {
-          if (oldEl.type !== "pool") continue;
-          const newPool = elements.find((e) => e.id === oldEl.id);
-          if (!newPool) continue;
-          const dX_left  = oldEl.x - newPool.x;                                 // > 0 when left edge moved out (leftward)
-          const dX_right = (newPool.x + newPool.width) - (oldEl.x + oldEl.width); // > 0 when right edge moved out (rightward)
-          // Only cascade RIGHT-edge growth to the other pools. The
-          // LEFT-edge cascade is deliberately suppressed — when an EP
-          // child is pushed past the EP's left and
-          // ensureContainersEncloseChildren extends the pool leftward,
-          // visibly shifting every other pool / element left feels like
-          // the whole diagram is sliding. User spec: leftward growth
-          // must NOT move anything else on the canvas. (Other
-          // directions — right, top, bottom — keep their existing
-          // cascade behaviour.)
-          if (dX_right !== 0) {
-            const r = applyPoolBoundaryShift(elements, connectors, oldEl.id, 0, dX_right);
-            elements = r.elements; connectors = r.connectors;
-          }
-        }
-        } // end !state.relaxedLayout cross-pool cascade
-        // Snap every pool's child lanes to the pool's current L/R.
-        if (!state.relaxedLayout) {
-          for (const el of elements) {
-            if (el.type === "pool") {
-              elements = syncLanesToPool(elements, el.id);
-            }
-          }
-        }
-        // Only recompute connectors whose source or target's rect
-        // actually changed during the cascade above. Recomputing
-        // every connector on every move tick produced spurious
-        // re-routes for unrelated connectors far from the moved
-        // element, causing visible "snap" jitter and burning CPU.
-        const beforeById = new Map(elementsBefore.map((e) => [e.id, e]));
-        const changedElIds = new Set<string>();
-        for (const after of elements) {
-          const before = beforeById.get(after.id);
-          if (!before) { changedElIds.add(after.id); continue; }
-          if (before.x !== after.x || before.y !== after.y
-              || before.width !== after.width || before.height !== after.height) {
-            changedElIds.add(after.id);
-          }
-        }
-        if (changedElIds.size > 0) {
-          connectors = connectors.map((conn) => {
-            if (!changedElIds.has(conn.sourceId) && !changedElIds.has(conn.targetId)) return conn;
-            return recomputeAllConnectors([conn], elements, state.relaxedLayout)[0] ?? conn;
-          });
-        }
+        const refit = refitContainersAfterMove(elements, connectors, state.relaxedLayout);
+        elements = refit.elements;
+        connectors = refit.connectors;
       }
 
       if (epMoveTrace && epTraceSnap) {
@@ -5260,6 +5338,57 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       });
 
       return { ...state, elements: updatePoolTypes(elements), connectors };
+    }
+
+    case "ELEMENTS_MOVE_END": {
+      // THE END OF A GROUP DRAG ends the way the end of a single drag does.
+      //
+      // Paul, 2026-09-25: "manually placing a template with an EP in it on or
+      // over existing diagram elements also does the same thing. … We need a
+      // generic fix for this issue independent of voice assist." The drag he
+      // made to get his template off his process left it outside Company,
+      // still owned by Warehouse, Front office and Marketing: a group drag
+      // never asked where anything landed, while one element dragged the same
+      // way was released.
+      //
+      // So every moved ROOT — moved, not mounted on another element's edge,
+      // its parent not moved with it — is given its parent by the drop-parent
+      // rule (`pickDropParent`, which every frame of a single drag and its
+      // drop ask too): dropped outside every container, released; into one,
+      // adopted. A step of an expanded subprocess (or a process group's
+      // child) stays in it, as a single drag keeps it (`dragHolderOf`) — only
+      // a container inside it may take it. Pools and lanes keep their place in
+      // the stack; a marker re-picks the shape it marks, as at MOVE_END; an
+      // event on a moved root's edge goes where its host went. Then the
+      // containers re-fit round the new parents (`refitContainersAfterMove`,
+      // what every frame of a single drag runs — the subprocess grows round a
+      // step dragged past its edge), and the connectors are corrected as
+      // before. Nothing is mounted on an edge here: a free event carried with
+      // its neighbour would otherwise be mounted by a drag that never meant it.
+      const { ids } = action.payload;
+      let elements = state.elements;
+      let connectors = state.connectors;
+      if (ids.length > 0) {
+        const moved = expandMoveSet(state.elements, ids, isContainerType, getAllDescendantIds);
+        const roots = new Set<string>();
+        for (const id of moved) {
+          const el = elements.find((e) => e.id === id);
+          if (!el || el.boundaryHostId || el.type === "pool" || el.type === "lane" || el.type === "sublane") continue;
+          if (el.parentId && moved.has(el.parentId)) continue;
+          roots.add(id);
+          const cx = el.x + el.width / 2, cy = el.y + el.height / 2;
+          const holder = dragHolderOf(elements, el);
+          const parentId = MARKER_TYPES.has(el.type) ? pickMarkerHost(el, elements, id)
+            : holder ? (pickDropParent(elements, el, cx, cy, holder) ?? holder).id
+            : pickDropParent(elements, el, cx, cy)?.id;
+          if (parentId !== el.parentId) elements = elements.map((e) => (e.id === id ? { ...e, parentId } : e));
+        }
+        elements = edgeEventsFollowHosts(elements, roots);
+        const refit = refitContainersAfterMove(elements, connectors, state.relaxedLayout);
+        elements = updatePoolTypes(refit.elements);
+        connectors = refit.connectors;
+      }
+      return reducerImpl({ ...state, elements, connectors }, { type: "CORRECT_ALL_CONNECTORS" });
     }
 
     case "CONVERT_TASK_SUBPROCESS": {
@@ -8645,33 +8774,13 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       ) {
         const cx = initialEl.x + initialEl.width / 2;
         const cy = initialEl.y + initialEl.height / 2;
-        const candidates = elements.filter(b =>
-          isContainerType(b.type) &&
-          containerAccepts(b.type, initialEl.type) &&
-          b.id !== id &&
-          !wouldCreateCycle(elements, id, b.id) &&
-          centreInContainer(cx, cy, b),
-        );
-        // Prefer innermost (smallest) EP, then archimate-shape, then the
-        // smallest lane (so a sublane wins over its parent lane — issue 1),
-        // then pool — same priority as MOVE_ELEMENT's auto-detection.
-        const newParent =
-          candidates.filter(b => b.type === "subprocess-expanded")
-            .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0] ??
-          candidates.filter(b => b.type === "archimate-shape")
-            .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0] ??
-          candidates.filter(b => b.type === "lane")
-            .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0] ??
-          candidates.find(b => b.type === "pool") ??
-          candidates.filter(b => b.type === "process-group")
-            .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0] ??
-          candidates.filter(b => b.type === "uml-package")
-            .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0] ??
-          candidates[0];
-        const newParentId = newParent?.id;
+        const newParentId = pickDropParent(elements, initialEl, cx, cy)?.id;
         if (newParentId !== initialEl.parentId) {
           elements = elements.map(e => e.id === id ? { ...e, parentId: newParentId } : e);
         }
+        // Its drag may have changed its parent on any frame; the events on its
+        // edge go where it went.
+        elements = edgeEventsFollowHosts(elements, new Set([id]));
       }
 
       // Step 1 (issue 8): EP boundary-aware growth fires once at drag
@@ -10238,6 +10347,8 @@ export function useDiagram(initialData: DiagramData) {
   const resizingRef       = useRef<string | null>(null);
   const preGroupMoveRef   = useRef<Snapshot | null>(null);
   const groupDraggingRef  = useRef<boolean>(false);
+  /** Every id the current group drag has moved — what its end re-parents. */
+  const groupMovedIdsRef  = useRef<Set<string>>(new Set());
   // One spoken command, one undo: while a group is open only the FIRST
   // pushHistory goes through (see app/lib/diagram/historyGroup.ts).
   const historyGroupRef   = useRef(createHistoryGroupGate());
@@ -10352,6 +10463,7 @@ export function useDiagram(initialData: DiagramData) {
       groupDraggingRef.current = true;
       preGroupMoveRef.current = snapshotData();
     }
+    if (dx !== 0 || dy !== 0) for (const id of ids) groupMovedIdsRef.current.add(id);
     dispatch({ type: "MOVE_ELEMENTS", payload: { ids, dx, dy } });
   }, []);
 
@@ -10369,8 +10481,13 @@ export function useDiagram(initialData: DiagramData) {
       preGroupMoveRef.current = null;
       groupDraggingRef.current = false;
     }
-    // Recompute partial connectors and validate obstacles after group drag ends
-    dispatch({ type: "CORRECT_ALL_CONNECTORS" });
+    // What moved finds its parents and containers re-fit, as at the end of a
+    // single drag; then the connectors are corrected. A click on a selection
+    // moved nothing, and only has the connectors corrected, as it always had.
+    const ids = [...groupMovedIdsRef.current];
+    groupMovedIdsRef.current = new Set();
+    if (ids.length > 0) dispatch({ type: "ELEMENTS_MOVE_END", payload: { ids } });
+    else dispatch({ type: "CORRECT_ALL_CONNECTORS" });
   }, []);
 
   const resizeElement = useCallback((id: string, x: number, y: number, width: number, height: number) => {
