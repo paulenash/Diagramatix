@@ -15,6 +15,7 @@ import { snapImportedBounds, type Box } from "./importGeometry";
 import { buildTestConnectors } from "./bpmnTestConnectors";
 import { tetherModeOnCreate } from "./labelTether";
 import { placeMessageLabels } from "./messageLabel";
+import { POOL_GAP } from "./poolLaneBounds";
 
 /**
  * Connector ids carry the INDEX of the connector within its own array.
@@ -124,7 +125,6 @@ const POOL_HEADER_W = 36;
 const LANE_H = 120;
 const LANE_PAD_X = 54; // 1.5 × start-event width (36) — gap between pool/lane header right edge and the first start event
 const BLACK_BOX_H = 50;
-const POOL_GAP = 98; // gap between pool boundaries = 1.5 × Task height (65) — plenty for a message label, no more (Paul 2026-07-29)
 const COL_SPACING = 160; // horizontal spacing between columns
 const TASK_W = 100; // standard task width for padding
 const START_X = 50;

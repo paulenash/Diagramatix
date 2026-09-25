@@ -178,11 +178,11 @@ describe("T4742 — a template past the pool's right edge still joins it, and th
   it("does not reach LEFT of the pool, or to another band", () => {
     // Overflowing the right edge is a pool that wants to be longer. Something
     // placed to the LEFT, or at a different height, was put there deliberately.
-    const after = apply(world(), [
-      E2({ id: "n4", type: "task", label: "Left", x: -300, y: 60, width: 100, height: 60, properties: {} }),
-      E2({ id: "n5", type: "task", label: "Below", x: 700, y: 900, width: 100, height: 60, properties: {} }),
-    ]);
-    expect(after.elements.find((e) => e.id === "n4")!.parentId, "left of the pool stays out").toBeUndefined();
-    expect(after.elements.find((e) => e.id === "n5")!.parentId, "a different band stays out").toBeUndefined();
+    // Each is its own template here: a template is ONE piece (issue 6), and one
+    // spanning both places would overlap the pool and be taken in whole.
+    const left = apply(world(), [E2({ id: "n4", type: "task", label: "Left", x: -300, y: 60, width: 100, height: 60, properties: {} })]);
+    const below = apply(world(), [E2({ id: "n5", type: "task", label: "Below", x: 700, y: 900, width: 100, height: 60, properties: {} })]);
+    expect(left.elements.find((e) => e.id === "n4")!.parentId, "left of the pool stays out").toBeUndefined();
+    expect(below.elements.find((e) => e.id === "n5")!.parentId, "a different band stays out").toBeUndefined();
   });
 });

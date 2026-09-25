@@ -171,6 +171,14 @@ export function clampRectToLimits(before: Rect, raw: Rect, lim: EdgeLimits): Rec
 export const MIN_LEFT_GAP = 18;     // half of a 36px event
 
 /**
+ * The gap between stacked pools: 1.5 × Task height (65) — "plenty for a message
+ * label, no more" (Paul, 2026-07-29). Generation stacks its pools with it, and a
+ * template that brings pools (or lanes) of its own is stacked below the
+ * diagram's with it.
+ */
+export const POOL_GAP = 98;
+
+/**
  * How far LEFT a container has to move so its header strip clears the content.
  *
  * Returns 0 when the gap is already there — the common case, and the one that

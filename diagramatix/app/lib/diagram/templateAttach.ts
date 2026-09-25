@@ -36,6 +36,7 @@ import { HALF_TASK_W, findFreeSlot, followOnParentId, planBoundaryFollowOn } fro
 import { canConnect, containerScopeOf, flowScopeOf } from "./canConnect";
 import { getElementPoolId } from "./poolUtil";
 import { isLaneUnowned } from "./containment";
+import { isTemplateContainer } from "./templateAdoption";
 import { previewBase, type TemplateIds, type TemplateSnapshot } from "./templatePreview";
 
 /** The sequence flow that joins a template to the element it follows. */
@@ -53,8 +54,8 @@ export function anchorNameOf(el: DiagramElement): string {
  * `anchor` into a task placed where the template's entry would go.
  *
  * Inside an expanded subprocess the answer is no, for now: the fragment is
- * pushed off the subprocess by the nudge, or split by the lane pass that runs
- * before the subprocess can grow, and the join is then refused (verdict-5).
+ * pushed off the subprocess by the nudge, which knows nothing of it, and the
+ * join is then refused (verdict-5).
  */
 export function whyTemplateCantFollow(anchor: DiagramElement, elements: DiagramElement[]): string | null {
   const noFlow = `a template can’t follow “${anchorNameOf(anchor)}” — no sequence flow can leave it`;
@@ -99,7 +100,7 @@ export function planTemplateAttach(
   if (!anchor) return { error: "the element it was to follow is no longer on the diagram", blame: "anchor" };
   const why = whyTemplateCantFollow(anchor, base.elements);
   if (why) return { error: why, blame: "anchor" };
-  if (templateData.elements.some((e) => e.type === "pool" || e.type === "lane" || e.type === "sublane")) {
+  if (templateData.elements.some(isTemplateContainer)) {
     return { error: "it brings a pool or lane of its own", blame: "template" };
   }
   const attach = templateAttachData(templateData);
@@ -190,9 +191,10 @@ export function checkTemplateAttach(base: DiagramData, plan: TemplateAttachPlan)
       const lane = byId.get(meant);
       return { error: `“${anchorNameOf(el)}” would land in “${parent ? anchorNameOf(parent) : "no lane"}”, not “${lane ? anchorNameOf(lane) : "its lane"}”` };
     }
-    // A lane — or a pool with no lanes — grows DOWN to take a template; one
-    // that reaches above its top hangs over the band above, drawn in one and
-    // owned by another.
+    // The band makes room all round a joined template — down, and at its top
+    // by carrying its own content down with it (useDiagram `makeRoomInLane`)
+    // — so a template reaching above its lane is placed, not refused. The
+    // check stays for anything that still ends up outside what owns it.
     const out = parent && !el.boundaryHostId ? sticksOut(el, parent) : null;
     if (parent && out) {
       return { error: `“${anchorNameOf(el)}” would stick out ${out} “${anchorNameOf(parent)}”` };

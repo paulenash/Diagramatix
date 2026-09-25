@@ -32,7 +32,7 @@ import { getLaneHeaderWidth, getPoolHeaderWidth, laneMetrics, minHeightForContai
 import { carveGeometry, refitStackAtEdge, shiftSublanesBy } from "@/app/lib/diagram/laneStack";
 import { uniqueContainerLabel } from "@/app/lib/diagram/containerNames";
 import { planCarve, planLaneDrop, type CarvePlan } from "@/app/lib/diagram/laneDropPlan";
-import { labelsFollowTheirSegments, holdGatewayBranchLabels } from "@/app/lib/diagram/labelFollow";
+import { labelsFollowTheirSegments, holdGatewayBranchLabels, labelFollowOnRouteChange } from "@/app/lib/diagram/labelFollow";
 import { gestureTraceOn, traceGesture, movedElements } from "@/app/lib/debug/gestureTrace";
 import { baseLabelAnchor } from "@/app/lib/diagram/checks/layoutViolations";
 import { absorbAtEdge, shrinkRoom, stackFrom, type Band, type StackEdge } from "@/app/lib/diagram/laneBands";
@@ -43,7 +43,7 @@ import { expandMoveSet } from "@/app/lib/diagram/moveSet";
 import { retypeTasksForSystemFlag, applyTaskTypeChanges } from "@/app/lib/diagram/itSystemTaskTypes";
 import { emieMountProps } from "@/app/lib/diagram/emieLabel";
 import { BOUNDARY_HOST_TYPES } from "@/app/lib/diagram/boundaryHosts";
-import { settleMessageLabels, movedElementIds, placeMessageLabel, messageLabelSide, healMessageLabels } from "@/app/lib/diagram/messageLabel";
+import { settleMessageLabels, movedElementIds, placeMessageLabel, messageLabelSide, healMessageLabels, followMessageLabel } from "@/app/lib/diagram/messageLabel";
 import { growPoolToAdopt } from "@/app/lib/diagram/growPool";
 import { planWrapInPool } from "@/app/lib/diagram/wrapInPoolPlan";
 import { planMovePool, planSwapPools, type PoolPosition } from "@/app/lib/diagram/poolOrder";
@@ -51,6 +51,8 @@ import { autoResizeUmlElement, sizeUmlNote } from "@/app/lib/diagram/umlAutoSize
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { getElementPoolId } from "@/app/lib/diagram/poolUtil";
 import { isLaneUnowned } from "@/app/lib/diagram/containment";
+import { isBlackBoxPool } from "@/app/lib/diagram/blackBoxPoolMenu";
+import { planTemplateAdoption, boxOf } from "@/app/lib/diagram/templateAdoption";
 import { CHEVRON_THEMES, chevronReadingOrder } from "@/app/lib/diagram/chevronThemes";
 import { createHistoryGroupGate } from "@/app/lib/diagram/historyGroup";
 import type { TemplateJoin } from "@/app/lib/diagram/templateAttach";
@@ -390,6 +392,10 @@ export type Action =
        *  because "was this connector made by a bulk gesture?" is not
        *  something the reducer can tell from the geometry. */
       labelTether?: "always";
+      /** Check only the NEW connector against obstacles, leaving every other
+       *  route as it is. The join APPLY_TEMPLATE draws: the template's flows
+       *  keep the routes they were saved with, joined or not. */
+      keepOtherRoutes?: boolean;
     }}
   | { type: "DELETE_CONNECTOR"; payload: { id: string } }
   | { type: "UPDATE_CONNECTOR_ENDPOINT"; payload: {
@@ -746,7 +752,9 @@ function reconcileLaneMembership(elements: DiagramElement[]): DiagramElement[] {
       const owner = pools
         // Explicitly black-box only — an absent poolType is ambiguous, and
         // stranding an element is worse than adopting it (see ADD_ELEMENT).
-        .filter((p) => (p.properties?.poolType as string | undefined) !== "black-box")
+        // The one predicate, shared with the template adoption and the
+        // template window (blackBoxPoolMenu.ts `isBlackBoxPool`).
+        .filter((p) => !isBlackBoxPool(p))
         .filter((p) => encloses(p, cx, cy))
         .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0];
       if (!owner || owner.id === el.parentId) return el;
@@ -1077,64 +1085,6 @@ function shiftSubtreesByX(
     }
   }
   return elements.map((e) => (all.has(e.id) ? { ...e, x: e.x + deltaX } : e));
-}
-
-/**
- * Mirror of `applyPoolBelowShift` along the X axis. When a pool grew
- * wider on the right (because an EP inside it grew right), shove ALL
- * pools whose left edge sits at-or-after the named pool's OLD right
- * edge to the right by `growth`, along with every descendant. Used by
- * the LEFT- and RIGHT-edge EP boundary growth.
- */
-function applyPoolRightShift(
-  elements: DiagramElement[],
-  connectors: Connector[],
-  poolId: string,
-  oldPoolRight: number,
-  growth: number,
-): { elements: DiagramElement[]; connectors: Connector[] } {
-  if (growth <= 0) return { elements, connectors };
-  const finalPool = elements.find((e) => e.id === poolId);
-  if (!finalPool) return { elements, connectors };
-  const newPoolRight = finalPool.x + finalPool.width;
-  const poolsRight = elements.filter(
-    (e) => e.type === "pool" && e.id !== poolId && e.x >= oldPoolRight,
-  );
-  const tooClose = poolsRight.some((p) => p.x - newPoolRight < 100);
-  if (!tooClose) return { elements, connectors };
-
-  const shiftIds = new Set<string>();
-  for (const p of poolsRight) {
-    shiftIds.add(p.id);
-    const stack = [p.id];
-    while (stack.length) {
-      const cid = stack.pop()!;
-      for (const e of elements) {
-        if ((e.parentId === cid || e.boundaryHostId === cid) && !shiftIds.has(e.id)) {
-          shiftIds.add(e.id);
-          stack.push(e.id);
-        }
-      }
-    }
-  }
-  const shiftedElements = elements.map((e) =>
-    shiftIds.has(e.id) ? { ...e, x: e.x + growth } : e,
-  );
-  // Shift connectors whose source AND target both moved (their waypoints
-  // need translating). For half-moved connectors, leave waypoints alone
-  // — a recompute pass downstream will validate.
-  const updatedConnectors = connectors.map((conn) => {
-    const srcMoved = shiftIds.has(conn.sourceId);
-    const tgtMoved = shiftIds.has(conn.targetId);
-    if (srcMoved && tgtMoved) {
-      return {
-        ...conn,
-        waypoints: conn.waypoints.map((wp) => ({ x: wp.x + growth, y: wp.y })),
-      };
-    }
-    return conn;
-  });
-  return { elements: shiftedElements, connectors: updatedConnectors };
 }
 
 /**
@@ -2436,180 +2386,208 @@ function pushPastLaneGrowth(
 }
 
 /**
- * 100px-rule shift: if the named pool grew so that its new bottom now
- * sits within 100px of any pool below, shove ALL pools below (and their
- * descendants) down by `growth` to preserve the visual gap. Recomputes
- * connectors for anything that moved, and adjusts messageBPMN label
- * offsets so labels track their Black-Box Pool attachment Y.
+ * THE POOLS-BELOW CASCADE — the one rule for what a GROWN pool does to the
+ * pools under it. Geometry only; connectors follow afterwards
+ * (`connectorsFollow`, via `settleGrowth`).
  *
- * Returns updated { elements, connectors }; safe to call when growth is
- * 0 or no pools are too close (returns the inputs unchanged).
+ * The rule is the existing 100-px rule: if a pool's growth brings its new
+ * bottom within 100px of a pool below, every pool below moves down by the
+ * growth, so the gap to it is kept; further away, nothing moves.
+ *
+ * Computed ONCE, top-down, from the ORIGINAL geometry (`before`). Asked pool
+ * by pool against geometry that is already moving, a pool just PUSHED looks
+ * like a pool that GREW and "below" is judged against bottoms that have
+ * already moved: two pools stacked under a growing one were pushed two and
+ * three times, and could end up in the wrong order (verdict-6). So:
+ *   • growth is the change in HEIGHT of a pool that actually grew (at its
+ *     bottom) — never the change in bottom of a pool that merely moved;
+ *   • a pool whose original top is at or below a grown pool's original bottom
+ *     moves by the sum of the growths above it that reach it, each judged by
+ *     the 100-px rule on its ORIGINAL gap;
+ *   • in a relaxed (free-form / imported) layout, where pools may sit side by
+ *     side, only the pools below that horizontally OVERLAP the grown pool are
+ *     pushed — a pool that grows must push what is under it, never swallow it.
+ *
+ * Each pushed pool takes everything it holds (lanes, contents, their boundary
+ * events). Returns `after` itself when nothing moves.
  */
-function applyPoolBelowShift(
-  elements: DiagramElement[],
-  connectors: Connector[],
-  poolId: string,
-  oldPoolBottom: number,
-  growth: number,
-): { elements: DiagramElement[]; connectors: Connector[] } {
-  if (growth <= 0) return { elements, connectors };
-  const finalPool = elements.find(e => e.id === poolId);
-  if (!finalPool) return { elements, connectors };
-  const newPoolBottom = finalPool.y + finalPool.height;
-  const poolsBelow = elements.filter(e =>
-    e.type === "pool" && e.id !== poolId && e.y >= oldPoolBottom
-  );
-  const tooClose = poolsBelow.some(p => p.y - newPoolBottom < 100);
-  if (!tooClose) return { elements, connectors };
-
-  const shiftIds = new Set<string>();
-  for (const p of poolsBelow) {
-    shiftIds.add(p.id);
-    const stack = [p.id];
-    while (stack.length) {
-      const cid = stack.pop()!;
-      for (const e of elements) {
-        if ((e.parentId === cid || e.boundaryHostId === cid) && !shiftIds.has(e.id)) {
-          shiftIds.add(e.id);
-          stack.push(e.id);
-        }
-      }
-    }
+export function cascadePoolsBelow(
+  before: DiagramElement[],
+  after: DiagramElement[],
+  relaxed?: boolean,
+): DiagramElement[] {
+  const EPS = 0.01;
+  const was = new Map(before.map((e) => [e.id, e] as const));
+  const bottomOf = (r: { y: number; height: number }) => r.y + r.height;
+  const pools = after
+    .filter((p) => p.type === "pool" && was.has(p.id))
+    .map((p) => ({ now: p, was: was.get(p.id)! }))
+    .sort((a, b) => a.was.y - b.was.y);
+  const grown = pools
+    .map((q) => ({ ...q, g: Math.min(q.now.height - q.was.height, bottomOf(q.now) - bottomOf(q.was)) }))
+    .filter((q) => q.g > EPS);
+  if (grown.length === 0) return after;
+  const overlapsAcross = (a: DiagramElement, b: DiagramElement) =>
+    Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x) > 0.5;
+  const shift = new Map<string, number>();
+  for (const q of grown) {
+    const under = pools.filter((c) => c.now.id !== q.now.id
+      && c.was.y >= bottomOf(q.was) - 0.5
+      && (!relaxed || overlapsAcross(q.now, c.was)));
+    if (!under.some((c) => c.was.y - bottomOf(q.was) - q.g < 100)) continue;
+    for (const c of under) shift.set(c.now.id, (shift.get(c.now.id) ?? 0) + q.g);
   }
-  const shiftedElements = elements.map(e =>
-    shiftIds.has(e.id) ? { ...e, y: e.y + growth } : e
-  );
-  let updatedConnectors = connectors.map(conn => {
-    if (!shiftIds.has(conn.sourceId) && !shiftIds.has(conn.targetId)) return conn;
-    return recomputeAllConnectors([conn], shiftedElements)[0] ?? conn;
-  });
-  // messageBPMN label tracking — BBP attachment Y dictates label Y.
-  const findPoolIdOf = (elId: string): string | null => {
-    let cur = shiftedElements.find(e => e.id === elId);
-    for (let i = 0; i < 10 && cur; i++) {
-      if (cur.type === "pool") return cur.id;
-      if (!cur.parentId) return null;
-      cur = shiftedElements.find(e => e.id === cur!.parentId);
-    }
-    return null;
-  };
-  updatedConnectors = updatedConnectors.map(conn => {
-    if (conn.type !== "messageBPMN") return conn;
-    const srcPoolId = findPoolIdOf(conn.sourceId);
-    const tgtPoolId = findPoolIdOf(conn.targetId);
-    const srcShifted = !!(srcPoolId && shiftIds.has(srcPoolId));
-    const tgtShifted = !!(tgtPoolId && shiftIds.has(tgtPoolId));
-    if (srcShifted === tgtShifted) return conn;
-    const srcPool = srcPoolId ? shiftedElements.find(e => e.id === srcPoolId) : undefined;
-    const tgtPool = tgtPoolId ? shiftedElements.find(e => e.id === tgtPoolId) : undefined;
-    const srcIsBlackBox = !!srcPool && ((srcPool.properties.poolType as string | undefined) ?? "black-box") !== "white-box";
-    const tgtIsBlackBox = !!tgtPool && ((tgtPool.properties.poolType as string | undefined) ?? "black-box") !== "white-box";
-    let bbpShifted: boolean;
-    if (srcIsBlackBox && !tgtIsBlackBox) bbpShifted = srcShifted;
-    else if (tgtIsBlackBox && !srcIsBlackBox) bbpShifted = tgtShifted;
-    else if (srcIsBlackBox && tgtIsBlackBox) bbpShifted = srcShifted;
-    else return conn;
-    const anchorShift = ((srcShifted ? growth : 0) + (tgtShifted ? growth : 0)) / 2;
-    const bbpShift = bbpShifted ? growth : 0;
-    const extra = bbpShift - anchorShift;
-    if (Math.abs(extra) < 0.5) return conn;
-    return { ...conn, labelOffsetY: (conn.labelOffsetY ?? 0) + extra };
-  });
-  return { elements: shiftedElements, connectors: updatedConnectors };
+  if (shift.size === 0) return after;
+  const dyOf = new Map<string, number>();
+  for (const [id, dy] of shift) {
+    dyOf.set(id, dy);
+    for (const d of getAllDescendantIds(after, id)) dyOf.set(d, dy);
+  }
+  return after.map((e) => (dyOf.has(e.id) ? { ...e, y: e.y + dyOf.get(e.id)! } : e));
 }
 
 /**
- * Mirror of `applyPoolBelowShift` for upward cascade. When a pool grew
- * upward (its `y` decreased), shove every pool whose old bottom was
- * at-or-above the moved pool's old top UP by `growth`, along with its
- * full descendant set. 100-px-rule: only shift if the moved pool's new
- * top is now within 100 px of any pool above. Connectors with one or
- * both endpoints in the shifted set are translated / recomputed in the
- * same pattern as the below-shift helper. messageBPMN labels track
- * their BBP attachment Y.
+ * Free notes follow the content they describe when growth moves it.
+ *
+ * A text annotation or review comment is deliberately unowned (containment.ts
+ * `isLaneUnowned`) — adopted into a lane it would travel with the lane — so
+ * nothing moved it when the lane under it was pushed down, and a note beside a
+ * task ended up in the lane above the task. A note that has not moved goes
+ * with the element it is ASSOCIATED to (a connector either way), when that
+ * element moved; failing an association, with the innermost lane or pool its
+ * centre sat in (its band), when that moved. `keep` holds notes the caller has
+ * already placed (a template's own notes ride with the template).
  */
-function applyPoolAboveShift(
-  elements: DiagramElement[],
+function unownedNotesFollow(
+  before: DiagramElement[],
+  after: DiagramElement[],
   connectors: Connector[],
-  poolId: string,
-  oldPoolTop: number,
-  growth: number,
-): { elements: DiagramElement[]; connectors: Connector[] } {
-  if (growth <= 0) return { elements, connectors };
-  const finalPool = elements.find((e) => e.id === poolId);
-  if (!finalPool) return { elements, connectors };
-  const newPoolTop = finalPool.y;
-  const poolsAbove = elements.filter((e) =>
-    e.type === "pool" && e.id !== poolId && e.y + e.height <= oldPoolTop,
-  );
-  const tooClose = poolsAbove.some((p) => newPoolTop - (p.y + p.height) < 100);
-  if (!tooClose) return { elements, connectors };
-
-  const shiftIds = new Set<string>();
-  for (const p of poolsAbove) {
-    shiftIds.add(p.id);
-    const stack = [p.id];
-    while (stack.length) {
-      const cid = stack.pop()!;
-      for (const e of elements) {
-        if ((e.parentId === cid || e.boundaryHostId === cid) && !shiftIds.has(e.id)) {
-          shiftIds.add(e.id);
-          stack.push(e.id);
-        }
-      }
-    }
-  }
-  const shiftedElements = elements.map((e) =>
-    shiftIds.has(e.id) ? { ...e, y: e.y - growth } : e,
-  );
-  let updatedConnectors = connectors.map((conn) => {
-    const srcIn = shiftIds.has(conn.sourceId);
-    const tgtIn = shiftIds.has(conn.targetId);
-    if (srcIn && tgtIn) {
-      return {
-        ...conn,
-        waypoints: conn.waypoints.map((wp) => ({ x: wp.x, y: wp.y - growth })),
-      };
-    }
-    if (srcIn || tgtIn) {
-      return recomputeAllConnectors([conn], shiftedElements)[0] ?? conn;
-    }
-    return conn;
-  });
-  // messageBPMN label tracking — mirror the below-shift logic with
-  // negative growth, so labels follow whichever pool is the BBP anchor.
-  const findPoolIdOf = (elId: string): string | null => {
-    let cur = shiftedElements.find((e) => e.id === elId);
-    for (let i = 0; i < 10 && cur; i++) {
-      if (cur.type === "pool") return cur.id;
-      if (!cur.parentId) return null;
-      cur = shiftedElements.find((e) => e.id === cur!.parentId);
-    }
-    return null;
+  keep: ReadonlySet<string> = new Set(),
+): DiagramElement[] {
+  const was = new Map(before.map((e) => [e.id, e] as const));
+  const now = new Map(after.map((e) => [e.id, e] as const));
+  const delta = (id: string): { dx: number; dy: number } | null => {
+    const b = was.get(id), a = now.get(id);
+    return b && a ? { dx: a.x - b.x, dy: a.y - b.y } : null;
   };
-  updatedConnectors = updatedConnectors.map((conn) => {
-    if (conn.type !== "messageBPMN") return conn;
-    const srcPoolId = findPoolIdOf(conn.sourceId);
-    const tgtPoolId = findPoolIdOf(conn.targetId);
-    const srcShifted = !!(srcPoolId && shiftIds.has(srcPoolId));
-    const tgtShifted = !!(tgtPoolId && shiftIds.has(tgtPoolId));
-    if (srcShifted === tgtShifted) return conn;
-    const srcPool = srcPoolId ? shiftedElements.find((e) => e.id === srcPoolId) : undefined;
-    const tgtPool = tgtPoolId ? shiftedElements.find((e) => e.id === tgtPoolId) : undefined;
-    const srcIsBlackBox = !!srcPool && ((srcPool.properties.poolType as string | undefined) ?? "black-box") !== "white-box";
-    const tgtIsBlackBox = !!tgtPool && ((tgtPool.properties.poolType as string | undefined) ?? "black-box") !== "white-box";
-    let bbpShifted: boolean;
-    if (srcIsBlackBox && !tgtIsBlackBox) bbpShifted = srcShifted;
-    else if (tgtIsBlackBox && !srcIsBlackBox) bbpShifted = tgtShifted;
-    else if (srcIsBlackBox && tgtIsBlackBox) bbpShifted = srcShifted;
-    else return conn;
-    const anchorShift = -((srcShifted ? growth : 0) + (tgtShifted ? growth : 0)) / 2;
-    const bbpShift = bbpShifted ? -growth : 0;
-    const extra = bbpShift - anchorShift;
-    if (Math.abs(extra) < 0.5) return conn;
-    return { ...conn, labelOffsetY: (conn.labelOffsetY ?? 0) + extra };
+  const moved = (d: { dx: number; dy: number } | null) => !!d && (Math.abs(d.dx) > 0.01 || Math.abs(d.dy) > 0.01);
+  const bands = before.filter((e) => e.type === "lane" || e.type === "pool");
+  let changed = false;
+  const out = after.map((note) => {
+    if (!isLaneUnowned(note) || note.parentId || keep.has(note.id)) return note;
+    const b = was.get(note.id);
+    if (!b || moved(delta(note.id))) return note;
+    const partnerId = connectors
+      .map((c) => (c.sourceId === note.id ? c.targetId : c.targetId === note.id ? c.sourceId : null))
+      .find((id): id is string => !!id && !!was.get(id) && !isLaneUnowned(was.get(id)!));
+    let d: { dx: number; dy: number } | null = null;
+    if (partnerId) d = delta(partnerId);
+    else {
+      const cx = b.x + b.width / 2, cy = b.y + b.height / 2;
+      const band = bands
+        .filter((e) => centreInContainer(cx, cy, e))
+        .sort((p, q) => p.width * p.height - q.width * q.height)[0];
+      if (band) d = delta(band.id);
+    }
+    if (!d || !moved(d)) return note;
+    changed = true;
+    return { ...note, x: note.x + d.dx, y: note.y + d.dy };
   });
-  return { elements: shiftedElements, connectors: updatedConnectors };
+  return changed ? out : after;
+}
+
+/**
+ * CONNECTORS FOLLOW THE GEOMETRY — once, after all of it has changed.
+ *
+ * `before` is the diagram as it was, `after` as the geometry finally is. For
+ * each connector, by the rectangles of its two ends:
+ *   • neither end moved — the route is left alone;
+ *   • both moved by the same (dx, dy) and neither changed size — the route is
+ *     TRANSLATED, exactly: a template's own flows keep the routes it was saved
+ *     with, and a hand-shaped flow in a lane or pool that was pushed keeps its
+ *     shape (re-routed, a route of nine or more points kept its old interior
+ *     and was left behind);
+ *   • otherwise it is re-routed on the final geometry, a message's end on a
+ *     pool that changed width held where it was (`pinPoolMessageEnds`), and a
+ *     sequence flow's label kept beside its horizontal segment (labelFollow.ts).
+ * Then every labelled message gets the ONE message-label rule, messageLabel.ts
+ * `followMessageLabel` — attached at its pool end, and placed again only when
+ * the change has left it outside its air gap. It runs for messages whose ends
+ * did not move too: a pool that grows next to one moves the gap under it.
+ *
+ * This is the step after any growth (`settleGrowth`). The rule it generalises
+ * — translate if both ends moved together, re-route if one did — is also
+ * written into shiftElementsPastLineWithinSpan, shiftElementsBeforeLineWithinSpan
+ * and MOVE_ELEMENTS, for one shift at a time (the EP-growth and drag paths,
+ * each with its own label handling; not pointed here yet).
+ */
+export function connectorsFollow(
+  before: DiagramElement[],
+  after: DiagramElement[],
+  connectors: Connector[],
+  opts: { relaxed?: boolean; fontSize?: number } = {},
+): Connector[] {
+  const EPS = 0.01;
+  const was = new Map(before.map((e) => [e.id, e] as const));
+  const now = new Map(after.map((e) => [e.id, e] as const));
+  const motion = (id: string) => {
+    const b = was.get(id), a = now.get(id);
+    if (!b || !a) return null;
+    const dx = a.x - b.x, dy = a.y - b.y;
+    const resized = Math.abs(a.width - b.width) > EPS || Math.abs(a.height - b.height) > EPS;
+    return { dx, dy, resized, moved: resized || Math.abs(dx) > EPS || Math.abs(dy) > EPS };
+  };
+  const resizedPools = new Set(after.filter((a) => a.type === "pool" && motion(a.id)?.resized).map((a) => a.id));
+  const routed = connectors.map((c) => {
+    const s = motion(c.sourceId), t = motion(c.targetId);
+    if (!s?.moved && !t?.moved) return c;
+    if (s && t && s.moved && t.moved && !s.resized && !t.resized
+      && Math.abs(s.dx - t.dx) < EPS && Math.abs(s.dy - t.dy) < EPS) {
+      return { ...c, waypoints: c.waypoints.map((p) => ({ x: p.x + s.dx, y: p.y + s.dy })) };
+    }
+    const held = pinPoolMessageEnds(c, c, was, after, resizedPools);
+    const re = recomputeAllConnectors([held], after, opts.relaxed)[0] ?? held;
+    const label = labelFollowOnRouteChange(c, re);
+    return label ? { ...re, ...label } : re;
+  });
+  let changed = routed.some((c, i) => c !== connectors[i]);
+  const out = routed.map((c, i) => {
+    const offsets = followMessageLabel(connectors[i], before, c, after, routed, opts.fontSize ?? 10);
+    if (!offsets) return c;
+    changed = true;
+    return { ...c, ...offsets };
+  });
+  return changed ? out : connectors;
+}
+
+/**
+ * THE STEP AFTER GROWTH. Every path that makes a lane or pool taller — a
+ * template dropped in, a lane renamed or its font enlarged, a first lane or a
+ * first sub-lane split, a step added after a boundary event — changes the
+ * geometry first, all of it, and then calls this ONCE with the diagram as it
+ * was (`before`) and as the geometry now is (`after`):
+ *   1. the pools below are pushed (`cascadePoolsBelow`, the 100-px rule),
+ *   2. free notes follow what they describe (`unownedNotesFollow`),
+ *   3. the connectors follow (`connectorsFollow`), with the one message-label
+ *      rule.
+ * Growing a lane moved elements and nothing followed them: a template dropped
+ * into Paul's diagram left 22 connectors hanging off their shapes and his
+ * Company pool over Pool 1 (2026-09-25).
+ */
+export function settleGrowth(
+  before: DiagramElement[],
+  after: DiagramElement[],
+  connectors: Connector[],
+  opts: { relaxed?: boolean; fontSize?: number; notesPlaced?: ReadonlySet<string> } = {},
+): { elements: DiagramElement[]; connectors: Connector[] } {
+  let elements = cascadePoolsBelow(before, after, opts.relaxed);
+  elements = unownedNotesFollow(before, elements, connectors, opts.notesPlaced);
+  return { elements, connectors: connectorsFollow(before, elements, connectors, opts) };
+}
+
+/** The diagram-wide settings `settleGrowth` reads. */
+function settleOptsOf(state: DiagramData): { relaxed: boolean; fontSize: number } {
+  return { relaxed: !!state.relaxedLayout, fontSize: state.connectorFontSize ?? 10 };
 }
 
 /** Read a lane's effective header width (stored property override, else 36). */
@@ -2687,6 +2665,9 @@ function rescaleSublanesRecursive(
  * siblings below it (and their whole subtrees) go down by the growth, and each
  * ancestor grows in turn, shifting ITS later siblings too. Returns the same
  * array when the lane is already tall enough.
+ *
+ * GEOMETRY ONLY: the pools below, free notes and connectors are the caller's
+ * one `settleGrowth` after all its geometry.
  */
 function growLaneToHeight(
   baseElements: DiagramElement[],
@@ -2761,64 +2742,88 @@ function growLaneToHeight(
   return elements;
 }
 
+/** A band a child can be made room in: a lane or sub-lane, or a pool with no lanes (its own band). */
+function roomBand(elements: DiagramElement[], id: string): DiagramElement | undefined {
+  const el = elements.find((e) => e.id === id);
+  if (!el) return undefined;
+  if ((el.type === "lane" || el.type === "sublane") && el.parentId) return el;
+  if (el.type === "pool" && !elements.some((k) => k.parentId === el.id && (k.type === "lane" || k.type === "sublane"))) return el;
+  return undefined;
+}
+
 /**
- * Make a lane tall enough to hold a new child spanning [top, bottom] with the
- * usual 8px round it (LANE_CHILD_PAD — the pad the placement clamps to), pushing everything below down (lanes, pools, their
- * contents and connectors) and taking the pool with it.
+ * `growLaneToHeight` for any band: a lane-less pool has no siblings to push and
+ * no ancestors to grow, so it simply gets taller ("just grow the Pool when the
+ * template is placed" — Paul, 2026-09-25). The pools below are the cascade's.
+ */
+function growBandToHeight(elements: DiagramElement[], id: string, minHeight: number): DiagramElement[] {
+  const band = elements.find((e) => e.id === id);
+  if (band?.type !== "pool") return growLaneToHeight(elements, id, minHeight);
+  return band.height >= minHeight ? elements : elements.map((e) => (e.id === id ? { ...e, height: minHeight } : e));
+}
+
+/**
+ * Make room at the TOP of a band: it grows by `by` (at the bottom — the band
+ * above is in the way) and everything in it moves down by `by`, so nothing in
+ * it moves relative to anything else in it, and a flow into it from the side
+ * stays level. "Everything in it" is its descendants and the free notes lying
+ * in it.
+ */
+function growLaneAtTop(elements: DiagramElement[], id: string, by: number): DiagramElement[] {
+  const band = elements.find((e) => e.id === id);
+  if (!band || by <= 0) return elements;
+  const inBand = (e: DiagramElement) => centreInContainer(e.x + e.width / 2, e.y + e.height / 2, band);
+  const carried = new Set(getAllDescendantIds(elements, id));
+  for (const e of elements) if (isLaneUnowned(e) && !e.parentId && inBand(e)) carried.add(e.id);
+  return growBandToHeight(elements, id, band.height + by)
+    .map((e) => (carried.has(e.id) ? { ...e, y: e.y + by } : e));
+}
+
+/**
+ * Make a band — a lane, or a pool with no lanes — tall enough to hold a child
+ * spanning [top, bottom] with the usual 8px round it (LANE_CHILD_PAD — the pad
+ * the placement clamps to).
  *
- * A child poking out ABOVE the lane cannot be met by growing the lane upward —
- * the lane above is in the way — so the lane grows at the bottom instead and
- * its own contents slide down with everything below; `dy` is how far, and the
- * caller moves the child by the same amount. Null when the child already fits.
+ * A child poking out ABOVE the band cannot be met by growing it upward — the
+ * band above is in the way — so it grows at the top in the sense of
+ * `growLaneAtTop`: its contents slide down with everything below; `dy` is how
+ * far, and the caller moves the child by the same amount. Null when the child
+ * already fits.
+ *
+ * GEOMETRY ONLY. The caller settles once, after all its geometry
+ * (`settleGrowth`): the pools below, the notes and the connectors.
  */
 function makeRoomInLane(
   elements: DiagramElement[],
-  connectors: Connector[],
   laneId: string,
   top: number,
   bottom: number,
-): { elements: DiagramElement[]; connectors: Connector[]; dy: number } | null {
+): { elements: DiagramElement[]; dy: number } | null {
   const PAD = LANE_CHILD_PAD;
-  const lane = elements.find((e) => e.id === laneId && (e.type === "lane" || e.type === "sublane"));
-  const parent = lane?.parentId ? elements.find((e) => e.id === lane.parentId) : undefined;
-  if (!lane || !parent) return null;
-  const needTop = Math.max(0, lane.y + PAD - top);
-  const needBottom = Math.max(0, (bottom + needTop) + PAD - (lane.y + lane.height + needTop));
+  const band = roomBand(elements, laneId);
+  if (!band) return null;
+  const needTop = Math.max(0, band.y + PAD - top);
+  const needBottom = Math.max(0, bottom + PAD - (band.y + band.height));
   if (needTop === 0 && needBottom === 0) return null;
-  // The lane and every container round it stay where they are; they grow.
-  const holds = new Set<string>([lane.id]);
-  for (let p: DiagramElement | undefined = parent; p; p = p.parentId ? elements.find((e) => e.id === p!.parentId) : undefined) {
-    holds.add(p.id);
-  }
-  let els = elements;
-  let conns = connectors;
-  if (needTop > 0) {
-    const r = shiftElementsPastLineWithinSpan(els, conns, "y", lane.y, needTop, parent.x, parent.x + parent.width, holds);
-    els = r.elements; conns = r.connectors;
-  }
+  let els = growLaneAtTop(elements, band.id, needTop);
   if (needBottom > 0) {
-    const stays = new Set<string>([...holds, ...getAllDescendantIds(els, lane.id)]);
-    const line = lane.y + lane.height + needTop;
-    const r = shiftElementsPastLineWithinSpan(els, conns, "y", line, needBottom, parent.x, parent.x + parent.width, stays);
-    els = r.elements; conns = r.connectors;
+    const now = els.find((e) => e.id === band.id)!;
+    els = growBandToHeight(els, band.id, now.height + needBottom);
   }
-  els = els.map((e) => (e.id === lane.id ? { ...e, height: e.height + needTop + needBottom } : e));
-  return { elements: els, connectors: conns, dy: needTop };
+  return { elements: els, dy: needTop };
 }
 
 function resizeLaneForLabel(
   baseElements: DiagramElement[],
-  baseConnectors: Connector[],
   laneId: string,
   fontSize: number,
-): { elements: DiagramElement[]; connectors: Connector[] } {
+): DiagramElement[] {
   const lane = baseElements.find(e => e.id === laneId && e.type === "lane");
-  if (!lane) return { elements: baseElements, connectors: baseConnectors };
+  if (!lane) return baseElements;
   const parent = baseElements.find(e => e.id === lane.parentId);
-  if (!parent) return { elements: baseElements, connectors: baseConnectors };
+  if (!parent) return baseElements;
 
   let elements = baseElements;
-  let connectors = baseConnectors;
 
   // ── 1. Height: grow this lane if its label demands more vertical space. ──
   const { minHeight: laneMin } = laneMetrics(lane.label, fontSize);
@@ -2859,24 +2864,11 @@ function resizeLaneForLabel(
     }
   }
 
-  // Recompute connectors touching anything we may have moved.
-  // (Conservative: recompute all that touch this lane or its descendants.)
-  const touched = new Set<string>([laneId]);
-  function collectAll(rootId: string) {
-    for (const e of elements) {
-      if (e.parentId === rootId || e.boundaryHostId === rootId) {
-        touched.add(e.id);
-        collectAll(e.id);
-      }
-    }
-  }
-  collectAll(lane.parentId!);
-  connectors = connectors.map(conn => {
-    if (!touched.has(conn.sourceId) && !touched.has(conn.targetId)) return conn;
-    return recomputeAllConnectors([conn], elements)[0] ?? conn;
-  });
-
-  return { elements, connectors };
+  // GEOMETRY ONLY. Callers settle once, after all their geometry
+  // (`settleGrowth`): a sub-lane that grows moves the lanes below its PARENT
+  // too, and the pool can grow over the pools below, so a connector pass that
+  // looks only inside this lane's parent leaves flows behind.
+  return elements;
 }
 
 /**
@@ -3726,10 +3718,9 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
               id: nanoid(), type: "lane", ...plan.rect,
               label: plan.label, properties: {}, parentId: plan.poolId,
             };
-            let next = { elements: updatePoolTypes([...state.elements, lane1]), connectors: state.connectors };
-            next = resizeLaneForLabel(next.elements, next.connectors, lane1.id, laneFs);
-            next.elements = ensureContainersEncloseChildren(next.elements);
-            return { ...state, ...next };
+            const sized = resizeLaneForLabel(updatePoolTypes([...state.elements, lane1]), lane1.id, laneFs);
+            const grown = ensureContainersEncloseChildren(sized);
+            return { ...state, ...settleGrowth(state.elements, grown, state.connectors, settleOptsOf(state)) };
           }
           if (plan.kind === "band") {
             const carved = applyCarve(state, plan.carve);
@@ -3749,11 +3740,10 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
             // The lane's loose contents join the first band, as before.
             const elements = state.elements.map((e) =>
               e.parentId === target.id && e.type !== "lane" ? { ...e, parentId: sub1.id } : e);
-            let next = { elements: [...elements, sub1, sub2], connectors: state.connectors };
-            next = resizeLaneForLabel(next.elements, next.connectors, sub1.id, laneFs);
-            next = resizeLaneForLabel(next.elements, next.connectors, sub2.id, laneFs);
-            const enclosed = ensureContainersEncloseChildren(next.elements);
-            return withLeftGap({ ...state, elements: updatePoolTypes(enclosed), connectors: next.connectors }, target.id);
+            const sized = resizeLaneForLabel(resizeLaneForLabel([...elements, sub1, sub2], sub1.id, laneFs), sub2.id, laneFs);
+            const enclosed = updatePoolTypes(ensureContainersEncloseChildren(sized));
+            const settled = settleGrowth(state.elements, enclosed, state.connectors, settleOptsOf(state));
+            return withLeftGap({ ...state, ...settled }, target.id);
           }
           // Nothing fits here — the drag showed a red pool boundary for this
           // very position, so the drop quietly does nothing.
@@ -4086,7 +4076,9 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
             // ambiguity would strand elements in a pool that is about to be
             // called white-box, which is a worse failure than the one being
             // prevented (it broke two parentage tests on the first attempt).
-            if (b.type === "pool" && (b.properties?.poolType as string | undefined) === "black-box") return false;
+            // The one predicate, shared with reconcileLaneMembership and the
+            // template adoption (blackBoxPoolMenu.ts `isBlackBoxPool`).
+            if (isBlackBoxPool(b)) return false;
             const centreInside = centreInContainer(newCx, newCy, b);
             // For subprocess-expanded: a non-event element placed ON the
             // EP boundary (straddling any edge) is treated as inside, so
@@ -4195,11 +4187,18 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       // it" after Event 4 landed in Marketing, below the Sales lane it
       // belonged to. Only for a caller that asks — an ordinary add is
       // unchanged.
+      //
+      // The room is geometry only; what it moves is settled once, below, with
+      // the rest of the add (`settleGrowth`) — the pools below by the one
+      // cascade, and their connectors and message labels with them. Stale
+      // lane parents are repaired first, because the growth moves by parentage.
+      let settleFrom: DiagramElement[] | null = null;
       if (initial?.keepInLane && newEl.parentId) {
-        const room = makeRoomInLane(workingElements, workingConnectors, newEl.parentId, newEl.y, newEl.y + newEl.height);
+        const repaired = reconcileLaneMembership(workingElements);
+        const room = makeRoomInLane(repaired, newEl.parentId, newEl.y, newEl.y + newEl.height);
         if (room) {
+          settleFrom = workingElements;
           workingElements = room.elements;
-          workingConnectors = room.connectors;
           newEl = { ...newEl, y: newEl.y + room.dy };
         }
       }
@@ -4212,6 +4211,10 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       // edge — re-running ensure-enclose / buffer / cascade here would
       // double-shift pools and desync messageBPMN labels.
       const elementsWithNew = ensureContainersEncloseChildren([...workingElements, newEl]);
+      if (settleFrom) {
+        const settled = settleGrowth(settleFrom, elementsWithNew, workingConnectors, settleOptsOf(state));
+        return { ...state, ...enablePainDesc, ...settled };
+      }
 
       return { ...state, ...enablePainDesc, elements: elementsWithNew, connectors: workingConnectors };
     }
@@ -4855,23 +4858,16 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         const pushed = pushPastLaneGrowth(elementsBefore, elements, connectors);
         elements = pushed.elements;
         connectors = pushed.connectors;
+        // A pool that grew pushes the pools below it: THE one top-down cascade
+        // (cascadePoolsBelow — in a relaxed layout only the pools it would
+        // cover). Geometry only; the recompute at the end of this block
+        // re-routes whatever it moved.
+        elements = cascadePoolsBelow(elementsBefore, elements, state.relaxedLayout);
         // Free-form / imported diagrams keep pools at independent sizes and
-        // positions (may sit side-by-side), so the vertical-stack + full-width
-        // cross-pool cascades below are suppressed — each pool only re-fits its
-        // own children, and other pools stay put.
+        // positions (may sit side-by-side), so the full-width cross-pool
+        // cascade below is suppressed — each pool only re-fits its own
+        // children, and other pools stay put.
         if (!state.relaxedLayout) {
-        // Cascade pool-below if any pool's bottom moved down because of
-        // the lane growth chain.
-        for (const oldEl of elementsBefore) {
-          if (oldEl.type !== "pool") continue;
-          const newPool = elements.find((e) => e.id === oldEl.id);
-          if (!newPool) continue;
-          const dY = (newPool.y + newPool.height) - (oldEl.y + oldEl.height);
-          if (dY > 0) {
-            const r = applyPoolBelowShift(elements, connectors, oldEl.id, oldEl.y + oldEl.height, dY);
-            elements = r.elements; connectors = r.connectors;
-          }
-        }
         // Issues 5 + 6: cascade pool L/R growth to OTHER aligned pools
         // and snap every pool's child lanes to the new L/R bounds. When
         // ensureContainersEncloseChildren widens a pool because an EP /
@@ -6213,10 +6209,13 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       }
       // Lane / sublane label edited: grow lane height if needed and
       // sync header widths across siblings.
+      // A lane that grows for its name pushes the pools below it and takes its
+      // flows with it — settled once (`settleGrowth`); renaming Warehouse to a
+      // long name in Paul's diagram put Company 78px over Pool 1.
       if (labelEl && labelEl.type === "lane") {
         const fontSize = state.laneFontSize ?? 14;
-        const updated = resizeLaneForLabel(elements, state.connectors, labelEl.id, fontSize);
-        return { ...state, ...updated };
+        const grown = resizeLaneForLabel(elements, labelEl.id, fontSize);
+        return { ...state, ...settleGrowth(elements, grown, state.connectors, settleOptsOf(state)) };
       }
       // Task / Sub-Process (collapsed): text-driven autosize, aspect-locked
       // to the type's default size. Centre stays put; attached connectors
@@ -6558,6 +6557,9 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       }
 
       const deletingIsContainer = el ? isContainerType(el.type) : false;
+      // The connectors as the lane re-sync below leaves them (it can move a
+      // lane's contents right, or grow a lane); state.connectors otherwise.
+      let followedConnectors = state.connectors;
       let elements = state.elements
         .filter((e) => e.id !== id)
         .filter((e) => e.boundaryHostId !== id)
@@ -6827,13 +6829,12 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           );
           if (survivingSibling) {
             const fontSize = state.laneFontSize ?? 14;
-            const synced = resizeLaneForLabel(
-              elements,
-              state.connectors,
-              survivingSibling.id,
-              fontSize,
-            );
-            elements = synced.elements;
+            const synced = resizeLaneForLabel(elements, survivingSibling.id, fontSize);
+            if (synced !== elements) {
+              const settled = settleGrowth(elements, synced, followedConnectors, settleOptsOf(state));
+              elements = settled.elements;
+              followedConnectors = settled.connectors;
+            }
           }
         }
       }
@@ -6890,7 +6891,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       for (const e of state.elements) {
         if (e.boundaryHostId === id) removedElementIds.add(e.id);
       }
-      let connectors = state.connectors.filter(
+      let connectors = followedConnectors.filter(
         (c) => !removedElementIds.has(c.sourceId) && !removedElementIds.has(c.targetId)
       );
       if (bridgeConnector) connectors = [...connectors, bridgeConnector];
@@ -7440,7 +7441,9 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       // through other elements (issue 8 expanded — applies to every new
       // connector path: auto-connect, manual draw, group-connect).
       // messageBPMN / associationBPMN are skipped inside the helper.
-      const validated = validateConnectorsAgainstObstacles(allConnectors, finalElements);
+      const validated = action.payload.keepOtherRoutes
+        ? [...state.connectors, ...validateConnectorsAgainstObstacles([newConnector], finalElements)]
+        : validateConnectorsAgainstObstacles(allConnectors, finalElements);
       return { ...state, elements: finalElements, connectors: validated };
     }
 
@@ -7991,16 +7994,16 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
     case "SET_LANE_FONT_SIZE": {
       // Recompute every lane's auto-size (height growth + sibling
       // header-width sync) at the new font size.
+      // All the lanes first, then ONE settle: the pools below are pushed once by
+      // the total growth, and the connectors follow the final geometry.
       let elements = state.elements;
-      let connectors = state.connectors;
       const fontSize = action.payload;
       for (const el of state.elements) {
         if (el.type !== "lane") continue;
-        const updated = resizeLaneForLabel(elements, connectors, el.id, fontSize);
-        elements = updated.elements;
-        connectors = updated.connectors;
+        elements = resizeLaneForLabel(elements, el.id, fontSize);
       }
-      return { ...state, elements, connectors, laneFontSize: fontSize };
+      const settled = settleGrowth(state.elements, elements, state.connectors, settleOptsOf(state));
+      return { ...state, ...settled, laneFontSize: fontSize };
     }
 
     case "SET_DATABASE":
@@ -9036,8 +9039,6 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       const { poolId } = action.payload;
       const pool = state.elements.find((e) => e.id === poolId && e.type === "pool");
       if (!pool) return state;
-      const oldPoolHeight = pool.height;
-      const oldPoolBottom = pool.y + oldPoolHeight;
       const POOL_LABEL_W = 36;
       const LANE_HEADER_H = 28;
       const MIN_LANE_H = 80;
@@ -9061,24 +9062,17 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           width: pool.width - POOL_LABEL_W_DYN, height: pool.height,
           label: `Lane ${laneCount + 1}`, properties: {}, parentId: poolId,
         };
-        next = { elements: updatePoolTypes([...state.elements, lane1]), connectors: state.connectors };
-        next = resizeLaneForLabel(next.elements, next.connectors, lane1.id, laneFs);
+        // A first lane that needs more height for its name is the one lane
+        // addition that can still grow the pool; the pools below keep their
+        // gap (`settleGrowth`, the one cascade).
+        const sized = resizeLaneForLabel(updatePoolTypes([...state.elements, lane1]), lane1.id, laneFs);
+        next = settleGrowth(state.elements, sized, state.connectors, settleOptsOf(state));
       } else {
         // Additional lane, at the bottom — carved out of the lane above it;
         // the pool keeps its size (Paul, 2026-09-22). No room → no lane.
         const carved = carveBandWithin(state, poolId, existingLanes.length, `Lane ${laneCount + 1}`);
         if (!carved) return state;
         next = { elements: carved.state.elements, connectors: carved.state.connectors };
-      }
-
-      // A first lane that needed more height for its name is the one lane
-      // addition that can still change the pool; pools below keep their gap.
-      {
-        const finalPool = next.elements.find(e => e.id === poolId);
-        if (finalPool) {
-          const growth = finalPool.height - oldPoolHeight;
-          next = applyPoolBelowShift(next.elements, next.connectors, poolId, oldPoolBottom, growth);
-        }
       }
 
       // The new lane header eats into the clear space the pool left, so the
@@ -9095,20 +9089,6 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       // past the default 36, sublanes must start at the wider boundary
       // or their headers overlap the parent lane header.
       const LANE_LW = getLaneHeaderWidth(parentLane);
-
-      // Walk up to find the containing pool — needed for the 100px
-      // pool-below-shift rule below if this addition grows the pool.
-      let topPool: DiagramElement | undefined;
-      {
-        let cur: DiagramElement | undefined = parentLane;
-        for (let i = 0; cur && i < 10; i++) {
-          if (cur.type === "pool") { topPool = cur; break; }
-          if (!cur.parentId) break;
-          cur = state.elements.find(e => e.id === cur!.parentId);
-        }
-      }
-      const oldPoolHeight = topPool?.height ?? 0;
-      const oldPoolBottom = topPool ? topPool.y + topPool.height : 0;
 
       const existingSublanes = state.elements.filter((e) => e.type === "lane" && e.parentId === laneId);
       if (existingSublanes.length > 0) {
@@ -9145,20 +9125,13 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           if (e.parentId === laneId && e.type !== "lane") return { ...e, parentId: sublane1.id };
           return e;
         });
-        let next = { elements: [...elements, sublane1, sublane2], connectors: state.connectors };
         const laneFs = state.laneFontSize ?? 14;
-        next = resizeLaneForLabel(next.elements, next.connectors, sublane1.id, laneFs);
-        next = resizeLaneForLabel(next.elements, next.connectors, sublane2.id, laneFs);
-        // resizeLaneForLabel can grow the parent lane (and the pool)
-        // when a sublane label needs more height than the half-split
-        // gave it — apply the 100px shift if so.
-        if (topPool) {
-          const finalPool = next.elements.find(e => e.id === topPool!.id);
-          if (finalPool) {
-            const growth = finalPool.height - oldPoolHeight;
-            next = applyPoolBelowShift(next.elements, next.connectors, topPool.id, oldPoolBottom, growth);
-          }
-        }
+        const sized = resizeLaneForLabel(
+          resizeLaneForLabel([...elements, sublane1, sublane2], sublane1.id, laneFs), sublane2.id, laneFs);
+        // A sub-lane whose name needs more height than the half-split gave it
+        // grows the lane and the pool: both sub-lanes first, then ONE settle,
+        // so the pools below are pushed once, by the total (`settleGrowth`).
+        const next = settleGrowth(state.elements, sized, state.connectors, settleOptsOf(state));
         return withLeftGap({ ...state, ...next }, laneId);
       }
     }
@@ -9806,108 +9779,91 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
     }
 
     case "APPLY_TEMPLATE": {
-      // A TEMPLATE DROPPED INSIDE A POOL BELONGS TO IT, AND THE POOL MAKES ROOM.
+      // A TEMPLATE INSERT SETTLES: all the geometry first, then the connectors
+      // once.
       //
       // Paul, 2026-09-24: "Note that insert a template may require the current
-      // Lane and Pool to be expanded to accommodate the new template." It did
-      // not: the inserted elements arrived with no parent, so the adoption pass
-      // never saw them, the enclosing pass had nothing to enclose, and a
-      // template larger than the space left simply hung out over the edge of
-      // the pool.
+      // Lane and Pool to be expanded to accommodate the new template." And
+      // 2026-09-25: "manually placing a template with an EP in it on or over
+      // existing diagram elements also does the same thing. Particularly if
+      // the EP does not fit into the lane it is initially placed in. All ok if
+      // the lane it goes into has been manually prepared for the template. We
+      // need a generic fix for this issue independent of voice assist."
       //
-      // Three steps, in this order, because each needs the one before it:
-      //   1. ADOPT by geometry — the same rule a dragged element obeys, so a
-      //      template dropped in a lane is in that lane and nowhere else.
-      //   2. GROW the lane it landed in to cover it, pushing the lanes below
-      //      down and taking the pool with them (`growLaneToHeight`).
-      //   3. ENCLOSE, which catches the width and anything not in a lane.
-      const laneFs = state.laneFontSize ?? 14;
-      const addedIds = new Set(action.payload.elements.map((e) => e.id));
-      // A parent the CALLER gave is kept. The attach puts a fragment in the
-      // lane of the element it follows — after a boundary event, the host's
-      // lane (R7.07, "Keep it fully inside the EMIE's own lane") — and the
-      // lane then grows round it. Re-homed by the lane pass instead, a
-      // fragment placed below its anchor's lane joined the lane underneath,
-      // and its join ran down across the lane line.
-      const given = new Map(action.payload.elements.filter((e) => e.parentId).map((e) => [e.id, e.parentId!] as const));
-      let merged = reconcileLaneMembership([...state.elements, ...action.payload.elements])
-        .map((e) => (given.has(e.id) && e.parentId !== given.get(e.id) ? { ...e, parentId: given.get(e.id) } : e));
-      // A POOL IS A HORIZONTAL BAND, so overflowing its RIGHT edge does not put
-      // you outside it (Paul, 2026-09-25: "just grow the Pool when the template
-      // is placed", and "assume the template will go on the end of the current
-      // elements").
-      //
-      // `reconcileLaneMembership` adopts by full containment, so a template
-      // dropped past the pool's right edge — which is exactly where "on the
-      // end" puts it — was adopted by nothing. With no parent there were no
-      // children to enclose, so the pool never grew and the template hung
-      // outside it looking like a mistake.
-      //
-      // Vertical position decides membership; horizontal overflow is just a
-      // pool that needs to be longer, and `ensureContainersEncloseChildren`
-      // below already grows width as well as height. Deliberately scoped to
-      // APPLY_TEMPLATE: a DRAGGED element released outside a pool is somebody
-      // deciding it goes outside, and must stay where it was put.
-      {
-        const bandOf = (el: DiagramElement, box: DiagramElement) => {
-          const cy = el.y + el.height / 2;
-          return cy >= box.y && cy < box.y + box.height
-            && el.x >= box.x                       // to the right, not to the left
-            && el.type !== "pool" && el.type !== "lane";
-        };
-        const pools = merged.filter((e) => e.type === "pool"
-          && ((e.properties?.poolType as string | undefined) ?? "black-box") === "white-box");
-        merged = merged.map((el) => {
-          if (!addedIds.has(el.id) || el.parentId) return el;
-          const pool = pools.find((p) => bandOf(el, p));
-          if (!pool) return el;
-          // Prefer the lane at that height, so the template joins a band rather
-          // than floating in the pool behind its own lanes.
-          const lane = merged
-            .filter((e) => e.type === "lane" && e.parentId === pool.id && bandOf(el, e))
-            .sort((a, b) => a.height - b.height)[0];
-          return { ...el, parentId: (lane ?? pool).id };
-        });
-      }
-      // Deepest first: growing a sub-lane moves its lane, and asking in the
-      // other order would measure the lane before its sub-lane had grown.
-      const depthOf = (el: DiagramElement): number => {
-        let d = 0;
-        let cur: DiagramElement | undefined = el;
-        for (let i = 0; cur?.parentId && i < 12; i++) { d++; cur = merged.find((e) => e.id === cur!.parentId); }
-        return d;
+      // What he saw: each template element joined the lane its own centre sat
+      // in, each of those lanes grew separately and shifted the template
+      // elements below it (the template came apart three ways), no connector
+      // followed anything a growing lane moved (22 left hanging), and the pool
+      // grew over the pool below it. In order, now:
+      //   1. REPAIR stale lane parents on the EXISTING elements — the growth
+      //      below moves by parentage.
+      //   2. PLACE the piece: one host for all of it (templateAdoption.ts —
+      //      the caller's parent, else by overlap; never a black-box pool; a
+      //      template with pools of its own stacked under the diagram's).
+      //   3. MAKE ROOM in that one band. Sticking out above it: with a JOIN
+      //      (the attach after an element) the band grows at the top and its
+      //      contents move down with the template, so the join stays level;
+      //      with none, only the template is lowered. Sticking out below: the
+      //      band grows down. Into the header: the piece moves right.
+      //   4. WIDEN the pool to the template ("just grow the Pool when the
+      //      template is placed"), and ENCLOSE.
+      //   5. SETTLE once (`settleGrowth`): the pools below, the notes, and every
+      //      connector — the template's own flows translated with it, keeping
+      //      the routes it was saved with.
+      // The template's notes and markers go wherever the piece goes, and no
+      // lane adopts them (containment.ts `isLaneUnowned`).
+      const payload = action.payload;
+      const payloadIds = new Set(payload.elements.map((e) => e.id));
+      const existing = reconcileLaneMembership(state.elements);
+      const before = [...existing, ...payload.elements];
+      const plan = planTemplateAdoption(existing, payload.elements);
+
+      let piece = payload.elements;
+      const movePiece = (dx: number, dy: number) => {
+        if (Math.abs(dx) > 1e-9 || Math.abs(dy) > 1e-9) piece = piece.map((e) => ({ ...e, x: e.x + dx, y: e.y + dy }));
       };
-      let elements = merged;
-      // A POOL WITH NO LANES is its own band and grows like one ("just grow
-      // the Pool when the template is placed"). Without it a template adopted
-      // straight into a lane-less pool hangs out of the pool's bottom, and the
-      // attach's dry run refuses nearly every template there.
-      const lanelessPool = (e: DiagramElement) => e.type === "pool"
-        && !merged.some((k) => k.parentId === e.id && (k.type === "lane" || k.type === "sublane"));
-      const hosts = merged
-        .filter((e) => (e.type === "lane" || lanelessPool(e)) && merged.some((k) => addedIds.has(k.id) && k.parentId === e.id))
-        .sort((a, b) => depthOf(b) - depthOf(a));
-      for (const host of hosts) {
-        const band = elements.find((e) => e.id === host.id);
-        if (!band) continue;
-        const kids = elements.filter((e) => e.parentId === band.id && e.type !== "lane" && e.type !== "sublane");
-        if (!kids.length) continue;
-        const needed = Math.max(...kids.map((k) => k.y + k.height)) + 8 - band.y;
-        if (band.type === "pool") {
-          // Nothing inside it to push down; the pools below are the same
-          // question a grown lane leaves (issue 6's one top-down cascade).
-          if (needed > band.height) elements = elements.map((e) => (e.id === band.id ? { ...e, height: needed } : e));
-          continue;
+      if (plan.move) movePiece(plan.move.dx, plan.move.dy);
+
+      let others = existing;
+      const host = plan.hostId ? existing.find((e) => e.id === plan.hostId) : undefined;
+      if (host) {
+        piece = piece.map((e) => (plan.topLevelIds.has(e.id) && !(e.parentId && existing.some((x) => x.id === e.parentId))
+          ? { ...e, parentId: host.id } : e));
+        // A boundary event belongs where its host does (the MOVE_END mount convention).
+        piece = piece.map((e) => {
+          if (!plan.boundaryIds.has(e.id)) return e;
+          const parentId = piece.find((h) => h.id === e.boundaryHostId)?.parentId;
+          return parentId === e.parentId ? e : { ...e, parentId };
+        });
+        // The host was CHOSEN without the events on the piece's edges; the
+        // band must still HOLD them. An event on an EP's rim sits half outside
+        // the EP but wholly inside the lane that owns it — measured without
+        // them, "End of Day" and "An Error" were left 10px below their lane.
+        const roomBox = () => boxOf(piece.filter((e) => plan.fragmentIds.has(e.id)));
+        if (host.type === "lane" || host.type === "pool") {
+          const headerRight = host.x + (host.type === "lane" ? getLaneHeaderWidth(host) : getPoolHeaderWidth(host));
+          const b0 = roomBox();
+          if (b0) movePiece(leftGapShortfall(headerRight, 0, b0.x), 0);
+          const b1 = roomBox();
+          if (b1 && !payload.join && b1.y < host.y + LANE_CHILD_PAD) movePiece(0, host.y + LANE_CHILD_PAD - b1.y);
+          const b2 = roomBox();
+          const room = b2 ? makeRoomInLane(others, host.id, b2.y, b2.bottom) : null;
+          if (room) {
+            others = room.elements;
+            movePiece(0, room.dy);
+          }
         }
-        elements = growLaneToHeight(elements, band.id, Math.max(needed, laneMetrics(band.label ?? "", laneFs).minHeight));
       }
+      let elements = [...others, ...piece];
+
       // …AND GROW IT SIDEWAYS, which nothing else will do.
       //
       // `ensureContainersEncloseChildren` sizes a pool or a lane from its
       // STRUCTURAL children only — lanes and sub-lanes. A task never grows its
       // lane, by design. So a template landing past the right edge was adopted
-      // (above) and then still hung outside, because the only pass that could
-      // have widened the pool was never going to look at a task.
+      // and then still hung outside, because the only pass that could have
+      // widened the pool was never going to look at a task. The other pools
+      // keep their width (open question for Paul).
       {
         const MARGIN = 40;
         const poolOfEl = (el: DiagramElement): DiagramElement | undefined => {
@@ -9920,9 +9876,10 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         };
         const wanted = new Map<string, number>();
         for (const el of elements) {
-          if (!addedIds.has(el.id)) continue;
+          if (!payloadIds.has(el.id)) continue;
           const pool = poolOfEl(el);
-          if (!pool) continue;
+          // A template's own pool is sized by the template.
+          if (!pool || payloadIds.has(pool.id)) continue;
           wanted.set(pool.id, Math.max(wanted.get(pool.id) ?? 0, el.x + el.width + MARGIN));
         }
         for (const [poolId, right] of wanted) {
@@ -9939,25 +9896,29 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           });
         }
       }
-      const placed: DiagramData = {
-        ...state,
-        elements: ensureContainersEncloseChildren(elements),
-        connectors: [...state.connectors, ...action.payload.connectors],
-      };
-      // THE JOIN, drawn last and by ADD_CONNECTOR itself. Concatenated with the
-      // template's own connectors it had no route, no gateway-vertex offset
-      // (R6.30), no merge convention and no legality or scope check; sent as a
-      // second action it was a second undo entry holding the same stale
-      // snapshot as the first. A join the rules refuse is simply not drawn —
-      // the template stays, and the caller's dry run says why.
-      const join = action.payload.join;
+      elements = ensureContainersEncloseChildren(elements);
+      const settled = settleGrowth(before, elements, [...state.connectors, ...payload.connectors],
+        { ...settleOptsOf(state), notesPlaced: payloadIds });
+      const placed: DiagramData = { ...state, elements: settled.elements, connectors: settled.connectors };
+      // THE JOIN, drawn last and by ADD_CONNECTOR itself, on the settled
+      // geometry. Concatenated with the template's own connectors it had no
+      // route, no gateway-vertex offset (R6.30), no merge convention and no
+      // legality or scope check; sent as a second action it was a second undo
+      // entry holding the same stale snapshot as the first. A join the rules
+      // refuse is simply not drawn — the template stays, and the caller's dry
+      // run says why. Only the join is checked against obstacles: joined or
+      // not, the template's flows keep the routes they were saved with (the
+      // decision for issue 6 — a stored route that runs through a shape, like
+      // the built-in's "Re-work completed → Assess", is the template's data
+      // to fix, not the insert's).
+      const join = payload.join;
       if (!join) return placed;
       return reducerImpl(placed, {
         type: "ADD_CONNECTOR",
         payload: {
           sourceId: join.sourceId, targetId: join.targetId,
           connectorType: "sequence", directionType: "directed", routingType: "rectilinear",
-          sourceSide: "right", targetSide: "left",
+          sourceSide: "right", targetSide: "left", keepOtherRoutes: true,
         },
       });
     }

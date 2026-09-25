@@ -1,0 +1,475 @@
+{
+ "about": "Paul's Block 2 Test 3 template insert (2026-09-25), rebuilt from his before/after exports: the template payload exactly as the window handed it to APPLY_TEMPLATE, centred on the viewport centre (495.41, 167.57). The before-state is tests/fixtures/block2-test3-template.json. Reproduced his after-state to 0.00 px with the reducer of that day, followed by his drag (681.43, 2.86) and CORRECT_ALL_CONNECTORS.",
+ "payload": {
+  "elements": [
+   {
+    "x": -20.918233702797238,
+    "y": 140.20777826884378,
+    "id": "n6asgrf1",
+    "type": "start-event",
+    "label": "",
+    "width": 40,
+    "height": 40,
+    "properties": {}
+   },
+   {
+    "x": 202.53079954952977,
+    "y": 125.0744657257828,
+    "id": "vjase8mn",
+    "type": "task",
+    "label": "Draft",
+    "width": 102,
+    "height": 65,
+    "parentId": "t05148g1",
+    "properties": {}
+   },
+   {
+    "x": 833.728429458461,
+    "y": 134.57446572578297,
+    "id": "0af5qlsg",
+    "type": "gateway",
+    "label": "Approved?",
+    "width": 46,
+    "height": 46,
+    "properties": {
+     "labelOffsetX": -52.89993762918232,
+     "labelOffsetY": -57.366687456939246
+    },
+    "gatewayType": "none"
+   },
+   {
+    "x": 963.728429458459,
+    "y": 37.57446572578288,
+    "id": "o2qsmzcc",
+    "type": "end-event",
+    "label": "Approved",
+    "width": 40,
+    "height": 40,
+    "properties": {}
+   },
+   {
+    "x": 971.7284294584588,
+    "y": 257.57446572578294,
+    "id": "2enq0ned",
+    "type": "end-event",
+    "label": "Rejected",
+    "width": 40,
+    "height": 40,
+    "properties": {}
+   },
+   {
+    "x": 657.428554200096,
+    "y": 125.07446572578297,
+    "id": "xg58cmmw",
+    "type": "task",
+    "label": "Assess",
+    "width": 102,
+    "height": 65,
+    "properties": {}
+   },
+   {
+    "x": 346.0048483945625,
+    "y": 125.73934396283542,
+    "id": "59cgey2d",
+    "type": "task",
+    "label": "Review",
+    "width": 102,
+    "height": 65,
+    "parentId": "t05148g1",
+    "properties": {}
+   },
+   {
+    "x": 79.22331341980328,
+    "y": 72.63959344610579,
+    "id": "t05148g1",
+    "type": "subprocess-expanded",
+    "label": "Repeat until Re-Work Completed",
+    "width": 501.26413025341736,
+    "height": 175.14946984805036,
+    "properties": {},
+    "repeatType": "loop"
+   },
+   {
+    "x": 126.20684426072569,
+    "y": 132.33940633365316,
+    "id": "xz8bxdjl",
+    "type": "start-event",
+    "label": "",
+    "width": 36,
+    "height": 36,
+    "parentId": "t05148g1",
+    "properties": {}
+   },
+   {
+    "x": 489.6039752031156,
+    "y": 140.23934396283542,
+    "id": "15cy2y6n",
+    "type": "end-event",
+    "label": "",
+    "width": 36,
+    "height": 36,
+    "parentId": "t05148g1",
+    "properties": {}
+   },
+   {
+    "x": 514.620444362193,
+    "y": 54.639593446105806,
+    "id": "jukf4rv8",
+    "type": "intermediate-event",
+    "label": "Re-work\ncompleted",
+    "width": 36,
+    "height": 36,
+    "eventType": "none",
+    "properties": {
+     "labelOffsetX": -56.6162196758072,
+     "labelOffsetY": -61.466126119580736
+    },
+    "boundaryHostId": "t05148g1"
+   }
+  ],
+  "connectors": [
+   {
+    "id": "5ews1it4",
+    "type": "sequence",
+    "sourceId": "n6asgrf1",
+    "targetId": "t05148g1",
+    "waypoints": [
+     {
+      "x": -0.918233702797238,
+      "y": 160.20777826884378
+     },
+     {
+      "x": 19.081766297202762,
+      "y": 160.20777826884378
+     },
+     {
+      "x": 39.08176629720276,
+      "y": 160.20777826884378
+     },
+     {
+      "x": 55.2233134198035,
+      "y": 160.21432837013108
+     },
+     {
+      "x": 79.22331341980328,
+      "y": 160.21432837013108
+     },
+     {
+      "x": 329.85537854651216,
+      "y": 160.21432837013108
+     }
+    ],
+    "sourceSide": "right",
+    "targetSide": "left",
+    "routingType": "rectilinear",
+    "directionType": "directed",
+    "sourceOffsetAlong": 0.5,
+    "targetOffsetAlong": 0.5,
+    "sourceInvisibleLeader": true,
+    "targetInvisibleLeader": true
+   },
+   {
+    "id": "zyl2efm8",
+    "type": "sequence",
+    "label": "",
+    "sourceId": "xg58cmmw",
+    "targetId": "0af5qlsg",
+    "waypoints": [
+     {
+      "x": 708.428554200096,
+      "y": 157.57446572578297
+     },
+     {
+      "x": 759.428554200096,
+      "y": 157.57446572578297
+     },
+     {
+      "x": 783.428554200096,
+      "y": 157.57446572578297
+     },
+     {
+      "x": 810.728429458461,
+      "y": 157.57446572578297
+     },
+     {
+      "x": 833.728429458461,
+      "y": 157.57446572578297
+     },
+     {
+      "x": 856.728429458461,
+      "y": 157.57446572578297
+     }
+    ],
+    "labelWidth": 80,
+    "sourceSide": "right",
+    "targetSide": "left",
+    "routingType": "rectilinear",
+    "labelOffsetX": 0,
+    "labelOffsetY": -20,
+    "directionType": "directed",
+    "sourceOffsetAlong": 0.5,
+    "targetOffsetAlong": 0.5,
+    "sourceInvisibleLeader": true,
+    "targetInvisibleLeader": true
+   },
+   {
+    "id": "5kf05h2m",
+    "type": "sequence",
+    "label": "",
+    "sourceId": "jukf4rv8",
+    "targetId": "xg58cmmw",
+    "waypoints": [
+     {
+      "x": 532.620444362193,
+      "y": 72.63959344610579
+     },
+     {
+      "x": 532.620444362193,
+      "y": 54.63959344610581
+     },
+     {
+      "x": 532.620444362193,
+      "y": 36.63959344610583
+     },
+     {
+      "x": 532.620444362193,
+      "y": 157.57446572578297
+     },
+     {
+      "x": 633.428554200096,
+      "y": 157.57446572578297
+     },
+     {
+      "x": 657.428554200096,
+      "y": 157.57446572578297
+     },
+     {
+      "x": 708.428554200096,
+      "y": 157.57446572578297
+     }
+    ],
+    "labelWidth": 80,
+    "sourceSide": "top",
+    "targetSide": "left",
+    "routingType": "rectilinear",
+    "labelOffsetX": 0,
+    "labelOffsetY": -20,
+    "directionType": "directed",
+    "sourceInvisibleLeader": true,
+    "targetInvisibleLeader": true
+   },
+   {
+    "id": "i16w4ufv",
+    "type": "sequence",
+    "label": "",
+    "sourceId": "vjase8mn",
+    "targetId": "59cgey2d",
+    "waypoints": [
+     {
+      "x": 253.53079954952977,
+      "y": 157.5744657257828
+     },
+     {
+      "x": 304.5307995495301,
+      "y": 158.23934396283548
+     },
+     {
+      "x": 322.53079954953,
+      "y": 158.23934396283548
+     },
+     {
+      "x": 328.00484839456226,
+      "y": 158.23934396283553
+     },
+     {
+      "x": 346.0048483945625,
+      "y": 158.23934396283553
+     },
+     {
+      "x": 397.00484839456226,
+      "y": 158.23934396283542
+     }
+    ],
+    "labelWidth": 80,
+    "sourceSide": "right",
+    "targetSide": "left",
+    "routingType": "rectilinear",
+    "labelOffsetX": 0,
+    "labelOffsetY": -20,
+    "directionType": "directed",
+    "sourceOffsetAlong": 0.5102288959546566,
+    "targetOffsetAlong": 0.5000000000000018,
+    "sourceInvisibleLeader": true,
+    "targetInvisibleLeader": true
+   },
+   {
+    "id": "d44hz3ot",
+    "type": "sequence",
+    "label": "",
+    "sourceId": "xz8bxdjl",
+    "targetId": "vjase8mn",
+    "waypoints": [
+     {
+      "x": 144.2068442607257,
+      "y": 150.33940633365316
+     },
+     {
+      "x": 162.2068442607257,
+      "y": 150.33940633365316
+     },
+     {
+      "x": 180.20684426072557,
+      "y": 150.33940633365316
+     },
+     {
+      "x": 184.53079954952966,
+      "y": 150.3394063336531
+     },
+     {
+      "x": 202.53079954952977,
+      "y": 150.3394063336531
+     },
+     {
+      "x": 253.53079954952977,
+      "y": 157.5744657257828
+     }
+    ],
+    "labelWidth": 80,
+    "sourceSide": "right",
+    "targetSide": "left",
+    "routingType": "rectilinear",
+    "labelOffsetX": 0,
+    "labelOffsetY": -20,
+    "directionType": "directed",
+    "sourceOffsetAlong": 0.5,
+    "targetOffsetAlong": 0.3886913939672354,
+    "sourceInvisibleLeader": true,
+    "targetInvisibleLeader": true
+   },
+   {
+    "id": "69613wrw",
+    "type": "sequence",
+    "label": "",
+    "sourceId": "59cgey2d",
+    "targetId": "15cy2y6n",
+    "waypoints": [
+     {
+      "x": 397.00484839456226,
+      "y": 158.23934396283542
+     },
+     {
+      "x": 448.00484839456226,
+      "y": 158.23934396283542
+     },
+     {
+      "x": 466.00484839456203,
+      "y": 158.23934396283542
+     },
+     {
+      "x": 471.60397520311585,
+      "y": 158.23934396283542
+     },
+     {
+      "x": 489.6039752031156,
+      "y": 158.23934396283542
+     },
+     {
+      "x": 507.6039752031154,
+      "y": 158.23934396283542
+     }
+    ],
+    "labelWidth": 80,
+    "sourceSide": "right",
+    "targetSide": "left",
+    "routingType": "rectilinear",
+    "labelOffsetX": 0,
+    "labelOffsetY": -20,
+    "directionType": "directed",
+    "sourceOffsetAlong": 0.5,
+    "targetOffsetAlong": 0.5,
+    "sourceInvisibleLeader": true,
+    "targetInvisibleLeader": true
+   },
+   {
+    "id": "12ucqbas",
+    "type": "sequence",
+    "label": "Yes",
+    "sourceId": "0af5qlsg",
+    "targetId": "o2qsmzcc",
+    "waypoints": [
+     {
+      "x": 856.728429458461,
+      "y": 157.57446572578297
+     },
+     {
+      "x": 856.228429458461,
+      "y": 135.07446572578297
+     },
+     {
+      "x": 856.228429458461,
+      "y": 53.57446572578287
+     },
+     {
+      "x": 963.728429458459,
+      "y": 53.57446572578287
+     },
+     {
+      "x": 983.7284294584585,
+      "y": 57.574465725782865
+     }
+    ],
+    "labelWidth": 80,
+    "sourceSide": "top",
+    "targetSide": "left",
+    "routingType": "rectilinear",
+    "labelOffsetX": -38.89993762918243,
+    "labelOffsetY": 11.21659390071278,
+    "directionType": "directed",
+    "sourceOffsetAlong": 0.4891304347826087,
+    "targetOffsetAlong": 0.4,
+    "sourceInvisibleLeader": true,
+    "targetInvisibleLeader": true
+   },
+   {
+    "id": "q8xpsjei",
+    "type": "sequence",
+    "label": "No",
+    "sourceId": "0af5qlsg",
+    "targetId": "2enq0ned",
+    "waypoints": [
+     {
+      "x": 856.728429458461,
+      "y": 157.57446572578297
+     },
+     {
+      "x": 856.728429458461,
+      "y": 180.57446572578297
+     },
+     {
+      "x": 856.728429458461,
+      "y": 277.57446572578294
+     },
+     {
+      "x": 971.7284294584588,
+      "y": 277.57446572578294
+     },
+     {
+      "x": 991.7284294584585,
+      "y": 277.57446572578294
+     }
+    ],
+    "labelWidth": 80,
+    "sourceSide": "bottom",
+    "targetSide": "left",
+    "routingType": "rectilinear",
+    "labelOffsetX": -41,
+    "labelOffsetY": -29,
+    "directionType": "directed",
+    "sourceOffsetAlong": 0.5,
+    "targetOffsetAlong": 0.5,
+    "sourceInvisibleLeader": true,
+    "targetInvisibleLeader": true
+   }
+  ]
+ }
+}

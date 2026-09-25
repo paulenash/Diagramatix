@@ -25,10 +25,13 @@
  *
  * Known limit of that strip: it takes off the preview's elements and
  * connectors, not the room APPLY_TEMPLATE made for them. The lane it grew stays
- * grown, a pool it widened stays wide, and the lanes it pushed down stay down.
+ * grown, a pool it widened stays wide, the lanes it pushed down stay down, and
+ * the pools below it pushed stay pushed; with a join (after an element) the
+ * lane's own content it carried down to keep the join level stays lower too.
  * Telling the preview's growth from the other editor's changes needs the
- * geometry to be recorded per container; until then a slightly roomy lane is
- * the price of never throwing a co-author's work away.
+ * geometry to be recorded per container; until then a roomy lane, and a
+ * process sitting lower in it, is the price of never throwing a co-author's
+ * work away.
  *
  * Pure. useDiagram holds the state; this decides — and `runTemplateApply`
  * is the order useDiagram's applyTemplate does it in, so a test can run the

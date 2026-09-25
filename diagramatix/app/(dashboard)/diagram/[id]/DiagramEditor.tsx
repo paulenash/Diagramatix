@@ -77,7 +77,7 @@ import { syntheticElement, withAdded, withDeleted, withLabel } from "@/app/lib/a
 import { needsConfirmation, parseConfirmation } from "@/app/lib/assist/confirm";
 import { collectRenameTargets, type RenameType, type RenameTarget } from "@/app/lib/assist/renameTargets";
 import { buildPickFlow, parsePickAnswer, substituteRef, type PickFlow } from "@/app/lib/assist/disambiguate";
-import { cardsOf, numberTemplates, templatesToOffer, canAttachInline, hiddenTemplatesNote, templateWindowSummary, parseTemplateAnswer, type TemplateCard, type TemplateSection } from "@/app/lib/assist/templatePick";
+import { cardsOf, numberTemplates, templatesToOffer, canAttachInline, diagramHasWhiteBoxPool, hiddenTemplatesNote, templateWindowSummary, parseTemplateAnswer, type TemplateCard, type TemplateSection } from "@/app/lib/assist/templatePick";
 import { TEMPLATE_BEFORE_REFUSAL } from "@/app/lib/assist/templatePhrase";
 import { planTemplateAttach, checkTemplateAttach, planTemplateShow, whyTemplateCantFollow, anchorNameOf } from "@/app/lib/diagram/templateAttach";
 import type { TemplateIds } from "@/app/lib/diagram/templatePreview";
@@ -4358,9 +4358,7 @@ export function DiagramEditor({
 
   /** The window's numbered offer, for a plain window or one whose picks go after `anchor`. */
   const buildTemplateFlow = useCallback((anchor?: DiagramElement, at?: Point): TemplateFlow => {
-    const hasWhiteBoxPool = elementsRef.current.some(
-      (e) => e.type === "pool" && (e.properties?.poolType ?? "white-box") === "white-box",
-    );
+    const hasWhiteBoxPool = diagramHasWhiteBoxPool(elementsRef.current);
     const opts = { hasWhiteBoxPool, attaching: !!anchor };
     const b = templatesToOffer(builtInTemplates, opts);
     const u = templatesToOffer(userTemplates, opts);

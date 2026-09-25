@@ -211,16 +211,22 @@ describe("T4850 — refused with the real reason, never placed half-joined", () 
       .toEqual({ error: "it brings a pool or lane of its own", blame: "template" });
   });
 
-  it("a template that would hang above its lane is refused by the dry run, not shown", () => {
-    // The lane grows DOWN to take a template; "Expanded 1" reaches above
-    // Warehouse's top into Front office. Joined or not, that is a broken
-    // picture, and the check says what is wrong with it.
+  it("a template reaching above its lane is no longer refused: the lane grows at its top, the join stays level (issue 6)", () => {
+    // It was: "“Expanded 1” would stick out above “Warehouse”" — the lane only
+    // grew down. Now Warehouse makes room at its top and its content moves
+    // down with the template, so the gateway and the entry stay level.
     const d = paulsDiagram();
     const p = plan(builtinTemplate("Expanded Subprocess Template"), MERGE, d);
-    expect(checkTemplateAttach(d, p)).toEqual({ error: "“Expanded 1” would stick out above “Warehouse”" });
+    const c = checkTemplateAttach(d, p);
+    expect("error" in c ? c.error : null).toBeNull();
+    const after = (c as { after: DiagramData }).after;
+    expect(cy(at(after, p.entryId))).toBeCloseTo(cy(at(after, MERGE)), 6);
   });
 
-  it("a loose anchor beside a pool: the fragment would straddle the pool, and says so", () => {
+  it("a loose anchor beside a pool: the fragment lands in the pool, away from its anchor, and says so", () => {
+    // One piece, by overlap: the fragment lies over "Us" and goes into it
+    // (it used to be refused as sticking out of Us's left edge); a join from
+    // a task outside every pool into it is not one the rules draw.
     const d: DiagramData = {
       elements: [
         E({ id: "P", type: "pool", label: "Us", x: 300, y: 0, width: 800, height: 300, properties: { poolType: "white-box" } }),
@@ -231,7 +237,7 @@ describe("T4850 — refused with the real reason, never placed half-joined", () 
     } as DiagramData;
     expect(whyTemplateCantFollow(at(d, "t"), d.elements), "a flow can leave it").toBeNull();
     const c = checkTemplateAttach(d, plan(builtinTemplate("Single Approval"), "t", d));
-    expect("error" in c ? c.error : null).toBe("“Submit” would stick out left of “Us”");
+    expect("error" in c ? c.error : null).toBe("“Submit” would land in “Us”, away from “Loose”");
   });
 });
 
@@ -453,8 +459,10 @@ describe("T4853 — one undo entry per window, and nothing left behind (the swap
     expect(hook.data.connectors.some((c) => c.sourceId === MERGE && !d.connectors.some((b) => b.id === c.id)), "the join went with it").toBe(false);
     expect(hook.past, "and the removal is itself one undo entry").toHaveLength(1);
     // The known limit (templatePreview.ts header): taken off by its ids, the
-    // preview leaves the room it made — Warehouse stays grown. Pinned so that
-    // lifting the limit is a deliberate change to this line.
+    // preview leaves the room it made — Warehouse stays grown, and the pools
+    // it pushed and any lane content it carried down to keep the join level
+    // stay moved. Pinned so that lifting the limit is a deliberate change to
+    // this line.
     expect(at(hook.data, WAREHOUSE).height).toBeGreaterThan(at(d, WAREHOUSE).height);
   });
 
@@ -495,7 +503,7 @@ describe("T4853 — one undo entry per window, and nothing left behind (the swap
     const win = windowModel(hook, MERGE);
     win.pick(builtinTemplate("Single Approval"));
     const showing = hook.data;
-    expect(win.pick(builtinTemplate("Expanded Subprocess Template"))).toBe("“Expanded 1” would stick out above “Warehouse”");
+    expect(win.pick(builtinTemplate("Perform Regular Task"))).toBe("it has no step a sequence flow can enter");
     expect(hook.data).toBe(showing);
     win.cancel();
     expect(hook.data.elements).toEqual(d.elements);
@@ -660,7 +668,7 @@ describe("T4856 — a white-box pool with no lanes grows round an attached templ
     expect(after.connectors.filter((x) => x.type === "sequence" && x.sourceId === "A" && x.targetId === p.entryId)).toHaveLength(1);
   });
 
-  it("no template is refused for sticking out BELOW a lane-less pool, whichever height it starts at", () => {
+  it("no template is refused for sticking out of a lane-less pool, above or below, whichever height it starts at", () => {
     const attached: Record<number, number> = {};
     for (const h of [150, 250]) {
       const d = world(h);
@@ -668,15 +676,15 @@ describe("T4856 — a white-box pool with no lanes grows round an attached templ
       for (const t of builtinTemplates()) {
         const shown = planTemplateShow(t.data, { data: d, provisional: null, showing: false, anchorId: "A", at: { x: 0, y: 0 } });
         if (!("refused" in shown)) { attached[h]++; continue; }
-        // What is left is a template that reaches ABOVE the pool's top (the
-        // band growing at the top for an anchored template is issue 6's
-        // growLaneAtTop, the same as in a lane), or one with nothing to join.
-        expect(shown.refused, `${h}px — ${t.name}`).toMatch(/stick out above|no step a sequence flow can enter|brings a pool or lane/);
+        // What is left has nothing inline to join. One reaching ABOVE the
+        // pool's top used to be refused too; the pool now grows at its top
+        // round an anchored template (issue 6's growLaneAtTop), as a lane does.
+        expect(shown.refused, `${h}px — ${t.name}`).toMatch(/no step a sequence flow can enter|brings a pool or lane/);
       }
     }
-    // Of the 29 inline built-ins, 27 have an entry. With Alpha's centre 125px
-    // below the pool's top, three of them reach above it; at 75px, six.
-    expect(attached).toEqual({ 150: 23, 250: 26 });
+    // Of the 31 built-ins without a pool, 29 have an entry, and every one of
+    // them attaches at both heights (before issue 6: 23 at 150px, 26 at 250px).
+    expect(attached).toEqual({ 150: 29, 250: 29 });
   });
 
   it("the reducer grows the pool to its child plus the lane pad; a pool with lanes still grows through its lane", () => {

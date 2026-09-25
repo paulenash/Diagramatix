@@ -35,8 +35,10 @@
  * Known limits: the label is sized at the diagram's connector font, but
  * hand-drawn view draws it 1.3× wider, so there a long name can reach its line
  * (the halo keeps it legible); a gap thinner than the label centres it and it
- * spills into both pools; moving pools closer together, or resizing one, can
- * still squeeze a placed label out of the gap — nothing re-places it then.
+ * spills into both pools; moving pools closer together, or resizing one by
+ * hand, can still squeeze a placed label out of the gap — nothing re-places it
+ * then. A pool that GROWS to make room (a template, a lane that grows, the pools
+ * pushed below it) does re-place it: `followMessageLabel`, below.
  *
  * ── KEEPING IT: preserve / settle, when a pool moves ────────────────────────
  *
@@ -387,6 +389,69 @@ export function placeMessageLabel(
     labelOffsetX: best.box.x + w / 2 - anchor.x,
     labelOffsetY: best.box.y - anchor.y,
   };
+}
+
+/** Is the drawn box between the gap's two pool edges? */
+function inAirGap(box: Box, gap: AirGap): boolean {
+  return box.y >= gap.lo - 0.5 && box.y + box.h <= gap.hi + 0.5;
+}
+
+/**
+ * A message label when the geometry round it changes — a pool grows or is
+ * pushed, an end is re-routed — and nothing has asked for it by name.
+ *
+ * Paul's rule above says where the label BELONGS: "in the air gap between pools
+ * and attached closest to the Pool meesage endpoint". Growth breaks it in two
+ * ways, both seen on 2026-09-26: a pool that grows by more than the 10px the
+ * label sits off its edge swallows the label, and the old shift code kept a
+ * label with whichever end it took for the "black-box end" (an absent poolType
+ * counted as black-box), so between two white-box pools it moved half the
+ * growth and drifted off its end.
+ *
+ * So the label keeps its place against the SAME pool end the placement rule
+ * uses (`messageAirGap`): it moves exactly as far as that end's edge crossing
+ * moved. Only when that leaves the drawn box out of the gap it was in is it
+ * placed again, by `placeMessageLabel`, on the side it was drawn on. One never
+ * placed (no stored offsets) is left to the load heal.
+ *
+ * A message with no air gap before or after the change (pools side by side, or
+ * overlapping as a template's own pools do where they are dropped, before they
+ * are stacked) has no pool end to keep: its label keeps the offsets it already
+ * has, i.e. its place on its line — rigidly translated with the line, or where
+ * the re-route put it. Measured against its old ABSOLUTE box instead, it stayed
+ * behind: 23 labels of the templates that bring their own pools lay over
+ * Company up to 966px from their lines, and a side-by-side message's label was
+ * left 164px above its line (review of 6a, 2026-09-26).
+ *
+ * `before` / `beforeElements` are the message and the diagram before the change,
+ * `after` / `afterElements` / `afterConnectors` after it. Null when nothing
+ * changes.
+ */
+export function followMessageLabel(
+  before: Connector,
+  beforeElements: DiagramElement[],
+  after: Connector,
+  afterElements: DiagramElement[],
+  afterConnectors: Connector[],
+  fontSize = 10,
+): LabelOffsets | null {
+  if (!MESSAGE_TYPES.has(after.type) || !(after.label ?? "").trim()) return null;
+  if (before.labelOffsetX == null && before.labelOffsetY == null) return null;
+  const oldBox = connectorLabelBox(before, beforeElements, fontSize);
+  const anchor = baseLabelAnchor(after);
+  if (!oldBox || !anchor) return null;
+  const oldGap = messageAirGap(before, beforeElements);
+  const newGap = messageAirGap(after, afterElements);
+  if (!oldGap || !newGap || oldGap.dir !== newGap.dir) return null;
+  const box: Box = { ...oldBox, x: oldBox.x + (newGap.lineX - oldGap.lineX), y: oldBox.y + (newGap.edgeY - oldGap.edgeY) };
+  let offsets: LabelOffsets = { labelOffsetX: box.x + box.w / 2 - anchor.x, labelOffsetY: box.y - anchor.y };
+  if (inAirGap(oldBox, oldGap) && !inAirGap(box, newGap)) {
+    const prefer = messageLabelSide(before, beforeElements, fontSize);
+    const placed = placeMessageLabel({ ...after, ...offsets }, afterElements, afterConnectors, { prefer, fontSize });
+    if (placed) offsets = { labelOffsetX: placed.labelOffsetX, labelOffsetY: placed.labelOffsetY };
+  }
+  const same = (a: number | undefined, b: number) => a != null && Math.abs(a - b) < 0.01;
+  return same(after.labelOffsetX, offsets.labelOffsetX) && same(after.labelOffsetY, offsets.labelOffsetY) ? null : offsets;
 }
 
 /**

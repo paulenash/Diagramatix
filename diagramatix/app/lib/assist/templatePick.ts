@@ -28,6 +28,8 @@ import { parseConfirmation } from "./confirm";
 import { phoneticMatches } from "./phonetic";
 import { spokenNumbersAsDigits } from "./resolveRef";
 import { parseTemplateAnswerPlace } from "./templatePhrase";
+import { isBlackBoxPool } from "@/app/lib/diagram/blackBoxPoolMenu";
+import type { DiagramElement } from "@/app/lib/diagram/types";
 
 export interface TemplateRowLike {
   id: string;
@@ -73,6 +75,17 @@ export function isInitialTemplate(row: { group?: string | null; initial?: boolea
 }
 
 /**
+ * Does the diagram already have a white-box pool — one the initial-template
+ * rule below hides starters for? Any pool that is not EXPLICITLY black-box: an
+ * absent poolType is white-box. The same predicate (blackBoxPoolMenu.ts
+ * `isBlackBoxPool`) decides which pools a template or a released element may
+ * join, so the window and the drop can never disagree about a legacy pool.
+ */
+export function diagramHasWhiteBoxPool(elements: readonly DiagramElement[]): boolean {
+  return elements.some((e) => e.type === "pool" && !isBlackBoxPool(e));
+}
+
+/**
  * The templates worth offering for THIS diagram.
  *
  * An initial template is offered only where it makes sense: an empty diagram,
@@ -81,9 +94,9 @@ export function isInitialTemplate(row: { group?: string | null; initial?: boolea
  */
 export function offerableTemplates<T extends TemplateRowLike>(
   rows: readonly T[],
-  diagramHasWhiteBoxPool: boolean,
+  hasWhiteBoxPool: boolean,
 ): T[] {
-  if (!diagramHasWhiteBoxPool) return [...rows];
+  if (!hasWhiteBoxPool) return [...rows];
   return rows.filter((r) => !isInitialTemplate(r));
 }
 
