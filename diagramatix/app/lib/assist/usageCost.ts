@@ -37,6 +37,11 @@ export interface CostReport {
   /** Seconds of microphone, closed sessions PLUS the live one the caller adds. */
   voiceSeconds: number;
   voiceCostUsd: number;
+  /** Replies Diagramatix SPOKE back (text-to-speech), successful ones only. */
+  spokenReplies: number;
+  /** Characters spoken — what Deepgram bills speech by. */
+  spokenChars: number;
+  speechCostUsd: number;
   totalUsd: number;
   /** Models seen with no rate on file — their calls cost 0 here and are named so nobody trusts the zero. */
   unpricedModels: string[];
@@ -44,6 +49,12 @@ export interface CostReport {
 
 export const LIVE_COMMAND_POINT = "bpmn.live-command";
 export const VOICE_POINT = "voice.dictation";
+/**
+ * One row per sentence spoken back. The row carries CHARACTERS in `inputTokens`
+ * and is priced by the same rate lookup as a model — the Aura-2 rows in
+ * pricing.ts are per million characters — so there is no second price to keep.
+ */
+export const REPLY_POINT = "voice.reply";
 
 export function summariseCommandUsage(
   rows: readonly UsageRow[],
@@ -52,6 +63,7 @@ export function summariseCommandUsage(
   opts: { sinceIso: string; liveVoiceSeconds?: number } ,
 ): CostReport {
   let aiCalls = 0, aiIn = 0, aiOut = 0, aiCost = 0, voiceSessions = 0, voiceSeconds = 0, voiceCost = 0;
+  let spokenReplies = 0, spokenChars = 0, speechCost = 0;
   const unpriced = new Set<string>();
   for (const r of rows) {
     if (r.invocationPoint === LIVE_COMMAND_POINT) {
@@ -67,6 +79,13 @@ export function summariseCommandUsage(
       const secs = Math.max(0, r.latencyMs) / 1000;
       voiceSeconds += secs;
       if (r.provider === "deepgram") voiceCost += (secs / 60) * deepgramUsdPerMinute;
+    } else if (r.invocationPoint === REPLY_POINT) {
+      spokenReplies += 1;
+      const chars = Math.max(0, r.inputTokens);
+      spokenChars += chars;
+      const rate = rateFor(r.model);
+      if (!rate) { unpriced.add(r.model); continue; }
+      speechCost += (chars / 1e6) * rate.inputPer1M;
     }
   }
   const live = Math.max(0, opts.liveVoiceSeconds ?? 0);
@@ -77,15 +96,21 @@ export function summariseCommandUsage(
     sinceIso: opts.sinceIso,
     aiCalls, aiInputTokens: aiIn, aiOutputTokens: aiOut, aiCostUsd: round(aiCost),
     voiceSessions, voiceSeconds: Math.round(voiceSeconds), voiceCostUsd: round(voiceCost),
-    totalUsd: round(aiCost + voiceCost),
+    spokenReplies, spokenChars, speechCostUsd: round(speechCost),
+    totalUsd: round(aiCost + voiceCost + speechCost),
     unpricedModels: [...unpriced].sort(),
   };
 }
 
-/** One line for the bar: "$0.0123 · 3 AI calls ($0.0111) · 4.2 min voice ($0.0012)". */
+/**
+ * One line for the bar: "$0.0123 · 3 AI calls ($0.0111) · 4.2 min voice ($0.0012)".
+ * Spoken replies join the line only when there were some — most users do not
+ * have speech, and "0 spoken ($0.00)" would be noise on every one of their bars.
+ */
 export function formatCostReport(r: CostReport): string {
   const usd = (n: number) => `$${n < 0.01 && n > 0 ? n.toFixed(4) : n.toFixed(2)}`;
   const mins = r.voiceSeconds >= 60 ? `${(r.voiceSeconds / 60).toFixed(1)} min` : `${r.voiceSeconds} s`;
   const parts = [`${r.aiCalls} AI call${r.aiCalls === 1 ? "" : "s"} (${usd(r.aiCostUsd)})`, `${mins} voice (${usd(r.voiceCostUsd)})`];
+  if (r.spokenReplies > 0) parts.push(`${r.spokenReplies} spoken (${usd(r.speechCostUsd)})`);
   return `${usd(r.totalUsd)} so far · ${parts.join(" · ")}`;
 }

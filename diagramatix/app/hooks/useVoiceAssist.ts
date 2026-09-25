@@ -1,86 +1,66 @@
 /**
- * Voice Assist speaker state and preferences.
+ * Voice Assist's spoken-reply state: the toggle, the voice, how much to say, and
+ * whether the voice is sounding right now (the mic gate reads that).
  *
- * Manages:
- * - speak enabled toggle
- * - voice choice (persists to localStorage)
- * - verbosity (persists to localStorage)
- * - speaker queue state (isSpeaking)
- * - mic gate during playback
+ * The preferences are read and written through `voicePrefs.ts`, which Animate's
+ * narration shares — one set of keys, not two.
  */
 
 import { useEffect, useState, useCallback } from "react";
 import type { TtsVoice } from "@/app/lib/voice/speakParams";
-import { speaker } from "@/app/lib/voice/speaker";
+import { DEFAULT_TTS_VOICE } from "@/app/lib/voice/speakParams";
+import { speaker, type SpeechPurpose } from "@/app/lib/voice/speaker";
 import type { SpeechVerbosity } from "@/app/lib/voice/spokenText";
-
-const SPEAK_KEY = "dgx.voice-assist.speak-enabled";
-const VOICE_KEY = "dgx.voice-assist.voice";
-const VERBOSITY_KEY = "dgx.voice-assist.verbosity";
+import {
+  DEFAULT_VERBOSITY,
+  readSpeakEnabled, writeSpeakEnabled,
+  readVoice, writeVoice,
+  readVerbosity, writeVerbosity,
+} from "@/app/lib/voice/voicePrefs";
 
 export function useVoiceAssist() {
   const [speakEnabled, setSpeakEnabled] = useState(false);
-  const [voice, setVoiceState] = useState<TtsVoice>("aura-2-theia-en");
-  const [verbosity, setVerbosityState] = useState<SpeechVerbosity>("problems");
+  const [voice, setVoiceState] = useState<TtsVoice>(DEFAULT_TTS_VOICE);
+  const [verbosity, setVerbosityState] = useState<SpeechVerbosity>(DEFAULT_VERBOSITY);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [micGated, setMicGated] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Load preferences from localStorage on mount
+  // Read after mount, not in the initialiser, so the server render matches.
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(SPEAK_KEY);
-      if (saved) setSpeakEnabled(JSON.parse(saved));
-      const savedVoice = localStorage.getItem(VOICE_KEY);
-      if (savedVoice) setVoiceState(JSON.parse(savedVoice));
-      const savedVerbosity = localStorage.getItem(VERBOSITY_KEY);
-      if (savedVerbosity) setVerbosityState(JSON.parse(savedVerbosity));
-    } catch {
-      // localStorage may be unavailable or corrupted — use defaults
-    }
+    setSpeakEnabled(readSpeakEnabled());
+    setVoiceState(readVoice());
+    setVerbosityState(readVerbosity());
   }, []);
 
-  const toggleSpeak = useCallback((enabled: boolean) => {
-    setSpeakEnabled(enabled);
-    try {
-      localStorage.setItem(SPEAK_KEY, JSON.stringify(enabled));
-    } catch {
-      // ignore
-    }
-    if (!enabled) {
+  const toggleSpeak = useCallback((on: boolean) => {
+    setSpeakEnabled(on);
+    writeSpeakEnabled(on);
+    setError(null);
+    if (!on) {
       speaker.stop();
       setIsSpeaking(false);
-      setMicGated(false);
     }
   }, []);
 
   const setVoice = useCallback((v: TtsVoice) => {
     setVoiceState(v);
-    try {
-      localStorage.setItem(VOICE_KEY, JSON.stringify(v));
-    } catch {
-      // ignore
-    }
+    writeVoice(v);
   }, []);
 
   const setVerbosity = useCallback((v: SpeechVerbosity) => {
     setVerbosityState(v);
-    try {
-      localStorage.setItem(VERBOSITY_KEY, JSON.stringify(v));
-    } catch {
-      // ignore
-    }
+    writeVerbosity(v);
   }, []);
 
   const speak = useCallback(
-    (text: string, purpose: "question" | "refusal" | "success") => {
+    (text: string, purpose: SpeechPurpose) => {
       if (!speakEnabled) return;
-      setMicGated(true);
-      speaker.speak(text, voice, purpose, (speaking) => {
-        setIsSpeaking(speaking);
-        if (!speaking) setMicGated(false);
+      speaker.speak(text, voice, purpose, {
+        onSpeakingChange: setIsSpeaking,
+        onError: setError,
       });
     },
-    [speakEnabled, voice]
+    [speakEnabled, voice],
   );
 
   return {
@@ -91,7 +71,9 @@ export function useVoiceAssist() {
     verbosity,
     setVerbosity,
     isSpeaking,
-    micGated,
+    /** While the voice is sounding the mic must not act on what it hears. */
+    micGated: isSpeaking,
+    error,
     speak,
   };
 }

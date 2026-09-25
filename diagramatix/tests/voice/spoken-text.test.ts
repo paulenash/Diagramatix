@@ -1,114 +1,71 @@
 /**
- * spokenText transformations — what log lines say aloud.
- * Pure function tests covering quote removal, number reading, id stripping, verbosity filtering.
+ * T4767 — what a line of text sounds like when Diagramatix says it.
+ *
+ * `speechTransform` is the cleanup every spoken string gets; `spokenText` puts
+ * it behind the verbosity gate for Voice Assist's log lines. Animate's narration
+ * uses the transform WITHOUT the gate — a bare label is neither a question nor a
+ * refusal, and the gate would silence the whole tour.
  */
 import { describe, it, expect } from "vitest";
-import { spokenText, type SpeechVerbosity } from "@/app/lib/voice/spokenText";
+import { spokenText, speechTransform } from "@/app/lib/voice/spokenText";
 
-describe("spokenText — log line transformations", () => {
-  describe("verbosity filter", () => {
-    it("off → empty string always", () => {
-      expect(spokenText("added Task 1 after Receive Order", "off")).toBe("");
-      expect(spokenText("no room above Underwriters", "off")).toBe("");
-      expect(spokenText("which Review? say a number", "off")).toBe("");
-    });
-
-    it("questions → only lines with ?", () => {
-      expect(spokenText("which Review? say 1 or 2", "questions")).toContain("which Review");
-      expect(spokenText("added Task 1 after Receive Order", "questions")).toBe("");
-      expect(spokenText("no room above Underwriters", "questions")).toBe("");
-    });
-
-    it("problems → questions + refusals (no, can't, won't, unable, there, nothing)", () => {
-      expect(spokenText("which Review? say 1 or 2", "problems")).toContain("which Review");
-      expect(spokenText("no room above Underwriters", "problems")).toContain("no room");
-      expect(spokenText("can't take Do x into Claims", "problems")).toContain("can't");
-      expect(spokenText("added Task 1 after Receive Order", "problems")).toBe("");
-    });
-
-    it("everything → all lines through", () => {
-      expect(spokenText("which Review? say 1 or 2", "everything")).toContain("which Review");
-      expect(spokenText("no room above Underwriters", "everything")).toContain("no room");
-      expect(spokenText("added Task 1 after Receive Order", "everything")).toContain("added");
-    });
+describe("T4767 — the verbosity gate", () => {
+  it("off says nothing, ever", () => {
+    for (const s of ["added Task 1 after Receive Order", "no room above Underwriters", "which Review? say a number"]) {
+      expect(spokenText(s, "off")).toBe("");
+    }
   });
 
-  describe("quote removal", () => {
-    it("removes curly quotes", () => {
-      const text = 'rename Task 1 to "Review Email"';
-      const result = spokenText(text, "everything");
-      expect(result).not.toContain('"');
-      expect(result).toContain("Review Email");
-    });
-
-    it("handles apostrophes in names", () => {
-      const text = "rename Task 1 to Alice's Review";
-      const result = spokenText(text, "everything");
-      expect(result).toContain("Alice");
-    });
+  it("questions: only what needs an answer", () => {
+    expect(spokenText("which Review? say 1 or 2", "questions")).toContain("which Review");
+    expect(spokenText("no room above Underwriters", "questions")).toBe("");
+    expect(spokenText("added Task 1 after Receive Order", "questions")).toBe("");
   });
 
-  describe("arrow to 'to'", () => {
-    it("converts arrow symbol to the word 'to'", () => {
-      const text = "rename Task 1 → Review Email";
-      const result = spokenText(text, "everything");
-      expect(result).toContain("to");
-      expect(result).not.toContain("→");
-    });
+  it("problems (the default): questions AND refusals, but successes stay silent", () => {
+    expect(spokenText("which Review? say 1 or 2", "problems")).toContain("which Review");
+    expect(spokenText("no room above Underwriters", "problems")).toContain("no room");
+    expect(spokenText("can't take Do x into Claims", "problems")).toContain("can't");
+    expect(spokenText("there are no events, activities, gateways, data objects or data stores to put in a pool", "problems")).toContain("there are no events");
+    expect(spokenText("added Task 1 after Receive Order", "problems")).toBe("");
   });
 
-  describe("element id stripping", () => {
-    it("removes UUIDs", () => {
-      const text = "moved 123e4567-e89b-12d3-a456-426614174000 to the left";
-      const result = spokenText(text, "everything");
-      expect(result).toBe("moved to the left");
-    });
+  it("everything: successes too", () => {
+    expect(spokenText("added Task 1 after Receive Order", "everything")).toContain("added");
+  });
+});
 
-    it("removes UUIDs with roles", () => {
-      const text = "connected 123e4567-e89b-12d3-a456-426614174000:start to end";
-      const result = spokenText(text, "everything");
-      expect(result).toBe("connected to end");
-    });
+describe("T4767 — the transform", () => {
+  it("drops quotation marks, straight and curly", () => {
+    expect(speechTransform('rename Task 1 to "Review Email"')).toBe("rename Task one to Review Email");
+    expect(speechTransform("put 2 elements in a new pool “Northwind Freight”")).toBe("put two elements in a new pool Northwind Freight");
   });
 
-  describe("number reading", () => {
-    it("reads single digits naturally", () => {
-      const text = "Task 1 after Task 2";
-      const result = spokenText(text, "everything");
-      expect(result).toContain("one");
-      expect(result).toContain("two");
-    });
+  it("keeps apostrophes — “can't” read as “cant” is audibly wrong", () => {
+    expect(speechTransform("can't take Do x into Claims")).toBe("can't take Do x into Claims");
+    expect(speechTransform("rename Task 1 to Alice's Review")).toContain("Alice's");
+    expect(speechTransform("can’t move it")).toBe("can't move it");
   });
 
-  describe("whitespace collapse", () => {
-    it("collapses multiple spaces", () => {
-      const text = "added    Task    1";
-      const result = spokenText(text, "everything");
-      expect(result).toBe("added Task one");
-    });
+  it("reads the arrow as the word", () => {
+    expect(speechTransform("Receive Order → Check Stock")).toBe("Receive Order to Check Stock");
   });
 
-  describe("real log lines", () => {
-    it("picker question", () => {
-      const text = "which Review? say a number, 1 or 2, or cancel";
-      const result = spokenText(text, "problems");
-      expect(result).toContain("which Review");
-      expect(result).toContain("one");
-      expect(result).toContain("two");
-    });
+  it("never reads an element id aloud", () => {
+    expect(speechTransform("moved 123e4567-e89b-12d3-a456-426614174000 to the left")).toBe("moved to the left");
+    expect(speechTransform("connected 123e4567-e89b-12d3-a456-426614174000:start to end")).toBe("connected to end");
+  });
 
-    it("refusal with names", () => {
-      const text = 'no room above Underwriters for a lane called Quality Assurance';
-      const result = spokenText(text, "problems");
-      expect(result).toContain("no room");
-      expect(result).toContain("Underwriters");
-    });
+  it("says a lone digit as a word, so the picker asks for “one or two”", () => {
+    expect(speechTransform("say 1 or 2, or cancel")).toBe("say one or two, or cancel");
+  });
 
-    it("rename with digit-suffixed name", () => {
-      const text = "rename Task 1 to Review Email";
-      const result = spokenText(text, "everything");
-      expect(result).toContain("rename");
-      expect(result).toContain("Review Email");
-    });
+  it("leaves longer numbers and digits inside words alone", () => {
+    expect(speechTransform("the 2026 plan")).toBe("the 2026 plan");
+    expect(speechTransform("Review1 after Task2")).toBe("Review1 after Task2");
+  });
+
+  it("collapses whitespace", () => {
+    expect(speechTransform("  added    Task    1  ")).toBe("added Task one");
   });
 });

@@ -5,7 +5,7 @@ import { prisma } from "@/app/lib/db";
 import { getEffectiveUserId } from "@/app/lib/superuser";
 import { ratesByModel } from "@/app/lib/ai/aiRates";
 import { DEEPGRAM_USD_PER_MINUTE } from "@/app/lib/ai/pricing";
-import { summariseCommandUsage, LIVE_COMMAND_POINT, VOICE_POINT } from "@/app/lib/assist/usageCost";
+import { summariseCommandUsage, LIVE_COMMAND_POINT, VOICE_POINT, REPLY_POINT } from "@/app/lib/assist/usageCost";
 
 /**
  * GET /api/ai/command/usage?since=<ISO>&live=<seconds>
@@ -31,7 +31,15 @@ export async function GET(req: Request) {
   const userIds = [...new Set([session.user.id, effective])];
 
   const rows = await prisma.aiInvocation.findMany({
-    where: { userId: { in: userIds }, createdAt: { gte: since }, invocationPoint: { in: [LIVE_COMMAND_POINT, VOICE_POINT] } },
+    where: {
+      userId: { in: userIds }, createdAt: { gte: since },
+      // A spoken reply that failed was never heard and never billed, so only
+      // successes count; the failures stay visible in the AI Usage report.
+      OR: [
+        { invocationPoint: { in: [LIVE_COMMAND_POINT, VOICE_POINT] } },
+        { invocationPoint: REPLY_POINT, status: "success" },
+      ],
+    },
     select: { invocationPoint: true, provider: true, model: true, inputTokens: true, outputTokens: true, cacheReadTokens: true, cacheWriteTokens: true, latencyMs: true },
   });
   const rates = await ratesByModel();

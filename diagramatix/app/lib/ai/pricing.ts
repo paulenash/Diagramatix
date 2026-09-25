@@ -22,10 +22,27 @@ export const PRICING_SNAPSHOT_DATE = "2026-07-27";
 export const DEEPGRAM_USD_PER_MINUTE = 0.0059;
 
 /**
- * Text-to-speech, USD per 1,000 characters — Deepgram Aura-2, pay-as-you-go list rate
- * (read 2026-09-25). One API request at 2,000 chars costs ~$0.060.
+ * Text-to-speech, USD per 1,000 characters — Deepgram Aura-2, pay-as-you-go list
+ * rate (read 2026-09-25). A 60-character spoken reply is about $0.0018.
  */
 export const DEEPGRAM_TTS_USD_PER_1K_CHARS = 0.030;
+
+/**
+ * Aura-2 voices, priced so the AI Usage report can cost speech WITHOUT special
+ * code: a `voice.reply` row carries its CHARACTER count in `inputTokens`, and
+ * this rate is per million of them — $0.030 per 1k chars is $30 per 1M. The
+ * report multiplies input by the input rate exactly as it does for a model, and
+ * the rates are editable in the catalog like any other.
+ *
+ * Derived from the one constant above, so the per-1k figure and the catalog
+ * figure cannot disagree. Not offered anywhere as a generate model: the model
+ * pickers iterate the provider registry (`models.ts`), not this table.
+ */
+const AURA_2_PER_1M_CHARS: ModelPrice = {
+  in: DEEPGRAM_TTS_USD_PER_1K_CHARS * 1000,
+  out: 0,
+  note: "speech: characters ride in the input column",
+};
 
 export interface ModelPrice {
   in: number; // USD per 1M input tokens
@@ -100,6 +117,12 @@ export const PRICING: Record<string, ModelPrice> = {
   // not listed here behaves the same way.
   "anthropic/claude-sonnet-4.6": { in: 3, out: 15, note: "resold; OpenRouter adds a margin" },
   "openai/gpt-5.2": { in: 1.25, out: 10, note: "resold; OpenRouter adds a margin" },
+
+  // Deepgram Aura-2 text-to-speech — the voice id IS the model id. See above.
+  "aura-2-theia-en": AURA_2_PER_1M_CHARS,
+  "aura-2-hyperion-en": AURA_2_PER_1M_CHARS,
+  "aura-2-pandora-en": AURA_2_PER_1M_CHARS,
+  "aura-2-draco-en": AURA_2_PER_1M_CHARS,
 };
 
 /** The reference price for a model id, or undefined when unknown / floating. */

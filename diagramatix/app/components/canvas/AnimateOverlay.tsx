@@ -7,11 +7,23 @@
  * present. A movable control panel regulates speed and traversal. Read-only and
  * non-destructive (it reveals a subset of the real diagram; the saved data is
  * never touched).
+ *
+ * NARRATION (Diagramatix Voice, slice 3). With Narrate on, each labelled shape
+ * is read aloud as it appears, and the tour WAITS for the line to finish before
+ * revealing the next thing — so the pace is set by the speech, not the slider.
+ * The slider still paces what has nothing to say (connectors, unlabelled
+ * shapes). What is said, and what is left silent, is `voice/narration.ts`.
+ * The switch only exists for someone who can hear it (`useSpeechAvailable`).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DiagramData } from "@/app/lib/diagram/types";
 import { buildAnimationOrder, type AnimateTraversal } from "@/app/lib/diagram/animateOrder";
 import { ReplayDiagramBackdrop } from "@/app/components/simulation/replay/ReplayDiagramBackdrop";
+import { narrationFor } from "@/app/lib/voice/narration";
+import { speaker } from "@/app/lib/voice/speaker";
+import { DEFAULT_TTS_VOICE, type TtsVoice } from "@/app/lib/voice/speakParams";
+import { readNarrate, writeNarrate, readVoice } from "@/app/lib/voice/voicePrefs";
+import { useSpeechAvailable } from "@/app/hooks/useSpeechAvailable";
 
 export function AnimateOverlay({ data, diagramName, onClose }: { data: DiagramData; diagramName?: string; onClose: () => void }) {
   const [mode, setMode] = useState<AnimateTraversal>("bfs");
@@ -23,15 +35,63 @@ export function AnimateOverlay({ data, diagramName, onClose }: { data: DiagramDa
   const total = order.length;
   const visibleIds = useMemo(() => new Set(order.slice(0, step)), [order, step]);
 
+  // ── Narration ──────────────────────────────────────────────────────────────
+  const canSpeak = useSpeechAvailable();
+  const [narratePref, setNarratePref] = useState(false);
+  const [voice, setVoice] = useState<TtsVoice>(DEFAULT_TTS_VOICE);
+  const [narrationError, setNarrationError] = useState<string | null>(null);
+  // Read after mount, not in the initialiser, so the server render matches.
+  useEffect(() => { setNarratePref(readNarrate()); setVoice(readVoice()); }, []);
+  const narrate = canSpeak === true && narratePref;
+  const setNarrate = (on: boolean) => { setNarratePref(on); writeNarrate(on); setNarrationError(null); };
+  /** The line for each shape, worked out once — connectors have none. */
+  const lines = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const el of data.elements) {
+      const line = narrationFor(el);
+      if (line) m.set(el.id, line);
+    }
+    return m;
+  }, [data]);
+
   // Restart from the beginning whenever the traversal changes.
   useEffect(() => { setStep(0); setPlaying(true); }, [mode]);
 
-  // Reveal tick.
+  // Read through a ref so moving the slider never re-runs the tick below: with
+  // narration on, that would cut the current line off and start it again on
+  // every notch of the drag. A new speed applies from the next silent step.
+  const speedRef = useRef(speed);
+  speedRef.current = speed;
+
+  // Reveal tick. Narrate the shape the LAST tick revealed, and move on when the
+  // line ends; anything with nothing to say moves on at the slider's pace. The
+  // last shape is narrated too — `done` stops the advance, not the voice.
   useEffect(() => {
-    if (!playing || step >= total) return;
-    const t = window.setTimeout(() => setStep((s) => Math.min(total, s + 1)), 1000 / speed);
+    if (!playing) return;
+    const justShown = step > 0 ? order[step - 1] : undefined;
+    const line = narrate && justShown ? lines.get(justShown) : undefined;
+    const advance = () => { if (step < total) setStep((s) => Math.min(total, s + 1)); };
+
+    if (line) {
+      let cancelled = false;
+      speaker.speak(line, voice, "narration", {
+        onSpeakingChange: (speaking) => { if (!speaking && !cancelled) advance(); },
+        onError: (message) => {
+          if (cancelled) return;
+          // The tour carries on without a voice rather than stopping dead.
+          setNarratePref(false);
+          setNarrationError(message);
+        },
+      });
+      // Pause, a traversal change, a restart or closing cuts the line off; Play
+      // then says the same line again from its start.
+      return () => { cancelled = true; speaker.stop(); };
+    }
+
+    if (step >= total) return;
+    const t = window.setTimeout(advance, 1000 / speedRef.current);
     return () => window.clearTimeout(t);
-  }, [playing, step, speed, total]);
+  }, [playing, step, total, narrate, voice, order, lines]);
   const done = step >= total;
 
   // Fit-to-content viewBox (stable across the whole animation).
@@ -98,9 +158,24 @@ export function AnimateOverlay({ data, diagramName, onClose }: { data: DiagramDa
 
           {/* Speed */}
           <label className="block">
-            <span className="text-[11px] text-gray-600">Speed — {speed}/s</span>
+            <span className="text-[11px] text-gray-600">
+              Speed — {speed}/s{narrate ? " · named shapes wait for their line" : ""}
+            </span>
             <input type="range" min={1} max={20} value={speed} onChange={(e) => setSpeed(Number(e.target.value))} className="w-full accent-blue-600" />
           </label>
+
+          {/* Narrate — only for someone who can hear it. */}
+          {canSpeak === true && (
+            <div>
+              <label className="flex items-center gap-2 text-[11px] text-gray-700 cursor-pointer">
+                <input type="checkbox" checked={narratePref} onChange={(e) => setNarrate(e.target.checked)} className="accent-blue-600" />
+                <span>🔊 Narrate — read each shape aloud as it appears</span>
+              </label>
+              {narrationError && (
+                <p className="mt-1 text-[11px] text-red-700 leading-snug">Narration stopped: {narrationError}</p>
+              )}
+            </div>
+          )}
 
           {/* Traversal */}
           <div>

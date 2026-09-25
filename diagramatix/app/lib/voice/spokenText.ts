@@ -1,87 +1,90 @@
 /**
- * Transform a log line or message into speech-friendly text.
+ * Turning written text into something worth hearing.
  *
- * Pure function, tested. Handles:
- * - Quote removal and normalization
- * - Arrow → becomes "to"
- * - Never element ids (drops them)
- * - Number reading (one, two, etc. for digits)
- * - Verbosity filtering (off / questions / questions+problems / everything)
+ * Two jobs, deliberately separate:
+ *   • `speechTransform` — the cleanup every spoken string gets, wherever it came
+ *     from (a Voice Assist log line, an element's label in Animate, a narrative).
+ *   • `spokenText` — that cleanup behind the verbosity gate, for log lines.
+ *
+ * They are split because Animate narrates bare labels, which the verbosity gate
+ * would silence as "not a question and not a refusal". One transform, two
+ * callers, rather than a second copy that drifts.
  */
 
 export type SpeechVerbosity = "off" | "questions" | "problems" | "everything";
 
 /**
- * Check if text looks like an element id (UUID, UUID:role, etc.),
- * so it can be dropped rather than read aloud.
+ * An element id must never be read out — "moved 123e4567-e89b…" is not a
+ * sentence. Ids reach the log when a command names an element the user has not
+ * labelled, and they are dropped rather than spelled.
  */
 function looksLikeElementId(s: string): boolean {
-  // UUID format: 8-4-4-4-12 hex digits. Optionally followed by :role.
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[a-z]+)?$/i.test(s.trim());
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:[a-z-]+)?$/i.test(s.trim());
 }
 
 /**
- * Remove quote marks: curly quotes and straight double quotes only (keep apostrophes).
+ * Quotation marks are punctuation for the eye; the voice does not need them, and
+ * Deepgram reads a stray one as a pause. Apostrophes STAY — stripping them turns
+ * "can't" into "cant", which is both wrong and audibly wrong.
  */
-function removeQuotes(s: string): string {
-  return s.replace(/[""|]/g, "");
+function removeQuoteMarks(s: string): string {
+  return s.replace(/["“”‘’]/g, (m) => (m === "‘" || m === "’" ? "'" : ""));
 }
 
-/**
- * Read a number naturally: "1" → "one", "2" → "two", etc.
- * Multi-digit numbers stay as-is for now (future: "21" → "twenty-one").
- */
 const DIGIT_WORDS: Record<string, string> = {
   "0": "zero", "1": "one", "2": "two", "3": "three", "4": "four",
   "5": "five", "6": "six", "7": "seven", "8": "eight", "9": "nine",
 };
 
-function readNumbers(s: string): string {
-  return s.replace(/\b(\d)\b/g, (match) => DIGIT_WORDS[match] ?? match);
-}
-
 /**
- * Drop element ids (UUIDs) and other noise, then collapse whitespace.
+ * A lone digit is spoken as a word. This matters for the numbered picker —
+ * "say 1 or 2" read as digits comes out clipped, where "say one or two" is what
+ * a person would say. Multi-digit numbers are left alone: Deepgram reads "2026"
+ * better than any naive expansion would.
  */
+function readSingleDigits(s: string): string {
+  return s.replace(/\b(\d)\b/g, (d) => DIGIT_WORDS[d] ?? d);
+}
+
 function dropElementIds(s: string): string {
-  const words = s.split(/\s+/).filter(w => !looksLikeElementId(w));
-  return words.join(" ").trim();
+  return s.split(/\s+/).filter((w) => !looksLikeElementId(w)).join(" ");
+}
+
+/** The cleanup every spoken string gets. Pure. */
+export function speechTransform(text: string): string {
+  let out = removeQuoteMarks(text.trim());
+  out = out.replace(/→/g, " to ");   // → reads as the word
+  out = dropElementIds(out);
+  out = readSingleDigits(out);
+  return out.replace(/\s+/g, " ").trim();
+}
+
+/** A line that needs an answer. */
+function isQuestion(s: string): boolean {
+  return s.includes("?");
 }
 
 /**
- * Transform a log line into speech text.
+ * A line saying the command did not happen. These are the ones worth hearing
+ * even when successes are silent: the user's eyes are on the canvas, and nothing
+ * moved, so without the voice there is no signal at all.
+ */
+function isRefusal(s: string): boolean {
+  return /^(no\b|not\b|can'?t\b|cannot\b|won'?t\b|unable\b|there (is|are|was|were)\b|nothing\b)/i.test(s.trim());
+}
+
+/**
+ * A log line as it should be spoken, or "" when this line stays silent.
  *
- * @param text the log line or message
- * @param verbosity "off" → empty string; "questions" → only picker/confirm/question lines;
- *                  "problems" → questions + refusals; "everything" → all lines.
- * @returns speech text, empty if this line should not be spoken
+ * @param verbosity off → silent; questions → only what needs an answer;
+ *   problems → that plus refusals (the default); everything → successes too.
  */
 export function spokenText(text: string, verbosity: SpeechVerbosity): string {
   if (verbosity === "off") return "";
 
-  // Determine if this line should be spoken based on verbosity.
   const trimmed = text.trim();
+  if (verbosity === "questions" && !isQuestion(trimmed)) return "";
+  if (verbosity === "problems" && !isQuestion(trimmed) && !isRefusal(trimmed)) return "";
 
-  // Question markers: "?" usually means a question that needs an answer.
-  const isQuestion = trimmed.includes("?");
-  // Refusal markers: "no ", "can't ", "won't", "unable", etc.
-  const isRefusal = /^(no |can't |won't |unable|there|nothing)/i.test(trimmed);
-  // Success: something got done, no uncertainty.
-  const isSuccess = !isQuestion && !isRefusal && (trimmed.startsWith("✓") || trimmed.startsWith("added") || trimmed.startsWith("put") || trimmed.startsWith("moved"));
-
-  // Apply verbosity filter.
-  if (verbosity === "questions" && !isQuestion) return "";
-  if (verbosity === "problems" && !isQuestion && !isRefusal) return "";
-  if (verbosity === "everything") {
-    // All lines go through.
-  }
-
-  // Transform the text.
-  let result = removeQuotes(trimmed);
-  result = result.replace(/→/g, " to ");
-  result = dropElementIds(result);
-  result = readNumbers(result);
-  result = result.replace(/\s+/g, " ").trim();
-
-  return result;
+  return speechTransform(trimmed);
 }

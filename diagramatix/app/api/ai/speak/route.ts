@@ -1,121 +1,120 @@
 /**
- * Text-to-speech via Deepgram Aura-2.
+ * POST /api/ai/speak — say something, in a Deepgram Aura-2 voice.
  *
- * POST /api/ai/speak
- * Body: { text: string, voice: TtsVoice, purpose: "question" | "refusal" | "success" }
- * Response: audio/mpeg stream
+ *   Body:     { text, voice, purpose }
+ *   Returns:  audio/mpeg, streamed through as Deepgram sends it.
  *
- * Gated by:
- * - Org policy allowVoiceAi (like STT dictation)
- * - User feature overrides (voice-feedback off at all levels, SuperAdmin grants per user)
- * - 2,000 character limit per request (enforced)
+ * Refuses, in this order: 401 signed out · 403 a SuperAdmin viewing another
+ * user read-only (speech spends money and writes a usage row, and view mode
+ * exists so that nothing does) · 403 the org has turned voice off · 403 speech
+ * not granted to this user (`speechAccess.ts` — fails CLOSED) · 400 bad body ·
+ * 413 over Deepgram's per-request cap · 503 not configured.
  *
- * Usage recorded via aiInvocation (provider: "deepgram-tts", characters).
+ * Every call that reaches Deepgram writes one `AiInvocation` row, failures too,
+ * so a run of errors shows up in AI Usage rather than only in a log:
+ *   provider "deepgram" (the same account and invoice as dictation),
+ *   model = the voice (on /v1/speak the voice IS the model),
+ *   invocationPoint "voice.reply",
+ *   inputTokens = CHARACTERS — priced per million by the Aura-2 rows in
+ *     pricing.ts, which is how the report costs speech with no special case,
+ *   latencyMs = until Deepgram's first byte — the delay a listener waits through.
  */
 
 import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/auth";
-import { tryGetCurrentOrgId } from "@/app/lib/auth/orgContext";
-import { cookies } from "next/headers";
-import { orgPolicyAllows } from "@/app/lib/auth/orgPolicy";
-import { getFeatureStates, isAvailable } from "@/app/lib/features/availability";
-import { speakParams, isValidTtsVoice } from "@/app/lib/voice/speakParams";
+import { gateOrgPolicy, orgPolicyAllows } from "@/app/lib/auth/orgPolicy";
+import { blockReadOnlyImpersonation } from "@/app/lib/routeGuard";
+import { speechGranted } from "@/app/lib/voice/speechAccess";
+import { speakParams, isValidTtsVoice, isSpeechPurpose, TTS_MAX_CHARS } from "@/app/lib/voice/speakParams";
 import { recordAiInvocation, enterAiContext, AI_INVOCATION_POINTS } from "@/app/lib/ai/aiTelemetry";
+import { resolveAiRouteContext } from "@/app/lib/ai/aiTelemetryRoute";
 
-const MAX_CHARS = 2000;
+/**
+ * GET /api/ai/speak → `{ available }` — may this user hear Diagramatix speak?
+ *
+ * Asked once by a surface before it draws a speech control, so a user without
+ * the grant never sees a Narrate switch that could only ever answer 403. The
+ * same two checks as POST, and nothing is spent. Read-only impersonation is not
+ * refused here — a SuperAdmin viewing as somebody should see what they would see.
+ */
+export async function GET() {
+  const session = await auth();
+  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const available =
+    Boolean(process.env.DEEPGRAM_API_KEY) &&
+    (await orgPolicyAllows(session, "allowVoiceAi")) &&
+    (await speechGranted(session));
+  return NextResponse.json({ available }, { headers: { "Cache-Control": "no-store" } });
+}
 
 export async function POST(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const readOnly = await blockReadOnlyImpersonation(session);
+  if (readOnly) return readOnly;
+
+  const pol = await gateOrgPolicy(session, "allowVoiceAi");
+  if (pol) return pol;
+
+  if (!(await speechGranted(session))) {
+    return NextResponse.json(
+      { error: "Spoken replies are not turned on for you — a SuperAdmin can turn them on." },
+      { status: 403 },
+    );
+  }
+
+  const body = (await req.json().catch(() => ({}))) as { text?: unknown; voice?: unknown; purpose?: unknown };
+  const text = typeof body.text === "string" ? body.text.trim() : "";
+  if (!text) return NextResponse.json({ error: "text is required" }, { status: 400 });
+  if (!isValidTtsVoice(body.voice)) return NextResponse.json({ error: "voice is not one Diagramatix offers" }, { status: 400 });
+  if (!isSpeechPurpose(body.purpose)) return NextResponse.json({ error: "purpose is invalid" }, { status: 400 });
+  if (text.length > TTS_MAX_CHARS) {
+    return NextResponse.json({ error: `text is over ${TTS_MAX_CHARS} characters — split it by sentence` }, { status: 413 });
+  }
+  const voice = body.voice;
+
+  const key = process.env.DEEPGRAM_API_KEY;
+  if (!key) return NextResponse.json({ error: "Speech is not configured on this server." }, { status: 503 });
+
+  // Entered on this frame, not inside a helper — see aiTelemetryRoute.ts for the
+  // bug that taught that: an enterWith inside an awaited helper does not survive.
+  enterAiContext(await resolveAiRouteContext(session, AI_INVOCATION_POINTS.VoiceReply));
+
+  const started = Date.now();
+  let res: Response;
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const cookieStore = await cookies();
-    const orgId = await tryGetCurrentOrgId(session, cookieStore);
-    if (!orgId) {
-      return NextResponse.json({ error: "No active org" }, { status: 400 });
-    }
-
-    // Check org policy.
-    const policyOk = await orgPolicyAllows(session, "allowVoiceAi");
-    if (!policyOk) {
-      return NextResponse.json(
-        { error: "Voice transcription is turned off by your organisation's policy." },
-        { status: 403 }
-      );
-    }
-
-    // Check user feature access (voice-feedback, off at all levels, SuperAdmin grants per user).
-    const states = await getFeatureStates(session.user.id);
-    if (!isAvailable(states, "voice-feedback")) {
-      return NextResponse.json({ error: "Voice replies are not available to you." }, { status: 403 });
-    }
-
-    const body = await req.json().catch(() => ({}));
-    const { text, voice, purpose } = body as { text?: unknown; voice?: unknown; purpose?: string };
-
-    if (typeof text !== "string" || !text.trim()) {
-      return NextResponse.json({ error: "text is required" }, { status: 400 });
-    }
-
-    if (!isValidTtsVoice(voice)) {
-      return NextResponse.json({ error: "voice is invalid" }, { status: 400 });
-    }
-
-    if (text.length > MAX_CHARS) {
-      return NextResponse.json(
-        { error: `Text exceeds ${MAX_CHARS} characters` },
-        { status: 413 }
-      );
-    }
-
-    if (!["question", "refusal", "success"].includes(purpose ?? "")) {
-      return NextResponse.json({ error: "purpose is invalid" }, { status: 400 });
-    }
-
-    // Deepgram request.
-    const key = process.env.DEEPGRAM_API_KEY;
-    if (!key) {
-      return NextResponse.json({ error: "TTS not configured" }, { status: 503 });
-    }
-
-    const params = speakParams(voice);
-    const res = await fetch(`https://api.deepgram.com/v1/speak?${params.toString()}`, {
+    res = await fetch(`https://api.deepgram.com/v1/speak?${speakParams(voice).toString()}`, {
       method: "POST",
-      headers: {
-        Authorization: `Token ${key}`,
-        "Content-Type": "application/json",
-      },
+      headers: { Authorization: `Token ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({ text }),
     });
-
-    if (!res.ok) {
-      console.error("Deepgram error:", res.status, await res.text().catch(() => ""));
-      return NextResponse.json({ error: "TTS service error" }, { status: 503 });
-    }
-
-    // Record usage via the standard invocation path.
-    const chars = text.length;
-    enterAiContext({
-      userId: session.user.id,
-      orgId,
-      invocationPoint: AI_INVOCATION_POINTS.VoiceReply,
-    });
-    await recordAiInvocation({
-      provider: "deepgram-tts",
-      model: voice,
-      status: "success",
-      inputTokens: chars, // Use inputTokens to store character count for billing
-    });
-
-    const audio = await res.arrayBuffer();
-    return new NextResponse(audio, {
-      status: 200,
-      headers: { "Content-Type": "audio/mpeg" },
-    });
   } catch (err) {
-    console.error("POST /api/ai/speak error:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    await recordAiInvocation({
+      provider: "deepgram", model: voice, status: "failure",
+      inputTokens: text.length, errorCode: err instanceof Error ? err.name : "network",
+      latencyMs: Date.now() - started,
+    });
+    return NextResponse.json({ error: "The voice service could not be reached." }, { status: 503 });
   }
+
+  const latencyMs = Date.now() - started;
+  if (!res.ok || !res.body) {
+    console.error("[POST /api/ai/speak] Deepgram", res.status, await res.text().catch(() => ""));
+    await recordAiInvocation({
+      provider: "deepgram", model: voice, status: "failure",
+      inputTokens: text.length, errorCode: String(res.status), latencyMs,
+    });
+    return NextResponse.json({ error: "The voice service refused the request." }, { status: 503 });
+  }
+
+  await recordAiInvocation({
+    provider: "deepgram", model: voice, status: "success",
+    inputTokens: text.length, latencyMs,
+  });
+
+  return new NextResponse(res.body, {
+    status: 200,
+    headers: { "Content-Type": "audio/mpeg", "Cache-Control": "no-store" },
+  });
 }

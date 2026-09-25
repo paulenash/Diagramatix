@@ -27,6 +27,9 @@ export function providerOf(model: string): string {
   // own rates rather than OpenRouter's.
   if (model.includes("/") && !model.startsWith("ollama/")) return "openrouter";
   if (/^ollama[/:]/i.test(model)) return "ollama"; // local Ollama (free) — check first
+  // Deepgram's Aura voices. Without this they fell through to "anthropic", and
+  // the catalog would have listed the speaking voices under Claude.
+  if (/^aura-/i.test(model)) return "deepgram";
   if (/^(kimi|moonshot)/i.test(model)) return "moonshot";
   if (/^deepseek/i.test(model)) return "deepseek";
   if (/^gemini/i.test(model)) return "google";
