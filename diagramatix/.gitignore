@@ -65,6 +65,10 @@ next-env.d.ts
 /new features/getai-api/*
 !/new features/getai-api/Partner API Plan.md
 !/new features/getai-api/Process API Proposed Design.md
+# Diagramatix Voice (spoken replies via Deepgram) — the plan only.
+!/new features/diagramatix-voice/
+/new features/diagramatix-voice/*
+!/new features/diagramatix-voice/diagramatix-voice-feedback-2026-09-25.md
 
 # Playwright e2e artifacts
 /test-results/
