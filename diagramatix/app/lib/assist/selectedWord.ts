@@ -138,6 +138,24 @@ export function repairTurnWord(text: string): SelectedWordRepair {
 export const TURN_MISHEARD_WORDS = TURN_MISHEARD;
 
 /**
+ * "Mood." → "Move." (Paul's test-diagram session, 2026-09-27). He paused after
+ * the verb; the recogniser returned "mood", which is no verb, so the half was
+ * not held for the rest — it failed on its own, and "pool three below Claims
+ * System" went to the AI by itself. Only the FIRST word, and "mood" starts no
+ * command, so nothing that was heard right can change.
+ */
+const MOVE_MISHEARD_RE = /^(mood)(?=[\s.,!?]|$)/i;
+export function repairMoveWord(text: string): SelectedWordRepair {
+  if (!text) return { text, corrected: false };
+  let corrected = false;
+  const out = text.replace(MOVE_MISHEARD_RE, (heard: string) => {
+    corrected = true;
+    return /^[A-Z]/.test(heard) ? "Move" : "move";
+  });
+  return { text: out, corrected };
+}
+
+/**
  * "and message" / "Handle message" → "add message" (Paul, 2026-09-25).
  *
  * Both came back as "didn't understand that", and the AI fallback failed too.
@@ -227,7 +245,7 @@ export const MISHEARD_ADD_LEADING_WORDS = MISHEARD_ADD_LEADING;
 export function repairHeardWords(text: string): string {
   // A spelled-out name ("F I N A N C E") is joined first, so every rule below
   // and every name slot sees the word (spelledWord.ts).
-  return repairSelectedWord(repairAddWord(repairTurnWord(joinSpelledLetters(text)).text).text).text;
+  return repairSelectedWord(repairAddWord(repairTurnWord(repairMoveWord(joinSpelledLetters(text)).text).text).text).text;
 }
 
 /** True when this word already refers to the selection. */

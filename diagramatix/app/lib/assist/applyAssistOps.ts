@@ -55,6 +55,7 @@ import { getRiskControl, riskControlPatch } from "@/app/lib/diagram/riskControl"
 import { simPatch } from "@/app/lib/diagram/simParams";
 import { whyTemplateCantFollow } from "@/app/lib/diagram/templateAttach";
 import { SEQUENCE_NODE_TYPES } from "@/app/lib/diagram/templates";
+import { eventSideRefusal } from "@/app/lib/diagram/eventSides";
 import { TEMPLATE_BEFORE_REFUSAL } from "./templatePhrase";
 import { refKind, type RefKind } from "./refKinds";
 
@@ -1015,10 +1016,41 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
     // rearrangement either way, and having to remember which verb applies is
     // exactly the kind of thing voice is supposed to remove.
     if (op.op === "moveGatewayPoint") {
-      const gws = selectedIds.map((id) => els.find((x) => x.id === id)).filter((g): g is DiagramElement => !!g && g.type === "gateway");
-      if (gws.length === 0) { results.push("select a gateway first"); anyFail = true; continue; }
+      const picked = selectedIds.map((id) => els.find((x) => x.id === id)).filter((g): g is DiagramElement => !!g);
+      const gws = picked.filter((g) => g.type === "gateway");
+      // AN EVENT TOO, inline or on a boundary (Paul, 2026-09-27: "New Voice
+      // Assist command for when a gateway OR an event … is selected … Move
+      // {left, top, right, bottom} to {left, top, right, bottom}"). Whichever
+      // flow sits at the named side moves — in or out, sequence or message —
+      // under the one side rule for events (eventSides.ts).
+      const evs = picked.filter((e) => /-event$/.test(e.type));
+      if (gws.length === 0 && evs.length === 0) { results.push("select a gateway or an event first"); anyFail = true; continue; }
       const moved: string[] = [];
       const missed: string[] = [];
+      for (const ev of evs) {
+        if (op.from === "middle" || op.to === "middle") { missed.push(`${nameOf(ev)}: say top, bottom, left or right for an event`); continue; }
+        const attached = data.connectors.filter((c) => (c.sourceId === ev.id || c.targetId === ev.id) && (c.type === "sequence" || c.type === "messageBPMN"));
+        const sideAt = (c: Connector) => (c.sourceId === ev.id ? c.sourceSide : c.targetSide);
+        const src = attached.find((c) => sideAt(c) === op.from);
+        if (!src) { missed.push(`${nameOf(ev)}: no connector at the ${op.from}`); continue; }
+        if (attached.some((c) => c.id !== src.id && sideAt(c) === op.to)) { missed.push(`${nameOf(ev)}: the ${op.to} already has one`); continue; }
+        const endpoint: "source" | "target" = src.sourceId === ev.id ? "source" : "target";
+        const refusal = eventSideRefusal(ev.type, endpoint, op.to);
+        if (refusal) { missed.push(`${nameOf(ev)}: ${refusal}`); continue; }
+        // ASK THE REDUCER FIRST. It keeps a boundary event's flow on its outer
+        // point (R7.02) and moves a flow back whose new route would run through
+        // something — right, and until this was asked, reported as "moved".
+        const next = preview({ type: "UPDATE_CONNECTOR_ENDPOINT", payload: { connectorId: src.id, endpoint, newElementId: ev.id, newSide: op.to, newOffsetAlong: 0.5 } });
+        const kept = next?.connectors.find((c) => c.id === src.id);
+        if (!kept || (endpoint === "source" ? kept.sourceSide : kept.targetSide) !== op.to) {
+          missed.push(`${nameOf(ev)}: ${ev.boundaryHostId && endpoint === "source"
+            ? "a boundary event’s flow leaves from its outer point (R7.02), so it stays"
+            : `a flow at the ${op.to} would not route cleanly here, so it stays at the ${op.from}`}`);
+          continue;
+        }
+        updateConnectorEndpoint(src.id, endpoint, ev.id, op.to, 0.5);
+        moved.push(nameOf(ev));
+      }
       for (const g of gws) {
         const outs = data.connectors.filter((c) => c.sourceId === g.id && c.type === "sequence");
         const ins = data.connectors.filter((c) => c.targetId === g.id && c.type === "sequence");
@@ -1040,7 +1072,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       }
       if (moved.length === 0) anyFail = true;
       results.push(
-        (moved.length ? `moved the ${op.from} connector to the ${op.to} on ${moved.length === 1 ? moved[0] : `${moved.length} gateways`}` : "") +
+        (moved.length ? `moved the ${op.from} connector to the ${op.to} on ${moved.length === 1 ? moved[0] : `${moved.length} elements`}` : "") +
         (missed.length ? `${moved.length ? " — " : ""}${missed.join("; ")}` : ""),
       );
       continue;

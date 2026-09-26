@@ -246,7 +246,7 @@ describe("T4930 — a name spelled out is the word (“rename Lane 3 to F I N A 
   });
 
   it("one repair for the grammar and the hold, and the rename-by-number answer too", () => {
-    expect(readFileSync("app/lib/assist/selectedWord.ts", "utf8")).toContain("repairTurnWord(joinSpelledLetters(text))");
+    expect(readFileSync("app/lib/assist/selectedWord.ts", "utf8")).toContain("repairTurnWord(repairMoveWord(joinSpelledLetters(text)).text)");
     const editor = readFileSync("app/(dashboard)/diagram/[id]/DiagramEditor.tsx", "utf8");
     const rename = editor.slice(editor.indexOf("const handleRenameUtterance = useCallback("), editor.indexOf("const handleRenameUtterance = useCallback(") + 800);
     expect(rename).toContain("const t = joinSpelledLetters(text.trim());");

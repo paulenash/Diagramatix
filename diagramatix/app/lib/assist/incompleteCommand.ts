@@ -50,6 +50,13 @@ export function isIncompleteCommand(text: string): boolean {
   if (/^(?:called|named|labell?ed)\b/.test(t)) return true;
   // A bare verb — "Swap." "Rename." "Move." — is the start of something.
   if (VERBS.test(t)) return true;
+  // "Swap lanes." / "Swap lines." — the kind is said, the two names are a pause
+  // away. Paul's test-diagram session (2026-09-27): "swap lines", "swap lane"
+  // and "swap Claims" each went to the AI on their own, which guessed a pair he
+  // had not named; "swap lanes lane two and underwriters", said in one breath,
+  // worked. Held, the names join it. Not pools: "swap the two pools" is a
+  // whole command already — it swaps the two selected.
+  if (/^swap(?:\s+the)?(?:\s+two)?\s+(?:sub-?\s?)?(?:lanes?|lines?)$/.test(t)) return true;
   // "Compress lane." / "Compress the pool." — the kind is said and the name is
   // usually a pause away. Held so "… three" can join it; if nothing comes it
   // runs, and a bare kind with several candidates asks which rather than

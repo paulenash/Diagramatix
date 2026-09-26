@@ -107,3 +107,26 @@ export function isDecisionGateway(
   const role = el.properties?.gatewayRole;
   return role === undefined || role === null || role === "decision";
 }
+
+const NUMBER_WORDS: Record<string, string> = {
+  one: "1", two: "2", three: "3", four: "4", five: "5", six: "6", seven: "7", eight: "8", nine: "9", ten: "10",
+  eleven: "11", twelve: "12", thirteen: "13", fourteen: "14", fifteen: "15", sixteen: "16", seventeen: "17",
+  eighteen: "18", nineteen: "19", twenty: "20",
+};
+/** The kind words a NUMBERED name is made of: "Pool 3", "Lane 2", "Task 1", "Step 4". */
+const NUMBERED_KINDS = "pool|lane|sub-?lane|task|sub-?process|step|phase|stage|gateway|event|option|level|round|version";
+const KIND_THEN_NUMBER_WORD = new RegExp(String.raw`\b(${NUMBERED_KINDS})\s+(${Object.keys(NUMBER_WORDS).join("|")})\b`, "gi");
+
+/**
+ * A spoken NAME says its number as a word; the diagram writes it as a digit.
+ *
+ * Paul's test-diagram session, 2026-09-27: "rename selected to pool three" named
+ * the pool "Pool three" (his verdict: partly) — the pool beside it is "Pool 3",
+ * and new ones are born "Pool N". So a number word straight after a kind word
+ * becomes its digit: "pool three" → "pool 3". Only in a NAME — "move the
+ * gateway two elements to the right" is a count, and the grammar reads counts
+ * as words.
+ */
+export function digitsAfterKindWord(name: string): string {
+  return String(name ?? "").replace(KIND_THEN_NUMBER_WORD, (_m, kind: string, n: string) => `${kind} ${NUMBER_WORDS[n.toLowerCase()]}`);
+}
