@@ -10,6 +10,7 @@ export const OUTCOME_STYLE: Record<Outcome, string> = {
   "ambiguous": "bg-blue-100 text-blue-800",
   "wrong-element": "bg-red-100 text-red-800",
   "wrong-edit": "bg-red-200 text-red-900",
+  "stale-clip": "bg-gray-100 text-gray-600",
 };
 
 /** What each outcome means, in a sentence — the tooltip and the window's key. */
@@ -22,4 +23,5 @@ export const OUTCOME_MEANS: Record<Outcome, string> = {
   "ambiguous": "the reference named more than one thing; live, the picker opens",
   "wrong-element": "it resolved, to the wrong element",
   "wrong-edit": "the ops were right and the diagram came out wrong",
+  "stale-clip": "cannot be judged — the clip names an element today's test diagram no longer has; neither a pass nor a failure",
 };

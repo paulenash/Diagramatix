@@ -35,7 +35,22 @@ export async function GET(req: Request) {
   if (!session?.user?.id || !isSuperuser(session)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  const seed = new URL(req.url).searchParams.get("seed");
+  const params = new URL(req.url).searchParams;
+  // WHICH SETS HAVE BEEN RECORDED — one row per seed, counted in the database.
+  // Never derived from the listing below: that is capped, and a set past the
+  // cap would silently vanish from the choice.
+  if (params.get("sets") === "1") {
+    const groups = await prisma.voiceClip.groupBy({
+      by: ["corpusSeed"],
+      _count: { _all: true },
+      _max: { recordedAt: true },
+    });
+    const sets = groups
+      .map((g) => ({ seed: g.corpusSeed, clips: g._count._all, lastRecordedAt: g._max.recordedAt }))
+      .sort((a, b) => (b.lastRecordedAt?.getTime() ?? 0) - (a.lastRecordedAt?.getTime() ?? 0));
+    return NextResponse.json({ sets });
+  }
+  const seed = params.get("seed");
   const clips = await prisma.voiceClip.findMany({
     where: seed ? { corpusSeed: seed } : undefined,
     select: LIST_SELECT,

@@ -20,7 +20,7 @@
  * comparable — and is "one rule, one place" applied to the measurement itself.
  */
 import { parseCommand } from "./commandGrammar";
-import { resolveRef } from "./resolveRef";
+import { resolveRef, isSelectionRef } from "./resolveRef";
 import type { AssistOp } from "./ops";
 import type { GeneratedCase } from "./commandGenerator";
 import type { DiagramData, DiagramElement } from "../diagram/types";
@@ -46,7 +46,16 @@ export type Outcome =
   /** L3b — it resolved, to the wrong element. */
   | "wrong-element"
   /** L4 — the ops were right and the diagram came out wrong. */
-  | "wrong-edit";
+  | "wrong-edit"
+  /**
+   * The case cannot be judged: an element it expects is not in TODAY'S test
+   * diagram. A recorded clip carries the refs of the diagram it was recorded
+   * against, and when that diagram changes a ref can vanish. Neither a pass
+   * nor a failure — before this outcome existed, such a clip PASSED whenever
+   * it was misheard as something that did exist, and failed when heard
+   * perfectly.
+   */
+  | "stale-clip";
 
 export interface CaseResult {
   caseId: string;
@@ -69,6 +78,11 @@ export const FAILING_OUTCOMES: readonly Outcome[] =
 
 export function isFailure(o: Outcome): boolean {
   return FAILING_OUTCOMES.includes(o);
+}
+
+/** Could this case be judged at all? A stale clip is counted apart, never in a pass rate. */
+export function isJudged(o: Outcome): boolean {
+  return o !== "stale-clip";
 }
 
 /**
@@ -181,6 +195,8 @@ function shapeDiff(want: AssistOp, got: AssistOp): string {
 interface RefCheck {
   ok: boolean;
   ambiguous: boolean;
+  /** The EXPECTED ref names nothing (or several things) in this world — the case cannot be judged. */
+  stale: boolean;
   detail: string;
 }
 
@@ -194,23 +210,34 @@ function checkRefs(expected: AssistOp[], actual: AssistOp[], world: readonly Dia
       const want = e[field];
       const got = a[field];
       if (typeof want !== "string" || !want) continue;
-      if (typeof got !== "string" || !got) {
-        return { ok: false, ambiguous: false, detail: `${field}: expected “${want}”, got nothing` };
-      }
       const wr = resolveRef(want, [...world]);
+      const wantId = wr && "id" in wr ? wr.id : null;
+      // THE ANSWER KEY MUST NAME ONE THING. When it named nothing here, any
+      // heard ref that happened to name SOMETHING passed — so an old clip
+      // scored "pass-despite-mishear" when misheard, and failed when heard
+      // perfectly. A selection word ("this", "selected") legitimately names
+      // nothing without a selection, and keeps its old treatment.
+      if (!wantId && !isSelectionRef(want)) {
+        return {
+          ok: false, ambiguous: false, stale: true,
+          detail: `${field}: “${want}” ${wr ? "names several things" : "is not"} in today's test diagram — the clip was recorded against another one`,
+        };
+      }
+      if (typeof got !== "string" || !got) {
+        return { ok: false, ambiguous: false, stale: false, detail: `${field}: expected “${want}”, got nothing` };
+      }
       const gr = resolveRef(got, [...world]);
       if (gr && "ambiguous" in gr) {
-        return { ok: false, ambiguous: true, detail: `${field}: “${got}” names ${gr.ambiguous.length} things` };
+        return { ok: false, ambiguous: true, stale: false, detail: `${field}: “${got}” names ${gr.ambiguous.length} things` };
       }
-      const wantId = wr && "id" in wr ? wr.id : null;
       const gotId = gr && "id" in gr ? gr.id : null;
-      if (!gotId) return { ok: false, ambiguous: false, detail: `${field}: “${got}” matched nothing` };
+      if (!gotId) return { ok: false, ambiguous: false, stale: false, detail: `${field}: “${got}” matched nothing` };
       if (wantId && gotId !== wantId) {
-        return { ok: false, ambiguous: false, detail: `${field}: “${got}” found ${gotId}, wanted ${wantId}` };
+        return { ok: false, ambiguous: false, stale: false, detail: `${field}: “${got}” found ${gotId}, wanted ${wantId}` };
       }
     }
   }
-  return { ok: true, ambiguous: false, detail: "" };
+  return { ok: true, ambiguous: false, stale: false, detail: "" };
 }
 
 /**
@@ -264,7 +291,7 @@ export function scoreCase(
   if (!refs.ok) {
     return {
       ...base, actual,
-      outcome: refs.ambiguous ? "ambiguous" : "wrong-element",
+      outcome: refs.stale ? "stale-clip" : refs.ambiguous ? "ambiguous" : "wrong-element",
       detail: refs.detail,
     };
   }
@@ -284,6 +311,7 @@ export function scoreCase(
 }
 
 export interface ScoreSummary {
+  /** Cases that could be judged: passed + failed. Stale clips are counted apart. */
   total: number;
   passed: number;
   failed: number;
@@ -291,25 +319,30 @@ export interface ScoreSummary {
   byFamily: Record<string, { total: number; passed: number; failed: number }>;
   /** What share of cases the deterministic grammar refused — the AI's real bill. */
   fallbackRate: number;
+  /** Cases that could not be judged (`stale-clip`): in `byOutcome`, never in `total`. */
+  stale: number;
 }
 
 export function summarise(results: readonly CaseResult[]): ScoreSummary {
   const byOutcome: Record<string, number> = {};
   const byFamily: Record<string, { total: number; passed: number; failed: number }> = {};
-  let passed = 0, unparsed = 0;
+  let passed = 0, unparsed = 0, stale = 0;
   for (const r of results) {
     byOutcome[r.outcome] = (byOutcome[r.outcome] ?? 0) + 1;
+    if (!isJudged(r.outcome)) { stale++; continue; }
     const fam = byFamily[r.family] ??= { total: 0, passed: 0, failed: 0 };
     fam.total++;
     if (isFailure(r.outcome)) fam.failed++; else { fam.passed++; passed++; }
     if (r.outcome === "unparsed") unparsed++;
   }
+  const judged = results.length - stale;
   return {
-    total: results.length,
+    total: judged,
     passed,
-    failed: results.length - passed,
+    failed: judged - passed,
     byOutcome,
     byFamily,
-    fallbackRate: results.length ? unparsed / results.length : 0,
+    fallbackRate: judged ? unparsed / judged : 0,
+    stale,
   };
 }

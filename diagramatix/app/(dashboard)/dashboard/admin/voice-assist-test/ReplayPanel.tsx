@@ -21,7 +21,7 @@
  * silence came before the voice (`wavTools.ts`).
  */
 import { useCallback, useEffect, useState } from "react";
-import { scoreCase, summarise, isFailure, type CaseResult } from "@/app/lib/assist/commandScore";
+import { scoreCase, summarise, isFailure, isJudged, type CaseResult } from "@/app/lib/assist/commandScore";
 import { fixtureElements } from "@/app/lib/assist/commandFixture";
 import { replayClip } from "@/app/lib/dictation/replayClip";
 import { BOOST_PROFILES, boostProfile, DEFAULT_BOOST_PROFILE, type BoostProfileId } from "@/app/lib/dictation/boostProfiles";
@@ -32,6 +32,9 @@ import {
   type MeasureMode, type Variant, type VariantKey, type Onset,
 } from "@/app/lib/dictation/replayCompare";
 import type { GeneratedCase } from "@/app/lib/assist/commandGenerator";
+import { DEFAULT_CORPUS_SEED } from "@/app/lib/assist/rng";
+import { OUTCOME_MEANS } from "./outcomeStyle";
+import { chooseReplaySet, type RecordedSet } from "@/app/lib/dictation/replaySets";
 
 interface ClipRow {
   id: string;
@@ -56,6 +59,8 @@ const BATCH_CAVEATS = [
 
 /** What a run was, fixed when it starts — so the screen never labels old numbers with new settings. */
 interface RunLabel {
+  /** The one recorded set this run replays, and is saved under. */
+  seed: string;
   leg: Leg;
   profileId: BoostProfileId;
   mode: MeasureMode;
@@ -65,6 +70,8 @@ interface RunLabel {
 type ByVariant<T> = Partial<Record<VariantKey, Record<string, T>>>;
 
 export function ReplayPanel() {
+  const [sets, setSets] = useState<RecordedSet[] | null>(null);
+  const [seed, setSeed] = useState<string | null>(null);
   const [clips, setClips] = useState<ClipRow[] | null>(null);
   const [leg, setLeg] = useState<Leg>("stream");
   const [profileId, setProfileId] = useState<BoostProfileId>(DEFAULT_BOOST_PROFILE);
@@ -84,9 +91,17 @@ export function ReplayPanel() {
   const [err, setErr] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  /** The recorded sets, then the clips of the chosen one — never every clip at once. */
+  const load = useCallback(async (want: string | null) => {
     try {
-      const res = await fetch("/api/admin/voice-assist-test/clips", { cache: "no-store" });
+      const setsRes = await fetch("/api/admin/voice-assist-test/clips?sets=1", { cache: "no-store" });
+      if (!setsRes.ok) throw new Error(`could not list the recorded sets (${setsRes.status})`);
+      const found = (await setsRes.json()).sets as RecordedSet[];
+      setSets(found);
+      const chosen = chooseReplaySet(found, want, DEFAULT_CORPUS_SEED);
+      setSeed(chosen);
+      if (!chosen) { setClips([]); return; }
+      const res = await fetch(`/api/admin/voice-assist-test/clips?seed=${encodeURIComponent(chosen)}`, { cache: "no-store" });
       if (!res.ok) throw new Error(`could not list clips (${res.status})`);
       setClips((await res.json()).clips as ClipRow[]);
     } catch (e) {
@@ -94,7 +109,7 @@ export function ReplayPanel() {
       setClips([]);
     }
   }, []);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(null); }, [load]);
 
   /** Latest take per case — a retake exists because the earlier one was worse. */
   const latest = (all: ClipRow[]): ClipRow[] => {
@@ -108,10 +123,10 @@ export function ReplayPanel() {
   };
 
   const run = useCallback(async () => {
-    if (!clips?.length) return;
+    if (!clips?.length || !seed) return;
     // Everything the run depends on is fixed here, so a control touched
     // afterwards can neither change the run nor relabel its results.
-    const runLabel: RunLabel = { leg, profileId, mode, variants: variantsFor(mode, leg) };
+    const runLabel: RunLabel = { seed, leg, profileId, mode, variants: variantsFor(mode, leg) };
     setLabel(runLabel);
     setRunning(true);
     setErr(null);
@@ -123,7 +138,9 @@ export function ReplayPanel() {
     setOnset({});
     setSkipped([]);
     const els = fixtureElements();
-    const todo = latest(clips);
+    // The listing was asked for this set only; the filter is the belt to that
+    // braces, so a stale listing can never put another set's clip in the run.
+    const todo = latest(clips.filter((c) => c.corpusSeed === runLabel.seed));
     setProgress({ done: 0, total: todo.length });
     const started = Date.now();
     const collected: Partial<Record<VariantKey, Array<CaseResult & Onset>>> = {};
@@ -229,7 +246,7 @@ export function ReplayPanel() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            leg: runLabel.leg, corpusSeed: todo[0]?.corpusSeed ?? "", boostProfile: runLabel.profileId,
+            leg: runLabel.leg, corpusSeed: runLabel.seed, boostProfile: runLabel.profileId,
             asrFingerprint: fingerprints[v.key] ?? null,
             notes,
             total: s.total, passed: s.passed, failed: s.failed,
@@ -241,10 +258,10 @@ export function ReplayPanel() {
       } catch { /* the numbers are on screen either way */ }
     }
     setSaved(kept ? `${kept === 1 ? "run" : `${kept} runs`} saved` : null);
-  }, [clips, leg, profileId, mode]);
+  }, [clips, seed, leg, profileId, mode]);
 
   // ── What the screen shows ──────────────────────────────────────────────────
-  const shown: RunLabel = label ?? { leg, profileId, mode, variants: variantsFor(mode, leg) };
+  const shown: RunLabel = label ?? { seed: seed ?? "", leg, profileId, mode, variants: variantsFor(mode, leg) };
   const baseKey: VariantKey = shown.variants[0]?.key ?? "recorded";
   const base = rows[baseKey] ?? {};
   const baseHeard = heard[baseKey] ?? {};
@@ -278,12 +295,26 @@ export function ReplayPanel() {
     const excluded = new Set([...(errored[v.key] ?? []), ...baseErrored]);
     const f = v.key === baseKey ? null : flips(base, r, (o) => isFailure(o as CaseResult["outcome"]), excluded);
     const fw = v.key === baseKey ? null : firstWordFlips(said, baseHeard, heard[v.key] ?? {}, excluded);
-    return [{ v, passed: s.passed, total: s.total, errored: (errored[v.key] ?? []).length, flips: f, firstWord: fw }];
+    return [{ v, passed: s.passed, total: s.total, stale: s.stale, errored: (errored[v.key] ?? []).length, flips: f, firstWord: fw }];
   });
+  const staleBase = results.filter((r) => !isJudged(r.outcome));
 
   return (
     <div>
       <div className="flex flex-wrap items-center gap-3 mb-3">
+        {/* ONE SET PER RUN — a second recorded set used to be mixed into the
+            first set's numbers, and the run filed under whichever sorted first. */}
+        <label className="flex items-center gap-1 text-xs">
+          <span className="font-medium text-gray-700">Set:</span>
+          <select value={seed ?? ""} disabled={running || !sets?.length}
+            onChange={(e) => { setRows({}); setHeard({}); setLabel(null); void load(e.target.value); }}
+            className="border border-gray-300 rounded px-2 py-1 text-xs bg-white disabled:opacity-50">
+            {!sets?.length && <option value="">nothing recorded</option>}
+            {sets?.map((s) => (
+              <option key={s.seed} value={s.seed}>{s.seed} — {s.clips} clip{s.clips === 1 ? "" : "s"}</option>
+            ))}
+          </select>
+        </label>
         <div className="flex items-center gap-1 text-xs">
           {(["stream", "batch"] as const).map((l) => (
             <button key={l} onClick={() => setLeg(l)} disabled={running}
@@ -296,7 +327,7 @@ export function ReplayPanel() {
           className="text-xs text-white bg-purple-600 hover:bg-purple-700 rounded px-3 py-1.5 disabled:opacity-50">
           {running ? `Replaying ${progress.done}/${progress.total}…` : "Replay corpus"}
         </button>
-        <button onClick={() => { void load(); }} disabled={running} className="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50">Refresh clips</button>
+        <button onClick={() => { void load(seed); }} disabled={running} className="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50">Refresh clips</button>
         {clips && <span className="text-xs text-gray-500">{latest(clips).length} clips</span>}
         {saved && <span className="text-xs text-green-700">{saved}</span>}
         {err && <span className="text-xs text-red-600">{err}</span>}
@@ -383,16 +414,17 @@ export function ReplayPanel() {
       {summary && (
         <>
           <p className="text-[11px] text-gray-500 mb-1">
-            These results: {shown.leg} leg · boosts “{boostProfile(shown.profileId).label}” · {shown.variants.map((v) => v.label).join(" + ")}
+            These results: set “{shown.seed}” · {shown.leg} leg · boosts “{boostProfile(shown.profileId).label}” · {shown.variants.map((v) => v.label).join(" + ")}
           </p>
           <div className="mb-2 space-y-0.5">
             {lines.map((l) => (
               <div key={l.v.key} className="text-sm">
                 <span className={l.v.key === baseKey ? "font-semibold text-gray-800" : "text-gray-800"}>
                   {l.v.label}: {l.passed}/{l.total} passed
-                  <span className="text-gray-400 font-normal"> ({Math.round((l.passed / l.total) * 100)}%)</span>
+                  {l.total > 0 && <span className="text-gray-400 font-normal"> ({Math.round((l.passed / l.total) * 100)}%)</span>}
                 </span>
                 {l.errored > 0 && <span className="text-xs text-amber-700 ml-2">{l.errored} errored, left out</span>}
+                {l.stale > 0 && <span className="text-xs text-gray-500 ml-2" title={OUTCOME_MEANS["stale-clip"]}>{l.stale} stale, not counted</span>}
                 {l.flips && l.firstWord && (
                   <span className="text-xs ml-2">
                     <span className="text-green-700">first word fixed {l.firstWord.fixed.length}</span>
@@ -436,6 +468,13 @@ export function ReplayPanel() {
           {erroredBase.length > 0 && (
             <div className="mb-3 text-xs text-amber-800 max-w-3xl">
               Never reached the recogniser: {erroredBase.map((r) => `“${said[r.caseId] ?? r.caseId}” (${baseHeard[r.caseId] ?? ""})`).join("; ")}
+            </div>
+          )}
+
+          {staleBase.length > 0 && (
+            <div className="mb-3 text-xs text-gray-600 max-w-3xl">
+              Stale — recorded against an older test diagram, so they cannot be judged and are in no count
+              (re-record them): {staleBase.map((r) => `“${said[r.caseId] ?? r.caseId}” (${r.detail})`).join("; ")}
             </div>
           )}
 
