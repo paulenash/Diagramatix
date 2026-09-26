@@ -3,7 +3,8 @@
  *
  * The GET returns the session in the SAME SHAPE the bar downloads, so what
  * comes out of the database is a file somebody can save and open. Snapshots
- * come back as metadata plus a URL; their bytes are served by
+ * come back with their diagram JSON inline (that is the snapshot now) plus a
+ * URL; an older session's picture bytes are served by
  * `/api/admin/voice-debug/snapshots/[id]`, because a session with twenty
  * pictures inline is a payload nobody wants on a detail page.
  */
@@ -64,6 +65,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       label: s.label,
       width: s.pngWidth,
       height: s.pngHeight,
+      // Only sessions saved before 26 Sep 2026 have a picture (snapshots are
+      // JSON since). The viewer shows an <img> only when this says so; asking
+      // for the URL of a picture that is not there drew a broken image.
+      hasPicture: s.pngWidth != null,
       url: `/api/admin/voice-debug/snapshots/${s.id}`,
       diagramJson: (() => { try { return JSON.parse(s.diagramJson); } catch { return null; } })(),
       elementCount: s.elementCount,

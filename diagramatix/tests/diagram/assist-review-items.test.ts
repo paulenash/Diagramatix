@@ -14,6 +14,7 @@ import { collectMessageTargets, parseMessageAnswer } from "@/app/lib/assist/mess
 import { resolveRef, ID_REF_PREFIX } from "@/app/lib/assist/resolveRef";
 import { validateOps } from "@/app/lib/assist/ops";
 import { COMMAND_CATALOG } from "@/app/lib/assist/commandCatalog";
+import { badgesOnScreen } from "@/app/lib/assist/debugCapture";
 import type { DiagramElement, DiagramData } from "@/app/lib/diagram/types";
 import { editorWithApplyLayer } from "./assistApplySource";
 
@@ -209,11 +210,16 @@ describe("6 & 7 — messages by number", () => {
     expect(ed).toContain("if (messageFlowRef.current) { handleMessageUtteranceRef.current(heard); return; }");
     // Badges are shared with the rename flow — and, since 2026-09-20, with
     // R2's disambiguation picker too, so this asserts that ONE prop carries
-    // all of them rather than pinning the exact expression.
-    const badges = ed.slice(ed.indexOf("renameBadges={"), ed.indexOf("renameBadges={") + 200);
-    expect(badges, "the rename flow's targets").toContain("renameFlow.targets");
-    expect(badges, "and the message flow's").toContain("messageFlow?.targets");
-    expect(badges, "and the picker's").toContain("pickFlow?.targets");
+    // all of them rather than pinning the exact expression. Since 2026-09-26
+    // that prop is `badgesOnScreen(...)`, which the voice-debug recording also
+    // reads, so what it saves is what was drawn (T4886, T4893).
+    expect(ed).toContain("renameBadges={onScreenBadges}");
+    expect(ed).toContain("const onScreenBadges = badgesOnScreen(renameFlow, messageFlow, pickFlow);");
+    const r = [{ id: "r", n: 1, kind: "element" as const, x: 0, y: 0, height: 0 }];
+    const m = [{ ...r[0], id: "m" }], p = [{ ...r[0], id: "p" }];
+    expect(badgesOnScreen({ phase: "pick", targets: r }, { targets: m }, { targets: p }), "the rename flow's targets").toBe(r);
+    expect(badgesOnScreen(null, { targets: m }, { targets: p }), "and the message flow's").toBe(m);
+    expect(badgesOnScreen(null, null, { targets: p }), "and the picker's").toBe(p);
     expect(ed).toMatch(/applyGrouped\(\[\{ op: "addMessage", fromRef: ID_REF_PREFIX \+ fromId, toRef: ID_REF_PREFIX \+ toId/);
     // …and the reminder card lists both forms (their parse is pinned by T4395).
     const msgs = COMMAND_CATALOG.find((f) => f.family === "Messages")!;

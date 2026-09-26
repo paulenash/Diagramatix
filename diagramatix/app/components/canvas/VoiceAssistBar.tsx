@@ -64,7 +64,7 @@ export function VoiceAssistBar({
   onToggleDebug?: (on: boolean) => void;
   /** Record the human's opinion of one command. */
   onAnnotate?: (id: string, patch: { note?: string; verdict?: Verdict }) => void;
-  /** Take a picture of the canvas — for one entry, or ad-hoc when id is null. */
+  /** Save the diagram as it is now (JSON), with the badges and the selection on screen — for one entry, or on its own when id is null. Recording also saves it around every command without being asked. */
   onSnapshot?: (entryId: string | null) => void;
   onDownloadSession?: () => void;
   /** Keep this session — saved to the SuperAdmin list, where it outlives the tab. */
@@ -224,7 +224,7 @@ export function VoiceAssistBar({
             </span>
             {onSnapshot && (
               <button onClick={() => onSnapshot(null)} className="shrink-0 px-1.5 py-0.5 rounded border border-amber-300 hover:bg-amber-100"
-                title="Take a picture of the canvas as it is now">📷 Snapshot</button>
+                title="Save the diagram as it is now (JSON) — marks this moment, with the numbered badges and the selection on screen">📷 Snapshot</button>
             )}
             {onSaveSession && (
               <button onClick={onSaveSession} disabled={log.length === 0 || saveState === "saving"}
@@ -301,7 +301,7 @@ export function VoiceAssistBar({
                     {onSnapshot && (
                       <button onClick={() => onSnapshot(e.id)}
                         className={`shrink-0 px-1 py-0.5 rounded text-[9px] border ${e.snapshotId ? "bg-amber-100 border-amber-300 text-amber-700" : "text-gray-500 border-gray-300 hover:bg-gray-50"}`}
-                        title={e.snapshotId ? "Snapshot taken for this command — click to replace" : "Take a picture of the canvas for this command"}>📷</button>
+                        title={e.snapshotId ? "The diagram is saved for this command (JSON) — click to save it again as it is now" : "Save the diagram as it is now (JSON), for this command"}>📷</button>
                     )}
                   </div>
                 )}

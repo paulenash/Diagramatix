@@ -34,7 +34,8 @@ export interface CommandLogEntry {
   // ─── Debug fields (Paul, 2026-09-24). Only populated while the debug toggle
   //     is on; the bar renders them only for a SuperAdmin. ───
 
-  /** Epoch ms. A saved session is unreadable without it. */
+  /** Epoch ms. A saved session is unreadable without it, so the editor's one
+   *  `appendLog` stamps it on every entry, recording or not. */
   at?: number;
   /** The comment typed beside this command. */
   note?: string;
@@ -49,7 +50,8 @@ export interface CommandLogEntry {
    * away the only signal that names it.
    */
   verdict?: CommandVerdict;
-  /** What it parsed to, or what the AI returned. */
+  /** The ops the command applied — what it parsed to, or what the AI returned,
+   *  with "again" already expanded. Set on the entry written after an apply. */
   ops?: AssistOp[];
   /** Which guided flow handled it, when one did. */
   flow?: "rename" | "message" | "template" | "pick" | "confirm";

@@ -15,6 +15,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { buildPickFlow, parsePickAnswer, substituteRef } from "@/app/lib/assist/disambiguate";
 import { numberTargets } from "@/app/lib/assist/renameTargets";
+import { badgesOnScreen } from "@/app/lib/assist/debugCapture";
 import { ID_REF_PREFIX, resolveRef } from "@/app/lib/assist/resolveRef";
 import type { AssistOp } from "@/app/lib/assist/ops";
 import type { DiagramElement } from "@/app/lib/diagram/types";
@@ -145,6 +146,10 @@ describe("T4573 — wired into the editor", () => {
   });
 
   it("draws the badges with the same renderer as the other flows", () => {
-    expect(body).toContain("pickFlow?.targets");
+    // One value feeds the canvas's badges and the voice-debug recording since
+    // 2026-09-26 (badgesOnScreen, T4893); the picker's targets are in it.
+    expect(body).toContain("const onScreenBadges = badgesOnScreen(renameFlow, messageFlow, pickFlow);");
+    const targets = [{ id: "t1", n: 1, kind: "element" as const, x: 0, y: 0, height: 0 }];
+    expect(badgesOnScreen(null, null, { targets })).toBe(targets);
   });
 });

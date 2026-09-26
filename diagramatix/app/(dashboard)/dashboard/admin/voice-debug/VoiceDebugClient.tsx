@@ -9,10 +9,23 @@
  *
  * Plain elements and Tailwind, no component library (house rule).
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import type { CommandLogEntry } from "@/app/lib/assist/commandLog";
 import { describeTouched } from "@/app/lib/assist/commandLog";
+import {
+  debugSessionFilename, readSnapshotDiagram, serialiseDebugSession, snapshotDiagramFile, snapshotFilename, snapshotPicture,
+  type DebugSessionFile,
+} from "@/app/lib/assist/debugSessionFile";
+import { serialiseEnvelope } from "@/app/lib/diagram/exportEnvelope";
+import { PRODUCT_VERSION } from "@/app/lib/diagram/types";
+
+// The editor's own canvas, read-only, fetched only when a snapshot is drawn.
+const SnapshotCanvas = dynamic(() => import("./SnapshotCanvas"), {
+  ssr: false,
+  loading: () => <p className="text-[10px] text-gray-400 mt-1">drawing…</p>,
+});
 
 interface SessionRow {
   id: string;
@@ -35,6 +48,10 @@ interface SnapshotView {
   width: number | null;
   height: number | null;
   url: string;
+  /** Only a session saved before 26 Sep 2026 has a picture; the GET says which. */
+  hasPicture?: boolean;
+  /** The snapshot itself: the diagram as JSON (see debugSessionFile.ts). */
+  diagramJson: unknown;
   elementCount: number;
   connectorCount: number;
 }
@@ -52,10 +69,86 @@ interface SessionDetail {
 
 const when = (ms: number) => new Date(ms).toLocaleString();
 
+/** Hand the browser a text file to save. */
+function saveText(text: string, filename: string) {
+  const blob = new Blob([text], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * One saved state of the diagram. JSON since 26 Sep 2026 (Paul: "JSON, not
+ * SVG … better used for diagnosis"), so the diagram is drawn on demand by the
+ * editor's own read-only canvas, downloaded as a file Import JSON opens, or
+ * copied whole for a bug report. An older session's picture still shows — and
+ * there is never an <img> without one.
+ */
+function SnapshotCard({ s, session, drawn, onDraw }: {
+  s: SnapshotView;
+  session: SessionDetail;
+  drawn: boolean;
+  onDraw: () => void;
+}) {
+  const reading = useMemo(() => readSnapshotDiagram(s.diagramJson), [s.diagramJson]);
+  const picture = snapshotPicture(s);
+  const [copied, setCopied] = useState<"idle" | "done" | "failed">("idle");
+  const role = reading?.meta?.role ?? (picture ? "picture" : "snapshot");
+  const badges = reading?.meta?.ui.badges?.length ?? 0;
+
+  const downloadJson = () => {
+    const file = snapshotDiagramFile(s, { diagramId: session.diagram.id, diagramName: session.diagram.name, appVersion: PRODUCT_VERSION });
+    if (file) saveText(serialiseEnvelope(file), snapshotFilename(session.diagram.name, role, s.takenAt));
+  };
+  const copyJson = async () => {
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(s.diagramJson, null, 2));
+      setCopied("done");
+    } catch {
+      setCopied("failed");
+    }
+    setTimeout(() => setCopied("idle"), 2000);
+  };
+
+  return (
+    <div className="mt-2">
+      <div className="flex items-center gap-2 text-[10px] text-gray-400">
+        <span className="px-1 rounded bg-amber-100 text-amber-800 text-[8px] uppercase tracking-wide"
+          title="start: when recording began · before: the mouse had changed the diagram since the last saved state · after: what the command left · marked: 📷">{role}</span>
+        <span>{s.elementCount} elements · {s.connectorCount} connectors{badges ? ` · ${badges} numbered badges` : ""} · {when(s.takenAt)}</span>
+        {reading && (
+          <button onClick={onDraw} className="text-blue-600 hover:underline">{drawn ? "hide" : "draw"}</button>
+        )}
+        {reading && (
+          <button onClick={downloadJson} className="text-blue-600 hover:underline"
+            title="The diagram as it was, as a file the editor's or a project's Import JSON opens">Download JSON</button>
+        )}
+        {s.diagramJson != null && (
+          <button onClick={() => { void copyJson(); }} className="text-blue-600 hover:underline"
+            title="The whole snapshot, including what was on screen (_voiceDebug)">
+            {copied === "done" ? "copied ✓" : copied === "failed" ? "copy failed" : "Copy JSON"}
+          </button>
+        )}
+      </div>
+      {picture && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={picture} alt="canvas snapshot" className="max-w-full mt-1 border border-gray-200 rounded" />
+      )}
+      {drawn && reading && <SnapshotCanvas reading={reading} />}
+    </div>
+  );
+}
+
 export function VoiceDebugClient() {
   const [rows, setRows] = useState<SessionRow[] | null>(null);
   const [disputedOnly, setDisputedOnly] = useState(false);
-  const [open, setOpen] = useState<SessionDetail | null>(null);
+  const [open, setOpenState] = useState<SessionDetail | null>(null);
+  // ONE drawn snapshot at a time: each is a whole editor canvas.
+  const [drawnId, setDrawnId] = useState<string | null>(null);
+  const setOpen = (d: SessionDetail | null) => { setDrawnId(null); setOpenState(d); };
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -98,14 +191,10 @@ export function VoiceDebugClient() {
 
   const [confirmId, setConfirmId] = useState<string | null>(null);
 
+  // The same serialiser and file name as the editor's Download: one diagram
+  // per line, and the name the bar gives the file.
   const download = (d: SessionDetail) => {
-    const blob = new Blob([JSON.stringify(d, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${(d.diagram.name ?? "diagram").replace(/[^A-Za-z0-9._-]+/g, "-")}-voice-debug-${new Date(d.savedAt).toISOString().slice(0, 10)}.dgx-voice.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    saveText(serialiseDebugSession(d as unknown as DebugSessionFile), debugSessionFilename(d.diagram.name, new Date(d.savedAt).toISOString()));
   };
 
   return (
@@ -194,7 +283,7 @@ export function VoiceDebugClient() {
             <button onClick={() => setOpen(null)} className="text-gray-400 hover:text-gray-700 text-lg leading-none">×</button>
           </div>
 
-          <div className="max-h-[28rem] overflow-y-auto p-3 space-y-2">
+          <div className="max-h-[40rem] overflow-y-auto p-3 space-y-2">
             {open.entries.map((e) => {
               const shots = open.snapshots.filter((s) => s.entryId === e.id);
               const disputed = e.ok && e.verdict === "wrong";
@@ -220,27 +309,25 @@ export function VoiceDebugClient() {
                   {e.touched && e.touched.length > 0 && (
                     <div className="ml-5 mt-1 text-[10px] text-gray-400">changed: {e.touched.map(describeTouched).join(", ")}</div>
                   )}
-                  {shots.map((s) => (
-                    <div key={s.id} className="ml-5 mt-2">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={s.url} alt="canvas snapshot" className="max-w-full border border-gray-200 rounded" />
-                      <div className="text-[10px] text-gray-400 mt-0.5">{s.elementCount} elements · {s.connectorCount} connectors · {when(s.takenAt)}</div>
+                  {shots.length > 0 && (
+                    <div className="ml-5">
+                      {shots.map((s) => (
+                        <SnapshotCard key={s.id} s={s} session={open} drawn={drawnId === s.id}
+                          onDraw={() => setDrawnId(drawnId === s.id ? null : s.id)} />
+                      ))}
                     </div>
-                  ))}
+                  )}
                 </div>
               );
             })}
 
-            {/* Snapshots taken without a command attached. */}
+            {/* Saved states with no command: the start of recording, and 📷 pressed on its own. */}
             {open.snapshots.filter((s) => !s.entryId).length > 0 && (
               <div className="pt-2 border-t border-gray-100">
-                <div className="text-[11px] font-semibold text-gray-600 mb-1">Snapshots taken on their own</div>
+                <div className="text-[11px] font-semibold text-gray-600 mb-1">Saved on their own — when recording started, or 📷 with no command</div>
                 {open.snapshots.filter((s) => !s.entryId).map((s) => (
-                  <div key={s.id} className="mb-2">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={s.url} alt="canvas snapshot" className="max-w-full border border-gray-200 rounded" />
-                    <div className="text-[10px] text-gray-400 mt-0.5">{s.elementCount} elements · {s.connectorCount} connectors · {when(s.takenAt)}</div>
-                  </div>
+                  <SnapshotCard key={s.id} s={s} session={open} drawn={drawnId === s.id}
+                    onDraw={() => setDrawnId(drawnId === s.id ? null : s.id)} />
                 ))}
               </div>
             )}

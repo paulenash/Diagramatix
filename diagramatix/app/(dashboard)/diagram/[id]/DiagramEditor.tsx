@@ -65,8 +65,9 @@ import { batchFlashes, isGoldFlashOn, setGoldFlash, goldFlashSummary, flashTarge
 import { touchedFor, type TouchBox, type CommandVerdict } from "@/app/lib/assist/commandLog";
 import { FRAGMENT_SILENCE_MS, FRAGMENT_CONTINUE_MS, FRAGMENT_MAX_WAITS } from "@/app/lib/assist/fragmentBuffer";
 import { isVoiceDebugOn, setVoiceDebug } from "@/app/lib/assist/voiceDebug";
-import { captureCanvasPng } from "@/app/lib/diagram/canvasSnapshot";
-import { buildDebugSessionFile, debugSessionFilename, serialiseDebugSession, type DebugSnapshot } from "@/app/lib/assist/debugSessionFile";
+import { buildDebugSessionFile, debugSessionFilename, serialiseDebugSession, type DebugSnapshot, type SnapshotRole } from "@/app/lib/assist/debugSessionFile";
+import { badgesOnScreen, captureState, captureStoppedSummary, newCaptureLedger, projectFlow, settleArm, type ArmedCapture, type CaptureLedger } from "@/app/lib/assist/debugCapture";
+import { serialiseEnvelope, singleDiagramEnvelope } from "@/app/lib/diagram/exportEnvelope";
 import { planMovePool, planSwapPools, selectedPools, poolsInOrder } from "@/app/lib/diagram/poolOrder";
 import { isContainerType, getAllDescendantIds } from "@/app/hooks/useDiagram";
 import { collectMessageTargets, parseMessageAnswer, resolveMessageAnswer, type MessagePick } from "@/app/lib/assist/messageTargets";
@@ -2704,6 +2705,22 @@ export function DiagramEditor({
   // ── Voice Assist: live voice/typed command editing ──
   const [voiceAssistOn, setVoiceAssistOn] = useState(false);
   const [voiceLog, setVoiceLog] = useState<CommandLogEntry[]>([]);
+  // The ops the command just applied, waiting for its log line. Every apply is
+  // followed by exactly one log line in the same tick (the rule the debug
+  // diff's "touched" already relies on), so the line written next is the one
+  // they belong to — and no caller has to remember to pass them.
+  const appliedOpsRef = useRef<AssistOp[] | null>(null);
+  /**
+   * The ONE way a line reaches the command log. It stamps `at`, recording or
+   * not — a session saved later cannot be read without it — and carries the
+   * ops just applied (plan: "The editor's single log closure … gains at and
+   * ops"). A dozen direct appends once skipped the time.
+   */
+  const appendLog = useCallback((entry: Omit<CommandLogEntry, "id" | "at">) => {
+    const ops = appliedOpsRef.current;
+    appliedOpsRef.current = null;
+    setVoiceLog((prev) => [...prev, { id: nanoid(), at: Date.now(), ...entry, ...(ops ? { ops } : {}) }]);
+  }, []);
   const [voiceListening, setVoiceListening] = useState(false);
   const [abraEngine, setAbraEngine] = useState<"deepgram" | "browser" | null>(null);
   // Mic pressed but the recogniser not yet live (token + permission + socket):
@@ -2724,6 +2741,9 @@ export function DiagramEditor({
    */
   const voiceBusyRef = useRef(false);
   const voiceQueueRef = useRef<string[]>([]);
+  // Wakes the drain effect (after the command runner): the queue drains one
+  // command per render, never inside the call that just finished.
+  const [voiceDrainTick, setVoiceDrainTick] = useState(0);
   const voiceLastId = useRef<string | null>(null);
   // M5 — where the mouse last was on the canvas, in world coordinates. A REF,
   // not state: it is written on every pointer move and must never cause a
@@ -2749,6 +2769,16 @@ export function DiagramEditor({
   const debugBeforeRef = useRef<TouchBox[] | null>(null);
   const [debugSnapshots, setDebugSnapshots] = useState<DebugSnapshot[]>([]);
   useEffect(() => { setVoiceDebugRecording(isVoiceDebugOn()); }, []);
+  // Saved states of the diagram, automatic while recording (debugCapture.ts,
+  // Paul's Q1 answer 2026-09-26). The reducer's state is immutable, so these
+  // hold REFERENCES — a state is turned into text only for the size total and
+  // when the session is saved or downloaded.
+  const debugDataRef = useRef(data);
+  debugDataRef.current = data;
+  const debugLedgerRef = useRef<CaptureLedger>(newCaptureLedger());
+  // A command in flight (settleArm, debugCapture.ts). The effect after the
+  // re-render saves the "after" and ties both states to its entry.
+  const debugArmRef = useRef<ArmedCapture | null>(null);
   // A destructive command waiting for "yes" (confirm.ts): the ops, what they
   // would do in words, and whether the AI interpreted them (for the log badge).
   const pendingConfirmRef = useRef<{ ops: AssistOp[]; what: string; viaAi: boolean } | null>(null);
@@ -2818,6 +2848,53 @@ export function DiagramEditor({
     setPickFlowState(null);
   }, [diagramId]);
 
+  // The numbered badges on the canvas — drawn by the Canvas, and saved by the
+  // debug recording, from this one value, so what is saved is what was drawn.
+  const onScreenBadges = badgesOnScreen(renameFlow, messageFlow, pickFlow);
+  /**
+   * Save one state of the diagram into the debug recording, with what was on
+   * screen: the selection, the pointer, what "it" means, the numbered badges
+   * and the open flow — what a replay of the next command needs. Returns the
+   * snapshot's id, or null when the ledger says it is not worth keeping (the
+   * same diagram as the last saved state, or past the size limit).
+   *
+   * A ref reassigned every render (the `runAbraCommandRef` idiom), so the
+   * command path reaches this render's values without rebuilding on every edit.
+   */
+  const saveDebugStateRef = useRef<(state: DiagramData, role: SnapshotRole, entryId: string | null) => string | null>(() => null);
+  saveDebugStateRef.current = (state, role, entryId) => {
+    const r = captureState(debugLedgerRef.current, state, {
+      role, diagramType, colorConfig: diagramColorConfig, displayMode,
+      ui: {
+        selectedIds: [...selectedIdsRef.current],
+        selectedConnectorId: selectedConnectorIdRef.current,
+        pointer: pointerWorld.current ? { ...pointerWorld.current } : null,
+        voiceLastId: voiceLastId.current,
+        badges: onScreenBadges ?? null,
+        flow: projectFlow({ template: templateFlow, pick: pickFlow, rename: renameFlow, message: messageFlow }),
+      },
+    });
+    debugLedgerRef.current = r.ledger;
+    if (!("diagramJson" in r)) {
+      if (r.stoppedNow) appendLog({ heard: "", summary: captureStoppedSummary(r.ledger), ok: true });
+      return null;
+    }
+    const id = nanoid();
+    setDebugSnapshots((prev) => [...prev, {
+      id, entryId, takenAt: Date.now(),
+      diagramJson: r.diagramJson,
+      elementCount: state.elements.length,
+      connectorCount: state.connectors.length,
+    }]);
+    return id;
+  };
+  // "Save once when recording starts" (Q1): the bar open with debug on, or the
+  // log cleared while recording (a new epoch — clearVoiceLog).
+  const [debugEpoch, setDebugEpoch] = useState(0);
+  useEffect(() => {
+    if (voiceAssistOn && voiceDebugRecording) saveDebugStateRef.current(debugDataRef.current, "start", null);
+  }, [voiceAssistOn, voiceDebugRecording, debugEpoch]);
+
 
   /**
    * Arm the gold flash: remember where everything was and what it was called,
@@ -2835,8 +2912,11 @@ export function DiagramEditor({
       marks: subtypeFingerprint(e as unknown as Record<string, unknown>),
     }));
   }, []);
-  /** The debug recording's before-snapshot — the op batch and the template
-   *  window's picks both change the diagram, and both are evidence. */
+  /** The debug recording's before-snapshot — the op batch, the template
+   *  window's picks and the guided rename all change the diagram, and all are
+   *  evidence. Two halves: the boxes the "touched" diff needs, and the diagram
+   *  itself, saved as a "before" when the mouse has changed it since the last
+   *  saved state (otherwise the last "after" already is this state). */
   const armDebugBefore = useCallback((elements: DiagramElement[]) => {
     if (voiceDebugRecording) {
       debugBeforeRef.current = elements.map((e) => ({
@@ -2844,6 +2924,12 @@ export function DiagramEditor({
         parentId: e.parentId, label: e.label,
         marks: subtypeFingerprint(e as unknown as Record<string, unknown>),
       }));
+      // Two applies before a render (a queued command drained in the same
+      // tick) share the first one's before-state: the diagram it started from.
+      if (!debugArmRef.current) {
+        const before = debugDataRef.current;
+        debugArmRef.current = { before, beforeShotId: saveDebugStateRef.current(before, "before", null) };
+      }
     }
   }, [voiceDebugRecording]);
   // Apply interpreted ops. The work is in app/lib/assist/applyAssistOps.ts, so the
@@ -2868,6 +2954,10 @@ export function DiagramEditor({
     // worth outlining, and those are exactly the ones whose effect a person
     // cannot see by looking, so they are the ones the evidence needs most.
     armDebugBefore(data.elements);
+    // After the arm, whose size-limit line (if it writes one) must not take
+    // them. Cleared on the next microtask in case no line follows after all.
+    appliedOpsRef.current = ops;
+    queueMicrotask(() => { if (appliedOpsRef.current === ops) appliedOpsRef.current = null; });
     return applyAssistOpsTo(ops, {
       elements: data.elements, connectors: data.connectors, riskCatalog,
       actions: {
@@ -2926,33 +3016,62 @@ export function DiagramEditor({
       : prev.map((e, i) => (i === prev.length - 1 ? { ...e, touched } : e))));
   }, [data.elements]);
 
+  // The debug recording's "after", once the command has re-rendered. Keyed on
+  // the log as well as the diagram: every command writes a line, so this runs
+  // for a command that changed nothing too — and clears its arm, rather than
+  // leaving it to catch the next mouse drag as if the command had done it. The
+  // entry is the last one, by the same rule as "touched" above.
+  useEffect(() => {
+    const armed = debugArmRef.current;
+    if (!armed) return;
+    debugArmRef.current = null;
+    const lastEntryId = voiceLog.length ? voiceLog[voiceLog.length - 1].id : null;
+    const { linkBefore, entrySnapshot } = settleArm(armed, data, lastEntryId, (entryId) => saveDebugStateRef.current(data, "after", entryId));
+    if (linkBefore) setDebugSnapshots((prev) => prev.map((s) => (s.id === linkBefore.snapshotId ? { ...s, entryId: linkBefore.entryId } : s)));
+    if (entrySnapshot) setVoiceLog((prev) => prev.map((e) => (e.id === entrySnapshot.entryId ? { ...e, snapshotId: entrySnapshot.snapshotId } : e)));
+  }, [data, voiceLog]);
+
+  /**
+   * The bar's "clear" starts the recording afresh. The saved states belong to
+   * the lines being cleared: kept, they would be states no line points at —
+   * invisible in the viewer, yet counted against the size limit — and the
+   * ledger would still hold the last "after", so the next command would get
+   * no "before" of its own. The new recording's "start" is saved by the start
+   * effect, which the new epoch wakes.
+   */
+  const clearVoiceLog = useCallback(() => {
+    setVoiceLog([]);
+    setDebugSnapshots([]);
+    debugLedgerRef.current = newCaptureLedger();
+    debugArmRef.current = null;
+    debugBeforeRef.current = null;
+    setDebugEpoch((n) => n + 1);
+  }, []);
+
   /** Record what Paul thought of one command. */
   const annotateCommand = useCallback((id: string, patch: { note?: string; verdict?: CommandVerdict }) => {
     setVoiceLog((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e)));
   }, []);
 
   /**
-   * Take a picture of the canvas, and keep the diagram behind it.
+   * 📷 — "mark this moment": save the diagram as it is now, as JSON, with what
+   * is on screen (the numbered badges, the selection).
    *
-   * Both halves, because they answer different questions: the PNG says what
-   * Paul was looking at, the JSON lets the situation be reloaded and replayed.
-   * A failed capture still stores the JSON — evidence with no picture beats no
-   * evidence, and the picture is the half most likely to fail.
+   * NO PICTURE. On 24 Sep Paul decided a snapshot captures the diagram JSON
+   * *and* a PNG; on 26 Sep he reversed it — "Make the snapshots in Voice Assist
+   * JSON, not SVG. These can be better used for diagnosis." The JSON had been
+   * in every snapshot all along, behind a button that said "take a picture";
+   * the pictures were 78–89 % of every file and could not be replayed. The one
+   * thing only a picture showed, the numbered badges, is saved as data and
+   * redrawn by the viewer's canvas.
+   *
+   * Recording also saves the diagram around every command on its own (Q1); this
+   * saves it regardless, because the badges or the selection may be the point.
    */
-  const takeDebugSnapshot = useCallback(async (entryId: string | null) => {
-    const shot = await captureCanvasPng(data.elements);
-    const id = nanoid();
-    setDebugSnapshots((prev) => [...prev, {
-      id,
-      entryId,
-      takenAt: Date.now(),
-      ...(shot ? { png: shot.png, width: shot.width, height: shot.height } : {}),
-      diagramJson: { elements: data.elements, connectors: data.connectors },
-      elementCount: data.elements.length,
-      connectorCount: data.connectors.length,
-    }]);
-    if (entryId) setVoiceLog((prev) => prev.map((e) => (e.id === entryId ? { ...e, snapshotId: id } : e)));
-  }, [data.elements, data.connectors]);
+  const takeDebugSnapshot = useCallback((entryId: string | null) => {
+    const id = saveDebugStateRef.current(data, "marked", entryId);
+    if (id && entryId) setVoiceLog((prev) => prev.map((e) => (e.id === entryId ? { ...e, snapshotId: id } : e)));
+  }, [data]);
 
   /**
    * The session, built once and used for both destinations.
@@ -3006,8 +3125,8 @@ export function DiagramEditor({
   const cancelRenameFlow = useCallback((reason?: string) => {
     setRenameFlow(null);
     cancelLabelEdit();
-    if (reason) setVoiceLog((prev) => [...prev, { id: nanoid(), heard: "", summary: reason, ok: true }]);
-  }, [setRenameFlow, cancelLabelEdit]);
+    if (reason) appendLog({ heard: "", summary: reason, ok: true });
+  }, [setRenameFlow, cancelLabelEdit, appendLog]);
 
   // Apply a dictated name to the picked element/connector, then STAY in the loop
   // (#3): re-number the same type so the user can keep renaming until "stop"/Esc.
@@ -3019,8 +3138,10 @@ export function DiagramEditor({
     const clean = capitaliseFirstWord(name.trim().replace(/[.,!?;:]+$/g, ""));
     if (!clean) { cancelRenameFlow("rename cancelled (empty name)"); return; }
     // The guided flow writes the label itself, so it has to arm the flash
-    // itself too — applyAssistOps is never involved.
+    // itself too — applyAssistOps is never involved. The debug recording
+    // likewise: a rename is a command that changed the diagram.
     armGoldFlash(data.elements);
+    armDebugBefore(data.elements);
     if (target.kind === "element") updateLabel(target.id, clean);
     else updateConnectorLabel(target.id, clean);
     cancelLabelEdit();
@@ -3031,14 +3152,14 @@ export function DiagramEditor({
     if (single) {
       // "label selected": one item, no pick loop afterwards.
       setRenameFlow(null);
-      setVoiceLog((prev) => [...prev, { id: nanoid(), heard: clean, summary: `labelled the connector “${clean}”`, ok: true }]);
+      appendLog({ heard: clean, summary: `labelled the connector “${clean}”`, ok: true });
       return;
     }
     const targets = collectRenameTargets(data.elements, data.connectors, itemType);
     if (targets.length > 0) setRenameFlow({ phase: "pick", itemType, targets });
     else setRenameFlow(null);
-    setVoiceLog((prev) => [...prev, { id: nanoid(), heard: clean, summary: `renamed to “${clean}” — pick another or say “done”`, ok: true }]);
-  }, [updateLabel, updateConnectorLabel, cancelLabelEdit, setRenameFlow, cancelRenameFlow, data.elements, data.connectors]);
+    appendLog({ heard: clean, summary: `renamed to “${clean}” — pick another or say “done”`, ok: true });
+  }, [updateLabel, updateConnectorLabel, cancelLabelEdit, setRenameFlow, cancelRenameFlow, armDebugBefore, appendLog, data.elements, data.connectors]);
 
   // Handle one utterance while the guided rename flow is active.
   const handleRenameUtterance = useCallback((text: string) => {
@@ -3053,10 +3174,13 @@ export function DiagramEditor({
     // answered with "say the number of the item to rename" — three times in a
     // row, in Paul's log (2026-09-21), which is the feature arguing with
     // someone trying to leave. It now does BOTH: drop the pick, then undo.
+    // The undo changes the diagram, so the debug recording is armed first: its
+    // "after" lands on its own line, not later as a "before" the mouse caused.
     if (/^undo\b/.test(low)) {
+      armDebugBefore(elementsRef.current);
       cancelRenameFlow("rename cancelled");
       undo();
-      setVoiceLog((prev) => [...prev, { id: nanoid(), heard: t, summary: "undid the last change", ok: true }]);
+      appendLog({ heard: t, summary: "undid the last change", ok: true });
       return;
     }
     if (flow.phase === "pick") {
@@ -3065,10 +3189,10 @@ export function DiagramEditor({
       // absorbs the recogniser substituting "lane" for "one" — a bias we
       // create ourselves by boosting `lane` (spokenNumber.ts).
       const picked = leadingSpokenNumber(t);
-      if (!picked) { setVoiceLog((prev) => [...prev, { id: nanoid(), heard: t, summary: "say the number of the item to rename", ok: false }]); return; }
+      if (!picked) { appendLog({ heard: t, summary: "say the number of the item to rename", ok: false }); return; }
       const n = picked.n;
       const target = flow.targets.find((x) => x.n === n);
-      if (!target) { setVoiceLog((prev) => [...prev, { id: nanoid(), heard: t, summary: `there’s no number ${n}`, ok: false }]); return; }
+      if (!target) { appendLog({ heard: t, summary: `there’s no number ${n}`, ok: false }); return; }
       // Select + enter edit mode (+ zoom for elements) so the change is visible.
       if (target.kind === "element") { setSelectedConnectorId(null); setSelectedElementIds(new Set([target.id])); beginLabelEdit(target.id); }
       else { setSelectedElementIds(new Set()); setSelectedConnectorId(target.id); }
@@ -3079,7 +3203,7 @@ export function DiagramEditor({
     }
     // phase "name" — the whole utterance is the new name.
     applyRenameName({ id: flow.targetId, kind: flow.kind }, t, flow.itemType, flow.single === true);
-  }, [applyRenameName, cancelRenameFlow, setRenameFlow, beginLabelEdit]);
+  }, [applyRenameName, cancelRenameFlow, setRenameFlow, beginLabelEdit, appendLog, armDebugBefore]);
   const handleRenameUtteranceRef = useRef(handleRenameUtterance);
   handleRenameUtteranceRef.current = handleRenameUtterance;
 
@@ -3096,7 +3220,7 @@ export function DiagramEditor({
     const flow = messageFlowRef.current;
     if (!flow) return;
     const t = text.trim();
-    const log = (summary: string, ok: boolean) => setVoiceLog((prev) => [...prev, { id: nanoid(), heard: t, summary, ok }]);
+    const log = (summary: string, ok: boolean) => appendLog({ heard: t, summary, ok });
     if (isFlowEndWord(t)) { setMessageFlow(null); log("message cancelled", true); return; }
     const a = parseMessageAnswer(t, flow.mode);
     if (!a) {
@@ -3114,17 +3238,17 @@ export function DiagramEditor({
     setMessageFlow(null);
     const r = applyGrouped([{ op: "addMessage", fromRef: ID_REF_PREFIX + fromId, toRef: ID_REF_PREFIX + toId, ...(a.label ? { label: a.label } : {}) }]);
     log(r.summary, r.ok);
-  }, [applyGrouped, setMessageFlow]);
+  }, [applyGrouped, setMessageFlow, appendLog]);
   const handleMessageUtteranceRef = useRef(handleMessageUtterance);
   handleMessageUtteranceRef.current = handleMessageUtterance;
 
   // Interpret a raw command (deterministic first; AI fallback added in Stage 4).
-  const runVoiceCommand = useCallback(async (text: string) => {
+  // `fromQueue`: the drain effect is running the queue's head, whose turn it is.
+  const runVoiceCommand = useCallback(async (text: string, fromQueue = false) => {
     const heard = text.trim();
     if (!heard) return;
-    // `at` is stamped on every entry, recording or not: a session saved later
-    // cannot be read without it, and a timestamp costs nothing.
-    const log = (entry: Omit<CommandLogEntry, "id">) => setVoiceLog((prev) => [...prev, { id: nanoid(), at: Date.now(), ...entry }]);
+    // `appendLog` stamps `at` on every entry and carries the ops just applied.
+    const log = appendLog;
     // A typed "stop" means the same as a spoken one: the mic, and anything parked, ends.
     if (isMicStopWord(heard)) {
       // "stop" is the brake — it must never queue behind an in-flight call,
@@ -3137,7 +3261,9 @@ export function DiagramEditor({
     }
     // Everything else queues rather than races, so commands apply in the order
     // they were spoken, each against the state the one before it left behind.
-    if (voiceBusyRef.current) {
+    // That includes a queue still draining after the call has finished: the
+    // drain waits for a render, and a newcomer must not jump it.
+    if (!fromQueue && (voiceBusyRef.current || voiceQueueRef.current.length > 0)) {
       voiceQueueRef.current.push(heard);
       log({ heard, summary: "waiting for the previous command…", ok: true });
       return;
@@ -3279,16 +3405,29 @@ export function DiagramEditor({
     } finally {
       voiceBusyRef.current = false;
       setVoiceBusy(false);
-      // Drain through the REF, not this closure: the render that follows the
-      // call rebuilds runVoiceCommand over the NEW diagram, and the queued
-      // command must see that, not the diagram as it was when it was spoken.
-      const next = voiceQueueRef.current.shift();
-      if (next !== undefined) void runAbraCommandRef.current(next);
+      // Not the next command itself: nothing has rendered since this call's
+      // changes, so it would resolve its names against the diagram from before
+      // the call, and the debug recording would fold both into one "after".
+      if (voiceQueueRef.current.length > 0) setVoiceDrainTick((n) => n + 1);
     }
-  }, [applyGrouped, data.elements, data.connectors]);
+  }, [applyGrouped, appendLog, data.elements, data.connectors]);
   // Keep a stable ref so the mic's onText callback always calls the latest.
   const runAbraCommandRef = useRef(runVoiceCommand);
   runAbraCommandRef.current = runVoiceCommand;
+  // B4's drain: one queued command per render. Through the REF, not a
+  // closure: the render that woke this rebuilt runVoiceCommand over the NEW
+  // diagram, and the queued command must see that, not the diagram as it was
+  // when it was spoken. Declared after the debug recording's "after" effect,
+  // so the command before is settled — its own "after", on its own line —
+  // before this one arms.
+  useEffect(() => {
+    if (voiceBusyRef.current) return;
+    const next = voiceQueueRef.current.shift();
+    if (next !== undefined) void runAbraCommandRef.current(next, true);
+    // Handled on the spot (no AI call), so no call will finish to wake the
+    // next: wake it for the render that follows this one.
+    if (!voiceBusyRef.current && voiceQueueRef.current.length > 0) setVoiceDrainTick((n) => n + 1);
+  }, [voiceDrainTick]);
   exportJsonRef.current = () => { void handleExportJson(); };
 
   // Voice comes in as fragments (Deepgram finalises on every pause), so ONE
@@ -3342,10 +3481,10 @@ export function DiagramEditor({
   const bumpAbraIdle = useCallback(() => {
     if (voiceIdleTimer.current) clearTimeout(voiceIdleTimer.current);
     voiceIdleTimer.current = setTimeout(() => {
-      setVoiceLog((prev) => [...prev, { id: nanoid(), heard: "", summary: "Voice Assist closed — 2 minutes idle", ok: true }]);
+      appendLog({ heard: "", summary: "Voice Assist closed — 2 minutes idle", ok: true });
       stopAbraListening();
     }, ABRA_IDLE_MS);
-  }, [stopAbraListening]);
+  }, [stopAbraListening, appendLog]);
 
   const toggleAbraListening = useCallback(async () => {
     if (voiceListening || voiceDictRef.current) { stopAbraListening(); return; }
@@ -3408,10 +3547,7 @@ export function DiagramEditor({
             // Nothing open: the half-command is already gone, which IS the
             // reset. Say so rather than sending a bare "cancel" to the AI,
             // which would cost a metered call to accomplish nothing.
-            setVoiceLog((prev) => [...prev, {
-              id: nanoid(), at: Date.now(), heard: txt,
-              summary: "cleared — listening for the next command", ok: true,
-            }]);
+            appendLog({ heard: txt, summary: "cleared — listening for the next command", ok: true });
           }
           return;
         }
@@ -3429,13 +3565,13 @@ export function DiagramEditor({
         if (voiceFlushTimer.current) clearTimeout(voiceFlushTimer.current);
         voiceFlushTimer.current = setTimeout(() => flushVoiceBuffer(), ABRA_SILENCE_MS);
       },
-      onError: (msg) => setVoiceLog((prev) => [...prev, { id: nanoid(), heard: "", summary: msg, ok: false }]),
+      onError: (msg) => appendLog({ heard: "", summary: msg, ok: false }),
       onEnd: () => { voiceDictRef.current = null; setVoiceListening(false); flushVoiceBuffer(true); },
     });
     if (!handle || voiceStopRequested.current) { handle?.stop(); voiceDictRef.current = null; setVoiceListening(false); return; }
     voiceDictRef.current = handle;
     bumpAbraIdle(); // start the idle clock even if no voice ever arrives
-  }, [voiceListening, stopAbraListening, flushVoiceBuffer, bumpAbraIdle]);
+  }, [voiceListening, stopAbraListening, flushVoiceBuffer, bumpAbraIdle, appendLog]);
 
   // Escape cancels a guided pick (rename or message) at any phase.
   useEffect(() => {
@@ -3443,19 +3579,19 @@ export function DiagramEditor({
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       if (renameFlow) cancelRenameFlow("rename cancelled");
-      if (messageFlow) { setMessageFlow(null); setVoiceLog((prev) => [...prev, { id: nanoid(), heard: "", summary: "message cancelled", ok: true }]); }
-      if (pickFlow) { setPickFlow(null); setVoiceLog((prev) => [...prev, { id: nanoid(), heard: "", summary: "cancelled", ok: true }]); }
+      if (messageFlow) { setMessageFlow(null); appendLog({ heard: "", summary: "message cancelled", ok: true }); }
+      if (pickFlow) { setPickFlow(null); appendLog({ heard: "", summary: "cancelled", ok: true }); }
       // Esc takes the provisional template back off with it — the window is
       // shut either way, and leaving a half-chosen template behind would be
       // the one outcome nobody asked for.
       if (templateFlow) {
         const summary = closeTemplateFlowRef.current(false);
-        setVoiceLog((prev) => [...prev, { id: nanoid(), heard: "", summary, ok: true }]);
+        appendLog({ heard: "", summary, ok: true });
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [renameFlow, messageFlow, pickFlow, templateFlow, cancelRenameFlow, setMessageFlow, setPickFlow]);
+  }, [renameFlow, messageFlow, pickFlow, templateFlow, cancelRenameFlow, setMessageFlow, setPickFlow, appendLog]);
 
   // Stop the mic when the mode is turned off or the editor unmounts.
   useEffect(() => {
@@ -3614,7 +3750,6 @@ export function DiagramEditor({
   // Build the single-diagram JSON envelope string (shared by export + preview).
   async function buildDiagramJsonString(): Promise<string> {
     // Full fidelity: JSON export/import must ALWAYS include annotations.
-    const { SCHEMA_VERSION, PRODUCT_VERSION } = await import("@/app/lib/diagram/types");
     let appVersion = PRODUCT_VERSION;
     try {
       const resp = await fetch("/api/schema");
@@ -3624,14 +3759,12 @@ export function DiagramEditor({
         if (m) appVersion = m[1];
       }
     } catch { /* best-effort */ }
-    const payload = {
-      schemaVersion: SCHEMA_VERSION,
-      appVersion,
-      exportedAt: new Date().toISOString(),
-      project: { name: "(single diagram)", description: "", ownerName: "", colorConfig: {} },
-      diagrams: [{ originalId: diagramId, name: diagramName, type: diagramType, data, colorConfig: diagramColorConfig, displayMode }],
-    };
-    return JSON.stringify(payload, null, 2);
+    // The one envelope builder (exportEnvelope.ts): a voice-debug snapshot's
+    // Download JSON writes the same file, so Import JSON opens both.
+    return serialiseEnvelope(singleDiagramEnvelope(
+      { originalId: diagramId, name: diagramName, type: diagramType, data, colorConfig: diagramColorConfig, displayMode },
+      { appVersion },
+    ));
   }
 
   async function handleExportJson() {
@@ -3874,15 +4007,12 @@ export function DiagramEditor({
 
       let saved = "";
       if (format === "json") {
-        const { SCHEMA_VERSION } = await import("@/app/lib/diagram/types");
         const { appVersion } = await resolveVersion();
-        const payload = {
-          schemaVersion: SCHEMA_VERSION, appVersion, exportedAt: new Date().toISOString(),
-          project: { name: "(single diagram)", description: "", ownerName: "", colorConfig: {} },
-          diagrams: [{ originalId: diagramId, name: diagramName, type: diagramType, data, colorConfig: diagramColorConfig, displayMode }],
-          ...(dataHasPcf(data) ? { pcfAttribution: APQC_ATTRIBUTION } : {}),
-        };
-        await uploadOne(`${safe}.json`, "application/json", JSON.stringify(payload, null, 2));
+        const payload = singleDiagramEnvelope(
+          { originalId: diagramId, name: diagramName, type: diagramType, data, colorConfig: diagramColorConfig, displayMode },
+          { appVersion, ...(dataHasPcf(data) ? { pcfAttribution: APQC_ATTRIBUTION } : {}) },
+        );
+        await uploadOne(`${safe}.json`, "application/json", serialiseEnvelope(payload));
         saved = `${safe}.json`;
       } else if (format === "xml") {
         const { buildSingleDiagramXml } = await import("@/app/lib/diagram/xmlExport");
@@ -4352,11 +4482,14 @@ export function DiagramEditor({
     const prov = flow?.provisional;
     if (keep && prov) return `added template “${prov.card.name}”${flow?.anchorName ? ` after “${flow.anchorName}”` : ""}`;
     if (prov) {
+      // Taking the preview off changes the diagram; every caller logs the
+      // returned line in this same tick, so the recording's "after" lands on it.
+      armDebugBefore(elementsRef.current);
       if (templateStillShowing(prov.stamp)) undo();
       else removeTemplate(prov.ids);
     }
     return "cancelled — no template added";
-  }, [setTemplateFlow, templateStillShowing, undo, removeTemplate]);
+  }, [setTemplateFlow, templateStillShowing, undo, removeTemplate, armDebugBefore]);
 
   /** The window's numbered offer, for a plain window or one whose picks go after `anchor`. */
   const buildTemplateFlow = useCallback((anchor?: DiagramElement, at?: Point): TemplateFlow => {
@@ -6250,7 +6383,7 @@ export function DiagramEditor({
         <Canvas
           data={displayData}
           diagramType={diagramType}
-          renameBadges={renameFlow?.phase === "pick" ? renameFlow.targets : (messageFlow?.targets ?? pickFlow?.targets)}
+          renameBadges={onScreenBadges}
           goldFlash={goldFlash}
           liftedIds={dragTravellingIds}
           onAddElement={addElementGated}
@@ -6363,14 +6496,14 @@ export function DiagramEditor({
             log={voiceLog}
             onSubmitText={(t) => { void runVoiceCommand(t); }}
             onToggleListen={() => { void toggleAbraListening(); }}
-            onClear={() => setVoiceLog([])}
+            onClear={clearVoiceLog}
             onClose={() => { stopAbraListening(); setVoiceAssistOn(false); try { localStorage.setItem(`voice-assist-${diagramId}`, "false"); } catch {} }}
             onCost={fetchAbraCost}
             isSuperAdmin={isActingAdmin}
             debugOn={voiceDebugRecording}
             onToggleDebug={(on) => { setVoiceDebug(on); setVoiceDebugRecording(on); }}
             onAnnotate={annotateCommand}
-            onSnapshot={(entryId) => { void takeDebugSnapshot(entryId); }}
+            onSnapshot={takeDebugSnapshot}
             onDownloadSession={downloadDebugSession}
             onSaveSession={() => { void saveDebugSession(); }}
             saveState={debugSaveState}
@@ -6838,16 +6971,15 @@ export function DiagramEditor({
             anchorName={templateFlow.anchorName}
             notice={templateFlow.notice}
             onPick={(card) => {
-              void pickTemplateCardRef.current(card, (r) =>
-                setVoiceLog((prev) => [...prev, { id: nanoid(), at: Date.now(), heard: "", summary: r.summary, ok: r.ok }]));
+              void pickTemplateCardRef.current(card, (r) => appendLog({ heard: "", summary: r.summary, ok: r.ok }));
             }}
             onConfirm={() => {
               const summary = closeTemplateFlowRef.current(true);
-              setVoiceLog((prev) => [...prev, { id: nanoid(), at: Date.now(), heard: "", summary, ok: true }]);
+              appendLog({ heard: "", summary, ok: true });
             }}
             onCancel={() => {
               const summary = closeTemplateFlowRef.current(false);
-              setVoiceLog((prev) => [...prev, { id: nanoid(), at: Date.now(), heard: "", summary, ok: true }]);
+              appendLog({ heard: "", summary, ok: true });
             }}
           />
         )}

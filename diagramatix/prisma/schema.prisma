@@ -2481,12 +2481,16 @@ model VoiceDebugSession {
   @@index([disputeCount, createdAt])
 }
 
-/// A picture of the canvas at one moment, and the diagram behind it.
+/// The diagram at one moment of a recorded session, as JSON.
 ///
-/// Both halves, because they answer different questions: the PNG says what the
-/// person was looking at, the JSON lets the situation be reloaded and replayed.
-/// A snapshot whose capture failed still keeps the JSON — evidence with no
-/// picture beats no evidence.
+/// Since 26 Sep 2026 there is no picture. Paul had decided on 24 Sep that a
+/// snapshot captures the JSON and a PNG; on 26 Sep he reversed it: "Make the
+/// snapshots in Voice Assist JSON, not SVG. These can be better used for
+/// diagnosis." The pictures were 78–89 % of every session and could not be
+/// replayed; the JSON can. `diagramJson` is the full DiagramData (minus
+/// aiGeneration and _archive) with a `_voiceDebug` block — what was on screen,
+/// and the snapshot's own shape version — so no column changed. Rows saved
+/// before then keep their `pngBytes`, and the viewer still shows them.
 model VoiceDebugSnapshot {
   id        String            @id @default(cuid())
   sessionId String
@@ -2497,6 +2501,7 @@ model VoiceDebugSnapshot {
   takenAt DateTime @default(now())
   label   String?
 
+  /// Only a session recorded before 26 Sep 2026 has a picture; the editor no longer takes one.
   pngBytes  Bytes?
   pngWidth  Int?
   pngHeight Int?

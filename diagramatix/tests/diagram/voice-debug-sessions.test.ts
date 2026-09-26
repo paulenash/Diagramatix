@@ -1,5 +1,5 @@
 /**
- * T4723 — keeping an annotated Voice Assist session.
+ * T4723, T4894 — keeping an annotated Voice Assist session.
  *
  * Phase 2 of the debug plan: sessions survive the browser, and the SuperAdmin
  * list leads with the pair that matters — a command the system reported as
@@ -18,6 +18,7 @@ import {
   buildDebugSessionFile, sessionCounts, DEBUG_SESSION_FORMAT,
 } from "@/app/lib/assist/debugSessionFile";
 import type { CommandLogEntry } from "@/app/lib/assist/commandLog";
+import { captureState, newCaptureLedger } from "@/app/lib/assist/debugCapture";
 
 const read = (p: string) => readFileSync(p, "utf8");
 const LIST_ROUTE = "app/api/admin/voice-debug/sessions/route.ts";
@@ -31,7 +32,7 @@ const entries: CommandLogEntry[] = [
 ];
 
 /** What the POST route does with an accepted body, without going through HTTP. */
-async function saveLikeTheRoute(png?: string) {
+async function saveLikeTheRoute(png?: string, diagramJson: unknown = { elements: [{ id: "a" }], connectors: [] }) {
   const file = buildDebugSessionFile({
     title: "Voice Assist — Order to Cash",
     diagramId: "d1", diagramName: "Order to Cash",
@@ -39,7 +40,7 @@ async function saveLikeTheRoute(png?: string) {
     snapshots: [{
       id: "s1", entryId: "2", takenAt: 1_700_000_000_000,
       ...(png ? { png, width: 800, height: 600 } : {}),
-      diagramJson: { elements: [{ id: "a" }], connectors: [] },
+      diagramJson,
       elementCount: 1, connectorCount: 0,
     }],
     savedAt: 1_700_000_001_000, appVersion: "2.12",
@@ -101,6 +102,27 @@ describe("T4723 — a saved session keeps what makes it evidence", () => {
     const shot = await prisma.voiceDebugSnapshot.findFirstOrThrow({ where: { sessionId: id } });
     expect(shot.pngBytes).toBeNull();
     expect(JSON.parse(shot.diagramJson).elements, "the replayable half survived").toHaveLength(1);
+  });
+
+  it("T4894 — a JSON snapshot's _voiceDebug survives the save, with no picture and no schema change", async () => {
+    // Paul, 2026-09-26: snapshots are the diagram as JSON. What was on screen
+    // rides INSIDE diagramJson, because the route keeps a fixed list of
+    // snapshot fields and would silently drop a new one.
+    const r = captureState(newCaptureLedger(), { elements: [], connectors: [], viewport: { x: 0, y: 0, zoom: 1 }, fontSize: 13 }, {
+      role: "after", diagramType: "bpmn", colorConfig: {}, displayMode: "normal",
+      ui: { selectedIds: ["a"], selectedConnectorId: null, pointer: { x: 1, y: 2 }, voiceLastId: "a", badges: null, flow: null },
+    });
+    if (!("diagramJson" in r)) throw new Error("not saved");
+    const id = await saveLikeTheRoute(undefined, r.diagramJson);
+    const shot = await prisma.voiceDebugSnapshot.findFirstOrThrow({ where: { sessionId: id } });
+    const back = JSON.parse(shot.diagramJson);
+    expect(back._voiceDebug).toEqual(r.diagramJson._voiceDebug);
+    expect(back.fontSize, "the whole DiagramData, not just elements and connectors").toBe(13);
+    expect(shot.pngBytes, "no picture").toBeNull();
+    expect(shot.pngWidth, "so the GET says hasPicture: false").toBeNull();
+    // The mirror above is honest only while the route stores the document whole.
+    expect(read(LIST_ROUTE)).toContain("diagramJson: JSON.stringify(s.diagramJson ?? {}),");
+    expect(read(ONE_ROUTE)).toContain("hasPicture: s.pngWidth != null,");
   });
 
   it("deleting a session takes its snapshots with it", async () => {

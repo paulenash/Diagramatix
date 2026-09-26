@@ -95,14 +95,32 @@ describe("T4567 — B4: the voice path waits its turn", () => {
     expect(body).toContain("voiceBusyRef.current = false;");
   });
 
-  it("queues what is spoken during a call instead of racing it", () => {
+  it("queues what is spoken during a call instead of racing it — and behind a queue still draining", () => {
     expect(body).toContain("voiceQueueRef.current.push(heard)");
     expect(body).toContain("waiting for the previous command");
+    // The drain waits for a render (below), so a sentence arriving in that gap
+    // must join the back of the queue, not jump it; the head being drained is
+    // the one command that goes straight through.
+    expect(body).toContain("if (!fromQueue && (voiceBusyRef.current || voiceQueueRef.current.length > 0)) {");
   });
 
-  it("drains the queue when the call finishes", () => {
-    expect(body).toContain("const next = voiceQueueRef.current.shift();");
-    expect(body).toContain("if (next !== undefined) void runAbraCommandRef.current(next);");
+  it("drains the queue AFTER the call's render, one command per render", () => {
+    // Changed by design 2026-09-26: the finally used to run the next command in
+    // the same tick, before anything rendered — so it resolved against the
+    // diagram from BEFORE the call, and the voice-debug recording folded both
+    // commands into one "after". The finally now only wakes the drain effect.
+    const fin = body.slice(body.indexOf("voiceBusyRef.current = false;"));
+    const finBlock = fin.slice(0, fin.indexOf("}, [applyGrouped, appendLog, data.elements, data.connectors]);"));
+    expect(finBlock).toContain("if (voiceQueueRef.current.length > 0) setVoiceDrainTick((n) => n + 1);");
+    expect(finBlock, "never the next command inside the call that finished").not.toContain("runAbraCommandRef");
+    const drain = body.slice(body.indexOf("if (voiceBusyRef.current) return;"));
+    const effect = drain.slice(0, drain.indexOf("}, [voiceDrainTick]);"));
+    expect(effect.length, "the drain effect is there").toBeGreaterThan(0);
+    expect(effect).toContain("const next = voiceQueueRef.current.shift();");
+    expect(effect).toContain("if (next !== undefined) void runAbraCommandRef.current(next, true);");
+    // A queued command handled on the spot finishes no call, so nothing else
+    // would wake the one behind it.
+    expect(effect).toContain("if (!voiceBusyRef.current && voiceQueueRef.current.length > 0) setVoiceDrainTick((n) => n + 1);");
   });
 
   it("drains through the REF, so the queued command sees the NEW diagram", () => {
@@ -110,14 +128,17 @@ describe("T4567 — B4: the voice path waits its turn", () => {
     // diagram as it was when it was spoken — the very bug being fixed.
     const drain = body.slice(body.indexOf("const next = voiceQueueRef.current.shift();"));
     expect(drain.slice(0, 200)).toContain("runAbraCommandRef.current");
-    expect(drain.slice(0, 200)).not.toContain("void runVoiceCommand(next)");
+    expect(drain.slice(0, 200)).not.toContain("void runVoiceCommand(next");
+    // The ref is reassigned during the render, so the effect reads it after.
+    expect(body.indexOf("runAbraCommandRef.current = runVoiceCommand;")).toBeLessThan(body.indexOf("const next = voiceQueueRef.current.shift();"));
   });
 
   it("lets 'stop' through immediately, and drops what is parked", () => {
     // The brake must never queue behind the thing it is trying to stop.
     const stop = body.slice(body.indexOf("if (isMicStopWord(heard))"));
     const clear = stop.indexOf("voiceQueueRef.current = []");
-    const guard = body.indexOf("if (voiceBusyRef.current) {");
+    const guard = body.indexOf("if (!fromQueue && (voiceBusyRef.current || voiceQueueRef.current.length > 0)) {");
+    expect(guard, "the queue guard is there").toBeGreaterThan(-1);
     expect(clear).toBeGreaterThan(-1);
     expect(body.indexOf("if (isMicStopWord(heard))"), "stop is checked BEFORE the queue guard")
       .toBeLessThan(guard);

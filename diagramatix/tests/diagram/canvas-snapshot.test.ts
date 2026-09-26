@@ -2,10 +2,12 @@
  * T4721–T4722 — the snapshot's framing maths, and the session file.
  *
  * Paul, 2026-09-24, asked for a snapshot beside a command, capturing both the
- * diagram JSON and a picture. The picture is produced by the code the SOP
+ * diagram JSON and a picture. The picture was produced by the code the SOP
  * generator already used — extracted rather than re-invented, because that one
  * carries a hard-won comment: html-to-image's `toPng` on a bare `<svg>` "fails
- * silently and left SOPs with no figure".
+ * silently and left SOPs with no figure". On 2026-09-26 he reversed the picture
+ * half ("JSON, not SVG"): the SOP figure keeps this code, and a snapshot is now
+ * the diagram as JSON (tests/diagram/voice-debug-json-snapshots.test.ts).
  *
  * Only the framing maths is tested here. The rasterising half is DOM and this
  * suite has no jsdom; it is kept deliberately thin for that reason, with
@@ -162,13 +164,21 @@ describe("T4722b — the bar and the editor are actually wired to all of it", ()
   });
 
   it("every log entry is stamped with a time, recording or not", () => {
-    expect(editor()).toContain("{ id: nanoid(), at: Date.now(), ...entry }");
+    // One helper for every line since 2026-09-26 (T4892): a dozen direct
+    // appends had skipped the time.
+    expect(editor()).toContain("{ id: nanoid(), at: Date.now(), ...entry, ...(ops ? { ops } : {}) }");
   });
 
-  it("a snapshot keeps the diagram even when the picture fails", () => {
+  it("a snapshot is the diagram as JSON — no picture is taken", () => {
+    // CHANGED BY DESIGN, 2026-09-26. This pinned "a snapshot keeps the diagram
+    // even when the picture fails" (PNG + { elements, connectors }). Paul: "Make
+    // the snapshots in Voice Assist JSON, not SVG. These can be better used for
+    // diagnosis." The picture is gone; the JSON is the whole DiagramData with
+    // what was on screen (T4886), saved through the capture ledger (T4887).
     const e = editor();
     const fn = e.slice(e.indexOf("const takeDebugSnapshot"), e.indexOf("const downloadDebugSession"));
-    expect(fn).toContain("...(shot ? { png: shot.png");
-    expect(fn, "the JSON is unconditional").toContain("diagramJson: { elements: data.elements, connectors: data.connectors }");
+    expect(fn).toContain('saveDebugStateRef.current(data, "marked", entryId)');
+    expect(fn, "no picture").not.toMatch(/captureCanvasPng|png:/);
+    expect(e).toContain("const r = captureState(debugLedgerRef.current, state, {");
   });
 });

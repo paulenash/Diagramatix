@@ -115,7 +115,9 @@ describe("T4613 — “undo” inside a numbered pick gets you out", () => {
   it("cancels the pick AND undoes, rather than arguing", () => {
     // Paul said "undo" three times and was told "say the number of the item to
     // rename" each time.
-    expect(body).toMatch(/if \(\/\^undo\\b\/\.test\(low\)\) \{\s*\n\s*cancelRenameFlow\("rename cancelled"\);\s*\n\s*undo\(\);/);
+    // Updated 2026-09-26: the voice-debug recording is armed first, because the
+    // undo changes the diagram (T4893) — still cancel, then undo.
+    expect(body).toMatch(/if \(\/\^undo\\b\/\.test\(low\)\) \{\s*\n\s*armDebugBefore\(elementsRef\.current\);\s*\n\s*cancelRenameFlow\("rename cancelled"\);\s*\n\s*undo\(\);/);
   });
 
   it("names the way out in the prompt, not just the way to finish", () => {

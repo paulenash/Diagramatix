@@ -2,9 +2,11 @@
  * A picture of the canvas as it is right now.
  *
  * Lifted out of `SopGenerateDialog.tsx` (2026-09-24) so the Voice Assist debug
- * log can take a snapshot beside a command without a second implementation of
- * the same thing. The SOP dialog now calls this; there is one way to rasterise
- * the canvas and one place to fix it.
+ * log could take a picture beside a command without a second implementation of
+ * the same thing. The debug log no longer takes pictures at all — Paul,
+ * 2026-09-26: "Make the snapshots in Voice Assist JSON, not SVG" — so its
+ * whole-canvas capture went with them, and what is left is what the SOP figure
+ * uses: one way to rasterise the canvas and one place to fix it.
  *
  * WHY NOT `html-to-image`. It is a dependency and it is the obvious reach. The
  * comment it replaced, written after the failure, says why not: `toPng` on a
@@ -12,7 +14,7 @@
  * serialise the SVG, load it through an `<img>`, draw it into a `<canvas>` — is
  * reliable for this canvas because every style on it is inline.
  *
- * TWO THINGS A SNAPSHOT DOES NOT CONTAIN, both by design and both worth knowing
+ * TWO THINGS A PICTURE DOES NOT CONTAIN, both by design and both worth knowing
  * before someone reports them as bugs:
  *
  *   • **Rich-text labels.** They are rendered in `<foreignObject>` (HTML). An
@@ -23,7 +25,8 @@
  *   • **Selection chrome.** Resize handles and the dashed blue outline are
  *     removed, so the picture shows the diagram rather than the editor.
  *
- * The maths is pure and tested; only `captureCanvasPng` touches the DOM.
+ * The maths is pure and tested; only `stripSelectionChrome` and `svgToPng`
+ * touch the DOM.
  */
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -122,58 +125,6 @@ export async function svgToPng(
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
     return canvas.toDataURL("image/png");
-  } catch {
-    return undefined;
-  }
-}
-
-/** A cloned, cropped, cleaned canvas SVG ready to rasterise. */
-export function prepareCanvasClone(
-  svg: SVGSVGElement,
-  bounds: ContentBounds,
-  outW: number,
-  outH: number,
-): SVGSVGElement {
-  const clone = svg.cloneNode(true) as SVGSVGElement;
-  // The canvas `<g>` carries the pan/zoom transform. Drop it so the picture is
-  // of the diagram rather than of wherever the user happened to be scrolled.
-  const g = clone.querySelector("g");
-  if (g) g.removeAttribute("transform");
-  clone.querySelectorAll("foreignObject").forEach((n) => n.remove());
-  stripSelectionChrome(clone);
-  clone.setAttribute("viewBox", `${bounds.x} ${bounds.y} ${bounds.w} ${bounds.h}`);
-  clone.setAttribute("width", String(outW));
-  clone.setAttribute("height", String(outH));
-  return clone;
-}
-
-export interface CanvasSnapshot {
-  /** `data:image/png;base64,…` */
-  png: string;
-  width: number;
-  height: number;
-}
-
-/**
- * Capture the whole canvas, fitted to its content.
- *
- * Returns `undefined` rather than throwing when there is no canvas, nothing on
- * it, or the browser refuses to rasterise — a snapshot is evidence, and failing
- * to get one must never take the command log down with it.
- */
-export async function captureCanvasPng(
-  elements: readonly SnapshotBox[],
-  opts: { margin?: number; maxWidth?: number } = {},
-): Promise<CanvasSnapshot | undefined> {
-  try {
-    const svg = document.querySelector("svg[data-canvas]") as SVGSVGElement | null;
-    if (!svg) return undefined;
-    const bounds = contentBounds(elements, opts.margin ?? 30);
-    if (!bounds) return undefined;
-    const { outW, outH } = fitOutputSize(bounds, opts.maxWidth ?? 1400);
-    const clone = prepareCanvasClone(svg, bounds, outW, outH);
-    const png = await svgToPng(clone, outW, outH);
-    return png ? { png, width: outW, height: outH } : undefined;
   } catch {
     return undefined;
   }
