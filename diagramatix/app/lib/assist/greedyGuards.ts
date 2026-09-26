@@ -27,6 +27,7 @@
 import { SYMBOL_PHRASES, SYMBOL_SYNONYMS } from "./ops";
 import { AFTER_WORDS, BEFORE_WORDS, HERE_WORDS } from "./placeWords";
 import { TEMPLATE_NOUN } from "./templatePhrase";
+import { COMPRESS_COMMAND_VERBS } from "./commandVerbs";
 
 /** Lane and pool words, including the mis-hears the grammar accepts. */
 const CONTAINER_WORD = /^(?:pools?|polls?|pulls?|lanes?|lines?|sub-?lanes?|sub-?lines?)$/i;
@@ -152,7 +153,7 @@ const POSITIONAL_INSIDE = /\s(?:between|above|below|under(?:neath)?|beside|next\
  * for a task, and "Surround" on its own might be one. It is the pair that
  * gives it away.
  */
-const COMMAND_VERB = /\b(?:surround|enclose|wrap|compress|shrink|extend|widen|split|swap|disconnect|unlink)\b/i;
+const COMMAND_VERB = new RegExp(`\\b(?:surround|enclose|wrap|${COMPRESS_COMMAND_VERBS.join("|")}|extend|widen|split|swap|disconnect|unlink)\\b`, "i");
 const CONTAINER_MENTION = /\b(?:pool|poll|pull|lanes?|sub-?lanes?|everything|all elements|subprocess)\b/i;
 
 export function looksLikeAnotherCommand(implicitLabel: string): boolean {

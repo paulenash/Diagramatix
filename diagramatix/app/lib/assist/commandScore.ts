@@ -21,6 +21,7 @@
  */
 import { parseCommand } from "./commandGrammar";
 import { resolveRef, isSelectionRef } from "./resolveRef";
+import { refKind } from "./refKinds";
 import type { AssistOp } from "./ops";
 import type { GeneratedCase } from "./commandGenerator";
 import type { DiagramData, DiagramElement } from "../diagram/types";
@@ -200,17 +201,24 @@ interface RefCheck {
   detail: string;
 }
 
-/** Compare every ref field by RESOLUTION against the same fixture. */
-function checkRefs(expected: AssistOp[], actual: AssistOp[], world: readonly DiagramElement[]): RefCheck {
+/**
+ * Compare every ref field by RESOLUTION against the same fixture — resolved as
+ * the app resolves it: the same kind table (refKinds.ts) and the case's
+ * selection. A scorer that resolved differently would call "three" ambiguous
+ * while the app found Pool 3, or pass what the app asks about.
+ */
+function checkRefs(expected: AssistOp[], actual: AssistOp[], world: readonly DiagramElement[], selected: readonly string[] = []): RefCheck {
   for (let i = 0; i < expected.length; i++) {
     const refs = refFieldsFor(expected[i].op);
     const e = expected[i] as unknown as Record<string, unknown>;
     const a = actual[i] as unknown as Record<string, unknown>;
+    const resolve = (spoken: string, field: string) =>
+      resolveRef(spoken, [...world], null, selected, { kind: refKind(expected[i].op, field) });
     for (const field of refs) {
       const want = e[field];
       const got = a[field];
       if (typeof want !== "string" || !want) continue;
-      const wr = resolveRef(want, [...world]);
+      const wr = resolve(want, field);
       const wantId = wr && "id" in wr ? wr.id : null;
       // THE ANSWER KEY MUST NAME ONE THING. When it named nothing here, any
       // heard ref that happened to name SOMETHING passed — so an old clip
@@ -226,7 +234,7 @@ function checkRefs(expected: AssistOp[], actual: AssistOp[], world: readonly Dia
       if (typeof got !== "string" || !got) {
         return { ok: false, ambiguous: false, stale: false, detail: `${field}: expected “${want}”, got nothing` };
       }
-      const gr = resolveRef(got, [...world]);
+      const gr = resolve(got, field);
       if (gr && "ambiguous" in gr) {
         return { ok: false, ambiguous: true, stale: false, detail: `${field}: “${got}” names ${gr.ambiguous.length} things` };
       }
@@ -287,7 +295,7 @@ export function scoreCase(
     };
   }
 
-  const refs = checkRefs(c.ops, actual, world);
+  const refs = checkRefs(c.ops, actual, world, c.needsSelection ?? []);
   if (!refs.ok) {
     return {
       ...base, actual,

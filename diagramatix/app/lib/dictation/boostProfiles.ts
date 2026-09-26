@@ -56,13 +56,13 @@ export const BOOST_PROFILES: readonly BoostProfile[] = [
     label: "Current (shipped)",
     keywords: COMMAND_KEYWORDS,
     explain:
-      "The list production runs today: containers at weight 3, 'selected' at 3, element nouns at 2, "
-      + "and a handful of command verbs unweighted. Every entry was added to fix a real mis-hear — but "
-      + "all of them were added while local voice was silently using the BROWSER recogniser, so none was "
-      + "ever tested against Deepgram.",
+      "Whatever production sends today. Since 25 September that is NOTHING: the old list (containers at "
+      + "weight 3, element nouns at 2, 'compact' and 'subprocess' among them) was measured against this "
+      + "corpus and cost more than it earned — while 'compact' was boosted, 'compress' came back as "
+      + "'compact' 9 times in 20. So today this runs the same as 'No boosts at all'.",
     watch:
-      "This is the baseline. Expect 'make'/'align'/'swap'/'remove' to lose their verb to 'Lane' or 'Pool', "
-      + "and every plural ('lanes', 'sublanes', 'pools') to come back singular.",
+      "This is the baseline. If it ever differs from 'No boosts at all', somebody has put words back in "
+      + "the shipped list — re-measure before trusting it, and never re-boost 'compact' or 'subprocess'.",
   },
   {
     id: "none",

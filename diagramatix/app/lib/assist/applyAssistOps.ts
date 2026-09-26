@@ -53,6 +53,7 @@ import { getRiskControl, riskControlPatch } from "@/app/lib/diagram/riskControl"
 import { simPatch } from "@/app/lib/diagram/simParams";
 import { whyTemplateCantFollow } from "@/app/lib/diagram/templateAttach";
 import { TEMPLATE_BEFORE_REFUSAL } from "./templatePhrase";
+import { refKind, type RefKind } from "./refKinds";
 
 /** The guided "rename by number" flow — pick a numbered badge, then say the name. */
 export type RenameFlow =
@@ -201,7 +202,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
    * `resolveRef` has always returned the list; the message discarded it and
    * said only "is ambiguous", which left the user to guess what it had found.
    */
-  const resolve1 = (ref: string, opts: { strict?: boolean } = {}): DiagramElement | { err: string; ambiguous?: string[] } => {
+  const resolve1 = (ref: string, opts: { strict?: boolean; kind?: RefKind } = {}): DiagramElement | { err: string; ambiguous?: string[] } => {
     const r = resolveRef(ref, els, voiceLastId.current, selectedIds, { ...opts, pointer: pointerWorld.current });
     if (!r) {
       if (isSelectionRef(ref) && selectedIds.length === 0) return { err: "nothing is selected" };
@@ -215,7 +216,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       // meaningless (Paul, 2026-09-21), and "did you mean" on an id is
       // noise, so neither is offered.
       if (looksLikeElementId(ref)) return { err: "couldn't work out which element that meant — say its name" };
-      const near = nearestRefs(ref, els, 3);
+      const near = nearestRefs(ref, els, 3, opts.kind);
       if (!near.length) return { err: `couldn't find “${ref}”` };
       const names = near.map((n) => `“${n.label}”`);
       const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} or ${names[names.length - 1]}`;
@@ -236,6 +237,9 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
     }
     return els.find((e) => e.id === r.id)!;
   };
+  /** Resolve one field of an op, bounded by the kind refKinds.ts says that field names. */
+  const resolveField = <O extends AssistOp>(op: O, field: keyof O & string, opts: { strict?: boolean } = {}) =>
+    resolve1(String(op[field] ?? ""), { ...opts, kind: refKind(op.op, field) });
   // "delete selected" on an expanded subprocess DISSOLVES it: the shell and
   // its Start/End go, the contents are spliced back into the flow and the
   // room the shell used is given back — the reverse of "surround selected"
@@ -568,7 +572,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
     // laid out again from the top, so a pool dropped between two others pushes
     // the rest down by its own height — no separate "make room" step.
     if (op.op === "movePoolTo") {
-      const m = resolve1(op.ref), a = resolve1(op.relativeTo);
+      const m = resolveField(op, "ref"), a = resolveField(op, "relativeTo");
       if ("err" in m) { results.push(m.err); anyFail = true; continue; }
       if ("err" in a) { results.push(a.err); anyFail = true; continue; }
       const plan = planMovePool(els, data.connectors, m.id, op.position, a.id, isContainerType, getAllDescendantIds);
@@ -584,7 +588,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
     if (op.op === "swapPools") {
       let a: DiagramElement | undefined, b: DiagramElement | undefined;
       if (op.a && op.b) {
-        const ra = resolve1(op.a), rb = resolve1(op.b);
+        const ra = resolveField(op, "a"), rb = resolveField(op, "b");
         if ("err" in ra) { results.push(ra.err); anyFail = true; continue; }
         if ("err" in rb) { results.push(rb.err); anyFail = true; continue; }
         a = ra; b = rb;
@@ -636,7 +640,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       // "above|below <named pool>" — resolve the anchor pool so we position by it.
       let relativeToId: string | undefined;
       if (op.relativeTo) {
-        const r = resolve1(op.relativeTo);
+        const r = resolveField(op, "relativeTo");
         if (!("err" in r) && r.type === "pool") relativeToId = r.id;
         else if (!("err" in r)) { results.push(`${op.relativeTo} isn’t a pool`); anyFail = true; continue; }
         else { results.push(r.err); anyFail = true; continue; }
@@ -694,12 +698,18 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
     }
 
     if (op.op === "compressPool") {
-      const p = resolve1(op.poolRef);
+      // Strict: "compress the pool" with several pools asks which, never
+      // takes the newest — compressing the wrong pool is a large quiet edit.
+      const p = resolveField(op, "poolRef", { strict: true });
       if ("err" in p && p.ambiguous) {
         const flow = buildPickFlow(ops, op.poolRef, p.ambiguous, els);
         if (flow) { setPickFlow(flow); results.push(flow.prompt); pickParked = true; break; }
       }
       if ("err" in p) { results.push(p.err); anyFail = true; continue; }
+      if (isAnyLane(p)) {
+        results.push(`${nameOf(p)} is a ${laneKindWord(p, els)} — say “compress the ${p.label?.trim() || laneKindWord(p, els)} lane”`);
+        anyFail = true; continue;
+      }
       if (p.type !== "pool") { results.push(`${nameOf(p)} isn't a pool`); anyFail = true; continue; }
       compressPool(p.id);
       results.push(`compressed ${nameOf(p)}`);
@@ -725,7 +735,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       const dist = op.distance ?? 20;
       let target: DiagramElement | undefined;
       if (op.ref) {
-        const r = resolve1(op.ref);
+        const r = resolveField(op, "ref");
         if ("err" in r) { results.push(r.err); anyFail = true; continue; }
         target = r;
       } else {
@@ -1224,7 +1234,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
     }
 
     if (op.op === "addLanes") {
-      const pool = resolve1(op.poolRef);
+      const pool = resolveField(op, "poolRef");
       // Candidates that share a label cannot be told apart by saying the name
       // — "which “pool three”? 2 match: “Pool 3”, “Pool 3”" (Paul's log,
       // 2026-09-23). Numbered badges can.

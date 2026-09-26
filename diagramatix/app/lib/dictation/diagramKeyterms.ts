@@ -24,9 +24,12 @@
  *      confused with ordinary speech. A bare common word can: "Order", "Check",
  *      "Review" are all real English, and biasing them costs more than it buys.
  *      Single words are kept only when they are long and distinctive.
- *   3. NOTHING THAT COLLIDES WITH THE COMMAND VOCABULARY. Those words are
- *      already boosted. Sending them again — or inside a phrase — is the
- *      `lane:3` mistake in a new costume.
+ *   3. NOTHING THAT COLLIDES WITH THE COMMAND VOCABULARY. Biasing a command
+ *      word — even inside a phrase — makes the recogniser reach for it where
+ *      the user said a DIFFERENT command word: while "compact" was boosted,
+ *      "compress" came back as "compact" 9 times in 20 (2026-09-25; the
+ *      command list has sent nothing since). That is the `lane:3` mistake in a
+ *      new costume.
  *   4. A CAP. Deepgram weighs a fixed list; a hundred terms dilute each other
  *      and the command words with them.
  *
@@ -38,6 +41,8 @@
  * Pure.
  */
 
+import { COMPRESS_VERBS } from "../assist/commandVerbs";
+
 /** Sent unboosted. Never give these a `:n` — see rule 1. */
 export const MAX_DIAGRAM_KEYTERMS = 60;
 /** A single word must be at least this long to be worth biasing on its own. */
@@ -46,14 +51,15 @@ export const MIN_SOLO_WORD = 6;
 export const MAX_KEYTERM_WORDS = 4;
 
 /**
- * Words the command vocabulary already owns. A label containing one of these is
- * not sent, because those terms are boosted and a second, competing appearance
- * is exactly what went wrong with the numbers.
+ * Words the command vocabulary owns (rule 3). A label containing one of these is
+ * not sent: the bias would act on the command word, not just on the name.
+ * Every compress verb is here (the one list, commandVerbs.ts) — "compact" was
+ * the word that took "compress".
  */
-const COMMAND_WORDS = new Set([
+const COMMAND_WORDS = new Set<string>([
   "lane", "lanes", "sublane", "sublanes", "pool", "pools", "gateway", "gateways",
   "task", "tasks", "subprocess", "selected", "selection", "boundary", "connect",
-  "rename", "delete", "compact", "voice", "assist", "start", "end", "event",
+  "rename", "delete", ...COMPRESS_VERBS, "voice", "assist", "start", "end", "event",
   "message", "swap", "move", "nudge", "add", "undo", "stop", "done",
   "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
 ]);

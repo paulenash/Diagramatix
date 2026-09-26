@@ -23,6 +23,26 @@
  */
 
 /**
+ * Every verb that means "compress" — ONE list. Six copies had drifted apart
+ * (2026-09-26 investigation), and "delete X and compress" was the casualty: the
+ * delete rule knew "compact" but not "compress", so it deleted X, dropped the
+ * compaction and showed a green tick.
+ */
+export const COMPRESS_VERBS = [
+  "compress", "collapse", "shrink", "reduce", "shorten", "compact", "tighten", "condense", "minimise", "minimize",
+] as const;
+
+/**
+ * The two strong enough to mark a command inside someone else's sentence. The
+ * rest are ordinary words in names ("Reduce Cost", "Collapse Report"), and a
+ * bare "Reduce." held for the rest of a sentence would wait ~12 s for nothing.
+ */
+export const COMPRESS_COMMAND_VERBS = ["compress", "shrink"] as const;
+
+/** A compress verb as a regex source, with the forms people say: "compressed the pool", "compressing Sales". */
+export const COMPRESS_VERB_SOURCE = `(?:compress(?:es|ed|ing)?|${COMPRESS_VERBS.filter((v) => v !== "compress").join("|")})`;
+
+/**
  * The verbs a spoken command starts with. A bare one is held for the rest of
  * the sentence (`isIncompleteCommand`) — moved here verbatim, so the hold's
  * decisions are exactly what they were.
@@ -31,7 +51,7 @@ export const COMMAND_VERBS = [
   "swap", "rename", "relabel", "label", "edit", "move", "slide", "nudge", "bump", "shift",
   "connect", "link", "join", "disconnect", "unlink", "delete", "remove",
   "add", "insert", "create", "put", "send", "draw", "attach", "place",
-  "compress", "shrink", "extend", "widen", "wrap", "surround", "enclose", "unwrap", "dissolve",
+  ...COMPRESS_COMMAND_VERBS, "extend", "widen", "wrap", "surround", "enclose", "unwrap", "dissolve",
   "call", "change", "set",
 ] as const;
 

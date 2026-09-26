@@ -66,7 +66,8 @@ describe("T4569 — and the phrasings that must still work", () => {
     // cost that.
     expect(firstOp("compress Warehouse")).toMatchObject({ op: "compressPool", poolRef: "Warehouse" });
     expect(firstOp("collapse Warehouse")).toMatchObject({ op: "compressPool" });
-    expect(firstOp("compress the Customer pool")).toMatchObject({ op: "compressPool", poolRef: "Customer" });
+    // The kind word is kept, at the front (2026-09-26), so the resolver binds it.
+    expect(firstOp("compress the Customer pool")).toMatchObject({ op: "compressPool", poolRef: "pool Customer" });
   });
 
   it("still swaps two lanes named without the word", () => {

@@ -193,12 +193,14 @@ describe("container maintenance — definitive set", () => {
     expect(parseCommand("move Task 1 up")).toEqual([{ op: "move", ref: "Task 1", direction: "up", count: 1 }]);
   });
   it("10. Compress a pool (all aliases)", () => {
-    expect(parseCommand("compress the Customer pool")).toEqual([{ op: "compressPool", poolRef: "Customer" }]);
+    // The kind word the user said is KEPT, at the front (2026-09-26): "pool
+    // Customer" can only be a pool — the resolver reads it as a constraint.
+    expect(parseCommand("compress the Customer pool")).toEqual([{ op: "compressPool", poolRef: "pool Customer" }]);
     expect(parseCommand("shrink Sales")).toEqual([{ op: "compressPool", poolRef: "Sales" }]);
     expect(parseCommand("collapse the pool")).toEqual([{ op: "compressPool", poolRef: "pool" }]);
-    expect(parseCommand("reduce the Finance pool")).toEqual([{ op: "compressPool", poolRef: "Finance" }]);
+    expect(parseCommand("reduce the Finance pool")).toEqual([{ op: "compressPool", poolRef: "pool Finance" }]);
     expect(parseCommand("shorten Sales")).toEqual([{ op: "compressPool", poolRef: "Sales" }]);
-    expect(parseCommand("compact the HR pool")).toEqual([{ op: "compressPool", poolRef: "HR" }]);
+    expect(parseCommand("compact the HR pool")).toEqual([{ op: "compressPool", poolRef: "pool HR" }]);
   });
 });
 

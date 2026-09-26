@@ -296,7 +296,8 @@ describe("T4585 — R6: a failed reference says what it nearly found", () => {
     // The looseness is the point AND the risk. `nearestRefs` is only ever read
     // into an error message; the resolver itself keeps its one-edit limit.
     const body = editorWithApplyLayer();
-    expect(body).toMatch(/const near = nearestRefs\(ref, els, 3\);/);
+    // (Bounded by the field's kind since 2026-09-26 — a suggestion of the wrong kind would be picked and refused.)
+    expect(body).toMatch(/const near = nearestRefs\(ref, els, 3, opts\.kind\);/);
     expect(body, "the candidates go into a question, not a resolution")
       .toMatch(/couldn't find “\$\{ref\}” — did you mean \$\{list\}\?/);
     const resolve = read("app", "lib", "assist", "resolveRef.ts");

@@ -19,6 +19,7 @@ import { auth } from "@/auth";
 import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
 import { gateFeature } from "@/app/lib/subscription-route";
 import { validateOps } from "@/app/lib/assist/ops";
+import { COMPRESS_VERBS } from "@/app/lib/assist/commandVerbs";
 import { serializeDiagramForCommand } from "@/app/lib/assist/serializeDiagram";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
 import { prisma } from "@/app/lib/db";
@@ -52,7 +53,7 @@ Canonical forms:
   align these (tidily)   ·   align these in a row   ·   align these in a column   ·   align their left edges
   accept the suggestion   ·   take the <type>   ·   take the second one
   add <n> lanes to <pool> called <A, B and C>   ·   add a lane above|below <lane>   ·   add <n> sublanes to <lane> called <A, B and C>   ·   swap <lane> with <lane>
-  compress <pool>   ·   extend the pools to include all elements   ·   nudge <name> up|down|left|right (20px; "nudge these left" for the selection)   ·   move these right (the selection, 100px per step)   ·   again
+  compress <pool> (keep the word "pool" when it was said: "compress pool 3")   ·   extend the pools to include all elements   ·   nudge <name> up|down|left|right (20px; "nudge these left" for the selection)   ·   move these right (the selection, 100px per step)   ·   again
   swap top and bottom · move top to bottom (the SELECTED gateways' connection points; swap exchanges two, move needs the destination free — any pair of top|bottom|middle|left|right; NOT a lane swap unless two lane NAMES are given)
   surround selected with an expanded subprocess called <name>   (the SELECTED elements become the contents of a new expanded subprocess; needs one flow in and one out)
   unwrap the selected subprocess   ·   delete selected (on an expanded subprocess: dissolves it, the contents stay in the flow)
@@ -89,7 +90,7 @@ Op shapes (use element NAMES for refs — they are resolved against the diagram;
   { "op":"addLaneAt", "poolRef": <name>, "position": "above"|"below", "refLane": <name>, "label"?: string }  // insert a lane by a ref lane
   { "op":"addSublanes", "laneRef": <name>, "labels": [string,…] }   // N equal named sublanes in a lane
   { "op":"swapLanes", "laneA": <name>, "laneB": <name> }            // swap two adjacent lanes
-  { "op":"compressPool", "poolRef": <name> }                        // shrink a pool to fit its contents (verbs: compress/shrink/reduce/shorten/compact/collapse)
+  { "op":"compressPool", "poolRef": <name> }                        // shrink a pool to fit its contents (verbs: ${COMPRESS_VERBS.join("/")}). Keep a kind word the user said: "pool 3", not "3"
   { "op":"extendPools" }                                            // widen ALL pools to the same width, covering every element (verbs: extend/lengthen/widen)
   { "op":"nudgePool", "ref"?: <name>, "direction": "up"|"down", "distance"?: number }  // move a pool a small step (default 20px); ref omitted → the black-box pool
   { "op":"movePoolBoundary", "ref"?: <name>, "boundary": "left"|"right"|"top"|"bottom", "direction": "up"|"down"|"left"|"right", "distance"?: number }  // move ONE edge of a pool (a resize). A left/right boundary only takes left/right; a top/bottom one only up/down. "move the pool left boundary right by 40"

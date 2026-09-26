@@ -10,7 +10,7 @@
  *
  * Pure, so every rule here is tested; the editor only imports it.
  */
-import { COMMAND_VERBS } from "./commandVerbs";
+import { COMMAND_VERBS, COMPRESS_COMMAND_VERBS } from "./commandVerbs";
 import { repairHeardWords } from "./selectedWord";
 import { parseBoundaryEventPhrase } from "./boundaryEventPhrase";
 import { ADD_MESSAGE_LEAD, MESSAGE_BY_NUMBER, MESSAGE_BY_NUMBER_FROM_SELECTION } from "./messagePhrase";
@@ -44,6 +44,12 @@ export function isIncompleteCommand(text: string): boolean {
   if (/^(?:called|named|labell?ed)\b/.test(t)) return true;
   // A bare verb — "Swap." "Rename." "Move." — is the start of something.
   if (VERBS.test(t)) return true;
+  // "Compress lane." / "Compress the pool." — the kind is said and the name is
+  // usually a pause away. Held so "… three" can join it; if nothing comes it
+  // runs, and a bare kind with several candidates asks which rather than
+  // taking the newest. Only the two strong verbs: a held bare "Reduce the
+  // pool." would be a rarer phrasing kept waiting.
+  if (new RegExp(`^(?:compress(?:es|ed|ing)?|${COMPRESS_COMMAND_VERBS.filter((v) => v !== "compress").join("|")})(?:\\s+the)?\\s+(?:pool|lane|sub-?\\s?lane)$`).test(t)) return true;
   // Ends on a dangling connective / preposition → more is coming. "after",
   // "before" and "following" too: "add template after" … "selected", split at
   // the pause, ran as a task called "Template after" (2026-09-25).

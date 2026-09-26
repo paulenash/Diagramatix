@@ -68,7 +68,7 @@ describe("T4604 — an element id never reaches the user", () => {
     // And it is checked BEFORE "did you mean", since suggesting names for an
     // id is noise on top of noise.
     const guard = body.indexOf("looksLikeElementId(ref)");
-    const near = body.indexOf("const near = nearestRefs(ref, els, 3);");
+    const near = body.indexOf("const near = nearestRefs(ref, els, 3, opts.kind);");
     expect(guard).toBeGreaterThan(-1);
     expect(near, "the id guard runs first").toBeGreaterThan(guard);
   });

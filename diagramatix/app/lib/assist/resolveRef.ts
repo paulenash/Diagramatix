@@ -9,6 +9,7 @@ import { phoneticMatches, soundsLike } from "./phonetic";
 import { isSublane, isTopLevelLane } from "../diagram/laneKind";
 import { elementUnderPointer, isPointerElementRef } from "./pointerRef";
 import { containerWordKind, foldNumberHomophones, leadingContainerWord } from "./containerWords";
+import { isOfKind, type RefKind } from "./refKinds";
 
 export type RefResolution = { id: string } | { ambiguous: string[] } | null;
 
@@ -40,6 +41,13 @@ export interface ResolveOpts {
    * simply a better guess than "the last element added" ever was.
    */
   pointer?: { x: number; y: number } | null;
+  /**
+   * The kind the COMMAND's field can name (refKinds.ts) — "compress pool
+   * three" can only mean a pool or a lane, "move pool three's top boundary"
+   * only a pool. Filters the name passes only: a selection word or "it" still
+   * means what is selected or last added, and the caller judges its type.
+   */
+  kind?: RefKind;
 }
 
 const LAST_PRONOUNS = new Set(["it", "that", "this", "the last", "the last one", "last one", "the new one"]);
@@ -376,7 +384,9 @@ export function resolveRef(spoken: string, elements: DiagramElement[], lastAdded
   // that kind matches, the answer is "not found" rather than something of
   // another kind: "delete sublane one" must never resolve to a LANE.
   const kindWanted = spokenKind(fullTarget);
-  const named = elements.filter((e) => (e.label ?? "").trim().length > 0);
+  // The command's own kind (refKinds.ts) bounds every name pass, the whole-name
+  // one included: "compress Review Claim" must not find a TASK.
+  const named = elements.filter((e) => (e.label ?? "").trim().length > 0 && (!opts.kind || isOfKind(opts.kind, e)));
 
   // A WHOLE NAME wins over the kind word, because it can only be a name: an
   // element genuinely called "Pool cleaning" is a task, and nobody says the
@@ -482,11 +492,13 @@ export function nearestRefs(
   spoken: string,
   elements: DiagramElement[],
   max = 3,
+  /** The same bound `resolveRef` was given — a suggestion of the wrong kind would be picked and refused. */
+  kind?: RefKind,
 ): NearMiss[] {
   const fullTarget = stripArticle(norm(spoken));
   if (!fullTarget) return [];
   const target = stripKind(fullTarget);
-  const labelled = elements.filter((e) => (e.label ?? "").trim().length > 0);
+  const labelled = elements.filter((e) => (e.label ?? "").trim().length > 0 && (!kind || isOfKind(kind, e)));
   const want = new Set(tokens(target));
 
   const scored = new Map<string, { m: NearMiss; score: number }>();

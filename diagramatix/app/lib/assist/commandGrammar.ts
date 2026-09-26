@@ -9,7 +9,8 @@ import { namesNonContainerKind, laneWordIsAttached, looksPositionalNotAName, nam
 import { parseRenameType } from "./renameTargets";
 import { parsePoolBoundaryPhrase, mentionsPoolBoundary } from "./poolBoundaryPhrase";
 import { repairHeardWords } from "./selectedWord";
-import { hasCommandAfterName } from "./commandVerbs";
+import { hasCommandAfterName, COMPRESS_VERB_SOURCE } from "./commandVerbs";
+import { parseCompressPhrase } from "./compressPhrase";
 import { PARTICIPANT_WORDS, BOX_WORDS, MESSAGE_WORDS, wordAlternation } from "./containerWords";
 import { parseBoundaryEventPhrase } from "./boundaryEventPhrase";
 import { MESSAGE_VERB, MESSAGE_BY_NUMBER, MESSAGE_BY_NUMBER_FROM_SELECTION, ADD_MESSAGE_LEAD } from "./messagePhrase";
@@ -360,15 +361,13 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     if (mBoundary) return [{ op: "movePoolBoundary", ...mBoundary }];
     const ALL = "(?:everything|all(?:\\s+(?:the\\s+)?elements?)?(?:\\s+on\\s+(?:the\\s+)?diagram)?|the\\s+(?:lot|whole\\s+thing|diagram)|it\\s+all)";
 
-    // Compress / collapse a pool: "compress the Customer pool", "shrink Sales".
-    // Aliases: compress · collapse · shrink · reduce · shorten · compact
-    //          (+ tighten · condense · minimise/minimize).
-    let mc = raw.match(new RegExp(`^(?:compress|collapse|shrink|reduce|shorten|compact|tighten|condense|minimise|minimize)\\s+(?:the\\s+)?(?:${P}\\s+)?(.+?)(?:\\s+${P})?$`, "i"));
-    // B5: the pool word is optional on BOTH sides, so this reduces to "any
-    // word after collapse". Decline when the ref plainly names something else
-    // — "collapse the subprocess" is an EP collapse, and saying so is the AI's
-    // job, not this rule's.
-    if (mc && !namesNonContainerKind(mc[1])) return [{ op: "compressPool", poolRef: clean(mc[1]) }];
+    // Compress a pool: "compress the Customer pool", "compress pool three",
+    // "shrink Sales" — the verbs are COMPRESS_VERBS (commandVerbs.ts). The kind
+    // word the user said is KEPT, at the front of the ref, so the resolver
+    // honours it (compressPhrase.ts); an EP collapse, plural kinds and "the
+    // gap" are not this rule's.
+    const compress = parseCompressPhrase(raw);
+    if (compress) return [{ op: "compressPool", poolRef: clean(compress.ref) }];
 
     // Swap two named lanes: "swap lane A with lane B" / "swap A and B".
     // (resolveRef strips a leading "lane"/"pool" kind word, so keep the raw ref.)
@@ -619,7 +618,10 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   if (m) {
     let ref = stripArticle(clean(m[1]));
     let compact = false;
-    const andCompact = ref.match(/\s+and\s+(?:compact|close the gap|tidy(?:\s+up)?|collapse|clean up)(?:\s+.*)?$/i);
+    // Every compress verb, plus the phrases that only make sense after a
+    // delete. "delete X and compress" used to delete X, skip the compaction
+    // and show a green tick — the list here had "compact" but not "compress".
+    const andCompact = ref.match(new RegExp(`\\s+and\\s+(?:${COMPRESS_VERB_SOURCE}|close the gap|tidy(?:\\s+up)?|clean up)(?:\\s+.*)?$`, "i"));
     if (andCompact) { compact = true; ref = clean(ref.slice(0, andCompact.index)); }
     return [{ op: "delete", ref, ...(compact ? { compact: true } : {}) }];
   }
