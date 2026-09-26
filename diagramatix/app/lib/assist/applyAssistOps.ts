@@ -54,6 +54,7 @@ import { buildPickFlow, type PickFlow } from "./disambiguate";
 import { getRiskControl, riskControlPatch } from "@/app/lib/diagram/riskControl";
 import { simPatch } from "@/app/lib/diagram/simParams";
 import { whyTemplateCantFollow } from "@/app/lib/diagram/templateAttach";
+import { SEQUENCE_NODE_TYPES } from "@/app/lib/diagram/templates";
 import { TEMPLATE_BEFORE_REFUSAL } from "./templatePhrase";
 import { refKind, type RefKind } from "./refKinds";
 
@@ -1300,6 +1301,19 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
           anyFail = true; continue;
         }
         results.push(openTemplateWindowRef.current({ at: { ...pointerWorld.current } }));
+        continue;
+      }
+      // ONE STEP SELECTED means "after it" (Paul, 2026-09-27: the Assist
+      // template addition "is correct for the command 'add template' IF an
+      // element is selected … expand the lane of the selected element, remove
+      // any start event, place the selected template in the lane, and connect
+      // it to the selected element"). That is the attach "after X" already
+      // does, so the selection simply becomes the anchor.
+      const selected = selectedIds.length === 1 ? els.find((e) => e.id === selectedIds[0]) : undefined;
+      if (selected && SEQUENCE_NODE_TYPES.has(selected.type)) {
+        const why = whyTemplateCantFollow(selected, els);
+        if (why) { results.push(why); anyFail = true; continue; }
+        results.push(openTemplateWindowRef.current({ anchorId: selected.id }));
         continue;
       }
       results.push(openTemplateWindowRef.current());

@@ -9,14 +9,14 @@
  * so that all the user has to do is say seven or nine and that template is
  * provisionally added."
  *
+ * A PICK IS FINAL (Paul, 2026-09-27: "remove the 'Keep it/cancel' step as this
+ * required mouse input"): the number puts the template on the diagram and the
+ * window closes; "undo that" takes it off.
+ *
  * The green is the badge green from the canvas (#16a34a), because the number in
  * this window means what a number on a badge means: say it. The pictures are
  * the templates' own stored previews, drawn large — a template is recognised by
  * its shape long before its name is read.
- *
- * The window shows WHICH ONE IS ON THE DIAGRAM right now (the provisional
- * pick): its card is ringed and says so, since the canvas behind is mostly
- * covered and the user needs to know what they are confirming.
  *
  * The mouse works too. A voice feature that cannot be clicked is a feature with
  * one way to fail.
@@ -28,10 +28,7 @@ const BADGE_GREEN = "#16a34a";
 
 interface Props {
   sections: TemplateSection[];
-  /** The template currently sitting on the diagram, waiting to be kept. */
-  provisionalId: string | null;
   onPick: (card: TemplateCard) => void;
-  onConfirm: () => void;
   onCancel: () => void;
   /** What was hidden and why (templatePick.ts hiddenTemplatesNote); empty when nothing was. */
   hiddenNote?: string;
@@ -42,7 +39,7 @@ interface Props {
 }
 
 export function TemplatePickerWindow({
-  sections, provisionalId, onPick, onConfirm, onCancel, hiddenNote = "", anchorName, notice,
+  sections, onPick, onCancel, hiddenNote = "", anchorName, notice,
 }: Props) {
   const total = sections.reduce((n, s) => n + s.cards.length, 0);
   const bySource = (source: "builtin" | "user") => sections.filter((s) => s.source === source && s.cards.length);
@@ -58,16 +55,10 @@ export function TemplatePickerWindow({
               {anchorName ? <>Add a template after “{anchorName}”</> : "Add a template"}
             </h3>
             <p className="text-xs text-gray-500">
-              Say a number — {total} to choose from. Then “yes” to keep it, or another number to swap.
+              Say a number — {total} to choose from. It goes on the diagram{anchorName ? `, joined after “${anchorName}”` : ""}; “undo that” takes it off.
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {provisionalId && (
-              <button onClick={onConfirm}
-                className="px-3 py-1.5 text-xs font-medium text-white rounded bg-green-600 hover:bg-green-700">
-                Keep it
-              </button>
-            )}
             <button onClick={onCancel}
               className="px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-300 rounded hover:bg-gray-50">
               Cancel
@@ -90,15 +81,12 @@ export function TemplatePickerWindow({
                     {s.group && <p className="text-[11px] font-medium text-gray-500 mb-1.5">{s.group}</p>}
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                       {s.cards.map((card) => {
-                        const showing = card.id === provisionalId;
                         return (
                           <button
                             key={card.id}
                             onClick={() => onPick(card)}
                             title={card.description ?? card.name}
-                            className={`relative text-left border rounded-lg p-2 hover:bg-gray-50 ${
-                              showing ? "border-green-600 ring-2 ring-green-500/40 bg-green-50/40" : "border-gray-200"
-                            }`}
+                            className="relative text-left border border-gray-200 rounded-lg p-2 hover:bg-gray-50"
                           >
                             <span
                               className="absolute -top-2 -left-2 flex items-center justify-center rounded-full text-white text-xs font-semibold"
@@ -110,11 +98,9 @@ export function TemplatePickerWindow({
                               <TemplateThumbnail templateId={card.id} svg={card.thumbnailSvg} width={190} height={100} />
                             </div>
                             <p className="mt-1.5 text-xs font-medium text-gray-800 truncate">{card.name}</p>
-                            {showing
-                              ? <p className="text-[11px] text-green-700">on the diagram — say “yes” to keep</p>
-                              : card.description
-                                ? <p className="text-[11px] text-gray-500 line-clamp-2">{card.description}</p>
-                                : null}
+                            {card.description
+                              ? <p className="text-[11px] text-gray-500 line-clamp-2">{card.description}</p>
+                              : null}
                           </button>
                         );
                       })}
@@ -128,7 +114,7 @@ export function TemplatePickerWindow({
 
         <div className="flex items-center justify-between gap-2 px-5 py-2.5 border-t border-gray-100">
           <span className="text-[11px] text-gray-500">
-            Say a number · “yes” to keep · “cancel” to stop
+            Say a number · “cancel” to stop
           </span>
           {notice
             ? <span className="text-[11px] text-red-600">{notice}</span>

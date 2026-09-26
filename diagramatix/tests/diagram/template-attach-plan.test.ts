@@ -589,8 +589,9 @@ describe("T4855 — wiring: one placement, one join, one close", () => {
     const close = body(editor, "closeTemplateFlow");
     expect(close).toContain("if (templateStillShowing(prov.stamp)) undo();");
     expect(close).toContain("else removeTemplate(prov.ids);");
-    // voice cancel/confirm, Esc, and the window's two buttons
-    expect((editor.match(/closeTemplateFlowRef\.current\(/g) ?? []).length).toBe(4);
+    // voice cancel, Esc, and the window's Cancel button — the Keep button went
+    // when a pick became final (T4928, 2026-09-27)
+    expect((editor.match(/closeTemplateFlowRef\.current\(/g) ?? []).length).toBe(3);
     expect(editor).not.toMatch(/templateFlow\.provisional\) undo\(\)/);
   });
 

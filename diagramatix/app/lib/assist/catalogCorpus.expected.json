@@ -13,12 +13,11 @@
       "symbolType": "gateway"
     }
   ],
-  "insert a parallel gateway called Split after Check Coverage": [
+  "insert a parallel gateway after Check Coverage": [
     {
       "op": "add",
       "symbolType": "gateway",
       "gatewayType": "parallel",
-      "label": "Split",
       "afterRef": "Check Coverage"
     }
   ],

@@ -3288,7 +3288,7 @@ export function DiagramEditor({
     if (templateFlowRef.current) {
       const flow = templateFlowRef.current;
       const answer = parseTemplateAnswer(heard, flow.cards, !!flow.provisional);
-      if (!answer) { log({ heard, summary: "say a number, “yes” to keep it, or “cancel”", ok: false }); return; }
+      if (!answer) { log({ heard, summary: "say a number, or “cancel”", ok: false }); return; }
       if (answer.kind === "cancel" || answer.kind === "confirm") {
         log({ heard, summary: closeTemplateFlowRef.current(answer.kind === "confirm"), ok: true });
         return;
@@ -4404,19 +4404,16 @@ export function DiagramEditor({
   }
 
   /**
-   * Put a template on the diagram to be LOOKED at — synchronously, once its
-   * data has arrived, so the caller can log in the same tick.
-   *
-   * It is planned on and applied to the diagram WITHOUT whatever was showing
-   * (templatePreview.ts `previewBase`): restored when the old preview is still
-   * exactly as it was left, stripped by its ids when something else has
-   * changed the diagram since, and the plain diagram when Ctrl+Z already took
-   * it off. The swap pushes no second undo entry.
+   * Put the picked template on the diagram, for good — synchronously, once its
+   * data has arrived, so the caller can log in the same tick — and close the
+   * window. There is no preview to keep or cancel any more (2026-09-27); the
+   * `previewBase` planning is kept so a window reopened over an older preview
+   * still plans on the diagram without it.
    *
    * After an element, the placement is templateAttach.ts's and the reducer
    * judges it first (a dry run): a template that would hang outside its lane,
    * land in another pool or not be joined is refused with that reason, and the
-   * window stays open for another number with the old one still showing.
+   * window stays open for another number.
    */
   const showTemplate = useCallback((flow: TemplateFlow, card: TemplateCard, tdata: TemplateData): { ok: boolean; summary: string } => {
     const now = { ...data, elements: elementsRef.current, connectors: connectorsRef.current };
@@ -4438,21 +4435,18 @@ export function DiagramEditor({
     }
     armGoldFlash(now.elements);
     armDebugBefore(now.elements);
-    const stamp = applyTemplate(plan.elements, plan.connectors, {
+    applyTemplate(plan.elements, plan.connectors, {
       ...(plan.join ? { join: plan.join } : {}),
       ...(plan.over ? { over: plan.over } : {}),
     });
     setSelectedElementIds(plan.newIds);
     setSelectedConnectorId(null);
-    setTemplateFlow({
-      ...flow,
-      notice: null,
-      provisional: {
-        card, stamp, base: plan.base,
-        ids: { elements: [...plan.newIds], connectors: plan.connectors.map((c) => c.id) },
-      },
-    });
-    return { ok: true, summary: `${card.n} → “${card.name}”${flow.anchorName ? ` after “${flow.anchorName}”` : ""} — say “yes” to keep it` };
+    // A PICK IS FINAL (Paul, 2026-09-27: "remove the 'Keep it/cancel' step as
+    // this required mouse input"). The number places it and the window closes;
+    // "undo that" takes it off — one undo, as the whole attach is one action.
+    templatePickSeqRef.current++;
+    setTemplateFlow(null);
+    return { ok: true, summary: `added template “${card.name}”${flow.anchorName ? ` after “${flow.anchorName}”` : ""}` };
   }, [data, templateStillShowing, setTemplateFlow, armGoldFlash, armDebugBefore, applyTemplate]);
   const showTemplateRef = useRef(showTemplate);
   showTemplateRef.current = showTemplate;
@@ -6968,16 +6962,11 @@ export function DiagramEditor({
         {templateFlow && (
           <TemplatePickerWindow
             sections={templateFlow.sections}
-            provisionalId={templateFlow.provisional?.card.id ?? null}
             hiddenNote={hiddenTemplatesNote(templateFlow.hiddenInitial, templateFlow.hiddenContainer)}
             anchorName={templateFlow.anchorName}
             notice={templateFlow.notice}
             onPick={(card) => {
               void pickTemplateCardRef.current(card, (r) => appendLog({ heard: "", summary: r.summary, ok: r.ok }));
-            }}
-            onConfirm={() => {
-              const summary = closeTemplateFlowRef.current(true);
-              appendLog({ heard: "", summary, ok: true });
             }}
             onCancel={() => {
               const summary = closeTemplateFlowRef.current(false);

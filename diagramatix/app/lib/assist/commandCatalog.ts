@@ -22,7 +22,7 @@ export const COMMAND_CATALOG: CatalogFamily[] = [
   // for word and every line can be scored end to end. A test keeps the two in
   // step: every name here must be one element of the test diagram.
   { family: "Elements & flow", items: [
-    { does: "Add an element (after another, connected)", say: ["add a task called Approve Claim after Review Claim", "add a decision", "insert a parallel gateway called Split after Check Coverage", "add an end event called Done after Pay Claim"] },
+    { does: "Add an element (after another, connected)", say: ["add a task called Approve Claim after Review Claim", "add a decision", "insert a parallel gateway after Check Coverage", "add an end event called Done after Pay Claim"] },
     { does: "Connect / disconnect", say: ["connect Check Coverage to Assess Risk", "connect them", "disconnect Review Claim from Check Coverage"] },
     { does: "Rename", say: ["rename the gateway to Approved?", "rename Lane 3 to Claims Support", "rename Task 1 to Review Email"] },
     { does: "Rename by number (say a type, pick a green number, say the name)", say: ["rename tasks", "rename lanes"] },
@@ -31,7 +31,7 @@ export const COMMAND_CATALOG: CatalogFamily[] = [
     { does: "Change what kind of thing it is — the same choices as the right-click menu", say: ["make this a user task", "turn the selected gateway into a parallel gateway", "make Review Claim a service task", "make the selected event a timer event"] },
     { does: "Delete (and close the gap)", say: ["delete Task 2", "remove Task 1 and compact"] },
     { does: "Boundary event on a task or subprocess", say: ["add a boundary event called Cancel to Subprocess 3", "add a boundary event to Check Coverage called Timeout"] },
-    { does: "Templates — the numbered template window; after an element, the pick goes there, joined to it", say: ["add template", "add template after Review Claim"] },
+    { does: "Templates — the numbered template window; say a number and it goes on the diagram. With a step selected (or “after X”) it goes after that step, in its lane, joined to it — a Start Event at its front is dropped and the lane grows to fit", say: ["add template", "add template after Review Claim"] },
   ] },
   { family: "The selection (mouse says which, voice says what)", items: [
     { does: "Refer to what is selected", say: ["rename the selected pool to Finance", "delete these", "connect this to Pay Claim", "move the selected task right", "add a boundary event called Timeout to this"] },

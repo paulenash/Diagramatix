@@ -360,3 +360,59 @@ describe("T4860 — inside the window: a template's whole name beats the place w
     expect(editor).toContain("selectionAtOpen: [...selectedIdsRef.current],");
   });
 });
+
+describe("T4927 — “add template” with ONE step selected goes after it, as the Assist template does", () => {
+  // Paul, 2026-09-27: the Assist template addition "is correct for the command
+  // 'add template' IF a element is selected … expand the lane of the selected
+  // element, remove any start event, place the selected template in the lane,
+  // and connect it to the selected element with a sequence connector".
+  const run = (selectedIds: string[]) => {
+    const h = headlessDiagram(world());
+    const r = applyAssistOps(parseCommand("add template")!, h.context({ selectedIds }));
+    return { r, h };
+  };
+
+  it("one selected step anchors the window on it — the same attach as “after X”", () => {
+    expect(run(["cs"]).h.screen).toEqual(["template after cs"]);
+    expect(run(["ep"]).h.screen).toEqual(["template after ep"]);
+  });
+
+  it("a selected step no template can follow says why, and opens nothing", () => {
+    const { r, h } = run(["end"]);
+    expect(r).toEqual({ ok: false, summary: "a template can’t follow “End” — no sequence flow can leave it" });
+    expect(h.screen).toEqual([]);
+  });
+
+  it("nothing, several, or a container selected: the plain window, as before", () => {
+    expect(run([]).h.screen).toEqual(["template"]);
+    expect(run(["cs", "r1"]).h.screen).toEqual(["template"]);
+    expect(run(["L"]).h.screen).toEqual(["template"]);
+    expect(run(["P"]).h.screen).toEqual(["template"]);
+  });
+});
+
+describe("T4928 — a pick is final: no Keep it / Cancel step", () => {
+  // Paul, 2026-09-27: "remove the 'Keep it/cancel' step as this required mouse input".
+  const editor = readFileSync("app/(dashboard)/diagram/[id]/DiagramEditor.tsx", "utf8");
+  const win = readFileSync("app/components/canvas/TemplatePickerWindow.tsx", "utf8");
+
+  it("the pick places the template and closes the window in the same step", () => {
+    const show = editor.slice(editor.indexOf("const showTemplate = useCallback("), editor.indexOf("const showTemplateRef = useRef(showTemplate);"));
+    const applied = show.indexOf("applyTemplate(plan.elements, plan.connectors");
+    const closed = show.indexOf("setTemplateFlow(null);");
+    expect(applied).toBeGreaterThan(-1);
+    expect(closed, "the window closes after the template is applied").toBeGreaterThan(applied);
+    expect(show).not.toContain("provisional: {");
+    expect(show).toContain("summary: `added template “${card.name}”");
+    expect(show, "no “yes to keep” is asked for").not.toMatch(/to keep it/);
+  });
+
+  it("the window has no Keep button and asks for a number or cancel", () => {
+    expect(win, "no Keep button").not.toMatch(/>\s*Keep it\s*</);
+    expect(win).not.toContain("onConfirm");
+    expect(win).not.toContain("provisionalId");
+    expect(win).toContain("Say a number · “cancel” to stop");
+    expect(editor).toContain("say a number, or “cancel”");
+    expect(editor).not.toContain("say a number, “yes” to keep it, or “cancel”");
+  });
+});
