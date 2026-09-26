@@ -43,6 +43,7 @@ export function VoiceAssistBar({
   onSaveSession,
   saveState = "idle",
   snapshotCount = 0,
+  onTestDiagram,
 }: {
   listening: boolean;
   /** Mic pressed but the recogniser not yet live — shown as "connecting…" so
@@ -71,6 +72,8 @@ export function VoiceAssistBar({
   onSaveSession?: () => void;
   saveState?: "idle" | "saving" | "saved" | "error";
   snapshotCount?: number;
+  /** Show the test diagram the Commands card is written for (the editor owns the window). */
+  onTestDiagram?: () => void;
 }) {
   const [text, setText] = useState("");
   const [showCommands, setShowCommands] = useState(false);
@@ -166,6 +169,11 @@ export function VoiceAssistBar({
             <button onClick={() => setShowCommands((v) => !v)}
               className={`text-[10px] px-1.5 py-0.5 rounded border ${showCommands ? "bg-purple-600 text-white border-purple-600" : "text-purple-700 border-purple-300 hover:bg-purple-50"}`}
               title="What you can say — a movable reminder card">Commands</button>
+            {onTestDiagram && (
+              <button onClick={onTestDiagram}
+                className="text-[10px] px-1.5 py-0.5 rounded border text-purple-700 border-purple-300 hover:bg-purple-50"
+                title="The diagram every Commands example is written for — see it, or create a copy in this project">Test diagram</button>
+            )}
             {onCost && (
               <button onClick={() => { void askCost(); }} disabled={cost.state === "loading"}
                 className="text-[10px] px-1.5 py-0.5 rounded border text-purple-700 border-purple-300 hover:bg-purple-50 disabled:opacity-50"

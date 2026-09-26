@@ -1684,6 +1684,17 @@ export function computeWaypoints(
       // would (e.g., source ABOVE gateway, target = gateway BOTTOM
       // vertex — the detour routes the path AROUND the gateway).
       midPath = buildOrthogonalPath(exitPt, approachPt, obstaclesForDetour, containmentBounds, poolBounds);
+      // A detour must never run through its OWN ends. Right→top onto an event
+      // level with the source ran straight through the event's middle, then
+      // climbed and dropped back into its top — so the obstacle pass threw the
+      // chosen side away (Paul, 2026-09-27: "move left to top" on an event).
+      // Only a route that crosses its own ends is retried, and the retry is
+      // kept only when it is clean, so a good route never changes.
+      const ownEnds = [getBounds(source), getBounds(target)];
+      if (pathHitsObstacles(midPath, ownEnds, 1)) {
+        const retry = buildOrthogonalPath(exitPt, approachPt, [...obstaclesForDetour, ...ownEnds], containmentBounds, poolBounds);
+        if (!pathHitsObstacles(retry, ownEnds, 1)) midPath = retry;
+      }
     }
   }
 

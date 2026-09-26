@@ -14,7 +14,7 @@ import { parseCompressPhrase, parseExpandPhrase } from "./compressPhrase";
 import { PARTICIPANT_WORDS, BOX_WORDS, MESSAGE_WORDS, wordAlternation } from "./containerWords";
 import { parseBoundaryEventPhrase } from "./boundaryEventPhrase";
 import { MESSAGE_VERB, MESSAGE_BY_NUMBER, MESSAGE_BY_NUMBER_FROM_SELECTION, ADD_MESSAGE_LEAD } from "./messagePhrase";
-import { capitaliseFirstWord } from "../diagram/nameCase";
+import { capitaliseFirstWord, digitsAfterKindWord } from "../diagram/nameCase";
 import { convertMatches } from "./convertPhrase";
 import { parseAlignTail } from "./alignPhrase";
 import { parseGhostPick } from "./ghostPick";
@@ -23,6 +23,8 @@ import { AFTER_WORDS, HERE_WORDS, TAIL_LEAD_IN, cleanRef } from "./placeWords";
 import type { SymbolType, EventType, GatewayType } from "../diagram/types";
 
 const clean = cleanRef;
+/** A spoken NAME: cleaned, with "pool three" written "pool 3" (nameCase.ts). */
+const spokenLabel = (s: string) => digitsAfterKindWord(clean(s));
 const stripArticle = (s: string) => s.replace(/^(a|an|the)\s+/i, "").trim();
 /** "Sales Team and Marketing Team" / "A, B and C" → ["…"] (handles Oxford comma). */
 const splitLabels = (s: string) => s.split(/\s*,\s*(?:and\s+)?|\s+and\s+/i).map(clean).filter(Boolean);
@@ -48,7 +50,9 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   // Speech punctuation: "Swap, top and bottom." — a comma straight after the
   // verb is a breath, not syntax (Paul's log, 2026-09-15). Only that comma is
   // dropped; commas inside a name list ("called Sales, Marketing and Support")
-  // still separate the names.
+  // still separate the names. A full stop there is the same breath: a verb
+  // said alone is held for the rest (incompleteCommand.ts) and the halves
+  // join as "Move. pool three below Claims System" (Paul, 2026-09-27).
   // "Selected" is what says WHICH thing to act on, and the recogniser keeps
   // returning "connect" for it — `connect` is boosted in the keyword list and
   // the two are close in en-AU. Repaired before anything is matched, and only
@@ -63,7 +67,7 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   // All three repairs go through repairHeardWords, which the hold
   // (incompleteCommand.ts) calls too, so the two never read different words.
   const heard = repairHeardWords(clean(utterance));
-  const raw = heard.replace(/^([A-Za-z]+),\s+/, "$1 ");
+  const raw = heard.replace(/^([A-Za-z]+)[,.]\s+/, "$1 ");
   if (!raw) return null;
   const lower = raw.toLowerCase();
 
@@ -232,7 +236,7 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     // this rule swallowed it and turned one connector label into a fill.
     const f = raw.match(/^(?:name|label|call)\s+(these|those|them|the selection|the selected\s+\w+s)\s+(.+)$/i);
     if (f) {
-      const labels = splitLabels(f[2]).map(capitaliseFirstWord);
+      const labels = splitLabels(f[2]).map((l) => capitaliseFirstWord(digitsAfterKindWord(l)));
       if (labels.length) return [{ op: "fillLabels", labels }];
     }
   }
@@ -282,11 +286,11 @@ export function parseCommand(utterance: string): AssistOp[] | null {
 
   // ── Rename ──
   m = raw.match(/^(?:rename|relabel)\s+(.+?)\s+(?:to|as)\s+(.+)$/i);
-  if (m) return [{ op: "rename", ref: clean(m[1]), label: capitaliseFirstWord(clean(m[2])) }];
+  if (m) return [{ op: "rename", ref: clean(m[1]), label: capitaliseFirstWord(spokenLabel(m[2])) }];
   m = raw.match(/^(?:change|set)\s+(?:the )?(?:name|label)(?: of)?\s+(.+?)\s+(?:to|as)\s+(.+)$/i);
-  if (m) return [{ op: "rename", ref: clean(m[1]), label: capitaliseFirstWord(clean(m[2])) }];
+  if (m) return [{ op: "rename", ref: clean(m[1]), label: capitaliseFirstWord(spokenLabel(m[2])) }];
   m = raw.match(/^call\s+(.+?)\s+(.+)$/i);
-  if (m && !matchSymbol(m[1])) return [{ op: "rename", ref: clean(m[1]), label: capitaliseFirstWord(clean(m[2])) }];
+  if (m && !matchSymbol(m[1])) return [{ op: "rename", ref: clean(m[1]), label: capitaliseFirstWord(spokenLabel(m[2])) }];
 
   // Guided rename: "rename <type>" (a bare element/connector TYPE, no "to <name>")
   // starts the numbered-badge pick flow. Types: pool · lane/sub-lane · message ·
@@ -295,7 +299,7 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   // text the editor waits for it. Checked before the by-type rule so "selected"
   // is never read as a type word.
   m = raw.match(/^label\s+(?:the\s+)?(?:selected|selection|this|that)(?:\s+(?:connector|flow|arrow|line|link))?(?:\s+(?:as|with|to))?(?:\s+(.+))?$/i);
-  if (m) return [{ op: "labelSelected", ...(m[1] ? { label: capitaliseFirstWord(clean(m[1])) } : {}) }];
+  if (m) return [{ op: "labelSelected", ...(m[1] ? { label: capitaliseFirstWord(spokenLabel(m[1])) } : {}) }];
 
   m = raw.match(/^(?:rename|relabel|edit|label)\s+(?:a\s+|an\s+|the\s+|all\s+)?(pools?|polls?|pulls?|sub-?lanes?|sub-?lines?|lanes?|lines?|messages??|sub-?lanes?|lanes?|messages?|tasks?|activit(?:y|ies)|steps?|subprocess(?:es)?|sub-?process(?:es)?|gateways?|decisions?|events?|connectors?|sequence(?:\s+flows?)?|flows?)\s*$/i);
   if (m) {
@@ -428,7 +432,9 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     // (Paul, 2026-09-21). "Move top to bottom." Same target phrases, and the
     // same place in the order: before the element `move` rule, which would
     // otherwise read "top" as the name of a thing to shove sideways.
-    const mp = raw.match(/^move\s+(?:(?:the\s+)?(?:selected|highlighted|these|those|this)\s*)?(?:gateways?(?:'s|s')?\s*)?,?\s*(?:the\s+)?(top|bottom|middle|centre|center|left|right)\s+(?:to|onto|into)\s+(?:the\s+)?(top|bottom|middle|centre|center|left|right)(?:\s+(?:points?|connectors?|connections?|sides?|vert(?:ex|ices)))?$/i);
+    // An EVENT too, inline or on a boundary (Paul, 2026-09-27) — the apply
+    // decides by what is selected.
+    const mp = raw.match(/^move\s+(?:(?:the\s+)?(?:selected|highlighted|these|those|this)\s*)?(?:(?:gateways?|events?)(?:'s|s')?\s*)?,?\s*(?:the\s+)?(top|bottom|middle|centre|center|left|right)\s+(?:to|onto|into)\s+(?:the\s+)?(top|bottom|middle|centre|center|left|right)(?:\s+(?:points?|connectors?|connections?|sides?|vert(?:ex|ices)))?$/i);
     if (mp) {
       type Pt = "top" | "middle" | "bottom" | "left" | "right";
       const pt = (w: string): Pt => (/^cent/i.test(w) ? "middle" : (w.toLowerCase() as Pt));
@@ -454,7 +460,7 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     mm = raw.match(new RegExp(`^(?:add|insert|create)\\s+(?:a\\s+)?(?:new\\s+)?${L}\\s+(?:to\\s+(?:the\\s+)?(.+?)\\s+)?(above|below|under(?:neath)?|over|before|after)\\s+(?:the\\s+)?(.+?)(?:\\s+(?:called|named|labell?ed)\\s+(.+))?$`, "i"));
     if (mm) {
       const pos = /^(?:above|over|before)/i.test(mm[2]) ? "above" : "below";
-      return [{ op: "addLaneAt", poolRef: mm[1] ? clean(mm[1]) : "the pool", position: pos, refLane: clean(mm[3]), ...(mm[4] ? { label: clean(mm[4]) } : {}) }];
+      return [{ op: "addLaneAt", poolRef: mm[1] ? clean(mm[1]) : "the pool", position: pos, refLane: clean(mm[3]), ...(mm[4] ? { label: spokenLabel(mm[4]) } : {}) }];
     }
 
     // Surround the SELECTION with an expanded subprocess (Paul, 2026-09-16):
@@ -580,7 +586,7 @@ export function parseCommand(utterance: string): AssistOp[] | null {
       // names a participant box out loud ("a participant box FOR THE COURIER").
       // Without it the name was dropped and the box arrived unlabelled.
       const cm = rest.match(/\b(?:called|named|labell?ed|for)\s+(?:the\s+)?(.+?)(?:\s+(?:above|below|under(?:neath)?|over)\b.*)?$/i);
-      const label = cm ? capitaliseFirstWord(clean(cm[1])) : undefined;
+      const label = cm ? capitaliseFirstWord(spokenLabel(cm[1])) : undefined;
       // Trailing text we didn't recognise as a name/position clause → not a clean
       // pool command; let the AI interpret it (matches "add a pool thingy blah").
       const restRecognised = !rest || /^(?:on\s+the\s+diagram)$/i.test(rest);
@@ -710,7 +716,7 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   // (defaults to "the lane"), optional names (default Sublane 1..N).
   m = raw.match(new RegExp(`^(?:add|insert|create|split)\\s+${COUNT}?\\s*(?:new\\s+|another\\s+|extra\\s+)?(?:sub-?lanes?|sub lanes?|sub-?lines?|sub lines?)(?:\\s+(?:to|in|into|onto|on|under|below|inside)\\s+(.+?))?(?:\\s+(?:called|named|labell?ed)\\s+(.+))?$`, "i"));
   if (m) {
-    let labels = m[3] ? splitLabels(m[3]) : [];
+    let labels = m[3] ? splitLabels(m[3]).map(digitsAfterKindWord) : [];
     // The BARE kind word, not "Sublane 1": the grammar cannot see the diagram,
     // so a number it invents is a name that is probably already taken. Asking
     // for "Sublane" makes the reducer number it against what exists — which is
@@ -723,7 +729,7 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   // ── Lanes ──
   m = raw.match(new RegExp(`^(?:add|insert|create|split)\\s+${COUNT}?\\s*(?:new\\s+|another\\s+|extra\\s+)?(?:lanes?|lines?)(?:\\s+(?:to|in|into|onto|on|inside)\\s+(.+?))?(?:\\s+(?:called|named|labell?ed)\\s+(.+))?$`, "i"));
   if (m) {
-    let labels = m[3] ? splitLabels(m[3]) : [];
+    let labels = m[3] ? splitLabels(m[3]).map(digitsAfterKindWord) : [];
     // Bare, and numbered by the reducer against the diagram — see the sublane
     // rule above.
     if (!labels.length) labels = Array.from({ length: Math.max(1, toCount(m[1])) }, () => "Lane");
@@ -765,7 +771,7 @@ export function parseCommand(utterance: string): AssistOp[] | null {
 
     let label: string | undefined;
     const named = rest.match(/\s+(?:called|named|labell?ed|titled)\s+(.+)$/i);
-    if (named) { label = clean(named[1]); rest = rest.slice(0, named.index).trim(); }
+    if (named) { label = spokenLabel(named[1]); rest = rest.slice(0, named.index).trim(); }
     const quoted = rest.match(/["'“”‘’](.+?)["'“”‘’]/);
     if (!label && quoted) { label = clean(quoted[1]); rest = rest.replace(quoted[0], "").trim(); }
 

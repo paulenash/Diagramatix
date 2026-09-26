@@ -45,7 +45,7 @@ async function loadAssistGreenRules(): Promise<string> {
 const SYSTEM = `You interpret ONE spoken (often mis-transcribed) instruction from a process modeller editing a BPMN diagram. Output ONLY a JSON OBJECT — no prose, no markdown:
   { "canonical": string, "ops": [ …op objects… ] }
 
-**canonical** (preferred): rewrite the instruction as ONE plain command using the exact phrasings below, keeping the user's names/numbers, and FIXING obvious speech mis-hears ("poll"/"pull"→pool, "line"→lane, "lane two"→Lane 2). The app re-parses this deterministically, so it's the safest path. Use "" if it doesn't fit any form.
+**canonical** (preferred): rewrite the instruction as ONE plain command using the exact phrasings below, keeping the user's names/numbers, and FIXING obvious speech mis-hears ("poll"/"pull"→pool, "line"→lane, "lane two"→Lane 2). A spoken name keeps ITS OWN kind word: "pool three" is Pool 3, never "Lane 3". The app re-parses this deterministically, so it's the safest path. Use "" if it doesn't fit any form.
 Canonical forms:
   add a <type> called <name> after <name>   ·   connect <name> to <name>   ·   disconnect <name> from <name>
   rename <name> to <name>   ·   move <name> <n> elements <left|right|up|down>
@@ -104,11 +104,11 @@ Op shapes (use element NAMES for refs — they are resolved against the diagram;
   { "op":"addMessageByNumber", "fromSelection"?: true }  // no ends given: number the candidates and let the user pick
   { "op":"labelSelected", "label"?: string }  // the selected connector
   { "op":"swapGatewayPoints", "a": "top"|"middle"|"bottom"|"left"|"right", "b": same }  // the selected gateways' points
-  { "op":"moveGatewayPoint", "from": same, "to": same }  // move ONE connector to a FREE point; swap needs both taken
+  { "op":"moveGatewayPoint", "from": same, "to": same }  // the selected gateways' OR events' points: move ONE connector to a FREE point; swap needs both taken. An event has no "middle"
   { "op":"wrapInSubprocess", "label"?: string }           // surround the SELECTED elements with an expanded subprocess
   { "op":"unwrapSubprocess" }                              // dissolve the SELECTED expanded subprocess back into the flow
   { "op":"renameByType", "itemType": "pool"|"lane"|"message"|"task"|"subprocess"|"gateway"|"event"|"connector" }  // numbers them for a pick
-  { "op":"pickTemplate", "afterRef"?: <name> }   // open the numbered TEMPLATE window; the user then says a number, and "yes" to keep it.
+  { "op":"pickTemplate", "afterRef"?: <name> }   // open the numbered TEMPLATE window; the user then says a number, and that pick is final.
         // Use for anything that asks to add or see a template WITHOUT naming one. Never invent a template name.
         // "afterRef": the element the chosen template goes AFTER ("add a template after Review"). Never an "add" op
         // with the label "Template" — a template is not a task.
