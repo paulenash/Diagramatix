@@ -86,6 +86,8 @@ import type { TemplateIds } from "@/app/lib/diagram/templatePreview";
 import { TemplatePickerWindow } from "@/app/components/canvas/TemplatePickerWindow";
 import { diagramKeyterms } from "@/app/lib/dictation/diagramKeyterms";
 import { VoiceAssistBar, type CommandLogEntry } from "@/app/components/canvas/VoiceAssistBar";
+import { TestDiagramWindow } from "@/app/components/canvas/TestDiagramWindow";
+import { testDiagramCreateBody } from "@/app/lib/assist/testDiagram";
 import { startDictation, type DictationHandle } from "@/app/lib/dictation";
 import { PropertiesPanel } from "@/app/components/canvas/PropertiesPanel";
 import { captureTemplate, instantiateTemplate } from "@/app/lib/diagram/templates";
@@ -1061,6 +1063,32 @@ export function DiagramEditor({
   const [saveAsName, setSaveAsName] = useState("");
   const [saveAsBusy, setSaveAsBusy] = useState(false);
   const [saveAsError, setSaveAsError] = useState<string | null>(null);
+  // The Voice Assist test diagram (Paul, 2026-09-27): shown in a window; "Create
+  // test diagram" saves THIS diagram, makes a copy of the test diagram in the
+  // same project, and opens it — the Save As pattern below.
+  const [testDiagram, setTestDiagram] = useState<{ open: boolean; creating: boolean; error: string | null }>({ open: false, creating: false, error: null });
+  async function createTestDiagram() {
+    if (testDiagram.creating) return;
+    setTestDiagram((t) => ({ ...t, creating: true, error: null }));
+    try {
+      await saveNowRef.current();
+      const res = await fetch("/api/diagrams", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(testDiagramCreateBody(projectId)),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Failed" }));
+        setTestDiagram((t) => ({ ...t, creating: false, error: err.error ?? "Could not create the test diagram" }));
+        return;
+      }
+      const created = await res.json();
+      setTestDiagram({ open: false, creating: false, error: null });
+      router.push(`/diagram/${created.id}`);
+    } catch (err) {
+      setTestDiagram((t) => ({ ...t, creating: false, error: err instanceof Error ? err.message : "Network error" }));
+    }
+  }
   async function handleSaveAs() {
     if (!saveAsName.trim() || saveAsBusy) return;
     setSaveAsBusy(true);
@@ -6507,6 +6535,17 @@ export function DiagramEditor({
             onSaveSession={() => { void saveDebugSession(); }}
             saveState={debugSaveState}
             snapshotCount={debugSnapshots.length}
+            onTestDiagram={() => setTestDiagram({ open: true, creating: false, error: null })}
+          />
+        )}
+
+        {testDiagram.open && (
+          <TestDiagramWindow
+            onClose={() => setTestDiagram({ open: false, creating: false, error: null })}
+            onCreate={() => { void createTestDiagram(); }}
+            creating={testDiagram.creating}
+            error={testDiagram.error}
+            canCreate={!readOnly}
           />
         )}
 
