@@ -39,7 +39,7 @@ import { SEQUENCE_NODE_TYPES, instantiateTemplate, instantiateTemplateAnchored, 
 import { findFreeSlot, followOnParentId, placeInline, planBoundaryFollowOn, type Box, type Center } from "./assistPlacement";
 import { canConnect, containerScopeOf, flowScopeOf } from "./canConnect";
 import { getElementPoolId } from "./poolUtil";
-import { isLaneUnowned } from "./containment";
+import { isLaneUnowned, getAllDescendantIds } from "./containment";
 import { boxOf, isTemplateContainer } from "./templateAdoption";
 import { isBlackBoxPool } from "./blackBoxPoolMenu";
 import { getLaneHeaderWidth, getPoolHeaderWidth } from "./containerMetrics";
@@ -126,7 +126,8 @@ export function planTemplateAttach(
   // A step after a boundary event joins the HOST's container, never the host:
   // adopted into the host, the subprocess grew round the fragment and the
   // entry flow was refused as out of scope.
-  const { elements, connectors } = nudgeAndAdopt(inst, base.elements, followOnParentId(anchor, base.elements));
+  const joinedTo = new Set([anchor.id, ...(anchor.boundaryHostId ? [anchor.boundaryHostId] : [])]);
+  const { elements, connectors } = nudgeAndAdopt(inst, base.elements, followOnParentId(anchor, base.elements), [], joinedTo);
   return {
     elements,
     connectors,
@@ -181,13 +182,40 @@ function flowSegments(connectors: readonly Connector[]): Box[] {
  * parentless elements join `adoptInto`. Notes stay unowned, as the lane pass
  * leaves them: a note adopted into a lane travels with the lane.
  */
-function nudgeAndAdopt(inst: Placed, existing: readonly DiagramElement[], adoptInto: string | undefined, flows: readonly Connector[] = []): Placed {
+function nudgeAndAdopt(
+  inst: Placed,
+  existing: readonly DiagramElement[],
+  adoptInto: string | undefined,
+  flows: readonly Connector[] = [],
+  /**
+   * What the template is joined to (and a boundary event's host). The entry
+   * sits EXACTLY one clearance from it by rule 1, so counted as an obstacle it
+   * sat on a floating-point knife-edge: the same placement "touched" it for
+   * one template and not another, and the loser jumped away.
+   */
+  joinedTo: ReadonlySet<string> = new Set(),
+): Placed {
   const b = boxOfPlaced(inst.elements);
+  // AFTER A STEP, ONLY THE BAND IT JOINS IS IN THE WAY. With a join the band
+  // grows round the template — at its top too, carrying its content — and
+  // the settle pushes every band below it down, so content in another lane
+  // is never where the template ends up. Counted anyway, it turned a
+  // half-pixel brush with the sub-lane below into a jump of half the
+  // template's WIDTH — "Dual Approval (two Eyes!)" landed 410 px above the
+  // step it follows, while a template 2 px shorter went in level (Paul's
+  // test-diagram session, 2026-09-27). A DROP has no join: it is only
+  // lowered into its lane, so there every lane's content still counts.
+  const band = adoptInto && joinedTo.size ? existing.find((e) => e.id === adoptInto) : undefined;
+  const inBand = band ? getAllDescendantIds([...existing], band.id) : null;
+  const bandBox = band ? { x: band.x, y: band.y, width: band.width, height: band.height } : null;
+  const crossesBand = (s: Box) => !bandBox
+    || (s.x <= bandBox.x + bandBox.width && s.x + s.width >= bandBox.x && s.y <= bandBox.y + bandBox.height && s.y + s.height >= bandBox.y);
   const others = [
     ...existing
       .filter((e) => e.type !== "pool" && e.type !== "lane" && e.type !== "sublane")
+      .filter((e) => (!inBand || inBand.has(e.id)) && !joinedTo.has(e.id))
       .map((e) => ({ x: e.x, y: e.y, width: e.width, height: e.height })),
-    ...flowSegments(flows),
+    ...flowSegments(flows).filter(crossesBand),
   ];
   const centre = { x: b.x + b.width / 2, y: b.y + b.height / 2 };
   const free = findFreeSlot(centre, b.width, b.height, others);

@@ -306,6 +306,24 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
     results.push(plan.summary);
     return true;
   };
+  /** Swap two pools in the stack — "swap Pool 1 with Pool 2", or two bare pool names. */
+  const swapTwoPools = (a: DiagramElement, b: DiagramElement): boolean => {
+    const plan = planSwapPools(els, data.connectors, a.id, b.id, isContainerType, getAllDescendantIds);
+    if ("error" in plan) { results.push(plan.error); return false; }
+    swapPools(a.id, b.id);
+    els = plan.elements;
+    setSelectedElementIds(new Set()); // selection protocol
+    results.push(`swapped ${nameOf(a)} and ${nameOf(b)}`);
+    return true;
+  };
+  /** When a name that must be a pool names something else, say what it is. Null when it names nothing. */
+  const notAPool = (ref: string): string | null => {
+    const r = resolveRef(ref, els, voiceLastId.current, selectedIds, { pointer: pointerWorld.current });
+    const e = r && "id" in r ? els.find((x) => x.id === r.id) : undefined;
+    if (!e || e.type === "pool") return null;
+    if (isAnyLane(e)) return `${nameOf(e)} is a ${laneKindWord(e, els)} — only pools move above or below each other; say “move the ${nameOf(e)} lane up” or “down”`;
+    return `${nameOf(e)} is a ${e.type.replace(/-/g, " ")} — only pools move above or below each other`;
+  };
   for (const op of ops) {
     if (op.op === "undo") { undo(); results.push("undid the last change"); continue; }
     if (op.op === "clear") { clearDiagram(); voiceLastId.current = null; results.push("cleared the diagram"); continue; }
@@ -625,8 +643,10 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
     // the rest down by its own height — no separate "make room" step.
     if (op.op === "movePoolTo") {
       const m = resolveField(op, "ref"), a = resolveField(op, "relativeTo");
-      if ("err" in m) { results.push(m.err); anyFail = true; continue; }
-      if ("err" in a) { results.push(a.err); anyFail = true; continue; }
+      // The names can be bare now ("move Pool 3 above Customer"), so a name
+      // that is not a pool is said to be what it IS, not "couldn't find".
+      if ("err" in m) { results.push(notAPool(op.ref) ?? m.err); anyFail = true; continue; }
+      if ("err" in a) { results.push(notAPool(op.relativeTo) ?? a.err); anyFail = true; continue; }
       const plan = planMovePool(els, data.connectors, m.id, op.position, a.id, isContainerType, getAllDescendantIds);
       if ("error" in plan) { results.push(plan.error); anyFail = true; continue; }
       movePoolTo(m.id, op.position, a.id);
@@ -656,12 +676,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
         }
         [a, b] = pair;
       }
-      const plan = planSwapPools(els, data.connectors, a.id, b.id, isContainerType, getAllDescendantIds);
-      if ("error" in plan) { results.push(plan.error); anyFail = true; continue; }
-      swapPools(a.id, b.id);
-      els = plan.elements;
-      setSelectedElementIds(new Set()); // selection protocol
-      results.push(`swapped ${nameOf(a)} and ${nameOf(b)}`);
+      if (!swapTwoPools(a, b)) anyFail = true;
       continue;
     }
 
@@ -737,10 +752,13 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
     }
 
     if (op.op === "swapLanes") {
-      const a = resolve1(op.laneA), b = resolve1(op.laneB);
+      const a = resolveField(op, "laneA"), b = resolveField(op, "laneB");
       if ("err" in a) { results.push(a.err); anyFail = true; continue; }
       if ("err" in b) { results.push(b.err); anyFail = true; continue; }
-      if (a.type !== "lane" || b.type !== "lane" || a.parentId !== b.parentId) { results.push("both must be lanes in the same pool"); anyFail = true; continue; }
+      // "swap Customer with Salesforce" names two POOLS without saying so —
+      // the same stack swap as "swap the Customer pool with …" (2026-09-27).
+      if (a.type === "pool" && b.type === "pool") { if (!swapTwoPools(a, b)) anyFail = true; continue; }
+      if (a.type !== "lane" || b.type !== "lane" || a.parentId !== b.parentId) { results.push("both must be lanes in the same pool, or both pools"); anyFail = true; continue; }
       const sibs = els.filter((e) => e.type === "lane" && e.parentId === a.parentId).sort((x, y) => x.y - y.y);
       const ia = sibs.findIndex((e) => e.id === a.id), ib = sibs.findIndex((e) => e.id === b.id);
       if (Math.abs(ia - ib) !== 1) { results.push("lanes must be next to each other to swap"); anyFail = true; continue; }

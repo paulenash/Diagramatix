@@ -24,6 +24,9 @@ const TABLE: Readonly<Record<string, Readonly<Record<string, RefKind>>>> = {
   addLanes: { poolRef: "pool" },
   movePoolTo: { ref: "pool", relativeTo: "pool" },
   swapPools: { a: "pool", b: "pool" },
+  // "swap Customer with Salesforce" arrives here with no kind word: two lanes,
+  // or two pools, never a task that happens to share the name.
+  swapLanes: { laneA: "container", laneB: "container" },
   addPool: { relativeTo: "pool" },
   // A lane word was said ("compress the Sales lane"), so only a lane — of any
   // depth — can answer, never a pool called Sales: a kind word you say is

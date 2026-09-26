@@ -86,10 +86,14 @@ describe("T4508 — the command exists now", () => {
     expect(parseCommand("swap Sales with Picking")?.[0].op).toBe("swapLanes");
     expect(parseCommand("swap top and bottom")?.[0].op).toBe("swapGatewayPoints");
     expect(parseCommand("nudge Pool 1 up")?.[0].op).toBe("nudgePool");
-    // And it only claims the sentence when BOTH sides are pools — otherwise
-    // "move Approve above Review" would be read as a pool reorder.
-    expect(parseCommand("move Approve above Review")?.[0].op).not.toBe("movePoolTo");
-    expect(parseCommand("move Pool 1 above Review")?.[0].op).not.toBe("movePoolTo");
+    // Changed by design 2026-09-27 (T4929): pools reorder without the word
+    // "pool" — Paul: "Proceed with: Pool reordering without the word 'pool'".
+    // Bare above/below names ARE a stack sentence now; the lookup can only
+    // find pools, and a task named there is told so (not guessed at).
+    expect(parseCommand("move Approve above Review")?.[0].op).toBe("movePoolTo");
+    expect(parseCommand("move Pool 1 above Review")?.[0].op).toBe("movePoolTo");
+    // "after" is about the flow, and a bare swap is still the lane rule's.
+    expect(parseCommand("move Approve after Review")?.[0]?.op).not.toBe("movePoolTo");
     expect(parseCommand("swap Approve with Review")?.[0].op).not.toBe("swapPools");
   });
 

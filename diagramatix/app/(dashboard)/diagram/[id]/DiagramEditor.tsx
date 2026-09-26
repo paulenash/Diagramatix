@@ -80,6 +80,7 @@ import { collectRenameTargets, type RenameType, type RenameTarget } from "@/app/
 import { buildPickFlow, parsePickAnswer, substituteRef, type PickFlow } from "@/app/lib/assist/disambiguate";
 import { cardsOf, numberTemplates, templatesToOffer, canAttachInline, diagramHasWhiteBoxPool, hiddenTemplatesNote, templateWindowSummary, parseTemplateAnswer, type TemplateCard, type TemplateSection } from "@/app/lib/assist/templatePick";
 import { TEMPLATE_BEFORE_REFUSAL } from "@/app/lib/assist/templatePhrase";
+import { joinSpelledLetters } from "@/app/lib/assist/spelledWord";
 import { planTemplateAttach, checkTemplateAttach, planTemplateShow, planTemplateDrop, whyTemplateCantFollow, anchorNameOf } from "@/app/lib/diagram/templateAttach";
 import type { TemplateIds } from "@/app/lib/diagram/templatePreview";
 import { TemplatePickerWindow } from "@/app/components/canvas/TemplatePickerWindow";
@@ -3167,7 +3168,9 @@ export function DiagramEditor({
   const handleRenameUtterance = useCallback((text: string) => {
     const flow = renameFlowRef.current;
     if (!flow) return;
-    const t = text.trim();
+    // "3 F I N A N C E" names it Finance — the spelled escape hatch the
+    // command grammar has too (spelledWord.ts).
+    const t = joinSpelledLetters(text.trim());
     const low = t.toLowerCase().replace(/[.,!?;:]+$/g, "").trim();
     // "done"/"cancel"/Esc-words end the rename loop (mic stays on); a bare
     // "stop" never reaches here — it stops the mic (stopWords.ts).

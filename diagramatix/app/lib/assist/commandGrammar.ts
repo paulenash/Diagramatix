@@ -307,11 +307,26 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     // "put Pool 1 below Pool 2". Before the generic move rule, which would take
     // "above Pool 2" as a direction and nudge it. Asking for this before it
     // existed got the AI's best guess — "nudge Pool 1 up", twenty pixels.
+    //
+    // THE POOL WORD ON ONE SIDE IS ENOUGH, AND NONE IS NEEDED (Paul,
+    // 2026-09-27: "Proceed with: Pool reordering without the word 'pool', as
+    // in 'move Pool 3 above Customer'"). Pools are named after parties —
+    // Customer, Salesforce — and nobody says "the Customer pool" twice in one
+    // breath. The fields can only name pools (refKinds.ts), so the lookup
+    // finds the pools and a task named here is told so. Bare names take only
+    // above/below: "move Review after Check" is about the flow, not the stack.
     {
       const mp = raw.match(
         /^(?:move|put|place|shift|position)\s+(?:the\s+)?(.+?)\s+(above|over|before|below|under(?:neath)?|after)\s+(?:the\s+)?(.+?)$/i,
       );
-      if (mp && /\b(?:pool|poll|pull)\b/i.test(mp[1]) && /\b(?:pool|poll|pull)\b/i.test(mp[3])) {
+      const POOL_WORD = /\b(?:pool|poll|pull)\b/i;
+      const LANE_WORD = /\b(?:sub-?\s?)?(?:lanes?|lines?)\b/i;
+      const SELECTION = /^(?:these|those|this|that|it|them|selected|highlighted|the\s+selection)\b/i;
+      const bare = (s: string) => !POOL_WORD.test(s) && !LANE_WORD.test(s) && !SELECTION.test(s) && !namesNonContainerKind(s);
+      const pooled = mp && (POOL_WORD.test(mp[1]) || POOL_WORD.test(mp[3]))
+        && !LANE_WORD.test(mp[1]) && !LANE_WORD.test(mp[3]);
+      const bareStack = mp && /^(?:above|over|below|under(?:neath)?)$/i.test(mp[2]) && bare(mp[1]) && bare(mp[3]);
+      if (mp && (pooled || bareStack)) {
         const position = /^(?:above|over|before)/i.test(mp[2]) ? "above" as const : "below" as const;
         return [{ op: "movePoolTo", ref: clean(mp[1]), position, relativeTo: clean(mp[3]) }];
       }
@@ -323,7 +338,12 @@ export function parseCommand(utterance: string): AssistOp[] | null {
       const sp = raw.match(
         /^swap\s+(?:the\s+)?(.+?)\s+(?:with|and|for|&)\s+(?:the\s+)?(.+?)$/i,
       );
-      if (sp && /\b(?:pool|poll|pull)\b/i.test(sp[1]) && /\b(?:pool|poll|pull)\b/i.test(sp[2])) {
+      // One pool word is enough ("swap Pool 3 with Customer"); with none, the
+      // lane swap below takes it and its apply swaps the pools when both names
+      // turn out to be pools (2026-09-27).
+      const POOL_WORD = /\b(?:pool|poll|pull)\b/i;
+      const LANE_WORD = /\b(?:sub-?\s?)?(?:lanes?|lines?)\b/i;
+      if (sp && (POOL_WORD.test(sp[1]) || POOL_WORD.test(sp[2])) && !LANE_WORD.test(sp[1]) && !LANE_WORD.test(sp[2])) {
         return [{ op: "swapPools", a: clean(sp[1]), b: clean(sp[2]) }];
       }
       // No names: the two pools the mouse has selected.

@@ -71,6 +71,13 @@
       "label": "Review Email"
     }
   ],
+  "rename Lane 3 to F I N A N C E": [
+    {
+      "op": "rename",
+      "ref": "Lane 3",
+      "label": "Finance"
+    }
+  ],
   "rename tasks": [
     {
       "op": "renameByType",
@@ -786,27 +793,27 @@
       "to": "middle"
     }
   ],
-  "move Pool 3 above the Customer pool": [
+  "move Pool 3 above Customer": [
     {
       "op": "movePoolTo",
       "ref": "Pool 3",
       "position": "above",
-      "relativeTo": "Customer pool"
+      "relativeTo": "Customer"
     }
   ],
-  "put the Customer pool below the Salesforce pool": [
+  "put Customer below Salesforce": [
     {
       "op": "movePoolTo",
-      "ref": "Customer pool",
+      "ref": "Customer",
       "position": "below",
-      "relativeTo": "Salesforce pool"
+      "relativeTo": "Salesforce"
     }
   ],
-  "swap the Customer pool with the Salesforce pool": [
+  "swap Customer with Salesforce": [
     {
-      "op": "swapPools",
-      "a": "Customer pool",
-      "b": "Salesforce pool"
+      "op": "swapLanes",
+      "laneA": "Customer",
+      "laneB": "Salesforce"
     }
   ],
   "swap the selected pools": [

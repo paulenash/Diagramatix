@@ -22,6 +22,8 @@ import { refKind } from "@/app/lib/assist/refKinds";
 import { isIncompleteCommand } from "@/app/lib/assist/incompleteCommand";
 import { scoreCase } from "@/app/lib/assist/commandScore";
 import { COMPRESS_VERBS } from "@/app/lib/assist/commandVerbs";
+import { fixtureDiagram } from "@/app/lib/assist/commandFixture";
+import { joinSpelledLetters } from "@/app/lib/assist/spelledWord";
 import type { DiagramData, DiagramElement } from "@/app/lib/diagram/types";
 
 const E = (o: Record<string, unknown>) => o as unknown as DiagramElement;
@@ -167,5 +169,86 @@ describe("T4902 — one compress verb list, one kind table (wiring)", () => {
     }
     expect(src("app/lib/assist/commandScore.ts")).toMatch(/kind: refKind\(/);
     expect(src("app/lib/assist/applyScore.ts")).toMatch(/kind: refKind\(/);
+  });
+});
+
+describe("T4929 — pools reorder without the word “pool”", () => {
+  // Paul, 2026-09-27: "Proceed with: Pool reordering without the word 'pool',
+  // as in 'move Pool 3 above Customer'". The Commands popup set found the gap:
+  // both names had to say "pool", so these went to the AI.
+  const fixture = (): DiagramData => fixtureDiagram();
+  const runOn = (said: string) => {
+    const ops = parseCommand(said);
+    const h = headlessDiagram(fixture());
+    const r = ops ? applyAssistOps(ops, h.context()) : null;
+    return { ops, h, r };
+  };
+  const order = (d: DiagramData) => d.elements.filter((e) => e.type === "pool").sort((a, b) => a.y - b.y).map((e) => e.label);
+
+  it("one pool word, or none, reorders the stack", () => {
+    for (const [said, first, second] of [
+      ["move Pool 3 above Customer", "Pool 3", "Customer"],
+      ["put Customer below Salesforce", "Salesforce", "Customer"],
+      ["move the Salesforce pool above Customer", "Salesforce", "Customer"],
+    ] as const) {
+      const { ops, h, r } = runOn(said);
+      expect(ops?.[0]?.op, said).toBe("movePoolTo");
+      expect(r!.ok, `${said}: ${r!.summary}`).toBe(true);
+      const o = order(h.data);
+      expect(o.indexOf(first), said).toBeLessThan(o.indexOf(second));
+    }
+  });
+
+  it("“swap Customer with Salesforce” swaps the pools, with or without a pool word", () => {
+    for (const said of ["swap Customer with Salesforce", "swap Pool 3 with Customer", "swap the Customer pool with Salesforce"]) {
+      const { h, r } = runOn(said);
+      expect(r!.ok, `${said}: ${r!.summary}`).toBe(true);
+      expect(order(h.data), said).not.toEqual(order(fixture()));
+    }
+  });
+
+  it("a task named in the stack sentence is told what it is — never a guess", () => {
+    const { ops, r } = runOn("move Review Claim above Check Coverage");
+    expect(ops?.[0]?.op).toBe("movePoolTo");
+    expect(r!.ok).toBe(false);
+    expect(r!.summary).toBe("Review Claim is a task — only pools move above or below each other");
+    const lane = runOn("move Underwriters above Customer").r!;
+    expect(lane.summary).toContain("Underwriters is a lane");
+  });
+
+  it("not a stack sentence: lane words, the flow words, a selection, a kind word", () => {
+    for (const said of ["move Lane 3 above Underwriters", "move Review Claim after Check Coverage", "move these above Customer", "put a task above Review Claim", "move the selected task above Pay Claim"]) {
+      expect(parseCommand(said)?.[0]?.op, said).not.toBe("movePoolTo");
+    }
+    expect(parseCommand("swap Underwriters with Lane 3")?.[0]?.op).toBe("swapLanes");
+  });
+});
+
+describe("T4930 — a name spelled out is the word (“rename Lane 3 to F I N A N C E”)", () => {
+  // Paul, 2026-09-27: "rename Lane 3 to finance … it kept hearing finance as
+  // 'finished'". Measured: his own "Finance" clips were heard right under
+  // every setting, so no recogniser setting was the fix; letters cannot be
+  // misheard as a word.
+  it("three or more single letters join into one word; the name gets its capital", () => {
+    expect(joinSpelledLetters("rename lane 3 to f i n a n c e")).toBe("rename lane 3 to finance");
+    expect(joinSpelledLetters("rename lane 3 to F I N A N C E")).toBe("rename lane 3 to finance");
+    expect(joinSpelledLetters("rename lane 3 to F-I-N-A-N-C-E")).toBe("rename lane 3 to finance");
+    expect(joinSpelledLetters("rename lane 3 to F. I. N. A. N. C. E.")).toBe("rename lane 3 to finance");
+    expect(parseCommand("rename Lane 3 to F I N A N C E")).toEqual([{ op: "rename", ref: "Lane 3", label: "Finance" }]);
+    // The lane rule gives its names their capital when applied, as it does for any name.
+    expect(parseCommand("add a lane called p a y r o l l")?.[0]).toMatchObject({ labels: ["payroll"] });
+  });
+
+  it("two letters, an article, and ordinary words are left alone", () => {
+    for (const s of ["rename Task 1 to Plan A B", "add a task", "swap top and bottom", "rename lane a to b", "connect Review Claim to Pay Claim"]) {
+      expect(joinSpelledLetters(s), s).toBe(s);
+    }
+  });
+
+  it("one repair for the grammar and the hold, and the rename-by-number answer too", () => {
+    expect(readFileSync("app/lib/assist/selectedWord.ts", "utf8")).toContain("repairTurnWord(joinSpelledLetters(text))");
+    const editor = readFileSync("app/(dashboard)/diagram/[id]/DiagramEditor.tsx", "utf8");
+    const rename = editor.slice(editor.indexOf("const handleRenameUtterance = useCallback("), editor.indexOf("const handleRenameUtterance = useCallback(") + 800);
+    expect(rename).toContain("const t = joinSpelledLetters(text.trim());");
   });
 });

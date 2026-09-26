@@ -25,6 +25,7 @@ export const COMMAND_CATALOG: CatalogFamily[] = [
     { does: "Add an element (after another, connected)", say: ["add a task called Approve Claim after Review Claim", "add a decision", "insert a parallel gateway after Check Coverage", "add an end event called Done after Pay Claim"] },
     { does: "Connect / disconnect", say: ["connect Check Coverage to Assess Risk", "connect them", "disconnect Review Claim from Check Coverage"] },
     { does: "Rename", say: ["rename the gateway to Approved?", "rename Lane 3 to Claims Support", "rename Task 1 to Review Email"] },
+    { does: "Spell a name the recogniser keeps mishearing — letters are never misheard as a word; the capital is added for you", say: ["rename Lane 3 to F I N A N C E"] },
     { does: "Rename by number (say a type, pick a green number, say the name)", say: ["rename tasks", "rename lanes"] },
     { does: "Move — one element-span; a selection moves together, 100 px per step", say: ["move the gateway two elements to the right", "move Pay Claim up", "move these right", "move the selected task two steps up"] },
     { does: "Nudge — 20 px in any direction, any element; a selection nudges together", say: ["nudge the selected task left", "nudge these down", "bump Assess Risk right", "nudge Customer down by 40"] },
@@ -73,8 +74,8 @@ export const COMMAND_CATALOG: CatalogFamily[] = [
     { does: "Move ONE connector to a free point — the companion to swap, which needs both points taken. Say the other and it tells you", say: ["move top to bottom", "move middle to top", "move selected gateway, bottom to middle"] },
   ] },
   { family: "Pools in order", items: [
-    { does: "Move a pool above or below another — the stack is laid out again, so room is made automatically", say: ["move Pool 3 above the Customer pool", "put the Customer pool below the Salesforce pool"] },
-    { does: "Swap two pools", say: ["swap the Customer pool with the Salesforce pool", "swap the selected pools"] },
+    { does: "Move a pool above or below another — the stack is laid out again, so room is made automatically", say: ["move Pool 3 above Customer", "put Customer below Salesforce"] },
+    { does: "Swap two pools", say: ["swap Customer with Salesforce", "swap the selected pools"] },
   ] },
   { family: "Diagram", items: [
     { does: "Undo, repeat, clear, export", say: ["undo that", "again", "clear the diagram", "export the diagram to JSON"] },

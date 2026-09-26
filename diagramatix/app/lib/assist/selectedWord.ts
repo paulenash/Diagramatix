@@ -32,6 +32,7 @@ import { SYMBOL_PHRASES } from "./ops";
 import { POOL_WORDS, LANE_WORDS, SUBLANE_WORDS, PARTICIPANT_WORDS, BOX_WORDS, MESSAGE_WORDS, wordAlternation } from "./containerWords";
 import { BOUNDARY_EVENT_NOUN } from "./boundaryEventPhrase";
 import { containsAnotherCommand, startsWithCommandVerb, COMPRESS_COMMAND_VERBS, EXPAND_COMMAND_VERB } from "./commandVerbs";
+import { joinSpelledLetters } from "./spelledWord";
 
 /**
  * Verbs after which a reference to the selection is expected.
@@ -224,7 +225,9 @@ export const MISHEARD_ADD_LEADING_WORDS = MISHEARD_ADD_LEADING;
  * the three can produce another's trigger.
  */
 export function repairHeardWords(text: string): string {
-  return repairSelectedWord(repairAddWord(repairTurnWord(text).text).text).text;
+  // A spelled-out name ("F I N A N C E") is joined first, so every rule below
+  // and every name slot sees the word (spelledWord.ts).
+  return repairSelectedWord(repairAddWord(repairTurnWord(joinSpelledLetters(text)).text).text).text;
 }
 
 /** True when this word already refers to the selection. */

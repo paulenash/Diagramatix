@@ -22,6 +22,7 @@ import { parseCommand } from "@/app/lib/assist/commandGrammar";
 import { isIncompleteCommand } from "@/app/lib/assist/incompleteCommand";
 import { stitchFinals } from "@/app/lib/assist/fragmentBuffer";
 import { repairAddWord, repairHeardWords, MISHEARD_ADD_BARE_WORDS, MISHEARD_ADD_LEADING_WORDS } from "@/app/lib/assist/selectedWord";
+import { joinSpelledLetters } from "@/app/lib/assist/spelledWord";
 import { containsAnotherCommand, startsWithCommandVerb, hasCommandAfterName, COMMAND_VERBS, CONVERT_VERBS } from "@/app/lib/assist/commandVerbs";
 import { parseBoundaryEventPhrase } from "@/app/lib/assist/boundaryEventPhrase";
 import { POOL_WORDS, LANE_WORDS, SUBLANE_WORDS, PARTICIPANT_WORDS, BOX_WORDS, MESSAGE_WORDS } from "@/app/lib/assist/containerWords";
@@ -446,7 +447,9 @@ describe("T4786 — a boundary event with no host goes on the selected task", ()
 describe("T4787 — the repair is invisible on everything heard correctly", () => {
   it("changes no clean generated sentence and no catalogue phrase", () => {
     // A future widening that touches a correctly heard command fails here.
-    const touched = cleanCorpus().filter((s) => repairHeardWords(s) !== s);
+    // A SPELLED name ("F I N A N C E") is joined on purpose (T4930) — that is
+    // not a mis-hear repair, so the comparison is with the joined sentence.
+    const touched = cleanCorpus().filter((s) => repairHeardWords(s) !== joinSpelledLetters(s));
     expect(touched).toEqual([]);
   });
 });
