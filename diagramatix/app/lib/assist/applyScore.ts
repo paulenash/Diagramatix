@@ -19,6 +19,7 @@ import { headlessDiagram } from "./headlessDiagram";
 import { checkEffect, checkAlign, type EffectCheck, type ResolvedRefs } from "./opEffects";
 import { resolveRef } from "./resolveRef";
 import { refKind } from "./refKinds";
+import { connectorOverElement, mayNameConnector, CONNECTOR_REF_PREFIX } from "./connectorRef";
 import type { AssistOp } from "./ops";
 import type { DiagramData } from "../diagram/types";
 
@@ -27,11 +28,21 @@ const REF_FIELDS = ["ref", "fromRef", "toRef", "afterRef", "hostRef", "poolRef",
 
 const refFieldsOf = (op: AssistOp) => (op.op === "swapPools" ? [...REF_FIELDS, "a", "b"] : REF_FIELDS);
 
-/** Resolve like the app: the same kind table (refKinds.ts) and the case's selection. */
+/**
+ * Resolve like the app: the same kind table (refKinds.ts), the case's
+ * selection, and the same rule for a connector named by its label
+ * (connectorRef.ts) — recorded as `connector:<id>` for opEffects.
+ */
 function resolveField(op: AssistOp, f: string, d: DiagramData, selected: readonly string[]) {
   const v = (op as unknown as Record<string, unknown>)[f];
   if (typeof v !== "string" || !v) return undefined;
-  return resolveRef(v, d.elements, null, selected, { kind: refKind(op.op, f) });
+  const r = resolveRef(v, d.elements, null, selected, { kind: refKind(op.op, f) });
+  if (mayNameConnector(op.op, f)) {
+    const el = r && "id" in r ? d.elements.find((x) => x.id === r.id) : null;
+    const conn = connectorOverElement(d.connectors, v, el);
+    if (conn) return { id: `${CONNECTOR_REF_PREFIX}${conn.id}` };
+  }
+  return r;
 }
 
 function resolveAll(op: AssistOp, d: DiagramData, selected: readonly string[]): ResolvedRefs {

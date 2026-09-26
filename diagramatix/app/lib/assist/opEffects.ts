@@ -26,6 +26,7 @@ import type { Connector, DiagramData, DiagramElement } from "../diagram/types";
 import { laneMetrics, poolMetrics } from "../diagram/containerMetrics";
 import { isLaneUnowned } from "../diagram/containment";
 import { nextContainerLabels } from "../diagram/containerNames";
+import { CONNECTOR_REF_PREFIX } from "./connectorRef";
 
 export interface EffectCheck {
   ok: boolean;
@@ -52,6 +53,11 @@ const newIn = (before: DiagramData, after: DiagramData) => {
 const linked = (d: DiagramData, a: string, b: string, type?: string) =>
   d.connectors.some((c) => ((c.sourceId === a && c.targetId === b) || (c.sourceId === b && c.targetId === a)) && (!type || c.type === type));
 const centre = (e: DiagramElement) => ({ x: e.x + e.width / 2, y: e.y + e.height / 2 });
+/** The connector id a ref resolved to, when it named a connector by its label (connectorRef.ts). */
+const connectorIdOf = (ref: string | undefined) =>
+  ref?.startsWith(CONNECTOR_REF_PREFIX) ? ref.slice(CONNECTOR_REF_PREFIX.length) : undefined;
+const labelOf = (d: DiagramData, connId: string) => spokenText(d.connectors.find((c) => c.id === connId)?.label);
+const spokenText = (s: string | undefined) => (s ?? "").replace(/\s+/g, " ").trim();
 
 /** A pool-ancestor walk: is this element inside some pool? */
 function inAPool(d: DiagramData, e: DiagramElement): boolean {
@@ -289,10 +295,23 @@ export function checkEffect(op: AssistOp, before: DiagramData, after: DiagramDat
       return a && b && !linked(after, a, b) ? pass : fail(`${nameOf(byId(after, a))} and ${nameOf(byId(after, b))} are still connected`);
     }
 
-    case "delete":
+    case "delete": {
+      // A connector named by its label: that connector is gone, and nothing else was.
+      const connId = connectorIdOf(refs.ref);
+      if (connId) {
+        if (after.connectors.some((c) => c.id === connId)) return fail(`the connector “${labelOf(before, connId)}” is still there`);
+        const lost = before.elements.filter((e) => !byId(after, e.id));
+        return lost.length ? fail(`${nameOf(lost[0])} was deleted — the sentence named the connector “${labelOf(before, connId)}”`) : pass;
+      }
       return refs.ref && byId(after, refs.ref) ? fail(`${nameOf(byId(after, refs.ref))} is still there`) : pass;
+    }
 
     case "rename": {
+      const connId = connectorIdOf(refs.ref);
+      if (connId) {
+        const c = after.connectors.find((x) => x.id === connId);
+        return c && sameText(spokenText(c.label), op.label) ? pass : fail(`the connector is labelled “${c?.label ?? "(gone)"}”, not “${op.label}”`);
+      }
       const e = byId(after, refs.ref);
       // A decision gateway's name is a question, and the reducer adds the "?"
       // — "rename Decision? to Update Policy" rightly gives "Update Policy?".

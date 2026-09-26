@@ -34,7 +34,7 @@ import type { DiagramElement } from "../diagram/types";
 import { makeRng, pick, int, DEFAULT_CORPUS_SEED, type Rng } from "./rng";
 import {
   ACTIVITY_LABELS, LANE_LABELS, POOL_LABELS, PARTICIPANT_LABELS, SYSTEM_LABELS,
-  EVENT_LABELS, BOUNDARY_LABELS, MESSAGE_LABELS, FIXTURE_IDS,
+  EVENT_LABELS, BOUNDARY_LABELS, MESSAGE_LABELS, FIXTURE_IDS, spokenName,
   fixtureConnectors,
 } from "./commandFixture";
 
@@ -77,9 +77,15 @@ export interface World {
   whiteBoxPool(rng: Rng): Named;
   lane(rng: Rng): Named;
   sublane(rng: Rng): Named;
-  /** A lane with no sublanes — one that has room to carve a new lane from.
-   *  A lane its sublanes fill has none, and refusing is decided (2026-09-25). */
-  laneWithoutSublanes(rng: Rng): Named;
+  /** A lane that is NOT already fitted to its content — "compress lane" on a
+   *  fitted one is rightly refused ("already fitted"), so asking measures a
+   *  correct refusal, not a compress. */
+  unfittedLane(rng: Rng): Named;
+  /** A lane, and the edge of it, with room for any new lane's name
+   *  (FIXTURE_IDS.laneRoom). A new lane is carved out of the lane it is named
+   *  against and the pool never grows, so voice refuses when the name does not
+   *  fit — decided (2026-09-25). Null when no lane has room. */
+  laneWithRoom(rng: Rng): { lane: Named; where: "above" | "below" } | null;
   /** Two elements a flow already joins — "disconnect" asks for nothing otherwise. */
   connectedPair(rng: Rng): [Named, Named] | null;
   /** A lane with a neighbour on BOTH sides, and a direction. A lane move trades
@@ -113,8 +119,33 @@ export interface World {
   defaultNamed(rng: Rng): Named | null;
   /** A pool still called what it was born as — "Pool 3". */
   defaultNamedPool(rng: Rng): Named | null;
-  has(kind: "task" | "gateway" | "event" | "pool" | "lane" | "sublane"): boolean;
+  has(kind: "task" | "gateway" | "event" | "pool" | "lane" | WorldFeature): boolean;
 }
+
+/**
+ * What a family needs the test diagram to HAVE, beyond elements of a kind. When
+ * the diagram lacks one, the family says less (or nothing), and that loss is
+ * written down in NOT_ON_TEST_DIAGRAM — never silent (T4932).
+ */
+export const WORLD_FEATURES = ["sublane", "defaultNamedPool", "loose", "laneRoom", "alignPair"] as const;
+export type WorldFeature = typeof WORLD_FEATURES[number];
+
+/**
+ * What TODAY'S test diagram cannot give the generator, and which sentences the
+ * corpus therefore no longer says.
+ *
+ * Paul's own diagram replaced the first test diagram on 2026-09-27 ("This looks
+ * a lot better and does allow for many of the commands"). It has no sub-lanes,
+ * no pool still called "Pool N" and nothing outside a pool, so three things the
+ * first diagram was built to exercise are no longer asked. Pinned both ways by
+ * T4932: a feature the diagram gains must come off this list, and one it loses
+ * must go on it — a family never quietly asks for less.
+ */
+export const NOT_ON_TEST_DIAGRAM: Readonly<Partial<Record<WorldFeature, string>>> = {
+  sublane: "no lane has sub-lanes, so a sub-lane is never compressed or expanded (“compress sublane Sub 1”, “expand sub one by 40”), and a lane with sub-lanes is never fitted one sub-lane at a time",
+  defaultNamedPool: "no pool is still called “Pool N”, so “compress pool three” — the “Pool 3 or Lane 3?” of Paul's 23 Sep log — is never said",
+  loose: "no element lies outside a pool, so “put a pool around everything called X” could only be refused — the wrapInPool family is not generated at all",
+};
 
 const byType = (els: readonly DiagramElement[], type: string) => els.filter((e) => e.type === type);
 const isSublane = (e: DiagramElement, els: readonly DiagramElement[]) =>
@@ -129,7 +160,7 @@ const isSublane = (e: DiagramElement, els: readonly DiagramElement[]) =>
  * (otherwise the picker would open, which is a different test).
  */
 function nameIt(rng: Rng, e: DiagramElement, els: readonly DiagramElement[], kindWord: string): Named {
-  const label = (e.label ?? "").trim();
+  const label = spokenName(e.label);
   const sameKind = els.filter((o) => o.type === e.type).length;
   const forms: string[] = [label];
   if (label) forms.push(label);                 // weight the plain name
@@ -146,6 +177,8 @@ export function worldOf(els: readonly DiagramElement[]): World {
   const subs = byType(els, "lane").filter((e) => isSublane(e, els));
   const black = pools.filter((p) => (p.properties as Record<string, unknown> | undefined)?.poolType === "black-box");
   const white = pools.filter((p) => !black.includes(p));
+  /** The (lane, edge) pairs the fixture declares have room for any new lane's name, among these lanes. */
+  const roomy = () => FIXTURE_IDS.laneRoom.filter(([id]) => lanes.some((l) => l.id === id));
 
   return {
     task: (rng) => nameIt(rng, pick(rng, tasks), els, "task"),
@@ -155,13 +188,19 @@ export function worldOf(els: readonly DiagramElement[]): World {
     // One pick, used for both halves. Picking twice took the id from one pool
     // and the name from another, so the case asked for "Customer" and expected
     // Salesforce — a corpus row that can never pass however well it is heard.
-    blackBoxPool: (rng) => { const p = pick(rng, black); return { id: p.id, spoken: (p.label ?? "").trim() }; },
+    blackBoxPool: (rng) => { const p = pick(rng, black); return { id: p.id, spoken: spokenName(p.label) }; },
     whiteBoxPool: (rng) => nameIt(rng, pick(rng, white.length ? white : pools), els, "pool"),
     lane: (rng) => nameIt(rng, pick(rng, lanes), els, "lane"),
     sublane: (rng) => nameIt(rng, pick(rng, subs), els, "sub-lane"),
-    laneWithoutSublanes: (rng) => {
-      const free = lanes.filter((l) => !els.some((e) => e.type === "lane" && e.parentId === l.id));
-      return nameIt(rng, pick(rng, free.length ? free : lanes), els, "lane");
+    unfittedLane: (rng) => {
+      const loose = lanes.filter((l) => !(FIXTURE_IDS.fittedLanes as readonly string[]).includes(l.id));
+      return nameIt(rng, pick(rng, loose.length ? loose : lanes), els, "lane");
+    },
+    laneWithRoom: (rng) => {
+      const room = roomy();
+      if (!room.length) return null;
+      const [id, where] = pick(rng, room);
+      return { lane: nameIt(rng, lanes.find((l) => l.id === id)!, els, "lane"), where };
     },
     connectedPair: (rng) => {
       const pairs = fixtureConnectors()
@@ -169,7 +208,7 @@ export function worldOf(els: readonly DiagramElement[]): World {
         .filter((p): p is readonly [DiagramElement, DiagramElement] => !!p[0] && !!p[1] && !!p[0].label && !!p[1].label);
       if (!pairs.length) return null;
       const [a, b] = pick(rng, pairs);
-      return [{ id: a.id, spoken: (a.label ?? "").trim() }, { id: b.id, spoken: (b.label ?? "").trim() }];
+      return [{ id: a.id, spoken: spokenName(a.label) }, { id: b.id, spoken: spokenName(b.label) }];
     },
     laneWithNeighbour: (rng) => {
       // A lane move TRADES height between the lanes either side of it — down
@@ -192,8 +231,8 @@ export function worldOf(els: readonly DiagramElement[]): World {
       const sorted = [...lanes].sort((a, b) => a.y - b.y);
       const i = int(rng, 0, Math.max(0, sorted.length - 2));
       return [
-        { id: sorted[i].id, spoken: (sorted[i].label ?? "").trim() },
-        { id: sorted[i + 1].id, spoken: (sorted[i + 1].label ?? "").trim() },
+        { id: sorted[i].id, spoken: spokenName(sorted[i].label) },
+        { id: sorted[i + 1].id, spoken: spokenName(sorted[i + 1].label) },
       ];
     },
     activityLabel: (rng) => pick(rng, ACTIVITY_LABELS),
@@ -230,17 +269,22 @@ export function worldOf(els: readonly DiagramElement[]): World {
       const cands = els.filter((e) => (FIXTURE_IDS.defaultNamed as readonly string[]).includes(e.id));
       if (!cands.length) return null;
       const e = pick(rng, cands);
-      return { id: e.id, spoken: (e.label ?? "").trim() };
+      return { id: e.id, spoken: spokenName(e.label) };
     },
     defaultNamedPool: (rng) => {
-      const born = pools.filter((p) => /^pool \d+$/i.test((p.label ?? "").trim()));
+      const born = pools.filter((p) => /^pool \d+$/i.test(spokenName(p.label)));
       if (!born.length) return null;
       const p = pick(rng, born);
-      return { id: p.id, spoken: (p.label ?? "").trim() };
+      return { id: p.id, spoken: spokenName(p.label) };
     },
     has: (kind) => ({
       task: tasks.length, gateway: gateways.length, event: events.length,
       pool: pools.length, lane: lanes.length, sublane: subs.length,
+      defaultNamedPool: pools.filter((p) => /^pool \d+$/i.test(spokenName(p.label))).length,
+      // Something a whole-diagram wrap can take in: an element in no container.
+      loose: els.filter((e) => e.type !== "pool" && !e.parentId && !e.boundaryHostId).length,
+      laneRoom: roomy().length,
+      alignPair: FIXTURE_IDS.alignPair.every((id) => els.some((e) => e.id === id)) ? 1 : 0,
     })[kind] > 0,
   };
 }
@@ -525,11 +569,14 @@ export const GENERATOR_FAMILIES: readonly OpTemplate[] = [
   },
   {
     family: "addLaneAt",
-    applicable: (w) => w.has("lane"),
+    // Only beside a lane with room for the name at that edge: with none, every
+    // case is a correct refusal, and the family is not generated (T4932).
+    applicable: (w) => w.has("lane") && w.has("laneRoom"),
     build: (rng, w) => {
-      const lane = w.laneWithoutSublanes(rng);
+      const room = w.laneWithRoom(rng);
+      if (!room) return null;
+      const { lane, where } = room;
       const label = w.laneLabel(rng);
-      const where = pick(rng, ["above", "below"] as const);
       return {
         utterance: `add a lane ${where} ${lane.spoken} called ${label}`,
         ops: [{ op: "addLaneAt", poolRef: "the pool", label, position: where, refLane: lane.spoken }],
@@ -601,13 +648,14 @@ export const GENERATOR_FAMILIES: readonly OpTemplate[] = [
   {
     // Paul, 2026-09-26: "Add commands Compress Lane <lane_name>, and, Expand
     // Lane <lane_name>". Always WITH the lane word — without it the sentence is
-    // compressPool, whose apply finds the lane. Claims Team is in the draw, and
-    // it has sub-lanes: each is fitted in turn.
+    // compressPool, whose apply finds the lane. A lane with sub-lanes, when the
+    // test diagram has one, is fitted one sub-lane at a time; a lane already
+    // fitted to its content is not asked — "already fitted" is the right answer.
     family: "compressLane",
     applicable: (w) => w.has("lane"),
     build: (rng, w) => {
       const sub = w.has("sublane") && rng.next() < 0.35;
-      const band = sub ? w.sublane(rng) : w.lane(rng);
+      const band = sub ? w.sublane(rng) : w.unfittedLane(rng);
       const [said, ref] = pick(rng, laneWordForms(band, sub ? "sublane" : "lane"));
       return {
         utterance: `${pick(rng, ["compress", "compress", "shrink", "compact"])} ${said}`,
@@ -673,7 +721,10 @@ export const GENERATOR_FAMILIES: readonly OpTemplate[] = [
   },
   {
     family: "align",
-    applicable: () => true,
+    // The selection is two steps the fixture names (FIXTURE_IDS.alignPair). It
+    // named ids of its own ("t1", "t2") until Paul's diagram had no t2, and
+    // every align was refused for want of a selection (2026-09-27).
+    applicable: (w) => w.has("alignPair"),
     build: (rng) => {
       const [phrase, mode] = pick(rng, [
         ["align these in a row", "center"],
@@ -682,12 +733,13 @@ export const GENERATOR_FAMILIES: readonly OpTemplate[] = [
         ["align their right edges", "right"],
         ["align their top edges", "top"],
       ] as const);
-      return { utterance: phrase, ops: [{ op: "alignSelection", mode }], needsSelection: ["t1", "t2"] };
+      return { utterance: phrase, ops: [{ op: "alignSelection", mode }], needsSelection: [...FIXTURE_IDS.alignPair] };
     },
   },
   {
     family: "wrapInPool",
-    applicable: () => true,
+    // Only with something outside every pool to wrap (NOT_ON_TEST_DIAGRAM.loose).
+    applicable: (w) => w.has("loose"),
     build: (rng, w) => {
       const label = w.poolLabel(rng);
       return {
@@ -752,6 +804,9 @@ export const NOT_GENERATED: Record<string, string> = {
   // Pool arrangement ops that need two pools in a known order.
   movePoolTo: "needs two pools and a stable vertical order",
   swapPools: "needs two pools and a stable vertical order",
+  // What the test diagram cannot supply (NOT_ON_TEST_DIAGRAM, T4932). It comes
+  // off this list the day the diagram has it — T4725 fails until it does.
+  wrapInPool: "the test diagram has no element outside a pool, so “put a pool around everything” could only be refused",
 };
 
 export interface GenerateOptions {

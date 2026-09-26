@@ -89,34 +89,37 @@ export interface CatalogContext {
 }
 const GHOST = "needs an Assist ghost suggestion on screen, which the test diagram cannot show";
 const POINTER = "needs the mouse over the canvas — “here” and “under the cursor” are where it is";
-const NO_LABELLED_CONNECTOR = "the test diagram has no labelled connector or message to name";
 const LIBRARY = "needs the project's Risk & Control library, which the test diagram does not have";
-const EMPTY_EP = "the test diagram's only expanded subprocess is empty, and an empty one is refused";
-const GATEWAY_POINTS = "needs a selected gateway with connectors on those points — the test diagram's gateways have one flow out, on the right";
+const NO_EP = "the test diagram has no expanded subprocess to dissolve — its one subprocess, Subprocess 3, is collapsed";
+const NOTHING_LOOSE = "the test diagram has no element outside a pool, and a pool cannot hold another pool — so the app rightly refuses";
+const NO_SUBLANES = "the test diagram has no sub-lanes — a sub-lane is born “Sub N” when one is added";
+const GATEWAY_POINTS = "needs a selected gateway with flows on those points — none of the test diagram's three gateways has one on the points this line names";
 /**
- * Selections are FIXTURE ids (commandFixture.ts): t1 Review Claim, t2 Check
- * Coverage, t3 Assess Risk, t4 Task 1, t5 Task 2, t6 Pay Claim, g Claim
- * Approved?, ep2 Expanded 2, pool3 Pool 3, cust Customer, sys Salesforce,
- * loose Reminder Sent (in no pool).
+ * Selections are FIXTURE ids (commandFixture.ts, Paul's diagram): t1 Review
+ * Claim, 95k4p9hz Check Claim, t4 Task 1, t5 Task 2, sub3 Subprocess 3,
+ * kkc0tsyc Check Coverage, t6 Pay Claim, start Claim Received, g Claim
+ * Approved? (flows out at its bottom and middle), p5fku96e Re-work Required?
+ * (flows out at its top and middle), n6jhgOBCGw8pvIuvRqZvN the Send Rejection
+ * Notification end event, cust Customer, sys Claims System.
  */
 export const CATALOG_CONTEXT: Readonly<Record<string, CatalogContext>> = {
   "connect them": { parseOnly: "means the last two elements added this session — the test diagram has no history" },
   "move these right": { needsSelection: ["t4", "t5"] },
   "move the selected task two steps up": { needsSelection: ["t4"] },
-  "nudge the selected task left": { needsSelection: ["t2"] },
+  "nudge the selected task left": { needsSelection: ["t1"] },
   "nudge these down": { needsSelection: ["t4", "t5"] },
   "make this a user task": { needsSelection: ["t1"] },
   "turn the selected gateway into a parallel gateway": { needsSelection: ["g"] },
-  "make the selected event a timer event": { needsSelection: ["loose"] },
-  "rename the selected pool to Finance": { needsSelection: ["pool3"] },
+  "make the selected event a timer event": { needsSelection: ["start"] },
+  "rename the selected pool to Finance": { needsSelection: ["sys"] },
   "delete these": { needsSelection: ["t4", "t5"] },
   "connect this to Pay Claim": { needsSelection: ["t5"] },
-  "move the selected task right": { needsSelection: ["t2"] },
-  "add a boundary event called Timeout to this": { needsSelection: ["t3"] },
+  "move the selected task right": { needsSelection: ["t1"] },
+  "add a boundary event called Timeout to this": { needsSelection: ["kkc0tsyc"] },
   "name these Receive, Check and Ship": { needsSelection: ["t4", "t5", "sub3"] },
   "label the selected tasks Draft and Review": { needsSelection: ["t4", "t5"] },
   "assign these to the Finance team": { needsSelection: ["t4", "t5"] },
-  "put the selected tasks in the Sales team": { needsSelection: ["t1", "t2"] },
+  "put the selected tasks in the Sales team": { needsSelection: ["t1", "95k4p9hz"] },
   "attach risk R-012 to these": { parseOnly: LIBRARY },
   "attach control C-3 to the selected task": { parseOnly: LIBRARY },
   "put a task here": { parseOnly: POINTER },
@@ -132,28 +135,27 @@ export const CATALOG_CONTEXT: Readonly<Record<string, CatalogContext>> = {
   "surround selected with an expanded subprocess called Check Stock": { needsSelection: ["t1"] },
   "wrap these in a subprocess": { needsSelection: ["t6"] },
   "put an expanded subprocess around the selected elements called Pick": { needsSelection: ["t1"] },
-  "wrap these in a pool called Finance": { needsSelection: ["loose"] },
-  // All four in the row: a lane round only some of a row would sweep the rest in, and it says so.
-  "surround selected with a lane called Picking": { needsSelection: ["t4", "t5", "sub3", "g"] },
-  "put a pool around the selected elements called Sales": { needsSelection: ["loose"] },
-  "unwrap the selected subprocess": { parseOnly: EMPTY_EP },
-  "dissolve the EP": { parseOnly: EMPTY_EP },
+  "wrap these in a pool called Finance": { parseOnly: NOTHING_LOOSE },
+  // The whole row: a lane round only some of a row would sweep the rest in, and it says so.
+  "surround selected with a lane called Picking": { needsSelection: ["t4", "t5", "sub3", "kkc0tsyc", "g", "n6jhgOBCGw8pvIuvRqZvN"] },
+  "put a pool around the selected elements called Sales": { parseOnly: NOTHING_LOOSE },
+  "unwrap the selected subprocess": { parseOnly: NO_EP },
+  "dissolve the EP": { parseOnly: NO_EP },
   "delete selected": { needsSelection: ["t5"] },
-  "rename connector Email Details to Send Invoice": { parseOnly: NO_LABELLED_CONNECTOR },
-  "delete connector Email Details": { parseOnly: NO_LABELLED_CONNECTOR },
-  "remove message Email Details": { parseOnly: NO_LABELLED_CONNECTOR },
+  "put a pool around everything": { parseOnly: NOTHING_LOOSE },
+  "wrap everything in a pool": { parseOnly: NOTHING_LOOSE },
+  "remove the sublane Sub 2": { parseOnly: NO_SUBLANES },
   "label selected Yes": { parseOnly: "needs a selected CONNECTOR — the harness can select elements only" },
   "label the selected connector Approved": { parseOnly: "needs a selected CONNECTOR — the harness can select elements only" },
   "label selected": { parseOnly: "needs a selected CONNECTOR — the harness can select elements only" },
-  "label messages": { parseOnly: "the test diagram has no message flows to number" },
   "add a message to the selected": { needsSelection: ["t4"] },
   "add a message from this": { needsSelection: ["t4"] },
   "swap top and bottom": { parseOnly: GATEWAY_POINTS },
-  "swap bottom and middle": { parseOnly: GATEWAY_POINTS },
+  "swap bottom and middle": { needsSelection: ["g"] },
   "swap selected gateway, top and bottom": { parseOnly: GATEWAY_POINTS },
-  "swap top with centre": { parseOnly: GATEWAY_POINTS },
-  "swap top and right": { parseOnly: GATEWAY_POINTS },
-  "move top to bottom": { parseOnly: GATEWAY_POINTS },
+  "swap top with centre": { needsSelection: ["p5fku96e"] },
+  "swap top and right": { needsSelection: ["p5fku96e"] },
+  "move top to bottom": { needsSelection: ["p5fku96e"] },
   "move middle to top": { needsSelection: ["g"] },
   "move selected gateway, bottom to middle": { parseOnly: GATEWAY_POINTS },
   "swap the selected pools": { needsSelection: ["cust", "sys"] },

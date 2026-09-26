@@ -21,7 +21,7 @@ import { COMMAND_CATALOG } from "@/app/lib/assist/commandCatalog";
 import { generateCases, FAMILY_NAMES } from "@/app/lib/assist/commandGenerator";
 import { parseCommand } from "@/app/lib/assist/commandGrammar";
 import { scoreCase } from "@/app/lib/assist/commandScore";
-import { fixtureElements } from "@/app/lib/assist/commandFixture";
+import { fixtureElements, fixtureDiagram } from "@/app/lib/assist/commandFixture";
 import { DEFAULT_CORPUS_SEED } from "@/app/lib/assist/rng";
 import { orderReplaySets, replaySetLabel, type RecordedSet } from "@/app/lib/dictation/replaySets";
 
@@ -91,18 +91,24 @@ describe("T4924 — the popup set IS the popup", () => {
 });
 
 describe("T4926 — the card speaks the test diagram's names (Paul's Q3, 2026-09-26)", () => {
+  // Changed 2026-09-27: the test diagram is Paul's own, so the card speaks its
+  // names — and its labelled messages make "rename connector …" real, resolved
+  // against the diagram's connectors as the app resolves them (connectorRef.ts).
+  const connectors = fixtureDiagram().connectors;
+
   it("every line that is not parse-only resolves, with its context, to the test diagram — no stale, no ambiguous, no wrong element", () => {
     const bad: string[] = [];
     for (const c of catalogCases()) {
       if (c.parseOnly) continue;
-      const r = scoreCase(c, undefined, world);
+      const r = scoreCase(c, undefined, world, { connectors });
       if (r.outcome !== "pass") bad.push(`${r.outcome}: “${c.utterance}” — ${r.detail}`);
     }
     expect(bad).toEqual([]);
   });
 
   it("the popup's selection example “the selected event” names any event (found by this set)", () => {
-    for (const id of ["start", "loose", "end"]) {
+    // Changed 2026-09-27: the start event and both end events (Paul's diagram has no intermediate event).
+    for (const id of ["start", "end", "n6jhgOBCGw8pvIuvRqZvN"]) {
       const c = { id: "e#1", family: "f", utterance: "make the selected event a timer event", ops: parseCommand("make the selected event a timer event") ?? [], refs: {}, needsSelection: [id] };
       expect(scoreCase(c, undefined, world).outcome, id).toBe("pass");
     }
@@ -113,6 +119,29 @@ describe("T4926 — the card speaks the test diagram's names (Paul's Q3, 2026-09
       if (ctx.parseOnly) expect(ctx.parseOnly.length, say).toBeGreaterThan(30);
       if (ctx.needsSelection) for (const id of ctx.needsSelection) expect(world.some((e) => e.id === id), `${say}: ${id}`).toBe(true);
     }
+  });
+});
+
+describe("T4935 — and every line APPLIES on the test diagram (L4), as the Test tab scores the set", () => {
+  // The admin Test tab scores "Commands popup: every line" with the whole
+  // diagram, so a line that resolves but edits wrongly would be a red row
+  // there and nowhere here. Found this way on Paul's diagram (2026-09-27):
+  // "delete connector Rejection Notification" deleted the end event of that
+  // name (T4934).
+  it("no line that is not parse-only is refused or comes out wrong", () => {
+    const bad: string[] = [];
+    for (const c of catalogCases()) {
+      if (c.parseOnly) continue;
+      const r = scoreCase(c, undefined, world, { diagram: fixtureDiagram() });
+      if (r.outcome !== "pass") bad.push(`${r.outcome}: “${c.utterance}” — ${r.detail}`);
+    }
+    expect(bad).toEqual([]);
+  });
+
+  it("Replay resolves a connector line as the Test tab does — it hands the scorer the diagram's connectors", () => {
+    const replay = read("app/(dashboard)/dashboard/admin/voice-assist-test/ReplayPanel.tsx");
+    expect(replay).toContain("scoreCase(asCase, replayError ? \"\" : transcript, els, { connectors })");
+    expect(read("app/(dashboard)/dashboard/admin/voice-assist-test/VoiceAssistTestClient.tsx")).toContain("{ diagram: fixtureDiagram() }");
   });
 });
 

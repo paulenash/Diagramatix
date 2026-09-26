@@ -20,15 +20,17 @@ export const COMMAND_CATALOG: CatalogFamily[] = [
   // THE EXAMPLES USE THE TEST DIAGRAM'S NAMES (commandFixture.ts; Paul,
   // 2026-09-26), so the "Commands popup: every line" test set is this card word
   // for word and every line can be scored end to end. A test keeps the two in
-  // step: every name here must be one element of the test diagram.
+  // step: every name here must be one element of the test diagram. Since
+  // 2026-09-27 that is Paul's own diagram: Claims Processing (Lane 3,
+  // Underwriters, Lane 2), Customer above it, Claims System below.
   { family: "Elements & flow", items: [
     { does: "Add an element (after another, connected)", say: ["add a task called Approve Claim after Review Claim", "add a decision", "insert a parallel gateway after Check Coverage", "add an end event called Done after Pay Claim"] },
-    { does: "Connect / disconnect", say: ["connect Check Coverage to Assess Risk", "connect them", "disconnect Review Claim from Check Coverage"] },
+    { does: "Connect / disconnect", say: ["connect Check Coverage to Pay Claim", "connect them", "disconnect Review Claim from Check Claim"] },
     { does: "Rename", say: ["rename the gateway to Approved?", "rename Lane 3 to Claims Support", "rename Task 1 to Review Email"] },
     { does: "Spell a name the recogniser keeps mishearing — letters are never misheard as a word; the capital is added for you", say: ["rename Lane 3 to F I N A N C E"] },
     { does: "Rename by number (say a type, pick a green number, say the name)", say: ["rename tasks", "rename lanes"] },
     { does: "Move — one element-span; a selection moves together, 100 px per step", say: ["move the gateway two elements to the right", "move Pay Claim up", "move these right", "move the selected task two steps up"] },
-    { does: "Nudge — 20 px in any direction, any element; a selection nudges together", say: ["nudge the selected task left", "nudge these down", "bump Assess Risk right", "nudge Customer down by 40"] },
+    { does: "Nudge — 20 px in any direction, any element; a selection nudges together", say: ["nudge the selected task left", "nudge these down", "bump Check Claim right", "nudge Customer down by 40"] },
     { does: "Change what kind of thing it is — the same choices as the right-click menu", say: ["make this a user task", "turn the selected gateway into a parallel gateway", "make Review Claim a service task", "make the selected event a timer event"] },
     { does: "Delete (and close the gap)", say: ["delete Task 2", "remove Task 1 and compact"] },
     { does: "Boundary event on a task or subprocess", say: ["add a boundary event called Cancel to Subprocess 3", "add a boundary event to Check Coverage called Timeout"] },
@@ -50,20 +52,20 @@ export const COMMAND_CATALOG: CatalogFamily[] = [
     { does: "Add a pool (empty, no lane)", say: ["add a pool", "add a pool called Finance", "add a black box pool above Customer"] },
     { does: "Wrap the loose elements in a pool", say: ["put a pool around everything", "wrap everything in a pool"] },
     { does: "Extend every pool to cover all elements", say: ["extend the pools to include all elements", "widen the pools", "include all elements"] },
-    { does: "Compress a pool to its content — name a lane and it is that lane that is compressed", say: ["compress the Customer pool", "compress pool 3", "shrink Salesforce"] },
-    { does: "Nudge a pool", say: ["nudge pool down", "bump Customer down by 40", "nudge Salesforce up"] },
+    { does: "Compress a pool to its content — name a lane and it is that lane that is compressed", say: ["compress the Customer pool", "compress Claims Processing", "shrink Claims System"] },
+    { does: "Nudge a pool", say: ["nudge pool down", "bump Customer down by 40", "nudge Claims System up"] },
     { does: "Move ONE edge of a pool — a resize, not a move. A left/right boundary only goes left/right, a top/bottom one only up/down; it stops at the first element it meets and the lanes follow", say: ["move the pool left boundary right", "nudge the Claims Processing pool's top boundary up by 40", "shift the bottom edge of the Customer pool down"] },
   ] },
   { family: "Lanes and sub-lanes", items: [
     { does: "Add lanes (named or not)", say: ["add a lane to the pool", "add 2 lanes to Claims Processing called Intake and Payments", "add a lane above Lane 3", "insert a lane below Underwriters called Support"] },
     { does: "Add sub-lanes", say: ["add 3 sublanes to the Underwriters lane called Manager, Assistant and Staff", "add sublanes to Lane 3"] },
     { does: "Delete / swap / move lanes", say: ["delete Lane 3", "remove the sublane Sub 2", "swap Underwriters with Lane 3", "move the Underwriters lane down"] },
-    { does: "Compress a lane to its content — its top stays, the lanes below close up and the pool shrinks; a lane with sub-lanes is fitted one sub-lane at a time", say: ["compress the Underwriters lane", "compress lane Claims Team", "shrink Lane 3"] },
-    { does: "Make a lane taller: one Task row, or by a number — at its bottom, its last sub-lane taking it; the lanes below move down", say: ["expand the Underwriters lane", "expand lane Claims Team by 100", "grow Lane 3"] },
+    { does: "Compress a lane to its content — its top stays, the lanes below close up and the pool shrinks; a lane with sub-lanes is fitted one sub-lane at a time", say: ["compress the Underwriters lane", "compress lane three", "shrink Lane 3"] },
+    { does: "Make a lane taller: one Task row, or by a number — at its bottom, its last sub-lane taking it; the lanes below move down", say: ["expand the Underwriters lane", "expand lane two by 100", "grow Lane 3"] },
   ] },
   { family: "Messages", items: [
-    { does: "Message flow between an activity and a pool", say: ["add message from Task 1 to Salesforce labelled Email Details", "send a message from Check Coverage to Customer", "add a message to Salesforce from Task 2 saying Get Approval"] },
-    { does: "Rename / delete a message by its label", say: ["rename connector Email Details to Send Invoice", "delete connector Email Details", "remove message Email Details"] },
+    { does: "Message flow between an activity and a pool", say: ["add message from Task 1 to Claims System labelled Email Details", "send a message from Check Coverage to Customer", "add a message to Claims System from Task 2 saying Get Approval"] },
+    { does: "Rename / delete a message by its label", say: ["rename connector Payment Details to Send Invoice", "delete connector Rejection Notification", "remove message Payment Details"] },
     { does: "Label the selected connector (no text → it waits for it)", say: ["label selected Yes", "label the selected connector Approved", "label selected"] },
     { does: "Label connectors by number — numbers every sequence flow (or message), then say “3 No”", say: ["label connectors", "label messages", "label flows"] },
     { does: "Message by number — numbers everything a message can start or end at (tasks, subprocesses, black-box pools and events), then say “3 to 7 labelled Order Placed”", say: ["add a message", "send a message"] },
@@ -74,8 +76,8 @@ export const COMMAND_CATALOG: CatalogFamily[] = [
     { does: "Move ONE connector to a free point — the companion to swap, which needs both points taken. Say the other and it tells you", say: ["move top to bottom", "move middle to top", "move selected gateway, bottom to middle"] },
   ] },
   { family: "Pools in order", items: [
-    { does: "Move a pool above or below another — the stack is laid out again, so room is made automatically", say: ["move Pool 3 above Customer", "put Customer below Salesforce"] },
-    { does: "Swap two pools", say: ["swap Customer with Salesforce", "swap the selected pools"] },
+    { does: "Move a pool above or below another — the stack is laid out again, so room is made automatically", say: ["move Claims System above Customer", "put Customer below Claims Processing"] },
+    { does: "Swap two pools", say: ["swap Customer with Claims System", "swap the selected pools"] },
   ] },
   { family: "Diagram", items: [
     { does: "Undo, repeat, clear, export", say: ["undo that", "again", "clear the diagram", "export the diagram to JSON"] },

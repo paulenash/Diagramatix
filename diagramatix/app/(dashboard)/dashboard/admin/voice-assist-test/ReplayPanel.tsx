@@ -22,7 +22,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { scoreCase, summarise, isFailure, isJudged, type CaseResult } from "@/app/lib/assist/commandScore";
-import { fixtureElements } from "@/app/lib/assist/commandFixture";
+import { fixtureElements, fixtureDiagram } from "@/app/lib/assist/commandFixture";
 import { replayClip } from "@/app/lib/dictation/replayClip";
 import { BOOST_PROFILES, boostProfile, DEFAULT_BOOST_PROFILE, type BoostProfileId } from "@/app/lib/dictation/boostProfiles";
 import { leadInMs, deadAirMs, padWavStart } from "@/app/lib/dictation/wavTools";
@@ -146,6 +146,8 @@ export function ReplayPanel() {
     // can be judged) comes from the set itself, keyed by case id.
     const popupContext = new Map(catalogCases().map((c) => [c.id, c] as const));
     const els = fixtureElements();
+    // A popup line can name a MESSAGE by its label; the scorer resolves it as the app does, against these.
+    const connectors = fixtureDiagram().connectors;
     // The listing was asked for this set only; the filter is the belt to that
     // braces, so a stale listing can never put another set's clip in the run.
     const todo = latest(clips.filter((c) => c.corpusSeed === runLabel.seed));
@@ -226,7 +228,7 @@ export function ReplayPanel() {
             fingerprint: undefined as string | undefined,
           }));
           if (fingerprint && !fingerprints[v.key]) fingerprints[v.key] = fingerprint;
-          const result = scoreCase(asCase, replayError ? "" : transcript, els);
+          const result = scoreCase(asCase, replayError ? "" : transcript, els, { connectors });
           // A replay that never reached the recogniser is not a mishear: it is
           // kept off the pass rate and out of the saved run, and named instead.
           if (replayError) (failedReplays[v.key] ??= []).push(clip.caseId);

@@ -16,13 +16,15 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import {
   generateCases, GENERATOR_FAMILIES, NOT_GENERATED, FAMILY_NAMES, worldOf,
+  NOT_ON_TEST_DIAGRAM, WORLD_FEATURES,
 } from "@/app/lib/assist/commandGenerator";
 import { scoreCase, summarise, isFailure } from "@/app/lib/assist/commandScore";
 import { parseCommand } from "@/app/lib/assist/commandGrammar";
 import {
   fixtureElements, FRESH_LABELS, ACTIVITY_LABELS, LANE_LABELS, POOL_LABELS,
-  PARTICIPANT_LABELS, SYSTEM_LABELS,
+  PARTICIPANT_LABELS, SYSTEM_LABELS, spokenName,
 } from "@/app/lib/assist/commandFixture";
+import { fixtureElements as fixtureElementsV1 } from "./_helpers/voiceFixtureV1";
 import { makeRng, seedFrom, pick, int, shuffled, DEFAULT_CORPUS_SEED } from "@/app/lib/assist/rng";
 import { resolveRef } from "@/app/lib/assist/resolveRef";
 
@@ -78,22 +80,29 @@ describe("T4724 — the corpus is the same corpus every time", () => {
   });
 
   it("the fixture carries the names this feature has been caught by", () => {
-    const labels = world().map((e) => e.label);
+    // Changed 2026-09-27: re-baselined on Paul's own test diagram. Names are
+    // compared as they are SAID — he typed line breaks into several of them.
+    const els = world();
+    const labels = els.map((e) => spokenName(e.label));
     // The un-renamed defaults, which Paul says are the commonest rename targets
     // there are — and the hardest to hear, because they end in a digit.
     expect(labels, "a task nobody has renamed yet").toContain("Task 1");
     expect(labels, "a subprocess nobody has renamed yet").toContain("Subprocess 3");
     expect(labels, "a lane nobody has renamed yet").toContain("Lane 3");
-    expect(labels, "a gateway nobody has renamed yet — and it ends in punctuation").toContain("Decision?");
-    expect(labels, "an expanded subprocess nobody has renamed yet").toContain("Expanded 2");
-    expect(labels, "the sub-lane naming Paul asked for").toContain("Sub 1");
+    expect(labels, "and another").toContain("Lane 2");
+    const y = (label: string) => els.find((e) => spokenName(e.label) === label)!.y;
+    expect(y("Lane 3"), "Lane 3 sits ABOVE Lane 2 — the number is a name, never a position").toBeLessThan(y("Lane 2"));
+    // Gateway questions end in punctuation the parser strips.
+    expect(labels, "a gateway question typed on two lines").toContain("Pass Claim Check?");
+    expect(labels, "a gateway question with a hyphen in it").toContain("Re-work Required?");
     // And the properly-named ones, which follow the modelling rules: an
     // activity is a verb phrase, a lane is a team, a black box is a party or a
     // system. Each is also an awkward class in its own right.
     expect(labels, "an activity is a VERB PHRASE, never a noun").toContain("Review Claim");
     expect(labels, "a lane is a team or a role").toContain("Underwriters");
     expect(labels, "a black-box participant is an external party").toContain("Customer");
-    expect(labels, "a black-box system is a product name").toContain("Salesforce");
+    expect(labels, "a black-box system is a product name").toContain("Claims System");
+    expect(els.find((e) => e.id === "sys")!.label, "said on one line, typed on two").toBe("Claims\nSystem");
     // And nothing the generator hands out as a NEW name may already be on it.
     for (const fresh of FRESH_LABELS) expect(labels).not.toContain(fresh);
   });
@@ -179,10 +188,15 @@ describe("T4725 — every op kind is generated, or consciously excluded", () => 
     }
   });
 
-  it("every family declares itself applicable against the fixture", () => {
+  it("every family declares itself applicable against the fixture — except what the fixture is written down as lacking", () => {
+    // Changed 2026-09-27: Paul's test diagram has nothing outside a pool, so
+    // the whole-diagram wrap is the one family it cannot supply — its op is on
+    // NOT_GENERATED and the lack on NOT_ON_TEST_DIAGRAM (T4932).
     const w = worldOf(world());
-    const usable = GENERATOR_FAMILIES.filter((t) => t.applicable(w));
-    expect(usable.length, "the fixture suits every family").toBe(GENERATOR_FAMILIES.length);
+    const unusable = GENERATOR_FAMILIES.filter((t) => !t.applicable(w)).map((t) => t.family);
+    expect(unusable, "the fixture suits every other family").toEqual(["wrapInPool"]);
+    for (const family of unusable) expect(NOT_GENERATED[family], family).toMatch(/test diagram/);
+    expect(NOT_ON_TEST_DIAGRAM.loose).toMatch(/wrapInPool/);
     expect(new Set(FAMILY_NAMES).size, "family names are unique").toBe(FAMILY_NAMES.length);
   });
 });
@@ -291,7 +305,8 @@ describe("T4727 — the round trip, with its disagreements frozen", () => {
 });
 
 describe("T4728 — the scorer names the layer, not just the failure", () => {
-  const els = world();
+  // The frozen first test diagram: these pin the SCORER on its names ("Review" is one task there, "Expanded 2" is there).
+  const els = fixtureElementsV1();
   const one = (utterance: string, ops: Parameters<typeof scoreCase>[0]["ops"], refs: Record<string, string> = {}) =>
     ({ id: "x#1", family: "test", utterance, ops, refs });
 
@@ -439,7 +454,8 @@ describe("T4729b — the tile, and what it is allowed to cost", () => {
 });
 
 describe("T4738 — two fixes the recorded corpus paid for", () => {
-  const els = fixtureElements();
+  // The frozen first test diagram: "Sales" names its Salesforce pool, as it did when the clips were recorded.
+  const els = fixtureElementsV1();
 
   it("the whole-diagram wrap keeps its name", () => {
     // Four clips in Paul's corpus where the recogniser heard the sentence
@@ -483,5 +499,36 @@ describe("T4738 — two fixes the recorded corpus paid for", () => {
       ops: [{ op: "rename", ref: "Sales", label: "Dispatch" }] as Parameters<typeof scoreCase>[0]["ops"],
     };
     expect(scoreCase(c, "Call sales despatch rider.", els).outcome).not.toBe("pass-despite-mishear");
+  });
+});
+
+describe("T4932 — what the test diagram cannot give the generator is written down, both ways", () => {
+  // Paul's own diagram replaced the first test diagram on 2026-09-27. It has no
+  // sub-lanes, no pool still called "Pool N" and nothing outside a pool — three
+  // things the first one was built to exercise. A family that quietly asked for
+  // less would look exactly like a family that still worked.
+  const w = worldOf(world());
+
+  it("a feature the diagram lacks is on NOT_ON_TEST_DIAGRAM, and one it has is not", () => {
+    for (const f of WORLD_FEATURES) {
+      expect(f in NOT_ON_TEST_DIAGRAM, `${f}: the diagram ${w.has(f) ? "has it — take it off" : "lacks it — write it down"}`).toBe(!w.has(f));
+    }
+    for (const [f, why] of Object.entries(NOT_ON_TEST_DIAGRAM)) expect(why.length, `${f} says what is no longer said`).toBeGreaterThan(60);
+    expect(Object.keys(NOT_ON_TEST_DIAGRAM).sort()).toEqual(["defaultNamedPool", "loose", "sublane"]);
+  });
+
+  it("the corpus does not say them, and says each again the moment a diagram has it", () => {
+    const said = (els: ReturnType<typeof world>) => {
+      const cases = generateCases({ count: 800, world: els });
+      const subIds = new Set(els.filter((e) => e.type === "lane" && els.some((p) => p.id === e.parentId && p.type === "lane")).map((e) => e.id));
+      return {
+        loose: cases.some((c) => c.family === "wrapInPool"),
+        defaultNamedPool: cases.some((c) => c.family === "compressPool" && /pool three|Pool 3/i.test(c.utterance)),
+        sublane: cases.some((c) => ["compressLane", "expandLane"].includes(c.family) && Object.values(c.refs).some((id) => subIds.has(id))),
+      };
+    };
+    expect(said(world()), "today's diagram").toEqual({ loose: false, defaultNamedPool: false, sublane: false });
+    // The frozen first diagram has all three: the families still work.
+    expect(said(fixtureElementsV1()), "the first diagram").toEqual({ loose: true, defaultNamedPool: true, sublane: true });
   });
 });

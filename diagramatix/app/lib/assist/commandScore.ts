@@ -24,8 +24,9 @@ import { resolveRef, isSelectionRef } from "./resolveRef";
 import { refKind } from "./refKinds";
 import type { AssistOp } from "./ops";
 import type { GeneratedCase } from "./commandGenerator";
-import type { DiagramData, DiagramElement } from "../diagram/types";
+import type { Connector, DiagramData, DiagramElement } from "../diagram/types";
 import { scoreApply } from "./applyScore";
+import { connectorOverElement, mayNameConnector, CONNECTOR_REF_PREFIX } from "./connectorRef";
 
 export type Outcome =
   /** Right ops, right elements. */
@@ -207,13 +208,26 @@ interface RefCheck {
  * selection. A scorer that resolved differently would call "three" ambiguous
  * while the app found Pool 3, or pass what the app asks about.
  */
-function checkRefs(expected: AssistOp[], actual: AssistOp[], world: readonly DiagramElement[], selected: readonly string[] = []): RefCheck {
+function checkRefs(
+  expected: AssistOp[], actual: AssistOp[], world: readonly DiagramElement[],
+  selected: readonly string[] = [], connectors: readonly Connector[] = [],
+): RefCheck {
   for (let i = 0; i < expected.length; i++) {
     const refs = refFieldsFor(expected[i].op);
     const e = expected[i] as unknown as Record<string, unknown>;
     const a = actual[i] as unknown as Record<string, unknown>;
-    const resolve = (spoken: string, field: string) =>
-      resolveRef(spoken, [...world], null, selected, { kind: refKind(expected[i].op, field) });
+    const resolve = (spoken: string, field: string) => {
+      const r = resolveRef(spoken, [...world], null, selected, { kind: refKind(expected[i].op, field) });
+      // A connector named by its label, by the app's own rule (connectorRef.ts):
+      // "delete connector Rejection Notification" names the message, never the
+      // end event the element resolver matches loosely.
+      if (connectors.length && mayNameConnector(expected[i].op, field)) {
+        const el = r && "id" in r ? world.find((x) => x.id === r.id) : null;
+        const conn = connectorOverElement(connectors, spoken, el);
+        if (conn) return { id: `${CONNECTOR_REF_PREFIX}${conn.id}` };
+      }
+      return r;
+    };
     for (const field of refs) {
       const want = e[field];
       const got = a[field];
@@ -263,8 +277,13 @@ export function scoreCase(
   c: GeneratedCase,
   transcript: string | undefined,
   world: readonly DiagramElement[],
-  /** Pass the whole diagram (normally `fixtureDiagram()`) to score L4 as well. */
-  opts: { diagram?: DiagramData } = {},
+  /**
+   * Pass the whole diagram (normally `fixtureDiagram()`) to score L4 as well.
+   * Without it, pass the diagram's `connectors` so a line that names a
+   * connector by its label ("rename connector Payment Details to …") can be
+   * resolved at L3 as the app resolves it; with neither, such a line is stale.
+   */
+  opts: { diagram?: DiagramData; connectors?: readonly Connector[] } = {},
 ): CaseResult {
   const heard = (transcript ?? c.utterance).trim();
   const textDiffered = transcript !== undefined && !sameWords(transcript, c.utterance);
@@ -310,7 +329,7 @@ export function scoreCase(
     };
   }
 
-  const refs = checkRefs(c.ops, actual, world, c.needsSelection ?? []);
+  const refs = checkRefs(c.ops, actual, world, c.needsSelection ?? [], opts.connectors ?? opts.diagram?.connectors ?? []);
   if (!refs.ok) {
     return {
       ...base, actual,

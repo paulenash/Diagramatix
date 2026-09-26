@@ -57,6 +57,7 @@ import { whyTemplateCantFollow } from "@/app/lib/diagram/templateAttach";
 import { SEQUENCE_NODE_TYPES } from "@/app/lib/diagram/templates";
 import { TEMPLATE_BEFORE_REFUSAL } from "./templatePhrase";
 import { refKind, type RefKind } from "./refKinds";
+import { connectorOverElement } from "./connectorRef";
 
 /** The guided "rename by number" flow — pick a numbered badge, then say the name. */
 export type RenameFlow =
@@ -148,18 +149,6 @@ export interface AssistApplyContext {
     openTemplateWindowRef: MutableRefObject<(opts?: { anchorId?: string; at?: { x: number; y: number } }) => string>;
     exportJsonRef: MutableRefObject<(() => void) | null>;
   };
-}
-
-/** Normalise a spoken connector/message reference to match against a connector
- *  label: drop a leading "connector/message/msg/flow/arrow" noun and any
- *  surrounding quotes. */
-function messageLabelKey(ref: string): string {
-  return ref
-    .trim()
-    .replace(/^(?:the\s+)?(?:connector|connexion|connection|message|msg|flow|arrow|link)\s+/i, "")
-    .replace(/^["'“”‘’]+|["'“”‘’]+$/g, "")
-    .trim()
-    .toLowerCase();
 }
 
 const elBox = (e: DiagramElement) => ({ x: e.x, y: e.y, width: e.width, height: e.height });
@@ -501,6 +490,13 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       // already asked which — containers had their own guard below — while
       // "delete the task" silently took the newest and reported success.
       const e = resolve1(op.ref, { strict: true });
+      // A connector named by its label beats an element matched loosely — the
+      // rename's rule (connectorRef.ts). Without it, "delete connector
+      // Rejection Notification" deleted the END EVENT "Send Rejection
+      // Notification" on Paul's test diagram (2026-09-27), and a label typed
+      // on two lines was never found.
+      const conn = connectorOverElement(data.connectors, op.ref, "err" in e ? null : e);
+      if (conn) { deleteConnector(conn.id); results.push(`deleted message “${conn.label}”`); continue; }
       if ("err" in e && e.ambiguous) {
         // R2: number the candidates and wait for a number, rather than
         // making the user rephrase a command that was already unambiguous
@@ -508,13 +504,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
         const flow = buildPickFlow(ops, op.ref, e.ambiguous, els);
         if (flow) { setPickFlow(flow); results.push(flow.prompt); pickParked = true; break; }
       }
-      if ("err" in e) {
-        // Not an element — maybe a message/connector label.
-        const key = messageLabelKey(op.ref);
-        const conn = data.connectors.find((c) => (c.label ?? "").trim().toLowerCase() === key);
-        if (conn) { deleteConnector(conn.id); results.push(`deleted message “${conn.label}”`); continue; }
-        results.push(e.err); anyFail = true; continue;
-      }
+      if ("err" in e) { results.push(e.err); anyFail = true; continue; }
       // #7 — never delete a container we can't confidently identify. If the
       // spoken name doesn't actually appear in the resolved container's label
       // and there's more than one of its kind, ask rather than guess.
@@ -1120,15 +1110,11 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
         // 4", its default name) or after a leading "message"/"connector" noun
         // ("message Invoice") — beats an element the resolver only matched
         // loosely: "rename message 4 to Request" renamed the event "Event 4"
-        // (2026-09-25 repro). An element named exactly what was said still wins.
-        const spaced = (s: string | undefined) => (s ?? "").replace(/\s+/g, " ").trim().toLowerCase();
-        const whole = spaced(leftRef.replace(/^["'“”‘’]+|["'“”‘’]+$/g, ""));
-        const key = messageLabelKey(leftRef);
-        const conn = data.connectors.find((c) => spaced(c.label) === whole)
-          ?? (key ? data.connectors.find((c) => spaced(c.label) === key) : undefined);
-        const elementExact = !("err" in e) && spaced(e.label) === whole;
-        if (!("err" in e) && (elementExact || !conn)) { updateLabel(e.id, newLabel); els = withLabel(els, e.id, newLabel); setSelectedElementIds(new Set()); results.push(`renamed ${nameOf(e)} → ${newLabel}`); done = true; break; }
+        // (2026-09-25 repro). An element named exactly what was said still
+        // wins. One rule, shared with the delete and both scorers (connectorRef.ts).
+        const conn = connectorOverElement(data.connectors, leftRef, "err" in e ? null : e);
         if (conn) { updateConnectorLabel(conn.id, newLabel); results.push(`renamed connector “${conn.label}” → ${newLabel}`); done = true; break; }
+        if (!("err" in e)) { updateLabel(e.id, newLabel); els = withLabel(els, e.id, newLabel); setSelectedElementIds(new Set()); results.push(`renamed ${nameOf(e)} → ${newLabel}`); done = true; break; }
       }
       if (!done) {
         const e = resolve1(op.ref);

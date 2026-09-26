@@ -14,16 +14,16 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { generateCases } from "@/app/lib/assist/commandGenerator";
+import { generateCases, NOT_GENERATED, NOT_ON_TEST_DIAGRAM } from "@/app/lib/assist/commandGenerator";
 import { scoreCase, summarise } from "@/app/lib/assist/commandScore";
 import { parseCommand } from "@/app/lib/assist/commandGrammar";
 import { applyAssistOps } from "@/app/lib/assist/applyAssistOps";
 import { headlessDiagram } from "@/app/lib/assist/headlessDiagram";
 import { checkEffect, checkAlign } from "@/app/lib/assist/opEffects";
-import { fixtureElements, fixtureDiagram, fixtureConnectors, LANE_LABELS } from "@/app/lib/assist/commandFixture";
+import { fixtureElements, fixtureDiagram, fixtureConnectors, LANE_LABELS, FIXTURE_IDS, spokenName } from "@/app/lib/assist/commandFixture";
+import { fixtureDiagram as fixtureDiagramV1 } from "./_helpers/voiceFixtureV1";
 import { reducer, connectorLabelPayload, healOnLoad } from "@/app/hooks/useDiagram";
-import { laneMetrics } from "@/app/lib/diagram/containerMetrics";
-import { MIN_LEFT_GAP } from "@/app/lib/diagram/poolLaneBounds";
+import { poolMetrics } from "@/app/lib/diagram/containerMetrics";
 import { DEFAULT_CORPUS_SEED } from "@/app/lib/assist/rng";
 import type { DiagramData } from "@/app/lib/diagram/types";
 
@@ -177,6 +177,13 @@ describe("T4750 — L4 over the corpus, with its wrong edits frozen", () => {
     // carve that would land anywhere but where it was named (voice only, the
     // mouse drop keeps its fallback); keep refusing beside sublanes — and the
     // corpus now asks only for what the fixture has room for.
+    //
+    // Re-run on Paul's own test diagram (2026-09-27): 59 wrong edits on the
+    // first pass, every one the HARNESS asking for what his diagram cannot do —
+    // an align selection naming a task it does not have, a whole-diagram wrap
+    // with nothing outside a pool, lanes carved where no name fits, a lane
+    // already fitted asked to compress. Each correctly refused; the generator
+    // now asks only what the diagram can do (T4932, T4933), and it is empty again.
   };
   const CORPUS = { seed: DEFAULT_CORPUS_SEED, count: 600 };
   const MAX_WRONG_EDITS = 0;
@@ -211,7 +218,8 @@ describe("T4750 — L4 over the corpus, with its wrong edits frozen", () => {
 });
 
 describe("T4751 — the checks catch a wrong edit, and never pass one by staying silent", () => {
-  const before = fixtureDiagram();
+  // The frozen first test diagram: these pin the CHECKS on its ids and numbers (t2 at y 30, the gateway "Decision?").
+  const before = fixtureDiagramV1();
   const renamed = (label: string): DiagramData => ({ ...before, elements: before.elements.map((e) => (e.id === "t4" ? { ...e, label } : e)) });
 
   it("a rename is checked against the NEW name, not just 'something changed'", () => {
@@ -239,8 +247,11 @@ describe("T4751 — the checks catch a wrong edit, and never pass one by staying
 });
 
 describe("T4752 — a command that changed nothing never says it worked", () => {
+  // The frozen first test diagram: Claims Team, filled by its sub-lanes, is the lane with no room.
+  const diagram = fixtureDiagramV1;
+
   it("“add a lane” with no room is refused, by name, not reported as added", () => {
-    const r = say("add a lane below Claims Team called Quality Assurance");
+    const r = say("add a lane below Claims Team called Quality Assurance", { diagram: diagram() });
     expect(r.ok).toBe(false);
     expect(r.summary).toMatch(/no room below Claims Team for a lane called “Quality Assurance”/);
     expect(r.after.elements.filter((e) => e.type === "lane")).toHaveLength(5);
@@ -248,15 +259,15 @@ describe("T4752 — a command that changed nothing never says it worked", () => 
 
   it("an edge lane says WHY it cannot move, rather than blaming its neighbour", () => {
     // Needs a lane on both sides: moving down grows the one above.
-    const top = say("move the Claims Team lane down");
+    const top = say("move the Claims Team lane down", { diagram: diagram() });
     expect(top.ok).toBe(false);
     expect(top.summary).toMatch(/Claims Team is the top lane/);
   });
 
   it("and a move that CAN happen still does, and says so", () => {
-    const r = say("move the Underwriters lane down");
+    const r = say("move the Underwriters lane down", { diagram: diagram() });
     expect(r.ok, r.summary).toBe(true);
-    const was = fixtureDiagram().elements.find((e) => e.id === "L2")!.y;
+    const was = diagram().elements.find((e) => e.id === "L2")!.y;
     expect(r.after.elements.find((e) => e.id === "L2")!.y).toBeGreaterThan(was);
   });
 
@@ -280,15 +291,32 @@ describe("T4753 — the corpus asks for things the fixture can do", () => {
   });
 
   it("a lane moves only if it has a lane on both sides, and never toward one its sublanes fill", () => {
-    for (const c of cases().filter((x) => x.family === "moveLane")) {
+    // Changed 2026-09-27: on Paul's diagram no lane has sublanes, so
+    // Underwriters — the one lane with a lane on both sides — moves BOTH ways;
+    // the first diagram's Claims Team, filled by its sublanes, kept it to "down".
+    const els = fixtureElements();
+    const stack = els.filter((e) => e.type === "lane" && e.parentId === "p").sort((a, b) => a.y - b.y);
+    const moves = cases().filter((x) => x.family === "moveLane");
+    expect(moves.length).toBeGreaterThan(0);
+    for (const c of moves) {
       expect(Object.values(c.refs), c.utterance).toEqual(["L2"]);
-      // Claims Team, above, is filled by its sublanes: moving up is refused by decision.
-      expect((c.ops[0] as { direction: string }).direction, c.utterance).toBe("down");
+      const dir = (c.ops[0] as { direction: string }).direction;
+      const i = stack.findIndex((l) => l.id === "L2");
+      const shrinks = stack[dir === "up" ? i - 1 : i + 1];
+      expect(els.some((e) => e.type === "lane" && e.parentId === shrinks.id), `${c.utterance} shrinks a lane its sublanes fill`).toBe(false);
     }
+    expect(new Set(moves.map((c) => (c.ops[0] as { direction: string }).direction))).toEqual(new Set(["up", "down"]));
   });
 
-  it("a lane is carved only beside a lane with room — never one its sublanes fill", () => {
-    for (const c of cases().filter((x) => x.family === "addLaneAt")) expect(Object.values(c.refs), c.utterance).not.toContain("L1");
+  it("a lane is carved only beside a lane with room — at the edge the fixture declares has it", () => {
+    // Changed 2026-09-27: room is DECLARED (FIXTURE_IDS.laneRoom) and proved
+    // by asking the reducer (T4757) — on Paul's diagram, Lane 3 above and below.
+    const room = new Set(FIXTURE_IDS.laneRoom.map(([id, where]) => `${id} ${where}`));
+    const adds = cases().filter((x) => x.family === "addLaneAt");
+    expect(adds.length).toBeGreaterThan(0);
+    for (const c of adds) {
+      expect(room.has(`${Object.values(c.refs)[0]} ${(c.ops[0] as { position: string }).position}`), c.utterance).toBe(true);
+    }
   });
 
   it("nothing is added AFTER a start event's flow — nothing flows into one", () => {
@@ -299,38 +327,52 @@ describe("T4753 — the corpus asks for things the fixture can do", () => {
   });
 
   it("the fixture holds nothing the reducer would correct on contact", () => {
-    // Black-box pools below the 116px minimum GREW on their first edit and
-    // made a boundary move read as the wrong way.
-    for (const p of fixtureElements().filter((e) => e.type === "pool")) expect(p.height, p.label).toBeGreaterThanOrEqual(116);
-    // And one loose element, so a wrap has something to wrap.
-    expect(fixtureElements().some((e) => e.type !== "pool" && !e.parentId)).toBe(true);
+    // Black-box pools below their name's minimum GREW on their first edit and
+    // made a boundary move read as the wrong way. Changed 2026-09-27: the floor
+    // is each pool's OWN name (the 116 was Salesforce's), and opening the
+    // diagram — the editor's load heal — must change nothing at all.
+    const d = fixtureDiagram();
+    for (const p of d.elements.filter((e) => e.type === "pool")) {
+      expect(p.height, spokenName(p.label)).toBeGreaterThanOrEqual(poolMetrics(p.label ?? "", d.poolFontSize ?? 16).minHeight);
+    }
+    const opened = headlessDiagram(fixtureDiagram()).data;
+    expect(opened.elements, "the load heal moves nothing").toEqual(d.elements);
+    expect(opened.connectors, "nor re-routes anything").toEqual(d.connectors);
+    // No element outside a pool, so a whole-diagram wrap has nothing to wrap —
+    // written down, and the family not generated (T4932).
+    expect(fixtureElements().some((e) => e.type !== "pool" && !e.parentId)).toBe(false);
+    expect(NOT_ON_TEST_DIAGRAM.loose).toBeTruthy();
+    expect(NOT_GENERATED.wrapInPool).toMatch(/test diagram/);
   });
 });
 
 describe("T4757 — the fixture has room for every lane name the corpus can say", () => {
-  it("each LANE_LABELS name fits the empty space above and below Underwriters and Lane 3", () => {
+  it("each LANE_LABELS name is added at every edge FIXTURE_IDS.laneRoom declares, and no undeclared edge fits them all", () => {
     // A new lane must be tall enough for its name, which runs up its header.
     // Without the room the carve goes elsewhere and voice refuses — correctly —
     // and a correct refusal of an impossible case is noise in the corpus.
-    const els = fixtureElements();
-    for (const laneId of ["L2", "L3"]) {
-      const lane = els.find((e) => e.id === laneId)!;
-      const inside = els.filter((e) => e.parentId === laneId);
-      const top = Math.min(...inside.map((e) => e.y)) - lane.y - MIN_LEFT_GAP;
-      const bottom = lane.y + lane.height - Math.max(...inside.map((e) => e.y + e.height)) - MIN_LEFT_GAP;
-      for (const name of LANE_LABELS) {
-        const need = laneMetrics(name, 14).minHeight;
-        expect(need, `${name} above ${lane.label}`).toBeLessThanOrEqual(top);
-        expect(need, `${name} below ${lane.label}`).toBeLessThanOrEqual(bottom);
+    // Changed 2026-09-27: Paul's diagram gives only Lane 3 room for every name
+    // (Underwriters fits the short ones, Lane 2 none), so the room is DECLARED
+    // and the generator carves only there — and this asks the reducer, through
+    // the voice apply, rather than re-deriving its room rule from geometry.
+    const lanes = fixtureElements().filter((e) => e.type === "lane");
+    for (const lane of lanes) {
+      for (const where of ["above", "below"] as const) {
+        const declared = FIXTURE_IDS.laneRoom.some(([id, w]) => id === lane.id && w === where);
+        const refused = LANE_LABELS.filter((name) => !say(`add a lane ${where} ${spokenName(lane.label)} called ${name}`).ok);
+        if (declared) expect(refused, `${where} ${spokenName(lane.label)} is declared to have room`).toEqual([]);
+        else expect(refused.length, `${where} ${spokenName(lane.label)} fits every name — declare it in FIXTURE_IDS.laneRoom`).toBeGreaterThan(0);
       }
     }
+    expect(FIXTURE_IDS.laneRoom.length, "some lane has room, or addLaneAt is never said").toBeGreaterThan(0);
   });
 });
 
 describe("T4758 — voice puts a lane where it was named, or nowhere", () => {
+  // The frozen first test diagram: its Underwriters had 190 px free above its row.
   /** Underwriters with its tasks hard against its top edge: no room above it, plenty at the pool's bottom. */
   const packedAbove = (): DiagramData => {
-    const d = fixtureDiagram();
+    const d = fixtureDiagramV1();
     return { ...d, elements: d.elements.map((e) => (e.parentId === "L2" ? { ...e, y: 318 } : e)) };
   };
 
@@ -352,7 +394,7 @@ describe("T4758 — voice puts a lane where it was named, or nowhere", () => {
   });
 
   it("and a lane with room at the named edge is added there, as before", () => {
-    const r = say("add a lane above Underwriters called Billing Team");
+    const r = say("add a lane above Underwriters called Billing Team", { diagram: fixtureDiagramV1() });
     expect(r.ok, r.summary).toBe(true);
     const lane = r.after.elements.find((e) => e.label === "Billing Team")!;
     expect(lane.y + lane.height).toBe(r.after.elements.find((e) => e.id === "L2")!.y);
@@ -360,10 +402,12 @@ describe("T4758 — voice puts a lane where it was named, or nowhere", () => {
 });
 
 describe("T4759 — a named wrap into an existing pool grows it, and says the name was not used", () => {
+  // The frozen first test diagram: its "Reminder Sent" lies outside every pool (Paul's diagram has nothing loose).
+
   it("the pool keeps its own name, and the log names the one that was dropped", () => {
     // Paul, 2026-09-25: "grow, ignore the name" — but a name the user SAID
     // must not vanish without a word.
-    const r = say("put a pool around everything called Accounts Payable");
+    const r = say("put a pool around everything called Accounts Payable", { diagram: fixtureDiagramV1() });
     expect(r.ok, r.summary).toBe(true);
     expect(r.summary).toMatch(/grew Claims Processing to take in 1 loose element — “Accounts Payable” was not used; the pool keeps its name/);
     expect(r.after.elements.some((e) => e.type === "pool" && e.label === "Accounts Payable")).toBe(false);
@@ -371,9 +415,96 @@ describe("T4759 — a named wrap into an existing pool grows it, and says the na
   });
 
   it("with NO pool yet, the new pool still takes the name", () => {
-    const d = fixtureDiagram();
+    const d = fixtureDiagramV1();
     const bare: DiagramData = { ...d, connectors: [], elements: [d.elements.find((e) => e.id === "loose")!] };
     const r = say("put a pool around everything called Accounts Payable", { diagram: bare });
     expect(r.after.elements.find((e) => e.type === "pool")?.label).toBe("Accounts Payable");
+  });
+});
+
+describe("T4933 — the fixture's declarations name what is really on the test diagram", () => {
+  it("every id FIXTURE_IDS names is on the diagram, as the kind it is filed under", () => {
+    // align asked for a selection of "t1" and "t2" by ids of its own; Paul's
+    // diagram has no t2, so every align was refused for want of a selection
+    // (2026-09-27). The ids live in FIXTURE_IDS now, and are checked here.
+    const els = fixtureElements();
+    const at = (id: string) => els.find((e) => e.id === id);
+    const poolType = (id: string) => (at(id)?.properties as Record<string, unknown> | undefined)?.poolType;
+    for (const id of FIXTURE_IDS.pools) expect(at(id)?.type, id).toBe("pool");
+    expect(poolType(FIXTURE_IDS.whiteBoxPool)).toBe("white-box");
+    expect(poolType(FIXTURE_IDS.participantPool)).toBe("black-box");
+    expect(poolType(FIXTURE_IDS.systemPool)).toBe("black-box");
+    for (const id of FIXTURE_IDS.lanes) expect(at(id)?.type, id).toBe("lane");
+    for (const id of FIXTURE_IDS.defaultNamed) expect(spokenName(at(id)?.label), id).toMatch(/^(?:task|subprocess|lane) \d+$/i);
+    for (const id of FIXTURE_IDS.alignPair) expect(at(id)?.type, id).toBe("task");
+    for (const [id] of FIXTURE_IDS.laneRoom) expect(at(id)?.type, id).toBe("lane");
+    for (const id of FIXTURE_IDS.fittedLanes) expect(at(id)?.type, id).toBe("lane");
+  });
+
+  it("a lane declared fitted is one the reducer will not compress, and every other lane is compressible", () => {
+    const d = fixtureDiagram();
+    for (const id of FIXTURE_IDS.lanes) {
+      const after = reducer(d, { type: "COMPRESS_LANE", payload: { laneId: id } });
+      expect(after === d, `${id} ${after === d ? "is already fitted" : "compresses"}`).toBe((FIXTURE_IDS.fittedLanes as readonly string[]).includes(id));
+    }
+  });
+});
+
+describe("T4934 — a connector named by its label is that connector, in the delete as in the rename", () => {
+  // Found by the Commands card on Paul's diagram (2026-09-27), the first test
+  // diagram with labelled messages: "delete connector Rejection Notification"
+  // deleted the END EVENT "Send Rejection Notification" — the delete never had
+  // the rename's rule — and "remove message Payment Details" found nothing,
+  // because the label was typed on two lines.
+  const REJECTION = "85ehykjb", PAYMENT = "q3rwp4lx", END = "n6jhgOBCGw8pvIuvRqZvN";
+
+  it("“delete connector Rejection Notification” deletes the message, and the end event stays", () => {
+    const r = say("delete connector Rejection Notification");
+    expect(r.ok, r.summary).toBe(true);
+    expect(r.after.connectors.some((c) => c.id === REJECTION), "the message is gone").toBe(false);
+    expect(r.after.elements.some((e) => e.id === END), "the end event is not").toBe(true);
+    expect(r.after.elements).toHaveLength(fixtureElements().length);
+  });
+
+  it("a label typed on two lines is found as it is said — delete and rename alike", () => {
+    const del = say("remove message Payment Details");
+    expect(del.ok, del.summary).toBe(true);
+    expect(del.after.connectors.some((c) => c.id === PAYMENT)).toBe(false);
+    const ren = say("rename connector Payment Details to Send Invoice");
+    expect(ren.ok, ren.summary).toBe(true);
+    expect(ren.after.connectors.find((c) => c.id === PAYMENT)!.label).toBe("Send Invoice");
+  });
+
+  it("an element named EXACTLY what was said still wins over a connector of that name", () => {
+    const d = fixtureDiagram();
+    const named: DiagramData = { ...d, elements: d.elements.map((e) => (e.id === "t5" ? { ...e, label: "Payment Details" } : e)) };
+    const r = say("delete Payment Details", { diagram: named });
+    expect(r.ok, r.summary).toBe(true);
+    expect(r.after.elements.some((e) => e.id === "t5"), "the task named that is deleted").toBe(false);
+    expect(r.after.connectors.some((c) => c.id === PAYMENT), "the message named that stays").toBe(true);
+  });
+
+  it("both scorers resolve it as the app does — and L4 fails the delete that took the end event", () => {
+    const c = { id: "x#1", family: "t", utterance: "delete connector Rejection Notification", ops: parseCommand("delete connector Rejection Notification")!, refs: {} };
+    expect(scoreCase(c, undefined, fixtureElements(), { connectors: fixtureDiagram().connectors }).outcome, "L3").toBe("pass");
+    expect(scoreCase(c, undefined, fixtureElements(), { diagram: fixtureDiagram() }).outcome, "L4").toBe("pass");
+    const d = fixtureDiagram();
+    const tookTheEvent: DiagramData = {
+      ...d,
+      elements: d.elements.filter((e) => e.id !== END),
+      connectors: d.connectors.filter((x) => x.sourceId !== END && x.targetId !== END),
+    };
+    const verdict = checkEffect({ op: "delete", ref: "connector Rejection Notification" }, d, tookTheEvent, { ref: `connector:${REJECTION}` })!;
+    expect(verdict.ok).toBe(false);
+    expect(verdict.detail).toMatch(/Send\s+Rejection\s+Notification was deleted — the sentence named the connector “Rejection Notification”/);
+  });
+
+  it("wiring: one rule, in connectorRef.ts, read by the apply layer and both scorers", () => {
+    const apply = src("app", "lib", "assist", "applyAssistOps.ts");
+    expect(apply).toContain("connectorOverElement(data.connectors, op.ref,");
+    expect(apply).toContain("connectorOverElement(data.connectors, leftRef,");
+    expect(apply, "no second copy of the label key").not.toContain("function messageLabelKey(");
+    expect(src("app", "lib", "assist", "commandScore.ts")).toContain("connectorOverElement(connectors, spoken, el)");
+    expect(src("app", "lib", "assist", "applyScore.ts")).toContain("connectorOverElement(d.connectors, v, el)");
   });
 });

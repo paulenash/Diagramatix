@@ -30,7 +30,8 @@ import { SYMBOL_PHRASES } from "@/app/lib/assist/ops";
 import { EVENT_OPTS } from "@/app/lib/diagram/elementSubtypes";
 import { BOUNDARY_HOST_TYPES, isBoundaryHost } from "@/app/lib/diagram/boundaryHosts";
 import { generateCases } from "@/app/lib/assist/commandGenerator";
-import { fixtureDiagram, fixtureElements } from "@/app/lib/assist/commandFixture";
+import { fixtureElements } from "@/app/lib/assist/commandFixture";
+import { fixtureDiagram as fixtureDiagramV1 } from "./_helpers/voiceFixtureV1";
 import { COMMAND_CATALOG, SUPERADMIN_COMMAND_CATALOG } from "@/app/lib/assist/commandCatalog";
 import { DEFAULT_CORPUS_SEED } from "@/app/lib/assist/rng";
 import { applyAssistOps } from "@/app/lib/assist/applyAssistOps";
@@ -65,7 +66,8 @@ function misheardPairs(): Array<{ clean: string; heard: string }> {
 
 /** Say it on the fixture, headless, with this selection. */
 function say(sentence: string, selectedIds: string[] = []) {
-  const h = headlessDiagram(fixtureDiagram());
+  // The frozen first test diagram: T4786's hosts (Assess Risk, the expanded subprocess, t2) are on it.
+  const h = headlessDiagram(fixtureDiagramV1());
   const before = new Set(h.data.elements.map((e) => e.id));
   const ops = parseCommand(sentence);
   expect(ops, `the grammar must parse “${sentence}”`).toBeTruthy();

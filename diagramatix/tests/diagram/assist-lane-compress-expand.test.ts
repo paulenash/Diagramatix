@@ -14,8 +14,11 @@
  *
  * Before this, "compress the Sales lane" was caught by the POOL rule and
  * refused ("Sales isn't a pool"), and "expand lane Sales" went to an AI that
- * had no lane-resize op. The names below are the test diagram's
- * (commandFixture.ts): Claims Team (Sub 1, Sub 2), Underwriters, Lane 3.
+ * had no lane-resize op. The names below are the FIRST test diagram's —
+ * Claims Team (Sub 1, Sub 2), Underwriters, Lane 3, Pool 3 — frozen in
+ * tests/diagram/_helpers/voiceFixtureV1.ts when Paul's own diagram replaced
+ * it (2026-09-27): his has no sub-lanes, and the numbers here were measured
+ * on it. T4914's card check and T4915's corpus check read TODAY's diagram.
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
@@ -37,7 +40,10 @@ import { hasCommandAfterName, COMMAND_VERBS, EXPAND_VERBS } from "@/app/lib/assi
 import { generateCases } from "@/app/lib/assist/commandGenerator";
 import { COMMAND_CATALOG } from "@/app/lib/assist/commandCatalog";
 import { DEFAULT_CORPUS_SEED } from "@/app/lib/assist/rng";
-import { fixtureDiagram, fixtureElements } from "@/app/lib/assist/commandFixture";
+// The geometry here is pinned on the frozen FIRST test diagram (sub-lanes, Pool 3); the card and corpus checks read today's.
+import { fixtureDiagram, fixtureElements } from "./_helpers/voiceFixtureV1";
+import { fixtureElements as testDiagramElements, FIXTURE_IDS } from "@/app/lib/assist/commandFixture";
+import { NOT_ON_TEST_DIAGRAM } from "@/app/lib/assist/commandGenerator";
 import { reducer } from "@/app/hooks/useDiagram";
 import { carveGeometry } from "@/app/lib/diagram/laneStack";
 import { fitLaneToContent, setBandHeightAtBottom, LANE_EXPAND_STEP } from "@/app/lib/diagram/laneFit";
@@ -723,35 +729,46 @@ describe("T4914 — wiring: one setter, one settle, one default", () => {
   });
 
   it("the card's lane examples are in the test diagram's names, and each finds one lane", () => {
+    // Today's test diagram (Paul's, 2026-09-27): the card speaks its names.
     const item = (prefix: string) => COMMAND_CATALOG.flatMap((f) => f.items).find((i) => i.does.startsWith(prefix))!;
     for (const said of [...item("Compress a lane").say, ...item("Make a lane taller").say]) {
       const op = parseCommand(said)![0] as AssistOp & { laneRef: string };
       expect(["compressLane", "expandLane"], said).toContain(op.op);
-      const r = resolveRef(op.laneRef, fixtureElements(), null, [], { kind: refKind(op.op, "laneRef") });
+      const r = resolveRef(op.laneRef, testDiagramElements(), null, [], { kind: refKind(op.op, "laneRef") });
       expect(r && "id" in r, `${said} names one lane of the test diagram`).toBe(true);
     }
   });
 });
 
 describe("T4915 — the generated corpus says the lane commands, and has a new seed", () => {
-  const cases = generateCases({ count: 600, world: fixtureElements() });
+  // Changed 2026-09-27: on Paul's own test diagram — no sub-lanes, no "Pool N",
+  // and a Lane 2 already fitted to its content. What it cannot supply is
+  // written down (NOT_ON_TEST_DIAGRAM, T4932), never quietly dropped.
+  const cases = generateCases({ count: 600, world: testDiagramElements() });
   const LANE_WORD = /\b(?:lanes?|sublanes?|line|sub)\b/i;
 
-  it("both families are generated, always WITH a lane word, and Claims Team (sub-lanes) is among them", () => {
+  it("both families are generated, always WITH a lane word, over every lane that can take them", () => {
+    const named = (family: string) => new Set(cases.filter((c) => c.family === family).flatMap((c) => Object.values(c.refs)));
     for (const family of ["compressLane", "expandLane"]) {
       const fam = cases.filter((c) => c.family === family);
       expect(fam.length, family).toBeGreaterThan(5);
       for (const c of fam) expect(c.utterance, c.id).toMatch(LANE_WORD);
-      expect(fam.some((c) => Object.values(c.refs).includes("L1")), `${family} names Claims Team`).toBe(true);
     }
+    expect(named("expandLane"), "every lane grows").toEqual(new Set(FIXTURE_IDS.lanes));
+    const fitted = FIXTURE_IDS.fittedLanes as readonly string[];
+    expect(named("compressLane"), "every lane not already fitted — “compress Lane 2” is rightly refused")
+      .toEqual(new Set(FIXTURE_IDS.lanes.filter((id) => !fitted.includes(id))));
+    // The first diagram's Claims Team, fitted one sub-lane at a time, has no counterpart here.
+    expect(NOT_ON_TEST_DIAGRAM.sublane).toMatch(/one sub-lane at a time/);
     const byN = cases.filter((c) => c.family === "expandLane" && / by \d+/.test(c.utterance));
     expect(byN.length).toBeGreaterThan(0);
     for (const c of byN) expect((c.ops[0] as { distance?: number }).distance, c.utterance).toBeGreaterThan(0);
   });
 
-  it("compress pool is said more ways: the pool nobody renamed, the pool word, “compact”, “compressed”", () => {
+  it("compress pool is said more ways: the pool word, “compact”, “compressed” — and the pool nobody renamed is written down as missing", () => {
     const said = cases.filter((c) => c.family === "compressPool").map((c) => c.utterance);
-    expect(said.some((s) => /pool three|Pool 3/.test(s)), "Pool 3").toBe(true);
+    expect(said.some((s) => /pool three|Pool 3/i.test(s)), "there is no Pool N to say").toBe(false);
+    expect(NOT_ON_TEST_DIAGRAM.defaultNamedPool).toMatch(/compress pool three/);
     expect(said.some((s) => /^compress the .+ pool$/.test(s)), "the X pool").toBe(true);
     expect(said.some((s) => /^compact /.test(s)), "compact").toBe(true);
     expect(said.some((s) => /^compressed /.test(s)), "compressed").toBe(true);
@@ -759,7 +776,8 @@ describe("T4915 — the generated corpus says the lane commands, and has a new s
 
   it("the realistic seed has a new name, so a recorded #35 still means the sentence recorded", () => {
     expect(DEFAULT_CORPUS_SEED).not.toBe("dgx-voice-2026-09-realistic");
-    expect(fixtureElements().find((e) => e.id === "pool3")?.label).toBe("Pool 3");
+    expect(DEFAULT_CORPUS_SEED, "the first diagram's seed — its clips were recorded against that diagram").not.toBe("dgx-voice-2026-09-26-realistic");
+    expect(testDiagramElements().find((e) => e.id === "sys")?.label, "and the diagram it goes with is Paul's").toBe("Claims\nSystem");
   });
 });
 

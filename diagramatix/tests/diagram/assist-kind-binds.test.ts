@@ -22,7 +22,7 @@ import { refKind } from "@/app/lib/assist/refKinds";
 import { isIncompleteCommand } from "@/app/lib/assist/incompleteCommand";
 import { scoreCase } from "@/app/lib/assist/commandScore";
 import { COMPRESS_VERBS } from "@/app/lib/assist/commandVerbs";
-import { fixtureDiagram } from "@/app/lib/assist/commandFixture";
+import { fixtureDiagram as fixtureDiagramV1 } from "./_helpers/voiceFixtureV1";
 import { joinSpelledLetters } from "@/app/lib/assist/spelledWord";
 import type { DiagramData, DiagramElement } from "@/app/lib/diagram/types";
 
@@ -176,7 +176,8 @@ describe("T4929 — pools reorder without the word “pool”", () => {
   // Paul, 2026-09-27: "Proceed with: Pool reordering without the word 'pool',
   // as in 'move Pool 3 above Customer'". The Commands popup set found the gap:
   // both names had to say "pool", so these went to the AI.
-  const fixture = (): DiagramData => fixtureDiagram();
+  // The frozen first test diagram: these need its default-named "Pool 3" and its Salesforce.
+  const fixture = (): DiagramData => fixtureDiagramV1();
   const runOn = (said: string) => {
     const ops = parseCommand(said);
     const h = headlessDiagram(fixture());

@@ -29,11 +29,11 @@
       "afterRef": "Pay Claim"
     }
   ],
-  "connect Check Coverage to Assess Risk": [
+  "connect Check Coverage to Pay Claim": [
     {
       "op": "connect",
       "fromRef": "Check Coverage",
-      "toRef": "Assess Risk"
+      "toRef": "Pay Claim"
     }
   ],
   "connect them": [
@@ -43,11 +43,11 @@
       "toRef": "the last"
     }
   ],
-  "disconnect Review Claim from Check Coverage": [
+  "disconnect Review Claim from Check Claim": [
     {
       "op": "disconnect",
       "fromRef": "Review Claim",
-      "toRef": "Check Coverage"
+      "toRef": "Check Claim"
     }
   ],
   "rename the gateway to Approved?": [
@@ -136,10 +136,10 @@
       "direction": "down"
     }
   ],
-  "bump Assess Risk right": [
+  "bump Check Claim right": [
     {
       "op": "nudgePool",
-      "ref": "Assess Risk",
+      "ref": "Check Claim",
       "direction": "right"
     }
   ],
@@ -462,16 +462,16 @@
       "poolRef": "pool Customer"
     }
   ],
-  "compress pool 3": [
+  "compress Claims Processing": [
     {
       "op": "compressPool",
-      "poolRef": "pool 3"
+      "poolRef": "Claims Processing"
     }
   ],
-  "shrink Salesforce": [
+  "shrink Claims System": [
     {
       "op": "compressPool",
-      "poolRef": "Salesforce"
+      "poolRef": "Claims System"
     }
   ],
   "nudge pool down": [
@@ -488,10 +488,10 @@
       "distance": 40
     }
   ],
-  "nudge Salesforce up": [
+  "nudge Claims System up": [
     {
       "op": "nudgePool",
-      "ref": "Salesforce",
+      "ref": "Claims System",
       "direction": "up"
     }
   ],
@@ -607,10 +607,10 @@
       "laneRef": "lane Underwriters"
     }
   ],
-  "compress lane Claims Team": [
+  "compress lane three": [
     {
       "op": "compressLane",
-      "laneRef": "lane Claims Team"
+      "laneRef": "lane three"
     }
   ],
   "shrink Lane 3": [
@@ -625,10 +625,10 @@
       "laneRef": "lane Underwriters"
     }
   ],
-  "expand lane Claims Team by 100": [
+  "expand lane two by 100": [
     {
       "op": "expandLane",
-      "laneRef": "lane Claims Team",
+      "laneRef": "lane two",
       "distance": 100
     }
   ],
@@ -638,11 +638,11 @@
       "laneRef": "lane 3"
     }
   ],
-  "add message from Task 1 to Salesforce labelled Email Details": [
+  "add message from Task 1 to Claims System labelled Email Details": [
     {
       "op": "addMessage",
       "fromRef": "Task 1",
-      "toRef": "Salesforce",
+      "toRef": "Claims System",
       "label": "Email Details"
     }
   ],
@@ -653,31 +653,31 @@
       "toRef": "Customer"
     }
   ],
-  "add a message to Salesforce from Task 2 saying Get Approval": [
+  "add a message to Claims System from Task 2 saying Get Approval": [
     {
       "op": "addMessage",
       "fromRef": "Task 2",
-      "toRef": "Salesforce",
+      "toRef": "Claims System",
       "label": "Get Approval"
     }
   ],
-  "rename connector Email Details to Send Invoice": [
+  "rename connector Payment Details to Send Invoice": [
     {
       "op": "rename",
-      "ref": "connector Email Details",
+      "ref": "connector Payment Details",
       "label": "Send Invoice"
     }
   ],
-  "delete connector Email Details": [
+  "delete connector Rejection Notification": [
     {
       "op": "delete",
-      "ref": "connector Email Details"
+      "ref": "connector Rejection Notification"
     }
   ],
-  "remove message Email Details": [
+  "remove message Payment Details": [
     {
       "op": "delete",
-      "ref": "message Email Details"
+      "ref": "message Payment Details"
     }
   ],
   "label selected Yes": [
@@ -793,27 +793,27 @@
       "to": "middle"
     }
   ],
-  "move Pool 3 above Customer": [
+  "move Claims System above Customer": [
     {
       "op": "movePoolTo",
-      "ref": "Pool 3",
+      "ref": "Claims System",
       "position": "above",
       "relativeTo": "Customer"
     }
   ],
-  "put Customer below Salesforce": [
+  "put Customer below Claims Processing": [
     {
       "op": "movePoolTo",
       "ref": "Customer",
       "position": "below",
-      "relativeTo": "Salesforce"
+      "relativeTo": "Claims Processing"
     }
   ],
-  "swap Customer with Salesforce": [
+  "swap Customer with Claims System": [
     {
       "op": "swapLanes",
       "laneA": "Customer",
-      "laneB": "Salesforce"
+      "laneB": "Claims System"
     }
   ],
   "swap the selected pools": [
