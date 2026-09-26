@@ -11,6 +11,7 @@
  * Pure.
  */
 import type { DiagramElement } from "./types";
+import { isAnyLane } from "./laneKind";
 
 /** Read a pool's effective header width (stored property override, else 36). */
 export function getPoolHeaderWidth(pool: DiagramElement): number {
@@ -60,16 +61,19 @@ export function minHeightForContainer(
   poolFs: number,
   laneFs: number,
 ): number {
+  // Both shapes of a sub-lane count (laneKind.ts). A stamped `type: "sublane"`
+  // fell through to the bare 40 below, so its name was never a floor and a
+  // lane holding stamped sub-lanes counted only its own name.
   if (el.type === "pool") {
     const own = poolMetrics(el.label, poolFs).minHeight;
-    const lanes = elements.filter(e => e.type === "lane" && e.parentId === el.id);
+    const lanes = elements.filter(e => isAnyLane(e) && e.parentId === el.id);
     if (lanes.length === 0) return own;
     const lanesH = lanes.reduce((s, l) => s + minHeightForContainer(l, elements, poolFs, laneFs), 0);
     return Math.max(own, lanesH);
   }
-  if (el.type === "lane") {
+  if (isAnyLane(el)) {
     const own = laneMetrics(el.label, laneFs).minHeight;
-    const sublanes = elements.filter(e => e.type === "lane" && e.parentId === el.id);
+    const sublanes = elements.filter(e => isAnyLane(e) && e.parentId === el.id);
     if (sublanes.length === 0) return own;
     const subH = sublanes.reduce((s, l) => s + minHeightForContainer(l, elements, poolFs, laneFs), 0);
     return Math.max(own, subH);

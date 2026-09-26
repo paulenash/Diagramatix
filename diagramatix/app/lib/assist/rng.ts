@@ -66,6 +66,9 @@ export function shuffled<T>(rng: Rng, items: readonly T[]): T[] {
 
 /** The corpus everything is measured against unless a caller says otherwise. */
 // Bumped when the generator's sentences change materially (2026-09-25: realistic
-// BPMN naming). A run against a different seed is a different exam, and the
-// recorded clips carry their own seed, so the two corpora cannot be confused.
-export const DEFAULT_CORPUS_SEED = "dgx-voice-2026-09-realistic";
+// BPMN naming; 2026-09-26: the compress and expand LANE families, more compress
+// phrasings and the "Pool 3" pool, which reshuffle every case). A run against a
+// different seed is a different exam, and the recorded clips carry their own
+// seed, so the two corpora cannot be confused: case #35 of the old seed stays
+// the #35 recorded on prod, and a retake never pairs a new sentence with it.
+export const DEFAULT_CORPUS_SEED = "dgx-voice-2026-09-26-realistic";

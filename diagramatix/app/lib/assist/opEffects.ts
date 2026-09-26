@@ -22,7 +22,9 @@
  * Pure.
  */
 import type { AssistOp } from "./ops";
-import type { DiagramData, DiagramElement } from "../diagram/types";
+import type { Connector, DiagramData, DiagramElement } from "../diagram/types";
+import { laneMetrics, poolMetrics } from "../diagram/containerMetrics";
+import { isLaneUnowned } from "../diagram/containment";
 
 export interface EffectCheck {
   ok: boolean;
@@ -68,6 +70,179 @@ function inAPoolId(d: DiagramData, e: DiagramElement, poolId: string): boolean {
     cur = byId(d, cur.parentId);
   }
   return false;
+}
+
+// ─── Lanes fitted and made taller ──────────────────────────────────────────
+//
+// Written from Paul's ruling of 2026-09-26 — THE BOTTOM EDGE MOVES — and not
+// from laneFit.ts: "compress the X lane" promises the top stays, the content
+// sits half a Task under it and the bottom half a Task under the content,
+// never below what a name needs; "expand lane X" promises one Task row (or the
+// number said) at the bottom, nothing inside moving. Half a Task and a Task row
+// are the sentence's measures, written here on purpose rather than imported.
+
+const HALF_TASK = 32;
+const ONE_TASK_ROW = 64;
+const TOL = 1;
+
+/** What a container's OWN name needs, at the diagram's font sizes. */
+const nameNeeds = (e: DiagramElement, d: DiagramData) => (e.type === "pool"
+  ? poolMetrics(e.label ?? "", d.poolFontSize ?? 16).minHeight
+  : laneMetrics(e.label ?? "", d.laneFontSize ?? 14).minHeight);
+
+/** The containers above an element, nearest first. */
+function ancestorsOf(d: DiagramData, e: DiagramElement): DiagramElement[] {
+  const out: DiagramElement[] = [];
+  let cur = byId(d, e.parentId);
+  for (let hops = 0; cur && hops < 20; hops++) { out.push(cur); cur = byId(d, cur.parentId); }
+  return out;
+}
+
+/** Everything inside a band that is not itself a band: children, theirs, and the events mounted on them. */
+function contentOf(d: DiagramData, id: string): DiagramElement[] {
+  const ids = new Set<string>([id]);
+  for (let pass = 0; pass < 20; pass++) {
+    const n = ids.size;
+    for (const e of d.elements) {
+      if ((e.parentId && ids.has(e.parentId)) || (e.boundaryHostId && ids.has(e.boundaryHostId))) ids.add(e.id);
+    }
+    if (ids.size === n) break;
+  }
+  ids.delete(id);
+  return d.elements.filter((e) => ids.has(e.id) && !isLaneLike(e));
+}
+
+/** The band and every band inside it, top to bottom. */
+function bandsOf(d: DiagramData, band: DiagramElement): DiagramElement[] {
+  return [band, ...childLanes(d, band.id).sort((a, b) => a.y - b.y).flatMap((k) => bandsOf(d, k))];
+}
+
+/** A band's stack fills it exactly, at every depth — the swimlane rule. What breaks it, or "". */
+function stackGap(d: DiagramData, band: DiagramElement): string {
+  const kids = childLanes(d, band.id).sort((a, b) => a.y - b.y);
+  if (!kids.length) return "";
+  let y = band.y;
+  for (const k of kids) {
+    if (Math.abs(k.y - y) > TOL) return `${nameOf(k)} starts at ${k.y}, not at ${y}`;
+    y = k.y + k.height;
+    const inner = stackGap(d, k);
+    if (inner) return inner;
+  }
+  return Math.abs(y - (band.y + band.height)) > TOL
+    ? `the bands in ${nameOf(band)} end at ${y}, not at its bottom (${band.y + band.height})` : "";
+}
+
+const within = (e: DiagramElement, band: DiagramElement) =>
+  e.y >= band.y - TOL && e.y + e.height <= band.y + band.height + TOL;
+
+/**
+ * The drawn routes between two things in `ids`, each as the height it spans. A
+ * rework loop dragged under a row is what its band shows as much as the tasks
+ * it joins: a compress that left it in the lane below clipped it.
+ */
+function routeSpans(d: DiagramData, ids: ReadonlySet<string>): Array<{ c: Connector; top: number; bottom: number }> {
+  return d.connectors
+    .filter((c) => c.waypoints?.length && ids.has(c.sourceId) && ids.has(c.targetId))
+    .map((c) => ({ c, top: Math.min(...c.waypoints.map((p) => p.y)), bottom: Math.max(...c.waypoints.map((p) => p.y)) }));
+}
+const spanWithin = (s: { top: number; bottom: number }, band: DiagramElement) =>
+  s.top >= band.y - TOL && s.bottom <= band.y + band.height + TOL;
+const flowName = (d: DiagramData, c: Connector) => `the flow from ${nameOf(byId(d, c.sourceId))} to ${nameOf(byId(d, c.targetId))}`;
+const centreWithin = (e: DiagramElement, band: DiagramElement) => {
+  const c = centre(e);
+  return c.x >= band.x && c.x <= band.x + band.width && c.y >= band.y && c.y <= band.y + band.height;
+};
+
+/** "compress the X lane" — see the section comment for what it promises. */
+function laneWasFitted(before: DiagramData, after: DiagramData, id: string | undefined): EffectCheck {
+  const b = byId(before, id), a = byId(after, id);
+  if (!a || !b) return fail("the lane went missing");
+  if (a.height > b.height + TOL) return fail(`${nameOf(a)} grew from ${b.height} to ${a.height} — a compress never makes a lane taller`);
+  const floor = nameNeeds(a, after);
+  if (a.height < Math.min(floor, b.height) - TOL) return fail(`${nameOf(a)} is ${a.height} tall, under the ${floor} its name needs`);
+  if (Math.abs(a.y - b.y) > TOL) return fail(`the top of ${nameOf(a)} moved (${b.y} → ${a.y})`);
+
+  const poolWas = ancestorsOf(before, b).find((e) => e.type === "pool");
+  if (poolWas) {
+    // The lanes above it did not move.
+    for (const x of before.elements) {
+      if (!isLaneLike(x) || x.id === b.id || !inAPoolId(before, x, poolWas.id) || x.y + x.height > b.y + TOL) continue;
+      const now = byId(after, x.id);
+      if (!now || Math.abs(now.y - x.y) > TOL || Math.abs(now.height - x.height) > TOL) return fail(`${nameOf(x)}, above ${nameOf(a)}, moved`);
+    }
+    // And the pool is not shorter than its own name.
+    const poolNow = byId(after, poolWas.id);
+    if (poolNow) {
+      const pf = nameNeeds(poolNow, after);
+      if (poolNow.height < Math.min(pf, poolWas.height) - TOL) return fail(`${nameOf(poolNow)} is ${poolNow.height} tall, under the ${pf} its name needs`);
+    }
+  }
+
+  const gap = stackGap(after, a);
+  if (gap) return fail(gap);
+
+  // Whatever sat inside a band of it still does.
+  for (const band0 of bandsOf(before, b)) {
+    const band = byId(after, band0.id);
+    if (!band) return fail(`${nameOf(band0)} went missing`);
+    const held = contentOf(before, band0.id);
+    for (const e of held) {
+      const now = byId(after, e.id);
+      if (now && within(e, band0) && !within(now, band)) return fail(`${nameOf(now)} is no longer inside ${nameOf(band)}`);
+    }
+    const spansNow = new Map(routeSpans(after, new Set(held.map((e) => e.id))).map((s) => [s.c.id, s] as const));
+    for (const was of routeSpans(before, new Set(held.map((e) => e.id)))) {
+      const now = spansNow.get(was.c.id);
+      if (now && spanWithin(was, band0) && !spanWithin(now, band)) return fail(`${flowName(after, was.c)} is no longer inside ${nameOf(band)}`);
+    }
+  }
+
+  // Half a Task round the content of each band, unless a name needs more. The
+  // lane's bottom band keeps what the containers above it need.
+  const leaves = bandsOf(after, a).filter((x) => childLanes(after, x.id).length === 0);
+  const last = leaves[leaves.length - 1];
+  const atFloor = (e: DiagramElement) => e.height <= nameNeeds(e, after) + TOL;
+  const aboveLast = last ? ancestorsOf(after, last) : [];
+  // A band with sub-lanes shows nothing of its own: a step it owns is shown in
+  // the sub-lane it lies in (a stamped sub-lane is never given it).
+  const stacked = new Set(bandsOf(after, a).filter((x) => childLanes(after, x.id).length > 0).map((x) => x.id));
+  for (const leaf of leaves) {
+    const governed = atFloor(leaf) || (leaf.id === last?.id && aboveLast.some(atFloor));
+    // What the band SHOWS: what it holds; a free note lying in it, though nobody
+    // owns it; a step owned by a lane above it that lies in it; and a route
+    // drawn between two of those.
+    const strays = after.elements.filter((e) => !isLaneLike(e) && !e.boundaryHostId && centreWithin(e, leaf)
+      && ((isLaneUnowned(e) && !e.parentId) || (!!e.parentId && stacked.has(e.parentId))));
+    const inside = [...contentOf(after, leaf.id), ...strays.flatMap((e) => [e, ...contentOf(after, e.id)])];
+    if (!inside.length) {
+      if (!governed) return fail(`${nameOf(leaf)} holds nothing and is taller than its name needs`);
+      continue;
+    }
+    const spans = [
+      ...inside.map((e) => ({ top: e.y, bottom: e.y + e.height })),
+      ...routeSpans(after, new Set(inside.map((e) => e.id))),
+    ];
+    const top = Math.min(...spans.map((s) => s.top)) - leaf.y;
+    const bottom = leaf.y + leaf.height - Math.max(...spans.map((s) => s.bottom));
+    if (top > HALF_TASK + TOL) return fail(`${nameOf(leaf)} leaves ${top}px above its content — more than half a Task`);
+    if (bottom > HALF_TASK + TOL && !governed) return fail(`${nameOf(leaf)} leaves ${bottom}px under its content — more than half a Task, and no name needs it`);
+  }
+  return pass;
+}
+
+/** "expand lane X [by N]" — taller by exactly that at the bottom, its stack still filling it, nothing inside moved. */
+function laneGrewBy(by: number, before: DiagramData, after: DiagramData, id: string | undefined): EffectCheck {
+  const b = byId(before, id), a = byId(after, id);
+  if (!a || !b) return fail("the lane went missing");
+  const grew = a.height - b.height;
+  if (Math.abs(grew - by) > TOL) return fail(`${nameOf(a)} grew by ${grew}px, not ${by}px`);
+  const gap = stackGap(after, a);
+  if (gap) return fail(gap);
+  for (const e of contentOf(before, b.id)) {
+    const now = byId(after, e.id);
+    if (now && Math.abs((now.y - a.y) - (e.y - b.y)) > TOL) return fail(`${nameOf(now)} moved inside ${nameOf(a)}`);
+  }
+  return pass;
 }
 
 /**
@@ -198,8 +373,19 @@ export function checkEffect(op: AssistOp, before: DiagramData, after: DiagramDat
       return (op.direction === "down" ? a.y > b.y : a.y < b.y) ? pass : fail(`${nameOf(a)} did not move ${op.direction}`);
     }
 
+    case "compressLane":
+      return laneWasFitted(before, after, refs.laneRef);
+
+    case "expandLane":
+      return laneGrewBy(op.distance ?? ONE_TASK_ROW, before, after, refs.laneRef);
+
     case "compressPool": {
-      const b = byId(before, refs.poolRef), a = byId(after, refs.poolRef);
+      // No kind word was said, and the name was a LANE's: the sentence then
+      // promised what "compress the X lane" promises. Checked as a pool, a lane
+      // that did nothing passed — its "pool" had not grown.
+      const target = byId(before, refs.poolRef);
+      if (target && isLaneLike(target)) return laneWasFitted(before, after, target.id);
+      const b = target, a = byId(after, refs.poolRef);
       if (!a || !b) return fail("the pool went missing");
       // "Compress" FITS the pool to what is in it — half a Task height clear
       // above and below — which can mean a little taller when the contents sat

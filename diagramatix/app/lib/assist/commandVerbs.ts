@@ -43,6 +43,28 @@ export const COMPRESS_COMMAND_VERBS = ["compress", "shrink"] as const;
 export const COMPRESS_VERB_SOURCE = `(?:compress(?:es|ed|ing)?|${COMPRESS_VERBS.filter((v) => v !== "compress").join("|")})`;
 
 /**
+ * Every verb that means "make it bigger" — TALLER when a lane is named ("expand
+ * lane X", Paul 2026-09-26), WIDER when the pools are ("expand the pools" is
+ * extend). ONE list, read by the lane rule (compressPhrase.ts), the extend rule
+ * (commandGrammar.ts) and the AI prompt (route.ts), so a verb one of them
+ * learns, all of them know.
+ */
+export const EXPAND_VERBS = ["expand", "grow", "enlarge"] as const;
+
+/** A verb with the forms people say — "expanded", "grows", "enlarging". A form no one says ("growed") costs nothing. */
+const inflected = (v: string) => (v.endsWith("e") ? `${v.slice(0, -1)}(?:e|es|ed|ing)` : `${v}(?:s|ed|ing)?`);
+
+/** An expand verb as a regex source, with its inflections. */
+export const EXPAND_VERB_SOURCE = `(?:${EXPAND_VERBS.map(inflected).join("|")})`;
+
+/**
+ * Only "expand" marks a command: "grow" and "enlarge" say the same thing, but
+ * rarely, and a held bare "Grow." would wait ~12 s for nothing — the same call
+ * as the rarer compress verbs.
+ */
+export const EXPAND_COMMAND_VERB: (typeof EXPAND_VERBS)[number] = "expand";
+
+/**
  * The verbs a spoken command starts with. A bare one is held for the rest of
  * the sentence (`isIncompleteCommand`) — moved here verbatim, so the hold's
  * decisions are exactly what they were.
@@ -51,7 +73,7 @@ export const COMMAND_VERBS = [
   "swap", "rename", "relabel", "label", "edit", "move", "slide", "nudge", "bump", "shift",
   "connect", "link", "join", "disconnect", "unlink", "delete", "remove",
   "add", "insert", "create", "put", "send", "draw", "attach", "place",
-  ...COMPRESS_COMMAND_VERBS, "extend", "widen", "wrap", "surround", "enclose", "unwrap", "dissolve",
+  ...COMPRESS_COMMAND_VERBS, EXPAND_COMMAND_VERB, "extend", "widen", "wrap", "surround", "enclose", "unwrap", "dissolve",
   "call", "change", "set",
 ] as const;
 

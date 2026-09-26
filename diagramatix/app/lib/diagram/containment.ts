@@ -47,6 +47,32 @@ export function poolOf(el: DiagramElement | undefined, byId: ElementIndex): Diag
   return null;
 }
 
+/**
+ * Every element that travels with a container: its children, theirs, and the
+ * events mounted on any of them. Lifted out of useDiagram.ts (which re-exports
+ * it) so the pure lane geometry (laneFit.ts) walks the same tree the reducer
+ * does, without importing the reducer.
+ */
+export function getAllDescendantIds(elements: DiagramElement[], containerId: string): Set<string> {
+  const result = new Set<string>();
+  const queue = [containerId];
+  while (queue.length) {
+    const id = queue.shift()!;
+    for (const e of elements) {
+      // Walk BOTH the parent-child edge AND the boundary-host edge so a
+      // boundary event whose host is inside this container is treated
+      // as a descendant. Without the boundaryHostId branch, dragging a
+      // Lane / Pool that contains a Task with a boundary error event
+      // would leave the boundary event behind.
+      if ((e.parentId === id || e.boundaryHostId === id) && !result.has(e.id)) {
+        result.add(e.id);
+        queue.push(e.id);
+      }
+    }
+  }
+  return result;
+}
+
 /** Is `child` a descendant of container `ancestorId` (via the parentId chain)? */
 export function isInside(child: DiagramElement, ancestorId: string, byId: ElementIndex): boolean {
   let cur: DiagramElement | undefined = child;

@@ -25,6 +25,11 @@ const TABLE: Readonly<Record<string, Readonly<Record<string, RefKind>>>> = {
   movePoolTo: { ref: "pool", relativeTo: "pool" },
   swapPools: { a: "pool", b: "pool" },
   addPool: { relativeTo: "pool" },
+  // A lane word was said ("compress the Sales lane"), so only a lane — of any
+  // depth — can answer, never a pool called Sales: a kind word you say is
+  // binding (adopted by Paul, 2026-09-26).
+  compressLane: { laneRef: "lane" },
+  expandLane: { laneRef: "lane" },
 };
 
 /** The kind `op.field` must name, or undefined when any element will do. */

@@ -46,6 +46,14 @@ export type AssistOp =
   | { op: "addSublanes"; laneRef: Ref; labels: string[] }
   | { op: "swapLanes"; laneA: Ref; laneB: Ref }
   | { op: "compressPool"; poolRef: Ref }
+  /**
+   * "compress the Underwriters lane" — fit ONE lane (or sub-lane) to its
+   * content at its bottom edge; the lanes below close up and the pool shrinks
+   * (Paul, 2026-09-26). `laneRef` names a lane only (refKinds.ts).
+   */
+  | { op: "compressLane"; laneRef: Ref }
+  /** "expand lane Underwriters [by 100]" — taller at the bottom: one Task row, or `distance`. */
+  | { op: "expandLane"; laneRef: Ref; distance?: number }
   | { op: "extendPools" }
   /** A 20px step in any direction — any element, or the whole selection ("nudge these left"). */
   | { op: "nudgePool"; ref?: Ref; direction: "up" | "down" | "left" | "right"; distance?: number }
@@ -250,6 +258,15 @@ export function validateOp(raw: unknown): AssistOp | null {
       return isRef(o.laneA) && isRef(o.laneB) ? { op: "swapLanes", laneA: (o.laneA as string).trim(), laneB: (o.laneB as string).trim() } : null;
     case "compressPool":
       return isRef(o.poolRef) ? { op: "compressPool", poolRef: (o.poolRef as string).trim() } : null;
+    case "compressLane":
+      return isRef(o.laneRef) ? { op: "compressLane", laneRef: (o.laneRef as string).trim() } : null;
+    case "expandLane": {
+      if (!isRef(o.laneRef)) return null;
+      const op: AssistOp = { op: "expandLane", laneRef: (o.laneRef as string).trim() };
+      // Clamped as moveLane's is: a whole number of pixels, at least one.
+      if (Number.isFinite(o.distance)) op.distance = Math.max(1, Math.round(Number(o.distance)));
+      return op;
+    }
     case "extendPools":
       return { op: "extendPools" };
     case "movePoolBoundary": {

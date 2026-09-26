@@ -50,7 +50,9 @@ import { planMovePool, planSwapPools, type PoolPosition } from "@/app/lib/diagra
 import { autoResizeUmlElement, sizeUmlNote } from "@/app/lib/diagram/umlAutoSize";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { getElementPoolId } from "@/app/lib/diagram/poolUtil";
-import { isLaneUnowned, edgeEventParentId } from "@/app/lib/diagram/containment";
+import { isLaneUnowned, edgeEventParentId, getAllDescendantIds } from "@/app/lib/diagram/containment";
+import { setBandHeightAtBottom, fitLaneToContent, bandContentIds, type LaneFonts } from "@/app/lib/diagram/laneFit";
+import { isAnyLane } from "@/app/lib/diagram/laneKind";
 import { isBlackBoxPool } from "@/app/lib/diagram/blackBoxPoolMenu";
 import { planTemplateAdoption, boxOf } from "@/app/lib/diagram/templateAdoption";
 import { CHEVRON_THEMES, chevronReadingOrder } from "@/app/lib/diagram/chevronThemes";
@@ -489,6 +491,10 @@ export type Action =
   | { type: "ADD_POOL"; payload: { label?: string; poolType?: string; position?: "above" | "below"; relativeToId?: string } }
   | { type: "ADD_LANE_AT"; payload: { poolId: string; label?: string; position: "above" | "below"; refLaneId: string } }
   | { type: "COMPRESS_POOL"; payload: { poolId: string } }
+  /** Fit one lane (or sub-lane) to its content at its bottom edge — laneFit.ts. */
+  | { type: "COMPRESS_LANE"; payload: { laneId: string } }
+  /** Make one lane (or sub-lane) `by` taller at its bottom edge; its last sub-lane takes it. */
+  | { type: "EXPAND_LANE"; payload: { laneId: string; by: number } }
   | { type: "EXTEND_POOLS"; payload: Record<string, never> }
   | { type: "MOVE_LANE_BOUNDARY"; payload: { aboveLaneId: string; belowLaneId: string; dy: number } }
   | { type: "MOVE_VSWIMLANE_BOUNDARY"; payload: { kind: "divider" | "left" | "right" | "bottom"; delta: number; leftId?: string; rightId?: string } }
@@ -628,25 +634,10 @@ function centreInContainer(cx: number, cy: number, b: DiagramElement): boolean {
   return cx >= r.x && cx <= r.x + r.width && cy >= r.y && cy <= r.y + r.height;
 }
 
-export function getAllDescendantIds(elements: DiagramElement[], containerId: string): Set<string> {
-  const result = new Set<string>();
-  const queue = [containerId];
-  while (queue.length) {
-    const id = queue.shift()!;
-    for (const e of elements) {
-      // Walk BOTH the parent-child edge AND the boundary-host edge so a
-      // boundary event whose host is inside this container is treated
-      // as a descendant. Without the boundaryHostId branch, dragging a
-      // Lane / Pool that contains a Task with a boundary error event
-      // would leave the boundary event behind.
-      if ((e.parentId === id || e.boundaryHostId === id) && !result.has(e.id)) {
-        result.add(e.id);
-        queue.push(e.id);
-      }
-    }
-  }
-  return result;
-}
+// Defined in containment.ts, where the pure lane geometry (laneFit.ts) can
+// walk the same tree without importing the reducer; the editor and the apply
+// layer import it from here.
+export { getAllDescendantIds };
 
 /**
  * Re-home lane-scoped flow elements into the lane that geometrically contains
@@ -2548,6 +2539,11 @@ export function cascadePoolsBelow(
  * element moved; failing an association, with the innermost lane or pool its
  * centre sat in (its band), when that moved. `keep` holds notes the caller has
  * already placed (a template's own notes ride with the template).
+ *
+ * One exception, on purpose: "compress lane" moves a note with the band it
+ * lies in, whatever it is associated to, because the fit measures what each
+ * band shows (laneFit.ts `lendToBands`). A note it has moved is not moved
+ * again here.
  */
 function unownedNotesFollow(
   before: DiagramElement[],
@@ -2679,6 +2675,11 @@ export function settleGrowth(
 /** The diagram-wide settings `settleGrowth` reads. */
 function settleOptsOf(state: DiagramData): { relaxed: boolean; fontSize: number } {
   return { relaxed: !!state.relaxedLayout, fontSize: state.connectorFontSize ?? 10 };
+}
+
+/** The font sizes a lane's and a pool's names are measured at (laneFit.ts). */
+function laneFontsOf(state: DiagramData): LaneFonts {
+  return { poolFs: state.poolFontSize ?? 16, laneFs: state.laneFontSize ?? 14 };
 }
 
 /**
@@ -2865,10 +2866,12 @@ function rescaleSublanesRecursive(
  * and a second copy of "grow a band and keep the stack tight" is the kind of
  * duplicate that goes stale in one place.
  *
- * Everything that must move, moves: the lane's own contents stay with it, the
- * siblings below it (and their whole subtrees) go down by the growth, and each
- * ancestor grows in turn, shifting ITS later siblings too. Returns the same
- * array when the lane is already tall enough.
+ * GROW-ONLY. The height itself is set by `setBandHeightAtBottom` (laneFit.ts),
+ * which "compress lane" and "expand lane" use too (Paul, 2026-09-26): one
+ * setter, so the lanes below, the ancestors and the lane's own sub-lanes are
+ * moved the same way whichever way the height goes. Returns the same array
+ * when the lane is already tall enough. `edge` is which of its sub-lanes takes
+ * the growth (the setter's).
  *
  * GEOMETRY ONLY: the pools below, free notes and connectors are the caller's
  * one `settleGrowth` after all its geometry.
@@ -2877,73 +2880,11 @@ function growLaneToHeight(
   baseElements: DiagramElement[],
   laneId: string,
   minHeight: number,
+  edge: StackEdge = "last",
 ): DiagramElement[] {
-  const lane = baseElements.find((e) => e.id === laneId && e.type === "lane");
+  const lane = baseElements.find((e) => e.id === laneId && isAnyLane(e));
   if (!lane || lane.height >= minHeight) return baseElements;
-  let elements = baseElements;
-  const growBy = minHeight - lane.height;
-
-  const siblings = elements
-    .filter((e) => e.type === "lane" && e.parentId === lane.parentId)
-    .sort((a, b) => a.y - b.y);
-  const idx = siblings.findIndex((sib) => sib.id === laneId);
-  const moveDownIds = new Set(siblings.slice(idx + 1).map((sib) => sib.id));
-
-  // Collect descendants of THIS lane and of every sibling below — they need to
-  // shift down together so contents stay anchored.
-  const descendants = new Set<string>();
-  function collectDesc(rootId: string) {
-    for (const e of elements) {
-      if (e.parentId === rootId || e.boundaryHostId === rootId) {
-        descendants.add(e.id);
-        collectDesc(e.id);
-      }
-    }
-  }
-  for (const sib of siblings.slice(idx + 1)) collectDesc(sib.id);
-
-  elements = elements.map((e) => {
-    if (e.id === lane.id) return { ...e, height: e.height + growBy };
-    if (moveDownIds.has(e.id) || descendants.has(e.id)) return { ...e, y: e.y + growBy };
-    return e;
-  });
-
-  // Propagate the growth UPWARD: a parent lane (if this is a sublane) and the
-  // pool eventually contain more. At each level, shift the just-grown
-  // ancestor's later siblings down so they are not overlapped by it.
-  let cur = elements.find((e) => e.id === lane.parentId);
-  while (cur) {
-    if (cur.type === "pool" || cur.type === "lane") {
-      const grownId = cur.id;
-      const shiftIds = new Set<string>();
-      if (cur.parentId) {
-        const ancestorSibs = elements
-          .filter((e) => e.type === "lane" && e.parentId === cur!.parentId)
-          .sort((a, b) => a.y - b.y);
-        const ai = ancestorSibs.findIndex((sib) => sib.id === grownId);
-        for (const sib of ancestorSibs.slice(ai + 1)) {
-          shiftIds.add(sib.id);
-          const stack = [sib.id];
-          while (stack.length) {
-            const cid = stack.pop()!;
-            for (const e of elements) {
-              if ((e.parentId === cid || e.boundaryHostId === cid) && !shiftIds.has(e.id)) {
-                shiftIds.add(e.id);
-                stack.push(e.id);
-              }
-            }
-          }
-        }
-      }
-      elements = elements.map((e) => {
-        if (e.id === grownId) return { ...e, height: e.height + growBy };
-        if (shiftIds.has(e.id)) return { ...e, y: e.y + growBy };
-        return e;
-      });
-    }
-    cur = cur.parentId ? elements.find((e) => e.id === cur!.parentId) : undefined;
-  }
-  return elements;
+  return setBandHeightAtBottom(baseElements, laneId, minHeight, { edge });
 }
 
 /** A band a child can be made room in: a lane or sub-lane, or a pool with no lanes (its own band). */
@@ -2960,9 +2901,9 @@ function roomBand(elements: DiagramElement[], id: string): DiagramElement | unde
  * no ancestors to grow, so it simply gets taller ("just grow the Pool when the
  * template is placed" — Paul, 2026-09-25). The pools below are the cascade's.
  */
-function growBandToHeight(elements: DiagramElement[], id: string, minHeight: number): DiagramElement[] {
+function growBandToHeight(elements: DiagramElement[], id: string, minHeight: number, edge: StackEdge = "last"): DiagramElement[] {
   const band = elements.find((e) => e.id === id);
-  if (band?.type !== "pool") return growLaneToHeight(elements, id, minHeight);
+  if (band?.type !== "pool") return growLaneToHeight(elements, id, minHeight, edge);
   return band.height >= minHeight ? elements : elements.map((e) => (e.id === id ? { ...e, height: minHeight } : e));
 }
 
@@ -2971,16 +2912,19 @@ function growBandToHeight(elements: DiagramElement[], id: string, minHeight: num
  * above is in the way) and everything in it moves down by `by`, so nothing in
  * it moves relative to anything else in it, and a flow into it from the side
  * stays level. "Everything in it" is its descendants and the free notes lying
- * in it.
+ * in it — `bandContentIds`, the same set "compress lane" slides up.
+ *
+ * A band with sub-lanes: its FIRST sub-lane takes the room, at its top, and the
+ * others are moved by the growth itself — so only what is not a lane is carried
+ * here. Grown at the last sub-lane and carried as well, the last sub-lane went
+ * twice as far and ran into the lane below.
  */
 function growLaneAtTop(elements: DiagramElement[], id: string, by: number): DiagramElement[] {
   const band = elements.find((e) => e.id === id);
   if (!band || by <= 0) return elements;
-  const inBand = (e: DiagramElement) => centreInContainer(e.x + e.width / 2, e.y + e.height / 2, band);
-  const carried = new Set(getAllDescendantIds(elements, id));
-  for (const e of elements) if (isLaneUnowned(e) && !e.parentId && inBand(e)) carried.add(e.id);
-  return growBandToHeight(elements, id, band.height + by)
-    .map((e) => (carried.has(e.id) ? { ...e, y: e.y + by } : e));
+  const carried = bandContentIds(elements, id);
+  const grown = growBandToHeight(elements, id, band.height + by, "first");
+  return grown.map((e) => (carried.has(e.id) && !isAnyLane(e) ? { ...e, y: e.y + by } : e));
 }
 
 /**
@@ -3752,6 +3696,10 @@ function tracePerActionRouteDiff(
 // divider drag are covered uniformly instead of per-return.
 const LANE_RECONCILE_ACTIONS = new Set<Action["type"]>([
   "ADD_ELEMENT", "ADD_LANE", "ADD_SUBLANE", "MOVE_LANE_BOUNDARY", "DELETE_ELEMENT",
+  // A lane made taller: its content moves with it, and whatever it moved must
+  // still be owned by the band it now sits in. (COMPRESS_LANE re-derives
+  // ownership BEFORE its fit — see its case.)
+  "EXPAND_LANE",
   // Commit points of a drag: resizing a lane's edge or dragging a lane/element
   // changes which lane encloses what, just as much as adding or deleting one.
   // Hooked at the END of the gesture (not every intermediate frame) so the pass
@@ -9570,6 +9518,34 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       return { ...state, elements: updatePoolTypes(els), connectors: recomputeAllConnectors(state.connectors, els) };
     }
 
+    // "Compress lane X" / "expand lane X" (Paul, 2026-09-26: the BOTTOM EDGE
+    // moves). The geometry is laneFit.ts, one setter shared with every lane
+    // that grows to fit; then ONE settle, so connectors and free notes follow
+    // and, on an expand, the 100-px rule pushes the pools below. A compress
+    // pushes nothing: the cascade is growth-only, so the pools below stay put.
+    //
+    // Ownership FIRST: the fit moves a band's content with the band, so what a
+    // band holds must be what lies in it. A step left owned by the pool, or by
+    // a lane it no longer lies in, was left behind by the fit — clipped — and
+    // then re-homed by the membership pass into whatever lane it had ended up
+    // in. After the fit, ownership is right by construction, so this action is
+    // not in LANE_RECONCILE_ACTIONS: a lane already fitted returns the state
+    // untouched, and "already fitted" is the truth.
+    case "COMPRESS_LANE": {
+      const owned = reconcileLaneMembership(state.elements);
+      const fitted = fitLaneToContent(owned, action.payload.laneId, { fonts: laneFontsOf(state), connectors: state.connectors });
+      if (fitted === owned) return state;
+      return { ...state, ...settleGrowth(owned, fitted, state.connectors, settleOptsOf(state)) };
+    }
+
+    case "EXPAND_LANE": {
+      const { laneId, by } = action.payload;
+      const lane = state.elements.find((e) => e.id === laneId && isAnyLane(e));
+      if (!lane || !(by > 0)) return state;
+      const grown = setBandHeightAtBottom(state.elements, laneId, lane.height + by, { fonts: laneFontsOf(state) });
+      return { ...state, ...settleGrowth(state.elements, grown, state.connectors, settleOptsOf(state)) };
+    }
+
     // Extend the pools rightward to include every element, then make ALL pools
     // the SAME width so a stack of pools stays aligned. Lanes/sublanes widen to
     // their pool's new right edge.
@@ -9783,12 +9759,14 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       const poolFsNow = state.poolFontSize ?? 16;
       const laneFsNow2 = state.laneFontSize ?? 14;
       // The tree, not a flat list: the room a lane has is the room ITS edge
-      // band has, recursively — see `shrinkRoom`.
+      // band has, recursively — see `shrinkRoom`. Both shapes of a sub-lane
+      // (laneKind.ts): `refitStackAtEdge` below re-fits a stamped one, so the
+      // clamp must know it is there, or the drag runs past its floor.
       const bandTree = (lane: DiagramElement, depth = 0): Band => ({
         height: lane.height,
         min: Math.max(MIN_H, laneMetrics(lane.label ?? "", laneFsNow2).minHeight),
         bands: depth > 12 ? [] : state.elements
-          .filter((e) => e.type === "lane" && e.parentId === lane.id)
+          .filter((e) => isAnyLane(e) && e.parentId === lane.id)
           .sort((a, b) => a.y - b.y)
           .map((sub) => bandTree(sub, depth + 1)),
       });
@@ -10984,6 +10962,16 @@ export function useDiagram(initialData: DiagramData) {
     dispatch({ type: "COMPRESS_POOL", payload: { poolId } });
   }, []);
 
+  const compressLane = useCallback((laneId: string) => {
+    pushHistory(snapshotData());
+    dispatch({ type: "COMPRESS_LANE", payload: { laneId } });
+  }, []);
+
+  const expandLane = useCallback((laneId: string, by: number) => {
+    pushHistory(snapshotData());
+    dispatch({ type: "EXPAND_LANE", payload: { laneId, by } });
+  }, []);
+
   const extendPools = useCallback(() => {
     pushHistory(snapshotData());
     dispatch({ type: "EXTEND_POOLS", payload: {} });
@@ -11297,6 +11285,8 @@ export function useDiagram(initialData: DiagramData) {
     addPool,
     addLaneAt,
     compressPool,
+    compressLane,
+    expandLane,
     extendPools,
     moveLaneBoundary,
     moveVSwimlaneBoundary,

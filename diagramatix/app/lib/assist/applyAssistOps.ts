@@ -33,7 +33,9 @@ import { isBoundaryHost } from "@/app/lib/diagram/boundaryHosts";
 import { resolveRef, resolveSelectionRefs, isSelectionRef, nearestRefs, ID_REF_PREFIX, spokenNumbersAsDigits } from "./resolveRef";
 import { isPointerElementRef } from "./pointerRef";
 import { nextContainerLabels } from "@/app/lib/diagram/containerNames";
-import { isAnyLane, laneKindWord, sameKindAs } from "@/app/lib/diagram/laneKind";
+import { isAnyLane, isSublane, laneKindWord, sameKindAs } from "@/app/lib/diagram/laneKind";
+import { LANE_EXPAND_STEP } from "@/app/lib/diagram/laneFit";
+import { containerWordKind } from "./containerWords";
 import { convertMatches, matchesForType } from "./convertPhrase";
 import { planLabelFill } from "./fillSelection";
 import { findRiskCatalogItem } from "./riskCatalogRef";
@@ -84,6 +86,8 @@ export interface AssistDiagramActions {
   addPool(opts?: { label?: string; poolType?: string; position?: "above" | "below"; relativeToId?: string }): void;
   addLaneAt(poolId: string, position: "above" | "below", refLaneId: string, label?: string): void;
   compressPool(poolId: string): void;
+  compressLane(laneId: string): void;
+  expandLane(laneId: string, by: number): void;
   extendPools(): void;
   swapLane(laneId: string, direction: "up" | "down"): void;
   moveLane(laneId: string, direction: "up" | "down", distance?: number): void;
@@ -108,11 +112,26 @@ export interface AssistUi {
   setGoldFlash(on: boolean): void;
 }
 
+/**
+ * The diagram's own settings the reducer reads — the fonts its names are
+ * measured at, its layout mode. A command that asks the reducer first
+ * (`wouldChange`) must ask about THIS diagram: asked at the default fonts, a
+ * lane at its 20 px name floor was "compressed" (nothing changed) and one at a
+ * 10 px floor was "already fitted" (it would have shrunk).
+ */
+export type AssistDiagramSettings = Pick<DiagramData, "poolFontSize" | "laneFontSize" | "connectorFontSize" | "relaxedLayout">;
+
+/** A diagram's settings for the apply context — one list, read by the editor and the headless harness alike. */
+export function assistSettingsOf(d: AssistDiagramSettings): AssistDiagramSettings {
+  return { poolFontSize: d.poolFontSize, laneFontSize: d.laneFontSize, connectorFontSize: d.connectorFontSize, relaxedLayout: d.relaxedLayout };
+}
+
 export interface AssistApplyContext {
   /** The diagram BEFORE the batch. React does not re-render mid-batch, so the
    *  working copy below threads each op's effect forward itself. */
   elements: DiagramElement[];
   connectors: Connector[];
+  settings: AssistDiagramSettings;
   riskCatalog: RiskCatalogItem[];
   actions: AssistDiagramActions;
   ui: AssistUi;
@@ -159,7 +178,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
   const {
     addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, updateConnectorLabel,
     deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool,
-    wrapInSubprocess, wrapInContainer, unwrapSubprocess, addPool, addLaneAt, compressPool, extendPools,
+    wrapInSubprocess, wrapInContainer, unwrapSubprocess, addPool, addLaneAt, compressPool, compressLane, expandLane, extendPools,
     swapLane, moveLane, moveElements, elementsMoveEnd, removeSpace, updateConnectorEndpoint, movePoolTo,
     swapPools, resizeElement, resizeElementEnd, alignElements,
   } = ctx.actions;
@@ -181,10 +200,11 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
    * Would this reducer action change the diagram as it stands mid-batch? Some
    * actions decline silently when there is no room — right for a drag, which
    * simply stops — and a spoken command must not report success for them. The
-   * REDUCER answers, so its room rule is never copied here.
+   * REDUCER answers, so its room rule is never copied here — and it answers
+   * about this diagram, its own fonts and layout mode included.
    */
   const preview = (action: Action): DiagramData | null => {
-    const now = { elements: els, connectors: data.connectors, viewport: { x: 0, y: 0, zoom: 1 } } as DiagramData;
+    const now = { ...ctx.settings, elements: els, connectors: data.connectors, viewport: { x: 0, y: 0, zoom: 1 } } as DiagramData;
     const next = reducer(now, action);
     return next === now ? null : next;
   };
@@ -240,6 +260,37 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
   /** Resolve one field of an op, bounded by the kind refKinds.ts says that field names. */
   const resolveField = <O extends AssistOp>(op: O, field: keyof O & string, opts: { strict?: boolean } = {}) =>
     resolve1(String(op[field] ?? ""), { ...opts, kind: refKind(op.op, field) });
+  /**
+   * A BARE KIND — "compress lane", "expand the lane", "compress the pool" —
+   * names no one thing. The mouse may: exactly one of that kind selected is the
+   * one meant (the mouse says which, the voice says what). Otherwise the strict
+   * resolve asks, numbered, and never takes the newest — compressing the wrong
+   * lane is a large, quiet edit. "lane" takes a selected lane of either depth;
+   * "sublane" only a sub-lane.
+   */
+  const selectedOfBareKind = (ref: string): DiagramElement | null => {
+    const kind = containerWordKind(ref.trim().replace(/^the\s+/i, ""));
+    if (!kind) return null;
+    const sel = selectedIds
+      .map((id) => els.find((e) => e.id === id))
+      .filter((e): e is DiagramElement => !!e)
+      .filter((e) => (kind === "pool" ? e.type === "pool" : kind === "sublane" ? isSublane(e, els) : isAnyLane(e)));
+    return sel.length === 1 ? sel[0] : null;
+  };
+  /**
+   * Fit a lane (or sub-lane) to its content — laneFit.ts, via the reducer. The
+   * reducer is ASKED first: a lane already fitted says so, rather than
+   * reporting a change that did not happen.
+   */
+  const compressTheLane = (lane: DiagramElement) => {
+    if (!wouldChange({ type: "COMPRESS_LANE", payload: { laneId: lane.id } })) {
+      results.push(`${nameOf(lane)} is already fitted to its content`);
+      anyFail = true;
+      return;
+    }
+    compressLane(lane.id);
+    results.push(`compressed ${nameOf(lane)} to its content`);
+  };
   // "delete selected" on an expanded subprocess DISSOLVES it: the shell and
   // its Start/End go, the contents are spliced back into the flow and the
   // room the shell used is given back — the reverse of "surround selected"
@@ -698,21 +749,43 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
     }
 
     if (op.op === "compressPool") {
-      // Strict: "compress the pool" with several pools asks which, never
-      // takes the newest — compressing the wrong pool is a large quiet edit.
-      const p = resolveField(op, "poolRef", { strict: true });
+      // Strict: "compress the pool" with several pools asks which (unless one
+      // is selected), never takes the newest — compressing the wrong pool is a
+      // large quiet edit.
+      const p = selectedOfBareKind(op.poolRef) ?? resolveField(op, "poolRef", { strict: true });
       if ("err" in p && p.ambiguous) {
         const flow = buildPickFlow(ops, op.poolRef, p.ambiguous, els);
         if (flow) { setPickFlow(flow); results.push(flow.prompt); pickParked = true; break; }
       }
       if ("err" in p) { results.push(p.err); anyFail = true; continue; }
-      if (isAnyLane(p)) {
-        results.push(`${nameOf(p)} is a ${laneKindWord(p, els)} — say “compress the ${p.label?.trim() || laneKindWord(p, els)} lane”`);
-        anyFail = true; continue;
-      }
+      // No kind word was said ("compress Underwriters"), so the name decides:
+      // a lane is compressed as a lane. This used to dead-end at "isn't a
+      // pool", and the AI never saw the sentence.
+      if (isAnyLane(p)) { compressTheLane(p); continue; }
       if (p.type !== "pool") { results.push(`${nameOf(p)} isn't a pool`); anyFail = true; continue; }
       compressPool(p.id);
       results.push(`compressed ${nameOf(p)}`);
+      continue;
+    }
+
+    // "compress the Underwriters lane", "expand lane Claims Team by 100" (Paul,
+    // 2026-09-26). The lane word binds (refKinds.ts): only a lane can answer,
+    // and a pool of the same name is never touched. Strict, as compress pool
+    // is: a bare "compress lane" asks which, numbered, unless one is selected.
+    if (op.op === "compressLane" || op.op === "expandLane") {
+      const lane = selectedOfBareKind(op.laneRef) ?? resolveField(op, "laneRef", { strict: true });
+      if ("err" in lane && lane.ambiguous) {
+        const flow = buildPickFlow(ops, op.laneRef, lane.ambiguous, els);
+        if (flow) { setPickFlow(flow); results.push(flow.prompt); pickParked = true; break; }
+      }
+      if ("err" in lane) { results.push(lane.err); anyFail = true; continue; }
+      if (!isAnyLane(lane)) { results.push(`${nameOf(lane)} isn't a lane`); anyFail = true; continue; }
+      if (op.op === "compressLane") { compressTheLane(lane); continue; }
+      // One Task row unless a number was said — the default lives here and
+      // in laneFit.ts's constant, nowhere else.
+      const by = op.distance ?? LANE_EXPAND_STEP;
+      expandLane(lane.id, by);
+      results.push(`made ${nameOf(lane)} ${by}px taller`);
       continue;
     }
 

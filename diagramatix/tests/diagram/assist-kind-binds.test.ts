@@ -76,10 +76,12 @@ describe("T4900 — a spoken kind word reaches the command, and binds", () => {
     expect(r!.summary).toContain("Pool 3");
   });
 
-  it("a lane named where a pool must be is told so — never “isn't a pool”", () => {
-    const { r } = run("compress lane three");
-    expect(r!.ok).toBe(false);
-    expect(r!.summary).toMatch(/Lane 3.*is a lane/);
+  it("a lane named with its lane word is compressed as a lane — never “isn't a pool”", () => {
+    // Changed by design in step 4 (2026-09-26): "compress lane X" is its own command now, so Lane 3 is compressed rather than refused.
+    const { ops, r } = run("compress lane three");
+    expect(ops).toEqual([{ op: "compressLane", laneRef: "lane three" }]);
+    expect(r!.ok, r!.summary).toBe(true);
+    expect(r!.summary).toMatch(/compressed Lane 3/);
     expect(r!.summary).not.toMatch(/isn't a pool/);
   });
 
@@ -110,7 +112,8 @@ describe("T4900 — a spoken kind word reaches the command, and binds", () => {
 describe("T4901 — what the compress rule reads, and what it leaves alone", () => {
   it("the kind word is kept and moved to the front", () => {
     expect(parseCommand("compress the Customer pool")).toEqual([{ op: "compressPool", poolRef: "pool Customer" }]);
-    expect(parseCommand("shrink the Sales lane")).toEqual([{ op: "compressPool", poolRef: "lane Sales" }]);
+    // Changed by design in step 4 (2026-09-26): a lane word now makes the lane command, compressLane.
+    expect(parseCommand("shrink the Sales lane")).toEqual([{ op: "compressLane", laneRef: "lane Sales" }]);
     expect(parseCommand("compress Customer")).toEqual([{ op: "compressPool", poolRef: "Customer" }]);
     expect(parseCommand("compress the pool")).toEqual([{ op: "compressPool", poolRef: "pool" }]);
   });
@@ -122,7 +125,7 @@ describe("T4901 — what the compress rule reads, and what it leaves alone", () 
   it("plural kinds, the gap and the diagram are not a compress of one container", () => {
     for (const said of ["compress the lanes", "compress all pools", "reduce the gap between Review and Pay", "compact the diagram", "collapse the subprocess"]) {
       const ops = parseCommand(said);
-      expect(ops?.some((o) => o.op === "compressPool") ?? false, said).toBe(false);
+      expect(ops?.some((o) => o.op === "compressPool" || o.op === "compressLane") ?? false, said).toBe(false);
     }
   });
 

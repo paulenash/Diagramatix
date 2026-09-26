@@ -280,7 +280,8 @@ describe("T4784 — one rule, one place: the parser and the hold read the same w
         expect(src, `${name} must not call ${one} directly`).not.toContain(one);
       }
     }
-    expect(hold).toMatch(/import \{ COMMAND_VERBS(?:, COMPRESS_COMMAND_VERBS)? \} from "\.\/commandVerbs"/);
+    // Step 4 (2026-09-26) adds the expand verb, from the same module, for the "Expand the lane." hold.
+    expect(hold).toMatch(/import \{ COMMAND_VERBS(?:, COMPRESS_COMMAND_VERBS)?(?:, EXPAND_COMMAND_VERB)? \} from "\.\/commandVerbs"/);
     expect(hold, "the hold must not keep its own verb literal").not.toMatch(/swap\|rename\|relabel/);
     // The grammar spells none of the shared nouns itself any more.
     expect(grammar).not.toMatch(/participant\(\?:/);

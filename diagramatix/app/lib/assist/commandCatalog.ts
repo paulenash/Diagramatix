@@ -44,7 +44,7 @@ export const COMMAND_CATALOG: CatalogFamily[] = [
     { does: "Add a pool (empty, no lane)", say: ["add a pool", "add a pool called Finance", "add a black box pool above Customer"] },
     { does: "Wrap the loose elements in a pool", say: ["put a pool around everything", "wrap everything in a pool"] },
     { does: "Extend every pool to cover all elements", say: ["extend the pools to include all elements", "widen the pools", "include all elements"] },
-    { does: "Compress a pool to its content", say: ["compress the Customer pool", "shrink Sales"] },
+    { does: "Compress a pool to its content — name a lane and it is that lane that is compressed", say: ["compress the Customer pool", "compress pool 3", "shrink Salesforce"] },
     { does: "Nudge a pool", say: ["nudge pool down", "bump Customer down by 40", "nudge the IT System up"] },
     { does: "Move ONE edge of a pool — a resize, not a move. A left/right boundary only goes left/right, a top/bottom one only up/down; it stops at the first element it meets and the lanes follow", say: ["move the pool left boundary right", "nudge the Warehouse pool's top boundary up by 40", "shift the bottom edge of the Customer pool down"] },
   ] },
@@ -52,6 +52,8 @@ export const COMMAND_CATALOG: CatalogFamily[] = [
     { does: "Add lanes (named or not)", say: ["add a lane to the pool", "add 2 lanes to the middle pool called Sales and Marketing", "add a lane above Lane 2", "insert a lane below Sales called Support"] },
     { does: "Add sub-lanes", say: ["add 3 sublanes to the Marketing lane called Manager, Assistant and Staff", "add sublanes to Sales"] },
     { does: "Delete / swap / move lanes", say: ["delete Lane 2", "remove the sublane Marketing Assistant", "swap Sales with Marketing", "move the Sales lane up"] },
+    { does: "Compress a lane to its content — its top stays, the lanes below close up and the pool shrinks; a lane with sub-lanes is fitted one sub-lane at a time", say: ["compress the Underwriters lane", "compress lane Claims Team", "shrink Lane 3"] },
+    { does: "Make a lane taller: one Task row, or by a number — at its bottom, its last sub-lane taking it; the lanes below move down", say: ["expand the Underwriters lane", "expand lane Claims Team by 100", "grow Lane 3"] },
   ] },
   { family: "Messages", items: [
     { does: "Message flow between an activity and a pool", say: ["add message from Task 1 to IT System labelled Email Details", "send a message from Approve to Customer", "add a message to IT System from Task 1 saying Get Approval"] },

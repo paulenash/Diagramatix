@@ -10,12 +10,18 @@
  *
  * Pure, so every rule here is tested; the editor only imports it.
  */
-import { COMMAND_VERBS, COMPRESS_COMMAND_VERBS } from "./commandVerbs";
+import { COMMAND_VERBS, COMPRESS_COMMAND_VERBS, EXPAND_COMMAND_VERB } from "./commandVerbs";
 import { repairHeardWords } from "./selectedWord";
 import { parseBoundaryEventPhrase } from "./boundaryEventPhrase";
 import { ADD_MESSAGE_LEAD, MESSAGE_BY_NUMBER, MESSAGE_BY_NUMBER_FROM_SELECTION } from "./messagePhrase";
+import { COMPRESS_KIND_WORDS, EXPAND_KIND_WORDS } from "./compressPhrase";
+import { wordAlternation } from "./containerWords";
 
 const VERBS = new RegExp(`^(?:${COMMAND_VERBS.join("|")})$`);
+/** A strong compress verb and ONE container's kind word, the name not said yet. */
+const BARE_COMPRESS_KIND = new RegExp(`^(?:compress(?:es|ed|ing)?|${COMPRESS_COMMAND_VERBS.filter((v) => v !== "compress").join("|")})(?:\\s+the)?\\s+(?:${wordAlternation(COMPRESS_KIND_WORDS)})$`);
+/** "expand" and ONE lane's kind word, the name not said yet. */
+const BARE_EXPAND_KIND = new RegExp(`^${EXPAND_COMMAND_VERB}(?:s|ed|ing)?(?:\\s+the)?\\s+(?:${wordAlternation(EXPAND_KIND_WORDS)})$`);
 
 export function isIncompleteCommand(text: string): boolean {
   // The same repairs the grammar makes, first — so the hold judges the words
@@ -49,7 +55,13 @@ export function isIncompleteCommand(text: string): boolean {
   // runs, and a bare kind with several candidates asks which rather than
   // taking the newest. Only the two strong verbs: a held bare "Reduce the
   // pool." would be a rarer phrasing kept waiting.
-  if (new RegExp(`^(?:compress(?:es|ed|ing)?|${COMPRESS_COMMAND_VERBS.filter((v) => v !== "compress").join("|")})(?:\\s+the)?\\s+(?:pool|lane|sub-?\\s?lane)$`).test(t)) return true;
+  // The kind words are the ones the compress rule reads, mis-hears and all:
+  // "Compress line." ran at once on the selected lane, and the name after the
+  // pause went to the AI on its own.
+  if (BARE_COMPRESS_KIND.test(t)) return true;
+  // "Expand the lane." the same way. Not "expand the pool": that is already
+  // a whole command (widen every pool), and holding it would only delay it.
+  if (BARE_EXPAND_KIND.test(t)) return true;
   // Ends on a dangling connective / preposition → more is coming. "after",
   // "before" and "following" too: "add template after" … "selected", split at
   // the pause, ran as a task called "Template after" (2026-09-25).

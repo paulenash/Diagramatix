@@ -11,8 +11,9 @@ command (with variants) → if none, the **AI** interprets it → ops apply live
 
 **Referring to things:** by **name** ("Review"), by **type** ("the gateway", "the pool"), by **position**
 ("the middle pool", "the left lane"), by **number** ("Lane 2" / "lane two" both work), or with
-**pronouns** ("it", "the last one", "the previous one"). A leading/trailing kind word is tolerated
-("the Sales lane" → the lane named Sales).
+**pronouns** ("it", "the last one", "the previous one"). A leading or trailing kind word **binds**
+for the compress and expand commands — "the Sales lane" finds only a lane named Sales, never a pool
+called Sales — and "compress pool three" can only mean a pool.
 
 ---
 
@@ -24,7 +25,7 @@ command (with variants) → if none, the **AI** interprets it → ops apply live
 | **Add a black‑box pool** | "add a black‑box pool", "add a black box pool above/below existing pools" | Bare participant box, no lanes; positions relative to existing pools |
 | **Wrap everything in a pool** | "put a pool around everything", "add a pool to all elements on the diagram", "wrap everything in a pool" | Wraps all loose (un‑pooled) elements |
 | **Extend the pools** | "extend the pools to include all elements", "widen the pools", "lengthen the pool", "include all elements" | **Widens every pool rightward** to cover all elements and sets **all pools to the same width** (kept aligned). Aliases: extend · lengthen · widen (· expand · grow · stretch) |
-| **Compress a pool** | "compress the Customer pool", "shrink Sales", "reduce Finance", "collapse the pool" | White‑box → shrinks pool + lanes (and sub‑lanes) to content ± ½ Task; black‑box / empty → fits the name in height and takes the **white‑box pool's width** (participant boxes stay aligned). Aliases: compress · shrink · reduce · shorten · compact · collapse |
+| **Compress a pool** | "compress the Customer pool", "compress pool 3", "shrink Sales", "reduce Finance", "collapse the pool" | White‑box → shrinks pool + lanes (and sub‑lanes) to content ± ½ Task; black‑box / empty → fits the name in height and takes the **white‑box pool's width** (participant boxes stay aligned). With no kind word, a name that is a **lane** compresses that lane (see *Compress a lane*). A bare "compress the pool" asks which, numbered, unless one pool is selected. Aliases: compress (· compressed · compressing) · shrink · reduce · shorten · compact · collapse · tighten · condense · minimise |
 | **Nudge a pool** | "nudge pool down", "nudge the IT System up", "bump Customer down by 40", "move the pool up" | Moves a pool a small step (default 20px); its lanes/contents ride along. Bare "nudge pool" → the most‑recent black‑box pool. Aliases: nudge · bump · inch · shift · move (move only when a pool is named). Follow with **"again"** to repeat |
 | **Move a pool boundary** | "move the pool left boundary right", "nudge the Warehouse pool's top boundary up by 40", "shift the bottom edge of the Customer pool down" | Moves ONE edge of a pool — a resize, not a move (default 20px). A left/right boundary only takes **left/right**; a top/bottom one only **up/down** — an impossible pairing is refused rather than guessed. Obeys every rule a mouse drag does: it stops at the first element any locked pool meets, the lanes and sub-lanes follow, and nothing inside moves. Aliases: move · nudge · shift · bump · drag · pull · push · slide |
 
@@ -36,6 +37,8 @@ command (with variants) → if none, the **AI** interprets it → ops apply live
 | **Insert a lane by position** | "add a lane above Lane 2", "add a lane below the Sales lane", "insert a lane below Sales called Support" | Inserts a band above/below the reference lane and grows the pool |
 | **Delete a lane** | "delete Lane 2", "remove the Sales lane" | Neighbour lane grows to fill the gap; elements kept |
 | **Swap two lanes** | "swap Sales with Marketing", "swap lane Sales and lane Support" | Adjacent lanes |
+| **Compress a lane** | "compress the Sales lane", "compress lane Sales", "compress lane two", "shrink Lane 3" | Fits ONE lane to its content, **at its bottom edge**: the top stays; the content slides up to ½ Task under it; the bottom comes up to ½ Task under the lowest content, never below what the lane's name — or the pool's — needs. The lanes below close up and the pool shrinks; the pools below stay put. A lane with sub‑lanes is fitted one sub‑lane at a time. A second compress changes nothing ("… is already fitted"). A bare "compress lane" asks which, numbered, unless one lane is selected — never the newest. "compress all lanes" goes to the AI. Same verbs as *Compress a pool*, with a lane word |
+| **Make a lane taller** | "expand the Sales lane", "expand lane Sales by 100", "grow lane two", "enlarge the Sales lane" | Adds ONE Task row (64px), or the number said, **at its bottom**; its last sub‑lane takes it, the lanes below move down, and the pools below are pushed by the 100‑px rule. Needs a lane word: "expand the pools" still widens every pool, and "expand the subprocess", "expand Review" and "expand the Production Line" go to the AI. A distance it cannot read ("by a hundred") goes to the AI too — never one Task row instead. Verbs: expand · grow · enlarge |
 
 ## Sub‑lanes
 
@@ -43,6 +46,7 @@ command (with variants) → if none, the **AI** interprets it → ops apply live
 |---|---|---|
 | **Add sub‑lane(s)** | "add 3 sublanes to the Marketing lane called Manager, Assistant and Staff", "add sublanes to Sales" | Equal size; names optional (default Sublane 1..N) |
 | **Delete a sub‑lane** | "remove the sublane Marketing Assistant", "delete sublane Staff" | Neighbour grows; pool keeps its size |
+| **Compress / expand a sub‑lane** | "compress the Manager sublane", "shrink sublane Staff", "expand sublane Manager by 40" | As for a lane; its later sub‑lanes move with it, and its parent lane and the pool shrink or grow |
 
 ## Messages (between an activity and a pool / participant)
 

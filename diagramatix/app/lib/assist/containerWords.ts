@@ -41,6 +41,15 @@ export const BOX_WORDS = ["black box", "black-box", "blackbox", "white box", "wh
 /** A message flow. Singular — a rule that takes a plural adds the `s` itself. */
 export const MESSAGE_WORDS = ["message", "msg"] as const;
 
+/**
+ * The spellings in a list that name ONE container. Every plural above ends in
+ * "s" and no singular does — "compress the lane" is one lane, "compress the
+ * lanes" several, and the rules that must tell them apart read it from here.
+ */
+export function singularWords(words: readonly string[]): string[] {
+  return words.filter((w) => !w.endsWith("s"));
+}
+
 const escRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**

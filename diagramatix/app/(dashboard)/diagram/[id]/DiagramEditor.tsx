@@ -72,7 +72,7 @@ import { planMovePool, planSwapPools, selectedPools, poolsInOrder } from "@/app/
 import { isContainerType, getAllDescendantIds } from "@/app/hooks/useDiagram";
 import { collectMessageTargets, parseMessageAnswer, resolveMessageAnswer, type MessagePick } from "@/app/lib/assist/messageTargets";
 import { validateOps, type AssistOp } from "@/app/lib/assist/ops";
-import { applyAssistOps as applyAssistOpsTo, type RenameFlow } from "@/app/lib/assist/applyAssistOps";
+import { applyAssistOps as applyAssistOpsTo, assistSettingsOf, type RenameFlow } from "@/app/lib/assist/applyAssistOps";
 import { boundaryRect } from "@/app/lib/assist/poolBoundaryPhrase";
 import { syntheticElement, withAdded, withDeleted, withLabel } from "@/app/lib/assist/workingSet";
 import { needsConfirmation, parseConfirmation } from "@/app/lib/assist/confirm";
@@ -1247,6 +1247,8 @@ export function DiagramEditor({
     addPool,
     addLaneAt,
     compressPool,
+    compressLane,
+    expandLane,
     extendPools,
     reorderLane,
     moveLaneBoundary,
@@ -2959,18 +2961,18 @@ export function DiagramEditor({
     appliedOpsRef.current = ops;
     queueMicrotask(() => { if (appliedOpsRef.current === ops) appliedOpsRef.current = null; });
     return applyAssistOpsTo(ops, {
-      elements: data.elements, connectors: data.connectors, riskCatalog,
+      elements: data.elements, connectors: data.connectors, settings: assistSettingsOf(data), riskCatalog,
       actions: {
         addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, updateConnectorLabel,
         deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool,
-        wrapInSubprocess, wrapInContainer, unwrapSubprocess, addPool, addLaneAt, compressPool, extendPools,
+        wrapInSubprocess, wrapInContainer, unwrapSubprocess, addPool, addLaneAt, compressPool, compressLane, expandLane, extendPools,
         swapLane, moveLane, moveElements, elementsMoveEnd, removeSpace, updateConnectorEndpoint, movePoolTo,
         swapPools, resizeElement, resizeElementEnd, alignElements,
       },
       ui: { setSelectedElementIds, setSelectedConnectorId, setPickFlow, setRenameFlow, setMessageFlow, setGoldFlash },
       refs: { voiceLastId, pointerWorld, selectedIdsRef, selectedConnectorIdRef, nextStepRef, openTemplateWindowRef, exportJsonRef },
     });
-  }, [data.elements, data.connectors, riskCatalog, armDebugBefore, armGoldFlash, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, updateConnectorLabel, deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool, wrapInSubprocess, wrapInContainer, unwrapSubprocess, addPool, addLaneAt, compressPool, extendPools, swapLane, moveLane, moveElements, elementsMoveEnd, removeSpace, updateConnectorEndpoint, movePoolTo, swapPools, resizeElement, resizeElementEnd, alignElements, setRenameFlow, setMessageFlow, setPickFlow]);
+  }, [data.elements, data.connectors, data.poolFontSize, data.laneFontSize, data.connectorFontSize, data.relaxedLayout, riskCatalog, armDebugBefore, armGoldFlash, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, updateConnectorLabel, deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool, wrapInSubprocess, wrapInContainer, unwrapSubprocess, addPool, addLaneAt, compressPool, compressLane, expandLane, extendPools, swapLane, moveLane, moveElements, elementsMoveEnd, removeSpace, updateConnectorEndpoint, movePoolTo, swapPools, resizeElement, resizeElementEnd, alignElements, setRenameFlow, setMessageFlow, setPickFlow]);
 
   // Gold flashing, part two: the command has run, React has re-rendered, and
   // `data.elements` is now the after picture. Diff it against the snapshot taken

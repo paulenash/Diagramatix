@@ -9,8 +9,8 @@ import { namesNonContainerKind, laneWordIsAttached, looksPositionalNotAName, nam
 import { parseRenameType } from "./renameTargets";
 import { parsePoolBoundaryPhrase, mentionsPoolBoundary } from "./poolBoundaryPhrase";
 import { repairHeardWords } from "./selectedWord";
-import { hasCommandAfterName, COMPRESS_VERB_SOURCE } from "./commandVerbs";
-import { parseCompressPhrase } from "./compressPhrase";
+import { hasCommandAfterName, COMPRESS_VERB_SOURCE, EXPAND_VERBS } from "./commandVerbs";
+import { parseCompressPhrase, parseExpandPhrase } from "./compressPhrase";
 import { PARTICIPANT_WORDS, BOX_WORDS, MESSAGE_WORDS, wordAlternation } from "./containerWords";
 import { parseBoundaryEventPhrase } from "./boundaryEventPhrase";
 import { MESSAGE_VERB, MESSAGE_BY_NUMBER, MESSAGE_BY_NUMBER_FROM_SELECTION, ADD_MESSAGE_LEAD } from "./messagePhrase";
@@ -361,13 +361,29 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     if (mBoundary) return [{ op: "movePoolBoundary", ...mBoundary }];
     const ALL = "(?:everything|all(?:\\s+(?:the\\s+)?elements?)?(?:\\s+on\\s+(?:the\\s+)?diagram)?|the\\s+(?:lot|whole\\s+thing|diagram)|it\\s+all)";
 
-    // Compress a pool: "compress the Customer pool", "compress pool three",
-    // "shrink Sales" — the verbs are COMPRESS_VERBS (commandVerbs.ts). The kind
-    // word the user said is KEPT, at the front of the ref, so the resolver
-    // honours it (compressPhrase.ts); an EP collapse, plural kinds and "the
+    // Compress a pool or a lane: "compress the Customer pool", "compress pool
+    // three", "compress the Underwriters lane", "shrink Sales" — the verbs are
+    // COMPRESS_VERBS (commandVerbs.ts). The kind word the user said is KEPT, at
+    // the front of the ref, so the resolver honours it, and it picks the
+    // command: a lane or sub-lane word is compressLane; a pool word, or none,
+    // compressPool, whose apply compresses the LANE when a bare name turns out
+    // to be one (compressPhrase.ts). An EP collapse, plural kinds and "the
     // gap" are not this rule's.
     const compress = parseCompressPhrase(raw);
-    if (compress) return [{ op: "compressPool", poolRef: clean(compress.ref) }];
+    if (compress) {
+      return [compress.kind === "lane" || compress.kind === "sublane"
+        ? { op: "compressLane", laneRef: clean(compress.ref) }
+        : { op: "compressPool", poolRef: clean(compress.ref) }];
+    }
+
+    // Make a lane taller: "expand lane Underwriters", "grow the Claims Team
+    // lane by 100" — only with a lane or sub-lane word (compressPhrase.ts).
+    // Without one "expand" is not ours: "expand the pools" is the extend rule
+    // below, and "expand the subprocess" / "expand Review" go to the AI.
+    const expand = parseExpandPhrase(raw);
+    if (expand) {
+      return [{ op: "expandLane", laneRef: clean(expand.ref), ...(expand.distance !== undefined ? { distance: expand.distance } : {}) }];
+    }
 
     // Swap two named lanes: "swap lane A with lane B" / "swap A and B".
     // (resolveRef strips a leading "lane"/"pool" kind word, so keep the raw ref.)
@@ -503,10 +519,11 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     }
 
     // Extend / widen the pools rightward to include all elements, keeping EVERY
-    // pool the same width. Aliases: extend · lengthen · widen (+ expand · grow ·
-    // stretch · enlarge). A bare "include all elements" also means extend.
+    // pool the same width. Aliases: extend · lengthen · widen · stretch, and the
+    // EXPAND_VERBS (commandVerbs.ts — with a lane word they make a lane taller,
+    // above). A bare "include all elements" also means extend.
     if (
-      new RegExp(`^(?:extend|lengthen|widen|expand|grow|stretch|enlarge)\\s+(?:all\\s+)?(?:the\\s+)?${P}s?(?:\\s+(?:to\\s+)?(?:the\\s+right|include|around|cover|contain|fit|accommodate|accomodate|encompass|hold)\\b.*)?$`, "i").test(raw)
+      new RegExp(`^(?:extend|lengthen|widen|stretch|${EXPAND_VERBS.join("|")})\\s+(?:all\\s+)?(?:the\\s+)?${P}s?(?:\\s+(?:to\\s+)?(?:the\\s+right|include|around|cover|contain|fit|accommodate|accomodate|encompass|hold)\\b.*)?$`, "i").test(raw)
       || new RegExp(`^(?:include|cover|contain|fit|encompass)\\s+${ALL}(?:\\s+(?:to\\s+)?the\\s+right)?$`, "i").test(raw)
     ) {
       return [{ op: "extendPools" }];

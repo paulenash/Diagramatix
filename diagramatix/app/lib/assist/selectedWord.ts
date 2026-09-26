@@ -31,7 +31,7 @@
 import { SYMBOL_PHRASES } from "./ops";
 import { POOL_WORDS, LANE_WORDS, SUBLANE_WORDS, PARTICIPANT_WORDS, BOX_WORDS, MESSAGE_WORDS, wordAlternation } from "./containerWords";
 import { BOUNDARY_EVENT_NOUN } from "./boundaryEventPhrase";
-import { containsAnotherCommand, startsWithCommandVerb, COMPRESS_COMMAND_VERBS } from "./commandVerbs";
+import { containsAnotherCommand, startsWithCommandVerb, COMPRESS_COMMAND_VERBS, EXPAND_COMMAND_VERB } from "./commandVerbs";
 
 /**
  * Verbs after which a reference to the selection is expected.
@@ -46,7 +46,7 @@ const SCOPE_VERBS = [
   // The rest of the grammar's target-taking verbs.
   "unwrap", "dissolve", "unpack", "flatten", "explode",
   "label", "remove", "connect", "disconnect", "swap", "colour", "color",
-  ...COMPRESS_COMMAND_VERBS, "extend", "align", "select", "copy", "duplicate", "make",
+  ...COMPRESS_COMMAND_VERBS, EXPAND_COMMAND_VERB, "extend", "align", "select", "copy", "duplicate", "make",
 ] as const;
 
 /**

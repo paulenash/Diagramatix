@@ -14,6 +14,24 @@
 import type { DiagramElement } from "./types";
 import { absorbAtEdge, stackFrom, type Band, type StackEdge } from "./laneBands";
 import { getLaneHeaderWidth, minHeightForContainer } from "./containerMetrics";
+import { isAnyLane } from "./laneKind";
+
+/**
+ * A band's own sub-lanes, in both shapes (laneKind.ts). A stamped
+ * `type: "sublane"` — the AI converter's, an import's — was skipped here, so
+ * a re-fit left it where it was and the stack no longer filled its lane.
+ */
+const subLanesOf = (els: DiagramElement[], laneId: string) => els.filter((e) => isAnyLane(e) && e.parentId === laneId);
+
+/**
+ * Where a sub-lane sits ACROSS its lane. A nested lane is inset by the lane's
+ * header. A stamped one keeps its own x and width: the import lays it flush
+ * inside its lane (bpmnLayout.ts, "a sub-lane must line up flush inside its
+ * parent lane"), and a re-fit is a vertical change — insetting it here moved
+ * it right and narrowed it on every divider drag.
+ */
+const acrossOf = (sub: DiagramElement, laneX: number, laneW: number, headerW: number) =>
+  sub.type === "sublane" ? { x: sub.x, width: sub.width } : { x: laneX + headerW, width: laneW - headerW };
 
 /**
  * Move a lane's whole sub-lane subtree by `dy`, keeping every height, and
@@ -34,16 +52,11 @@ export function shiftSublanesBy(
   const lane = elements.find((e) => e.id === laneId);
   if (!lane) return elements;
   const LANE_LW = getLaneHeaderWidth(lane);
-  const subs = elements.filter((e) => e.type === "lane" && e.parentId === laneId);
+  const subs = subLanesOf(elements, laneId);
   if (subs.length === 0) return elements;
   let result = elements;
   for (const sub of subs) {
-    const updated: DiagramElement = {
-      ...sub,
-      x: laneX + LANE_LW,
-      y: sub.y + dy,
-      width: laneW - LANE_LW,
-    };
+    const updated: DiagramElement = { ...sub, ...acrossOf(sub, laneX, laneW, LANE_LW), y: sub.y + dy };
     result = result.map((e) => (e.id === sub.id ? updated : e));
     result = shiftSublanesBy(result, sub.id, dy, updated.x, updated.width);
   }
@@ -64,7 +77,7 @@ export function refitStackAtEdge(
 ): DiagramElement[] {
   const lane = els.find((e) => e.id === laneId);
   const LANE_LW = lane ? getLaneHeaderWidth(lane) : 36;
-  const subs = els.filter((e) => e.type === "lane" && e.parentId === laneId).sort((a, b) => a.y - b.y);
+  const subs = subLanesOf(els, laneId).sort((a, b) => a.y - b.y);
   if (subs.length === 0) return els;
   const bands: Band[] = subs.map((sub) => ({
     height: sub.height,
@@ -76,8 +89,7 @@ export function refitStackAtEdge(
   const absorbing = edge === "first" ? 0 : subs.length - 1;
   let result = els;
   for (let i = 0; i < subs.length; i++) {
-    const newSubX = laneX + LANE_LW;
-    const newSubW = laneW - LANE_LW;
+    const { x: newSubX, width: newSubW } = acrossOf(subs[i], laneX, laneW, LANE_LW);
     const updatedSub: DiagramElement = { ...subs[i], x: newSubX, y: ys[i], width: newSubW, height: heights[i] };
     result = result.map((e) => (e.id === subs[i].id ? updatedSub : e));
     if (i === absorbing) {

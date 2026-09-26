@@ -105,6 +105,8 @@ export interface World {
   newNameFor(rng: Rng, target: Named): string;
   /** An element nobody has renamed yet — "Task 1", "Subprocess 3", "Lane 3". */
   defaultNamed(rng: Rng): Named | null;
+  /** A pool still called what it was born as — "Pool 3". */
+  defaultNamedPool(rng: Rng): Named | null;
   has(kind: "task" | "gateway" | "event" | "pool" | "lane" | "sublane"): boolean;
 }
 
@@ -224,6 +226,12 @@ export function worldOf(els: readonly DiagramElement[]): World {
       const e = pick(rng, cands);
       return { id: e.id, spoken: (e.label ?? "").trim() };
     },
+    defaultNamedPool: (rng) => {
+      const born = pools.filter((p) => /^pool \d+$/i.test((p.label ?? "").trim()));
+      if (!born.length) return null;
+      const p = pick(rng, born);
+      return { id: p.id, spoken: (p.label ?? "").trim() };
+    },
     has: (kind) => ({
       task: tasks.length, gateway: gateways.length, event: events.length,
       pool: pools.length, lane: lanes.length, sublane: subs.length,
@@ -248,6 +256,31 @@ export interface OpTemplate {
 // The templates. Phrasings come from the command catalogue and from how Paul
 // speaks — never from the grammar's regexes.
 // ─────────────────────────────────────────────────────────────────────────────
+
+/** A digit as a person says it: "pool 3" → "pool three". */
+const NUMBER_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
+const sayNumber = (s: string) => s.replace(/\b\d\b/g, (d) => NUMBER_WORDS[Number(d)]);
+
+/** A name that starts with a kind word of its own — "Pool 3", "Lane 3", "Sub 1". */
+const namedByKind = (name: string) => /^(?:pool|lane|sub)\b/i.test(name.trim());
+
+/**
+ * How a sentence names a lane WITH its lane word, and the ref the grammar
+ * ought to give for it — the kind word at the front, where the resolver reads
+ * it: "the Underwriters lane" → "lane Underwriters". A name that already starts
+ * with a kind word is said as it is, or with its number spoken: "Lane 3",
+ * "lane three", "Sub 1", "sub one".
+ */
+function laneWordForms(band: Named, word: "lane" | "sublane"): Array<[string, string]> {
+  if (namedByKind(band.spoken)) {
+    const spoken = sayNumber(band.spoken.toLowerCase());
+    return [[band.spoken, band.spoken], [spoken, spoken.replace(/^sub\b/, "sublane")]];
+  }
+  return [
+    [`the ${band.spoken} ${word}`, `${word} ${band.spoken}`],
+    [`${word} ${band.spoken}`, `${word} ${band.spoken}`],
+  ];
+}
 
 const ELEMENT_WORDS: Array<[string, AssistOp & { op: "add" }]> = [
   ["a task", { op: "add", symbolType: "task" }],
@@ -527,11 +560,78 @@ export const GENERATOR_FAMILIES: readonly OpTemplate[] = [
     family: "compressPool",
     applicable: (w) => w.has("pool"),
     build: (rng, w) => {
+      // The pool nobody renamed, said with its kind word — "compress pool
+      // three" asked "Pool 3 or Lane 3?" in Paul's log of 2026-09-23, and a
+      // corpus that only ever said "compress <proper name>" never saw it.
+      const born = rng.next() < 0.3 ? w.defaultNamedPool(rng) : null;
+      if (born) {
+        const said = pick(rng, [born.spoken, sayNumber(born.spoken.toLowerCase())]);
+        return {
+          utterance: `${pick(rng, ["compress", "compact", "shrink"])} ${said}`,
+          ops: [{ op: "compressPool", poolRef: said }],
+          refs: { [said]: born.id },
+        };
+      }
       const pool = w.pool(rng);
+      // Its name, or its name with the pool word — "the Customer pool" — and
+      // the verbs and forms people use: "compact", "compressed the …". A name
+      // that is itself a kind word ("Pool 3") is not said twice.
+      const forms: Array<[string, string]> = [
+        [`compress ${pool.spoken}`, pool.spoken],
+        [`compact ${pool.spoken}`, pool.spoken],
+      ];
+      if (!namedByKind(pool.spoken)) {
+        forms.push([`compress the ${pool.spoken} pool`, `pool ${pool.spoken}`]);
+        forms.push([`compressed the ${pool.spoken} pool`, `pool ${pool.spoken}`]);
+      }
+      const [utterance, ref] = pick(rng, forms);
       return {
-        utterance: `compress ${pool.spoken}`,
-        ops: [{ op: "compressPool", poolRef: pool.spoken }],
-        refs: { [pool.spoken]: pool.id },
+        utterance,
+        ops: [{ op: "compressPool", poolRef: ref }],
+        refs: { [ref]: pool.id },
+      };
+    },
+  },
+  {
+    // Paul, 2026-09-26: "Add commands Compress Lane <lane_name>, and, Expand
+    // Lane <lane_name>". Always WITH the lane word — without it the sentence is
+    // compressPool, whose apply finds the lane. Claims Team is in the draw, and
+    // it has sub-lanes: each is fitted in turn.
+    family: "compressLane",
+    applicable: (w) => w.has("lane"),
+    build: (rng, w) => {
+      const sub = w.has("sublane") && rng.next() < 0.35;
+      const band = sub ? w.sublane(rng) : w.lane(rng);
+      const [said, ref] = pick(rng, laneWordForms(band, sub ? "sublane" : "lane"));
+      return {
+        utterance: `${pick(rng, ["compress", "compress", "shrink", "compact"])} ${said}`,
+        ops: [{ op: "compressLane", laneRef: ref }],
+        refs: { [ref]: band.id },
+      };
+    },
+  },
+  {
+    // One Task row at the bottom, or "by N". Only with the lane word: "expand"
+    // alone is the BPMN word for opening a subprocess.
+    family: "expandLane",
+    applicable: (w) => w.has("lane"),
+    build: (rng, w) => {
+      const sub = w.has("sublane") && rng.next() < 0.35;
+      const band = sub ? w.sublane(rng) : w.lane(rng);
+      const [said, ref] = pick(rng, laneWordForms(band, sub ? "sublane" : "lane"));
+      const verb = pick(rng, ["expand", "expand", "grow", "enlarge"]);
+      if (rng.next() < 0.4) {
+        const n = pick(rng, [40, 64, 100, 120]);
+        return {
+          utterance: `${verb} ${said} by ${n}${pick(rng, ["", " pixels", "px"])}`,
+          ops: [{ op: "expandLane", laneRef: ref, distance: n }],
+          refs: { [ref]: band.id },
+        };
+      }
+      return {
+        utterance: `${verb} ${said}`,
+        ops: [{ op: "expandLane", laneRef: ref }],
+        refs: { [ref]: band.id },
       };
     },
   },

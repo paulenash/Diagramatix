@@ -32,6 +32,11 @@
  * un-renamed elements — `Task 1`, `Task 2`, `Subprocess 3`, `Lane 3` — beside
  * the properly named ones, and the generator prefers them as rename targets.
  *
+ * One of them breaks the realistic-names rule above, deliberately: a pool
+ * called `Pool 3`. New pools are born "Pool N", and "compress pool three"
+ * asking "Pool 3 or Lane 3?" (Paul's log, 2026-09-23) lives exactly there — a
+ * fixture of proper pool names could never reproduce it (2026-09-26).
+ *
  * The awkward classes are still represented, because they were each found the
  * hard way: a name ending in a digit (`Lane 3`), a bare word that is also a
  * verb (`Review Claim` starts with one), a two-word proper noun, and a
@@ -44,7 +49,7 @@ import type { Connector, DiagramData, DiagramElement } from "../diagram/types";
 
 const E = (o: Record<string, unknown>) => o as unknown as DiagramElement;
 
-/** The elements. A claims department, two teams, an external party and a system. */
+/** The elements. A claims department, two teams, an external party, a system, and a pool nobody renamed. */
 export function fixtureElements(): DiagramElement[] {
   return [
     E({ id: "p", type: "pool", label: "Claims Processing", x: 0, y: 0, width: 900, height: 1180, properties: { poolType: "white-box" } }),
@@ -88,6 +93,9 @@ export function fixtureElements(): DiagramElement[] {
     // correct on contact measures the correction, not the command.
     E({ id: "cust", type: "pool", label: "Customer", x: 0, y: 1280, width: 900, height: 120, properties: { poolType: "black-box" } }),
     E({ id: "sys", type: "pool", label: "Salesforce", x: 0, y: 1440, width: 900, height: 120, properties: { poolType: "black-box" } }),
+    // Born "Pool 3" and never renamed — see the note above. Black-box, as a
+    // new pool is.
+    E({ id: "pool3", type: "pool", label: "Pool 3", x: 0, y: 1600, width: 900, height: 120, properties: { poolType: "black-box" } }),
 
     // One element in NO pool — last in the list, so no template's picks shift.
     // Without it "put a pool around everything" had nothing to wrap and was
@@ -125,17 +133,19 @@ export function fixtureDiagram(): DiagramData {
 
 /** Ids grouped by what they are, so a template can ask without knowing the fixture. */
 export const FIXTURE_IDS = {
-  pools: ["p", "cust", "sys"],
+  pools: ["p", "cust", "sys", "pool3"],
   whiteBoxPool: "p",
   participantPool: "cust",
   systemPool: "sys",
+  /** "Pool 3" — the pool nobody renamed. */
+  defaultNamedPool: "pool3",
   lanes: ["L1", "L2", "L3"],
   sublanes: ["S1", "S2"],
   tasks: ["t1", "t2", "t3", "t4", "t5", "t6"],
   gateways: ["g"],
   events: ["start", "end"],
   /** Un-renamed elements — the commonest rename targets. */
-  defaultNamed: ["t4", "t5", "sub3", "L3", "g2", "ep2"],
+  defaultNamed: ["t4", "t5", "sub3", "L3", "g2", "ep2", "pool3"],
   gateways2: ["g", "g2"],
 } as const;
 

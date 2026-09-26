@@ -25,7 +25,7 @@
  */
 import { reducer, connectorLabelPayload, healOnLoad, type Action } from "@/app/hooks/useDiagram";
 import type { DiagramData } from "@/app/lib/diagram/types";
-import type { AssistApplyContext, AssistDiagramActions, AssistUi } from "./applyAssistOps";
+import { assistSettingsOf, type AssistApplyContext, type AssistDiagramActions, type AssistUi } from "./applyAssistOps";
 import type { PickFlow } from "./disambiguate";
 
 export interface HeadlessDiagram {
@@ -80,6 +80,8 @@ export function headlessDiagram(initial: DiagramData): HeadlessDiagram {
     addPool: (opts) => commit({ type: "ADD_POOL", payload: { label: opts?.label, poolType: opts?.poolType, position: opts?.position, relativeToId: opts?.relativeToId } }),
     addLaneAt: (poolId, position, refLaneId, label) => commit({ type: "ADD_LANE_AT", payload: { poolId, position, refLaneId, label } }),
     compressPool: (poolId) => commit({ type: "COMPRESS_POOL", payload: { poolId } }),
+    compressLane: (laneId) => commit({ type: "COMPRESS_LANE", payload: { laneId } }),
+    expandLane: (laneId, by) => commit({ type: "EXPAND_LANE", payload: { laneId, by } }),
     extendPools: () => commit({ type: "EXTEND_POOLS", payload: {} }),
     swapLane: (laneId, direction) => commit({ type: "SWAP_LANES_VERTICAL", payload: { laneId, direction } }),
     moveLane: (laneId, direction, distance = 32) => commit({ type: "MOVE_LANE", payload: { laneId, direction, distance } }),
@@ -133,6 +135,7 @@ export function headlessDiagram(initial: DiagramData): HeadlessDiagram {
     context: (opts = {}) => ({
       elements: state.elements,
       connectors: state.connectors,
+      settings: assistSettingsOf(state),
       riskCatalog: [],
       actions,
       ui,
