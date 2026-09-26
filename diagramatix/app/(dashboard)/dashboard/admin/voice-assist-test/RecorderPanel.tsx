@@ -11,15 +11,22 @@
  * in this feature; a crash at clip seventy must cost nothing.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { generateCases, type GeneratedCase } from "@/app/lib/assist/commandGenerator";
+import type { GeneratedCase } from "@/app/lib/assist/commandGenerator";
 import { fixtureElements } from "@/app/lib/assist/commandFixture";
 import { DEFAULT_CORPUS_SEED } from "@/app/lib/assist/rng";
+import { CORPUS_SETS, CUSTOM_SET, corpusSet, casesForSet, resumeAt, isRecorded } from "@/app/lib/assist/corpusSets";
 import { useClipRecorder } from "@/app/lib/dictation/useClipRecorder";
 import { SILENT_TAKE_PEAK } from "@/app/lib/dictation/wav";
 import { asrFingerprint, liveStreamParams } from "@/app/lib/dictation/asrParams";
 
 export function RecorderPanel() {
-  const [seed, setSeed] = useState(DEFAULT_CORPUS_SEED);
+  /** A set from the registry, or CUSTOM_SET with a seed typed below. The id is what each clip carries. */
+  const [setId, setSetId] = useState<string>(DEFAULT_CORPUS_SEED);
+  const [customSeed, setCustomSeed] = useState("");
+  const seed = setId === CUSTOM_SET ? (customSeed.trim() || DEFAULT_CORPUS_SEED) : setId;
+  const fixedSet = corpusSet(setId)?.kind === "catalog";
+  /** Cases of this set already recorded (same case id AND sentence) when the session began. */
+  const [alreadyRecorded, setAlreadyRecorded] = useState(0);
   const [count, setCount] = useState(100);
   const [script, setScript] = useState<GeneratedCase[] | null>(null);
   const [at, setAt] = useState(0);
@@ -38,22 +45,31 @@ export function RecorderPanel() {
     [],
   );
 
-  const begin = useCallback(() => {
+  const begin = useCallback(async () => {
     // Say what went wrong, on the screen. Generating the script is the one step
     // between pressing the button and having something to read, and a silent
     // failure here leaves a teleprompter with working buttons and no sentence —
     // which is indistinguishable, to the person sitting there, from the feature
     // being broken.
     try {
-      const cases = generateCases({ seed, count, world: fixtureElements() });
+      const cases = casesForSet(seed, { count, world: fixtureElements() });
       if (cases.length === 0) {
-        setErr("The generator produced no sentences for that seed. Try the default seed.");
+        setErr("That set produced no sentences. Try the realistic sample.");
         return;
       }
+      // RESUME, as the clips route has always promised: a crash at clip seventy
+      // must cost nothing. Start at the first case in the SET'S OWN order that
+      // has no clip with its id and sentence — the listing's order sorts ids as
+      // strings (#1, #10, #11, #2…) and cannot be used.
+      let recorded: Array<{ caseId: string; utterance: string }> = [];
+      const res = await fetch(`/api/admin/voice-assist-test/clips?seed=${encodeURIComponent(seed)}`, { cache: "no-store" });
+      if (res.ok) recorded = (await res.json()).clips ?? [];
+      const start = resumeAt(cases, recorded);
+      setAlreadyRecorded(cases.filter((c) => isRecorded(c, recorded)).length);
       setScript(cases);
-      setAt(0);
+      setAt(Math.min(start, cases.length - 1));
       setSaved({});
-      setErr(null);
+      setErr(start >= cases.length ? "Every sentence in this set has been recorded — replay it on the Replay tab." : null);
     } catch (e) {
       setErr(`Could not build the script: ${e instanceof Error ? e.message : "unknown error"}`);
     }
@@ -124,17 +140,31 @@ export function RecorderPanel() {
         </p>
         <div className="flex items-end gap-3">
           <label className="text-xs text-gray-700">
-            <div className="mb-0.5">Seed</div>
-            <input value={seed} onChange={(e) => setSeed(e.target.value)} className="border border-gray-300 rounded px-2 py-1 text-xs w-56" />
+            <div className="mb-0.5">Set</div>
+            <select value={setId} onChange={(e) => setSetId(e.target.value)}
+              className="border border-gray-300 rounded px-2 py-1 text-xs"
+              title={corpusSet(setId)?.explain ?? "The realistic generator, reshuffled by a seed of your own"}>
+              {CORPUS_SETS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+              <option value={CUSTOM_SET}>Custom seed…</option>
+            </select>
           </label>
+          {setId === CUSTOM_SET && (
+            <label className="text-xs text-gray-700">
+              <div className="mb-0.5">Seed</div>
+              <input value={customSeed} onChange={(e) => setCustomSeed(e.target.value)} placeholder={DEFAULT_CORPUS_SEED}
+                className="border border-gray-300 rounded px-2 py-1 text-xs w-56" />
+            </label>
+          )}
           <label className="text-xs text-gray-700">
             <div className="mb-0.5">Sentences</div>
-            <input type="number" min={1} max={500} value={count}
+            <input type="number" min={1} max={500} value={count} disabled={fixedSet}
+              title={fixedSet ? "This set is a fixed list — every line, once" : undefined}
               onChange={(e) => setCount(Math.max(1, Math.min(500, Number(e.target.value) || 1)))}
-              className="border border-gray-300 rounded px-2 py-1 text-xs w-24" />
+              className="border border-gray-300 rounded px-2 py-1 text-xs w-24 disabled:opacity-50" />
           </label>
-          <button onClick={begin} className="text-xs text-white bg-purple-600 hover:bg-purple-700 rounded px-3 py-1.5">Start recording session</button>
+          <button onClick={() => { void begin(); }} className="text-xs text-white bg-purple-600 hover:bg-purple-700 rounded px-3 py-1.5">Start recording session</button>
         </div>
+        {corpusSet(setId) && <p className="mt-2 text-[11px] text-gray-500 max-w-2xl">{corpusSet(setId)!.explain}</p>}
         {err && <p className="mt-2 text-xs text-red-700">{err}</p>}
       </div>
     );
@@ -145,6 +175,7 @@ export function RecorderPanel() {
       <div className="flex items-center gap-3 mb-4 text-xs text-gray-600">
         <span><strong>{at + 1}</strong> / {script.length}</span>
         <span className="text-green-700">{done} kept</span>
+        {alreadyRecorded > 0 && <span className="text-gray-500" title="Clips of this set recorded in earlier sessions — the session resumed after them">{alreadyRecorded} already recorded</span>}
         <span className="flex-1" />
         {err && <span className="text-red-600">{err}</span>}
         <button onClick={() => setScript(null)} className="px-2 py-0.5 rounded border border-gray-300 hover:bg-gray-50">End session</button>

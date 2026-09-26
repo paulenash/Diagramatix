@@ -56,6 +56,12 @@ export interface GeneratedCase {
   refs: Record<string, string>;
   /** Set when the case only makes sense with something selected. */
   needsSelection?: string[];
+  /**
+   * Only the parse can be judged, and this says why (a ghost suggestion or a
+   * library the test diagram cannot supply). Resolution and the edit are not
+   * scored, so the case is never failed for what the harness cannot set up.
+   */
+  parseOnly?: string;
 }
 
 /** A view over the fixture that hands out elements by kind, already phrased. */

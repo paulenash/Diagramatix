@@ -199,6 +199,11 @@ function kindToType(word: string, elements: DiagramElement[]): ((e: DiagramEleme
     const expandedOnly = /^(?:expanded|eps?$)/.test(w);
     return (e) => e.type === "subprocess-expanded" || (!expandedOnly && e.type === "subprocess");
   }
+  // "the selected event" is ANY event — start, intermediate or end. There is
+  // no bare "event" type noun, so the Commands card's own example "make the
+  // selected event a timer event" found nothing, whatever was selected (found
+  // by the "Commands popup: every line" set, 2026-09-26).
+  if (/^events?$/.test(w)) return (e) => /-event$/.test(e.type);
   const t = typeNoun(w) ?? typeNoun(w.replace(/(?:es|s)$/, ""));
   return t ? (e) => e.type === t : null;
 }

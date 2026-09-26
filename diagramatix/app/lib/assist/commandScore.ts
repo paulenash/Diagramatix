@@ -235,6 +235,10 @@ function checkRefs(expected: AssistOp[], actual: AssistOp[], world: readonly Dia
         return { ok: false, ambiguous: false, stale: false, detail: `${field}: expected “${want}”, got nothing` };
       }
       const gr = resolve(got, field);
+      // "these" with two things selected names BOTH, on purpose: when the
+      // answer key names the same set, it is the same answer.
+      if (wr && "ambiguous" in wr && gr && "ambiguous" in gr
+        && wr.ambiguous.length === gr.ambiguous.length && wr.ambiguous.every((id) => gr.ambiguous.includes(id))) continue;
       if (gr && "ambiguous" in gr) {
         return { ok: false, ambiguous: true, stale: false, detail: `${field}: “${got}” names ${gr.ambiguous.length} things` };
       }
@@ -292,6 +296,17 @@ export function scoreCase(
           // two JSON blobs by eye to find out that one word was dropped.
           ? c.ops.map((o, i) => shapeDiff(o, actual[i])).filter(Boolean).join(" · ")
           : `parsed as ${actual.map((o) => o.op).join(" + ")}, expected ${c.ops.map((o) => o.op).join(" + ")}`,
+    };
+  }
+
+  // A case whose context the test diagram cannot supply is judged on its
+  // parse alone — failing it for a missing ghost suggestion would be the
+  // harness manufacturing a failure.
+  if (c.parseOnly) {
+    return {
+      ...base, actual,
+      outcome: textDiffered ? "pass-despite-mishear" : "pass",
+      detail: `parse only — ${c.parseOnly}`,
     };
   }
 

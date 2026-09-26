@@ -25,6 +25,7 @@ import type { AssistOp } from "./ops";
 import type { Connector, DiagramData, DiagramElement } from "../diagram/types";
 import { laneMetrics, poolMetrics } from "../diagram/containerMetrics";
 import { isLaneUnowned } from "../diagram/containment";
+import { nextContainerLabels } from "../diagram/containerNames";
 
 export interface EffectCheck {
   ok: boolean;
@@ -343,7 +344,11 @@ export function checkEffect(op: AssistOp, before: DiagramData, after: DiagramDat
       // Splitting a container with NO lanes yet gives it `labels.length` lanes;
       // splitting one that has them adds that many. Either way the count rises.
       if (now.length <= was) return fail(`${nameOf(byId(after, parent))} has ${now.length} lanes, as before`);
-      const named = op.labels.filter((l) => /\S/.test(l));
+      // The names the reducer GIVES, from the one naming rule — "add a lane to
+      // the pool" asks for "Lane" and gets "Lane 4" when Lane 1–3 exist. Held to
+      // the words as said, the check failed every unnamed lane (the popup set
+      // found it, 2026-09-26).
+      const named = nextContainerLabels(before.elements, op.labels.filter((l) => /\S/.test(l)), op.op === "addLanes" ? "Lane" : "Sublane");
       const missing = named.filter((l) => !now.some((e) => sameText(e.label, l)));
       return missing.length ? fail(`no lane called ${missing.map((m) => `“${m}”`).join(", ")}`) : pass;
     }

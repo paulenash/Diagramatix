@@ -34,7 +34,9 @@ import {
 import type { GeneratedCase } from "@/app/lib/assist/commandGenerator";
 import { DEFAULT_CORPUS_SEED } from "@/app/lib/assist/rng";
 import { OUTCOME_MEANS } from "./outcomeStyle";
-import { chooseReplaySet, type RecordedSet } from "@/app/lib/dictation/replaySets";
+import { chooseReplaySet, orderReplaySets, replaySetLabel, type RecordedSet } from "@/app/lib/dictation/replaySets";
+import { CATALOG_SET_ID, catalogCases } from "@/app/lib/assist/catalogCorpus";
+import { parseCommand } from "@/app/lib/assist/commandGrammar";
 
 interface ClipRow {
   id: string;
@@ -90,13 +92,15 @@ export function ReplayPanel() {
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [err, setErr] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
+  /** Popup-set clips whose sentence parses differently today from when it was recorded. */
+  const [moved, setMoved] = useState<string[]>([]);
 
   /** The recorded sets, then the clips of the chosen one — never every clip at once. */
   const load = useCallback(async (want: string | null) => {
     try {
       const setsRes = await fetch("/api/admin/voice-assist-test/clips?sets=1", { cache: "no-store" });
       if (!setsRes.ok) throw new Error(`could not list the recorded sets (${setsRes.status})`);
-      const found = (await setsRes.json()).sets as RecordedSet[];
+      const found = orderReplaySets((await setsRes.json()).sets as RecordedSet[]);
       setSets(found);
       const chosen = chooseReplaySet(found, want, DEFAULT_CORPUS_SEED);
       setSeed(chosen);
@@ -137,6 +141,10 @@ export function ReplayPanel() {
     setSaid({});
     setOnset({});
     setSkipped([]);
+    setMoved([]);
+    // A popup line's context (the selection it needs, or why only its parse
+    // can be judged) comes from the set itself, keyed by case id.
+    const popupContext = new Map(catalogCases().map((c) => [c.id, c] as const));
     const els = fixtureElements();
     // The listing was asked for this set only; the filter is the belt to that
     // braces, so a stale listing can never put another set's clip in the run.
@@ -187,12 +195,25 @@ export function ReplayPanel() {
         // The clip carries its own sentence and its own expected ops — that is
         // exactly why they are denormalised onto it, and why a generator change
         // cannot orphan a corpus that took twenty minutes to record.
+        //
+        // THE POPUP SET IS A HEARING TEST. Its answer is what the SENTENCE
+        // parses to today, so a clip measures the ear — did "heard" parse like
+        // "said"? — however the grammar has moved since it was recorded. A
+        // move is noted, never hidden.
+        const recordedOps = JSON.parse(clip.expectedOps || "[]");
+        const ctx = runLabel.seed === CATALOG_SET_ID ? popupContext.get(clip.caseId) : undefined;
+        const nowOps = runLabel.seed === CATALOG_SET_ID ? (parseCommand(clip.utterance) ?? []) : recordedOps;
+        if (runLabel.seed === CATALOG_SET_ID && JSON.stringify(nowOps) !== JSON.stringify(recordedOps)) {
+          setMoved((p) => (p.includes(clip.caseId) ? p : [...p, clip.caseId]));
+        }
         const asCase: GeneratedCase = {
           id: clip.caseId,
           family: clip.family || "recorded",
           utterance: clip.utterance,
-          ops: JSON.parse(clip.expectedOps || "[]"),
+          ops: nowOps,
           refs: {},
+          ...(ctx?.needsSelection ? { needsSelection: ctx.needsSelection } : {}),
+          ...(ctx?.parseOnly ? { parseOnly: ctx.parseOnly } : {}),
         };
 
         for (const v of runLabel.variants) {
@@ -311,7 +332,7 @@ export function ReplayPanel() {
             className="border border-gray-300 rounded px-2 py-1 text-xs bg-white disabled:opacity-50">
             {!sets?.length && <option value="">nothing recorded</option>}
             {sets?.map((s) => (
-              <option key={s.seed} value={s.seed}>{s.seed} — {s.clips} clip{s.clips === 1 ? "" : "s"}</option>
+              <option key={s.seed} value={s.seed} title={s.seed}>{replaySetLabel(s)}</option>
             ))}
           </select>
         </label>
@@ -475,6 +496,14 @@ export function ReplayPanel() {
             <div className="mb-3 text-xs text-gray-600 max-w-3xl">
               Stale — recorded against an older test diagram, so they cannot be judged and are in no count
               (re-record them): {staleBase.map((r) => `“${said[r.caseId] ?? r.caseId}” (${r.detail})`).join("; ")}
+            </div>
+          )}
+
+          {moved.length > 0 && (
+            <div className="mb-3 text-xs text-amber-800 max-w-3xl">
+              The grammar has moved since {moved.length === 1 ? "this line was" : "these lines were"} recorded — scored against
+              what the sentence parses to <strong>today</strong>, so the number still measures hearing:{" "}
+              {moved.map((id) => `“${said[id] ?? id}”`).join("; ")}
             </div>
           )}
 

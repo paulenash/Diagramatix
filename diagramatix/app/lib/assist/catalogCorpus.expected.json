@@ -1,0 +1,839 @@
+{
+  "add a task called Approve Claim after Review Claim": [
+    {
+      "op": "add",
+      "symbolType": "task",
+      "label": "Approve Claim",
+      "afterRef": "Review Claim"
+    }
+  ],
+  "add a decision": [
+    {
+      "op": "add",
+      "symbolType": "gateway"
+    }
+  ],
+  "insert a parallel gateway called Split after Check Coverage": [
+    {
+      "op": "add",
+      "symbolType": "gateway",
+      "gatewayType": "parallel",
+      "label": "Split",
+      "afterRef": "Check Coverage"
+    }
+  ],
+  "add an end event called Done after Pay Claim": [
+    {
+      "op": "add",
+      "symbolType": "end-event",
+      "label": "Done",
+      "afterRef": "Pay Claim"
+    }
+  ],
+  "connect Check Coverage to Assess Risk": [
+    {
+      "op": "connect",
+      "fromRef": "Check Coverage",
+      "toRef": "Assess Risk"
+    }
+  ],
+  "connect them": [
+    {
+      "op": "connect",
+      "fromRef": "the previous",
+      "toRef": "the last"
+    }
+  ],
+  "disconnect Review Claim from Check Coverage": [
+    {
+      "op": "disconnect",
+      "fromRef": "Review Claim",
+      "toRef": "Check Coverage"
+    }
+  ],
+  "rename the gateway to Approved?": [
+    {
+      "op": "rename",
+      "ref": "the gateway",
+      "label": "Approved"
+    }
+  ],
+  "rename Lane 3 to Claims Support": [
+    {
+      "op": "rename",
+      "ref": "Lane 3",
+      "label": "Claims Support"
+    }
+  ],
+  "rename Task 1 to Review Email": [
+    {
+      "op": "rename",
+      "ref": "Task 1",
+      "label": "Review Email"
+    }
+  ],
+  "rename tasks": [
+    {
+      "op": "renameByType",
+      "itemType": "task"
+    }
+  ],
+  "rename lanes": [
+    {
+      "op": "renameByType",
+      "itemType": "lane"
+    }
+  ],
+  "move the gateway two elements to the right": [
+    {
+      "op": "move",
+      "ref": "the gateway",
+      "direction": "right",
+      "count": 2
+    }
+  ],
+  "move Pay Claim up": [
+    {
+      "op": "move",
+      "ref": "Pay Claim",
+      "direction": "up",
+      "count": 1
+    }
+  ],
+  "move these right": [
+    {
+      "op": "move",
+      "ref": "these",
+      "direction": "right",
+      "count": 1
+    }
+  ],
+  "move the selected task two steps up": [
+    {
+      "op": "move",
+      "ref": "the selected task",
+      "direction": "up",
+      "count": 2
+    }
+  ],
+  "nudge the selected task left": [
+    {
+      "op": "nudgePool",
+      "ref": "selected task",
+      "direction": "left"
+    }
+  ],
+  "nudge these down": [
+    {
+      "op": "nudgePool",
+      "ref": "these",
+      "direction": "down"
+    }
+  ],
+  "bump Assess Risk right": [
+    {
+      "op": "nudgePool",
+      "ref": "Assess Risk",
+      "direction": "right"
+    }
+  ],
+  "nudge Customer down by 40": [
+    {
+      "op": "nudgePool",
+      "ref": "Customer",
+      "direction": "down",
+      "distance": 40
+    }
+  ],
+  "make this a user task": [
+    {
+      "op": "convert",
+      "ref": "this",
+      "subtype": "user task"
+    }
+  ],
+  "turn the selected gateway into a parallel gateway": [
+    {
+      "op": "convert",
+      "ref": "the selected gateway",
+      "subtype": "parallel gateway"
+    }
+  ],
+  "make Review Claim a service task": [
+    {
+      "op": "convert",
+      "ref": "Review Claim",
+      "subtype": "service task"
+    }
+  ],
+  "make the selected event a timer event": [
+    {
+      "op": "convert",
+      "ref": "the selected event",
+      "subtype": "timer event"
+    }
+  ],
+  "delete Task 2": [
+    {
+      "op": "delete",
+      "ref": "Task 2"
+    }
+  ],
+  "remove Task 1 and compact": [
+    {
+      "op": "delete",
+      "ref": "Task 1",
+      "compact": true
+    }
+  ],
+  "add a boundary event called Cancel to Subprocess 3": [
+    {
+      "op": "addBoundary",
+      "hostRef": "Subprocess 3",
+      "label": "Cancel"
+    }
+  ],
+  "add a boundary event to Check Coverage called Timeout": [
+    {
+      "op": "addBoundary",
+      "hostRef": "Check Coverage",
+      "label": "Timeout"
+    }
+  ],
+  "add template": [
+    {
+      "op": "pickTemplate"
+    }
+  ],
+  "add template after Review Claim": [
+    {
+      "op": "pickTemplate",
+      "afterRef": "Review Claim"
+    }
+  ],
+  "rename the selected pool to Finance": [
+    {
+      "op": "rename",
+      "ref": "the selected pool",
+      "label": "Finance"
+    }
+  ],
+  "delete these": [
+    {
+      "op": "delete",
+      "ref": "these"
+    }
+  ],
+  "connect this to Pay Claim": [
+    {
+      "op": "connect",
+      "fromRef": "this",
+      "toRef": "Pay Claim"
+    }
+  ],
+  "move the selected task right": [
+    {
+      "op": "move",
+      "ref": "the selected task",
+      "direction": "right",
+      "count": 1
+    }
+  ],
+  "add a boundary event called Timeout to this": [
+    {
+      "op": "addBoundary",
+      "hostRef": "this",
+      "label": "Timeout"
+    }
+  ],
+  "name these Receive, Check and Ship": [
+    {
+      "op": "fillLabels",
+      "labels": [
+        "Receive",
+        "Check",
+        "Ship"
+      ]
+    }
+  ],
+  "label the selected tasks Draft and Review": [
+    {
+      "op": "fillLabels",
+      "labels": [
+        "Draft",
+        "Review"
+      ]
+    }
+  ],
+  "assign these to the Finance team": [
+    {
+      "op": "assignTeam",
+      "team": "Finance"
+    }
+  ],
+  "put the selected tasks in the Sales team": [
+    {
+      "op": "assignTeam",
+      "team": "Sales"
+    }
+  ],
+  "attach risk R-012 to these": [
+    {
+      "op": "attachRiskControl",
+      "ref": "R-012"
+    }
+  ],
+  "attach control C-3 to the selected task": [
+    {
+      "op": "attachRiskControl",
+      "ref": "C-3"
+    }
+  ],
+  "put a task here": [
+    {
+      "op": "add",
+      "symbolType": "task",
+      "at": "pointer"
+    }
+  ],
+  "add a gateway there": [
+    {
+      "op": "add",
+      "symbolType": "gateway",
+      "at": "pointer"
+    }
+  ],
+  "rename the one under the cursor to Approve": [
+    {
+      "op": "rename",
+      "ref": "the one under the cursor",
+      "label": "Approve"
+    }
+  ],
+  "align these": [
+    {
+      "op": "alignSelection",
+      "mode": "smart"
+    }
+  ],
+  "align these in a row": [
+    {
+      "op": "alignSelection",
+      "mode": "center"
+    }
+  ],
+  "line these up in a column": [
+    {
+      "op": "alignSelection",
+      "mode": "vcenter"
+    }
+  ],
+  "align their left edges": [
+    {
+      "op": "alignSelection",
+      "mode": "left"
+    }
+  ],
+  "accept the suggestion": [
+    {
+      "op": "acceptGhost",
+      "pick": "accept the suggestion"
+    }
+  ],
+  "take the gateway": [
+    {
+      "op": "acceptGhost",
+      "pick": "take the gateway"
+    }
+  ],
+  "take the second one": [
+    {
+      "op": "acceptGhost",
+      "pick": "take the second one"
+    }
+  ],
+  "surround selected with an expanded subprocess called Check Stock": [
+    {
+      "op": "wrapInSubprocess",
+      "label": "Check Stock"
+    }
+  ],
+  "wrap these in a subprocess": [
+    {
+      "op": "wrapInSubprocess"
+    }
+  ],
+  "put an expanded subprocess around the selected elements called Pick": [
+    {
+      "op": "wrapInSubprocess",
+      "label": "Pick"
+    }
+  ],
+  "wrap these in a pool called Finance": [
+    {
+      "op": "wrapInContainer",
+      "container": "pool",
+      "label": "Finance"
+    }
+  ],
+  "surround selected with a lane called Picking": [
+    {
+      "op": "wrapInContainer",
+      "container": "lane",
+      "label": "Picking"
+    }
+  ],
+  "put a pool around the selected elements called Sales": [
+    {
+      "op": "wrapInContainer",
+      "container": "pool",
+      "label": "Sales"
+    }
+  ],
+  "unwrap the selected subprocess": [
+    {
+      "op": "unwrapSubprocess"
+    }
+  ],
+  "dissolve the EP": [
+    {
+      "op": "unwrapSubprocess"
+    }
+  ],
+  "delete selected": [
+    {
+      "op": "delete",
+      "ref": "selected"
+    }
+  ],
+  "add a pool": [
+    {
+      "op": "addPool"
+    }
+  ],
+  "add a pool called Finance": [
+    {
+      "op": "addPool",
+      "label": "Finance"
+    }
+  ],
+  "add a black box pool above Customer": [
+    {
+      "op": "addPool",
+      "poolType": "black-box",
+      "position": "above",
+      "relativeTo": "Customer"
+    }
+  ],
+  "put a pool around everything": [
+    {
+      "op": "wrapInPool"
+    }
+  ],
+  "wrap everything in a pool": [
+    {
+      "op": "wrapInPool"
+    }
+  ],
+  "extend the pools to include all elements": [
+    {
+      "op": "extendPools"
+    }
+  ],
+  "widen the pools": [
+    {
+      "op": "extendPools"
+    }
+  ],
+  "include all elements": [
+    {
+      "op": "extendPools"
+    }
+  ],
+  "compress the Customer pool": [
+    {
+      "op": "compressPool",
+      "poolRef": "pool Customer"
+    }
+  ],
+  "compress pool 3": [
+    {
+      "op": "compressPool",
+      "poolRef": "pool 3"
+    }
+  ],
+  "shrink Salesforce": [
+    {
+      "op": "compressPool",
+      "poolRef": "Salesforce"
+    }
+  ],
+  "nudge pool down": [
+    {
+      "op": "nudgePool",
+      "direction": "down"
+    }
+  ],
+  "bump Customer down by 40": [
+    {
+      "op": "nudgePool",
+      "ref": "Customer",
+      "direction": "down",
+      "distance": 40
+    }
+  ],
+  "nudge Salesforce up": [
+    {
+      "op": "nudgePool",
+      "ref": "Salesforce",
+      "direction": "up"
+    }
+  ],
+  "move the pool left boundary right": [
+    {
+      "op": "movePoolBoundary",
+      "boundary": "left",
+      "direction": "right"
+    }
+  ],
+  "nudge the Claims Processing pool's top boundary up by 40": [
+    {
+      "op": "movePoolBoundary",
+      "boundary": "top",
+      "direction": "up",
+      "ref": "Claims Processing",
+      "distance": 40
+    }
+  ],
+  "shift the bottom edge of the Customer pool down": [
+    {
+      "op": "movePoolBoundary",
+      "boundary": "bottom",
+      "direction": "down",
+      "ref": "Customer"
+    }
+  ],
+  "add a lane to the pool": [
+    {
+      "op": "addLanes",
+      "poolRef": "the pool",
+      "labels": [
+        "Lane"
+      ]
+    }
+  ],
+  "add 2 lanes to Claims Processing called Intake and Payments": [
+    {
+      "op": "addLanes",
+      "poolRef": "Claims Processing",
+      "labels": [
+        "Intake",
+        "Payments"
+      ]
+    }
+  ],
+  "add a lane above Lane 3": [
+    {
+      "op": "addLaneAt",
+      "poolRef": "the pool",
+      "position": "above",
+      "refLane": "Lane 3"
+    }
+  ],
+  "insert a lane below Underwriters called Support": [
+    {
+      "op": "addLaneAt",
+      "poolRef": "the pool",
+      "position": "below",
+      "refLane": "Underwriters",
+      "label": "Support"
+    }
+  ],
+  "add 3 sublanes to the Underwriters lane called Manager, Assistant and Staff": [
+    {
+      "op": "addSublanes",
+      "laneRef": "the Underwriters lane",
+      "labels": [
+        "Manager",
+        "Assistant",
+        "Staff"
+      ]
+    }
+  ],
+  "add sublanes to Lane 3": [
+    {
+      "op": "addSublanes",
+      "laneRef": "Lane 3",
+      "labels": [
+        "Sublane"
+      ]
+    }
+  ],
+  "delete Lane 3": [
+    {
+      "op": "delete",
+      "ref": "Lane 3"
+    }
+  ],
+  "remove the sublane Sub 2": [
+    {
+      "op": "delete",
+      "ref": "sublane Sub 2"
+    }
+  ],
+  "swap Underwriters with Lane 3": [
+    {
+      "op": "swapLanes",
+      "laneA": "Underwriters",
+      "laneB": "Lane 3"
+    }
+  ],
+  "move the Underwriters lane down": [
+    {
+      "op": "moveLane",
+      "ref": "Underwriters",
+      "direction": "down"
+    }
+  ],
+  "compress the Underwriters lane": [
+    {
+      "op": "compressLane",
+      "laneRef": "lane Underwriters"
+    }
+  ],
+  "compress lane Claims Team": [
+    {
+      "op": "compressLane",
+      "laneRef": "lane Claims Team"
+    }
+  ],
+  "shrink Lane 3": [
+    {
+      "op": "compressLane",
+      "laneRef": "lane 3"
+    }
+  ],
+  "expand the Underwriters lane": [
+    {
+      "op": "expandLane",
+      "laneRef": "lane Underwriters"
+    }
+  ],
+  "expand lane Claims Team by 100": [
+    {
+      "op": "expandLane",
+      "laneRef": "lane Claims Team",
+      "distance": 100
+    }
+  ],
+  "grow Lane 3": [
+    {
+      "op": "expandLane",
+      "laneRef": "lane 3"
+    }
+  ],
+  "add message from Task 1 to Salesforce labelled Email Details": [
+    {
+      "op": "addMessage",
+      "fromRef": "Task 1",
+      "toRef": "Salesforce",
+      "label": "Email Details"
+    }
+  ],
+  "send a message from Check Coverage to Customer": [
+    {
+      "op": "addMessage",
+      "fromRef": "Check Coverage",
+      "toRef": "Customer"
+    }
+  ],
+  "add a message to Salesforce from Task 2 saying Get Approval": [
+    {
+      "op": "addMessage",
+      "fromRef": "Task 2",
+      "toRef": "Salesforce",
+      "label": "Get Approval"
+    }
+  ],
+  "rename connector Email Details to Send Invoice": [
+    {
+      "op": "rename",
+      "ref": "connector Email Details",
+      "label": "Send Invoice"
+    }
+  ],
+  "delete connector Email Details": [
+    {
+      "op": "delete",
+      "ref": "connector Email Details"
+    }
+  ],
+  "remove message Email Details": [
+    {
+      "op": "delete",
+      "ref": "message Email Details"
+    }
+  ],
+  "label selected Yes": [
+    {
+      "op": "labelSelected",
+      "label": "Yes"
+    }
+  ],
+  "label the selected connector Approved": [
+    {
+      "op": "labelSelected",
+      "label": "Approved"
+    }
+  ],
+  "label selected": [
+    {
+      "op": "labelSelected"
+    }
+  ],
+  "label connectors": [
+    {
+      "op": "renameByType",
+      "itemType": "connector"
+    }
+  ],
+  "label messages": [
+    {
+      "op": "renameByType",
+      "itemType": "message"
+    }
+  ],
+  "label flows": [
+    {
+      "op": "renameByType",
+      "itemType": "connector"
+    }
+  ],
+  "add a message": [
+    {
+      "op": "addMessageByNumber"
+    }
+  ],
+  "send a message": [
+    {
+      "op": "addMessageByNumber"
+    }
+  ],
+  "add a message to the selected": [
+    {
+      "op": "addMessageByNumber",
+      "fromSelection": true
+    }
+  ],
+  "add a message from this": [
+    {
+      "op": "addMessageByNumber",
+      "fromSelection": true
+    }
+  ],
+  "swap top and bottom": [
+    {
+      "op": "swapGatewayPoints",
+      "a": "top",
+      "b": "bottom"
+    }
+  ],
+  "swap bottom and middle": [
+    {
+      "op": "swapGatewayPoints",
+      "a": "bottom",
+      "b": "middle"
+    }
+  ],
+  "swap selected gateway, top and bottom": [
+    {
+      "op": "swapGatewayPoints",
+      "a": "top",
+      "b": "bottom"
+    }
+  ],
+  "swap top with centre": [
+    {
+      "op": "swapGatewayPoints",
+      "a": "top",
+      "b": "middle"
+    }
+  ],
+  "swap top and right": [
+    {
+      "op": "swapGatewayPoints",
+      "a": "top",
+      "b": "right"
+    }
+  ],
+  "move top to bottom": [
+    {
+      "op": "moveGatewayPoint",
+      "from": "top",
+      "to": "bottom"
+    }
+  ],
+  "move middle to top": [
+    {
+      "op": "moveGatewayPoint",
+      "from": "middle",
+      "to": "top"
+    }
+  ],
+  "move selected gateway, bottom to middle": [
+    {
+      "op": "moveGatewayPoint",
+      "from": "bottom",
+      "to": "middle"
+    }
+  ],
+  "move Pool 3 above the Customer pool": [
+    {
+      "op": "movePoolTo",
+      "ref": "Pool 3",
+      "position": "above",
+      "relativeTo": "Customer pool"
+    }
+  ],
+  "put the Customer pool below the Salesforce pool": [
+    {
+      "op": "movePoolTo",
+      "ref": "Customer pool",
+      "position": "below",
+      "relativeTo": "Salesforce pool"
+    }
+  ],
+  "swap the Customer pool with the Salesforce pool": [
+    {
+      "op": "swapPools",
+      "a": "Customer pool",
+      "b": "Salesforce pool"
+    }
+  ],
+  "swap the selected pools": [
+    {
+      "op": "swapPools"
+    }
+  ],
+  "undo that": [
+    {
+      "op": "undo"
+    }
+  ],
+  "again": [
+    {
+      "op": "again"
+    }
+  ],
+  "clear the diagram": [
+    {
+      "op": "clear"
+    }
+  ],
+  "export the diagram to JSON": [
+    {
+      "op": "export",
+      "format": "json"
+    }
+  ]
+}

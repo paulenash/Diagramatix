@@ -16,10 +16,11 @@
  */
 import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
-import { generateCases, FAMILY_NAMES, NOT_GENERATED } from "@/app/lib/assist/commandGenerator";
+import { FAMILY_NAMES, NOT_GENERATED } from "@/app/lib/assist/commandGenerator";
 import { scoreCase, summarise, isFailure, type CaseResult, type Outcome } from "@/app/lib/assist/commandScore";
 import { fixtureElements, fixtureDiagram } from "@/app/lib/assist/commandFixture";
 import { DEFAULT_CORPUS_SEED } from "@/app/lib/assist/rng";
+import { CORPUS_SETS, CUSTOM_SET, corpusSet, casesForSet, familiesForSet } from "@/app/lib/assist/corpusSets";
 import { RecorderPanel } from "./RecorderPanel";
 import { ReplayPanel } from "./ReplayPanel";
 import { RecogniserBadge } from "./RecogniserBadge";
@@ -29,7 +30,11 @@ import { OUTCOME_STYLE, OUTCOME_MEANS } from "./outcomeStyle";
 
 export function VoiceAssistTestClient() {
   const [tab, setTab] = useState<"text" | "record" | "replay">("text");
-  const [seed, setSeed] = useState(DEFAULT_CORPUS_SEED);
+  /** A set from the registry, or CUSTOM_SET — the realistic generator with a seed typed below. */
+  const [setId, setSetId] = useState<string>(DEFAULT_CORPUS_SEED);
+  const [customSeed, setCustomSeed] = useState("");
+  const seed = setId === CUSTOM_SET ? (customSeed.trim() || DEFAULT_CORPUS_SEED) : setId;
+  const fixedSet = corpusSet(setId)?.kind === "catalog";
   const [count, setCount] = useState(200);
   const [family, setFamily] = useState<string>("");
   const [results, setResults] = useState<CaseResult[] | null>(null);
@@ -42,11 +47,7 @@ export function VoiceAssistTestClient() {
   const run = useCallback(() => {
     const t0 = performance.now();
     const els = fixtureElements();
-    const cases = generateCases({
-      seed, count,
-      world: els,
-      ...(family ? { families: [family] } : {}),
-    });
+    const cases = casesForSet(seed, { count, world: els, ...(family ? { families: [family] } : {}) });
     // L4 too: each case is applied to its own headless copy of the fixture.
     setResults(cases.map((c) => scoreCase(c, undefined, els, { diagram: fixtureDiagram() })));
     setRanMs(Math.round(performance.now() - t0));
@@ -108,23 +109,35 @@ export function VoiceAssistTestClient() {
 
       <div className="flex flex-wrap items-end gap-3 mb-4">
         <label className="text-xs text-gray-700">
-          <div className="mb-0.5">Seed</div>
-          <input value={seed} onChange={(e) => setSeed(e.target.value)}
-            className="border border-gray-300 rounded px-2 py-1 text-xs w-56"
-            title="Same seed, same corpus — so a red case can always be reached again" />
+          <div className="mb-0.5">Set</div>
+          <select value={setId} onChange={(e) => { setSetId(e.target.value); setFamily(""); setResults(null); }}
+            className="border border-gray-300 rounded px-2 py-1 text-xs"
+            title={corpusSet(setId)?.explain ?? "The realistic generator, reshuffled by a seed of your own"}>
+            {CORPUS_SETS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+            <option value={CUSTOM_SET}>Custom seed…</option>
+          </select>
         </label>
+        {setId === CUSTOM_SET && (
+          <label className="text-xs text-gray-700">
+            <div className="mb-0.5">Seed</div>
+            <input value={customSeed} onChange={(e) => setCustomSeed(e.target.value)} placeholder={DEFAULT_CORPUS_SEED}
+              className="border border-gray-300 rounded px-2 py-1 text-xs w-56"
+              title="Same seed, same corpus — so a red case can always be reached again" />
+          </label>
+        )}
         <label className="text-xs text-gray-700">
           <div className="mb-0.5">Cases</div>
-          <input type="number" min={1} max={5000} value={count}
+          <input type="number" min={1} max={5000} value={count} disabled={fixedSet}
+            title={fixedSet ? "This set is a fixed list — every line, once" : undefined}
             onChange={(e) => setCount(Math.max(1, Math.min(5000, Number(e.target.value) || 1)))}
-            className="border border-gray-300 rounded px-2 py-1 text-xs w-24" />
+            className="border border-gray-300 rounded px-2 py-1 text-xs w-24 disabled:opacity-50" />
         </label>
         <label className="text-xs text-gray-700">
           <div className="mb-0.5">Family</div>
           <select value={family} onChange={(e) => setFamily(e.target.value)}
             className="border border-gray-300 rounded px-2 py-1 text-xs">
             <option value="">all</option>
-            {FAMILY_NAMES.map((f) => <option key={f} value={f}>{f}</option>)}
+            {familiesForSet(seed, FAMILY_NAMES).map((f) => <option key={f} value={f}>{f}</option>)}
           </select>
         </label>
         <button onClick={run} className="text-xs text-white bg-purple-600 hover:bg-purple-700 rounded px-3 py-1.5">Run</button>
