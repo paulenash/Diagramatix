@@ -112,7 +112,8 @@ describe("T4573 — wired into the editor", () => {
   const body = editor();
 
   it("a destructive command with candidates parks instead of failing", () => {
-    expect(body).toContain("buildPickFlow(ops, op.ref, e.ambiguous, els)");
+    // Changed 2026-09-27: re-runs from the op that asked (T4939).
+    expect(body).toContain("buildPickFlow(ops.slice(opAt), op.ref, e.ambiguous, els)");
     expect(body).toContain("pickParked = true");
     expect(body, "and a parked command is not a failure").toContain("ok: !anyFail || pickParked");
   });

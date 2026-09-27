@@ -27,6 +27,18 @@ export type RefResolution = { id: string } | { ambiguous: string[] } | null;
  *
  * `strict` makes a bare type noun with more than one candidate report the
  * ambiguity instead of guessing, so the caller can ask.
+ *
+ * AND NOW NOTHING GUESSES (Paul, 2026-09-27: "Should a bare 'the pool' / 'the
+ * gateway' ask which one when there are several? Yes"). "The most recent" was
+ * the one you just made only on a diagram built this session; on a loaded one
+ * it is the LAST IN THE FILE — so on his test diagram "add a lane to the pool"
+ * put a lane in the black-box Claims System and made it white-box, and "rename
+ * the gateway" renamed Re-work Required?. With several, a bare kind word takes
+ * (see `bareKindChoice`):
+ *   1. the one SELECTED, when exactly one of that kind is — the mouse says which;
+ *   2. the one you just added by voice (not under `strict`) — R3's "the gateway
+ *      you just made", now only when it really is;
+ *   3. otherwise it asks.
  */
 export interface ResolveOpts {
   /** Refuse to guess between candidates; report them instead. */
@@ -72,11 +84,32 @@ const norm = (s: string) => spokenNumbersAsDigits(s.toLowerCase().replace(/[.,!?
 const stripArticle = (s: string) => s.replace(/^(the|a|an)\s+/i, "").trim();
 const tokens = (s: string) => norm(s).split(/\s+/).filter(Boolean);
 
+/**
+ * THE RULE for a bare kind word ("the pool", "the gateway") with these
+ * candidates, oldest first: the only one, the one selected, the one just added
+ * (unless `strict`), or the question. See `ResolveOpts`.
+ */
+export function bareKindChoice(
+  items: readonly DiagramElement[],
+  selectedIds: readonly string[] | undefined,
+  lastAddedId: string | null | undefined,
+  strict = false,
+): RefResolution {
+  if (!items.length) return null;
+  if (items.length === 1) return { id: items[0].id };
+  const selected = items.filter((e) => selectedIds?.includes(e.id));
+  if (selected.length === 1) return { id: selected[0].id };
+  if (!strict && lastAddedId && items.some((e) => e.id === lastAddedId)) return { id: lastAddedId };
+  return { ambiguous: items.map((e) => e.id) };
+}
+
 // Bare container type-nouns ("the pool", "pool", "the lane", "sublane") →
 // resolveRef never knew these (SYMBOL_SYNONYMS has no pool/lane), so "the pool"
-// used to fall through to name-matching and fail. Resolve to the unique / most
-// recent element of that container type.
-function containerNoun(spoken: string, elements: DiagramElement[], strict = false): RefResolution {
+// used to fall through to name-matching and fail. `bareKindChoice` picks.
+function containerNoun(
+  spoken: string, elements: DiagramElement[], strict = false,
+  selectedIds?: readonly string[], lastAddedId?: string | null,
+): RefResolution {
   const s = stripArticle(norm(spoken));
   // B6 — a sub-lane is a nested lane OR a stamped "sublane"; "lane" on its own
   // means a band directly in a pool. The two sets do not overlap, so a
@@ -89,10 +122,7 @@ function containerNoun(spoken: string, elements: DiagramElement[], strict = fals
     : kind === "lane" ? elements.filter((e) => isTopLevelLane(e, elements))
     : null;
   if (!items) return null;
-  if (!items.length) return null;
-  // Destructive: report the candidates rather than taking the newest.
-  if (strict && items.length > 1) return { ambiguous: items.map((e) => e.id) };
-  return { id: items[items.length - 1].id }; // most-recent
+  return bareKindChoice(items, selectedIds, lastAddedId, strict);
 }
 
 function pick(ids: string[]): RefResolution {
@@ -361,19 +391,13 @@ export function resolveRef(spoken: string, elements: DiagramElement[], lastAdded
     return prev ? { id: prev.id } : null;
   }
 
-  // Bare container noun ("the pool", "pool", "sublane") → the unique/most-recent.
-  const cont = containerNoun(s, elements, opts.strict);
+  // Bare container noun ("the pool", "pool", "sublane") and bare type noun
+  // ("the gateway", "the end event"): the only one, the selected one, the one
+  // just added, or the question (bareKindChoice).
+  const cont = containerNoun(s, elements, opts.strict, selectedIds, lastAddedId);
   if (cont) return cont;
-
-  // Bare type noun ("the gateway", "the end event") → elements of that type.
   const t = typeNoun(s);
-  if (t) {
-    const ofType = elements.filter((e) => e.type === t);
-    // Prefer the most-recent when there are several of a bare type — except
-    // under strict, where guessing is precisely what we are avoiding.
-    if (ofType.length > 1 && !opts.strict) return { id: ofType[ofType.length - 1].id };
-    return pick(ofType.map((e) => e.id));
-  }
+  if (t) return bareKindChoice(elements.filter((e) => e.type === t), selectedIds, lastAddedId, opts.strict);
 
   const fullTarget = stripArticle(s);          // "lane 2"
   const target = stripKind(fullTarget);        // "2"

@@ -501,10 +501,11 @@ describe("T4934 — a connector named by its label is that connector, in the del
 
   it("wiring: one rule, in connectorRef.ts, read by the apply layer and both scorers", () => {
     const apply = src("app", "lib", "assist", "applyAssistOps.ts");
-    expect(apply).toContain("connectorOverElement(data.connectors, op.ref,");
-    expect(apply).toContain("connectorOverElement(data.connectors, leftRef,");
+    // Changed 2026-09-27: every match, so several are a question (T4939).
+    expect(apply).toContain("connectorsOverElement(data.connectors, op.ref,");
+    expect(apply).toContain("connectorsOverElement(data.connectors, leftRef,");
     expect(apply, "no second copy of the label key").not.toContain("function messageLabelKey(");
-    expect(src("app", "lib", "assist", "commandScore.ts")).toContain("connectorOverElement(connectors, spoken, el)");
-    expect(src("app", "lib", "assist", "applyScore.ts")).toContain("connectorOverElement(d.connectors, v, el)");
+    expect(src("app", "lib", "assist", "commandScore.ts")).toContain("connectorResolution(connectors, spoken, el)");
+    expect(src("app", "lib", "assist", "applyScore.ts")).toContain("connectorResolution(d.connectors, v, el)");
   });
 });

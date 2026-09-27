@@ -26,7 +26,7 @@ import type { AssistOp } from "./ops";
 import type { GeneratedCase } from "./commandGenerator";
 import type { Connector, DiagramData, DiagramElement } from "../diagram/types";
 import { scoreApply } from "./applyScore";
-import { connectorOverElement, mayNameConnector, CONNECTOR_REF_PREFIX } from "./connectorRef";
+import { connectorResolution, mayNameConnector } from "./connectorRef";
 
 export type Outcome =
   /** Right ops, right elements. */
@@ -223,8 +223,8 @@ function checkRefs(
       // end event the element resolver matches loosely.
       if (connectors.length && mayNameConnector(expected[i].op, field)) {
         const el = r && "id" in r ? world.find((x) => x.id === r.id) : null;
-        const conn = connectorOverElement(connectors, spoken, el);
-        if (conn) return { id: `${CONNECTOR_REF_PREFIX}${conn.id}` };
+        const conn = connectorResolution(connectors, spoken, el);
+        if (conn) return conn;
       }
       return r;
     };

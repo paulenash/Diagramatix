@@ -161,6 +161,14 @@ export const CATALOG_CONTEXT: Readonly<Record<string, CatalogContext>> = {
   "move the selected event, right to bottom": { needsSelection: ["start"] },
   "move left to bottom": { needsSelection: ["end"] },
   "swap the selected pools": { needsSelection: ["cust", "sys"] },
+  // A bare kind word with several of that kind ASKS (Paul, 2026-09-27) — the
+  // test diagram has three gateways and three pools. Selected, it says which.
+  "rename the gateway to Approved?": { needsSelection: ["g"] },
+  "move the gateway two elements to the right": { needsSelection: ["p5fku96e"] },
+  "add a lane to the pool": { needsSelection: ["p"] },
+  // Naming no pool means "the pool" (refKinds.ts unsaidRef) — the same rule.
+  "nudge pool down": { needsSelection: ["sys"] },
+  "move the pool left boundary right": { needsSelection: ["sys"] },
 };
 
 /** `dgx-voice-catalog#<slug>` — from the words, so an inserted line moves nothing. */

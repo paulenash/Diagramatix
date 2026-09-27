@@ -37,6 +37,25 @@ export function badgePlaceFor(type: string): "below" | "above" | "header" {
 const EVENT_TYPES = new Set<string>(["start-event", "intermediate-event", "end-event"]);
 const SUBPROCESS_TYPES = new Set<string>(["subprocess", "subprocess-expanded", "subprocess-collapsed"]);
 
+/** Where a connector's number sits: its middle waypoint. The rename flow and the picker agree. */
+function connectorBadgeAt(c: Connector): { x: number; y: number } {
+  const wps = c.waypoints ?? [];
+  return wps.length ? wps[Math.floor(wps.length / 2)] : { x: 0, y: 0 };
+}
+
+/**
+ * Number a set of CONNECTORS in the same reading order, each badge on its
+ * middle — the picker's answer when several share a label ("delete connector
+ * Yes" on a diagram with three Yes flows, Paul 2026-09-27).
+ */
+export function numberConnectorTargets(conns: readonly Connector[]): RenameTarget[] {
+  const band = (y: number) => Math.round(y / 64);
+  return conns
+    .map((c) => ({ c, at: connectorBadgeAt(c) }))
+    .sort((a, b) => band(a.at.y) - band(b.at.y) || a.at.x - b.at.x)
+    .map(({ c, at }, i) => ({ id: c.id, n: i + 1, kind: "connector" as const, x: at.x, y: at.y, height: 0, label: c.label ?? undefined }));
+}
+
 /** Map a spoken type word ("tasks", "sub-lane", "decision"…) to a RenameType. */
 /**
  * Number a set of elements in reading order — rows of about 64px, then left to
@@ -95,8 +114,7 @@ export function collectRenameTargets(
     const wantType = itemType === "message" ? "messageBPMN" : "sequence";
     for (const c of connectors) {
       if (c.type !== wantType) continue;
-      const wps = c.waypoints ?? [];
-      const mid = wps.length ? wps[Math.floor(wps.length / 2)] : { x: 0, y: 0 };
+      const mid = connectorBadgeAt(c);
       raw.push({ id: c.id, x: mid.x, y: mid.y, height: 0, kind: "connector" });
     }
   } else {

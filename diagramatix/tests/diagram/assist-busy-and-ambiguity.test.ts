@@ -31,10 +31,13 @@ const twoTasks = [el("t1", "task", "Review"), el("t2", "task", "Approve")];
 const twoPools = [el("p1", "pool", "Customer"), el("p2", "pool", "Supplier")];
 
 describe("T4565 — R3: a destructive command does not guess", () => {
-  it("still takes the most recent for an ordinary command", () => {
-    // The convenience that makes "add a task after the gateway" quick.
-    const r = resolveRef("the task", twoTasks, null, []);
-    expect(r).toEqual({ id: "t2" });
+  it("an ordinary command asks too — unless the one you just added, or the one selected, says which (Paul, 2026-09-27)", () => {
+    // "The most recent" was the LAST IN THE FILE on a loaded diagram. Now a
+    // bare kind word with several asks (T4939); R3's convenience survives
+    // where it was real: the task you just added.
+    expect(resolveRef("the task", twoTasks, null, [])).toEqual({ ambiguous: ["t1", "t2"] });
+    expect(resolveRef("the task", twoTasks, "t1", [])).toEqual({ id: "t1" });
+    expect(resolveRef("the task", twoTasks, null, ["t1"])).toEqual({ id: "t1" });
   });
 
   it("reports the candidates instead, under strict", () => {
@@ -43,7 +46,10 @@ describe("T4565 — R3: a destructive command does not guess", () => {
   });
 
   it("applies to bare container nouns too", () => {
-    expect(resolveRef("the pool", twoPools, null, [])).toEqual({ id: "p2" });
+    expect(resolveRef("the pool", twoPools, null, [])).toEqual({ ambiguous: ["p1", "p2"] });
+    // Under strict, what you just added is still not enough — only the mouse.
+    expect(resolveRef("the pool", twoPools, "p2", [], { strict: true })).toEqual({ ambiguous: ["p1", "p2"] });
+    expect(resolveRef("the pool", twoPools, null, ["p2"], { strict: true })).toEqual({ id: "p2" });
     expect(resolveRef("the pool", twoPools, null, [], { strict: true }))
       .toEqual({ ambiguous: ["p1", "p2"] });
   });

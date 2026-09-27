@@ -18,8 +18,8 @@ import { applyAssistOps } from "./applyAssistOps";
 import { headlessDiagram } from "./headlessDiagram";
 import { checkEffect, checkAlign, type EffectCheck, type ResolvedRefs } from "./opEffects";
 import { resolveRef } from "./resolveRef";
-import { refKind } from "./refKinds";
-import { connectorOverElement, mayNameConnector, CONNECTOR_REF_PREFIX } from "./connectorRef";
+import { refKind, unsaidRef } from "./refKinds";
+import { connectorResolution, mayNameConnector } from "./connectorRef";
 import type { AssistOp } from "./ops";
 import type { DiagramData } from "../diagram/types";
 
@@ -34,13 +34,14 @@ const refFieldsOf = (op: AssistOp) => (op.op === "swapPools" ? [...REF_FIELDS, "
  * (connectorRef.ts) — recorded as `connector:<id>` for opEffects.
  */
 function resolveField(op: AssistOp, f: string, d: DiagramData, selected: readonly string[]) {
-  const v = (op as unknown as Record<string, unknown>)[f];
+  // A field not said means what the app reads it as (refKinds.ts unsaidRef).
+  const v = (op as unknown as Record<string, unknown>)[f] ?? unsaidRef(op.op, f);
   if (typeof v !== "string" || !v) return undefined;
   const r = resolveRef(v, d.elements, null, selected, { kind: refKind(op.op, f) });
   if (mayNameConnector(op.op, f)) {
     const el = r && "id" in r ? d.elements.find((x) => x.id === r.id) : null;
-    const conn = connectorOverElement(d.connectors, v, el);
-    if (conn) return { id: `${CONNECTOR_REF_PREFIX}${conn.id}` };
+    const conn = connectorResolution(d.connectors, v, el);
+    if (conn) return conn;
   }
   return r;
 }

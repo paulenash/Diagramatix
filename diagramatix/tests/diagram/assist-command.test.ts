@@ -135,8 +135,9 @@ describe("container maintenance — definitive set", () => {
     expect(parseCommand("add a lane to My Company called Sales")).toEqual([{ op: "addLanes", poolRef: "My Company", labels: ["Sales"] }]);
   });
   it("3. Add Lane above/below a lane", () => {
-    expect(parseCommand("add a lane above Lane 2")).toEqual([{ op: "addLaneAt", poolRef: "the pool", position: "above", refLane: "Lane 2" }]);
-    expect(parseCommand("add a lane below the Sales lane")).toEqual([{ op: "addLaneAt", poolRef: "the pool", position: "below", refLane: "Sales lane" }]);
+    // Changed 2026-09-27: no pool unless one is said — the lane names its own (T4939).
+    expect(parseCommand("add a lane above Lane 2")).toEqual([{ op: "addLaneAt", position: "above", refLane: "Lane 2" }]);
+    expect(parseCommand("add a lane below the Sales lane")).toEqual([{ op: "addLaneAt", position: "below", refLane: "Sales lane" }]);
     expect(parseCommand("insert a lane to My Company below Sales called Support")).toEqual([{ op: "addLaneAt", poolRef: "My Company", position: "below", refLane: "Sales", label: "Support" }]);
   });
   it("4. Delete Lane / Sublane", () => {

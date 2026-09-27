@@ -47,9 +47,11 @@ describe("T4695 — a spoken kind word is a constraint, not decoration", () => {
     expect(resolveRef("sublane one", noSubs)).toBeNull();
   });
 
-  it("a bare kind word still means 'the one of that kind', as before", () => {
-    expect(resolveRef("the pool", world())).toEqual({ id: "p3" });   // most recent
-    expect(resolveRef("sublane", world())).toEqual({ id: "S2" });
+  it("a bare kind word means the one of that kind — and with several, asks (changed 2026-09-27, T4939)", () => {
+    const pools = world().filter((e) => e.type === "pool").map((e) => e.id);
+    expect(resolveRef("the pool", world())).toEqual({ ambiguous: pools });
+    expect(resolveRef("the pool", world(), null, ["p3"])).toEqual({ id: "p3" });
+    expect(resolveRef("sublane", world(), "S2")).toEqual({ id: "S2" });
   });
 
   it("a name that merely starts with a kind word is untouched", () => {
@@ -156,7 +158,7 @@ describe("T4700 — asking WHICH one in a way that can be answered", () => {
     // Two things with the same name cannot be told apart by name.
     const ed = editorWithApplyLayer();
     for (const ref of ["op.poolRef", "op.laneRef"]) {
-      expect(ed, ref).toContain(`buildPickFlow(ops, ${ref},`);
+      expect(ed, ref).toContain(`buildPickFlow(ops.slice(opAt), ${ref},`);   // re-runs from the op that asked (2026-09-27)
     }
   });
 

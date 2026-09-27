@@ -541,7 +541,6 @@
   "add a lane above Lane 3": [
     {
       "op": "addLaneAt",
-      "poolRef": "the pool",
       "position": "above",
       "refLane": "Lane 3"
     }
@@ -549,7 +548,6 @@
   "insert a lane below Underwriters called Support": [
     {
       "op": "addLaneAt",
-      "poolRef": "the pool",
       "position": "below",
       "refLane": "Underwriters",
       "label": "Support"

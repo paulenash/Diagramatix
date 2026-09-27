@@ -40,6 +40,20 @@ export function refKind(op: string, field: string): RefKind | undefined {
   return TABLE[op]?.[field];
 }
 
+/**
+ * What an op means when a ref field was NOT SAID — "nudge pool down", "move
+ * the pool left boundary right" name no pool, and mean "the pool". Read by the
+ * apply layer and by L4, so a question the app asks is one the scorer
+ * expects (Paul, 2026-09-27: a bare "the pool" asks which when there are several).
+ */
+const UNSAID: Record<string, Record<string, string>> = {
+  nudgePool: { ref: "the pool" },
+  movePoolBoundary: { ref: "the pool" },
+};
+export function unsaidRef(op: string, field: string): string | undefined {
+  return UNSAID[op]?.[field];
+}
+
 /** Does `e` belong to `kind`? Both shapes of a sub-lane count as a lane (laneKind.ts). */
 export function isOfKind(kind: RefKind, e: DiagramElement): boolean {
   if (kind === "pool") return e.type === "pool";

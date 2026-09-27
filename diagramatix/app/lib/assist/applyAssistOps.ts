@@ -50,15 +50,15 @@ import { boundaryRect } from "./poolBoundaryPhrase";
 import { planWrapInPool } from "@/app/lib/diagram/wrapInPoolPlan";
 import { syntheticElement, withAdded, withDeleted, withLabel } from "./workingSet";
 import { collectRenameTargets, type RenameType, type RenameTarget } from "./renameTargets";
-import { buildPickFlow, type PickFlow } from "./disambiguate";
+import { buildConnectorPickFlow, buildPickFlow, type PickFlow } from "./disambiguate";
 import { getRiskControl, riskControlPatch } from "@/app/lib/diagram/riskControl";
 import { simPatch } from "@/app/lib/diagram/simParams";
 import { whyTemplateCantFollow } from "@/app/lib/diagram/templateAttach";
 import { SEQUENCE_NODE_TYPES } from "@/app/lib/diagram/templates";
 import { eventSideRefusal } from "@/app/lib/diagram/eventSides";
 import { TEMPLATE_BEFORE_REFUSAL } from "./templatePhrase";
-import { refKind, type RefKind } from "./refKinds";
-import { connectorOverElement } from "./connectorRef";
+import { refKind, unsaidRef, type RefKind } from "./refKinds";
+import { connectorsOverElement } from "./connectorRef";
 
 /** The guided "rename by number" flow — pick a numbered badge, then say the name. */
 export type RenameFlow =
@@ -203,11 +203,15 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
   // Multi-modal: "this" / "these" / "the selected task" resolve to the mouse
   // selection — the mouse says WHICH, the voice says WHAT.
   const selectedIds = selectedIdsRef.current;
+  /** The op being applied, by index: a parked question re-runs from HERE, so what already ran never runs twice. */
+  let opAt = -1;
+  /** The last genuine ambiguity `resolve1` met — raised as a picker if the op reported it (`askWhich`). */
+  let pendingAsk: { ref: string; ids: string[]; err: string; at: number } | null = null;
   /**
-   * `strict` (R3) is for commands that DESTROY something. Without it a bare
-   * type noun resolves to the most recent of its kind — the right call for
-   * "add a task after the gateway", and quietly the wrong element for
-   * "delete the task".
+   * `strict` (R3) is for commands that DESTROY something: only the selection
+   * settles a bare type noun there. Without it, the one just added by voice
+   * does too — "add a task after the gateway" you just made. Otherwise,
+   * with several, it asks (bareKindChoice, Paul 2026-09-27).
    *
    * R2: an ambiguity now names the candidates instead of throwing them away.
    * `resolveRef` has always returned the list; the message discarded it and
@@ -244,7 +248,9 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       // The ids travel with the message so a caller can raise the PICKER
       // (R2) instead of only reporting; callers that don't care still get a
       // sentence that names what it found.
-      return { err: `which “${ref}”? ${names.length} match: ${shown}${more} — say the name`, ambiguous: r.ambiguous };
+      const err = `which “${ref}”? ${names.length} match: ${shown}${more} — say the name`;
+      pendingAsk = { ref, ids: r.ambiguous, err, at: opAt };
+      return { err, ambiguous: r.ambiguous };
     }
     return els.find((e) => e.id === r.id)!;
   };
@@ -314,7 +320,51 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
     if (isAnyLane(e)) return `${nameOf(e)} is a ${laneKindWord(e, els)} — only pools move above or below each other; say “move the ${nameOf(e)} lane up” or “down”`;
     return `${nameOf(e)} is a ${e.type.replace(/-/g, " ")} — only pools move above or below each other`;
   };
+  /**
+   * A command that names NO pool — "nudge pool down", "move the pool left
+   * boundary right" — means "the pool", by the same rule as any bare kind word:
+   * the only one, the one selected, the one just added, or the question. Both
+   * used to take the newest (black-box first): Claims System on Paul's test
+   * diagram (2026-09-27). The parked command carries the words, so the picked
+   * number lands in it.
+   */
+  const thePoolFor = (op: AssistOp & { ref?: string }): DiagramElement | "parked" | null => {
+    const ref = op.ref ?? unsaidRef(op.op, "ref") ?? "the pool";
+    if (!op.ref && !els.some((e) => e.type === "pool")) { results.push("there's no pool on the diagram"); anyFail = true; return null; }
+    const r = resolve1(ref);
+    if (!("err" in r)) return r;
+    if (!op.ref && r.ambiguous) {
+      const flow = buildPickFlow([{ ...op, ref } as AssistOp, ...ops.slice(opAt + 1)], ref, r.ambiguous, els);
+      if (flow) { setPickFlow(flow); results.push(flow.prompt); pickParked = true; return "parked"; }
+    }
+    results.push(r.err); anyFail = true;
+    return null;
+  };
+  /**
+   * ONE PLACE ASKS "WHICH?" (Paul, 2026-09-27: a bare "the pool" / "the
+   * gateway" asks which when there are several). A command that REPORTED an
+   * ambiguity — "which “the pool”? 3 match …" — parks for a number instead,
+   * whichever op it was. The pickers written into single ops (delete, add
+   * after, add lane …) had left every other op answering "say the name".
+   * Only a reported ambiguity is raised: an op that met one and dealt with it
+   * some other way is left alone.
+   */
+  const askWhich = (): boolean => {
+    const a = pendingAsk;
+    pendingAsk = null;
+    if (!a || pickParked) return false;
+    const i = results.lastIndexOf(a.err);
+    if (i < 0) return false;
+    const flow = buildPickFlow(ops.slice(a.at), a.ref, a.ids, els);
+    if (!flow) return false;
+    results[i] = flow.prompt;
+    setPickFlow(flow);
+    pickParked = true;
+    return true;
+  };
   for (const op of ops) {
+    opAt += 1;
+    if (askWhich()) break;
     if (op.op === "undo") { undo(); results.push("undid the last change"); continue; }
     if (op.op === "clear") { clearDiagram(); voiceLastId.current = null; results.push("cleared the diagram"); continue; }
     if (op.op === "export") { exportJsonRef.current?.(); results.push("exported to JSON"); continue; }
@@ -344,7 +394,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
         if ("err" in a && a.ambiguous) {
           // They can see which one they meant — number them and ask, rather
           // than making them rephrase (R2).
-          const flow = buildPickFlow(ops, op.afterRef, a.ambiguous, els);
+          const flow = buildPickFlow(ops.slice(opAt), op.afterRef, a.ambiguous, els);
           if (flow) { setPickFlow(flow); results.push(flow.prompt); pickParked = true; break; }
         }
         if ("err" in a) { results.push(a.err); anyFail = true; continue; }
@@ -496,13 +546,24 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       // Rejection Notification" deleted the END EVENT "Send Rejection
       // Notification" on Paul's test diagram (2026-09-27), and a label typed
       // on two lines was never found.
-      const conn = connectorOverElement(data.connectors, op.ref, "err" in e ? null : e);
-      if (conn) { deleteConnector(conn.id); results.push(`deleted message “${conn.label}”`); continue; }
+      // Several connectors named that — Paul's three “Yes” flows — is a
+      // question, never the first in the file.
+      const conns = connectorsOverElement(data.connectors, op.ref, "err" in e ? null : e);
+      if (conns.length > 1) {
+        const flow = buildConnectorPickFlow(ops.slice(opAt), op.ref, conns);
+        if (flow) { setPickFlow(flow); results.push(flow.prompt); pickParked = true; break; }
+      }
+      if (conns.length === 1) {
+        const conn = conns[0];
+        deleteConnector(conn.id);
+        results.push(`deleted ${conn.type === "messageBPMN" ? "message" : "connector"} “${spokenName(conn.label)}”`);
+        continue;
+      }
       if ("err" in e && e.ambiguous) {
         // R2: number the candidates and wait for a number, rather than
         // making the user rephrase a command that was already unambiguous
         // to THEM — they can see which one they meant.
-        const flow = buildPickFlow(ops, op.ref, e.ambiguous, els);
+        const flow = buildPickFlow(ops.slice(opAt), op.ref, e.ambiguous, els);
         if (flow) { setPickFlow(flow); results.push(flow.prompt); pickParked = true; break; }
       }
       if ("err" in e) { results.push(e.err); anyFail = true; continue; }
@@ -713,7 +774,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       const ref = resolve1(op.refLane);
       if ("err" in ref) { results.push(ref.err); anyFail = true; continue; }
       if (ref.type !== "lane") { results.push(`${nameOf(ref)} isn't a lane`); anyFail = true; continue; }
-      const poolId = ref.parentId ?? (() => { const p = resolve1(op.poolRef); return "err" in p ? null : p.id; })();
+      const poolId = ref.parentId ?? (() => { if (!op.poolRef) return null; const p = resolve1(op.poolRef); return "err" in p ? null : p.id; })();
       if (!poolId) { results.push(`couldn't find the pool for ${nameOf(ref)}`); anyFail = true; continue; }
       // The reducer carves the new lane out of its neighbour and never grows the
       // pool, so with no room it adds NOTHING — and this said "added a lane"
@@ -764,7 +825,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       // large quiet edit.
       const p = selectedOfBareKind(op.poolRef) ?? resolveField(op, "poolRef", { strict: true });
       if ("err" in p && p.ambiguous) {
-        const flow = buildPickFlow(ops, op.poolRef, p.ambiguous, els);
+        const flow = buildPickFlow(ops.slice(opAt), op.poolRef, p.ambiguous, els);
         if (flow) { setPickFlow(flow); results.push(flow.prompt); pickParked = true; break; }
       }
       if ("err" in p) { results.push(p.err); anyFail = true; continue; }
@@ -785,7 +846,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
     if (op.op === "compressLane" || op.op === "expandLane") {
       const lane = selectedOfBareKind(op.laneRef) ?? resolveField(op, "laneRef", { strict: true });
       if ("err" in lane && lane.ambiguous) {
-        const flow = buildPickFlow(ops, op.laneRef, lane.ambiguous, els);
+        const flow = buildPickFlow(ops.slice(opAt), op.laneRef, lane.ambiguous, els);
         if (flow) { setPickFlow(flow); results.push(flow.prompt); pickParked = true; break; }
       }
       if ("err" in lane) { results.push(lane.err); anyFail = true; continue; }
@@ -822,8 +883,10 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
         if ("err" in r) { results.push(r.err); anyFail = true; continue; }
         target = r;
       } else {
-        const pools = els.filter((e) => e.type === "pool");
-        target = pools[pools.length - 1];
+        const t = thePoolFor(op);
+        if (t === "parked") break;
+        if (!t) continue;
+        target = t;
       }
       if (!target || target.type !== "pool") {
         results.push(op.ref ? `${nameOf(target!)} isn't a pool` : "there's no pool to resize");
@@ -859,11 +922,10 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
         if ("err" in r) { results.push(r.err); anyFail = true; continue; }
         target = r;
       } else {
-        // Default target: the most-recent black-box pool, else any pool.
-        const pools = els.filter((e) => e.type === "pool");
-        const blacks = pools.filter((p) => (p.properties?.poolType as string | undefined) === "black-box");
-        target = blacks[blacks.length - 1] ?? pools[pools.length - 1];
-        if (!target) { results.push("there's no pool to nudge"); anyFail = true; continue; }
+        const t = thePoolFor(op);
+        if (t === "parked") break;
+        if (!t) continue;
+        target = t;
       }
       // MOVE_ELEMENTS auto-includes container descendants, so a white-box pool
       // rides with its lanes/contents; a black-box pool just moves itself.
@@ -1144,10 +1206,17 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
         // loosely: "rename message 4 to Request" renamed the event "Event 4"
         // (2026-09-25 repro). An element named exactly what was said still
         // wins. One rule, shared with the delete and both scorers (connectorRef.ts).
-        const conn = connectorOverElement(data.connectors, leftRef, "err" in e ? null : e);
+        const conns = connectorsOverElement(data.connectors, leftRef, "err" in e ? null : e);
+        if (conns.length > 1) {
+          // Parked with THIS split, so the number lands on the words that named them.
+          const flow = buildConnectorPickFlow([{ ...op, ref: leftRef, label: newLabel }, ...ops.slice(opAt + 1)], leftRef, conns);
+          if (flow) { setPickFlow(flow); results.push(flow.prompt); pickParked = true; done = true; break; }
+        }
+        const conn = conns.length === 1 ? conns[0] : undefined;
         if (conn) { updateConnectorLabel(conn.id, newLabel); results.push(`renamed connector “${conn.label}” → ${newLabel}`); done = true; break; }
         if (!("err" in e)) { updateLabel(e.id, newLabel); els = withLabel(els, e.id, newLabel); setSelectedElementIds(new Set()); results.push(`renamed ${nameOf(e)} → ${newLabel}`); done = true; break; }
       }
+      if (pickParked) break;
       if (!done) {
         const e = resolve1(op.ref);
         results.push("err" in e ? e.err : `couldn't rename “${op.ref}”`);
@@ -1321,7 +1390,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
         // op with an #id, and a name not found stops the command.
         const a = resolve1(op.afterRef, { strict: true });
         if ("err" in a && a.ambiguous) {
-          const flow = buildPickFlow(ops, op.afterRef, a.ambiguous, els);
+          const flow = buildPickFlow(ops.slice(opAt), op.afterRef, a.ambiguous, els);
           if (flow) { setPickFlow(flow); results.push(flow.prompt); pickParked = true; break; }
         }
         if ("err" in a) { results.push(a.err); anyFail = true; continue; }
@@ -1362,7 +1431,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       // — "which “pool three”? 2 match: “Pool 3”, “Pool 3”" (Paul's log,
       // 2026-09-23). Numbered badges can.
       if ("err" in pool && pool.ambiguous) {
-        const flow = buildPickFlow(ops, op.poolRef, pool.ambiguous, els);
+        const flow = buildPickFlow(ops.slice(opAt), op.poolRef, pool.ambiguous, els);
         if (flow) { setPickFlow(flow); results.push(flow.prompt); pickParked = true; break; }
       }
       if ("err" in pool) { results.push(pool.err); anyFail = true; continue; }
@@ -1380,7 +1449,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
     if (op.op === "addSublanes") {
       const lane = resolve1(op.laneRef);
       if ("err" in lane && lane.ambiguous) {
-        const flow = buildPickFlow(ops, op.laneRef, lane.ambiguous, els);
+        const flow = buildPickFlow(ops.slice(opAt), op.laneRef, lane.ambiguous, els);
         if (flow) { setPickFlow(flow); results.push(flow.prompt); pickParked = true; break; }
       }
       if ("err" in lane) { results.push(lane.err); anyFail = true; continue; }
@@ -1394,7 +1463,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
         const lanesIn = els.filter((e) => e.type === "lane" && e.parentId === target.id);
         if (lanesIn.length === 1) target = lanesIn[0];
         else if (lanesIn.length > 1) {
-          const flow = buildPickFlow(ops, op.laneRef, lanesIn.map((l) => l.id), els);
+          const flow = buildPickFlow(ops.slice(opAt), op.laneRef, lanesIn.map((l) => l.id), els);
           if (flow) { setPickFlow(flow); results.push(`which lane in ${nameOf(target)}? ${flow.prompt}`); pickParked = true; break; }
         } else { results.push(`${nameOf(target)} has no lanes to put a sublane in`); anyFail = true; continue; }
       }
@@ -1405,5 +1474,6 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       continue;
     }
   }
+  askWhich();
   return { ok: !anyFail || pickParked, summary: results.join("; ") || "nothing to do" };
 }

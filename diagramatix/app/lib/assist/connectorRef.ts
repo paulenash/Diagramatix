@@ -21,6 +21,7 @@
  * Pure.
  */
 import type { Connector, DiagramElement } from "../diagram/types";
+import { ID_REF_PREFIX } from "./resolveRef";
 
 /** The ops whose `ref` may name a connector by its label (applyAssistOps.ts). */
 export const CONNECTOR_NAMING_OPS: ReadonlySet<string> = new Set(["rename", "delete"]);
@@ -51,25 +52,51 @@ export function messageLabelKey(ref: string): string {
     .replace(QUOTES, ""));
 }
 
-/** The connector whose label is exactly what was said — whole, or after its noun. */
-export function connectorNamed(connectors: readonly Connector[], spoken: string): Connector | undefined {
+/**
+ * Every connector whose label is exactly what was said — whole, or after its
+ * noun. A picked one comes back as an `#id:` reference (disambiguate.ts) and
+ * names exactly that connector.
+ */
+export function connectorsNamed(connectors: readonly Connector[], spoken: string): Connector[] {
+  if (spoken.startsWith(ID_REF_PREFIX)) {
+    const id = spoken.slice(ID_REF_PREFIX.length);
+    return connectors.filter((c) => c.id === id);
+  }
   const whole = spokenLabel(spoken.replace(QUOTES, ""));
+  const byWhole = whole ? connectors.filter((c) => spokenLabel(c.label) === whole) : [];
+  if (byWhole.length) return byWhole;
   const key = messageLabelKey(spoken);
-  return (whole ? connectors.find((c) => spokenLabel(c.label) === whole) : undefined)
-    ?? (key ? connectors.find((c) => spokenLabel(c.label) === key) : undefined);
+  return key ? connectors.filter((c) => spokenLabel(c.label) === key) : [];
 }
 
 /**
- * THE RULE: the connector this names, unless `element` — what the element
+ * THE RULE: the connectors this names, unless `element` — what the element
  * resolver found for the same words, if anything — is named exactly that.
+ *
+ * MORE THAN ONE IS A QUESTION, never the first found (Paul, 2026-09-27): his
+ * test diagram has three “Yes” and three “No” flows, and "delete connector Yes"
+ * deleted whichever came first in the file. The caller numbers them and asks.
  */
-export function connectorOverElement(
+export function connectorsOverElement(
   connectors: readonly Connector[],
   spoken: string,
   element: DiagramElement | null | undefined,
-): Connector | undefined {
-  const conn = connectorNamed(connectors, spoken);
-  if (!conn) return undefined;
-  if (element && spokenLabel(element.label) === spokenLabel(spoken.replace(QUOTES, ""))) return undefined;
-  return conn;
+): Connector[] {
+  const hits = connectorsNamed(connectors, spoken);
+  if (!hits.length) return [];
+  if (element && spokenLabel(element.label) === spokenLabel(spoken.replace(QUOTES, ""))) return [];
+  return hits;
+}
+
+/** The rule as a scorer reads it: one connector, several (a question), or none. */
+export function connectorResolution(
+  connectors: readonly Connector[],
+  spoken: string,
+  element: DiagramElement | null | undefined,
+): { id: string } | { ambiguous: string[] } | null {
+  const hits = connectorsOverElement(connectors, spoken, element);
+  if (!hits.length) return null;
+  return hits.length === 1
+    ? { id: `${CONNECTOR_REF_PREFIX}${hits[0].id}` }
+    : { ambiguous: hits.map((c) => `${CONNECTOR_REF_PREFIX}${c.id}`) };
 }

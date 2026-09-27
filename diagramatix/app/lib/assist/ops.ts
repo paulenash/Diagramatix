@@ -42,7 +42,7 @@ export type AssistOp =
   | { op: "addBoundary"; hostRef?: Ref; label?: string; eventType?: EventType; nonInterrupting?: boolean }
   | { op: "addPool"; label?: string; poolType?: "black-box" | "white-box"; position?: "above" | "below"; relativeTo?: Ref }
   | { op: "addLanes"; poolRef: Ref; labels: string[] }
-  | { op: "addLaneAt"; poolRef: Ref; label?: string; position: "above" | "below"; refLane: Ref }
+  | { op: "addLaneAt"; /** Only when a pool was SAID — the ref lane names its own pool. */ poolRef?: Ref; label?: string; position: "above" | "below"; refLane: Ref }
   | { op: "addSublanes"; laneRef: Ref; labels: string[] }
   | { op: "swapLanes"; laneA: Ref; laneB: Ref }
   | { op: "compressPool"; poolRef: Ref }
@@ -249,8 +249,9 @@ export function validateOp(raw: unknown): AssistOp | null {
       return isRef(o.poolRef) && labels.length ? { op: "addLanes", poolRef: (o.poolRef as string).trim(), labels } : null;
     }
     case "addLaneAt": {
-      if (!isRef(o.poolRef) || !isRef(o.refLane) || (o.position !== "above" && o.position !== "below")) return null;
-      const op: AssistOp = { op: "addLaneAt", poolRef: (o.poolRef as string).trim(), position: o.position, refLane: (o.refLane as string).trim() };
+      if (!isRef(o.refLane) || (o.position !== "above" && o.position !== "below")) return null;
+      const op: AssistOp = { op: "addLaneAt", position: o.position, refLane: (o.refLane as string).trim() };
+      if (isRef(o.poolRef)) op.poolRef = (o.poolRef as string).trim();
       if (isRef(o.label)) op.label = (o.label as string).trim();
       return op;
     }

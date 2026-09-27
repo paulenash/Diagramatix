@@ -20,9 +20,9 @@
  *
  * Pure.
  */
-import type { DiagramElement } from "../diagram/types";
+import type { Connector, DiagramElement } from "../diagram/types";
 import type { AssistOp } from "./ops";
-import { numberTargets, type RenameTarget } from "./renameTargets";
+import { numberConnectorTargets, numberTargets, type RenameTarget } from "./renameTargets";
 import { ID_REF_PREFIX, spokenNumbersAsDigits } from "./resolveRef";
 import { phoneticMatches } from "./phonetic";
 import { leadingContainerWord } from "./containerWords";
@@ -59,6 +59,25 @@ export function buildPickFlow(
     ref,
     targets: numberTargets(els),
     prompt: `which “${ref}”? say a number (1–${els.length}), or “cancel”`,
+  };
+}
+
+/**
+ * Park a command whose connector name matched several connectors — the same
+ * question, numbered on the connectors (connectorRef.ts). The answer comes
+ * back as an `#id:` reference, which the connector rule reads exactly.
+ */
+export function buildConnectorPickFlow(
+  ops: readonly AssistOp[],
+  ref: string,
+  connectors: readonly Connector[],
+): PickFlow | null {
+  if (connectors.length < 2) return null;
+  return {
+    ops: [...ops],
+    ref,
+    targets: numberConnectorTargets(connectors),
+    prompt: `which “${ref}”? ${connectors.length} connectors have that name — say a number (1–${connectors.length}), or “cancel”`,
   };
 }
 

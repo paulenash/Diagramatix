@@ -45,7 +45,7 @@ async function loadAssistGreenRules(): Promise<string> {
 const SYSTEM = `You interpret ONE spoken (often mis-transcribed) instruction from a process modeller editing a BPMN diagram. Output ONLY a JSON OBJECT — no prose, no markdown:
   { "canonical": string, "ops": [ …op objects… ] }
 
-**canonical** (preferred): rewrite the instruction as ONE plain command using the exact phrasings below, keeping the user's names/numbers, and FIXING obvious speech mis-hears ("poll"/"pull"→pool, "line"→lane, "lane two"→Lane 2). A spoken name keeps ITS OWN kind word: "pool three" is Pool 3, never "Lane 3". The app re-parses this deterministically, so it's the safest path. Use "" if it doesn't fit any form.
+**canonical** (preferred): rewrite the instruction as ONE plain command using the exact phrasings below, keeping the user's names/numbers, and FIXING obvious speech mis-hears ("poll"/"pull"→pool, "line"→lane, "lane two"→Lane 2). A spoken name keeps ITS OWN kind word: "pool three" is Pool 3, never "Lane 3". A bare "the pool" / "the gateway" stays exactly that — never swap in a name: with several, the app asks the user which. The app re-parses this deterministically, so it's the safest path. Use "" if it doesn't fit any form.
 Canonical forms:
   add a <type> called <name> after <name>   ·   connect <name> to <name>   ·   disconnect <name> from <name>
   rename <name> to <name>   ·   move <name> <n> elements <left|right|up|down>
@@ -89,7 +89,7 @@ Op shapes (use element NAMES for refs — they are resolved against the diagram;
   { "op":"acceptGhost", "pick"?: string }  // take an Assist ghost suggestion ("accept", "take the gateway",
         // "the second one"). Only when a suggestion is showing; do NOT use it to add an element.
   { "op":"addLanes", "poolRef": <name>, "labels": [string,…] }      // N equal named lanes in a pool
-  { "op":"addLaneAt", "poolRef": <name>, "position": "above"|"below", "refLane": <name>, "label"?: string }  // insert a lane by a ref lane
+  { "op":"addLaneAt", "poolRef"?: <name>, "position": "above"|"below", "refLane": <name>, "label"?: string }  // insert a lane by a ref lane; the ref lane names its pool, so give poolRef only when the user named one
   { "op":"addSublanes", "laneRef": <name>, "labels": [string,…] }   // N equal named sublanes in a lane
   { "op":"swapLanes", "laneA": <name>, "laneB": <name> }            // swap two adjacent lanes
   { "op":"compressPool", "poolRef": <name> }                        // shrink a pool to fit its contents (verbs: ${COMPRESS_VERBS.join("/")}). Keep a kind word the user said: "pool 3", not "3"

@@ -94,7 +94,7 @@ describe("T4602 — a named anchor that does not resolve STOPS the command", () 
     // They can see which one they meant; numbering the candidates is cheaper
     // than making them rephrase a command that was unambiguous to them.
     expect(body).toMatch(/const a = resolve1\(op\.afterRef, \{ strict: true \}\);/);
-    expect(body).toMatch(/if \("err" in a && a\.ambiguous\)[\s\S]{0,300}buildPickFlow\(ops, op\.afterRef, a\.ambiguous, els\)/);
+    expect(body).toMatch(/if \("err" in a && a\.ambiguous\)[\s\S]{0,300}buildPickFlow\(ops\.slice\(opAt\), op\.afterRef, a\.ambiguous, els\)/);   // from the op that asked (2026-09-27)
   });
 
   it("keeps the recency fallback for when NO anchor was named", () => {

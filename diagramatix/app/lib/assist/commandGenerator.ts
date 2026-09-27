@@ -579,7 +579,7 @@ export const GENERATOR_FAMILIES: readonly OpTemplate[] = [
       const label = w.laneLabel(rng);
       return {
         utterance: `add a lane ${where} ${lane.spoken} called ${label}`,
-        ops: [{ op: "addLaneAt", poolRef: "the pool", label, position: where, refLane: lane.spoken }],
+        ops: [{ op: "addLaneAt", label, position: where, refLane: lane.spoken }],
         refs: { [lane.spoken]: lane.id },
       };
     },

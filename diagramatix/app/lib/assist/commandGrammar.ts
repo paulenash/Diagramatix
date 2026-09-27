@@ -457,10 +457,12 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     }
 
     // Insert a lane above/below a reference lane: "add a lane above/below Lane X".
+    // No pool unless one is said: Lane X names its own, and an invented "the
+    // pool" became a question once a bare kind word stopped guessing (2026-09-27).
     mm = raw.match(new RegExp(`^(?:add|insert|create)\\s+(?:a\\s+)?(?:new\\s+)?${L}\\s+(?:to\\s+(?:the\\s+)?(.+?)\\s+)?(above|below|under(?:neath)?|over|before|after)\\s+(?:the\\s+)?(.+?)(?:\\s+(?:called|named|labell?ed)\\s+(.+))?$`, "i"));
     if (mm) {
       const pos = /^(?:above|over|before)/i.test(mm[2]) ? "above" : "below";
-      return [{ op: "addLaneAt", poolRef: mm[1] ? clean(mm[1]) : "the pool", position: pos, refLane: clean(mm[3]), ...(mm[4] ? { label: spokenLabel(mm[4]) } : {}) }];
+      return [{ op: "addLaneAt", ...(mm[1] ? { poolRef: clean(mm[1]) } : {}), position: pos, refLane: clean(mm[3]), ...(mm[4] ? { label: spokenLabel(mm[4]) } : {}) }];
     }
 
     // Surround the SELECTION with an expanded subprocess (Paul, 2026-09-16):
