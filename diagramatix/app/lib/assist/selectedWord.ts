@@ -138,6 +138,26 @@ export function repairTurnWord(text: string): SelectedWordRepair {
 export const TURN_MISHEARD_WORDS = TURN_MISHEARD;
 
 /**
+ * "Coverage Check Claim to a task" → "convert Check Claim to a task" (Paul's
+ * test-diagram sessions, 2026-09-27). The diagram's own "Check Coverage" is
+ * sent to the recogniser as a name, and "convert" kept coming back as its
+ * word — "Coverage check claim to a task", "Coverage selected to a
+ * subprocess"; once as "Pass". Only the FIRST word, and only in the convert
+ * SHAPE — "<word> X to a task / subprocess", with nothing else to be its verb
+ * — which no other command has, so a sentence heard right cannot change.
+ */
+const CONVERT_MISHEARD_RE = /^(coverage|covert|converse|convent|converts|conversion|comfort|cover|pass)(?=\s+.+?\s+(?:in)?to\s+(?:an?\s+)?(?:sub[\s-]?process|process(?:ing)?|task)[.!?]?$)/i;
+export function repairConvertWord(text: string): SelectedWordRepair {
+  if (!text) return { text, corrected: false };
+  let corrected = false;
+  const out = text.replace(CONVERT_MISHEARD_RE, (heard: string) => {
+    corrected = true;
+    return /^[A-Z]/.test(heard) ? "Convert" : "convert";
+  });
+  return { text: out, corrected };
+}
+
+/**
  * "Mood." → "Move." (Paul's test-diagram session, 2026-09-27). He paused after
  * the verb; the recogniser returned "mood", which is no verb, so the half was
  * not held for the rest — it failed on its own, and "pool three below Claims
@@ -245,7 +265,7 @@ export const MISHEARD_ADD_LEADING_WORDS = MISHEARD_ADD_LEADING;
 export function repairHeardWords(text: string): string {
   // A spelled-out name ("F I N A N C E") is joined first, so every rule below
   // and every name slot sees the word (spelledWord.ts).
-  return repairSelectedWord(repairAddWord(repairTurnWord(repairMoveWord(joinSpelledLetters(text)).text).text).text).text;
+  return repairSelectedWord(repairAddWord(repairTurnWord(repairConvertWord(repairMoveWord(joinSpelledLetters(text)).text).text).text).text).text;
 }
 
 /** True when this word already refers to the selection. */

@@ -288,13 +288,15 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   // is still M3's marker, and "sub process" is how the recogniser often
   // writes it.
   for (const pat of [
-    /^(?:convert|turn|change|make)\s+(.+?)\s+(?:in)?to\s+(?:an?\s+)?(sub[\s-]?process|task)$/i,
+    // "sub process" also comes back as "Processing" or "process" — and a
+    // process is the only thing a task becomes here (2026-09-27, session 2).
+    /^(?:convert|turn|change|make)\s+(.+?)\s+(?:in)?to\s+(?:an?\s+)?(sub[\s-]?process|process(?:ing)?|task)$/i,
     /^(?:make|turn)\s+(.+?)\s+an?\s+(sub[\s-]?process|task)$/i,
   ]) {
     const c = raw.match(pat);
     if (!c) continue;
     const ref = clean(c[1]);
-    if (ref) return [{ op: "convertActivity", ref, to: /^sub/i.test(c[2]) ? "subprocess" : "task" }];
+    if (ref) return [{ op: "convertActivity", ref, to: /^task$/i.test(c[2]) ? "task" : "subprocess" }];
   }
 
   // ── Convert in place (M3) ──

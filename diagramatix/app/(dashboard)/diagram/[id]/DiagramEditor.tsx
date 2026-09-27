@@ -58,6 +58,7 @@ import { findRiskCatalogItem } from "@/app/lib/assist/riskCatalogRef";
 import { parseGhostPick, resolveGhostPick } from "@/app/lib/assist/ghostPick";
 import { looksLikeElementId, notUnderstoodMessage, humaniseIds } from "@/app/lib/assist/refMentions";
 import { isMicStopWord, isFlowEndWord } from "@/app/lib/assist/stopWords";
+import { aiInventedRename, INVENTED_RENAME_REFUSAL } from "@/app/lib/assist/aiGuards";
 import { isIncompleteCommand } from "@/app/lib/assist/incompleteCommand";
 import { leadingSpokenNumber } from "@/app/lib/assist/spokenNumber";
 import { capitaliseFirstWord, needsCapital } from "@/app/lib/diagram/nameCase";
@@ -3422,6 +3423,8 @@ export function DiagramEditor({
       // vocabulary. The model answers with ids because we gave it ids, and the
       // log printed them verbatim — "connect qruut4v9 to ksjm25kj" (Paul,
       // 2026-09-21). The command was right; the sentence describing it was not.
+      // The AI never invents a rename (aiGuards.ts) — on either path below.
+      if (canonicalOps && aiInventedRename(heard, canonicalOps)) { log({ heard, summary: INVENTED_RENAME_REFUSAL, ok: false, viaAi: true }); return; }
       if (canonicalOps) { applyOrAsk(canonicalOps, true, `“${humaniseIds(canonical, data.elements)}” → `); return; }
       const aiOps = validateOps(j.ops);
       if (aiOps.length === 0) {
@@ -3432,6 +3435,7 @@ export function DiagramEditor({
         log({ heard, summary: notUnderstoodMessage(heard, data.elements), ok: false, viaAi: true });
         return;
       }
+      if (aiInventedRename(heard, aiOps)) { log({ heard, summary: INVENTED_RENAME_REFUSAL, ok: false, viaAi: true }); return; }
       applyOrAsk(aiOps, true);
     } catch {
       log({ heard, summary: "command service unavailable", ok: false, viaAi: true });

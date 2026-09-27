@@ -64,6 +64,18 @@ const COMMAND_WORDS = new Set<string>([
   "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
 ]);
 
+/**
+ * Words that pull a COMMAND VERB toward themselves when a label carrying them
+ * is sent (rule 3's cousin: the label does not contain the verb, it shadows
+ * it). Each entry is here on evidence, never on a guess — every keyword is a
+ * bet against every other word.
+ *   coverage → "convert": Paul's two sessions of 2026-09-27, with "Check
+ *     Coverage" on the diagram — "Coverage check claim to a task", "Coverage
+ *     selected to a subprocess", five times in ten minutes. The parser repairs
+ *     it too (selectedWord.ts repairConvertWord); this stops asking for it.
+ */
+export const VERB_SHADOWS: ReadonlyMap<string, string> = new Map([["coverage", "convert"]]);
+
 const clean = (s: string) => s.replace(/\s+/g, " ").trim();
 
 /**
@@ -89,6 +101,7 @@ export function diagramKeyterms(
     const lower = words.map((w) => w.toLowerCase().replace(/[^a-z0-9'-]/g, ""));
     if (lower.some((w) => !w)) continue;                      // punctuation-only word
     if (lower.some((w) => COMMAND_WORDS.has(w))) continue;    // rule 3
+    if (lower.some((w) => VERB_SHADOWS.has(w))) continue;     // …and what shadows a command verb
     if (lower.some((w) => /^\d+$/.test(w))) continue;         // a number word by another name
 
     if (words.length === 1 && lower[0].length < MIN_SOLO_WORD) continue; // rule 2
