@@ -5,8 +5,9 @@
  * popup can blow it up without pixelation. Simplified shapes (recognisable, not
  * pixel-perfect) keyed by element type.
  */
-import type { TemplateData, DiagramElement, Connector, SymbolType } from "./types";
-import { resolveColor, type SymbolColorConfig } from "./colors";
+import type { TemplateData, DiagramElement, Connector } from "./types";
+import type { SymbolColorConfig } from "./colors";
+import { elementFill } from "./canvasPaint";
 import { wrapText } from "./textMetrics";
 
 /**
@@ -58,10 +59,11 @@ const palFor = (t: string) => PAL[t] ?? DEFAULT_PAL;
 const VE = ' vector-effect="non-scaling-stroke"';
 
 // Fill/stroke — the diagram's REAL colours when opts.trueColors, else the
-// compact preview palette. Real fill = per-element override → project colorConfig
-// → type default (mirrors SymbolRenderer: `properties.fillColor ?? resolveColor`).
+// compact preview palette. The real fill is elementFill — the rule the canvas
+// itself paints with (canvasPaint.ts): per-element override → colorConfig →
+// type default, and an ArchiMate element's layer colour.
 function fillFor(e: DiagramElement, opts?: ThumbnailOpts): string {
-  if (opts?.trueColors) return (e.properties?.fillColor as string | undefined) ?? resolveColor(e.type as SymbolType, opts.colorConfig);
+  if (opts?.trueColors) return elementFill(e, opts.colorConfig);
   return palFor(e.type as string).fill;
 }
 function strokeFor(e: DiagramElement, opts?: ThumbnailOpts): string {

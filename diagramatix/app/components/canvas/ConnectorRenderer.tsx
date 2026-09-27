@@ -12,6 +12,7 @@ import { waypointsToSvgPath, waypointsToCurvePath, waypointsToRoundedPath } from
 import { connectorLabelSize } from "@/app/lib/diagram/textMetrics";
 import { ArchimateConnectorRenderer, isArchimateConnectorType } from "./ArchimateConnectorRenderer";
 import { ShowReviewCommentsCtx } from "./SymbolRenderer";
+import { connectorStroke, connectorDash, visibleWaypoints as visibleWaypointsOf } from "@/app/lib/diagram/canvasPaint";
 
 interface Props {
   connector: Connector;
@@ -927,14 +928,12 @@ function ConnectorRendererInner({ connector, selected, onSelect, svgToWorld, onU
     );
   }
 
-  const isMessage = connector.type === "message";
   const isAssocBPMN = connector.type === "associationBPMN";
   const isFlowchartAssoc = connector.type === "flowchart-association";
   // EPC: control flow is the default grey line and needs no special case — the
-  // other two are tinted to match the objects they join, so a reader can tell
-  // at a glance which arcs carry sequence and which are assignments.
-  const isEpcInfo = connector.type === "epc-information-flow";
-  const isEpcOrg = connector.type === "epc-org-assignment";
+  // other two are tinted to match the objects they join (connectorStroke), so a
+  // reader can tell at a glance which arcs carry sequence and which are
+  // assignments.
   const isMessageBPMN = connector.type === "messageBPMN";
   // Only on a free-form / imported diagram is a message a rectilinear,
   // segment-editable connector. A NORMAL message also stores routingType
@@ -948,18 +947,18 @@ function ConnectorRendererInner({ connector, selected, onSelect, svgToWorld, onU
   // The pink tether hides with its stickies under the review-marker toggle.
   if (isReviewLink && !showReviewMarkers) return null;
   const isBottleneck = connector.type === "sequence" && !!connector.bottleneck && !!showBottleneck;
+  // The RESTING colour per connector type (message grey, association grey,
+  // EPC information-flow blue / org-assignment amber, …) is connectorStroke in
+  // canvasPaint.ts, shared with the Project-screen tile picture. The states
+  // layered over it (selected, highlighted, bottleneck, a review note's
+  // per-author colour) stay here.
   const strokeColor = selected ? "#2563eb"
     : highlight ? "#16a34a"   // Process-Context association highlight (green)
     // NOTE: the red "misaligned/overlap" violation stroke was removed (issue #9);
     // the `misaligned` prop is kept for compatibility but no longer colours the line.
     : isBottleneck ? "#9333ea"
-    : isMessageBPMN ? "#b0b7c3"
-    : isAssocBPMN ? "#9ca3af"
-    : isFlowchartAssoc ? "#9333ea"   // dotted comment association (purple)
-    : isEpcInfo ? "#3b82f6"          // blue, like the information objects it joins
-    : isEpcOrg ? "#b45309"           // amber, like the organisational units
-    : isReviewLink ? (reviewLinkColor ?? "#ec4899")   // matches the note's per-author colour (item K)
-    : "#6b7280";
+    : isReviewLink && reviewLinkColor ? reviewLinkColor   // matches the note's per-author colour (item K)
+    : connectorStroke(connector.type);
   const isUmlConn = isUmlConnType(connector.type);
   const markerId = `arrow-${connector.id}`;
   const openMarkerId = `arrow-open-${connector.id}`;
@@ -974,10 +973,11 @@ function ConnectorRendererInner({ connector, selected, onSelect, svgToWorld, onU
     (isAssocBPMN && connector.directionType === "directed") ||
     (isReviewLink && connector.directionType === "directed");
 
-  // Trim invisible leader segments for visible rendering
+  // Trim invisible leader segments for visible rendering (the rule is
+  // visibleWaypoints in canvasPaint.ts, shared with the tile picture).
   const visStart = connector.sourceInvisibleLeader ? 1 : 0;
   const visEnd = connector.targetInvisibleLeader ? waypoints.length - 2 : waypoints.length - 1;
-  const visibleWaypoints = waypoints.slice(visStart, visEnd + 1);
+  const visibleWaypoints = visibleWaypointsOf(connector);
 
   const visibleD = (() => {
     if ((connector.type === "transition" || connector.type === "flow") && connector.routingType === "curvilinear"
@@ -1303,7 +1303,7 @@ function ConnectorRendererInner({ connector, selected, onSelect, svgToWorld, onU
         fill="none"
         stroke={strokeColor}
         strokeWidth={(connector.type === "uml-association" || connector.type === "sequence") && connector.weight ? (selected ? connector.weight + 0.5 : connector.weight) : (highlight && !selected ? 2.5 : isAssocBPMN ? (selected ? 2.5 : 2) : (selected ? 2 : 1.5))}
-        strokeDasharray={(connector.type === "uml-dependency" || connector.type === "uml-realisation" || connector.type === "uml-note-anchor") ? "6 4" : connector.type === "uml-association" && connector.dashed ? "6 4" : isMessageBPMN ? "10 5" : isAssocBPMN ? "0.5 3" : isFlowchartAssoc ? "1 3" : isReviewLink ? "4 3" : (isMessage ? "6 3" : undefined)}
+        strokeDasharray={connectorDash(connector)}
         strokeLinecap={isAssocBPMN || isFlowchartAssoc ? "round" : undefined}
         markerStart={(displayMode === "hand-drawn" && !isMessageBPMN) ? undefined :
           isMessageBPMN ? `url(#msg-start-${connector.id})`

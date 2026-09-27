@@ -24,6 +24,13 @@ export function getLaneHeaderWidth(lane: DiagramElement): number {
   return typeof stored === "number" && stored > 0 ? stored : 36;
 }
 
+/** A Standard Flowchart vertical swimlane's top header strip height (stored
+ *  property override, else 36). */
+export function getVSwimlaneHeaderHeight(el: DiagramElement): number {
+  const stored = el.properties?.vlaneHeaderHeight as number | undefined;
+  return typeof stored === "number" && stored > 0 ? stored : 36;
+}
+
 export function poolMetrics(label: string, fontSize: number): { minHeight: number; headerWidth: number } {
   const lines = (label || "").split("\n");
   const charPxWidth = fontSize * 0.6;

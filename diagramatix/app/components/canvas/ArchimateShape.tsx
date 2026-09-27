@@ -19,7 +19,7 @@ import {
   getCachedCatalogue,
   type ArchimateShapeEntry,
 } from "@/app/lib/archimate/catalogue";
-import { getThemeFor, type ArchimateCategoryTheme } from "@/app/lib/archimate/themes";
+import { archimatePaint, ARCHI_GROUPING_STROKE, ARCHI_GROUPING_DASH, ARCHI_STROKE_WIDTH } from "@/app/lib/diagram/canvasPaint";
 import { ICON_DRAWERS } from "@/app/lib/archimate/icons";
 import { effectiveIconLayout, type IconLayout } from "@/app/lib/archimate/iconLayout";
 import { useArchimateIconLayout } from "@/app/lib/archimate/useArchimateIconLayout";
@@ -30,16 +30,7 @@ import { drawCustomIcon } from "@/app/lib/archimate/iconShapes";
 import { ArchimateDepthCtx } from "./SymbolRenderer";
 import { archiNodeDepth } from "@/app/lib/diagram/nodeGeometry";
 
-const STROKE_WIDTH = 2.4;               // 2× the previous 1.2
-
-function lightenHex(hex: string, amount: number): string {
-  const m = /^#([0-9a-f]{6})$/i.exec(hex);
-  if (!m) return hex;
-  const n = parseInt(m[1], 16);
-  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
-  const mix = (c: number) => Math.round(c + (255 - c) * amount);
-  return `#${[mix(r), mix(g), mix(b)].map(v => v.toString(16).padStart(2, "0")).join("")}`;
-}
+const STROKE_WIDTH = ARCHI_STROKE_WIDTH; // 2× the previous 1.2
 
 /** Darken a hex colour toward black by `amount` (0..1). */
 function darkenHex(hex: string, amount: number): string {
@@ -132,37 +123,23 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
     );
   }
 
-  // Resolve theme (category default or user override on this element)
-  const theme: ArchimateCategoryTheme | undefined = getThemeFor(entry.category);
-  // Location renders in a light, dull purple (element box + symbol), distinct
-  // from the neutral-grey Composite category default.
-  const isLocation = entry.iconType === "location";
-  const locFill = "#efd1e4", locInk = "#8f77a6";
-  // Grouping renders as a dark-grey dashed boundary with a fully transparent
-  // interior (ArchiMate notation) so enclosed elements show through.
-  const isGrouping = entry.iconType === "grouping";
-  const elOverrideFill = el.properties?.fill as string | undefined;
-  const elOverrideStroke = el.properties?.stroke as string | undefined;
-  let fill = elOverrideFill ?? (isLocation ? locFill : theme?.fill) ?? entry.fill ?? "#f5f5f5";
-  // Un-shaded base fill (before the depth-lightening below) — the Node 3D faces are
-  // coloured relative to THIS, so they aren't washed out by containment shading.
-  const baseFill = fill;
-  const stroke = elOverrideStroke ?? (isLocation ? locInk : theme?.stroke) ?? entry.stroke ?? "#666666";
-  const iconColour = (el.properties?.iconColour as string | undefined) ?? (isLocation ? locInk : theme?.iconColour) ?? stroke;
-
-  // Depth-based container fill: each level of nesting makes the parent
-  // ~30% lighter (capped at 85% toward white). A leaf (depth 0) keeps
-  // its original colour. As soon as a child is added, the element
-  // becomes depth 1 and lightens; adding a grandchild takes it to depth
-  // 2 (two steps lighter), etc. When the last child is removed, the
-  // depth reverts to 0 and the colour returns to the original.
+  // Colours: the element's own fill/stroke, else Location's purple, else the
+  // category theme (Business yellow, Application cyan, …), else the stencil.
+  // Grouping is a dark-grey dashed boundary with a transparent interior.
+  //
+  // Depth-based container fill: each level of nesting makes the parent ~38%
+  // lighter (capped at 85% toward white). A leaf (depth 0) keeps its original
+  // colour; when the last child is removed the colour returns.
+  //
+  // The rule is archimatePaint (canvasPaint.ts), shared with the Project-screen
+  // tile picture so the two colour an ArchiMate element the same way.
   const depthMap = useContext(ArchimateDepthCtx);
   const depth = depthMap.get(el.id) ?? 0;
-  if (depth > 0) {
-    // ~38% lighter per level (was 25% — too subtle at 2 levels), capped at
-    // 85% toward white so even a single nesting reads clearly.
-    fill = lightenHex(fill, Math.min(0.85, depth * 0.38));
-  }
+  const paint = archimatePaint(el, entry, depth);
+  const { fill, stroke, iconColour, isGrouping } = paint;
+  // Un-shaded base fill (before the depth-lightening) — the Node 3D faces are
+  // coloured relative to THIS, so they aren't washed out by containment shading.
+  const baseFill = paint.baseFill;
 
   const iconOnly = !!el.properties?.archimateIconOnly;
   // A SuperAdmin-assigned custom library icon replaces the built-in drawer for
@@ -329,9 +306,9 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
       <path
         d={d}
         fill={isGrouping ? "none" : fill}
-        stroke={isGrouping ? "#555555" : stroke}
+        stroke={isGrouping ? ARCHI_GROUPING_STROKE : stroke}
         strokeWidth={STROKE_WIDTH}
-        strokeDasharray={isGrouping ? "8 4" : undefined}
+        strokeDasharray={isGrouping ? ARCHI_GROUPING_DASH : undefined}
       />
       {isGrouping && (
         <>
@@ -350,7 +327,7 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
           />
         </>
       )}
-      {drawIcon ? renderGlyph(drawIcon, el, layout, isGrouping ? "#555555" : glyphColour) : null}
+      {drawIcon ? renderGlyph(drawIcon, el, layout, isGrouping ? ARCHI_GROUPING_STROKE : glyphColour) : null}
       {stereotype && (
         // ArchiMate 3.x has no Skill element, so a Capability stands in and the
         // stereotype is what separates a competency a PERSON holds from a

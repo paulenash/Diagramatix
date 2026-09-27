@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { UserGuideLink } from "@/app/components/UserGuideLink";
 import type { DiagramType, DiagramData } from "@/app/lib/diagram/types";
 import { SCHEMA_VERSION, PRODUCT_VERSION, checkSchemaCompatibility } from "@/app/lib/diagram/types";
-import { resolveColor, DEFAULT_SYMBOL_COLORS, type SymbolColorConfig } from "@/app/lib/diagram/colors";
+import { effectiveSymbolColors, type SymbolColorConfig } from "@/app/lib/diagram/colors";
+import { buildDiagramThumbnail } from "@/app/lib/diagram/diagramThumbnail";
 import { DiagramMaintenanceModal, type FontConfig } from "./DiagramMaintenanceModal";
 import { LinkScanDialog } from "./LinkScanDialog";
 import { PcfSeedFoldersDialog } from "./PcfSeedFoldersDialog";
@@ -379,6 +380,10 @@ interface DiagramSummary {
   createdAt: Date;
   updatedAt: Date;
   data?: unknown;
+  /** The diagram's own colour overrides + display mode — the tile picture
+   *  draws in the colours the diagram opens in. */
+  colorConfig?: unknown;
+  displayMode?: string | null;
   version?: number;
   diagramOwnerId?: string | null;
   diagramOwner?: { name: string | null; email: string | null } | null;
@@ -4600,72 +4605,38 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
   );
 }
 
-function DiagramThumbnail({ data, colorConfig }: { data: unknown; colorConfig?: SymbolColorConfig }) {
-  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
-  const d = data as DiagramData;
-  if (!d.elements?.length) return null;
-
-  const colors = { ...DEFAULT_SYMBOL_COLORS, ...colorConfig };
-
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const el of d.elements) {
-    minX = Math.min(minX, el.x);
-    minY = Math.min(minY, el.y);
-    maxX = Math.max(maxX, el.x + el.width);
-    maxY = Math.max(maxY, el.y + el.height);
-  }
-
-  const PAD = 10;
-  const vw = maxX - minX + PAD * 2;
-  const vh = maxY - minY + PAD * 2;
-  const viewBox = `${minX - PAD} ${minY - PAD} ${vw} ${vh}`;
-
+/**
+ * The small picture on a diagram tile, in the diagram's REAL colours. The
+ * shapes come from buildDiagramThumbnail, which takes every colour from
+ * canvasPaint.ts — the module the canvas paints with — so a tile cannot drift
+ * from the diagram it opens (Paul, 2026-09-27: pools/lanes were too dark,
+ * ArchiMate washed out). Built once per data/colour change, then plain SVG.
+ */
+function DiagramThumbnail({ data, colorConfig, boxW, boxH }: {
+  data: unknown; colorConfig?: SymbolColorConfig; boxW: number; boxH: number;
+}) {
+  const thumb = useMemo(() => buildDiagramThumbnail(data, colorConfig, boxW, boxH), [data, colorConfig, boxW, boxH]);
+  if (!thumb) return null;
   return (
-    <svg viewBox={viewBox} className="w-full h-full" preserveAspectRatio="xMidYMid meet">
-      {d.connectors?.map((c) => {
-        if (!c.waypoints?.length) return null;
-        const pts = c.waypoints.map((p) => `${p.x},${p.y}`).join(" ");
-        return <polyline key={c.id} points={pts} fill="none" stroke="#9ca3af" strokeWidth={1} />;
-      })}
-      {d.elements.map((el) => {
-        const { x, y, width: w, height: h, type } = el;
-        const fill = resolveColor(type, colors);
-        if (type === "gateway") {
-          const cx = x + w / 2, cy = y + h / 2;
-          return <polygon key={el.id}
-            points={`${cx},${y} ${x + w},${cy} ${cx},${y + h} ${x},${cy}`}
-            fill={fill} stroke="#374151" strokeWidth={1} />;
+    <svg viewBox={thumb.viewBox} className="w-full h-full" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+      {thumb.shapes.map((s, i) => {
+        switch (s.k) {
+          case "rect":
+            return <rect key={i} x={s.x} y={s.y} width={s.w} height={s.h} rx={s.rx} fill={s.fill}
+              fillOpacity={s.fillOpacity} stroke={s.stroke} strokeWidth={s.sw} strokeDasharray={s.dash} />;
+          case "circle":
+            return <circle key={i} cx={s.cx} cy={s.cy} r={s.r} fill={s.fill} stroke={s.stroke} strokeWidth={s.sw} />;
+          case "ellipse":
+            return <ellipse key={i} cx={s.cx} cy={s.cy} rx={s.rx} ry={s.ry} fill={s.fill} stroke={s.stroke} strokeWidth={s.sw} />;
+          case "polygon":
+            return <polygon key={i} points={s.points} fill={s.fill} stroke={s.stroke} strokeWidth={s.sw} strokeLinejoin="round" />;
+          case "path":
+            return <path key={i} d={s.d} fill={s.fill} fillOpacity={s.fillOpacity} stroke={s.stroke} strokeWidth={s.sw}
+              strokeDasharray={s.dash} strokeLinejoin="round" strokeLinecap="round" />;
+          case "polyline":
+            return <polyline key={i} points={s.points} fill="none" stroke={s.stroke} strokeWidth={s.sw}
+              strokeDasharray={s.dash} strokeLinejoin="round" strokeLinecap="round" />;
         }
-        if (type === "start-event" || type === "end-event" || type === "intermediate-event"
-            || type === "initial-state" || type === "final-state") {
-          return <circle key={el.id} cx={x + w / 2} cy={y + h / 2} r={w / 2}
-            fill={fill} stroke="#374151" strokeWidth={1} />;
-        }
-        if (type === "use-case") {
-          return <ellipse key={el.id} cx={x + w / 2} cy={y + h / 2} rx={w / 2} ry={h / 2}
-            fill={fill} stroke="#374151" strokeWidth={1} />;
-        }
-        if (type === "actor" || type === "team" || type === "hourglass" || type === "system") {
-          return <rect key={el.id} x={x} y={y} width={w} height={h}
-            fill="none" stroke={fill} strokeWidth={1} />;
-        }
-        if (type === "chevron" || type === "chevron-collapsed") {
-          const notch = Math.min(w * 0.15, 8);
-          return <polygon key={el.id}
-            points={`${x},${y} ${x+w-notch},${y} ${x+w},${y+h/2} ${x+w-notch},${y+h} ${x},${y+h} ${x+notch},${y+h/2}`}
-            fill={fill} stroke="#374151" strokeWidth={1} />;
-        }
-        if (type === "fork-join") {
-          return <rect key={el.id} x={x} y={y} width={w} height={h}
-            rx={1} fill="#1f2937" />;
-        }
-        if (type === "group" || type === "text-annotation") {
-          return <rect key={el.id} x={x} y={y} width={w} height={h}
-            fill="none" stroke={fill} strokeWidth={1} strokeDasharray="4 2" />;
-        }
-        const rx = type === "state" || type === "composite-state" || type === "submachine" ? 8 : 3;
-        return <rect key={el.id} x={x} y={y} width={w} height={h}
-          rx={rx} fill={fill} stroke="#374151" strokeWidth={1} />;
       })}
     </svg>
   );
@@ -4718,6 +4689,15 @@ function DiagramCard({
   const sz = large
     ? { card: "px-4 py-3", name: "text-sm", icon: 14, glyph: "text-xs", row2: "mt-1", meta: "flex-col items-start gap-1 text-[11px] pt-1", thumb: "w-42 h-24" }
     : { card: "px-2 py-1.5", name: "text-[11px]", icon: 11, glyph: "text-[10px]", row2: "mt-0.5", meta: "items-center gap-1.5 text-[9px] pt-0.5", thumb: "w-14 h-8" };
+  // The thumbnail's box in CSS px (w-42 h-24 / w-14 h-8): the picture keeps its
+  // outlines visible at that size.
+  const thumbBox = large ? { w: 168, h: 96 } : { w: 56, h: 32 };
+  // The colours the diagram opens in: its own overrides on the project's, or
+  // black and white when it is hand-drawn — the editor's rule (colors.ts).
+  const thumbColors = useMemo(
+    () => effectiveSymbolColors(colorConfig, diagram.colorConfig, diagram.displayMode),
+    [colorConfig, diagram.colorConfig, diagram.displayMode],
+  );
 
   return (
     <div
@@ -4793,8 +4773,11 @@ function DiagramCard({
           {!large && <span>{"\u00B7"}</span>}
           <span>{new Date(diagram.updatedAt).toLocaleDateString()}</span>
         </div>
-        <div className={`ml-auto ${sz.thumb} opacity-90 group-hover:opacity-100 transition-opacity pointer-events-none shrink-0`}>
-          <DiagramThumbnail data={(diagram.data ?? { elements: [], connectors: [] }) as DiagramData} colorConfig={colorConfig} />
+        {/* White, like the canvas it pictures — on the type-tinted tile a pale
+            fill read as a different colour, and the old 90% opacity washed every
+            colour toward the tint. */}
+        <div className={`ml-auto ${sz.thumb} rounded-sm bg-white ring-1 ring-black/5 overflow-hidden pointer-events-none shrink-0`}>
+          <DiagramThumbnail data={diagram.data} colorConfig={thumbColors} boxW={thumbBox.w} boxH={thumbBox.h} />
         </div>
       </div>
     </div>

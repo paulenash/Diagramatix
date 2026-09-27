@@ -168,3 +168,21 @@ export const BW_SYMBOL_COLORS: Record<SymbolType, string> = {
 export function resolveColor(type: SymbolType, config?: SymbolColorConfig): string {
   return config?.[type] ?? DEFAULT_SYMBOL_COLORS[type] ?? "#e5e7eb";
 }
+
+const asConfig = (v: unknown): SymbolColorConfig =>
+  v && typeof v === "object" && !Array.isArray(v) ? (v as SymbolColorConfig) : {};
+
+/**
+ * The colour config a diagram is actually drawn with: the diagram's own
+ * overrides on top of the project's — or, in hand-drawn mode, black and white.
+ * The editor's canvas and the Project-screen tile picture both call this, so a
+ * tile shows a diagram in the colours it opens in.
+ */
+export function effectiveSymbolColors(
+  project: unknown,
+  diagram: unknown,
+  displayMode?: string | null,
+): SymbolColorConfig {
+  if (displayMode === "hand-drawn") return BW_SYMBOL_COLORS;
+  return { ...asConfig(project), ...asConfig(diagram) };
+}
