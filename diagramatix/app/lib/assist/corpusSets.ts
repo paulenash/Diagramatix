@@ -17,6 +17,7 @@
 import { generateCases, type GeneratedCase } from "./commandGenerator";
 import { DEFAULT_CORPUS_SEED } from "./rng";
 import { CATALOG_SET_ID, catalogCases } from "./catalogCorpus";
+import { NEW_COMMANDS_SET_ID, newCommandCases } from "./newCommandsCorpus";
 import type { DiagramElement } from "../diagram/types";
 
 export interface CorpusSet {
@@ -27,6 +28,12 @@ export interface CorpusSet {
   /** `generated`: sampled from the generator, `count` of them. `catalog`: a fixed list. */
   kind: "generated" | "catalog";
 }
+
+/** The cases of each fixed-list set, by id. */
+const FIXED_SETS: Readonly<Record<string, () => GeneratedCase[]>> = {
+  [CATALOG_SET_ID]: catalogCases,
+  [NEW_COMMANDS_SET_ID]: newCommandCases,
+};
 
 export const CORPUS_SETS: readonly CorpusSet[] = [
   {
@@ -45,6 +52,18 @@ export const CORPUS_SETS: readonly CorpusSet[] = [
       "Every example on the Commands card, word for word, in the card's order — one case each. Measures how well "
       + "the commands we TELL people to say are heard and understood. A line added to the card joins this set by itself.",
   },
+  {
+    // Paul, 2026-09-27: "Construct a set of 50 voice commands covering the new
+    // commands … for me to explore these new commands and their reliability."
+    id: NEW_COMMANDS_SET_ID,
+    label: "New commands: dividers, convert, contents (50)",
+    kind: "catalog",
+    explain:
+      "Fifty sentences for the three commands shipped on 27 Sep — moving a lane's top or bottom divider (20), converting "
+      + "a task to a subprocess and back (12), and moving everything in or from a lane (18) — each with its answer written "
+      + "out by hand, so a parser mistake is a red row. Nine must be REFUSED (a divider through a task, a move left with no "
+      + "room) or need a sub-lane: those are scored on their parse, and say what the app must answer.",
+  },
 ];
 
 /** The drop-down entry that reveals a free seed box: the realistic generator, reshuffled. */
@@ -56,15 +75,17 @@ export function corpusSet(id: string): CorpusSet | undefined {
 
 /**
  * The cases of a set. A generated set (or a custom seed, which is the
- * generator with another seed) takes `count` and optional families; the
- * popup set is always all of its lines.
+ * generator with another seed) takes `count` and optional families; a
+ * fixed-list set (the popup set, the new-commands set) is always all of its
+ * lines.
  */
 export function casesForSet(
   setOrSeed: string,
   opts: { count: number; world: readonly DiagramElement[]; families?: readonly string[] },
 ): GeneratedCase[] {
-  if (setOrSeed === CATALOG_SET_ID) {
-    const all = catalogCases();
+  const fixed = FIXED_SETS[setOrSeed];
+  if (fixed) {
+    const all = fixed();
     return opts.families?.length ? all.filter((c) => opts.families!.includes(c.family)) : all;
   }
   return generateCases({ seed: setOrSeed, count: opts.count, world: opts.world, ...(opts.families ? { families: opts.families } : {}) });
@@ -86,6 +107,7 @@ export function resumeAt(cases: readonly GeneratedCase[], recorded: ReadonlyArra
 
 /** The family names a set's results table can have. */
 export function familiesForSet(setOrSeed: string, generatorFamilies: readonly string[]): string[] {
-  if (setOrSeed === CATALOG_SET_ID) return [...new Set(catalogCases().map((c) => c.family))];
+  const fixed = FIXED_SETS[setOrSeed];
+  if (fixed) return [...new Set(fixed().map((c) => c.family))];
   return [...generatorFamilies];
 }
