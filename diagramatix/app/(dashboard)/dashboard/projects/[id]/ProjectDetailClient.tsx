@@ -23,6 +23,10 @@ import { useFeatureColors } from "@/app/lib/theme/useFeatureColors";
 import { DiagramFeatureBadges } from "@/app/components/DiagramFeatureBadges";
 import { diagramFeatureBadges, type DiagramBadgeKey } from "@/app/lib/diagram/diagramFeatureBadges";
 import { matchesTreeFilter, isTreeFilterActive, EMPTY_TREE_FILTER, type TreeFilter } from "@/app/lib/diagram/treeFilter";
+import {
+  DEFAULT_TILE_LAYOUT, TILE_LAYOUTS, TILE_LAYOUT_SPEC,
+  readTileLayout, writeTileLayout, tileColumnsFor, type TileLayout,
+} from "@/app/lib/project/tileLayout";
 import { tonesFor, featureVars } from "@/app/lib/theme/featureColors";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { SharePointPicker } from "@/app/components/SharePointPicker";
@@ -475,26 +479,40 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
   // the required re-numbering of both Orgs).
   const orgOwnerName = allOrgs?.find((o) => o.id === (project.orgId ?? ""))?.name ?? orgName ?? "";
 
-  // Tile grid column count — computed from the grid container's actual width
-  // (not the viewport). This gives "primacy" to the nav-tree width: when the
-  // user drags the tree wider, the main pane shrinks and the tile count
-  // re-flows automatically, rather than tiles staying fixed and getting cut off.
-  const tileGridRef = useRef<HTMLDivElement | null>(null);
-  const [tileColumns, setTileColumns] = useState(3);
+  // Diagram-tile layout — 2-wide (large tiles, the default) or 4-wide (compact).
+  // Paul, 2026-09-27: "Display Diagram tiles 2-wide and 2 x height and 2 x width
+  // with an large diagram icon to match, in the Project screen, in a scrollable
+  // region. Allow user to choose 2-wide or 4-wide format." The choice is per
+  // browser; it starts at the default on the server render and adopts the
+  // stored one after hydration (as the nav width does).
+  const [tileLayout, setTileLayout] = useState<TileLayout>(DEFAULT_TILE_LAYOUT);
+  useEffect(() => { setTileLayout(readTileLayout()); }, []);
+  function chooseTileLayout(next: TileLayout) {
+    setTileLayout(next);
+    writeTileLayout(next);
+  }
+  // Tile column count — the chosen layout, dropping columns only when the tile
+  // area is too narrow to hold them legibly (tileColumnsFor). Measured on the
+  // SCROLL REGION, which is always mounted, rather than the grid, which is not
+  // there while a folder is empty. Measuring the pane (not the viewport) still
+  // gives "primacy" to the nav-tree width: drag the tree wider and the tiles
+  // re-flow rather than getting cut off.
+  const tileScrollRef = useRef<HTMLDivElement | null>(null);
+  const [tileAreaWidth, setTileAreaWidth] = useState<number | null>(null);
   useEffect(() => {
-    const el = tileGridRef.current;
+    const el = tileScrollRef.current;
     if (!el) return;
-    const TILE_MIN = 240; // matches the target column width used by DiagramCard
-    function recompute(width: number) {
-      setTileColumns(Math.max(1, Math.floor(width / TILE_MIN)));
-    }
-    recompute(el.clientWidth);
+    // contentRect is the content box: padding and scrollbar already excluded,
+    // which is exactly the width the grid gets. The first callback arrives as
+    // soon as observation starts, so no separate initial read is needed.
     const ro = new ResizeObserver(entries => {
-      for (const ent of entries) recompute(ent.contentRect.width);
+      for (const ent of entries) setTileAreaWidth(ent.contentRect.width);
     });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+  const tileSpec = TILE_LAYOUT_SPEC[tileLayout];
+  const tileColumns = tileColumnsFor(tileLayout, tileAreaWidth);
   const [projectDescription, setProjectDescription] = useState(project.description ?? "");
   const [projectOwner, setProjectOwner] = useState(project.ownerName ?? "");
   const [editingProjectName, setEditingProjectName] = useState(false);
@@ -2642,13 +2660,22 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
   const isImpersonating = !!impersonationMode;
 
   return (
-    <div className={`min-h-screen ${isImpersonating ? "bg-orange-50" : "dgx-dashboard-bg"} flex flex-col`}>
+    // A viewport-high screen, not a min-height one: with min-h-screen the page
+    // grew with its content, so the whole document scrolled and took the header
+    // with it. Bounded, the header stays put and each pane below scrolls on its
+    // own — the tile area, the nav tree and the properties panel. dvh, not vh,
+    // so a phone's collapsing address bar cannot hide the last row of tiles
+    // (as the /m shell does).
+    <div className={`h-dvh ${isImpersonating ? "bg-orange-50" : "dgx-dashboard-bg"} flex flex-col overflow-hidden`}>
       {isImpersonating && viewingAsName !== undefined && viewingAsEmail !== undefined && (
         <ImpersonationBanner viewingAsName={viewingAsName ?? ""} viewingAsEmail={viewingAsEmail ?? ""} mode={impersonationMode} />
       )}
       {/* Header */}
       <header className={`${isImpersonating ? "bg-orange-50" : "bg-white"} border-b border-gray-200 px-4 py-2 flex-shrink-0`}>
-        <div className="flex items-center gap-3">
+        {/* Wraps on a narrow window instead of running off the right edge.
+            The screen is overflow-hidden now, so a button past the edge would
+            be unreachable rather than a sideways scroll away. */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <button
             onClick={() => router.push("/dashboard")}
             className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
@@ -3202,70 +3229,116 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
           }}
         />
 
-        {/* Right: Diagram tiles */}
-        <main className="flex-1 overflow-y-auto p-4">
-          {selectedDiagramIds.size > 0 && (
-            <div className="mb-3 flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-md sticky top-0 z-10">
-              <span className="text-xs text-blue-900 font-medium">
-                {selectedDiagramIds.size} diagram{selectedDiagramIds.size === 1 ? "" : "s"} selected
-              </span>
-              <button
-                onClick={() => setShowBulkMoveDialog(true)}
-                className="px-2 py-1 text-xs text-white bg-blue-600 rounded hover:bg-blue-700"
-              >
-                Move to folder…
-              </button>
-              <button
-                onClick={() => setShowBulkDeleteConfirm(true)}
-                className="px-2 py-1 text-xs text-white bg-red-600 rounded hover:bg-red-700"
-              >
-                Delete {selectedDiagramIds.size}…
-              </button>
-              <button
-                onClick={clearDiagramSelection}
-                className="ml-auto px-2 py-1 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
-                title="Press Escape to clear"
-              >
-                Clear
-              </button>
+        {/* Right: Diagram tiles. The pane is a column: a toolbar that stays
+            put (tile layout toggle + the multi-select bar), then the tile
+            area, which is the ONLY part of it that scrolls. */}
+        <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
+          <div className="flex-shrink-0 px-4 pt-2 pb-2 flex flex-col gap-2">
+            {/* Tile layout — 2-wide (large tiles) or 4-wide (compact), remembered
+                per browser. Same button face as the header's File ▾ / Project ▾;
+                the chosen one takes the blue "active" fill. */}
+            <div className="flex items-center justify-end gap-1.5">
+              <span id="tile-layout-label" className="text-xs text-gray-500">Tiles:</span>
+              <div role="group" aria-labelledby="tile-layout-label" className="flex items-center gap-1">
+                {TILE_LAYOUTS.map((layout) => {
+                  const on = layout === tileLayout;
+                  return (
+                    <button
+                      key={layout}
+                      type="button"
+                      onClick={() => chooseTileLayout(layout)}
+                      aria-pressed={on}
+                      title={TILE_LAYOUT_SPEC[layout].title}
+                      className={`px-3 py-1 text-xs font-medium rounded-md border ${
+                        on
+                          ? "bg-blue-600 text-white border-blue-600"
+                          : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                      }`}
+                    >
+                      {TILE_LAYOUT_SPEC[layout].label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          )}
-          {visibleDiagrams.length === 0 ? (
-            <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
-              <p className="text-gray-500 text-sm mb-3">No diagrams in this folder</p>
-              <button
-                onClick={() => setShowNewDiagram(true)}
-                className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs"
+            {/* Multi-select bar — used to be sticky inside the scrolling pane;
+                it now sits in the toolbar, which never scrolls. */}
+            {selectedDiagramIds.size > 0 && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-md">
+                <span className="text-xs text-blue-900 font-medium">
+                  {selectedDiagramIds.size} diagram{selectedDiagramIds.size === 1 ? "" : "s"} selected
+                </span>
+                <button
+                  onClick={() => setShowBulkMoveDialog(true)}
+                  className="px-2 py-1 text-xs text-white bg-blue-600 rounded hover:bg-blue-700"
+                >
+                  Move to folder…
+                </button>
+                <button
+                  onClick={() => setShowBulkDeleteConfirm(true)}
+                  className="px-2 py-1 text-xs text-white bg-red-600 rounded hover:bg-red-700"
+                >
+                  Delete {selectedDiagramIds.size}…
+                </button>
+                <button
+                  onClick={clearDiagramSelection}
+                  className="ml-auto px-2 py-1 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+                  title="Press Escape to clear"
+                >
+                  Clear
+                </button>
+              </div>
+            )}
+          </div>
+          {/* The scrollable tile region. min-h-0 lets it shrink inside the
+              column so overflow-y-auto engages; overflow-x-hidden plus the
+              minmax(0, 1fr) columns mean a narrow pane never scrolls sideways.
+              The stable scrollbar gutter keeps the measured width from
+              changing when the scrollbar appears, so the columns cannot
+              flicker at a threshold. pt-1 leaves room for a selected tile's
+              ring on the first row. */}
+          <div
+            ref={tileScrollRef}
+            data-testid="diagram-tile-scroll"
+            className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 pt-1 pb-4 [scrollbar-gutter:stable]"
+          >
+            {visibleDiagrams.length === 0 ? (
+              <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
+                <p className="text-gray-500 text-sm mb-3">No diagrams in this folder</p>
+                <button
+                  onClick={() => setShowNewDiagram(true)}
+                  className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs"
+                >
+                  Create a diagram
+                </button>
+              </div>
+            ) : (
+              <div
+                className="grid"
+                style={{ gridTemplateColumns: `repeat(${tileColumns}, minmax(0, 1fr))`, gap: tileSpec.gap }}
               >
-                Create a diagram
-              </button>
-            </div>
-          ) : (
-            <div
-              ref={tileGridRef}
-              className="grid gap-2"
-              style={{ gridTemplateColumns: `repeat(${tileColumns}, minmax(0, 1fr))` }}
-            >
-              {visibleDiagrams.map((d) => (
-                <DiagramCard
-                  key={d.id}
-                  diagram={d}
-                  otherProjects={otherProjects}
-                  onDelete={handleDeleteDiagram}
-                  onClone={handleCloneDiagram}
-                  onTranslate={handleTranslateDiagram}
-                  onMove={handleMoveDiagram}
-                  onCardClick={handleDiagramCardClick}
-                  onOpen={handleOpenDiagram}
-                  selected={selectedDiagramIds.has(d.id)}
-                  preview={previewDiagramId === d.id}
-                  colorConfig={projectColorConfig}
-                  nonApqc={highlightNonApqc && !diagramIsApqc(d)}
-                  apqcColor={apqcTone.text}
-                />
-              ))}
-            </div>
-          )}
+                {visibleDiagrams.map((d) => (
+                  <DiagramCard
+                    key={d.id}
+                    large={tileSpec.large}
+                    diagram={d}
+                    otherProjects={otherProjects}
+                    onDelete={handleDeleteDiagram}
+                    onClone={handleCloneDiagram}
+                    onTranslate={handleTranslateDiagram}
+                    onMove={handleMoveDiagram}
+                    onCardClick={handleDiagramCardClick}
+                    onOpen={handleOpenDiagram}
+                    selected={selectedDiagramIds.has(d.id)}
+                    preview={previewDiagramId === d.id}
+                    colorConfig={projectColorConfig}
+                    nonApqc={highlightNonApqc && !diagramIsApqc(d)}
+                    apqcColor={apqcTone.text}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         </main>
 
         {/* Right: per-diagram Properties — shown when a tile is single-clicked
@@ -4612,6 +4685,7 @@ function DiagramCard({
   colorConfig,
   nonApqc,
   apqcColor,
+  large = false,
 }: {
   diagram: DiagramSummary;
   otherProjects: OtherProject[];
@@ -4629,11 +4703,21 @@ function DiagramCard({
   colorConfig?: SymbolColorConfig;
   nonApqc?: boolean;
   apqcColor?: string;
+  /** 2-wide layout: double width (from the grid), double height, large thumbnail. */
+  large?: boolean;
 }) {
   const [showMove, setShowMove] = useState(false);
   // Colour-code the tile with a soft tint of the diagram-type colour.
   const typeStyle = useDiagramTypeStyles()(diagram.type);
   const tileTint = lightenHex(typeStyle.bgColor, 0.5);
+  // Tile sizing. Compact is the original 4-wide tile, unchanged. Large (2-wide)
+  // doubles the padding and grows the thumbnail from 56×32 to 168×96 (same
+  // aspect), which takes the tile to twice the compact height (measured: 74px
+  // → 152px); the grid already makes it twice as wide. The type and date stack
+  // beside the big thumbnail.
+  const sz = large
+    ? { card: "px-4 py-3", name: "text-sm", icon: 14, glyph: "text-xs", row2: "mt-1", meta: "flex-col items-start gap-1 text-[11px] pt-1", thumb: "w-42 h-24" }
+    : { card: "px-2 py-1.5", name: "text-[11px]", icon: 11, glyph: "text-[10px]", row2: "mt-0.5", meta: "items-center gap-1.5 text-[9px] pt-0.5", thumb: "w-14 h-8" };
 
   return (
     <div
@@ -4643,7 +4727,7 @@ function DiagramCard({
       onDoubleClick={(e) => { e.preventDefault(); onOpen(diagram.id); }}
       title={`${diagram.name} — double-click to open`}
       style={{ backgroundColor: tileTint, ...(nonApqc && apqcColor && !selected && !preview ? { boxShadow: `0 0 0 2px ${apqcColor}` } : {}) }}
-      className={`rounded-md px-2 py-1.5 hover:shadow-sm cursor-pointer group transition-all relative ${
+      className={`rounded-md ${sz.card} hover:shadow-sm cursor-pointer group transition-all relative ${
         selected
           ? "border-2 border-blue-500 ring-2 ring-blue-200"
           : preview
@@ -4653,12 +4737,12 @@ function DiagramCard({
     >
       {/* Row 1: Name + action icons */}
       <div className="flex items-center justify-between">
-        <h3 className="font-medium text-gray-900 text-[11px] leading-tight truncate flex-1" title={diagram.name}>{diagram.name}</h3>
+        <h3 className={`font-medium text-gray-900 ${sz.name} leading-tight truncate flex-1`} title={diagram.name}>{diagram.name}</h3>
         <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 ml-1 shrink-0">
           {diagram.type === "flowchart" && (
             <button
               onClick={(e) => { e.stopPropagation(); onTranslate(diagram.id); }}
-              className="text-gray-400 hover:text-blue-500 px-0.5 font-semibold text-[10px] leading-none"
+              className={`text-gray-400 hover:text-blue-500 px-0.5 font-semibold ${sz.glyph} leading-none`}
               title="Translate to BPMN"
             >
               →BP
@@ -4669,7 +4753,7 @@ function DiagramCard({
             className="text-gray-400 hover:text-blue-500 px-0.5"
             title="Clone diagram"
           >
-            <svg width={11} height={11} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+            <svg width={sz.icon} height={sz.icon} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
               <rect x={5} y={5} width={10} height={10} rx={1.5} />
               <path d="M11 5V2.5A1.5 1.5 0 009.5 1H2.5A1.5 1.5 0 001 2.5v7A1.5 1.5 0 002.5 11H5" />
             </svg>
@@ -4677,7 +4761,7 @@ function DiagramCard({
           <div className="relative">
             <button
               onClick={(e) => { e.stopPropagation(); setShowMove((v) => !v); }}
-              className="text-gray-400 hover:text-blue-500 text-[10px] px-0.5"
+              className={`text-gray-400 hover:text-blue-500 ${sz.glyph} px-0.5`}
               title="Move to project..."
             >{"\u2197"}</button>
             {showMove && (
@@ -4698,18 +4782,18 @@ function DiagramCard({
           </div>
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(diagram.id); }}
-            className="text-gray-400 hover:text-red-500 text-[10px] px-0.5"
+            className={`text-gray-400 hover:text-red-500 ${sz.glyph} px-0.5`}
           >{"\u2715"}</button>
         </div>
       </div>
       {/* Row 2: Type/date on left, thumbnail on right */}
-      <div className="flex items-start mt-0.5">
-        <div className="flex items-center gap-1.5 text-[9px] text-gray-400 pt-0.5">
+      <div className={`flex items-start ${sz.row2}`}>
+        <div className={`flex ${sz.meta} text-gray-400`}>
           <DiagramTypeBadge type={diagram.type} showLabel showCode={false} />
-          <span>{"\u00B7"}</span>
+          {!large && <span>{"\u00B7"}</span>}
           <span>{new Date(diagram.updatedAt).toLocaleDateString()}</span>
         </div>
-        <div className="ml-auto w-14 h-8 opacity-90 group-hover:opacity-100 transition-opacity pointer-events-none shrink-0">
+        <div className={`ml-auto ${sz.thumb} opacity-90 group-hover:opacity-100 transition-opacity pointer-events-none shrink-0`}>
           <DiagramThumbnail data={(diagram.data ?? { elements: [], connectors: [] }) as DiagramData} colorConfig={colorConfig} />
         </div>
       </div>
