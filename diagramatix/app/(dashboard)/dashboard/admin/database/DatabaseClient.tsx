@@ -806,22 +806,36 @@ export function DatabaseClient() {
                   onChange={(e) => setSql(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="Enter SQL query... (Ctrl+Enter to execute, Alt+Up/Down for history)"
-                  rows={15}
-                  className="w-full h-[38vh] min-h-[16rem] font-mono text-xs border border-gray-300 rounded px-3 py-2 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none resize-y"
+                  rows={19}
+                  // 25% taller than it was (38vh / 16rem) — Paul, 2026-09-27.
+                  className="w-full h-[47.5vh] min-h-[20rem] font-mono text-xs border border-gray-300 rounded px-3 py-2 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none resize-y"
                   spellCheck={false}
                 />
               </div>
-              <button
-                onClick={executeQuery}
-                disabled={executing || !sql.trim()}
-                className={`px-4 py-2 text-xs font-medium rounded ${
-                  executing
-                    ? "bg-yellow-50 text-yellow-700 border border-yellow-300"
-                    : "bg-blue-600 text-white hover:bg-blue-700"
-                } disabled:opacity-50`}
-              >
-                {executing ? "Running..." : "Execute"}
-              </button>
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={executeQuery}
+                  disabled={executing || !sql.trim()}
+                  className={`px-4 py-2 text-xs font-medium rounded ${
+                    executing
+                      ? "bg-yellow-50 text-yellow-700 border border-yellow-300"
+                      : "bg-blue-600 text-white hover:bg-blue-700"
+                  } disabled:opacity-50`}
+                >
+                  {executing ? "Running..." : "Execute"}
+                </button>
+                {/* Clear, under Execute (Paul, 2026-09-27): empties the editor and
+                    starts the Alt+Up/Down history from the latest again. The
+                    results stay — they are what was just run. */}
+                <button
+                  onClick={() => { setSql(""); setHistoryIndex(-1); textareaRef.current?.focus(); }}
+                  disabled={executing || !sql}
+                  title="Clear the SQL editor"
+                  className="px-4 py-2 text-xs font-medium rounded border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Clear
+                </button>
+              </div>
             </div>
             <div className="flex items-center gap-3 mt-1">
               <span className="text-[10px] text-gray-400">Ctrl+Enter to execute</span>
