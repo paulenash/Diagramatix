@@ -31,7 +31,8 @@
  */
 import type { AssistOp } from "./ops";
 import type { DiagramElement } from "../diagram/types";
-import { planMoveContents } from "../diagram/moveContents";
+import { bandOf, planMoveContents } from "../diagram/moveContents";
+import { contentCrossedBy, laneEdgePlan } from "../diagram/laneBoundary";
 import { makeRng, pick, int, DEFAULT_CORPUS_SEED, type Rng } from "./rng";
 import {
   ACTIVITY_LABELS, LANE_LABELS, POOL_LABELS, PARTICIPANT_LABELS, SYSTEM_LABELS,
@@ -98,6 +99,10 @@ export interface World {
    * not a copy of it).
    */
   contentsMove(rng: Rng): { c: Named; direction: "left" | "right"; steps?: number; pixels?: number } | null;
+  /** A lane divider that can move 20px that way — through nothing, with height to give (laneBoundary.ts). */
+  laneDividerMove(rng: Rng): { lane: Named; boundary: "top" | "bottom"; direction: "up" | "down" } | null;
+  /** A step in a lane, and a move of it and everything after it that the planner allows (moveContents.ts). */
+  contentsFromMove(rng: Rng): { start: Named; direction: "left" | "right"; steps?: number; pixels?: number } | null;
   /** A lane with a neighbour on BOTH sides, and a direction. A lane move trades
    *  height between those two, so an edge lane cannot move at all; asking
    *  measures a refusal, not a move. */
@@ -300,6 +305,32 @@ export function worldOf(els: readonly DiagramElement[]): World {
       const direction = rng.next() < 0.5 && !("error" in planMoveContents(els, c, -dist)) ? "left" : "right";
       return { c: { id: c.id, spoken: spokenName(c.label) }, direction, ...amount };
     },
+    laneDividerMove: (rng) => {
+      const cands: Array<{ l: DiagramElement; boundary: "top" | "bottom"; direction: "up" | "down" }> = [];
+      for (const l of [...lanes, ...subs]) for (const boundary of ["top", "bottom"] as const) for (const direction of ["up", "down"] as const) {
+        const plan = laneEdgePlan(els, l, boundary);
+        if (!("divider" in plan)) continue;
+        const above = els.find((e) => e.id === plan.divider.aboveId)!, below = els.find((e) => e.id === plan.divider.belowId)!;
+        const dy = direction === "up" ? -20 : 20;
+        if ((dy < 0 ? above : below).height - 20 < 80) continue;   // leave the reducer's floor well alone
+        if (contentCrossedBy(els, above.id, below.id, below.y + dy).length) continue;
+        cands.push({ l, boundary, direction });
+      }
+      if (!cands.length) return null;
+      const c = pick(rng, cands);
+      return { lane: { id: c.l.id, spoken: spokenName(c.l.label) }, boundary: c.boundary, direction: c.direction };
+    },
+    contentsFromMove: (rng) => {
+      const starts = els.filter((e) => ["task", "subprocess", "gateway"].includes(e.type) && e.label && !e.boundaryHostId && bandOf(e, els)?.type === "lane");
+      if (!starts.length) return null;
+      const s = pick(rng, starts);
+      const band = bandOf(s, els)!;
+      const amount: { steps?: number; pixels?: number } = pick(rng, [{ steps: 1 }, { steps: 2 }, { pixels: 50 }, { pixels: 30 }]);
+      const dist = amount.pixels ?? (amount.steps ?? 1) * 100;
+      const from = { x: s.x, name: spokenName(s.label) };
+      const direction = rng.next() < 0.5 && !("error" in planMoveContents(els, band, -dist, from)) ? "left" : "right";
+      return { start: { id: s.id, spoken: spokenName(s.label) }, direction, ...amount };
+    },
     has: (kind) => ({
       task: tasks.length, gateway: gateways.length, event: events.length,
       pool: pools.length, lane: lanes.length, sublane: subs.length,
@@ -444,6 +475,44 @@ export const GENERATOR_FAMILIES: readonly OpTemplate[] = [
         ]),
         ops: [{ op: "moveContents", ref: m.c.spoken, direction: m.direction, ...(m.pixels ? { pixels: m.pixels } : { steps: m.steps }) }],
         refs: { [m.c.spoken]: m.c.id },
+      };
+    },
+  },
+  {
+    // A lane's top or bottom boundary is a divider (Paul, 2026-09-27).
+    family: "moveLaneBoundary",
+    applicable: (w) => w.has("lane"),
+    build: (rng, w) => {
+      const m = w.laneDividerMove(rng);
+      if (!m) return null;
+      const lane = m.lane.spoken;
+      const laneForm = /^lane\b/i.test(lane) ? lane : `the ${lane} lane`;
+      return {
+        utterance: pick(rng, [
+          `move ${lane} ${m.boundary} boundary ${m.direction}`,
+          `move ${laneForm} ${m.boundary} divider ${m.direction}`,
+        ]),
+        ops: [{ op: "movePoolBoundary", ref: lane, boundary: m.boundary, direction: m.direction }],
+        refs: { [lane]: m.lane.id },
+      };
+    },
+  },
+  {
+    // "move everything from Check Claim one step to the right" (Paul, 2026-09-27).
+    family: "moveContentsFrom",
+    applicable: (w) => w.has("lane"),
+    build: (rng, w) => {
+      const m = w.contentsFromMove(rng);
+      if (!m) return null;
+      const amount = m.pixels ? `${m.pixels} pixels` : `${m.steps === 1 ? "one step" : `${m.steps} steps`}`;
+      return {
+        utterance: pick(rng, [
+          `move everything from ${m.start.spoken} ${amount} to the ${m.direction}`,
+          `move everything after ${m.start.spoken} ${amount} to the ${m.direction}`,
+          `move ${m.start.spoken} and everything after it ${amount} to the ${m.direction}`,
+        ]),
+        ops: [{ op: "moveContents", fromRef: m.start.spoken, direction: m.direction, ...(m.pixels ? { pixels: m.pixels } : { steps: m.steps }) }],
+        refs: { [m.start.spoken]: m.start.id },
       };
     },
   },

@@ -170,6 +170,7 @@ export const CATALOG_CONTEXT: Readonly<Record<string, CatalogContext>> = {
   "nudge pool down": { needsSelection: ["sys"] },
   "move the pool left boundary right": { needsSelection: ["sys"] },
   "convert selected to a task": { needsSelection: ["sub3"] },
+  "move everything from selected two steps to the right": { needsSelection: ["t5"] },
 };
 
 /** `dgx-voice-catalog#<slug>` — from the words, so an inserted line moves nothing. */

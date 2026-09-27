@@ -22,7 +22,8 @@ const TABLE: Readonly<Record<string, Readonly<Record<string, RefKind>>>> = {
   compressPool: { poolRef: "container" },
   // "move everything in Underwriters …" — a pool, lane or sub-lane (2026-09-27).
   moveContents: { ref: "container" },
-  movePoolBoundary: { ref: "pool" },
+  // A lane's top or bottom boundary too — a divider (2026-09-27).
+  movePoolBoundary: { ref: "container" },
   addLanes: { poolRef: "pool" },
   movePoolTo: { ref: "pool", relativeTo: "pool" },
   swapPools: { a: "pool", b: "pool" },

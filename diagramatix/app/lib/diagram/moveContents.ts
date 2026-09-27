@@ -18,6 +18,14 @@
  * same thing happens there. So a move with no room is refused, saying how far
  * it could go, never shortened silently.
  *
+ * FROM A STEP (Paul, 2026-09-27: "Move everything from selected, in
+ * <lane_name>, {<n> steps, <m> pixels} to the {right, left}. Never allow
+ * overlaps if it can't be done. Assume the lane or pool from the selected
+ * element's parent"): only what starts at or after that step moves — the
+ * contents whose centre lies at or right of its left edge. What stays can now
+ * be in the way on the left, so a move left keeps clear of it as well as of
+ * the headers, and is refused with the exact room when it would not.
+ *
  * Pure.
  */
 import type { DiagramElement } from "./types";
@@ -36,7 +44,21 @@ export type MoveContentsPlan =
   | { ids: string[]; grow?: { poolId: string; width: number } }
   | { error: string; room?: number };
 
-export function planMoveContents(els: readonly DiagramElement[], container: DiagramElement, dx: number): MoveContentsPlan {
+/** The pool, lane or sub-lane an element sits in — the nearest band above it. */
+export function bandOf(el: DiagramElement, els: readonly DiagramElement[]): DiagramElement | undefined {
+  const byId = new Map(els.map((e) => [e.id, e] as const));
+  let cur = byId.get(el.parentId ?? "");
+  for (let i = 0; cur && i < 16 && !isBand(cur); i++) cur = byId.get(cur.parentId ?? "");
+  return cur && isBand(cur) ? cur : undefined;
+}
+
+export function planMoveContents(
+  els: readonly DiagramElement[],
+  container: DiagramElement,
+  dx: number,
+  /** Only what starts at or after this line moves ("move everything from selected …"). */
+  from?: { x: number; name: string },
+): MoveContentsPlan {
   const byId = new Map(els.map((e) => [e.id, e] as const));
   const name = (container.label ?? "").replace(/\s+/g, " ").trim() || container.type;
   // Inside = under the container through bands only: a lane's sub-lanes are
@@ -50,8 +72,9 @@ export function planMoveContents(els: readonly DiagramElement[], container: Diag
     }
     return undefined;
   };
-  const movers = els.filter((e) => !isBand(e) && !e.boundaryHostId && bandUnder(e));
-  if (!movers.length) return { error: `there is nothing in ${name} to move` };
+  const contents = els.filter((e) => !isBand(e) && !e.boundaryHostId && bandUnder(e));
+  const movers = from ? contents.filter((e) => e.x + e.width / 2 >= from.x) : contents;
+  if (!movers.length) return { error: from ? `there is nothing from ${from.name} on in ${name} to move` : `there is nothing in ${name} to move` };
 
   // The extent that moves: the movers, their boundary events and everything inside them.
   const moving = new Set(movers.map((e) => e.id));
@@ -65,15 +88,25 @@ export function planMoveContents(els: readonly DiagramElement[], container: Diag
   const extent = els.filter((e) => moving.has(e.id));
 
   if (dx < 0) {
-    // The room on the left: every mover's own band keeps its header clear.
-    const room = Math.floor(Math.min(...movers.map((e) => {
+    // The room on the left: every mover's own band keeps its header clear…
+    let room = Math.min(...movers.map((e) => {
       const band = bandUnder(e)!;
       return e.x - (band.x + containerHeaderWidth(band)) - LEFT_MARGIN;
-    })));
+    }));
+    // …and nothing that moves comes within the margin of anything that stays.
+    const staying = els.filter((e) => !isBand(e) && !moving.has(e.id) && (contents.includes(e) || (e.boundaryHostId && contents.some((c) => c.id === e.boundaryHostId))));
+    for (const m of extent) {
+      for (const f of staying) {
+        const sameRow = m.y < f.y + f.height + LEFT_MARGIN && m.y + m.height > f.y - LEFT_MARGIN;
+        if (sameRow && f.x + f.width <= m.x + 0.5) room = Math.min(room, m.x - (f.x + f.width) - LEFT_MARGIN);
+      }
+    }
+    room = Math.floor(room);
+    const where = from ? `of ${from.name}` : `in ${name}`;
     if (-dx > room) {
       return room > 0
-        ? { error: `only ${room}px of room on the left in ${name} — say a smaller move`, room }
-        : { error: `there is no room on the left in ${name}`, room: 0 };
+        ? { error: `only ${room}px of room on the left ${where} — say a smaller move`, room }
+        : { error: `there is no room on the left ${where}`, room: 0 };
     }
     return { ids: movers.map((e) => e.id) };
   }

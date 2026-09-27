@@ -185,6 +185,22 @@
       "pixels": 50
     }
   ],
+  "move everything from selected two steps to the right": [
+    {
+      "op": "moveContents",
+      "fromRef": "selected",
+      "direction": "right",
+      "steps": 2
+    }
+  ],
+  "move everything after Check Claim one step to the right": [
+    {
+      "op": "moveContents",
+      "fromRef": "Check Claim",
+      "direction": "right",
+      "steps": 1
+    }
+  ],
   "make this a user task": [
     {
       "op": "convert",
@@ -565,6 +581,23 @@
       "boundary": "bottom",
       "direction": "down",
       "ref": "Customer"
+    }
+  ],
+  "move Underwriters top boundary up": [
+    {
+      "op": "movePoolBoundary",
+      "boundary": "top",
+      "direction": "up",
+      "ref": "Underwriters"
+    }
+  ],
+  "move the Underwriters lane bottom divider up by 20": [
+    {
+      "op": "movePoolBoundary",
+      "boundary": "bottom",
+      "direction": "up",
+      "ref": "Underwriters",
+      "distance": 20
     }
   ],
   "add a lane to the pool": [

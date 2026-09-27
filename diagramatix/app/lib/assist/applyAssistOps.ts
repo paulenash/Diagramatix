@@ -57,7 +57,8 @@ import { whyTemplateCantFollow } from "@/app/lib/diagram/templateAttach";
 import { SEQUENCE_NODE_TYPES } from "@/app/lib/diagram/templates";
 import { eventSideRefusal } from "@/app/lib/diagram/eventSides";
 import { bandAt, planInsertBetween } from "@/app/lib/diagram/insertBetween";
-import { planMoveContents, CONTENTS_STEP_PX } from "@/app/lib/diagram/moveContents";
+import { bandOf, planMoveContents, CONTENTS_STEP_PX } from "@/app/lib/diagram/moveContents";
+import { contentCrossedBy, laneEdgePlan } from "@/app/lib/diagram/laneBoundary";
 import { TEMPLATE_BEFORE_REFUSAL } from "./templatePhrase";
 import { refKind, unsaidRef, type RefKind } from "./refKinds";
 import { connectorsOverElement } from "./connectorRef";
@@ -103,6 +104,9 @@ export interface AssistDiagramActions {
   insertSpace(markerX: number, markerY: number, dx: number, dy: number, scopeId?: string): void;
   /** The right-click menu's task ↔ subprocess toggle. */
   convertTaskSubprocess(id: string): void;
+  /** The divider drag: the band above grows by dy, the band below gives way. */
+  moveLaneBoundary(aboveLaneId: string, belowLaneId: string, dy: number): void;
+  laneBoundaryMoveEnd(): void;
   updateConnectorEndpoint(connectorId: string, endpoint: "source" | "target", newElementId: string, newSide: Side, newOffsetAlong?: number): void;
   movePoolTo(poolId: string, position: PoolPosition, relativeToId: string): void;
   swapPools(aId: string, bId: string): void;
@@ -176,7 +180,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
     addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, updateConnectorLabel,
     deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool,
     wrapInSubprocess, wrapInContainer, unwrapSubprocess, addPool, addLaneAt, compressPool, compressLane, expandLane, extendPools,
-    swapLane, moveLane, moveElements, elementsMoveEnd, removeSpace, insertSpace, convertTaskSubprocess, updateConnectorEndpoint, movePoolTo,
+    swapLane, moveLane, moveElements, elementsMoveEnd, removeSpace, insertSpace, convertTaskSubprocess, moveLaneBoundary, laneBoundaryMoveEnd, updateConnectorEndpoint, movePoolTo,
     swapPools, resizeElement, resizeElementEnd, alignElements,
   } = ctx.actions;
   const { setSelectedElementIds, setSelectedConnectorId, setPickFlow, setRenameFlow, setMessageFlow, setGoldFlash } = ctx.ui;
@@ -961,8 +965,43 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
         if (!t) continue;
         target = t;
       }
+      // A LANE'S top or bottom boundary is a divider (Paul, 2026-09-27: "Move
+      // <lane_name> {top, bottom} boundary/divider {up, down}") — the line the
+      // mouse drags, found by laneBoundary.ts. At the end of the stack it is
+      // the pool's own edge, which falls through to the pool move below.
+      if (target && isAnyLane(target)) {
+        if (op.boundary === "left" || op.boundary === "right") {
+          results.push(`${nameOf(target)}'s ${op.boundary} edge is its pool's — say “move <pool> ${op.boundary} boundary ${op.direction}”`);
+          anyFail = true; continue;
+        }
+        const edge = laneEdgePlan(els, target, op.boundary);
+        if ("error" in edge) { results.push(edge.error); anyFail = true; continue; }
+        if ("divider" in edge) {
+          const { aboveId, belowId } = edge.divider;
+          const dy = op.direction === "up" ? -dist : dist;
+          const above = els.find((e) => e.id === aboveId)!, below = els.find((e) => e.id === belowId)!;
+          const next = preview({ type: "MOVE_LANE_BOUNDARY", payload: { aboveLaneId: aboveId, belowLaneId: belowId, dy } });
+          const moved = next ? (next.elements.find((e) => e.id === aboveId)!.height - above.height) : 0;
+          const giver = dy < 0 ? above : below;
+          if (!moved) { results.push(`${nameOf(giver)} is as small as it can be — the divider can't move ${op.direction}`); anyFail = true; continue; }
+          const crossed = contentCrossedBy(els, aboveId, belowId, below.y + moved);
+          if (crossed.length) {
+            const names = crossed.slice(0, 3).map((e) => `“${nameOf(e)}”`).join(", ") + (crossed.length > 3 ? `, and ${crossed.length - 3} more` : "");
+            results.push(`the divider would run through ${names} — move ${crossed.length === 1 ? "it" : "them"} first, or say a smaller move`);
+            anyFail = true; continue;
+          }
+          moveLaneBoundary(aboveId, belowId, dy);
+          laneBoundaryMoveEnd();
+          setSelectedElementIds(new Set()); // selection protocol
+          if (next) els = next.elements;
+          const short = Math.abs(moved) < dist ? ` — ${nameOf(giver)} is as small as it can be` : "";
+          results.push(`moved ${nameOf(target)}'s ${op.boundary} boundary ${op.direction} ${Math.abs(moved)}px${short}`);
+          continue;
+        }
+        target = els.find((e) => e.id === edge.poolEdge.poolId);
+      }
       if (!target || target.type !== "pool") {
-        results.push(op.ref ? `${nameOf(target!)} isn't a pool` : "there's no pool to resize");
+        results.push(op.ref ? `${nameOf(target!)} is not a pool or a lane` : "there's no pool to resize");
         anyFail = true; continue;
       }
       const before = { x: target.x, y: target.y, width: target.width, height: target.height };
@@ -1444,12 +1483,37 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
     // the pool FIRST (a group moved past its edge falls out of it) and then
     // lines every pool up; a move left into a header is refused with the room.
     if (op.op === "moveContents") {
-      const c = resolveField(op, "ref");
-      if ("err" in c) { results.push(c.err); anyFail = true; continue; }
+      // FROM A STEP ON (Paul, 2026-09-27): the step named or selected — the
+      // leftmost, when several are — and the lane or pool it sits in, unless
+      // one is named. A selected LANE means everything in it.
+      let start: DiagramElement | undefined;
+      if (op.fromRef) {
+        const sel = resolveSelectionRefs(op.fromRef, els, selectedIds);
+        if (sel) {
+          if (!sel.length) { results.push("nothing is selected"); anyFail = true; continue; }
+          start = sel.map((id) => els.find((e) => e.id === id)!).filter(Boolean).sort((a, b) => a.x - b.x)[0];
+        } else {
+          const s0 = resolve1(op.fromRef);
+          if ("err" in s0) { results.push(s0.err); anyFail = true; continue; }
+          start = s0;
+        }
+      }
+      let c: DiagramElement | undefined;
+      if (op.ref) {
+        const r = resolveField(op, "ref");
+        if ("err" in r) { results.push(r.err); anyFail = true; continue; }
+        c = r;
+      } else if (start && (start.type === "pool" || isAnyLane(start))) {
+        c = start; start = undefined;
+      } else if (start) {
+        c = bandOf(start, els);
+        if (!c) { results.push(`${nameOf(start)} is in no pool or lane`); anyFail = true; continue; }
+      }
+      if (!c) { results.push("say which pool or lane"); anyFail = true; continue; }
       if (c.type !== "pool" && !isAnyLane(c)) { results.push(`${nameOf(c)} is a ${c.type.replace(/-/g, " ")} — say a pool, lane or sub-lane`); anyFail = true; continue; }
       const dist = op.pixels ?? CONTENTS_STEP_PX * (op.steps ?? 1);
       const dx = op.direction === "right" ? dist : -dist;
-      const plan = planMoveContents(els, c, dx);
+      const plan = planMoveContents(els, c, dx, start ? { x: start.x, name: nameOf(start) } : undefined);
       if ("error" in plan) { results.push(plan.error); anyFail = true; continue; }
       if (plan.grow) {
         const pool = els.find((e) => e.id === plan.grow!.poolId)!;
@@ -1460,7 +1524,8 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       moveElements(plan.ids, dx, 0);
       elementsMoveEnd();
       setSelectedElementIds(new Set());   // selection protocol
-      results.push(`moved everything in ${nameOf(c)} ${op.direction} ${dist}px${plan.grow ? " — the pools widened to make room" : ""}`);
+      const what = start ? `${nameOf(start)} and everything after it in ${nameOf(c)}` : `everything in ${nameOf(c)}`;
+      results.push(`moved ${what} ${op.direction} ${dist}px${plan.grow ? " — the pools widened to make room" : ""}`);
       continue;
     }
 

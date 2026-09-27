@@ -33,6 +33,7 @@ export const COMMAND_CATALOG: CatalogFamily[] = [
     { does: "Move — one element-span; a selection moves together, 100 px per step", say: ["move the gateway two elements to the right", "move Pay Claim up", "move these right", "move the selected task two steps up"] },
     { does: "Nudge — 20 px in any direction, any element; a selection nudges together", say: ["nudge the selected task left", "nudge these down", "bump Check Claim right", "nudge Customer down by 40"] },
     { does: "Move everything in a pool, lane or sub-lane — n steps (100 px each) or m pixels, right or left. Moving right widens the pools when it needs to; nothing moves into a header", say: ["move everything in Underwriters two steps to the right", "move everything in Lane 2 50 pixels to the left"] },
+    { does: "Move everything from a step on — the step selected (or named) and everything after it, in its own lane or the pool or lane you name. Never into an overlap: too far left, it says how far it can go", say: ["move everything from selected two steps to the right", "move everything after Check Claim one step to the right"] },
     { does: "Change what kind of thing it is — the same choices as the right-click menu", say: ["make this a user task", "turn the selected gateway into a parallel gateway", "make Review Claim a service task", "make the selected event a timer event"] },
     { does: "Task ↔ subprocess — the right-click menu's convert. A task's marker, or a subprocess's link to its sub-diagram, does not survive the change", say: ["convert Review Claim to a subprocess", "convert selected to a task"] },
     { does: "Delete (and close the gap)", say: ["delete Task 2", "remove Task 1 and compact"] },
@@ -58,6 +59,7 @@ export const COMMAND_CATALOG: CatalogFamily[] = [
     { does: "Compress a pool to its content — name a lane and it is that lane that is compressed", say: ["compress the Customer pool", "compress Claims Processing", "shrink Claims System"] },
     { does: "Nudge a pool", say: ["nudge pool down", "bump Customer down by 40", "nudge Claims System up"] },
     { does: "Move ONE edge of a pool — a resize, not a move. A left/right boundary only goes left/right, a top/bottom one only up/down; it stops at the first element it meets and the lanes follow", say: ["move the pool left boundary right", "nudge the Claims Processing pool's top boundary up by 40", "shift the bottom edge of the Customer pool down"] },
+    { does: "A lane's top or bottom boundary — the divider it shares with the lane beside it (the pool's edge at the top or bottom of the pool). It never runs through anything", say: ["move Underwriters top boundary up", "move the Underwriters lane bottom divider up by 20"] },
   ] },
   { family: "Lanes and sub-lanes", items: [
     { does: "Add lanes (named or not)", say: ["add a lane to the pool", "add 2 lanes to Claims Processing called Intake and Payments", "add a lane above Lane 3", "insert a lane below Underwriters called Support"] },

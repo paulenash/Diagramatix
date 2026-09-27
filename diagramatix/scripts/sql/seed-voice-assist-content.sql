@@ -120,6 +120,8 @@ The bar can be **dragged by its header**. The Symbols palette and the Properties
 - "compress the Customer pool" · "extend the pools to include all elements"
 - "compress the Sales lane" · "expand lane Picking by 100" — a lane fits to its content: its top stays and the lanes below close up. Expand adds one Task row at the bottom, or the number you say.
 - "move everything in Sales two steps to the right" · "move everything in Picking 50 pixels to the left" — the contents of a pool, lane or sub-lane move, not the container (a step is 100 px). Moving right widens the pools when it needs to; nothing moves into a header.
+- "move everything from selected two steps to the right" · "move everything after Pick Items 50 pixels to the left" — the step and everything after it, in its own lane (or the pool or lane you name). It never moves into an overlap: too far left, it says how far it can go.
+- "move Sales top boundary up" · "move the Picking lane bottom divider down by 20" — a lane's top or bottom boundary is the divider it shares with the lane beside it (at the top or bottom of the pool, the pool's own edge). It never runs through anything.
 - "move the pool left boundary right" · "nudge the Warehouse pool top boundary up by 40" — moves **one edge**, not the pool. A left/right boundary only goes left or right, a top/bottom one only up or down; it stops at the first element it meets, and the lanes follow.
 
 **Messages**

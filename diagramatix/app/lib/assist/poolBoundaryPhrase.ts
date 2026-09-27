@@ -70,7 +70,9 @@ const POOL_WORD = /^(?:pools?|polls?|pulls?|pooled|pulled)$/i;
 /** Lane words are accepted and ignored: "nudge pull lane, left boundary left"
  *  is a person correcting themselves mid-sentence, not a lane command. */
 const LANE_WORD = /^(?:lanes?|lines?|sub-?lanes?|sub-?lines?)$/i;
-const BOUNDARY_WORD = /^(?:boundary|boundaries|edge|edges|border|borders|side)$/i;
+// "divider": what a lane's top and bottom edges are called (Paul, 2026-09-27:
+// "Move <lane_name> {top, bottom} boundary/divider {up, down}").
+const BOUNDARY_WORD = /^(?:boundary|boundaries|edge|edges|border|borders|side|dividers?)$/i;
 const VERB = /^(?:move|moves?|moved|nudge|nudged|shift|shifted|bump|bumped|drag|dragged|pull|push|pushed|slide|slid)$/i;
 const FILLER = /^(?:the|a|an|of|to|please|its|it'?s|and|then)$/i;
 
@@ -151,8 +153,12 @@ function parseWords(words: string[]): BoundaryParse {
   // continuation form ("left boundary, left") — which only counts when a side
   // word introduces it, so an unrelated "…edge…" cannot be captured.
   const poolMentioned = words.some((w) => POOL_WORD.test(w));
+  // A lane's boundary is the same sentence (2026-09-27): "move the Finance
+  // Team lane top boundary up", "move lane divider down". The apply layer
+  // finds a pool or a lane by the name.
+  const laneWord = words.find((w) => LANE_WORD.test(w));
   const bareForm = bIdx > 0 && isSideWord(words[bIdx - 1]);
-  if (!poolMentioned && !bareForm) return null;
+  if (!poolMentioned && !laneWord && !bareForm) return null;
 
   // THE EDGE: the nearest side word before the boundary word.
   let boundary: PoolBoundary | null = null;
@@ -186,15 +192,25 @@ function parseWords(words: string[]): BoundaryParse {
   // THE POOL: whatever is left once every word doing a job is taken out. The
   // direction word and anything after it is dropped, so "…up by 40" cannot
   // become part of a name.
+  // A kind word followed by a number is part of the NAME — "Lane 3", "Pool
+  // two" — and keeping it binds the name to its kind: without it "move Lane 3
+  // bottom boundary down" named only "3" (2026-09-27).
+  const NUMBER = /^(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)$/i;
   const naming = [...before, ...after.slice(0, dirAt)];
   const ref = naming
-    .filter((w) => !VERB.test(w) && !FILLER.test(w) && !POOL_WORD.test(w) && !LANE_WORD.test(w)
-      && !isSideWord(w) && !BOUNDARY_WORD.test(w))
+    .filter((w, i) => {
+      if ((POOL_WORD.test(w) || LANE_WORD.test(w)) && NUMBER.test(naming[i + 1] ?? "")) return true;
+      return !VERB.test(w) && !FILLER.test(w) && !POOL_WORD.test(w) && !LANE_WORD.test(w)
+        && !isSideWord(w) && !BOUNDARY_WORD.test(w);
+    })
     .join(" ")
     .trim();
 
   const out: PoolBoundaryPhrase = { boundary, direction };
   if (ref) out.ref = ref;
+  // Only the kind word named it — "move lane divider up": the lane (the
+  // selected one, or the question), never the pool.
+  else if (laneWord && !poolMentioned) out.ref = /^sub/i.test(laneWord) ? "the sub-lane" : "the lane";
   if (distance !== undefined) out.distance = distance;
   return out;
 }
@@ -209,7 +225,7 @@ function parseWords(words: string[]): BoundaryParse {
  */
 export function mentionsPoolBoundary(text: string): boolean {
   const words = tokenise(text);
-  const bIdx = words.findIndex((w) => /^(?:boundary|boundaries|border|borders)$/i.test(w));
+  const bIdx = words.findIndex((w) => /^(?:boundary|boundaries|border|borders|dividers?)$/i.test(w));
   if (bIdx < 0) return false;
   return words.some((w) => POOL_WORD.test(w) || LANE_WORD.test(w))
     || (bIdx > 0 && isSideWord(words[bIdx - 1]));

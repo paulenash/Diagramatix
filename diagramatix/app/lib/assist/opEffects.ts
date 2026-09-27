@@ -27,6 +27,7 @@ import { laneMetrics, poolMetrics } from "../diagram/containerMetrics";
 import { isLaneUnowned } from "../diagram/containment";
 import { nextContainerLabels } from "../diagram/containerNames";
 import { CONNECTOR_REF_PREFIX } from "./connectorRef";
+import { bandOf, planMoveContents, CONTENTS_STEP_PX } from "../diagram/moveContents";
 
 export interface EffectCheck {
   ok: boolean;
@@ -356,24 +357,42 @@ export function checkEffect(op: AssistOp, before: DiagramData, after: DiagramDat
     }
 
     case "moveContents": {
-      // Everything that was inside moved by the same amount, and is still inside.
-      const id = refs.ref;
-      const c = id ? byId(before, id) : undefined;
+      // Judged by the planner the app uses (moveContents.ts): what it says
+      // moves moved by the amount, everything else in there stayed, nothing
+      // fell out of its lane, and nothing new overlaps. A plan it refuses
+      // must leave the diagram as it was.
+      const start = refs.fromRef ? byId(before, refs.fromRef) : undefined;
+      const isBandEl = (e: DiagramElement) => ["pool", "lane", "sublane"].includes(e.type);
+      const c = refs.ref ? byId(before, refs.ref) : start ? (isBandEl(start) ? start : bandOf(start, before.elements)) : undefined;
       if (!c) return null;
-      const under = (d: DiagramData, eid: string): boolean => {
-        let cur = byId(d, eid);
-        for (let i = 0; cur && i < 16; i++) { if (cur.parentId === c.id) return true; cur = byId(d, cur.parentId ?? ""); }
-        return false;
-      };
-      const inside = before.elements.filter((e) => !["pool", "lane", "sublane"].includes(e.type) && under(before, e.id));
-      if (!inside.length) return null;
-      const dist = op.pixels ?? 100 * (op.steps ?? 1);
+      const from = start && start.id !== c.id ? { x: start.x, name: nameOf(start) } : undefined;
+      const dist = op.pixels ?? CONTENTS_STEP_PX * (op.steps ?? 1);
       const want = op.direction === "right" ? dist : -dist;
-      for (const e of inside) {
+      const plan = planMoveContents(before.elements, c, want, from);
+      const flow = before.elements.filter((e) => !isBandEl(e));
+      if ("error" in plan) {
+        const shifted = flow.find((e) => { const a = byId(after, e.id); return !a || a.x !== e.x || a.y !== e.y; });
+        return shifted ? fail(`${nameOf(shifted)} moved, though “${plan.error}”`) : pass;
+      }
+      const movers = new Set(plan.ids);
+      for (const e of flow) {
         const a = byId(after, e.id);
         if (!a) return fail(`${nameOf(e)} went missing`);
-        if (Math.abs(a.x - e.x - want) > 1 || Math.abs(a.y - e.y) > 1) return fail(`${nameOf(e)} moved (${Math.round(a.x - e.x)}, ${Math.round(a.y - e.y)}), not ${want}px ${op.direction}`);
-        if (!under(after, e.id)) return fail(`${nameOf(e)} fell out of ${nameOf(c)}`);
+        const host = e.boundaryHostId ? before.elements.find((x) => x.id === e.boundaryHostId) : undefined;
+        const moves = movers.has(e.id) || (!!host && movers.has(host.id)) || (!!e.parentId && movers.has(e.parentId));
+        const dx = a.x - e.x;
+        if (moves && (Math.abs(dx - want) > 1 || Math.abs(a.y - e.y) > 1)) return fail(`${nameOf(e)} moved (${Math.round(dx)}, ${Math.round(a.y - e.y)}), not ${want}px ${op.direction}`);
+        if (!moves && (Math.abs(dx) > 1 || Math.abs(a.y - e.y) > 1)) return fail(`${nameOf(e)} moved, though it was not in what moves`);
+        if (moves && a.parentId !== e.parentId) return fail(`${nameOf(e)} fell out of ${nameOf(byId(before, e.parentId ?? "")) }`);
+      }
+      const solid = (d: DiagramData) => d.elements.filter((e) => !isBandEl(e) && !e.boundaryHostId && e.type !== "subprocess-expanded");
+      const hit = (x: DiagramElement, y: DiagramElement) => x.x < y.x + y.width && x.x + x.width > y.x && x.y < y.y + y.height && x.y + x.height > y.y;
+      const was = new Set<string>();
+      const b0 = solid(before);
+      for (let i = 0; i < b0.length; i++) for (let j = i + 1; j < b0.length; j++) if (hit(b0[i], b0[j])) was.add(b0[i].id + "|" + b0[j].id);
+      const a0 = solid(after);
+      for (let i = 0; i < a0.length; i++) for (let j = i + 1; j < a0.length; j++) {
+        if (hit(a0[i], a0[j]) && !was.has(a0[i].id + "|" + a0[j].id) && !was.has(a0[j].id + "|" + a0[i].id)) return fail(`${nameOf(a0[i])} now overlaps ${nameOf(a0[j])}`);
       }
       return pass;
     }
@@ -490,7 +509,10 @@ export function checkEffect(op: AssistOp, before: DiagramData, after: DiagramDat
         op.boundary === "left" ? e.x : op.boundary === "right" ? e.x + e.width : op.boundary === "top" ? e.y : e.y + e.height;
       const moved = edge(a) - edge(b);
       const want = op.direction === "right" || op.direction === "down" ? 1 : -1;
-      return moved * want >= 0 ? pass : fail(`the ${op.boundary} edge of ${nameOf(a)} moved the wrong way (${moved}px)`);
+      if (moved * want < 0) return fail(`the ${op.boundary} edge of ${nameOf(a)} moved the wrong way (${moved}px)`);
+      // A boundary never carries content into another lane (a lane divider, 2026-09-27).
+      const rehomed = before.elements.find((e) => !["pool", "lane", "sublane"].includes(e.type) && byId(after, e.id)?.parentId !== e.parentId);
+      return rehomed ? fail(`${nameOf(rehomed)} changed lane`) : pass;
     }
 
     case "addMessage": {

@@ -99,6 +99,8 @@ export function headlessDiagram(initial: DiagramData): HeadlessDiagram {
     },
     removeSpace: (zone) => commit({ type: "REMOVE_SPACE", payload: { zone } }),
     convertTaskSubprocess: (id) => commit({ type: "CONVERT_TASK_SUBPROCESS", payload: { id } }),
+    moveLaneBoundary: (aboveLaneId, belowLaneId, dy) => commit({ type: "MOVE_LANE_BOUNDARY", payload: { aboveLaneId, belowLaneId, dy } }),
+    laneBoundaryMoveEnd: () => {},
     insertSpace: (markerX, markerY, dx, dy, scopeId) =>
       commit({ type: "INSERT_SPACE", payload: { markerX, markerY, dx, dy, ...(scopeId ? { scopeId } : {}) } }),
     updateConnectorEndpoint: (connectorId, endpoint, newElementId, newSide, newOffsetAlong) =>

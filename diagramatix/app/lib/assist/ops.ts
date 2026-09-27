@@ -106,8 +106,13 @@ export type AssistOp =
   | { op: "convert"; ref: Ref; subtype: string }
   /** "convert Review Claim to a subprocess" / "convert selected to a task" — the right-click menu's shape change (Paul, 2026-09-27). */
   | { op: "convertActivity"; ref: Ref; to: "task" | "subprocess" }
-  /** "move everything in Underwriters two steps to the right" — a container's contents, not the container (Paul, 2026-09-27). */
-  | { op: "moveContents"; ref: Ref; direction: "left" | "right"; steps?: number; pixels?: number }
+  /**
+   * "move everything in Underwriters two steps to the right" — a container's
+   * contents, not the container; "move everything from selected (in Finance
+   * Team) two steps right" — only what starts at or after that step, in its own
+   * lane or pool unless one is named (Paul, 2026-09-27). One of ref / fromRef.
+   */
+  | { op: "moveContents"; ref?: Ref; fromRef?: Ref; direction: "left" | "right"; steps?: number; pixels?: number }
   /**
    * M4 — fill the selection. Each names none of its targets and says several
    * things at once, relying on the selection; `fillLabels` relies on reading
@@ -396,8 +401,10 @@ export function validateOp(raw: unknown): AssistOp | null {
       if (!isRef(o.ref) || (o.to !== "task" && o.to !== "subprocess")) return null;
       return { op: "convertActivity", ref: (o.ref as string).trim(), to: o.to };
     case "moveContents": {
-      if (!isRef(o.ref) || (o.direction !== "left" && o.direction !== "right")) return null;
-      const op: AssistOp = { op: "moveContents", ref: (o.ref as string).trim(), direction: o.direction };
+      if ((!isRef(o.ref) && !isRef(o.fromRef)) || (o.direction !== "left" && o.direction !== "right")) return null;
+      const op: AssistOp = { op: "moveContents", direction: o.direction };
+      if (isRef(o.ref)) op.ref = (o.ref as string).trim();
+      if (isRef(o.fromRef)) op.fromRef = (o.fromRef as string).trim();
       if (typeof o.pixels === "number" && o.pixels > 0) op.pixels = Math.round(o.pixels);
       else if (typeof o.steps === "number" && o.steps > 0) op.steps = Math.round(o.steps);
       return op;

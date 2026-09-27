@@ -98,7 +98,7 @@ Op shapes (use element NAMES for refs — they are resolved against the diagram;
   { "op":"expandLane", "laneRef": <lane name>, "distance"?: number }  // make ONE lane or sub-lane taller at its bottom (verbs: ${EXPAND_VERBS.join("/")}, WITH a lane word); default one Task row (${LANE_EXPAND_STEP}px). "expand the subprocess" is NOT this
   { "op":"extendPools" }                                            // widen ALL pools to the same width, covering every element (verbs: extend/lengthen/widen)
   { "op":"nudgePool", "ref"?: <name>, "direction": "up"|"down", "distance"?: number }  // move a pool a small step (default 20px); ref omitted → the black-box pool
-  { "op":"movePoolBoundary", "ref"?: <name>, "boundary": "left"|"right"|"top"|"bottom", "direction": "up"|"down"|"left"|"right", "distance"?: number }  // move ONE edge of a pool (a resize). A left/right boundary only takes left/right; a top/bottom one only up/down. "move the pool left boundary right by 40"
+  { "op":"movePoolBoundary", "ref"?: <name>, "boundary": "left"|"right"|"top"|"bottom", "direction": "up"|"down"|"left"|"right", "distance"?: number }  // move ONE edge of a pool (a resize) — or a LANE's top/bottom boundary, the divider it shares with its neighbour ("move Finance Team top boundary up"). A left/right boundary only takes left/right; a top/bottom one only up/down. "move the pool left boundary right by 40"
   { "op":"moveLane", "ref": <lane name>, "direction": "up"|"down", "distance"?: number }  // shift a lane ½ Task height (32px), keeping its height
   { "op":"again" }                                                  // repeat the last command (e.g. another nudge)
   { "op":"addMessage", "fromRef": <name>, "toRef": <name>, "label"?: string }  // message flow between an activity and a pool/participant
@@ -124,7 +124,7 @@ Op shapes (use element NAMES for refs — they are resolved against the diagram;
         // "call subprocess", "transaction", "loop", "MI parallel", "input data object". This CANNOT change a task
         // into a gateway (task <-> subprocess is convertActivity); if that is what was asked, return no ops rather than something adjacent.
   { "op":"convertActivity", "ref": <name>, "to": "task"|"subprocess" }  // change the SHAPE task <-> (collapsed) subprocess, as the right-click menu does: "convert Review to a subprocess", "convert selected to a task"
-  { "op":"moveContents", "ref": <pool, lane or sub-lane name>, "direction": "left"|"right", "steps"?: number, "pixels"?: number }  // move EVERYTHING INSIDE the container, not the container; a step is 100px: "move everything in Underwriters two steps to the right"
+  { "op":"moveContents", "ref": <pool, lane or sub-lane name>, "direction": "left"|"right", "steps"?: number, "pixels"?: number }  // move EVERYTHING INSIDE the container, not the container; a step is 100px: "move everything in Underwriters two steps to the right". With "fromRef" (the step, e.g. "selected") only that step and what is after it move, in its own lane unless "ref" names one: "move everything from selected two steps to the right"
   { "op":"clear" }                    // empty the whole diagram
   { "op":"export", "format":"json" }  // download the diagram as JSON
   { "op":"undo" }

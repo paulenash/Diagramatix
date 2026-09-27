@@ -96,7 +96,8 @@ describe("T4900 — a spoken kind word reaches the command, and binds", () => {
     const els = [...world(), E({ id: "t9", type: "task", label: "Customer", x: 0, y: 0, width: 10, height: 10, properties: {} })];
     expect(resolveRef("Customer", els, null, [], { kind: "pool" })).toBeNull();
     expect(resolveRef("three", world(), null, [], { kind: "pool" })).toEqual({ id: "p3" });
-    expect(refKind("movePoolBoundary", "ref")).toBe("pool");
+    // Changed 2026-09-27: a lane's top/bottom boundary is a divider (T4945) — pool or lane.
+    expect(refKind("movePoolBoundary", "ref")).toBe("container");
     expect(refKind("compressPool", "poolRef")).toBe("container");
     expect(refKind("delete", "ref")).toBeUndefined();
   });

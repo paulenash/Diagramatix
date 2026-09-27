@@ -46,6 +46,25 @@ function matchSymbol(text: string): { symbolType: SymbolType; eventType?: EventT
 }
 
 /** Parse a single utterance into ops, or null if unrecognised. */
+/**
+ * The "<n steps | m pixels> to the <right | left>" tail of a contents move, in
+ * either order — "two steps to the right", "to the right by 50 pixels", "left
+ * 1 step". Returns what is left (the names) with the amount and direction taken
+ * out, or null when no left or right was said.
+ */
+function readShift(tail: string): { direction: "left" | "right"; amount: { steps?: number; pixels?: number }; rest: string } | null {
+  const dirs = [...tail.matchAll(/\b(left|right)\b/gi)];
+  if (!dirs.length) return null;
+  const direction = dirs[dirs.length - 1][1].toLowerCase() as "left" | "right";
+  let rest = tail;
+  const amt = rest.match(/\b(\d+|an?|one|two|three|four|five|six|seven|eight|nine|ten)\s*(steps?|places?|spaces?|pixels?|px)\b/i);
+  if (amt) rest = rest.replace(amt[0], " ");
+  rest = rest.replace(new RegExp(String.raw`(?:\s+to)?(?:\s+the)?\s+${direction}\b`, "i"), " ").replace(/\s+by\s*$/i, " ").replace(/\s+by\s+/i, " ");
+  const n = amt ? toCount(amt[1]) : undefined;
+  const amount = n ? (/^(?:pixels?|px)$/i.test(amt![2]) ? { pixels: n } : { steps: n }) : {};
+  return { direction, amount, rest: rest.replace(/\s+/g, " ").replace(/\s*,\s*$/, "").trim() };
+}
+
 export function parseCommand(utterance: string): AssistOp[] | null {
   // Speech punctuation: "Swap, top and bottom." — a comma straight after the
   // verb is a breath, not syntax (Paul's log, 2026-09-15). Only that comma is
@@ -657,22 +676,28 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   // "move everything in Underwriters two steps to the right", "move all the
   // elements in Lane 2 50 pixels to the left". Before the element move, which
   // would read "everything in Underwriters" as the name of one thing. The
-  // amount and the direction may come in either order.
+  // amount and the direction may come in either order (readShift).
   m = raw.match(/^(?:move|shift|slide)\s+(?:everything|all(?:\s+(?:of\s+)?(?:the\s+)?(?:elements?|contents?|steps?|items?|things?|shapes?))?|the\s+(?:contents?|elements?))\s+(?:in(?:side)?|of|within)\s+(.+)$/i);
   if (m) {
-    let tail = m[1];
-    const dirs = [...tail.matchAll(/\b(left|right)\b/gi)];
-    if (dirs.length) {
-      const direction = dirs[dirs.length - 1][1].toLowerCase() as "left" | "right";
-      const amt = tail.match(/\b(\d+|an?|one|two|three|four|five|six|seven|eight|nine|ten)\s*(steps?|places?|spaces?|pixels?|px)\b/i);
-      if (amt) tail = tail.replace(amt[0], " ");
-      tail = tail.replace(new RegExp(String.raw`(?:\s+to)?(?:\s+the)?\s+${direction}\b`, "i"), " ").replace(/\s+by\s*$/i, " ").replace(/\s+by\s+/i, " ");
-      const ref = clean(tail.replace(/\s+/g, " ").trim());
-      if (ref) {
-        const n = amt ? toCount(amt[1]) : undefined;
-        const px = amt && /^(?:pixels?|px)$/i.test(amt[2]);
-        return [{ op: "moveContents", ref, direction, ...(n ? (px ? { pixels: n } : { steps: n }) : {}) }];
-      }
+    const sh = readShift(m[1]);
+    const ref = sh ? clean(sh.rest) : "";
+    if (sh && ref) return [{ op: "moveContents", ref, direction: sh.direction, ...sh.amount }];
+  }
+
+  // ── Move everything FROM a step on (Paul, 2026-09-27) ──
+  // "move everything from selected, in Finance Team, two steps to the right",
+  // "move everything after Check Claim 50 pixels left", "move the selected task
+  // and everything after it one step right". The lane or pool is the step's
+  // own unless one is named.
+  m = raw.match(/^(?:move|shift|slide)\s+(?:everything|all(?:\s+the\s+\w+)?)\s+(?:from|after|starting\s+(?:at|from|with))\s+(.+)$/i)
+    ?? raw.match(/^(?:move|shift|slide)\s+(.+?)\s+and\s+(?:everything|all)\s+(?:after|beyond|to\s+the\s+right\s+of|right\s+of)\s+(?:it|that|them|this)\b(.*)$/i);
+  if (m) {
+    const sh = readShift(m[2] !== undefined ? m[1] + " " + m[2] : m[1]);
+    if (sh) {
+      const [fromPart, inPart] = sh.rest.split(/\s*,?\s+in(?:side)?\s+(?:the\s+)?/i);
+      const fromRef = clean(fromPart.replace(/\s*,\s*$/, "").replace(/\s+(?:on|onwards?|forwards?)$/i, ""));
+      const ref = inPart ? clean(inPart.replace(/^,\s*/, "")) : "";
+      if (fromRef) return [{ op: "moveContents", fromRef, ...(ref ? { ref } : {}), direction: sh.direction, ...sh.amount }];
     }
   }
 

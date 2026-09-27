@@ -70,8 +70,9 @@ export function shuffled<T>(rng: Rng, items: readonly T[]): T[] {
 // phrasings and the "Pool 3" pool, which reshuffle every case; 2026-09-27:
 // Paul's own test diagram replaces the first one; 2026-09-27b: the
 // "insert … between" family; 2026-09-27c: task ↔ subprocess and "move
-// everything in"). A run against a
+// everything in"; 2026-09-27d: lane dividers and "move everything from").
+// A run against a
 // different seed is a different exam, and the recorded clips carry their own
 // seed, so the two corpora cannot be confused: case #35 of the old seed stays
 // the #35 recorded on prod, and a retake never pairs a new sentence with it.
-export const DEFAULT_CORPUS_SEED = "dgx-voice-2026-09-27c-realistic";
+export const DEFAULT_CORPUS_SEED = "dgx-voice-2026-09-27d-realistic";
