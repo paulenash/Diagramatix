@@ -24,40 +24,21 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
-    # Postgres service container for the integration suite. Production runs
-    # PostgreSQL 18; matching the major version here catches version-specific
-    # SQL (jsonb_set, etc.) the same way prod would. POSTGRES_DB creates the
-    # test database up-front — the suite's globalSetup runs `prisma db push`
-    # but NOT `CREATE DATABASE`, so the DB must already exist.
-    services:
-      postgres:
-        # Pull from AWS's ECR public mirror of the official Postgres image instead
-        # of Docker Hub — GitHub's shared runners share Docker Hub's anonymous
-        # pull-rate limit, which was failing the service-container pull ("Docker
-        # pull failed"). ECR Public mirrors the same tags with no such limit.
-        image: public.ecr.aws/docker/library/postgres:18
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: diagramatix_test
-        ports:
-          - 5432:5432
-        # Wait for the server to accept connections before the job runs.
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-
     env:
       # The suite's globalSetup reads TEST_DATABASE_URL (falls back to this same
       # default locally) and pins DATABASE_URL to it for the production db.ts
-      # singleton. Points at the service container created above.
+      # singleton. Points at the PostgreSQL the first step starts.
       TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/diagramatix_test
 
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      # PostgreSQL 18 on localhost:5432 — started here, not as a service
+      # container, so a registry out of anonymous quota falls through to the
+      # next (.github/scripts/start-postgres.sh).
+      - name: Start PostgreSQL 18
+        run: bash .github/scripts/start-postgres.sh
 
       - name: Set up Node 24
         uses: actions/setup-node@v5
@@ -94,30 +75,11 @@ jobs:
 
   # Browser/e2e layer (Playwright) — the journeys the unit suite can't reach.
   # Separate job so the fast unit `test` job isn't slowed; its own Postgres
-  # service (jobs don't share services). The webServer (scripts/e2e-server.cjs)
+  # (jobs don't share containers). The webServer (scripts/e2e-server.cjs)
   # db-pushes, seeds the SubscriptionLevel catalog, builds non-standalone, and
   # serves on :3001 against this service — so the job only needs deps + a browser.
   e2e:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        # Pull from AWS's ECR public mirror of the official Postgres image instead
-        # of Docker Hub — GitHub's shared runners share Docker Hub's anonymous
-        # pull-rate limit, which was failing the service-container pull ("Docker
-        # pull failed"). ECR Public mirrors the same tags with no such limit.
-        image: public.ecr.aws/docker/library/postgres:18
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: diagramatix_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-
     env:
       # No .env on the runner — credentials auth needs a JWT secret + trusted host.
       # Dummy values only; the e2e flows use email/password, not these integrations.
@@ -130,6 +92,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      # PostgreSQL 18 on localhost:5432 — started here, not as a service
+      # container, so a registry out of anonymous quota falls through to the
+      # next (.github/scripts/start-postgres.sh).
+      - name: Start PostgreSQL 18
+        run: bash .github/scripts/start-postgres.sh
 
       - name: Set up Node 24
         uses: actions/setup-node@v5
