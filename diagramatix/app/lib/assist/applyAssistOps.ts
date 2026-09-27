@@ -1001,7 +1001,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
           setSelectedElementIds(new Set()); // selection protocol
           if (next) els = next.elements;
           const short = Math.abs(moved) < dist ? ` — ${nameOf(giver)} is as small as it can be` : "";
-          results.push(`moved ${nameOf(target)}'s ${op.boundary} boundary ${op.direction} ${Math.abs(moved)}px${short}`);
+          results.push(`moved ${nameOf(target)}'s ${op.boundary} boundary ${op.direction} ${Math.round(Math.abs(moved))}px${short}`);
           continue;
         }
         target = els.find((e) => e.id === edge.poolEdge.poolId);

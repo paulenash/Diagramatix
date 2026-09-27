@@ -199,3 +199,25 @@ describe("T4963 — a boundary moves as far as you say, and says how far it can 
     expect(parents(t.h.data)).toEqual(parents(on().h.data));
   });
 });
+
+describe("T4964 — “boundary” and “divider” always mean the boundary; a partial move reads in whole pixels (Paul's sweep, 2026-09-27)", () => {
+  it("“move Finance team boundary up” moves the boundary, never the whole lane — and a boundary EVENT is still an element", () => {
+    expect(parsePoolBoundaryPhrase("move Underwriters boundary up")).toEqual({ ref: "Underwriters", boundary: "top", direction: "up" });
+    expect(parsePoolBoundaryPhrase("move Underwriters divider down")).toEqual({ ref: "Underwriters", boundary: "bottom", direction: "down" });
+    expect(parsePoolBoundaryPhrase("move the boundary event up")).toBeNull();
+    expect(parseCommand("move the boundary event up")?.[0]?.op).not.toBe("movePoolBoundary");
+    // "edge", "border", "side" are everyday words: they still need a kind or a side.
+    expect(parsePoolBoundaryPhrase("move Underwriters edge up")).toBeNull();
+    const s = on();
+    const y = s.el("L2").y;
+    expect(s.say("move Underwriters boundary up")).toEqual({ ok: true, summary: "moved Underwriters's top boundary up 20px" });
+    expect(s.el("L2").y).toBeCloseTo(y - 20, 6);
+  });
+
+  it("a move the reducer stops short reports whole pixels, and why", () => {
+    const s = on();
+    const r = s.say("move Lane 2 top boundary up by 400");
+    if (r.ok) expect(r.summary).toMatch(/^moved Lane 2's top boundary up \d+px( — .+ is as small as it can be)?$/);
+    else expect(r.summary).toMatch(/at most \d+px|as small as it can be/);
+  });
+});

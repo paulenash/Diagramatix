@@ -221,7 +221,14 @@ function parseWords(words: string[]): BoundaryParse {
   // finds a pool or a lane by the name.
   const laneWord = words.find((w) => LANE_WORD.test(w));
   const bareForm = bIdx > 0 && isSideWord(words[bIdx - 1]);
-  if (!poolMentioned && !laneWord && !bareForm) return null;
+  // "boundary" and "divider" are never anything else — "move Finance team
+  // boundary up" named no kind and no side, and fell to the element move,
+  // which moved the whole LANE (Paul's sweep, 2026-09-27). "edge", "border"
+  // and "side" are everyday words, so they still need a kind or a side.
+  const strongWord = /^(?:boundary|boundaries|dividers?)$/i.test(words[bIdx]);
+  // …except a BOUNDARY EVENT, which is an element: "move the boundary event up".
+  if (/^events?$/i.test(words[bIdx + 1] ?? "")) return null;
+  if (!poolMentioned && !laneWord && !bareForm && !strongWord) return null;
 
   // THE EDGE: the nearest side word before the boundary word.
   let boundary: PoolBoundary | null = null;
