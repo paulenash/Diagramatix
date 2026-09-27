@@ -961,10 +961,16 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
         if ("err" in r) { results.push(r.err); anyFail = true; continue; }
         target = r;
       } else {
-        const t = thePoolFor(op);
-        if (t === "parked") break;
-        if (!t) continue;
-        target = t;
+        // The mouse says which (Paul's boundary session, 2026-09-27: a lane
+        // selected, "top boundary up one hundred" asked "which pool?").
+        const selBands = selectedIds.map((id) => els.find((e) => e.id === id)).filter((e): e is DiagramElement => !!e && (e.type === "pool" || isAnyLane(e)));
+        if (selBands.length === 1) target = selBands[0];
+        else {
+          const t = thePoolFor(op);
+          if (t === "parked") break;
+          if (!t) continue;
+          target = t;
+        }
       }
       // A LANE'S top or bottom boundary is a divider (Paul, 2026-09-27: "Move
       // <lane_name> {top, bottom} boundary/divider {up, down}") — the line the

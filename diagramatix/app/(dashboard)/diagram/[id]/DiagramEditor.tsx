@@ -59,6 +59,7 @@ import { parseGhostPick, resolveGhostPick } from "@/app/lib/assist/ghostPick";
 import { looksLikeElementId, notUnderstoodMessage, humaniseIds } from "@/app/lib/assist/refMentions";
 import { isMicStopWord, isFlowEndWord } from "@/app/lib/assist/stopWords";
 import { aiInventedRename, INVENTED_RENAME_REFUSAL } from "@/app/lib/assist/aiGuards";
+import { interruptsPick } from "@/app/lib/assist/pickInterrupt";
 import { isIncompleteCommand } from "@/app/lib/assist/incompleteCommand";
 import { leadingSpokenNumber } from "@/app/lib/assist/spokenNumber";
 import { capitaliseFirstWord, needsCapital } from "@/app/lib/diagram/nameCase";
@@ -3334,6 +3335,9 @@ export function DiagramEditor({
       else await pickTemplateCardRef.current(answer.card, report);
       return;
     }
+    // A whole new command while the numbers are up closes the question and
+    // runs (pickInterrupt.ts) — it used to be read as a wrong answer.
+    if (pickFlowRef.current && interruptsPick(heard, pickFlowRef.current)) setPickFlow(null);
     if (pickFlowRef.current) {
       const flow = pickFlowRef.current;
       if (isFlowEndWord(heard)) {

@@ -184,12 +184,31 @@ function readDistance(words: readonly string[], vertical: boolean): { px: number
     // a number: "40", "40px", "forty", "forty five", "a hundred", "a task"
     let n: number | null = null, j = i;
     const digits = w.match(/^(\d+)(px)?$/);
+    // "one hundred" read as 1, and moved the boundary 1px (Paul's boundary
+    // session, 2026-09-27). Now: "one hundred", "two hundred and fifty", "a
+    // hundred", and the way people say numbers aloud — "one fifty" is 150.
+    const word = (k: number): number | undefined => NUMBER_WORD[lower[k] ?? ""];
+    const tail = (k: number): [number, number] => {   // tens and units after position k: [value, last index]
+      let v = 0, at = k;
+      if (lower[at + 1] === "and") at++;
+      const tens = word(at + 1);
+      if (tens !== undefined && tens >= 20 && tens < 100 && tens % 10 === 0) {
+        v = tens; at++;
+        const unit = word(at + 1);
+        if (unit !== undefined && unit < 10) { v += unit; at++; }
+      } else if (tens !== undefined && tens < 20) { v = tens; at++; }
+      return v ? [v, at] : [0, k];
+    };
     if (digits) { n = Number(digits[1]); if (digits[2]) return { px: n, used: new Set([i]) }; }
     else if (w in NUMBER_WORD) {
       n = NUMBER_WORD[w];
-      if (n >= 20 && n % 10 === 0 && n < 100 && (lower[i + 1] ?? "") in NUMBER_WORD && NUMBER_WORD[lower[i + 1]] < 10) { n += NUMBER_WORD[lower[i + 1]]; j = i + 1; }
-    } else if ((w === "a" || w === "an") && (lower[i + 1] === "hundred")) { n = 100; j = i + 1; }
+      if (n < 10 && lower[i + 1] === "hundred") { const [v, at] = tail(i + 1); n = n * 100 + v; j = at; }
+      else if (n < 10 && (word(i + 1) ?? 0) >= 20 && (word(i + 1) ?? 0) < 100) { const [v, at] = tail(i); n = n * 100 + v; j = at; }
+      else if (n >= 20 && n % 10 === 0 && n < 100 && (word(i + 1) ?? 99) < 10) { n += word(i + 1)!; j = i + 1; }
+    } else if ((w === "a" || w === "an") && (lower[i + 1] === "hundred")) { const [v, at] = tail(i + 1); n = 100 + v; j = at; }
     else if ((w === "a" || w === "an") && unitPx(lower[i + 1])) { n = 1; }
+    // "down to tasks" — the recogniser's "two tasks"; only straight before a unit.
+    else if ((w === "to" || w === "too") && unitPx(lower[i + 1])) { n = 2; }
     if (n === null) continue;
     const used = new Set<number>();
     for (let k = i; k <= j; k++) used.add(k);

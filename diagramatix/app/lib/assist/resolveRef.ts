@@ -258,7 +258,19 @@ export function resolveSelectionRefs(spoken: string, elements: DiagramElement[],
   const m = s.match(SELECTION_KIND);
   if (!m) return null;
   const ofKind = kindToType(m[1], elements);
-  if (!ofKind) return null;
+  if (!ofKind) {
+    // "the selected Claims" — not a kind, a NAME: the selected thing called
+    // that (Paul's boundary session, 2026-09-27: three lanes selected, "move
+    // selected Claims upper boundary up" answered "3 elements are selected").
+    // No selected thing has that name → not a selection reference at all.
+    const name = m[1].replace(/\s+(?:lanes?|lines?|pools?|sub-?lanes?)$/, "");
+    const named = sel.filter((id) => {
+      const e = elements.find((x) => x.id === id);
+      const label = norm((e?.label ?? "").replace(/\s+/g, " "));
+      return !!label && (label === name || label.includes(name) || name.includes(label));
+    });
+    return named.length ? named : null;
+  }
   return sel.filter((id) => { const e = elements.find((x) => x.id === id); return !!e && ofKind(e); });
 }
 

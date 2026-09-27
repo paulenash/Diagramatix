@@ -78,6 +78,15 @@ export function isIncompleteCommand(text: string): boolean {
   if (/^(rename|relabel|change|set|call)\b/.test(t) && !/\b(to|as)\b\s+\S+/.test(t) && !/^(rename|relabel)\s+(?:a\s+|an\s+|the\s+|all\s+)?\w+s?$/.test(t)) return true;
   // surround / enclose / wrap — "surround selected" is the start of "… with an
   // expanded subprocess called X"; without the "with/in …" part it is held.
+  // A MOVE WITH NO WAY YET (Paul's boundary session, 2026-09-27): he paused
+  // after the name — "move underwriters team" … "top boundary up one
+  // hundred", "move selected lines top" … "boundary up one hundred" — and the
+  // halves ran apart: the first went to the AI (which once turned it into a
+  // LANE move), the second named nothing and asked "which pool?". Every move
+  // command says which way — up / down / left / right, above / below, or "to"
+  // (a gateway point) — so one without it is waiting for the rest.
+  if (/^(?:move|shift|slide|nudge|drag|bump)\b/.test(t)
+    && !/\b(?:up|down|left|right|upwards?|downwards?|above|below|under(?:neath)?|over|to|into|onto)\b/.test(t)) return true;
   if (/^(surround|enclose|wrap)\b/.test(t) && !/\b(with|in|inside|into|within|using)\b\s+\S+/.test(t)) return true;
   // connect / disconnect — missing the second operand ("connect them" is complete).
   if (/^(connect|link|join|disconnect|unlink)\b/.test(t) && !/\b(to|and|with|from)\b\s+\S+/.test(t) && !/^(connect|link|join)\s+(them|these|those|it up|the last two|the previous two)$/.test(t)) return true;
