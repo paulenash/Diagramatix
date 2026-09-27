@@ -36,6 +36,7 @@ import { quickAddSymbols, QUICK_ADD_LABELS } from "@/app/lib/diagram/quickAddSym
 import { messageLabelsHiddenWhileDragging } from "@/app/lib/diagram/labelVisibility";
 import { movedBandIds, movedBands, planLaneDrop, previewBands, samePlan, type LaneDropPlan } from "@/app/lib/diagram/laneDropPlan";
 import { getLaneHeaderWidth, getPoolHeaderWidth } from "@/app/lib/diagram/containerMetrics";
+import { sublaneIdsOf, laneDepths, sameTypeAncestorDepths, archimateDescendantDepths } from "@/app/lib/diagram/nestingDepth";
 import { poolGuideNext, type PoolBoundaryGuide, type PoolGuideEvent } from "@/app/lib/diagram/poolGuide";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { canConnect } from "@/app/lib/diagram/canConnect";
@@ -4419,37 +4420,13 @@ export function Canvas({
     [onDrillBack, data.elements, data.connectors, diagramType],
   );
 
-  const sublaneIds = useMemo(() => {
-    const laneIds = new Set(data.elements.filter(e => e.type === "lane").map(e => e.id));
-    const result = new Set<string>();
-    for (const el of data.elements) {
-      if (el.type === "lane" && el.parentId && laneIds.has(el.parentId)) {
-        result.add(el.id);
-      }
-    }
-    return result;
-  }, [data.elements]);
+  // The nesting depths that decide a container's shade live in
+  // app/lib/diagram/nestingDepth.ts, shared with the Project-screen tile
+  // picture so the two shade the same element the same way.
+  const sublaneIds = useMemo(() => sublaneIdsOf(data.elements), [data.elements]);
 
   // Lane nesting depth (0 = top-level lane, 1 = sublane, 2 = sub-sublane, etc.)
-  const laneDepthMap = useMemo(() => {
-    const map = new Map<string, number>();
-    const byId = new Map(data.elements.map(e => [e.id, e]));
-    for (const el of data.elements) {
-      if (el.type !== "lane") continue;
-      let depth = 0;
-      let cur: typeof el | undefined = el;
-      const visited = new Set<string>();
-      while (cur?.parentId && !visited.has(cur.id)) {
-        visited.add(cur.id);
-        const parent = byId.get(cur.parentId);
-        if (!parent) break;
-        if (parent.type === "lane") depth++;
-        cur = parent;
-      }
-      map.set(el.id, depth);
-    }
-    return map;
-  }, [data.elements]);
+  const laneDepthMap = useMemo(() => laneDepths(data.elements), [data.elements]);
 
   // EPs are split out of `otherContainers` so they can render AFTER lanes
   // (issue 5: EPs in lane-pools were being obscured by the lane background).
@@ -4513,72 +4490,18 @@ export function Canvas({
   // ArchiMate descendant depth: for every archimate-shape, the max
   // depth of its descendant chain (0 = leaf, 1 = parent of leaves,
   // 2 = grandparent, …). Drives per-level fill lightening.
-  const archimateDepthMap = useMemo(() => {
-    const m = new Map<string, number>();
-    const children = new Map<string, string[]>();
-    for (const e of data.elements) {
-      if (e.parentId) {
-        if (!children.has(e.parentId)) children.set(e.parentId, []);
-        children.get(e.parentId)!.push(e.id);
-      }
-    }
-    function depth(id: string, visited: Set<string>): number {
-      if (m.has(id)) return m.get(id)!;
-      if (visited.has(id)) return 0;
-      visited.add(id);
-      const kids = children.get(id) ?? [];
-      if (kids.length === 0) { m.set(id, 0); return 0; }
-      let maxChildDepth = 0;
-      for (const kid of kids) maxChildDepth = Math.max(maxChildDepth, depth(kid, visited));
-      const d = maxChildDepth + 1;
-      m.set(id, d);
-      return d;
-    }
-    for (const e of data.elements) if (e.type === "archimate-shape") depth(e.id, new Set());
-    return m;
-  }, [data.elements]);
+  const archimateDepthMap = useMemo(() => archimateDescendantDepths(data.elements), [data.elements]);
 
   // Compute process-group nesting depth: how many process-group ancestors each has
-  const processGroupDepthMap = useMemo(() => {
-    const DEPTH_TYPES = new Set(["process-group", "subprocess-expanded"]);
-    const map = new Map<string, number>();
-    for (const el of data.elements) {
-      if (!DEPTH_TYPES.has(el.type)) continue;
-      let depth = 0;
-      let cur = el;
-      const visited = new Set<string>();
-      while (cur.parentId && !visited.has(cur.id)) {
-        visited.add(cur.id);
-        const parent = data.elements.find(p => p.id === cur.parentId);
-        if (!parent) break;
-        if (parent.type === el.type) depth++; // count ancestors of the same type
-        cur = parent;
-      }
-      map.set(el.id, depth);
-    }
-    return map;
-  }, [data.elements]);
+  // (an expanded subprocess likewise counts expanded-subprocess ancestors).
+  const processGroupDepthMap = useMemo(
+    () => sameTypeAncestorDepths(data.elements, ["process-group", "subprocess-expanded"]),
+    [data.elements],
+  );
 
   // uml-package nesting depth (0 = top-level, 1 = child, 2 = grandchild …) —
   // counts uml-package ancestors so each level can be shaded (issue #13).
-  const umlPackageDepthMap = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const el of data.elements) {
-      if (el.type !== "uml-package") continue;
-      let depth = 0;
-      let cur = el;
-      const visited = new Set<string>();
-      while (cur.parentId && !visited.has(cur.id)) {
-        visited.add(cur.id);
-        const parent = data.elements.find(p => p.id === cur.parentId);
-        if (!parent) break;
-        if (parent.type === "uml-package") depth++;
-        cur = parent;
-      }
-      map.set(el.id, depth);
-    }
-    return map;
-  }, [data.elements]);
+  const umlPackageDepthMap = useMemo(() => sameTypeAncestorDepths(data.elements, ["uml-package"]), [data.elements]);
 
   // Stray-element warning. An eligible element gets a red outline when
   // its centre point sits OUTSIDE every pool's bounding rectangle AND

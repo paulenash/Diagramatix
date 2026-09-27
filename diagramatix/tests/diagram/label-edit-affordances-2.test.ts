@@ -88,7 +88,8 @@ describe("T4472 — a group with no name can still be reached", () => {
     const body = functionBody(SYMBOL, "GroupShape");
     // The full-size visible rect must remain inert — a group that swallowed
     // clicks would make everything inside it unselectable.
-    expect(body).toMatch(/strokeDasharray="10 3\.5 2 3\.5"[\s\S]{0,120}pointerEvents: "none"/);
+    // (Its dash-dot pattern is GROUP_DASH, shared with the tile picture.)
+    expect(body).toMatch(/strokeDasharray=\{GROUP_DASH\}[\s\S]{0,120}pointerEvents: "none"/);
   });
 
   it("keeps the strip narrow rather than taking the whole top band", () => {

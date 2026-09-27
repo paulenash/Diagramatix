@@ -3,7 +3,17 @@
 import { useState, createContext, useContext, useRef, useEffect, useLayoutEffect, memo } from "react";
 import { canvasMemoEqual } from "./memoEqual";
 import type { BpmnTaskType, GatewayType, EventType, DiagramElement, Point, Side, SymbolType } from "@/app/lib/diagram/types";
-import { type SymbolColorConfig, resolveColor } from "@/app/lib/diagram/colors";
+import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
+// Every colour a shape is painted with comes from here, shared with the
+// Project-screen tile picture (diagramThumbnail.ts) so the two cannot drift.
+import {
+  elementFill, poolPaint, lanePaint, headedContainerPaint, nestedContainerFill,
+  UML_PACKAGE_BODY_OPACITY, FLOWCHART_STROKE, SHAPE_STROKE, PAIN_POINT_STROKE, ISSUE_STROKE,
+  ANNOTATION_COLORS, ANNOTATION_BOX_FILL, FORK_JOIN_FILL, GROUP_DASH, REVIEW_COMMENT_PALETTE, painPointStarPoints, CONTAINER_HEADER_H,
+} from "@/app/lib/diagram/canvasPaint";
+import { getLaneHeaderWidth, getPoolHeaderWidth, getVSwimlaneHeaderHeight } from "@/app/lib/diagram/containerMetrics";
+// Re-exported: Canvas and the Palette import these from here.
+export { REVIEW_COMMENT_PALETTE, painPointStarPoints, getVSwimlaneHeaderHeight };
 import { DisplayModeCtx, FontScaleCtx, PoolFontSizeCtx, LaneFontSizeCtx, ProcessFontSizeCtx, ValueChainFontSizeCtx, DescriptionFontSizeCtx, sketchyFilter } from "@/app/lib/diagram/displayMode";
 import { wrapText, computePackageTab } from "@/app/lib/diagram/textMetrics";
 import { holdsInternalLabel, wrapShapeLabel } from "@/app/lib/diagram/shapeFit";
@@ -73,17 +83,6 @@ export const SublaneIdsCtx = createContext<Set<string>>(new Set());
  * only while the symbol is being dragged over the pool.
  */
 export const GhostMovedNameIdsCtx = createContext<Set<string>>(new Set());
-
-/** Linear interpolate between two #rrggbb colours. `frac=0` returns `hex`,
- *  `frac=1` returns `toward`. Used to tint pool/lane bodies to a very light
- *  shade of their header colour. */
-function lerpHex(hex: string, toward: string, frac: number): string {
-  const parse = (h: string) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
-  const [r1, g1, b1] = parse(hex);
-  const [r2, g2, b2] = parse(toward);
-  const c = (a: number, b: number) => Math.round(a + (b - a) * frac).toString(16).padStart(2, "0");
-  return `#${c(r1, r2)}${c(g1, g2)}${c(b1, b2)}`;
-}
 
 export type ResizeHandle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
 
@@ -168,7 +167,9 @@ function ellipseOctagonPoints(cx: number, cy: number, rx: number, ry: number): s
 
 const CONNECTION_POINT_SIDES: Side[] = ["top", "right", "bottom", "left"];
 
-export const HEADER_H = 28;
+/** Header band height of a system boundary / composite state / UML class
+ *  (canvasPaint.ts owns the number, so the tile picture draws the same band). */
+export const HEADER_H = CONTAINER_HEADER_H;
 /**
  * Width of the group's name hit strip, in world units. A group has no solid
  * body to click — its interior is click-through by design — so this strip is
@@ -236,19 +237,7 @@ export const ShowIssueDescCtx = createContext<boolean>(false);
  *  "Display Review markers" master toggle). Defaults true. Provided by Canvas.tsx. */
 export const ShowReviewCommentsCtx = createContext<boolean>(true);
 
-/** Pale pastel palette for review comments — index 0 (pink) is the default /
- *  first author; each additional distinct author gets the next colour so
- *  different users' comments are easily told apart (item G). */
-export const REVIEW_COMMENT_PALETTE = [
-  { fill: "#fce7f3", stroke: "#ec4899", fold: "#f9a8d4", text: "#831843" }, // pink
-  { fill: "#dbeafe", stroke: "#3b82f6", fold: "#93c5fd", text: "#1e3a8a" }, // blue
-  { fill: "#dcfce7", stroke: "#22c55e", fold: "#86efac", text: "#14532d" }, // green
-  { fill: "#fef3c7", stroke: "#f59e0b", fold: "#fcd34d", text: "#78350f" }, // amber
-  { fill: "#ede9fe", stroke: "#8b5cf6", fold: "#c4b5fd", text: "#4c1d95" }, // purple
-  { fill: "#ccfbf1", stroke: "#14b8a6", fold: "#5eead4", text: "#134e4a" }, // teal
-  { fill: "#ffe4e6", stroke: "#f43f5e", fold: "#fda4af", text: "#881337" }, // rose
-  { fill: "#ecfccb", stroke: "#84cc16", fold: "#bef264", text: "#365314" }, // lime
-];
+// REVIEW_COMMENT_PALETTE (per-author note colours) lives in canvasPaint.ts.
 /** Stable per-author key for a review comment (reviewer id/email, or the
  *  author's display name). Empty = anonymous/legacy → all share colour 0. */
 export function reviewCommentAuthorKey(el: DiagramElement): string {
@@ -347,7 +336,7 @@ function TaskShape({ el }: { el: DiagramElement }) {
   return (
     <g>
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
-        rx={4} ry={4} fill={(el.properties.fillColor as string | undefined) ?? resolveColor("task", colors)} stroke="#374151" strokeWidth={1.5} />
+        rx={4} ry={4} fill={elementFill(el, colors)} stroke="#374151" strokeWidth={1.5} />
       <RepeatMarker el={el} cx={el.x + el.width / 2} cy={el.y + el.height - 10} />
       {/* ValueBadge rendered in main SymbolRenderer */}
     </g>
@@ -414,7 +403,7 @@ function GatewayShape({ el }: { el: DiagramElement }) {
   const points = `${cx},${el.y} ${el.x + el.width},${cy} ${cx},${el.y + el.height} ${el.x},${cy}`;
   return (
     <g>
-      <polygon points={points} fill={(el.properties.fillColor as string | undefined) ?? resolveColor("gateway", colors)} stroke="#374151" strokeWidth={1.5} />
+      <polygon points={points} fill={elementFill(el, colors)} stroke="#374151" strokeWidth={1.5} />
       {el.gatewayType && <GatewayMarker type={el.gatewayType} cx={cx} cy={cy} />}
     </g>
   );
@@ -590,7 +579,7 @@ function StartEventShape({ el }: { el: DiagramElement }) {
   const cx = el.x + el.width / 2;
   const cy = el.y + el.height / 2;
   const r  = el.width / 2;
-  const fill = (el.properties.fillColor as string | undefined) ?? resolveColor("start-event", colors);
+  const fill = elementFill(el, colors);
   const nonInterrupting = el.properties.interruptionType === "non-interrupting";
   return (
     <g>
@@ -607,7 +596,7 @@ function EndEventShape({ el }: { el: DiagramElement }) {
   const cx = el.x + el.width / 2;
   const cy = el.y + el.height / 2;
   const r  = el.width / 2;
-  const fill = (el.properties.fillColor as string | undefined) ?? resolveColor("end-event", colors);
+  const fill = elementFill(el, colors);
   return (
     <g>
       <circle cx={cx} cy={cy} r={r} fill={fill} stroke="#374151" strokeWidth={3.5} />
@@ -622,7 +611,7 @@ function IntermediateEventShape({ el }: { el: DiagramElement }) {
   const cx = el.x + el.width / 2;
   const cy = el.y + el.height / 2;
   const r  = el.width / 2;
-  const fill = (el.properties.fillColor as string | undefined) ?? resolveColor("intermediate-event", colors);
+  const fill = elementFill(el, colors);
   const nonInterrupting = el.properties.interruptionType === "non-interrupting";
   const dash = nonInterrupting ? "4 3" : undefined;
   return (
@@ -685,7 +674,7 @@ function DataObjectShape({ el }: { el: DiagramElement }) {
   const ly1 = ly2 - lineH;
 
   const colors = useContext(SymbolColorCtx);
-  const fill = resolveColor("data-object", colors);
+  const fill = elementFill(el, colors);
   // Derive fold colour as a slightly darker tint of the main fill
   const foldFill = fill === "#bfdbfe" ? "#93c5fd" : fill;
   return (
@@ -718,7 +707,7 @@ function DataObjectShape({ el }: { el: DiagramElement }) {
 
 function DataStoreShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
-  const fill = resolveColor("data-store", colors);
+  const fill = elementFill(el, colors);
   const { x, y, width: w, height: h } = el;
   const rx = w / 2;
   const ry = Math.max(4, Math.round(h * 0.15));
@@ -759,7 +748,7 @@ function UseCaseShape({ el }: { el: DiagramElement }) {
     <ellipse
       cx={el.x + el.width / 2} cy={el.y + el.height / 2}
       rx={el.width / 2} ry={el.height / 2}
-      fill={resolveColor("use-case", colors)} stroke="#374151" strokeWidth={1.5}
+      fill={elementFill(el, colors)} stroke="#374151" strokeWidth={1.5}
     />
   );
 }
@@ -770,18 +759,17 @@ function HourglassShape({ el }: { el: DiagramElement }) {
   const cx = x + w / 2;
   const cy = y + h / 2;
   const points = `${x},${y} ${x + w},${y} ${cx},${cy} ${x + w},${y + h} ${x},${y + h} ${cx},${cy}`;
-  return <polygon points={points} fill={resolveColor("hourglass", colors)} stroke="#374151" strokeWidth={1.5} />;
+  return <polygon points={points} fill={elementFill(el, colors)} stroke="#374151" strokeWidth={1.5} />;
 }
 
 function SystemBoundaryShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
-  const headerColor = resolveColor("system-boundary", colors);
-  const bodyColor = resolveColor("system-boundary-body", colors);
+  const { header: headerColor, body: bodyColor, bodyOpacity } = headedContainerPaint("system-boundary", colors);
   return (
     <g>
       {/* Outer rect with body fill */}
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
-        fill={bodyColor} fillOpacity={0.3} stroke="#374151" strokeWidth={1.5} rx={2} />
+        fill={bodyColor} fillOpacity={bodyOpacity} stroke="#374151" strokeWidth={1.5} rx={2} />
       {/* Header fill */}
       <rect x={el.x} y={el.y} width={el.width} height={HEADER_H}
         fill={headerColor} stroke="none" rx={2} />
@@ -810,8 +798,7 @@ export function compositeRegions(el: DiagramElement): { count: number; orientati
 
 function CompositeStateShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
-  const headerColor = resolveColor("composite-state", colors);
-  const bodyColor = resolveColor("composite-state-body", colors);
+  const { header: headerColor, body: bodyColor, bodyOpacity } = headedContainerPaint("composite-state", colors);
   const { orientation, fracs } = compositeRegions(el);
   const bodyTop = el.y + HEADER_H;
   const bodyH = el.height - HEADER_H;
@@ -819,7 +806,7 @@ function CompositeStateShape({ el }: { el: DiagramElement }) {
     <g>
       {/* Outer rounded rect with body fill */}
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
-        fill={bodyColor} fillOpacity={0.4} stroke="#374151" strokeWidth={1.5} rx={12} />
+        fill={bodyColor} fillOpacity={bodyOpacity} stroke="#374151" strokeWidth={1.5} rx={12} />
       {/* Header fill */}
       <rect x={el.x} y={el.y} width={el.width} height={HEADER_H}
         fill={headerColor} stroke="none" rx={12} />
@@ -844,7 +831,7 @@ function CompositeStateShape({ el }: { el: DiagramElement }) {
 function GroupShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
   const mode = useContext(DisplayModeCtx);
-  const lineColor = resolveColor("group", colors);  // configurable boundary line colour
+  const lineColor = elementFill(el, colors);  // configurable boundary line colour
   const bodyFill = mode === "hand-drawn" ? "rgba(255,255,255,0.15)" : "rgba(249,250,251,0.15)";
   return (
     <g>
@@ -871,15 +858,13 @@ function GroupShape({ el }: { el: DiagramElement }) {
       {/* Visual dashed-dotted border — interior always transparent */}
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
         rx={8} fill={bodyFill} stroke={lineColor} strokeWidth={1.5}
-        strokeDasharray="10 3.5 2 3.5"
+        strokeDasharray={GROUP_DASH}
         style={{ pointerEvents: "none" }} />
     </g>
   );
 }
 
-const ANNOTATION_COLORS: Record<string, string> = {
-  black: "#000000", green: "#16a34a", orange: "#ea580c", red: "#dc2626", purple: "#9333ea",
-};
+// ANNOTATION_COLORS (bracket colours by `annotationColor`) lives in canvasPaint.ts.
 
 function TextAnnotationShape({ el }: { el: DiagramElement }) {
   const annotationColor = (el.properties.annotationColor as string | undefined) ?? "black";
@@ -891,7 +876,7 @@ function TextAnnotationShape({ el }: { el: DiagramElement }) {
     return (
       <g>
         <rect x={el.x} y={el.y} width={el.width} height={el.height} rx={3}
-          fill="#FFFDF5" stroke={bracketColor} strokeWidth={1} />
+          fill={ANNOTATION_BOX_FILL} stroke={bracketColor} strokeWidth={1} />
       </g>
     );
   }
@@ -982,7 +967,7 @@ function StickFigure({
 
 function ActorShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
-  const stroke = resolveColor("actor", colors);
+  const stroke = elementFill(el, colors);
   const headR = 10;
   const bodyLen = 16;
   return (
@@ -1001,7 +986,7 @@ function ActorShape({ el }: { el: DiagramElement }) {
 
 function TeamShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
-  const stroke = resolveColor("team", colors);
+  const stroke = elementFill(el, colors);
   const cx = el.x + el.width / 2;
   const top = el.y + 4;
   return (
@@ -1015,7 +1000,7 @@ function TeamShape({ el }: { el: DiagramElement }) {
 
 function SystemShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
-  const fill = resolveColor("system", colors);
+  const fill = elementFill(el, colors);
   const lineAreaEnd = el.y + el.height / 3;
   const lineSpacing = (lineAreaEnd - el.y - 8) / 2;
   const midY = el.y + 8 + lineSpacing;
@@ -1034,7 +1019,7 @@ function StateShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
   return (
     <rect x={el.x} y={el.y} width={el.width} height={el.height}
-      rx={12} ry={12} fill={(el.properties.fillColor as string | undefined) ?? resolveColor("state", colors)} stroke="#374151" strokeWidth={1.5} />
+      rx={12} ry={12} fill={elementFill(el, colors)} stroke="#374151" strokeWidth={1.5} />
   );
 }
 
@@ -1042,7 +1027,7 @@ function InitialStateShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
   return (
     <circle cx={el.x + el.width / 2} cy={el.y + el.height / 2} r={el.width / 2}
-      fill={resolveColor("initial-state", colors)} />
+      fill={elementFill(el, colors)} />
   );
 }
 
@@ -1077,7 +1062,7 @@ function HistoryStateShape({ el, deep }: { el: DiagramElement; deep?: boolean })
 
 function FinalStateShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
-  const disc = resolveColor("final-state", colors);
+  const disc = elementFill(el, colors);
   const cx = el.x + el.width / 2;
   const cy = el.y + el.height / 2;
   const r = el.width / 2;
@@ -1102,7 +1087,7 @@ function SubmachineShape({ el }: { el: DiagramElement }) {
   return (
     <g>
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
-        rx={12} ry={12} fill={resolveColor("submachine", colors)} stroke="#374151" strokeWidth={1.5} />
+        rx={12} ry={12} fill={elementFill(el, colors)} stroke="#374151" strokeWidth={1.5} />
       {/* SubMachine marker: two small rounded-rect states connected by a line */}
       <rect x={mx} y={my} width={sw} height={sh} rx={sr} ry={sr}
         fill="white" stroke={markerStroke} strokeWidth={1.2} />
@@ -1116,7 +1101,7 @@ function SubmachineShape({ el }: { el: DiagramElement }) {
 
 function ChevronShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
-  const fill = (el.properties.fillColor as string | undefined) ?? resolveColor("chevron", colors);
+  const fill = elementFill(el, colors);
   const { x, y, width: w, height: h } = el;
   const notch = Math.min(20, w * 0.15); // chevron point depth
   const points = `${x},${y} ${x + w - notch},${y} ${x + w},${y + h / 2} ${x + w - notch},${y + h} ${x},${y + h} ${x + notch},${y + h / 2}`;
@@ -1125,7 +1110,7 @@ function ChevronShape({ el }: { el: DiagramElement }) {
 
 function ChevronCollapsedShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
-  const fill = (el.properties.fillColor as string | undefined) ?? resolveColor("chevron-collapsed", colors);
+  const fill = elementFill(el, colors);
   const { x, y, width: w, height: h } = el;
   const notch = Math.min(20, w * 0.15);
   const points = `${x},${y} ${x + w - notch},${y} ${x + w},${y + h / 2} ${x + w - notch},${y + h} ${x},${y + h} ${x + notch},${y + h / 2}`;
@@ -1150,17 +1135,8 @@ function ProcessGroupShape({ el }: { el: DiagramElement }) {
   const depthMap = useContext(ProcessGroupDepthCtx);
   const depth = depthMap.get(el.id) ?? 0;
   // Lighten the fill by blending toward white based on nesting depth
-  const baseFill = (el.properties.fillColor as string | undefined) ?? resolveColor("process-group", colors);
-  const lightenStep = 0.25; // 25% lighter per nesting level
-  const t = Math.min(depth * lightenStep, 0.9); // cap at 90% toward white
-  function lerpHex(hex: string, toward: string, frac: number): string {
-    const parse = (h: string) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
-    const [r1, g1, b1] = parse(hex);
-    const [r2, g2, b2] = parse(toward);
-    const c = (a: number, b: number) => Math.round(a + (b - a) * frac).toString(16).padStart(2, "0");
-    return `#${c(r1, r2)}${c(g1, g2)}${c(b1, b2)}`;
-  }
-  const fill = depth > 0 ? lerpHex(baseFill, "#ffffff", t) : baseFill;
+  // (25% lighter per nesting level, capped at 90% toward white).
+  const fill = nestedContainerFill(el, colors, depth);
   return (
     <rect x={el.x} y={el.y} width={el.width} height={el.height}
       rx={4} ry={4} fill={fill} stroke="#374151" strokeWidth={1.5} />
@@ -1170,7 +1146,7 @@ function ProcessGroupShape({ el }: { el: DiagramElement }) {
 function ForkJoinShape({ el }: { el: DiagramElement }) {
   return (
     <rect x={el.x} y={el.y} width={el.width} height={el.height}
-      fill="#1f2937" rx={2} ry={2} />
+      fill={FORK_JOIN_FILL} rx={2} ry={2} />
   );
 }
 
@@ -1213,7 +1189,7 @@ function SubprocessShape({ el }: { el: DiagramElement }) {
   const mx = plusCX - markerW / 2;
   const my = L.my;
   const spType = (el.properties.subprocessType as string | undefined) ?? "normal";
-  const fill = resolveColor("subprocess", colors);
+  const fill = elementFill(el, colors);
   return (
     <g>
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
@@ -1296,18 +1272,8 @@ function ExpandedSubprocessShape({ el }: { el: DiagramElement }) {
   const depthMap = useContext(ProcessGroupDepthCtx);
   const depth = depthMap.get(el.id) ?? 0;
   const spType = (el.properties.subprocessType as string | undefined) ?? "normal";
-  const baseFill = resolveColor("subprocess-expanded", colors);
-  // Lighten nested expanded subprocesses toward white
-  const lightenStep = 0.25;
-  const t = Math.min(depth * lightenStep, 0.9);
-  function lerpHex(hex: string, toward: string, frac: number): string {
-    const parse = (h: string) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
-    const [r1, g1, b1] = parse(hex);
-    const [r2, g2, b2] = parse(toward);
-    const c = (a: number, b: number) => Math.round(a + (b - a) * frac).toString(16).padStart(2, "0");
-    return `#${c(r1, r2)}${c(g1, g2)}${c(b1, b2)}`;
-  }
-  const fill = depth > 0 ? lerpHex(baseFill, "#ffffff", t) : baseFill;
+  // Lighten nested expanded subprocesses toward white (25% a level, cap 90%).
+  const fill = nestedContainerFill(el, colors, depth);
   // Centre one or two bottom markers (Repeat and/or Ad-hoc) about the
   // shape's horizontal centre. With two markers, they sit symmetrically
   // 7px either side of centre; with one, it sits exactly on centre.
@@ -1554,7 +1520,7 @@ function BpmnTaskShape({ el }: { el: DiagramElement }) {
   return (
     <g>
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
-        rx={4} ry={4} fill={resolveColor("task", colors)} stroke="#374151" strokeWidth={1.5} />
+        rx={4} ry={4} fill={elementFill(el, colors)} stroke="#374151" strokeWidth={1.5} />
       {el.taskType && el.taskType !== "none" && (
         <BpmnTaskMarker taskType={el.taskType} x={el.x + 4} y={el.y + 4} />
       )}
@@ -1597,7 +1563,7 @@ export function formatUmlOperation(op: import("@/app/lib/diagram/types").UmlOper
 function UmlClassShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
   const fsc = useContext(FontScaleCtx);
-  const fill = resolveColor("uml-class", colors);
+  const fill = elementFill(el, colors);
   const db = useContext(DatabaseCtx);
   const isDbDiagram = db && db !== "none";
   const explicitStereotype = el.properties.stereotype as string | undefined;
@@ -1699,7 +1665,7 @@ function UmlClassShape({ el }: { el: DiagramElement }) {
 function UmlEnumerationShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
   const fsc = useContext(FontScaleCtx);
-  const fill = resolveColor("uml-enumeration", colors);
+  const fill = elementFill(el, colors);
   const stereotype = (el.properties.stereotype as string | undefined) ?? "enumeration";
   const values: string[] = (el.properties.values as string[] | undefined) ?? [];
   const valFontSize = Math.round(10 * fsc * 10) / 10;
@@ -1749,8 +1715,7 @@ function UmlPackageShape({ el }: { el: DiagramElement }) {
   const depth = useContext(UmlPackageDepthCtx).get(el.id) ?? 0;
   // Lighten each nesting level toward white so grandparent→parent→child reads
   // as distinct shaded bands (issue #13). Cap so deep nests stay visible.
-  const baseFill = resolveColor("uml-package", colors);
-  const fill = depth > 0 ? lerpHex(baseFill, "#ffffff", Math.min(depth * 0.22, 0.8)) : baseFill;
+  const fill = nestedContainerFill(el, colors, depth);
   const labelFontSize = Math.round(12 * fsc * 10) / 10;
   const lineH = Math.round(labelFontSize * 1.3);
   const PADX = 8, PADY = 5;
@@ -1767,7 +1732,7 @@ function UmlPackageShape({ el }: { el: DiagramElement }) {
         fill={fill} stroke="#374151" strokeWidth={1.5} />
       {/* Body */}
       <rect x={el.x} y={el.y + tabH} width={el.width} height={el.height - tabH}
-        fill={fill} fillOpacity={0.35} stroke="#374151" strokeWidth={1.5} />
+        fill={fill} fillOpacity={UML_PACKAGE_BODY_OPACITY} stroke="#374151" strokeWidth={1.5} />
       <text x={el.x + PADX} y={el.y + PADY + labelFontSize * 0.9} textAnchor="start"
         fontSize={labelFontSize} fill="#111827" fontWeight="bold"
         style={{ pointerEvents: "none", userSelect: "none" }}>
@@ -1796,7 +1761,7 @@ function UmlPackageShape({ el }: { el: DiagramElement }) {
 function UmlNoteShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
   const fsc = useContext(FontScaleCtx);
-  const fill = resolveColor("uml-note", colors);
+  const fill = elementFill(el, colors);
   const fold = Math.min(16, el.width * 0.25, el.height * 0.4);
   const x = el.x, y = el.y, w = el.width, h = el.height;
   const fontSize = Math.round(12 * fsc * 10) / 10;
@@ -1822,19 +1787,8 @@ function UmlNoteShape({ el }: { el: DiagramElement }) {
   );
 }
 
-// Pain Point — a jagged "explosion" marker highlighting a problem area.
-/** The original 12-point starburst, on the element's (now golden-ratio) box.
- *  Shared by the canvas shape and the palette preview so they match. */
-export function painPointStarPoints(cx: number, cy: number, rx: number, ry: number): string {
-  const spikes = 12;
-  const pts: string[] = [];
-  for (let i = 0; i < spikes * 2; i++) {
-    const ang = (Math.PI * i) / spikes - Math.PI / 2;
-    const r = i % 2 === 0 ? 1 : 0.62;
-    pts.push(`${cx + Math.cos(ang) * rx * r},${cy + Math.sin(ang) * ry * r}`);
-  }
-  return pts.join(" ");
-}
+// Pain Point — a jagged "explosion" marker highlighting a problem area. The
+// starburst geometry (painPointStarPoints) lives in canvasPaint.ts.
 
 /** Shared starburst marker used by both Pain Points (red) and Issues (dark
  *  green). Identical geometry + auto-number + description caption; only the
@@ -1846,7 +1800,7 @@ function MarkerShape({ el, show, showDesc, stroke, numberColor, descColor }: {
   const colors = useContext(SymbolColorCtx);
   const fsc = useContext(FontScaleCtx);
   if (!show) return null; // master display toggle off — hide on canvas
-  const fill = resolveColor(el.type, colors);
+  const fill = elementFill(el, colors);
   const cx = el.x + el.width / 2, cy = el.y + el.height / 2;
   const rx = el.width / 2, ry = el.height / 2;
   // Slightly smaller auto-number, shrunk more for 2+ digits so it stays inside.
@@ -1879,12 +1833,12 @@ function MarkerShape({ el, show, showDesc, stroke, numberColor, descColor }: {
 
 function UmlPainPointShape({ el }: { el: DiagramElement }) {
   return <MarkerShape el={el} show={useContext(ShowPainPointsCtx)} showDesc={useContext(ShowPainPointDescCtx)}
-    stroke="#b91c1c" numberColor="#7f1d1d" descColor="#7f1d1d" />;
+    stroke={PAIN_POINT_STROKE} numberColor="#7f1d1d" descColor="#7f1d1d" />;
 }
 
 function UmlIssueShape({ el }: { el: DiagramElement }) {
   return <MarkerShape el={el} show={useContext(ShowIssuesCtx)} showDesc={useContext(ShowIssueDescCtx)}
-    stroke="#166534" numberColor="#ffffff" descColor="#166534" />;
+    stroke={ISSUE_STROKE} numberColor="#ffffff" descColor="#166534" />;
 }
 
 function ExternalEntityShape({ el }: { el: DiagramElement }) {
@@ -1892,7 +1846,7 @@ function ExternalEntityShape({ el }: { el: DiagramElement }) {
   return (
     <g>
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
-        fill={resolveColor("external-entity", colors)} stroke="#374151" strokeWidth={1.5} />
+        fill={elementFill(el, colors)} stroke="#374151" strokeWidth={1.5} />
     </g>
   );
 }
@@ -1905,7 +1859,7 @@ function ProcessSystemShape({ el }: { el: DiagramElement }) {
   return (
     <g>
       <circle cx={cx} cy={cy} r={r}
-        fill={resolveColor("process-system", colors)} stroke="#374151" strokeWidth={1.5} />
+        fill={elementFill(el, colors)} stroke="#374151" strokeWidth={1.5} />
     </g>
   );
 }
@@ -1917,8 +1871,7 @@ function PoolShape({ el }: { el: DiagramElement }) {
   // Header strip width: dynamic per pool (widens when label has 4+ lines
   // or large font). Stored on the element by the reducer after a label
   // or font change; falls back to the legacy default of 36.
-  const storedLW = (el.properties?.poolHeaderWidth as number | undefined);
-  const LW = typeof storedLW === "number" && storedLW > 0 ? storedLW : 36;
+  const LW = getPoolHeaderWidth(el);
   const cx = x + LW / 2 + 3;
   const cy = y + h / 2;
   const lines = (el.label ?? "").split('\n');
@@ -1931,8 +1884,7 @@ function PoolShape({ el }: { el: DiagramElement }) {
   const mcx      = x + LW + (w - LW) / 2;
   const mly2     = y + h - 3;
   const mly1     = mly2 - mLineH;
-  const poolHeaderColour = resolveColor("pool", colors);
-  const poolBodyTint = lerpHex(poolHeaderColour, "#ffffff", 0.93);
+  const { header: poolHeaderColour, body: poolBodyTint } = poolPaint(colors);
   return (
     <g>
       <rect x={x} y={y} width={w} height={h} fill={poolBodyTint} stroke="#374151" strokeWidth={1.5} />
@@ -1976,8 +1928,7 @@ function LaneShape({ el, isSublane }: { el: DiagramElement; isSublane?: boolean 
   const { x, y, width: w, height: h } = el;
   // Dynamic lane header width — set by the reducer when a sibling label
   // grows tall enough to need >36px. Falls back to the legacy default.
-  const storedLW = el.properties?.laneHeaderWidth as number | undefined;
-  const LW = typeof storedLW === "number" && storedLW > 0 ? storedLW : 36;
+  const LW = getLaneHeaderWidth(el);
   const cx = x + LW / 2 + 3;
   const cy = y + h / 2;
   // While a lane drop is being previewed, a band whose name is moving has that
@@ -1988,12 +1939,10 @@ function LaneShape({ el, isSublane }: { el: DiagramElement; isSublane?: boolean 
   const lines = nameIsGhosted ? [] : (el.label ?? "").split('\n');
   const fontSize = Math.round(laneFs * 10) / 10;
   const lineH = Math.round(laneFs * 1.2);
-  // Lighten fill based on nesting depth beyond direct sublane (depth 1)
-  const baseFill = resolveColor(isSublane ? "sublane" : "lane", colors);
-  // depth 0 = top-level lane, 1 = sublane (baseFill already), 2+ = sub-sublane (lighten)
-  const lightenFrac = Math.min((laneDepth - 1) * 0.25, 0.8);
-  const headerFill = laneDepth > 1 ? lerpHex(baseFill, "#ffffff", lightenFrac) : baseFill;
-  const bodyTint = lerpHex(headerFill, "#ffffff", 0.93);
+  // Header: the lane / sublane colour, lightened per level past a sublane
+  // (depth 0 = top-level lane, 1 = sublane, 2+ = sub-sublane); body: a very
+  // light tint of it. The rule is lanePaint in canvasPaint.ts.
+  const { header: headerFill, body: bodyTint } = lanePaint(laneDepth, isSublane ? "sublane" : "lane", colors);
   return (
     <g>
       <rect x={x} y={y} width={w} height={h} fill={bodyTint} stroke="#374151" strokeWidth={1} />
@@ -2020,10 +1969,11 @@ function LaneShape({ el, isSublane }: { el: DiagramElement; isSublane?: boolean 
 // The palette colours ARE the notation — a reader identifies an event or a
 // function by colour before reading a word of it — so every shape fills from
 // the colour config rather than hard-coding white the way flowchart does.
-const EPC_STROKE = "#374151";
+const EPC_STROKE = SHAPE_STROKE;
 const EPC_SW = 1.5;
+/** `properties.fill` ?? colour config — the rule is elementFill (canvasPaint.ts). */
 function epcFill(el: DiagramElement, colors: SymbolColorConfig | undefined): string {
-  return (el.properties?.fill as string | undefined) ?? resolveColor(el.type, colors) ?? "#ffffff";
+  return elementFill(el, colors);
 }
 
 /** Event — an elongated hexagon, flat top and bottom, pointed left and right. */
@@ -2274,10 +2224,11 @@ function EpcAnnotationShape({ el, glyph }: { el: DiagramElement; glyph: Annotati
 }
 
 // ── Standard Flowchart shapes (monochrome: white fill, black stroke) ──
-const FC_STROKE = "#111111";
+const FC_STROKE = FLOWCHART_STROKE;
 const FC_SW = 1.6;
+/** `properties.fill` ?? colour config — the rule is elementFill (canvasPaint.ts). */
 function fcFill(el: DiagramElement, colors: SymbolColorConfig | undefined): string {
-  return (el.properties?.fill as string | undefined) ?? resolveColor(el.type, colors) ?? "#ffffff";
+  return elementFill(el, colors);
 }
 function FlowchartTerminatorShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
@@ -2409,11 +2360,8 @@ function FlowchartCommentShape({ el }: { el: DiagramElement }) {
 }
 /** Vertical swimlane column: white body, black border, a top header strip with
  *  a horizontal (un-rotated) centred label. Columns snap into a band and share
- *  one height — that coordination lives in the reducer, not here. */
-export function getVSwimlaneHeaderHeight(el: DiagramElement): number {
-  const stored = el.properties?.vlaneHeaderHeight as number | undefined;
-  return typeof stored === "number" && stored > 0 ? stored : 36;
-}
+ *  one height — that coordination lives in the reducer, not here. The header
+ *  height is getVSwimlaneHeaderHeight (containerMetrics.ts). */
 function FlowchartVSwimlaneShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
   const { x, y, width: w, height: h } = el;

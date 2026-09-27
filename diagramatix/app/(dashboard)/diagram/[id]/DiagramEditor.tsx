@@ -25,7 +25,7 @@ import { mergeDiagram, type MergeConflict } from "@/app/lib/diagram/mergeDiagram
 import { AI_PROMPT_ANNOTATION_ID, buildPromptAnnotation, contentBBox, stripPromptAnnotations, stripPromptAnnotationConnectors } from "@/app/lib/ai/promptAnnotation";
 import { usesPlanFlow } from "@/app/lib/ai/planTypes";
 import { useAllowedModels } from "./ModelSelect";
-import { BW_SYMBOL_COLORS, DEFAULT_SYMBOL_COLORS, type SymbolColorConfig } from "@/app/lib/diagram/colors";
+import { DEFAULT_SYMBOL_COLORS, effectiveSymbolColors, type SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { setCurrentDiagramName } from "@/app/lib/help/currentDiagram";
 import type { DisplayMode } from "@/app/lib/diagram/displayMode";
 import { DiagramColorModal } from "./DiagramColorModal";
@@ -2546,9 +2546,9 @@ export function DiagramEditor({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [clearMenuOpen]);
 
-  const effectiveColorConfig: SymbolColorConfig = displayMode === "hand-drawn"
-    ? BW_SYMBOL_COLORS
-    : { ...projectColorConfig, ...diagramColorConfig };
+  // Diagram overrides on project colours, or B&W when hand-drawn — the same
+  // rule the Project screen's tile picture uses (colors.ts).
+  const effectiveColorConfig: SymbolColorConfig = effectiveSymbolColors(projectColorConfig, diagramColorConfig, displayMode);
 
   const selectedElement = selectedElementIds.size === 1
     ? data.elements.find((el) => selectedElementIds.has(el.id)) ?? null

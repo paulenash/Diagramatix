@@ -46,7 +46,7 @@ export async function GET(_req: Request, { params }: Params) {
     include: {
       diagrams: {
         orderBy: { updatedAt: "desc" },
-        select: { id: true, name: true, type: true, createdAt: true, updatedAt: true, data: true, version: true, diagramOwnerId: true, diagramOwner: { select: { name: true, email: true } } },
+        select: { id: true, name: true, type: true, createdAt: true, updatedAt: true, data: true, colorConfig: true, displayMode: true, version: true, diagramOwnerId: true, diagramOwner: { select: { name: true, email: true } } },
       },
     },
   });
