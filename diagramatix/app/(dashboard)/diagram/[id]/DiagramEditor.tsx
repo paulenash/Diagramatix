@@ -2855,7 +2855,7 @@ export function DiagramEditor({
   // Fresh each time the flow opens or closes.
   const dividerMemRef = useRef<DividerMemory>({});
   const setDividerFlow = useCallback((f: DividerFlow | null) => { dividerFlowRef.current = f; dividerMemRef.current = {}; setDividerFlowState(f); }, []);
-  const dividerTargets = useMemo(() => (dividerFlow ? collectDividers(data.elements) : null), [dividerFlow, data.elements]);
+  const dividerTargets = useMemo(() => (dividerFlow ? collectDividers(data.elements, dividerFlow.order) : null), [dividerFlow, data.elements]);
   // Green ticks every 100px down the lanes' name strips while it is open (Paul, 2026-09-28).
   const onScreenRulers = useMemo(() => (dividerFlow ? dividerRulers(data.elements) : null), [dividerFlow, data.elements]);
   // ── R2: the disambiguation picker. Same numbered-badge mechanism as the
@@ -3309,11 +3309,12 @@ export function DiagramEditor({
     const t = text.trim();
     const log = (summary: string, ok: boolean) => appendLog({ heard: t, summary, ok });
     if (isFlowEndWord(t)) { setDividerFlow(null); log("dividers closed", true); return; }
-    const targets = collectDividers(elementsRef.current);
+    const targets = collectDividers(elementsRef.current, dividerFlowRef.current?.order);
     const mem = dividerMemRef.current;
     const u = readDividerUtterance(t, targets, mem);
     if (!u || u.kind === "miss") { log(explainDividerMiss(t, targets), false); return; }
-    if (u.kind === "hold") { mem.pendingN = u.n; log(`${u.n} — now “up …” or “down …”`, true); return; }
+    if (u.kind === "hold") { mem.pendingN = u.n; mem.pendingPx = undefined; log(`${u.n} — now “up …” or “down …”`, true); return; }
+    if (u.kind === "askWay") { mem.pendingPx = u.px; log(`${u.n}, ${u.px} pixels — up or down?`, true); return; }
     const more = (ok: boolean) => (ok ? " — another, or “done”" : "");
     if (u.kind === "adjust") {
       const so = mem.last!.moved;
@@ -3322,14 +3323,15 @@ export function DiagramEditor({
       const r = applyGrouped([op]);
       const m = movedPx(r.summary);
       const total = so + (op.op === "movePoolBoundary" && op.direction === u.direction ? m : -m);
-      mem.last = { n: u.target.n, direction: u.direction, moved: total };
+      mem.last = { id: u.target.id, n: u.target.n, direction: u.direction, moved: total };
       log(`${u.target.n} → ${dividerReply(r.summary, u.target.n)} (${Math.round(total)}px ${u.direction} in all)${more(r.ok)}`, r.ok);
       return;
     }
     const a = u.answer;
     mem.pendingN = undefined;
+    mem.pendingPx = undefined;
     const r = applyGrouped([dividerOp(a)]);
-    mem.last = { n: a.target.n, direction: a.direction, moved: r.ok ? movedPx(r.summary) : 0 };
+    mem.last = { id: a.target.id, n: a.target.n, direction: a.direction, moved: r.ok ? movedPx(r.summary) : 0 };
     log(`${a.target.n} → ${dividerReply(r.summary, a.target.n)}${more(r.ok)}`, r.ok);
   }, [applyGrouped, setDividerFlow, appendLog]);
   const handleDividerUtteranceRef = useRef(handleDividerUtterance);
@@ -3381,7 +3383,7 @@ export function DiagramEditor({
     // a whole new command closes it and runs — the numbers are never a trap
     // (as the pick, pickInterrupt.ts).
     if (dividerFlowRef.current) {
-      const answer = readDividerUtterance(heard, collectDividers(elementsRef.current), dividerMemRef.current);
+      const answer = readDividerUtterance(heard, collectDividers(elementsRef.current, dividerFlowRef.current.order), dividerMemRef.current);
       if (!answer && !isFlowEndWord(heard) && parseCommand(heard)) setDividerFlow(null);
       else { handleDividerUtteranceRef.current(heard); return; }
     }

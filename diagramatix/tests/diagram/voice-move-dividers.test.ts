@@ -106,7 +106,8 @@ describe("T4968 — wired into the editor, the card, the AI and the generator", 
   const ed = readFileSync("app/(dashboard)/diagram/[id]/DiagramEditor.tsx", "utf8");
 
   it("the editor shows its numbers, reads its answers first, and closes it on done / Escape / stop / a new command", () => {
-    expect(ed).toContain("const dividerTargets = useMemo(() => (dividerFlow ? collectDividers(data.elements) : null), [dividerFlow, data.elements]);");
+    // Changed 2026-09-28: numbered in the order the flow opened with (T4983).
+    expect(ed).toContain("const dividerTargets = useMemo(() => (dividerFlow ? collectDividers(data.elements, dividerFlow.order) : null), [dividerFlow, data.elements]);");
     expect(ed).toContain("badgesOnScreen(renameFlow, messageFlow, pickFlow, dividerTargets)");
     expect(ed).toContain("if (!answer && !isFlowEndWord(heard) && parseCommand(heard)) setDividerFlow(null);");
     expect(ed).toContain("else { handleDividerUtteranceRef.current(heard); return; }");

@@ -37,7 +37,7 @@ import type { RenameTarget } from "./renameTargets";
 import { isAnyLane } from "../diagram/laneKind";
 import { containerHeaderWidth } from "../diagram/containerHeader";
 import { readDistance, readLoneAmount } from "./poolBoundaryPhrase";
-import { leadingSpokenNumber } from "./spokenNumber";
+import { leadingSpokenNumber, type LeadingNumber } from "./spokenNumber";
 import { ID_REF_PREFIX } from "./resolveRef";
 
 /**
@@ -60,10 +60,18 @@ export interface DividerTarget extends RenameTarget {
 /** The open flow — its numbers are recomputed from the diagram as it stands. */
 export interface DividerFlow {
   prompt: string;
+  /**
+   * The dividers, by id, in the order they were numbered when the flow opened.
+   * The numbers stay put while it is open (the 2026-09-28 sweep: with two
+   * pools side by side, "1 down 100" re-sorted them by height, and the next
+   * "fifty pixels" moved the OTHER pool's divider). A divider that appears
+   * later is numbered after them.
+   */
+  order: readonly string[];
 }
 
-/** Every divider, numbered top to bottom (then left to right), each badge ON its line. */
-export function collectDividers(els: readonly DiagramElement[]): DividerTarget[] {
+/** Every divider, numbered top to bottom (then left to right) — or in `order`, while a flow is open — each badge ON its line. */
+export function collectDividers(els: readonly DiagramElement[], order?: readonly string[]): DividerTarget[] {
   const parents = els.filter((e) => e.type === "pool" || isAnyLane(e));
   const raw: Array<Omit<DividerTarget, "n">> = [];
   for (const parent of parents) {
@@ -79,8 +87,15 @@ export function collectDividers(els: readonly DiagramElement[]): DividerTarget[]
       });
     }
   }
+  const rank = new Map((order ?? []).map((id, i) => [id, i] as const));
+  const byPlace = (a: Omit<DividerTarget, "n">, b: Omit<DividerTarget, "n">) => Math.round(a.y) - Math.round(b.y) || a.x - b.x;
   return raw
-    .sort((a, b) => Math.round(a.y) - Math.round(b.y) || a.x - b.x)
+    .sort((a, b) => {
+      const ra = rank.get(a.id), rb = rank.get(b.id);
+      if (ra !== undefined && rb !== undefined) return ra - rb;
+      if (ra !== undefined || rb !== undefined) return ra !== undefined ? -1 : 1;
+      return byPlace(a, b);
+    })
     .map((d, i) => ({ ...d, n: i + 1 }));
 }
 
@@ -88,7 +103,10 @@ export function collectDividers(els: readonly DiagramElement[]): DividerTarget[]
 export function buildDividerFlow(els: readonly DiagramElement[]): DividerFlow | { error: string } {
   const n = collectDividers(els).length;
   if (!n) return { error: "there are no lane dividers here — a pool needs two lanes (or a lane two sub-lanes)" };
-  return { prompt: `${n} divider${n === 1 ? "" : "s"} numbered — say “<n> up 100 pixels”, “<n> down 2 tasks”… then “done”` };
+  return {
+    prompt: `${n} divider${n === 1 ? "" : "s"} numbered — say “<n> up 100 pixels”, “<n> down 2 tasks”… then “done”`,
+    order: collectDividers(els).map((d) => d.id),
+  };
 }
 
 export interface DividerAnswer {
@@ -98,23 +116,52 @@ export interface DividerAnswer {
   distance?: number;
 }
 
+const UP_WORD = /^(?:up|upwards?|higher|raise)$/;
+const DOWN_WORD = /^(?:down|downwards?|lower)$/;
+/** What an answer may carry besides its number, its way and its amount. */
+const ANSWER_FILLER = new Set(["by", "please", "just", "more", "again", "and", "so", "then", "now"]);
+
+/**
+ * The rest of an answer after its number: ONE way, an amount if any, and
+ * nothing else. Anything more — "top boundary", "2", a name — means the words
+ * are a whole command, not an answer (the 2026-09-28 sweep: with the numbers
+ * up, "move Lane 2 top boundary up 40" was read as "1 up 40", because a
+ * mis-heard "lane" is 1 — and it moved the wrong divider through elements).
+ */
+function readAnswerTail(rest: string): { direction: "up" | "down"; distance?: number } | null {
+  const words = rest.toLowerCase().split(/\s+/).filter(Boolean);
+  const ways = words.flatMap((w, i) => (UP_WORD.test(w) || DOWN_WORD.test(w) ? [i] : []));
+  if (ways.length !== 1) return null;
+  const at = ways[0];
+  // The way word stays in place: a bare number beside it is an amount ("1 up 20 more").
+  const amount = readDistance(words, true);
+  if (!words.every((w, i) => i === at || amount?.used.has(i) || ANSWER_FILLER.has(w))) return null;
+  return { direction: UP_WORD.test(words[at]) ? "up" : "down", ...(amount ? { distance: amount.px } : {}) };
+}
+
+/**
+ * A number the recogniser only MIGHT have meant ("lane" for "one") is a noun
+ * when an article says so — "the lane up" — or when a number follows it:
+ * "lane 2 down" is Lane 2, never "1, down 2 pixels".
+ */
+const NOUN_LEAD = /^(?:the|a|an|this|that|my)\s/i;
+const misheardNoun = (t: string, lead: LeadingNumber) =>
+  lead.corrected && (NOUN_LEAD.test(t) || leadingSpokenNumber(lead.rest)?.corrected === false);
+
 /**
  * "2 up 100 pixels", "two down 2 tasks", "number 3 up by forty", "move 1 down
- * a bit", "3 up" (one step). The number first, then the way, then how far —
- * read by the boundary command's own distance reader.
+ * a bit", "3 up" (one step), "one a hundred and fifty pixels down". The number
+ * first, then the way and how far in either order — read by the boundary
+ * command's own distance reader — and nothing else.
  */
 export function parseDividerAnswer(text: string, targets: readonly DividerTarget[]): DividerAnswer | null {
   const t = String(text ?? "").trim().replace(/[.,!?]+$/g, "").replace(/^(?:move|shift|nudge|put)\s+/i, "").replace(/^divider\s+/i, "");
   const lead = leadingSpokenNumber(t);
-  if (!lead) return null;
+  if (!lead || misheardNoun(t, lead)) return null;
   const target = targets.find((d) => d.n === lead.n);
   if (!target) return null;
-  const words = lead.rest.toLowerCase().split(/\s+/).filter(Boolean);
-  const at = words.findIndex((w) => /^(?:up|upwards?|higher|raise)$/.test(w) || /^(?:down|downwards?|lower)$/.test(w));
-  if (at < 0) return null;
-  const direction = /^(?:up|upwards?|higher|raise)$/.test(words[at]) ? "up" : "down";
-  const amount = readDistance(words.map((w, i) => (i === at ? "" : w)), true);
-  return { target, direction, ...(amount ? { distance: amount.px } : {}) };
+  const tail = readAnswerTail(lead.rest);
+  return tail ? { target, ...tail } : null;
 }
 
 /**
@@ -173,14 +220,18 @@ const spoken = (e: DiagramElement) => (e.label ?? "").replace(/\s+/g, " ").trim(
 export interface DividerMemory {
   /** A number said on its own: the divider the next "up …"/"down …" is for. */
   pendingN?: number;
-  /** The last answer — and how far it has moved, in its own direction, so far. */
-  last?: { n: number; direction: "up" | "down"; moved: number };
+  /** …and an amount said after it, before the way: "one" … "sixty pixels" … "down". */
+  pendingPx?: number;
+  /** The last answer, BY ID (numbers are only what is on screen) — and how far it has moved, in its own direction, so far. */
+  last?: { id: string; n: number; direction: "up" | "down"; moved: number };
 }
 
 export type DividerUtterance =
   | { kind: "move"; answer: DividerAnswer }
   | { kind: "hold"; n: number }
   | { kind: "adjust"; target: DividerTarget; direction: "up" | "down"; total: number }
+  /** An amount for a held divider that has no way yet — "1, 60 pixels — up or down?" */
+  | { kind: "askWay"; n: number; px: number }
   /** A bare number that is no divider — the flow explains, and stays open. */
   | { kind: "miss" };
 
@@ -191,19 +242,26 @@ export function readDividerUtterance(text: string, targets: readonly DividerTarg
   const answer = parseDividerAnswer(t, targets);
   if (answer) return { kind: "move", answer };
   const bareT = t.replace(/^(?:move|shift|nudge|put)\s+/i, "").replace(/^(?:divider|number)\s+/i, "");
-  // "down two tasks" after a held "one".
+  // "down two tasks" after a held "one" — with the amount said before the way, if it was.
   if (mem.pendingN !== undefined && WAY_FIRST.test(bareT)) {
     const joined = parseDividerAnswer(`${mem.pendingN} ${bareT}`, targets);
-    if (joined) return { kind: "move", answer: joined };
+    if (joined) return { kind: "move", answer: joined.distance === undefined && mem.pendingPx !== undefined ? { ...joined, distance: mem.pendingPx } : joined };
   }
+  const lone = readLoneAmount(bareT.split(/\s+/), true);
   const lead = leadingSpokenNumber(bareT);
-  // "one" — which divider; the way comes next.
-  if (lead && !lead.rest) return targets.some((d) => d.n === lead.n) ? { kind: "hold", n: lead.n } : { kind: "miss" };
-  // "fifty pixels" after an answer — that answer's move, to this much in all.
-  if (mem.last) {
-    const px = readLoneAmount(bareT.split(/\s+/), true);
-    const target = targets.find((d) => d.n === mem.last!.n);
-    if (px !== null && target) return { kind: "adjust", target, direction: mem.last.direction, total: px };
+  // "one" — which divider; the way comes next. A number that is no divider is
+  // an amount after an answer ("twenty", "100"), else explained.
+  if (lead && !lead.rest && !misheardNoun(bareT, lead)) {
+    if (targets.some((d) => d.n === lead.n)) return { kind: "hold", n: lead.n };
+    if (!(mem.last && lone !== null)) return { kind: "miss" };
+  }
+  if (lone !== null) {
+    // A different divider held since the last answer: that one, once it has a way.
+    const held = mem.pendingN !== undefined ? targets.find((d) => d.n === mem.pendingN) : undefined;
+    if (held && held.id !== mem.last?.id) return { kind: "askWay", n: held.n, px: lone };
+    // "fifty pixels" after an answer — that answer's move, to this much in all.
+    const target = mem.last ? targets.find((d) => d.id === mem.last!.id) : undefined;
+    if (mem.last && target) return { kind: "adjust", target, direction: mem.last.direction, total: lone };
   }
   return null;
 }

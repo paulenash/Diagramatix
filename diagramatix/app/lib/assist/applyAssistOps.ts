@@ -61,6 +61,8 @@ import { bandOf, planMoveContents, CONTENTS_STEP_PX } from "@/app/lib/diagram/mo
 import { buildDividerFlow, type DividerFlow } from "./dividerFlow";
 import { contentCrossedBy, cutByLine, dividerRoom, givingBands, laneEdgePlan, poolEdgeRoom, wrapLabelInTwo } from "@/app/lib/diagram/laneBoundary";
 import { nextBoundaryMemory, type BoundaryMemory } from "./boundaryFollowUp";
+import { laneMetrics } from "@/app/lib/diagram/containerMetrics";
+import { checkElementOverlap } from "@/app/lib/diagram/checks/diagramChecks";
 import { BOUNDARY_STEP_PX } from "./poolBoundaryPhrase";
 import { TEMPLATE_BEFORE_REFUSAL } from "./templatePhrase";
 import { refKind, unsaidRef, type RefKind } from "./refKinds";
@@ -170,6 +172,19 @@ export interface AssistApplyContext {
 }
 
 const elBox = (e: DiagramElement) => ({ x: e.x, y: e.y, width: e.width, height: e.height });
+/** Whether anything that sat inside its pool in `before` sticks out of it in `after`. */
+function leavesItsPool(before: readonly DiagramElement[], after: readonly DiagramElement[]): boolean {
+  const byId = new Map(after.map((e) => [e.id, e] as const));
+  const poolOf = (e: DiagramElement) => { let c = byId.get(e.parentId ?? ""); for (let i = 0; c && i < 16; i++) { if (c.type === "pool") return c; c = byId.get(c.parentId ?? ""); } return undefined; };
+  const out = (e: DiagramElement, p: DiagramElement) => e.x < p.x - 0.5 || e.y < p.y - 0.5 || e.x + e.width > p.x + p.width + 0.5 || e.y + e.height > p.y + p.height + 0.5;
+  const was = new Map(before.map((e) => [e.id, e] as const));
+  return after.some((e) => {
+    const p = poolOf(e);
+    if (!p) return false;
+    const w = was.get(e.id), wp = w ? was.get(p.id) : undefined;
+    return out(e, p) && !(w && wp && out(w, wp));
+  });
+}
 const nameOf = (e: DiagramElement) => (spokenName(e.label) || e.type);
 const sameName = (a: string | undefined, b: string | undefined) => (a ?? "").trim().toLowerCase() === (b ?? "").trim().toLowerCase();
 /** M7 — how the log says what an align just did. */
@@ -217,6 +232,40 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
     return next === now ? null : next;
   };
   const wouldChange = (action: Action): boolean => preview(action) !== null;
+  /**
+   * One lane, up or down within its stack (MOVE_LANE: it and everything in it
+   * move; the neighbour it moves toward gives way). "move the Finance lane up",
+   * and since the 2026-09-28 sweep "move Finance up" / "nudge Finance up" too —
+   * a lane is never slid as a shape. Says what happened; false when refused.
+   */
+  const moveLaneInStack = (r: DiagramElement, direction: "up" | "down", distance: number): boolean => {
+    if (r.type !== "lane") {
+      results.push(`${nameOf(r)} is a sub-lane of its own kind that can't be moved up or down — say “move ${nameOf(r)} top boundary ${direction}” to move its divider`);
+      return false;
+    }
+    const sibs = els.filter((e) => e.type === "lane" && e.parentId === r.parentId).sort((a, b) => a.y - b.y);
+    const i = sibs.findIndex((s) => s.id === r.id);
+    const toward = direction === "down" ? sibs[i + 1] : sibs[i - 1];
+    if (!toward) { results.push(`${nameOf(r)} is against the pool edge — can't move it ${direction}`); return false; }
+    // Same trap as addLaneAt. A lane move is a trade between its two
+    // neighbours — moving down grows the lane ABOVE and shrinks the one below
+    // — so the reducer needs a lane on BOTH sides, and stops where the one
+    // giving way runs out (its contents, or sublanes that fill it). The edge
+    // check above only looked one way, and either refusal still reported
+    // "moved" (found by L4, 2026-09-25).
+    if (!wouldChange({ type: "MOVE_LANE", payload: { laneId: r.id, direction, distance } })) {
+      const behind = direction === "down" ? sibs[i - 1] : sibs[i + 1];
+      results.push(behind
+        ? `${nameOf(r)} can't move ${direction} — ${nameOf(toward)} has no room to give`
+        : `${nameOf(r)} is the ${direction === "down" ? "top" : "bottom"} lane — moving it ${direction} needs a lane ${direction === "down" ? "above" : "below"} it to take up the gap`);
+      return false;
+    }
+    moveLane(r.id, direction, distance);
+    voiceLastId.current = r.id;
+    setSelectedElementIds(new Set()); // selection protocol
+    results.push(`moved ${nameOf(r)} ${direction}`);
+    return true;
+  };
   // Multi-modal: "this" / "these" / "the selected task" resolve to the mouse
   // selection — the mouse says WHICH, the voice says WHAT.
   const selectedIds = selectedIdsRef.current;
@@ -688,9 +737,30 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       deleteElement(e.id);
       els = withDeleted(els, e.id);
       if (voiceLastId.current === e.id) voiceLastId.current = null;
-      // Compact: close the horizontal gap the element left (vertical strip only).
-      if (op.compact) removeSpace({ x: foot.x, y: foot.y, width: foot.width, height: 0 });
-      results.push(`deleted ${nameOf(e)}${op.compact ? " and compacted" : ""}`);
+      if (!op.compact) { results.push(`deleted ${nameOf(e)}`); continue; }
+      // Compact: close the horizontal gap the element left. The mouse's
+      // remove-space tool deletes whatever sits wholly in the column, in EVERY
+      // lane — right for a zone the user drew, wrong here: "delete Pay Claim
+      // and compact" also deleted the gateway above it (the 2026-09-28 sweep).
+      // So it is tried first, and only kept when it removes nothing else and
+      // puts nothing on top of anything.
+      const zone = { x: foot.x, y: foot.y, width: foot.width, height: 0 };
+      const trial = preview({ type: "REMOVE_SPACE", payload: { zone } });
+      if (!trial) { results.push(`deleted ${nameOf(e)} — there was no gap to close`); continue; }
+      const lost = els.filter((x) => !trial.elements.some((y) => y.id === x.id));
+      const pairKey = (v: { ids: string[] }) => [...v.ids].sort().join("|");
+      const was = new Set(checkElementOverlap({ elements: els, connectors: data.connectors }).map(pairKey));
+      const landed = checkElementOverlap({ elements: trial.elements, connectors: trial.connectors }).filter((v) => !was.has(pairKey(v)));
+      if (lost.length || landed.length) {
+        const nm = (id: string) => `“${nameOf(els.find((x) => x.id === id) ?? trial.elements.find((x) => x.id === id)!)}”`;
+        results.push(`deleted ${nameOf(e)} — the gap stays: closing it would ${lost.length
+          ? `also delete ${lost.slice(0, 3).map((x) => `“${nameOf(x)}”`).join(", ")}${lost.length > 3 ? `, and ${lost.length - 3} more` : ""}`
+          : `put ${nm(landed[0].ids[0])} on ${nm(landed[0].ids[1])}`}`);
+        continue;
+      }
+      removeSpace(zone);
+      els = trial.elements;
+      results.push(`deleted ${nameOf(e)} and compacted`);
       continue;
     }
 
@@ -712,6 +782,13 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       const e = resolve1(op.ref);
       if ("err" in e) { results.push(e.err); anyFail = true; continue; }
       const horiz = op.direction === "left" || op.direction === "right";
+      // …nor up or down (the 2026-09-28 sweep: "move Finance up" slid the lane
+      // over Office and out of its stack, content out of the pool). Up or down,
+      // a lane moves AS a lane — the same move as "move the Finance lane up".
+      if (!horiz && isAnyLane(e)) {
+        if (!moveLaneInStack(e, op.direction as "up" | "down", 32 * (op.count ?? 1))) anyFail = true;
+        continue;
+      }
       // A pool or lane is not a shape to slide sideways — its "span" is its
       // whole width, so a lane went ~1,260px and every pool widened with it
       // (the 50-command set, 2026-09-27). What was meant is its contents.
@@ -1020,14 +1097,27 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
             for (const band of givingBands(els, giver, dy < 0 ? "last" : "first")) {
               const two = wrapLabelInTwo(band.label);
               if (!two) continue;
-              const trial = els.map((e) => (e.id === band.id ? { ...e, label: two } : e));
-              const got = reducer({ ...ctx.settings, elements: trial, connectors: data.connectors, viewport: { x: 0, y: 0, zoom: 1 } } as DiagramData, moveAction);
+              // The label change as the editor makes it (a two-line name widens
+              // the name strips, and everything in the lanes shifts right), then
+              // the move — kept only when it goes further AND nothing ends up
+              // outside its pool (at larger lane fonts the shift can push an
+              // element past the pool's right edge: the 2026-09-28 sweep).
+              const now = { ...ctx.settings, elements: els, connectors: data.connectors, viewport: { x: 0, y: 0, zoom: 1 } } as DiagramData;
+              const labelled = reducer(now, { type: "UPDATE_LABEL", payload: { id: band.id, label: two } });
+              const got = reducer(labelled, moveAction);
               const m2 = got.elements.find((e) => e.id === aboveId)!.height - above.height;
-              if (Math.abs(m2) > Math.abs(moved) + 0.5) { els = trial; moved = m2; next = got; wrapped.push(band); updateLabel(band.id, two); }
+              if (Math.abs(m2) > Math.abs(moved) + 0.5 && !leavesItsPool(els, got.elements)) {
+                els = labelled.elements; moved = m2; next = got; wrapped.push(band); updateLabel(band.id, two);
+              }
               if (Math.abs(moved) >= dist - 0.5) break;
             }
           }
-          if (!moved) { results.push(`${nameOf(giver)} is as small as its name allows — the divider can't move ${op.direction}`); anyFail = true; remember(target.id, 0); continue; }
+          // Name the band that really stops it — the band giving way, or the
+          // sub-lane at its edge (the sweep: "Underwriters team is as small as
+          // its name allows" when it was its sub-lane Tax).
+          const edgeOf = dy < 0 ? "last" as const : "first" as const;
+          const stopper = (list: DiagramElement[]) => { const b = list.find((x) => x.height <= Math.max(40, laneMetrics(x.label ?? "", ctx.settings.laneFontSize ?? 14).minHeight) + 0.5); return b ?? giver; };
+          if (!moved) { results.push(`${nameOf(stopper(givingBands(els, giver, edgeOf)))} is as small as its name allows — the divider can't move ${op.direction}`); anyFail = true; remember(target.id, 0); continue; }
           const crossed = op.overContent ? [] : contentCrossedBy(els, aboveId, belowId, below.y + moved);
           if (crossed.length) {
             // Say how far it CAN go (Paul, 2026-09-27: more flexibility than a
@@ -1052,7 +1142,8 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
           setSelectedElementIds(new Set()); // selection protocol
           if (next) els = next.elements;
           remember(target.id, moved);
-          const short = Math.abs(moved) < dist - 0.5 ? ` — ${nameOf(giver)} is as small as its name allows` : "";
+          const giverAfter = els.find((x) => x.id === giver.id) ?? giver;
+          const short = Math.abs(moved) < dist - 0.5 ? ` — ${nameOf(stopper(givingBands(els, giverAfter, edgeOf)))} is as small as its name allows` : "";
           const wraps = wrapped.length ? ` — ${wrapped.map((b) => `“${nameOf(b)}”`).join(" and ")} now ${wrapped.length === 1 ? "wraps" : "wrap"} onto two lines` : "";
           results.push(`moved ${nameOf(target)}'s ${op.boundary} boundary ${op.direction} ${Math.round(Math.abs(moved))}px${wraps}${short}`);
           continue;
@@ -1122,6 +1213,14 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
         if (!t) continue;
         target = t;
       }
+      // A lane is never nudged as a shape (the 2026-09-28 sweep: "nudge Finance
+      // up" put it 20px over Office and shrank the pool): up or down it moves
+      // as a lane; sideways, what was meant is its contents.
+      if (isAnyLane(target)) {
+        if (op.direction === "up" || op.direction === "down") { if (!moveLaneInStack(target, op.direction, dist)) anyFail = true; }
+        else { results.push(`${nameOf(target)} is a ${laneKindWord(target, els)} — to move what is in it, say “move everything in ${nameOf(target)} one step to the ${op.direction}”`); anyFail = true; }
+        continue;
+      }
       // MOVE_ELEMENTS auto-includes container descendants, so a white-box pool
       // rides with its lanes/contents; a black-box pool just moves itself.
       moveElements([target.id], dx, dy);
@@ -1141,7 +1240,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       // the user actually named rather than telling them it "isn't a lane".
       const r = resolve1(op.ref);
       if ("err" in r) { results.push(r.err); anyFail = true; continue; }
-      if (r.type !== "lane") {
+      if (!isAnyLane(r)) {
         const dy = (op.distance ?? 32) * (op.direction === "down" ? 1 : -1);
         moveElements([r.id], 0, dy);
         elementsMoveEnd();
@@ -1150,27 +1249,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
         results.push(`moved ${nameOf(r)} ${op.direction}`);
         continue;
       }
-      const sibs = els.filter((e) => e.type === "lane" && e.parentId === r.parentId).sort((a, b) => a.y - b.y);
-      const i = sibs.findIndex((s) => s.id === r.id);
-      const toward = op.direction === "down" ? sibs[i + 1] : sibs[i - 1];
-      if (!toward) { results.push(`${nameOf(r)} is against the pool edge — can't move it ${op.direction}`); anyFail = true; continue; }
-      // Same trap as addLaneAt. A lane move is a trade between its two
-      // neighbours — moving down grows the lane ABOVE and shrinks the one below
-      // — so the reducer needs a lane on BOTH sides, and stops where the one
-      // giving way runs out (its contents, or sublanes that fill it). The edge
-      // check above only looked one way, and either refusal still reported
-      // "moved" (found by L4, 2026-09-25).
-      if (!wouldChange({ type: "MOVE_LANE", payload: { laneId: r.id, direction: op.direction, distance: op.distance ?? 32 } })) {
-        const behind = op.direction === "down" ? sibs[i - 1] : sibs[i + 1];
-        results.push(behind
-          ? `${nameOf(r)} can't move ${op.direction} — ${nameOf(toward)} has no room to give`
-          : `${nameOf(r)} is the ${op.direction === "down" ? "top" : "bottom"} lane — moving it ${op.direction} needs a lane ${op.direction === "down" ? "above" : "below"} it to take up the gap`);
-        anyFail = true; continue;
-      }
-      moveLane(r.id, op.direction, op.distance ?? 32);
-      voiceLastId.current = r.id;
-      setSelectedElementIds(new Set()); // selection protocol
-      results.push(`moved ${nameOf(r)} ${op.direction}`);
+      if (!moveLaneInStack(r, op.direction, op.distance ?? 32)) anyFail = true;
       continue;
     }
 

@@ -3008,7 +3008,10 @@ function resizeLaneForLabel(
         if (e.id === sib.id) {
           return { ...e, properties: { ...e.properties, laneHeaderWidth: maxNeeded } };
         }
-        if (sibDesc.has(e.id)) return { ...e, x: e.x + deltaW };
+        // A sub-lane moves right with everything else — and is narrowed by
+        // the same amount, so its right edge stays on the lane's (it used to
+        // run past the pool: the 2026-09-28 sweep, a wrapped lane name).
+        if (sibDesc.has(e.id)) return isAnyLane(e) ? { ...e, x: e.x + deltaW, width: Math.max(0, e.width - deltaW) } : { ...e, x: e.x + deltaW };
         return e;
       });
     }

@@ -66,6 +66,8 @@ describe("the selection protocol", () => {
     expect(ed).toMatch(/updateLabel\(e\.id, newLabel\); els = withLabel\(els, e\.id, newLabel\); setSelectedElementIds\(new Set\(\)\);/);
     expect(ed).toMatch(/elementsMoveEnd\(\);[^\n]*\n\s*setSelectedElementIds\(new Set\(\)\); \/\/ selection protocol: a voice move leaves nothing selected/);
     expect(ed).toMatch(/elementsMoveEnd\(\); \/\/ commit the nudge as its own undo entry\s*setSelectedElementIds\(new Set\(\)\);/);
-    expect(ed).toMatch(/moveLane\(r\.id, op\.direction, op\.distance \?\? 32\);\s*voiceLastId\.current = r\.id;\s*setSelectedElementIds\(new Set\(\)\);/);
+    // Changed 2026-09-28: the lane move is one helper (moveLaneInStack) for
+    // "move the X lane up", "move X up" and "nudge X up" (T4988).
+    expect(ed).toMatch(/moveLane\(r\.id, direction, distance\);\s*voiceLastId\.current = r\.id;\s*setSelectedElementIds\(new Set\(\)\);/);
   });
 });

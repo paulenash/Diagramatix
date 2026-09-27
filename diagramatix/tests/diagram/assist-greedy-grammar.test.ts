@@ -163,7 +163,8 @@ describe("T4570 — the guards themselves", () => {
     // prose instead of code made this fail on a correct implementation.
     const branch = editor.slice(start, start + 1400)
       .split("\n").filter((l) => !l.trim().startsWith("//")).join("\n");
-    const notLane = branch.indexOf('if (r.type !== "lane") {');
+    // Changed 2026-09-28: either kind of sub-lane counts as a lane (isAnyLane) — T4988.
+    const notLane = branch.indexOf("if (!isAnyLane(r)) {");
     const moves = branch.indexOf("moveElements([r.id], 0, dy)");
     const refuses = branch.indexOf("isn't a lane");
     expect(notLane, "the wrong-type case is handled").toBeGreaterThan(-1);

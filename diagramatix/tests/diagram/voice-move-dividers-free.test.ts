@@ -175,7 +175,7 @@ describe("T4977 — an answer said in two halves is still one answer (Paul's ses
   });
 
   it("an amount on its own after an answer makes that move the amount IN ALL", () => {
-    const mem: DividerMemory = { last: { n: 1, direction: "down", moved: 20 } };
+    const mem: DividerMemory = { last: { id: ts[0].id, n: 1, direction: "down", moved: 20 } };
     const u = readDividerUtterance("fifty pixels", ts, mem);
     expect(u).toMatchObject({ kind: "adjust", direction: "down", total: 50 });
     expect(readDividerUtterance("by fifty", ts, mem)).toMatchObject({ kind: "adjust", total: 50 });
@@ -188,7 +188,7 @@ describe("T4977 — an answer said in two halves is still one answer (Paul's ses
   });
 
   it("…and a whole new command is never taken for half an answer", () => {
-    const mem: DividerMemory = { pendingN: 1, last: { n: 1, direction: "down", moved: 20 } };
+    const mem: DividerMemory = { pendingN: 1, last: { id: ts[0].id, n: 1, direction: "down", moved: 20 } };
     for (const said of ["move Salesforce down twenty pixels", "move customer up", "add Task 2", "rename pool", "add two lanes", "put a pool around everything", "delete Task 11"]) {
       expect(readDividerUtterance(said, ts, mem), said).toBeNull();
       expect(parseCommand(said), `${said} — so it closes the flow and runs`).toBeTruthy();
@@ -204,10 +204,10 @@ describe("T4977 — an answer said in two halves is still one answer (Paul's ses
     expect(first?.kind).toBe("move");
     const r1 = applyAssistOps([dividerOp((first as { answer: Parameters<typeof dividerOp>[0] }).answer)], h.context());
     expect(r1).toEqual({ ok: true, summary: "moved Finance's top boundary down 20px" });
-    mem.last = { n: 1, direction: "down", moved: movedPx(r1.summary) };
+    mem.last = { id: collectDividers(h.data.elements)[0].id, n: 1, direction: "down", moved: movedPx(r1.summary) };
     const second = readDividerUtterance("fifty pixels", collectDividers(h.data.elements), mem);
     expect(second?.kind).toBe("adjust");
-    const r2 = applyAssistOps([adjustOp(second as Parameters<typeof adjustOp>[0], mem.last.moved)!], h.context());
+    const r2 = applyAssistOps([adjustOp(second as Parameters<typeof adjustOp>[0], mem.last!.moved)!], h.context());
     expect(r2).toEqual({ ok: true, summary: "moved Finance's top boundary down 30px" });
     expect(byId(h.data, "6ry0lcpt").y).toBeCloseTo(y0 + 50, 6);
   });
@@ -233,7 +233,8 @@ describe("T4978 — the ruler: green ticks every 100px down the lanes' name stri
     expect(ed).toContain("dividerRulers={onScreenRulers}");
     // The memory is fresh each time the flow opens or closes.
     expect(ed).toContain("const setDividerFlow = useCallback((f: DividerFlow | null) => { dividerFlowRef.current = f; dividerMemRef.current = {}; setDividerFlowState(f); }, []);");
-    expect(ed).toContain("const answer = readDividerUtterance(heard, collectDividers(elementsRef.current), dividerMemRef.current);");
+    // Changed 2026-09-28: numbered in the order the flow opened with (T4983).
+    expect(ed).toContain("const answer = readDividerUtterance(heard, collectDividers(elementsRef.current, dividerFlowRef.current.order), dividerMemRef.current);");
     const cv = readFileSync("app/components/canvas/Canvas.tsx", "utf8");
     const ruler = cv.indexOf("{dividerRulers && dividerRulers.length > 0 && (");
     const badges = cv.indexOf("{renameBadges && renameBadges.length > 0 && (");

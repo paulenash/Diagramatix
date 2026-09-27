@@ -60,13 +60,17 @@ export type StackEdge = "first" | "last";
  * Never negative: a stack already past its floor has no room to give, and is
  * not asked to give any back either.
  *
- * A container with no bands answers for itself — a lane with no sublanes still
- * has a name to fit.
+ * A container answers for itself as well — a lane with no sublanes still has
+ * a name to fit, and so does a lane WITH them: its height changes by exactly
+ * what its edge band gives, so it may give no more than its own name leaves.
+ * (The 2026-09-28 sweep: "Underwriters team", with two sub-lanes, went down to
+ * 84px against a 159px name, because only the sub-lane's floor was asked.)
  */
 export function shrinkRoom(node: Band, edge: StackEdge): number {
   const kids = node.bands ?? [];
-  if (kids.length === 0) return Math.max(0, node.height - node.min);
-  return shrinkRoom(edge === "first" ? kids[0] : kids[kids.length - 1], edge);
+  const own = Math.max(0, node.height - node.min);
+  if (kids.length === 0) return own;
+  return Math.min(own, shrinkRoom(edge === "first" ? kids[0] : kids[kids.length - 1], edge));
 }
 
 /**
