@@ -35,7 +35,8 @@ import type { GeneratedCase } from "@/app/lib/assist/commandGenerator";
 import { DEFAULT_CORPUS_SEED } from "@/app/lib/assist/rng";
 import { OUTCOME_MEANS } from "./outcomeStyle";
 import { chooseReplaySet, orderReplaySets, replaySetLabel, type RecordedSet } from "@/app/lib/dictation/replaySets";
-import { CATALOG_SET_ID, catalogCases } from "@/app/lib/assist/catalogCorpus";
+import { CATALOG_SET_ID } from "@/app/lib/assist/catalogCorpus";
+import { casesForSet, corpusSet } from "@/app/lib/assist/corpusSets";
 import { parseCommand } from "@/app/lib/assist/commandGrammar";
 
 interface ClipRow {
@@ -142,10 +143,12 @@ export function ReplayPanel() {
     setOnset({});
     setSkipped([]);
     setMoved([]);
-    // A popup line's context (the selection it needs, or why only its parse
-    // can be judged) comes from the set itself, keyed by case id.
-    const popupContext = new Map(catalogCases().map((c) => [c.id, c] as const));
     const els = fixtureElements();
+    // A fixed set's case context (the selection it needs, or why only its
+    // parse can be judged) comes from the set itself, keyed by case id — the
+    // popup set and the new-commands set alike (2026-09-27).
+    const fixedCases = corpusSet(runLabel.seed)?.kind === "catalog" ? casesForSet(runLabel.seed, { count: 0, world: els }) : [];
+    const popupContext = new Map(fixedCases.map((c) => [c.id, c] as const));
     // A popup line can name a MESSAGE by its label; the scorer resolves it as the app does, against these.
     const connectors = fixtureDiagram().connectors;
     // The listing was asked for this set only; the filter is the belt to that
@@ -202,9 +205,13 @@ export function ReplayPanel() {
         // parses to today, so a clip measures the ear — did "heard" parse like
         // "said"? — however the grammar has moved since it was recorded. A
         // move is noted, never hidden.
+        //
+        // A HAND-WRITTEN key (the new-commands set) is today's key for the
+        // same sentence, so a corrected answer reaches clips already recorded.
         const recordedOps = JSON.parse(clip.expectedOps || "[]");
-        const ctx = runLabel.seed === CATALOG_SET_ID ? popupContext.get(clip.caseId) : undefined;
-        const nowOps = runLabel.seed === CATALOG_SET_ID ? (parseCommand(clip.utterance) ?? []) : recordedOps;
+        const ctx = popupContext.get(clip.caseId);
+        const nowOps = runLabel.seed === CATALOG_SET_ID ? (parseCommand(clip.utterance) ?? [])
+          : ctx && ctx.utterance === clip.utterance ? ctx.ops : recordedOps;
         if (runLabel.seed === CATALOG_SET_ID && JSON.stringify(nowOps) !== JSON.stringify(recordedOps)) {
           setMoved((p) => (p.includes(clip.caseId) ? p : [...p, clip.caseId]));
         }

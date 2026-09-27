@@ -17,6 +17,7 @@ import {
   CATALOG_SET_ID, CATALOG_NOT_RECORDED, CATALOG_CONTEXT, catalogLines, catalogCases, catalogCaseId,
   notRecordedReason, expectedOpsFor,
 } from "@/app/lib/assist/catalogCorpus";
+import { NEW_COMMANDS_SET_ID } from "@/app/lib/assist/newCommandsCorpus";
 import { COMMAND_CATALOG } from "@/app/lib/assist/commandCatalog";
 import { generateCases, FAMILY_NAMES } from "@/app/lib/assist/commandGenerator";
 import { parseCommand } from "@/app/lib/assist/commandGrammar";
@@ -30,7 +31,8 @@ const world = fixtureElements();
 
 describe("T4923 — the set registry", () => {
   it("lists the realistic sample and the popup set, each explaining itself", () => {
-    expect(CORPUS_SETS.map((s) => s.id)).toEqual([DEFAULT_CORPUS_SEED, CATALOG_SET_ID]);
+    // Changed 2026-09-27: + the new-commands set (voice-new-commands-set.test.ts).
+    expect(CORPUS_SETS.map((s) => s.id)).toEqual([DEFAULT_CORPUS_SEED, CATALOG_SET_ID, NEW_COMMANDS_SET_ID]);
     for (const s of CORPUS_SETS) {
       expect(s.label.length, s.id).toBeGreaterThan(5);
       expect(s.explain.length, `${s.id} says what it is for`).toBeGreaterThan(60);
