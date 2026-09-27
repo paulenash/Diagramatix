@@ -108,6 +108,12 @@
       "itemType": "lane"
     }
   ],
+  "rename messages": [
+    {
+      "op": "renameByType",
+      "itemType": "message"
+    }
+  ],
   "move the gateway two elements to the right": [
     {
       "op": "move",

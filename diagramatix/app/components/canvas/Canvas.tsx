@@ -6458,43 +6458,6 @@ export function Canvas({
             <GoldFlashOverlay runId={goldFlash.runId} targets={goldFlash.targets} />
           )}
 
-          {/* Guided rename — large green number badges on every matching item.
-              Inverse-scaled by zoom so they stay a readable, constant screen size. */}
-          {renameBadges && renameBadges.length > 0 && (
-            <g pointerEvents="none">
-              {renameBadges.map((b) => {
-                // Where the badge sits (Paul, 2026-09-15): activities below, events
-                // ABOVE, pools and lanes in the header just before the START of the
-                // name — the name is rotated -90° about (cx, cy) and centred, so its
-                // start is cy + width/2; measuring the label means the badge moves
-                // when the name changes length.
-                const pos = (() => {
-                  if (b.kind !== "element") return { x: b.x, y: b.y };
-                  if (b.place === "above") return { x: b.x, y: b.y - b.height / 2 - 16 / zoom };
-                  if (b.place === "header") {
-                    const e = data.elements.find((el) => el.id === b.id);
-                    if (e) {
-                      const isPool = e.type === "pool";
-                      const LW = containerHeaderWidth(e);
-                      const fs = (isPool ? (data.poolFontSize ?? 16) : (data.laneFontSize ?? 14)) * (displayMode === "hand-drawn" ? 1.3 : 1);
-                      const nameW = Math.max(0, ...(e.label ?? "").split("\n").map((l) => measureHeaderLabel(l, fs)));
-                      return { x: e.x + LW / 2 + 3, y: e.y + e.height / 2 + nameW / 2 + 6 + 13 / zoom };
-                    }
-                  }
-                  return { x: b.x, y: b.y + b.height / 2 + 16 / zoom };
-                })();
-                const digits = String(b.n).length;
-                const rw = 20 + digits * 11;
-                return (
-                  <g key={`rename-badge-${b.n}`} transform={`translate(${pos.x}, ${pos.y}) scale(${1 / zoom})`}>
-                    <rect x={-rw / 2} y={-13} width={rw} height={26} rx={13} ry={13} fill="#16a34a" stroke="#ffffff" strokeWidth={2} />
-                    <text x={0} y={1} fontSize={17} fontWeight={800} fill="#ffffff" textAnchor="middle" dominantBaseline="middle" fontFamily="sans-serif">{b.n}</text>
-                  </g>
-                );
-              })}
-            </g>
-          )}
-
           {/* Association connectors — rendered above all elements.
 
               A click INSIDE any shape selects that shape, never the line
@@ -7484,6 +7447,47 @@ export function Canvas({
               debugMode={debugMode}
             />
           ))}
+
+          {/* Guided rename — large green number badges on every matching item.
+              Inverse-scaled by zoom so they stay a readable, constant screen size.
+              THE LAST LAYER (Paul, 2026-09-27: "Place green numbers above everything.
+              Currently they are under the message connectors.") — messages,
+              associations and ArchiMate connectors, the selected connector and the
+              review notes all draw after the elements, and used to cover them. */}
+          {renameBadges && renameBadges.length > 0 && (
+            <g pointerEvents="none">
+              {renameBadges.map((b) => {
+                // Where the badge sits (Paul, 2026-09-15): activities below, events
+                // ABOVE, pools and lanes in the header just before the START of the
+                // name — the name is rotated -90° about (cx, cy) and centred, so its
+                // start is cy + width/2; measuring the label means the badge moves
+                // when the name changes length.
+                const pos = (() => {
+                  if (b.kind !== "element") return { x: b.x, y: b.y };
+                  if (b.place === "above") return { x: b.x, y: b.y - b.height / 2 - 16 / zoom };
+                  if (b.place === "header") {
+                    const e = data.elements.find((el) => el.id === b.id);
+                    if (e) {
+                      const isPool = e.type === "pool";
+                      const LW = containerHeaderWidth(e);
+                      const fs = (isPool ? (data.poolFontSize ?? 16) : (data.laneFontSize ?? 14)) * (displayMode === "hand-drawn" ? 1.3 : 1);
+                      const nameW = Math.max(0, ...(e.label ?? "").split("\n").map((l) => measureHeaderLabel(l, fs)));
+                      return { x: e.x + LW / 2 + 3, y: e.y + e.height / 2 + nameW / 2 + 6 + 13 / zoom };
+                    }
+                  }
+                  return { x: b.x, y: b.y + b.height / 2 + 16 / zoom };
+                })();
+                const digits = String(b.n).length;
+                const rw = 20 + digits * 11;
+                return (
+                  <g key={`rename-badge-${b.n}`} transform={`translate(${pos.x}, ${pos.y}) scale(${1 / zoom})`}>
+                    <rect x={-rw / 2} y={-13} width={rw} height={26} rx={13} ry={13} fill="#16a34a" stroke="#ffffff" strokeWidth={2} />
+                    <text x={0} y={1} fontSize={17} fontWeight={800} fill="#ffffff" textAnchor="middle" dominantBaseline="middle" fontFamily="sans-serif">{b.n}</text>
+                  </g>
+                );
+              })}
+            </g>
+          )}
 
         </g>
       </svg>

@@ -29,7 +29,7 @@ export const COMMAND_CATALOG: CatalogFamily[] = [
     { does: "Connect / disconnect", say: ["connect Check Coverage to Pay Claim", "connect them", "disconnect Review Claim from Check Claim"] },
     { does: "Rename", say: ["rename the gateway to Approved?", "rename Lane 3 to Claims Support", "rename Task 1 to Review Email"] },
     { does: "Spell a name the recogniser keeps mishearing — letters are never misheard as a word; the capital is added for you", say: ["rename Lane 3 to F I N A N C E"] },
-    { does: "Rename by number (say a type, pick a green number, say the name)", say: ["rename tasks", "rename lanes"] },
+    { does: "Rename by number (say a type, pick a green number, say the name)", say: ["rename tasks", "rename lanes", "rename messages"] },
     { does: "Move — one element-span; a selection moves together, 100 px per step", say: ["move the gateway two elements to the right", "move Pay Claim up", "move these right", "move the selected task two steps up"] },
     { does: "Nudge — 20 px in any direction, any element; a selection nudges together", say: ["nudge the selected task left", "nudge these down", "bump Check Claim right", "nudge Customer down by 40"] },
     { does: "Move everything in a pool, lane or sub-lane — n steps (100 px each) or m pixels, right or left. Moving right widens the pools when it needs to; nothing moves into a header", say: ["move everything in Underwriters two steps to the right", "move everything in Lane 2 50 pixels to the left"] },

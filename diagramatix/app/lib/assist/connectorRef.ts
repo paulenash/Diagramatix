@@ -21,7 +21,7 @@
  * Pure.
  */
 import type { Connector, DiagramElement } from "../diagram/types";
-import { ID_REF_PREFIX } from "./resolveRef";
+import { ID_REF_PREFIX, spokenNumbersAsDigits } from "./resolveRef";
 
 /** The ops whose `ref` may name a connector by its label (applyAssistOps.ts). */
 export const CONNECTOR_NAMING_OPS: ReadonlySet<string> = new Set(["rename", "delete"]);
@@ -36,7 +36,10 @@ export const CONNECTOR_REF_PREFIX = "connector:";
 
 /** A label as it is said: line breaks and runs of spaces as one space, lower case. */
 export function spokenLabel(s: string | null | undefined): string {
-  return (s ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+  // Numbers are compared as digits, both sides — "rename message six to …"
+  // could not find the message labelled "message 6" (Paul, 2026-09-27). The
+  // element resolver has always folded "lane two" into "Lane 2" this way.
+  return spokenNumbersAsDigits((s ?? "").replace(/\s+/g, " ").trim().toLowerCase());
 }
 
 const QUOTES = /^["'“”‘’]+|["'“”‘’]+$/g;
