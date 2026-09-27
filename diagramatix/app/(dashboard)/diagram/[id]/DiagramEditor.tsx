@@ -61,6 +61,7 @@ import { isMicStopWord, isFlowEndWord } from "@/app/lib/assist/stopWords";
 import { aiInventedRename, INVENTED_RENAME_REFUSAL } from "@/app/lib/assist/aiGuards";
 import { interruptsPick } from "@/app/lib/assist/pickInterrupt";
 import { adjustOp, collectDividers, dividerOp, dividerReply, dividerRulers, explainDividerMiss, movedPx, readDividerUtterance, type DividerFlow, type DividerMemory } from "@/app/lib/assist/dividerFlow";
+import { readBoundaryFollowUp, type BoundaryMemory } from "@/app/lib/assist/boundaryFollowUp";
 import { isIncompleteCommand } from "@/app/lib/assist/incompleteCommand";
 import { leadingSpokenNumber } from "@/app/lib/assist/spokenNumber";
 import { capitaliseFirstWord, needsCapital } from "@/app/lib/diagram/nameCase";
@@ -2779,6 +2780,10 @@ export function DiagramEditor({
   // command per render, never inside the call that just finished.
   const [voiceDrainTick, setVoiceDrainTick] = useState(0);
   const voiceLastId = useRef<string | null>(null);
+  // The last lane-boundary / pool-edge command, for its follow-up — "sixty
+  // pixels", "up by 98" (boundaryFollowUp.ts). applyAssistOps writes it; any
+  // other command clears it (applyGrouped).
+  const boundaryLastRef = useRef<BoundaryMemory | null>(null);
   // M5 — where the mouse last was on the canvas, in world coordinates. A REF,
   // not state: it is written on every pointer move and must never cause a
   // render. Null until the pointer has been over the canvas at all, which is
@@ -2890,6 +2895,7 @@ export function DiagramEditor({
     setVoiceListening(false);
     pendingConfirmRef.current = null; // a parked "clear the diagram?" never outlives the diagram it was asked on
     pickFlowRef.current = null;       // nor a parked "which one?" — its candidates are on the old diagram
+    boundaryLastRef.current = null;   // nor a boundary's follow-up
     setPickFlowState(null);
   }, [diagramId]);
 
@@ -3013,7 +3019,7 @@ export function DiagramEditor({
         swapPools, resizeElement, resizeElementEnd, alignElements,
       },
       ui: { setSelectedElementIds, setSelectedConnectorId, setPickFlow, setRenameFlow, setMessageFlow, setDividerFlow, setGoldFlash },
-      refs: { voiceLastId, pointerWorld, selectedIdsRef, selectedConnectorIdRef, nextStepRef, openTemplateWindowRef, exportJsonRef },
+      refs: { voiceLastId, pointerWorld, selectedIdsRef, selectedConnectorIdRef, nextStepRef, openTemplateWindowRef, exportJsonRef, boundaryLast: boundaryLastRef },
     });
   }, [data.elements, data.connectors, data.poolFontSize, data.laneFontSize, data.connectorFontSize, data.relaxedLayout, riskCatalog, armDebugBefore, armGoldFlash, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, updateConnectorLabel, deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool, wrapInSubprocess, wrapInContainer, unwrapSubprocess, addPool, addLaneAt, compressPool, compressLane, expandLane, extendPools, swapLane, moveLane, moveElements, elementsMoveEnd, removeSpace, insertSpace, convertTaskSubprocess, moveLaneBoundary, laneBoundaryMoveEnd, updateConnectorEndpoint, movePoolTo, swapPools, resizeElement, resizeElementEnd, alignElements, setRenameFlow, setMessageFlow, setPickFlow, setDividerFlow]);
 
@@ -3259,6 +3265,8 @@ export function DiagramEditor({
   // One spoken command = ONE undo entry, however many reducer helpers it fans
   // out into (historyGroup.ts). "Undo that" used to revert only the last of them.
   const applyGrouped = useCallback((ops: AssistOp[]) => {
+    // Any other command ends a boundary command's follow-up (boundaryFollowUp.ts).
+    if (!(ops.length === 1 && ops[0].op === "movePoolBoundary" && !ops[0].overContent)) boundaryLastRef.current = null;
     beginHistoryGroup();
     try { return applyAssistOps(ops); } finally { endHistoryGroup(); }
   }, [applyAssistOps, beginHistoryGroup, endHistoryGroup]);
@@ -3467,6 +3475,19 @@ export function DiagramEditor({
 
     const ops = parseCommand(heard);
     if (ops) { applyOrAsk(ops, false); return; }
+    // A boundary command's follow-up (Paul, 2026-09-28: refused with "say “up by
+    // 98”", he said "sixty pixels" — and neither parsed). Only what parses as
+    // nothing else, so it never shadows a command; the AI never sees it.
+    if (boundaryLastRef.current) {
+      const f = readBoundaryFollowUp(heard, boundaryLastRef.current);
+      if (f) {
+        if ("reply" in f) { log({ heard, summary: f.reply, ok: true }); return; }
+        const r = applyGrouped([f.op]);
+        const mem = boundaryLastRef.current;
+        log({ heard, summary: `${r.summary}${f.inAll && r.ok && mem ? ` (${mem.moved}px ${mem.direction} in all)` : ""}`, ok: r.ok });
+        return;
+      }
+    }
     // Deterministic parser didn't recognise it → AI fallback (metered).
     voiceBusyRef.current = true;
     setVoiceBusy(true);

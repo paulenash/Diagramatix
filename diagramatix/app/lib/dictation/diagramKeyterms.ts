@@ -58,7 +58,7 @@ export const MAX_KEYTERM_WORDS = 4;
  */
 const COMMAND_WORDS = new Set<string>([
   "lane", "lanes", "sublane", "sublanes", "pool", "pools", "gateway", "gateways",
-  "task", "tasks", "subprocess", "selected", "selection", "boundary", "connect",
+  "task", "tasks", "subprocess", "selected", "selection", "boundary", "divider", "dividers", "connect",
   "rename", "delete", ...COMPRESS_VERBS, "voice", "assist", "start", "end", "event",
   "message", "swap", "move", "nudge", "add", "undo", "stop", "done",
   "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",

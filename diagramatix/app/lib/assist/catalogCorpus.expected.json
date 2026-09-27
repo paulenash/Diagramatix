@@ -620,6 +620,21 @@
       "op": "numberDividers"
     }
   ],
+  "move divider": [
+    {
+      "op": "numberDividers"
+    }
+  ],
+  "move lane dividers": [
+    {
+      "op": "numberDividers"
+    }
+  ],
+  "move lane divider": [
+    {
+      "op": "numberDividers"
+    }
+  ],
   "add a lane to the pool": [
     {
       "op": "addLanes",

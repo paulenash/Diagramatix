@@ -23,6 +23,7 @@
  * The screen half (`ui`) is a recorder. Selection, pickers and prompts change
  * nothing on the diagram, but a case may want to know that a picker opened.
  */
+import type { BoundaryMemory } from "./boundaryFollowUp";
 import { reducer, connectorLabelPayload, healOnLoad, type Action } from "@/app/hooks/useDiagram";
 import type { DiagramData } from "@/app/lib/diagram/types";
 import { assistSettingsOf, type AssistApplyContext, type AssistDiagramActions, type AssistUi } from "./applyAssistOps";
@@ -35,6 +36,8 @@ export interface HeadlessDiagram {
   readonly ui: AssistUi;
   /** What the screen was asked to do, in order — "pick", "rename", "message". */
   readonly screen: string[];
+  /** The last boundary command, as the editor keeps it between utterances (boundaryFollowUp.ts). */
+  readonly boundaryLast: { current: BoundaryMemory | null };
   /** Build the context `applyAssistOps` takes, with this diagram behind it. */
   context(opts?: { selectedIds?: string[]; selectedConnectorId?: string | null; pointer?: { x: number; y: number } | null }): AssistApplyContext;
 }
@@ -49,6 +52,7 @@ export function headlessDiagram(initial: DiagramData): HeadlessDiagram {
   let resizing: string | null = null;
   let groupMoved = new Set<string>();           // every id the staged group move carried
   const screen: string[] = [];
+  const boundaryLast: { current: BoundaryMemory | null } = { current: null };
 
   const run = (a: Action) => { state = reducer(state, a); };
   /** One undo entry, then the action — what `pushHistory(snapshotData()); dispatch(…)` does. */
@@ -138,6 +142,7 @@ export function headlessDiagram(initial: DiagramData): HeadlessDiagram {
     actions,
     ui,
     screen,
+    boundaryLast,
     context: (opts = {}) => ({
       elements: state.elements,
       connectors: state.connectors,
@@ -160,6 +165,7 @@ export function headlessDiagram(initial: DiagramData): HeadlessDiagram {
           },
         },
         exportJsonRef: { current: () => { screen.push("export"); } },
+        boundaryLast,
       },
     }),
   };

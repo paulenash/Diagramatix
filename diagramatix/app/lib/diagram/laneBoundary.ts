@@ -14,6 +14,9 @@
  * must not do that. So a move that would put the line through, or past,
  * anything in either band is refused, naming what is in the way.
  *
+ * Which band: only the one giving way (contentCrossedBy) — Paul, 2026-09-28:
+ * "that command uses element positions inside the lane".
+ *
  * Except "move dividers" (dividerFlow.ts, Paul 2026-09-28), whose numbered
  * answers go through the elements by design: only the names (wrapLabelInTwo
  * lets one wrap first) and the pool limit them.
@@ -49,10 +52,21 @@ export function laneEdgePlan(els: readonly DiagramElement[], band: DiagramElemen
 
 /**
  * What the divider between `above` and `below` would pass through at `newY`:
- * anything in either band that would no longer sit wholly on its own side.
+ * anything in the band GIVING WAY that would no longer sit wholly on its own
+ * side — moving up, the band above; moving down, the band below.
+ *
+ * Only that band (Paul's session, 2026-09-28). The band that grows only takes
+ * in more of what it already holds. A task the line already cuts — left there
+ * by "move dividers" or the mouse, which both go through elements — sits in
+ * the growing band, and checking it too refused a 20px nudge UP ("the divider
+ * would run through “Task 8” — it can move up at most 98px") because the line
+ * was still in Task 8 on its way out of it. This is also exactly the band
+ * `dividerRoom` measures, so a refusal and the room it offers always agree.
  */
 export function contentCrossedBy(els: readonly DiagramElement[], aboveId: string, belowId: string, newY: number): DiagramElement[] {
   const byId = byIdOf(els);
+  const line = byId.get(belowId)?.y;
+  if (line === undefined || newY === line) return [];
   const under = (e: DiagramElement, bandId: string): boolean => {
     let cur = byId.get(e.parentId ?? "");
     for (let i = 0; cur && i < 16; i++) { if (cur.id === bandId) return true; cur = byId.get(cur.parentId ?? ""); }
@@ -61,10 +75,15 @@ export function contentCrossedBy(els: readonly DiagramElement[], aboveId: string
   // Touching is not crossing: within half a pixel is clear (a task 19.998px
   // under a divider refused the plain 20px step — the 50-command set, 2026-09-27).
   const EPS = 0.5;
-  return els.filter((e) => !isAnyLane(e) && e.type !== "pool" && (
-    (under(e, aboveId) && e.y + e.height > newY + EPS)
-    || (under(e, belowId) && e.y < newY - EPS)
-  ));
+  const up = newY < line;
+  return els.filter((e) => !isAnyLane(e) && e.type !== "pool" && under(e, up ? aboveId : belowId)
+    && (up ? e.y + e.height > newY + EPS : e.y < newY - EPS));
+}
+
+/** Of `els`, those the divider at `lineY` already passes through. */
+export function cutByLine(els: readonly DiagramElement[], lineY: number): DiagramElement[] {
+  const EPS = 0.5;
+  return els.filter((e) => e.y < lineY - EPS && e.y + e.height > lineY + EPS);
 }
 
 /**

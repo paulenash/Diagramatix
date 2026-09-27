@@ -59,7 +59,8 @@ import { eventSideRefusal } from "@/app/lib/diagram/eventSides";
 import { bandAt, planInsertBetween } from "@/app/lib/diagram/insertBetween";
 import { bandOf, planMoveContents, CONTENTS_STEP_PX } from "@/app/lib/diagram/moveContents";
 import { buildDividerFlow, type DividerFlow } from "./dividerFlow";
-import { contentCrossedBy, dividerRoom, givingBands, laneEdgePlan, poolEdgeRoom, wrapLabelInTwo } from "@/app/lib/diagram/laneBoundary";
+import { contentCrossedBy, cutByLine, dividerRoom, givingBands, laneEdgePlan, poolEdgeRoom, wrapLabelInTwo } from "@/app/lib/diagram/laneBoundary";
+import { nextBoundaryMemory, type BoundaryMemory } from "./boundaryFollowUp";
 import { BOUNDARY_STEP_PX } from "./poolBoundaryPhrase";
 import { TEMPLATE_BEFORE_REFUSAL } from "./templatePhrase";
 import { refKind, unsaidRef, type RefKind } from "./refKinds";
@@ -163,6 +164,8 @@ export interface AssistApplyContext {
     /** Opens the numbered window; `anchorId` — each pick goes after it, `at` — at that point. Returns the log line. */
     openTemplateWindowRef: MutableRefObject<(opts?: { anchorId?: string; at?: { x: number; y: number } }) => string>;
     exportJsonRef: MutableRefObject<(() => void) | null>;
+    /** The last lane-boundary / pool-edge command and how far it has moved — its follow-up ("sixty pixels") reads it (boundaryFollowUp.ts). Written. */
+    boundaryLast?: MutableRefObject<BoundaryMemory | null>;
   };
 }
 
@@ -965,6 +968,13 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       // lanes and sublanes follow, the pool stays its lane stack (T4628),
       // and nothing inside moves. One rule, one place — the reducer's.
       const dist = op.distance ?? BOUNDARY_STEP_PX;
+      // Remembered for the follow-up — refused (0) or moved — but never for
+      // "move dividers", which keeps its own memory (dividerFlow.ts).
+      const remember = (id: string, moved: number) => {
+        const ref = ctx.refs.boundaryLast;
+        if (!ref || op.overContent) return;
+        ref.current = nextBoundaryMemory(ref.current, { targetId: id, boundary: op.boundary, direction: op.direction, moved: Math.round(Math.abs(moved)) });
+      };
       let target: DiagramElement | undefined;
       if (op.ref) {
         const r = resolveField(op, "ref");
@@ -1017,22 +1027,31 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
               if (Math.abs(moved) >= dist - 0.5) break;
             }
           }
-          if (!moved) { results.push(`${nameOf(giver)} is as small as its name allows — the divider can't move ${op.direction}`); anyFail = true; continue; }
+          if (!moved) { results.push(`${nameOf(giver)} is as small as its name allows — the divider can't move ${op.direction}`); anyFail = true; remember(target.id, 0); continue; }
           const crossed = op.overContent ? [] : contentCrossedBy(els, aboveId, belowId, below.y + moved);
           if (crossed.length) {
             // Say how far it CAN go (Paul, 2026-09-27: more flexibility than a
-            // bare refusal) — the room before the first thing in the way.
+            // bare refusal) — the room before the first thing in the way. The
+            // advice is sayable as it stands: "up by 98" is the follow-up
+            // (boundaryFollowUp.ts), and so is "sixty pixels".
             const room = Math.floor(dividerRoom(els, aboveId, belowId, op.direction === "up" ? "up" : "down"));
             const names = crossed.slice(0, 3).map((e) => `“${nameOf(e)}”`).join(", ") + (crossed.length > 3 ? `, and ${crossed.length - 3} more` : "");
+            const them = crossed.length === 1 ? "it" : "them";
+            // Already cut by the line ("move dividers" and the mouse go through
+            // elements): it can't go further in — but the other way it can.
+            const already = cutByLine(crossed, below.y).length === crossed.length;
             results.push(room > 0
               ? `the divider would run through ${names} — it can move ${op.direction} at most ${room}px: say “${op.direction} by ${room}”`
-              : `the divider would run through ${names} — move ${crossed.length === 1 ? "it" : "them"} first`);
-            anyFail = true; continue;
+              : already
+                ? `the divider already runs through ${names} — it can't go further ${op.direction}: move ${them} first, or use “move dividers”, which goes through elements`
+                : `the divider would run through ${names} — move ${them} first`);
+            anyFail = true; remember(target.id, 0); continue;
           }
           moveLaneBoundary(aboveId, belowId, dy);
           laneBoundaryMoveEnd();
           setSelectedElementIds(new Set()); // selection protocol
           if (next) els = next.elements;
+          remember(target.id, moved);
           const short = Math.abs(moved) < dist - 0.5 ? ` — ${nameOf(giver)} is as small as its name allows` : "";
           const wraps = wrapped.length ? ` — ${wrapped.map((b) => `“${nameOf(b)}”`).join(" and ")} now ${wrapped.length === 1 ? "wraps" : "wrap"} onto two lines` : "";
           results.push(`moved ${nameOf(target)}'s ${op.boundary} boundary ${op.direction} ${Math.round(Math.abs(moved))}px${wraps}${short}`);
@@ -1055,7 +1074,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       const go = Math.min(dist, toward.room);
       if (go <= 0) {
         results.push(`${nameOf(target)}'s ${op.boundary} boundary can't move ${op.direction} — ${toward.neighbour ? nameOf(toward.neighbour) : "another pool"} is right there`);
-        anyFail = true; continue;
+        anyFail = true; remember(target.id, 0); continue;
       }
       const want = boundaryRect(before, op.boundary, op.direction, go);
       const wasWhiteBoxAtResizeStart = ((target.properties?.poolType as string | undefined) ?? "black-box") === "white-box";
@@ -1066,8 +1085,9 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       const moved = after ? Math.round(Math.abs(edgeOf(after) - edgeOf(before))) : 0;
       if (!moved) {
         results.push(`${nameOf(target)}'s ${op.boundary} boundary can't move ${op.direction} — something inside is in the way`);
-        anyFail = true; continue;
+        anyFail = true; remember(target.id, 0); continue;
       }
+      remember(target.id, moved);
       resizeElement(target.id, want.x, want.y, want.width, want.height);
       resizeElementEnd(target.id);   // a spoken move is whole; close it, as the mouse does on release
       setSelectedElementIds(new Set()); // selection protocol

@@ -36,12 +36,19 @@ import type { AssistOp } from "./ops";
 import type { RenameTarget } from "./renameTargets";
 import { isAnyLane } from "../diagram/laneKind";
 import { containerHeaderWidth } from "../diagram/containerHeader";
-import { readDistance } from "./poolBoundaryPhrase";
+import { readDistance, readLoneAmount } from "./poolBoundaryPhrase";
 import { leadingSpokenNumber } from "./spokenNumber";
 import { ID_REF_PREFIX } from "./resolveRef";
 
-/** "move dividers", "move the lane dividers", "number the dividers", "show dividers". */
-export const DIVIDER_COMMAND_RE = /^(?:move|adjust|show|number|pick)\s+(?:the\s+)?(?:(?:lane|sub-?lane|line)s?\s+)?dividers?$/i;
+/**
+ * "move dividers", "move divider", "move lane dividers", "move lane divider"
+ * (Paul, 2026-09-28: "Recognise all the following … for the command"), with
+ * "the"/"a"/"all the", "sub-lane" or the recogniser's "line", a possessive
+ * the recogniser writes ("divider's", "lanes' dividers"), and a trailing
+ * "please"/"now" — the forms that used to be held as half a move instead.
+ * Also "adjust", "show", "number", "pick".
+ */
+export const DIVIDER_COMMAND_RE = /^(?:move|adjust|show|number|pick)\s+(?:(?:the|a|all(?:\s+the)?)\s+)?(?:(?:lane|sub-?lane|line)s?['’]?s?\s+)?dividers?(?:['’]s?)?(?:\s+(?:please|now))?$/i;
 
 /** One divider, numbered: the band above it and the band below it. */
 export interface DividerTarget extends RenameTarget {
@@ -178,8 +185,6 @@ export type DividerUtterance =
   | { kind: "miss" };
 
 const WAY_FIRST = /^(?:up|upwards?|higher|raise|down|downwards?|lower)\b/i;
-/** Words that may sit round an amount said on its own: "by fifty", "make it fifty pixels in all". */
-const AMOUNT_FILLER = new Set(["by", "make", "it", "that", "to", "in", "all", "total", "altogether", "please", "instead", "actually", "no", "so", "and", "of", ""]);
 
 export function readDividerUtterance(text: string, targets: readonly DividerTarget[], mem: DividerMemory): DividerUtterance | null {
   const t = String(text ?? "").trim().replace(/[.,!?]+$/g, "");
@@ -196,11 +201,9 @@ export function readDividerUtterance(text: string, targets: readonly DividerTarg
   if (lead && !lead.rest) return targets.some((d) => d.n === lead.n) ? { kind: "hold", n: lead.n } : { kind: "miss" };
   // "fifty pixels" after an answer — that answer's move, to this much in all.
   if (mem.last) {
-    const words = bareT.toLowerCase().split(/\s+/);
-    const amount = readDistance(words, true);
+    const px = readLoneAmount(bareT.split(/\s+/), true);
     const target = targets.find((d) => d.n === mem.last!.n);
-    const onlyAmount = amount && words.every((w, i) => amount.used.has(i) || AMOUNT_FILLER.has(w));
-    if (onlyAmount && target) return { kind: "adjust", target, direction: mem.last.direction, total: amount.px };
+    if (px !== null && target) return { kind: "adjust", target, direction: mem.last.direction, total: px };
   }
   return null;
 }

@@ -232,6 +232,24 @@ export function readAmount(words: readonly string[]): { value: number; unit: Amo
   return bare;
 }
 
+/** Words that may sit round an amount said on its own: "by fifty", "make it fifty pixels in all". */
+const LONE_AMOUNT_FILLER = new Set(["by", "make", "it", "that", "to", "in", "all", "total", "altogether", "please", "instead", "actually", "no", "so", "and", "of", "then", "ok", "okay"]);
+
+/**
+ * An amount said ON ITS OWN — "fifty pixels", "by fifty", "make it a hundred",
+ * "two tasks" — in pixels (readDistance's units), or null when anything else
+ * was said. A bare number below ten is no amount here ("two" alone is far more
+ * likely a pick than 2px). The follow-ups read it: "move dividers" (dividerFlow.ts)
+ * and a boundary command's (boundaryFollowUp.ts).
+ */
+export function readLoneAmount(words: readonly string[], vertical: boolean): number | null {
+  const w = words.map((x) => x.toLowerCase()).filter(Boolean);
+  const a = readAmount(w);
+  if (!a || (a.unit === "bare" && a.value < 10)) return null;
+  if (!w.every((x, i) => a.used.has(i) || LONE_AMOUNT_FILLER.has(x))) return null;
+  return readDistance(w, vertical)?.px ?? null;
+}
+
 /** A boundary's distance in pixels: a step is 20px, a task its height (or width for a side), a bare number pixels. */
 export function readDistance(words: readonly string[], vertical: boolean): { px: number; used: Set<number> } | null {
   const a = readAmount(words);
