@@ -14,6 +14,7 @@ import { headlessDiagram } from "@/app/lib/assist/headlessDiagram";
 import { fixtureDiagram } from "@/app/lib/assist/commandFixture";
 import { scoreApply } from "@/app/lib/assist/applyScore";
 import { laneEdgePlan } from "@/app/lib/diagram/laneBoundary";
+import { parsePoolBoundaryPhrase, BOUNDARY_STEP_PX } from "@/app/lib/assist/poolBoundaryPhrase";
 import type { DiagramData, DiagramElement } from "@/app/lib/diagram/types";
 
 function on(d: DiagramData = fixtureDiagram()) {
@@ -66,7 +67,8 @@ describe("T4945 — a lane's top or bottom boundary is its divider (Paul, 2026-0
     const before = structuredClone(s.h.data);
     const r = s.say("move Underwriters top boundary up by 200");
     expect(r.ok).toBe(false);
-    expect(r.summary).toMatch(/^the divider would run through “.+ — move (?:it|them) first, or say a smaller move$/);
+    // Changed 2026-09-27: it says how far it CAN go (T4963).
+    expect(r.summary).toMatch(/^the divider would run through “.+ — it can move up at most \d+px: say “up by \d+”$/);
     expect(s.h.data).toEqual(before);
   });
 
@@ -151,5 +153,49 @@ describe("T4946 — move everything from a step on, in its lane or pool (Paul, 2
       const v = scoreApply(parseCommand(said)!, fixtureDiagram(), [...sel]);
       expect(v.ok, `${said}: ${v.detail} / ${v.summary}`).toBe(true);
     }
+  });
+});
+
+describe("T4963 — a boundary moves as far as you say, and says how far it can (Paul, 2026-09-27: “I can only move a lane boundary by 20px”)", () => {
+  const dist = (said: string) => { const p = parsePoolBoundaryPhrase(said); return p && p !== "needs-direction" ? p.distance : "none"; };
+
+  it("reads the distance however it is said — digits, words, pixels, steps, tasks, a bit — before or after the way", () => {
+    const cases: Array<[string, number | undefined]> = [
+      ["move Underwriters top boundary up", undefined],
+      ["move Underwriters top boundary up by 40", 40],
+      ["move Underwriters top boundary up 40", 40],
+      ["move Underwriters top boundary up 40 pixels", 40],
+      ["move Underwriters top boundary up 40px", 40],
+      ["move Underwriters top boundary up by forty", 40],
+      ["move Underwriters top boundary up forty five", 45],
+      ["move Underwriters top boundary up by a hundred", 100],
+      ["move Underwriters top boundary up two steps", 2 * BOUNDARY_STEP_PX],
+      ["move Underwriters top boundary up a task", 64],
+      ["move Underwriters top boundary up half a task", 32],
+      ["move Underwriters top boundary up a bit", 10],
+      ["move Underwriters top boundary 40 pixels up", 40],
+      ["move the pool right boundary right a task", 102],   // a side moves by a Task's WIDTH
+    ];
+    for (const [said, want] of cases) expect(dist(said), said).toBe(want);
+  });
+
+  it("the amount never becomes part of the name — and a lane's own number never becomes an amount", () => {
+    expect(parsePoolBoundaryPhrase("move Underwriters top boundary 40 pixels up")).toMatchObject({ ref: "Underwriters", distance: 40 });
+    expect(parsePoolBoundaryPhrase("move the top boundary of Lane 2 up")).toEqual({ ref: "Lane 2", boundary: "top", direction: "up" });
+    expect(parsePoolBoundaryPhrase("move the top boundary of Lane 2 up by 30")).toMatchObject({ ref: "Lane 2", distance: 30 });
+  });
+
+  it("on the test diagram: it moves that far; blocked, it says the room — and exactly that room then moves", () => {
+    const s = on();
+    const y0 = s.el("L2").y;
+    expect(s.say("move Underwriters top boundary up a task")).toEqual({ ok: true, summary: "moved Underwriters's top boundary up 64px" });
+    expect(s.el("L2").y).toBeCloseTo(y0 - 64, 6);
+    const t = on();
+    const r = t.say("move Underwriters top boundary up by 200");
+    expect(r.ok).toBe(false);
+    const room = Number(r.summary.match(/at most (\d+)px/)![1]);
+    expect(room).toBeGreaterThan(0);
+    expect(t.say("move Underwriters top boundary up by " + room).ok, "the room it named fits").toBe(true);
+    expect(parents(t.h.data)).toEqual(parents(on().h.data));
   });
 });

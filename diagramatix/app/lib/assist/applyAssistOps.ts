@@ -58,7 +58,8 @@ import { SEQUENCE_NODE_TYPES } from "@/app/lib/diagram/templates";
 import { eventSideRefusal } from "@/app/lib/diagram/eventSides";
 import { bandAt, planInsertBetween } from "@/app/lib/diagram/insertBetween";
 import { bandOf, planMoveContents, CONTENTS_STEP_PX } from "@/app/lib/diagram/moveContents";
-import { contentCrossedBy, laneEdgePlan } from "@/app/lib/diagram/laneBoundary";
+import { contentCrossedBy, dividerRoom, laneEdgePlan } from "@/app/lib/diagram/laneBoundary";
+import { BOUNDARY_STEP_PX } from "./poolBoundaryPhrase";
 import { TEMPLATE_BEFORE_REFUSAL } from "./templatePhrase";
 import { refKind, unsaidRef, type RefKind } from "./refKinds";
 import { connectorsOverElement } from "./connectorRef";
@@ -953,7 +954,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       // stops at the first content any locked pool meets (T4627/T4633), the
       // lanes and sublanes follow, the pool stays its lane stack (T4628),
       // and nothing inside moves. One rule, one place — the reducer's.
-      const dist = op.distance ?? 20;
+      const dist = op.distance ?? BOUNDARY_STEP_PX;
       let target: DiagramElement | undefined;
       if (op.ref) {
         const r = resolveField(op, "ref");
@@ -986,8 +987,13 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
           if (!moved) { results.push(`${nameOf(giver)} is as small as it can be — the divider can't move ${op.direction}`); anyFail = true; continue; }
           const crossed = contentCrossedBy(els, aboveId, belowId, below.y + moved);
           if (crossed.length) {
+            // Say how far it CAN go (Paul, 2026-09-27: more flexibility than a
+            // bare refusal) — the room before the first thing in the way.
+            const room = Math.floor(dividerRoom(els, aboveId, belowId, op.direction === "up" ? "up" : "down"));
             const names = crossed.slice(0, 3).map((e) => `“${nameOf(e)}”`).join(", ") + (crossed.length > 3 ? `, and ${crossed.length - 3} more` : "");
-            results.push(`the divider would run through ${names} — move ${crossed.length === 1 ? "it" : "them"} first, or say a smaller move`);
+            results.push(room > 0
+              ? `the divider would run through ${names} — it can move ${op.direction} at most ${room}px: say “${op.direction} by ${room}”`
+              : `the divider would run through ${names} — move ${crossed.length === 1 ? "it" : "them"} first`);
             anyFail = true; continue;
           }
           moveLaneBoundary(aboveId, belowId, dy);

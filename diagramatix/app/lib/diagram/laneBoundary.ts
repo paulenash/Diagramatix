@@ -60,4 +60,27 @@ export function contentCrossedBy(els: readonly DiagramElement[], aboveId: string
   ));
 }
 
+/**
+ * How far the divider between `above` and `below` can move before it would
+ * reach anything in the band that gives way — up: the lowest thing in the band
+ * above; down: the highest thing in the band below. Infinity when that band is
+ * empty (the reducer's own floor still applies).
+ */
+export function dividerRoom(els: readonly DiagramElement[], aboveId: string, belowId: string, direction: "up" | "down"): number {
+  const byId = byIdOf(els);
+  const under = (e: DiagramElement, bandId: string): boolean => {
+    let cur = byId.get(e.parentId ?? "");
+    for (let i = 0; cur && i < 16; i++) { if (cur.id === bandId) return true; cur = byId.get(cur.parentId ?? ""); }
+    return false;
+  };
+  const below = byId.get(belowId);
+  if (!below) return 0;
+  const line = below.y;
+  const content = els.filter((e) => !isAnyLane(e) && e.type !== "pool" && under(e, direction === "up" ? aboveId : belowId));
+  if (!content.length) return Infinity;
+  return direction === "up"
+    ? line - Math.max(...content.map((e) => e.y + e.height))
+    : Math.min(...content.map((e) => e.y)) - line;
+}
+
 const spoken = (e: DiagramElement) => (e.label ?? "").replace(/\s+/g, " ").trim() || e.type;

@@ -59,7 +59,7 @@ export const COMMAND_CATALOG: CatalogFamily[] = [
     { does: "Compress a pool to its content — name a lane and it is that lane that is compressed", say: ["compress the Customer pool", "compress Claims Processing", "shrink Claims System"] },
     { does: "Nudge a pool", say: ["nudge pool down", "bump Customer down by 40", "nudge Claims System up"] },
     { does: "Move ONE edge of a pool — a resize, not a move. A left/right boundary only goes left/right, a top/bottom one only up/down; it stops at the first element it meets and the lanes follow", say: ["move the pool left boundary right", "nudge the Claims Processing pool's top boundary up by 40", "shift the bottom edge of the Customer pool down"] },
-    { does: "A lane's top or bottom boundary — the divider it shares with the lane beside it (the pool's edge at the top or bottom of the pool). It never runs through anything", say: ["move Underwriters top boundary up", "move the Underwriters lane bottom divider up by 20"] },
+    { does: "A lane's top or bottom boundary — the divider it shares with the lane beside it (the pool's edge at the top or bottom of the pool). Any distance — “by 40”, “forty”, “two steps”, “a task”; blocked, it says how far it can go. It never runs through anything", say: ["move Underwriters top boundary up", "move the Underwriters lane bottom divider up by 20", "move Underwriters top boundary up a task"] },
   ] },
   { family: "Lanes and sub-lanes", items: [
     { does: "Add lanes (named or not)", say: ["add a lane to the pool", "add 2 lanes to Claims Processing called Intake and Payments", "add a lane above Lane 3", "insert a lane below Underwriters called Support"] },

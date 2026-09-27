@@ -137,6 +137,69 @@ export function parsePoolBoundaryPhrase(text: string): BoundaryParse {
   return parseWords(tokenise(text));
 }
 
+/** One boundary step — what a boundary moves when no distance is said, and what "two steps" counts in. */
+export const BOUNDARY_STEP_PX = 20;
+/** A Task, for "up a task" / "half a task": its height for a top/bottom edge, its width for a side. */
+const TASK_H = 64, TASK_W = 102;
+
+const NUMBER_WORD: Record<string, number> = {
+  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+  eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17,
+  eighteen: 18, nineteen: 19, twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60,
+  seventy: 70, eighty: 80, ninety: 90, hundred: 100,
+};
+
+/**
+ * HOW FAR (Paul, 2026-09-27: "I can only move a lane boundary by 20px"). Only
+ * "by <digits>" was read, so "up 40", "up 40 pixels", "up by forty" and "down
+ * two steps" all moved the default 20. Now, anywhere after the boundary word:
+ *   a number — digits or words ("forty", "forty five", "a hundred") — in
+ *   pixels, or in steps (20px, the default move), or in tasks / rows (a Task's
+ *   height, or its width for a side); "half a task"; "a bit" / "a little" /
+ *   "slightly" (10px). Returns the distance and which words it used, so none
+ *   of them can become part of the name.
+ */
+function readDistance(words: readonly string[], vertical: boolean): { px: number; used: Set<number> } | null {
+  const lower = words.map((w) => w.toLowerCase());
+  const unitPx = (u: string | undefined): number | null => {
+    if (!u) return null;
+    if (/^(?:px|pixels?|points?)$/.test(u)) return 1;
+    if (/^(?:steps?|notch(?:es)?|clicks?|nudges?)$/.test(u)) return BOUNDARY_STEP_PX;
+    if (/^(?:tasks?|rows?)$/.test(u)) return vertical ? TASK_H : TASK_W;
+    return null;
+  };
+  for (let i = 0; i < lower.length; i++) {
+    const w = lower[i];
+    // "a bit", "a little", "slightly"
+    if (w === "slightly") return { px: 10, used: new Set([i]) };
+    if ((w === "a" || w === "an") && /^(?:bit|little|touch)$/.test(lower[i + 1] ?? "")) return { px: 10, used: new Set([i, i + 1]) };
+    // "half a task" / "half a step"
+    if (w === "half" && /^an?$/.test(lower[i + 1] ?? "")) {
+      const u = unitPx(lower[i + 2]);
+      if (u) return { px: Math.round(u / 2), used: new Set([i, i + 1, i + 2]) };
+    }
+    // A number straight after a kind word is a NAME — "the top boundary of
+    // Lane 2 up" — never a distance.
+    if (i > 0 && (POOL_WORD.test(words[i - 1]) || LANE_WORD.test(words[i - 1]))) continue;
+    // a number: "40", "40px", "forty", "forty five", "a hundred", "a task"
+    let n: number | null = null, j = i;
+    const digits = w.match(/^(\d+)(px)?$/);
+    if (digits) { n = Number(digits[1]); if (digits[2]) return { px: n, used: new Set([i]) }; }
+    else if (w in NUMBER_WORD) {
+      n = NUMBER_WORD[w];
+      if (n >= 20 && n % 10 === 0 && n < 100 && (lower[i + 1] ?? "") in NUMBER_WORD && NUMBER_WORD[lower[i + 1]] < 10) { n += NUMBER_WORD[lower[i + 1]]; j = i + 1; }
+    } else if ((w === "a" || w === "an") && (lower[i + 1] === "hundred")) { n = 100; j = i + 1; }
+    else if ((w === "a" || w === "an") && unitPx(lower[i + 1])) { n = 1; }
+    if (n === null) continue;
+    const used = new Set<number>();
+    for (let k = i; k <= j; k++) used.add(k);
+    const u = unitPx(lower[j + 1]);
+    if (u) { used.add(j + 1); return { px: n * u, used }; }
+    return { px: n, used };
+  }
+  return null;
+}
+
 function parseWords(words: string[]): BoundaryParse {
   const bIdx = words.findIndex((w) => BOUNDARY_WORD.test(w));
   if (bIdx < 0) return null;
@@ -181,13 +244,11 @@ function parseWords(words: string[]): BoundaryParse {
   if (!boundary) boundary = boundaryFacing(direction);
   if (!boundaryTakesDirection(boundary, direction)) return null;
 
-  // "by 40", "by 40px".
-  let distance: number | undefined;
-  const byAt = after.findIndex((w) => /^by$/i.test(w));
-  if (byAt >= 0) {
-    const n = after[byAt + 1]?.match(/^(\d+)/);
-    if (n) distance = Number(n[1]);
-  }
+  // HOW FAR — anywhere after the boundary word, before or after the way
+  // (readDistance); its words, and a "by", are never part of the name.
+  const amount = readDistance(after.map((w, i) => (i === dirAt ? "" : w)), direction === "up" || direction === "down");
+  const distance = amount?.px;
+  const spent = (i: number) => i === dirAt || !!amount?.used.has(i) || (/^by$/i.test(after[i]) && !!amount);
 
   // THE POOL: whatever is left once every word doing a job is taken out. The
   // direction word and anything after it is dropped, so "…up by 40" cannot
@@ -196,7 +257,7 @@ function parseWords(words: string[]): BoundaryParse {
   // two" — and keeping it binds the name to its kind: without it "move Lane 3
   // bottom boundary down" named only "3" (2026-09-27).
   const NUMBER = /^(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)$/i;
-  const naming = [...before, ...after.slice(0, dirAt)];
+  const naming = [...before, ...after.slice(0, dirAt).filter((_, i) => !spent(i))];
   const ref = naming
     .filter((w, i) => {
       if ((POOL_WORD.test(w) || LANE_WORD.test(w)) && NUMBER.test(naming[i + 1] ?? "")) return true;

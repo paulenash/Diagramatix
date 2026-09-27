@@ -606,6 +606,15 @@
       "distance": 20
     }
   ],
+  "move Underwriters top boundary up a task": [
+    {
+      "op": "movePoolBoundary",
+      "boundary": "top",
+      "direction": "up",
+      "ref": "Underwriters",
+      "distance": 64
+    }
+  ],
   "add a lane to the pool": [
     {
       "op": "addLanes",
