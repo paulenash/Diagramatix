@@ -59,7 +59,7 @@ import { eventSideRefusal } from "@/app/lib/diagram/eventSides";
 import { bandAt, planInsertBetween } from "@/app/lib/diagram/insertBetween";
 import { bandOf, planMoveContents, CONTENTS_STEP_PX } from "@/app/lib/diagram/moveContents";
 import { buildDividerFlow, type DividerFlow } from "./dividerFlow";
-import { contentCrossedBy, dividerRoom, laneEdgePlan } from "@/app/lib/diagram/laneBoundary";
+import { contentCrossedBy, dividerRoom, laneEdgePlan, poolEdgeRoom } from "@/app/lib/diagram/laneBoundary";
 import { BOUNDARY_STEP_PX } from "./poolBoundaryPhrase";
 import { TEMPLATE_BEFORE_REFUSAL } from "./templatePhrase";
 import { refKind, unsaidRef, type RefKind } from "./refKinds";
@@ -709,6 +709,13 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       const e = resolve1(op.ref);
       if ("err" in e) { results.push(e.err); anyFail = true; continue; }
       const horiz = op.direction === "left" || op.direction === "right";
+      // A pool or lane is not a shape to slide sideways — its "span" is its
+      // whole width, so a lane went ~1,260px and every pool widened with it
+      // (the 50-command set, 2026-09-27). What was meant is its contents.
+      if (horiz && (e.type === "pool" || isAnyLane(e))) {
+        results.push(`${nameOf(e)} is a ${e.type === "pool" ? "pool" : laneKindWord(e, els)} — to move what is in it, say “move everything in ${nameOf(e)} one step to the ${op.direction}”`);
+        anyFail = true; continue;
+      }
       // "N elements over" → move past the N nearest elements in that direction
       // (same band), else fall back to N element-spans.
       const band = els.filter((x) => x.id !== e.id && x.type !== "pool" && x.type !== "lane" && x.type !== "sublane" && (
@@ -1020,12 +1027,35 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
         anyFail = true; continue;
       }
       const before = { x: target.x, y: target.y, width: target.width, height: target.height };
-      const want = boundaryRect(before, op.boundary, op.direction, dist);
+      // Growing toward another pool stops short of it (poolEdgeRoom); the
+      // reducer stops a shrink at the content. Either way the reply says what
+      // REALLY moved — it used to repeat the distance asked for (the
+      // 50-command set, 2026-09-27: "moved … 100px" after 7px).
+      const outward = (op.boundary === "top" && op.direction === "up") || (op.boundary === "bottom" && op.direction === "down")
+        || (op.boundary === "left" && op.direction === "left") || (op.boundary === "right" && op.direction === "right");
+      const toward = outward ? poolEdgeRoom(els, target, op.boundary) : { room: Infinity };
+      const go = Math.min(dist, toward.room);
+      if (go <= 0) {
+        results.push(`${nameOf(target)}'s ${op.boundary} boundary can't move ${op.direction} — ${toward.neighbour ? nameOf(toward.neighbour) : "another pool"} is right there`);
+        anyFail = true; continue;
+      }
+      const want = boundaryRect(before, op.boundary, op.direction, go);
+      const wasWhiteBoxAtResizeStart = ((target.properties?.poolType as string | undefined) ?? "black-box") === "white-box";
+      const next = preview({ type: "RESIZE_ELEMENT", payload: { id: target.id, x: want.x, y: want.y, width: want.width, height: want.height, wasWhiteBoxAtResizeStart } });
+      const after = next?.elements.find((e) => e.id === target!.id);
+      const edgeOf = (b: { x: number; y: number; width: number; height: number }) =>
+        op.boundary === "left" ? b.x : op.boundary === "right" ? b.x + b.width : op.boundary === "top" ? b.y : b.y + b.height;
+      const moved = after ? Math.round(Math.abs(edgeOf(after) - edgeOf(before))) : 0;
+      if (!moved) {
+        results.push(`${nameOf(target)}'s ${op.boundary} boundary can't move ${op.direction} — something inside is in the way`);
+        anyFail = true; continue;
+      }
       resizeElement(target.id, want.x, want.y, want.width, want.height);
       resizeElementEnd(target.id);   // a spoken move is whole; close it, as the mouse does on release
       setSelectedElementIds(new Set()); // selection protocol
       voiceLastId.current = target.id;
-      results.push(`moved ${nameOf(target)}'s ${op.boundary} boundary ${op.direction} ${dist}px`);
+      const why = moved >= dist ? "" : go < dist && moved >= go - 1 ? ` — it stops short of ${toward.neighbour ? nameOf(toward.neighbour) : "the next pool"}` : " — it stops at what is inside";
+      results.push(`moved ${nameOf(target)}'s ${op.boundary} boundary ${op.direction} ${moved}px${why}`);
       continue;
     }
 

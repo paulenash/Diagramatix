@@ -7,7 +7,7 @@ import type { AssistOp } from "./ops";
 import { SYMBOL_SYNONYMS, SYMBOL_PHRASES } from "./ops";
 import { namesNonContainerKind, laneWordIsAttached, looksPositionalNotAName, namesAContainer, namesOnlyTemplate } from "./greedyGuards";
 import { parseRenameType } from "./renameTargets";
-import { parsePoolBoundaryPhrase, mentionsPoolBoundary } from "./poolBoundaryPhrase";
+import { parsePoolBoundaryPhrase, mentionsPoolBoundary, readAmount } from "./poolBoundaryPhrase";
 import { DIVIDER_COMMAND_RE } from "./dividerFlow";
 import { repairHeardWords } from "./selectedWord";
 import { hasCommandAfterName, COMPRESS_VERB_SOURCE, EXPAND_VERBS } from "./commandVerbs";
@@ -57,12 +57,24 @@ function readShift(tail: string): { direction: "left" | "right"; amount: { steps
   const dirs = [...tail.matchAll(/\b(left|right)\b/gi)];
   if (!dirs.length) return null;
   const direction = dirs[dirs.length - 1][1].toLowerCase() as "left" | "right";
-  let rest = tail;
-  const amt = rest.match(/\b(\d+|an?|one|two|three|four|five|six|seven|eight|nine|ten)\s*(steps?|places?|spaces?|pixels?|px)\b/i);
-  if (amt) rest = rest.replace(amt[0], " ");
+  // HOW FAR, read by the one reader the boundary command uses (readAmount):
+  // "twenty pixels", "one task", "a bit" and "one and a half steps" had all
+  // been read as nothing here, and silently moved the default 100px (the
+  // 50-command set, 2026-09-27). A step is 100px; a task is a Task's width; a
+  // bare number is steps below ten ("two to the right") and pixels from ten
+  // ("fifty to the left").
+  const words = tail.split(/\s+/).filter(Boolean);
+  const amt = readAmount(words.map((w) => w.replace(/[.,!?;:]+$/g, "")));
+  let rest = words.filter((_, k) => !amt?.used.has(k)).join(" ");
   rest = rest.replace(new RegExp(String.raw`(?:\s+to)?(?:\s+the)?\s+${direction}\b`, "i"), " ").replace(/\s+by\s*$/i, " ").replace(/\s+by\s+/i, " ");
-  const n = amt ? toCount(amt[1]) : undefined;
-  const amount = n ? (/^(?:pixels?|px)$/i.test(amt![2]) ? { pixels: n } : { steps: n }) : {};
+  let amount: { steps?: number; pixels?: number } = {};
+  if (amt) {
+    const { value, unit } = amt;
+    if (unit === "px") amount = { pixels: Math.round(value) };
+    else if (unit === "task") amount = { pixels: Math.round(value * 102) };
+    else if (unit === "step" || (unit === "bare" && value < 10)) amount = Number.isInteger(value) ? { steps: value } : { pixels: Math.round(value * 100) };
+    else amount = { pixels: Math.round(value) };
+  }
   return { direction, amount, rest: rest.replace(/\s+/g, " ").replace(/\s*,\s*$/, "").trim() };
 }
 
@@ -672,6 +684,9 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     // than guessed — and "…boundary up" still ends in a direction word, so
     // this rule would happily slide the entire pool instead. Let the AI ask.
     if (mnudge && mentionsPoolBoundary(raw)) mnudge = null;
+    // "move everything in the Claims Processing pool one step right" is the
+    // CONTENTS move, never the whole pool (the 50-command set, 2026-09-27).
+    if (mnudge && /^(?:move|shift|slide)\s+(?:everything|all\b|the\s+contents?\b)/i.test(raw)) mnudge = null;
     if (mnudge) {
       const rawRef = clean(mnudge[1] || "");
       const ref = rawRef && !new RegExp(`^${P}$`, "i").test(rawRef) ? rawRef : undefined; // bare "pool" → default target
@@ -685,6 +700,13 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   // would read "everything in Underwriters" as the name of one thing. The
   // amount and the direction may come in either order (readShift).
   m = raw.match(/^(?:move|shift|slide)\s+(?:everything|all(?:\s+(?:of\s+)?(?:the\s+)?(?:elements?|contents?|steps?|items?|things?|shapes?))?|the\s+(?:contents?|elements?))\s+(?:in(?:side)?|of|within)\s+(.+)$/i);
+  // "move Underwriters contents one step to the right", "move the Underwriters
+  // lane's content …" — the same move; it had fallen to the ELEMENT move and
+  // slid the whole lane ~1,260px (the 50-command set, 2026-09-27).
+  if (!m) {
+    const mc = raw.match(/^(?:move|shift|slide)\s+(?:the\s+)?(.+?)(?:'s)?\s+contents?\s+(.+)$/i);
+    if (mc) m = [mc[0], `${mc[1]} ${mc[2]}`] as unknown as RegExpMatchArray;
+  }
   if (m) {
     const sh = readShift(m[1]);
     const ref = sh ? clean(sh.rest) : "";

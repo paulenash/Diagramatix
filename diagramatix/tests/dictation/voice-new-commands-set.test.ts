@@ -33,7 +33,7 @@ const world = fixtureElements();
 const cases = newCommandCases();
 const OP_OF: Record<string, string> = { [DIVIDERS]: "movePoolBoundary", [CONVERT]: "convertActivity", [CONTENTS]: "moveContents" };
 
-describe("T_NEWSET — the new-commands set: fifty cases, registered, ids from the words", () => {
+describe("T4969 — the new-commands set: fifty cases, registered, ids from the words", () => {
   it("exactly 50 — 20 dividers, 12 converts, 18 contents moves — each of its own command", () => {
     expect(cases).toHaveLength(50);
     const n = (f: string) => cases.filter((c) => c.family === f).length;
@@ -79,7 +79,7 @@ describe("T_NEWSET — the new-commands set: fifty cases, registered, ids from t
   });
 });
 
-describe("T_NEWSET — every case that can be judged passes L1–L3 and L4 on the test diagram", () => {
+describe("T4970 — every case that can be judged passes L1–L3 and L4 on the test diagram", () => {
   it("L1–L3: every case parses to its hand-written key; every one that is not parse-only resolves to the right element", () => {
     const connectors = fixtureDiagram().connectors;
     const bad: string[] = [];
@@ -98,12 +98,13 @@ describe("T_NEWSET — every case that can be judged passes L1–L3 and L4 on th
       if (r.outcome !== "pass") bad.push(`${r.outcome}: “${c.utterance}” — ${r.detail}`);
     }
     expect(bad).toEqual([]);
-    expect(cases.filter((c) => !c.parseOnly)).toHaveLength(41);
+    // 42: "move Underwriters bottom boundary down" is judged since touching stopped counting as crossing (2026-09-27).
+    expect(cases.filter((c) => !c.parseOnly)).toHaveLength(42);
   });
 
   it("the ones that must be REFUSED are refused, with the words written in the set, and change nothing", () => {
     const refusing = NEW_COMMAND_CASES.filter((c) => c.refuses);
-    expect(refusing.map((c) => c.family)).toEqual([DIVIDERS, DIVIDERS, DIVIDERS, CONVERT, CONVERT, CONTENTS, CONTENTS, CONTENTS]);
+    expect(refusing.map((c) => c.family)).toEqual([DIVIDERS, DIVIDERS, CONVERT, CONVERT, CONTENTS, CONTENTS, CONTENTS]);
     for (const c of refusing) {
       const ops = parseCommand(c.say)!;
       expect(ops, c.say).not.toBeNull();
@@ -130,10 +131,10 @@ describe("T_NEWSET — every case that can be judged passes L1–L3 and L4 on th
   });
 });
 
-describe("T_NEWSET — what cannot be judged says why", () => {
-  it("parse-only is the eight refusals and the one sub-lane line — each with its reason written out", () => {
+describe("T4971 — what cannot be judged says why", () => {
+  it("parse-only is the seven refusals and the one sub-lane line — each with its reason written out", () => {
     const po = cases.filter((c) => c.parseOnly);
-    expect(po).toHaveLength(9);
+    expect(po).toHaveLength(8);
     for (const c of po) expect(c.parseOnly!.length, c.utterance).toBeGreaterThan(30);
     for (const c of NEW_COMMAND_CASES) {
       const got = cases.find((x) => x.utterance === c.say)!;
@@ -151,7 +152,7 @@ describe("T_NEWSET — what cannot be judged says why", () => {
   });
 });
 
-describe("T_NEWSET — Replay handles the set like the popup set", () => {
+describe("T4972 — Replay handles the set like the popup set", () => {
   it("names it, orders it after the popup set, and gives each clip its case's context and today's key", () => {
     const sets = [
       { seed: NEW_COMMANDS_SET_ID, clips: 50, lastRecordedAt: "2026-09-27T00:00:00Z" },

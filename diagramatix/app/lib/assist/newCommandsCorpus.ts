@@ -118,12 +118,12 @@ export const NEW_COMMAND_CASES: readonly NewCommandCase[] = [
   // Refused: never through anything — and it says how far it can go.
   {
     family: DIVIDERS, say: "move Underwriters top boundary down by 50", ops: [boundary("Underwriters", "top", "down", 50)],
-    refuses: "the divider would run through “Task 2”, “Subprocess 3”, “Check Coverage” — it can move down at most 43px",
+    // Subprocess 3 only TOUCHES the line at 50px down — touching is not crossing (2026-09-27).
+    refuses: "the divider would run through “Task 2”, “Check Coverage” — it can move down at most 43px",
   },
-  {
-    family: DIVIDERS, say: "move Underwriters bottom boundary down", ops: [boundary("Underwriters", "bottom", "down")],
-    refuses: "the divider would run through “Pay Claim” — it can move down at most 19px",
-  },
+  // The plain step: Pay Claim sits 19.998px under this divider, which refused it
+  // until touching stopped counting as crossing (2026-09-27) — now it moves.
+  { family: DIVIDERS, say: "move Underwriters bottom boundary down", ops: [boundary("Underwriters", "bottom", "down")] },
   {
     family: DIVIDERS, say: "move Underwriters top boundary up by three tasks", ops: [boundary("Underwriters", "top", "up", 192)],
     refuses: "it can move up at most 115px",

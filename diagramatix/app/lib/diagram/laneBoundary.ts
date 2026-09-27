@@ -54,9 +54,12 @@ export function contentCrossedBy(els: readonly DiagramElement[], aboveId: string
     for (let i = 0; cur && i < 16; i++) { if (cur.id === bandId) return true; cur = byId.get(cur.parentId ?? ""); }
     return false;
   };
+  // Touching is not crossing: within half a pixel is clear (a task 19.998px
+  // under a divider refused the plain 20px step — the 50-command set, 2026-09-27).
+  const EPS = 0.5;
   return els.filter((e) => !isAnyLane(e) && e.type !== "pool" && (
-    (under(e, aboveId) && e.y + e.height > newY)
-    || (under(e, belowId) && e.y < newY)
+    (under(e, aboveId) && e.y + e.height > newY + EPS)
+    || (under(e, belowId) && e.y < newY - EPS)
   ));
 }
 
@@ -81,6 +84,33 @@ export function dividerRoom(els: readonly DiagramElement[], aboveId: string, bel
   return direction === "up"
     ? line - Math.max(...content.map((e) => e.y + e.height))
     : Math.min(...content.map((e) => e.y)) - line;
+}
+
+/** The gap a pool keeps from its neighbour when its edge grows toward it. */
+export const POOL_GAP = 10;
+
+/**
+ * How far a pool's edge can GROW before it would meet another pool — the
+ * mouse lets a pool run over its neighbour; a sentence must not (the
+ * 50-command set, 2026-09-27: "move the top boundary of Lane 3 up by 200" put
+ * Claims Processing over the Customer pool). Infinity when nothing is that way.
+ */
+export function poolEdgeRoom(els: readonly DiagramElement[], pool: DiagramElement, boundary: "top" | "bottom" | "left" | "right"): { room: number; neighbour?: DiagramElement } {
+  const others = els.filter((e) => e.type === "pool" && e.id !== pool.id);
+  const right = pool.x + pool.width, bottom = pool.y + pool.height;
+  const spanX = (o: DiagramElement) => o.x < right && o.x + o.width > pool.x;
+  const spanY = (o: DiagramElement) => o.y < bottom && o.y + o.height > pool.y;
+  let best: { room: number; neighbour?: DiagramElement } = { room: Infinity };
+  for (const o of others) {
+    const gap =
+      boundary === "top" && spanX(o) && o.y + o.height <= pool.y + 0.5 ? pool.y - (o.y + o.height)
+      : boundary === "bottom" && spanX(o) && o.y >= bottom - 0.5 ? o.y - bottom
+      : boundary === "left" && spanY(o) && o.x + o.width <= pool.x + 0.5 ? pool.x - (o.x + o.width)
+      : boundary === "right" && spanY(o) && o.x >= right - 0.5 ? o.x - right
+      : Infinity;
+    if (gap < best.room) best = { room: Math.max(0, gap - POOL_GAP), neighbour: o };
+  }
+  return best;
 }
 
 const spoken = (e: DiagramElement) => (e.label ?? "").replace(/\s+/g, " ").trim() || e.type;

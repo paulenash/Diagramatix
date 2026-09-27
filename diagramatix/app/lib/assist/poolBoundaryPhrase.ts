@@ -103,7 +103,7 @@ const isDirWord = (w: string) => w.toLowerCase() in DIRS;
  */
 function tokenise(text: string): string[] {
   return text
-    .replace(/[.,;:!?"“”]/g, " ")
+    .replace(/[,;:!?"“”]|\.(?!\d)|(?<!\d)\./g, " ")   // a decimal point ("1.5 tasks") stays
     .replace(/'s\b/gi, " ")
     .split(/\s+/)
     .filter(Boolean);
@@ -125,7 +125,7 @@ export function parsePoolBoundaryPhrase(text: string): BoundaryParse {
   // selected"; read as the sentence it is, it is the command with no name at
   // all, which is right. The whole string is still tried afterwards, so a
   // genuine one-sentence command is unaffected.
-  const fragments = text.split(/[.!?]+/).map((f) => f.trim()).filter(Boolean);
+  const fragments = text.split(/(?:[!?]|\.(?!\d))+/).map((f) => f.trim()).filter(Boolean);   // "1.5 tasks" is not two sentences
   const lastWithBoundary = [...fragments].reverse()
     .find((f) => tokenise(f).some((w) => BOUNDARY_WORD.test(w)));
   if (lastWithBoundary && lastWithBoundary !== text.trim()) {
@@ -150,73 +150,94 @@ const NUMBER_WORD: Record<string, number> = {
 };
 
 /**
- * HOW FAR (Paul, 2026-09-27: "I can only move a lane boundary by 20px"). Only
- * "by <digits>" was read, so "up 40", "up 40 pixels", "up by forty" and "down
- * two steps" all moved the default 20. Now, anywhere after the boundary word:
- *   a number — digits or words ("forty", "forty five", "a hundred") — in
- *   pixels, or in steps (20px, the default move), or in tasks / rows (a Task's
- *   height, or its width for a side); "half a task"; "a bit" / "a little" /
- *   "slightly" (10px). Returns the distance and which words it used, so none
- *   of them can become part of the name.
+ * HOW FAR — one reader for every "move … by how much" (Paul, 2026-09-27: "I can
+ * only move a lane boundary by 20px"; the 50-command set then found the
+ * contents move silently moving 100px for "twenty pixels", "one task" and "a
+ * bit", because it had a weaker reader of its own). Anywhere in the words:
+ *   a number — digits ("40", "1.5"), words ("forty five", "a hundred and
+ *   twenty", "one fifty" = 150), "one and a half", "half a" — followed by a
+ *   unit: pixels, steps, tasks / rows; or "a bit" / "a little" / "slightly".
+ *   A number with no unit is "bare": each command decides what that means.
+ * Returns the amount, its unit and which words it used, so none of them can
+ * become part of a name.
  */
-export function readDistance(words: readonly string[], vertical: boolean): { px: number; used: Set<number> } | null {
+export type AmountUnit = "px" | "step" | "task" | "bare";
+export function readAmount(words: readonly string[]): { value: number; unit: AmountUnit; used: Set<number> } | null {
   const lower = words.map((w) => w.toLowerCase());
-  const unitPx = (u: string | undefined): number | null => {
+  const unitOf = (u: string | undefined): AmountUnit | null => {
     if (!u) return null;
-    if (/^(?:px|pixels?|points?)$/.test(u)) return 1;
-    if (/^(?:steps?|notch(?:es)?|clicks?|nudges?)$/.test(u)) return BOUNDARY_STEP_PX;
-    if (/^(?:tasks?|rows?)$/.test(u)) return vertical ? TASK_H : TASK_W;
+    if (/^(?:px|pixels?|points?)$/.test(u)) return "px";
+    if (/^(?:steps?|places?|spaces?|notch(?:es)?|clicks?|nudges?)$/.test(u)) return "step";
+    if (/^(?:tasks?|rows?)$/.test(u)) return "task";
     return null;
   };
+  const word = (k: number): number | undefined => NUMBER_WORD[lower[k] ?? ""];
+  const tail = (k: number): [number, number] => {   // tens and units after position k: [value, last index]
+    let v = 0, at = k;
+    if (lower[at + 1] === "and" && word(at + 2) !== undefined) at++;
+    const tens = word(at + 1);
+    if (tens !== undefined && tens >= 20 && tens < 100 && tens % 10 === 0) {
+      v = tens; at++;
+      const unit = word(at + 1);
+      if (unit !== undefined && unit < 10) { v += unit; at++; }
+    } else if (tens !== undefined && tens < 20) { v = tens; at++; }
+    return v ? [v, at] : [0, k];
+  };
+  let bare: { value: number; unit: AmountUnit; used: Set<number> } | null = null;
   for (let i = 0; i < lower.length; i++) {
     const w = lower[i];
-    // "a bit", "a little", "slightly"
-    if (w === "slightly") return { px: 10, used: new Set([i]) };
-    if ((w === "a" || w === "an") && /^(?:bit|little|touch)$/.test(lower[i + 1] ?? "")) return { px: 10, used: new Set([i, i + 1]) };
+    // "a bit", "a little", "slightly" — ten pixels.
+    if (w === "slightly") return { value: 10, unit: "px", used: new Set([i]) };
+    if ((w === "a" || w === "an") && /^(?:bit|little|touch)$/.test(lower[i + 1] ?? "")) return { value: 10, unit: "px", used: new Set([i, i + 1]) };
     // "half a task" / "half a step"
     if (w === "half" && /^an?$/.test(lower[i + 1] ?? "")) {
-      const u = unitPx(lower[i + 2]);
-      if (u) return { px: Math.round(u / 2), used: new Set([i, i + 1, i + 2]) };
+      const u = unitOf(lower[i + 2]);
+      if (u) return { value: 0.5, unit: u, used: new Set([i, i + 1, i + 2]) };
     }
     // A number straight after a kind word is a NAME — "the top boundary of
-    // Lane 2 up" — never a distance.
-    if (i > 0 && (POOL_WORD.test(words[i - 1]) || LANE_WORD.test(words[i - 1]))) continue;
-    // a number: "40", "40px", "forty", "forty five", "a hundred", "a task"
+    // Lane 2 up" — never a distance… unless a unit follows it: "the lane one
+    // step to the right", "the pool two tasks" (the 50-command set, 2026-09-27).
+    if (i > 0 && (POOL_WORD.test(words[i - 1]) || LANE_WORD.test(words[i - 1])) && !unitOf(lower[i + 1])) continue;
     let n: number | null = null, j = i;
-    const digits = w.match(/^(\d+)(px)?$/);
-    // "one hundred" read as 1, and moved the boundary 1px (Paul's boundary
-    // session, 2026-09-27). Now: "one hundred", "two hundred and fifty", "a
-    // hundred", and the way people say numbers aloud — "one fifty" is 150.
-    const word = (k: number): number | undefined => NUMBER_WORD[lower[k] ?? ""];
-    const tail = (k: number): [number, number] => {   // tens and units after position k: [value, last index]
-      let v = 0, at = k;
-      if (lower[at + 1] === "and") at++;
-      const tens = word(at + 1);
-      if (tens !== undefined && tens >= 20 && tens < 100 && tens % 10 === 0) {
-        v = tens; at++;
-        const unit = word(at + 1);
-        if (unit !== undefined && unit < 10) { v += unit; at++; }
-      } else if (tens !== undefined && tens < 20) { v = tens; at++; }
-      return v ? [v, at] : [0, k];
-    };
-    if (digits) { n = Number(digits[1]); if (digits[2]) return { px: n, used: new Set([i]) }; }
+    const digits = w.match(/^(\d+(?:\.\d+)?)(px)?$/);
+    if (digits) { n = Number(digits[1]); if (digits[2]) return { value: n, unit: "px", used: new Set([i]) }; }
     else if (w in NUMBER_WORD) {
       n = NUMBER_WORD[w];
       if (n < 10 && lower[i + 1] === "hundred") { const [v, at] = tail(i + 1); n = n * 100 + v; j = at; }
       else if (n < 10 && (word(i + 1) ?? 0) >= 20 && (word(i + 1) ?? 0) < 100) { const [v, at] = tail(i); n = n * 100 + v; j = at; }
       else if (n >= 20 && n % 10 === 0 && n < 100 && (word(i + 1) ?? 99) < 10) { n += word(i + 1)!; j = i + 1; }
-    } else if ((w === "a" || w === "an") && (lower[i + 1] === "hundred")) { const [v, at] = tail(i + 1); n = 100 + v; j = at; }
-    else if ((w === "a" || w === "an") && unitPx(lower[i + 1])) { n = 1; }
+    } else if ((w === "a" || w === "an") && lower[i + 1] === "hundred") { const [v, at] = tail(i + 1); n = 100 + v; j = at; }
+    else if ((w === "a" || w === "an" || w === "one") && unitOf(lower[i + 1])) { n = 1; }
     // "down to tasks" — the recogniser's "two tasks"; only straight before a unit.
-    else if ((w === "to" || w === "too") && unitPx(lower[i + 1])) { n = 2; }
+    else if ((w === "to" || w === "too") && unitOf(lower[i + 1])) { n = 2; }
     if (n === null) continue;
+    // "one and a half tasks"
+    if (lower[j + 1] === "and" && /^an?$/.test(lower[j + 2] ?? "") && lower[j + 3] === "half") { n += 0.5; j += 3; }
     const used = new Set<number>();
     for (let k = i; k <= j; k++) used.add(k);
-    const u = unitPx(lower[j + 1]);
-    if (u) { used.add(j + 1); return { px: n * u, used }; }
-    return { px: n, used };
+    const u = unitOf(lower[j + 1]);
+    if (u) { used.add(j + 1); return { value: n, unit: u, used }; }
+    // A BARE number is an amount only where an amount goes — next to the way
+    // or "by"/"to", or at the end ("up 40", "by forty", "two to the right").
+    // Anywhere else it is part of a name: in "starting at Task 2 in Claims
+    // Processing one step to the right" the "2" had been read as the distance
+    // (the 50-command set, 2026-09-27). The first such, and only when no
+    // amount with a unit is said anywhere.
+    const WAYISH = /^(?:up|down|left|right|upwards?|downwards?|to|by|please)$/;
+    if (!bare && (j + 1 >= lower.length || WAYISH.test(lower[j + 1]) || (i > 0 && WAYISH.test(lower[i - 1])))) {
+      bare = { value: n, unit: "bare", used };
+    }
+    i = j;
   }
-  return null;
+  return bare;
+}
+
+/** A boundary's distance in pixels: a step is 20px, a task its height (or width for a side), a bare number pixels. */
+export function readDistance(words: readonly string[], vertical: boolean): { px: number; used: Set<number> } | null {
+  const a = readAmount(words);
+  if (!a) return null;
+  const per = a.unit === "step" ? BOUNDARY_STEP_PX : a.unit === "task" ? (vertical ? TASK_H : TASK_W) : 1;
+  return { px: Math.round(a.value * per), used: a.used };
 }
 
 function parseWords(words: string[]): BoundaryParse {
