@@ -16,6 +16,7 @@ import { parseBoundaryEventPhrase } from "./boundaryEventPhrase";
 import { ADD_MESSAGE_LEAD, MESSAGE_BY_NUMBER, MESSAGE_BY_NUMBER_FROM_SELECTION } from "./messagePhrase";
 import { COMPRESS_KIND_WORDS, EXPAND_KIND_WORDS } from "./compressPhrase";
 import { wordAlternation } from "./containerWords";
+import { DIVIDER_COMMAND_RE } from "./dividerFlow";
 
 const VERBS = new RegExp(`^(?:${COMMAND_VERBS.join("|")})$`);
 /** A strong compress verb and ONE container's kind word, the name not said yet. */
@@ -85,7 +86,7 @@ export function isIncompleteCommand(text: string): boolean {
   // LANE move), the second named nothing and asked "which pool?". Every move
   // command says which way — up / down / left / right, above / below, or "to"
   // (a gateway point) — so one without it is waiting for the rest.
-  if (/^(?:move|shift|slide|nudge|drag|bump)\b/.test(t)
+  if (/^(?:move|shift|slide|nudge|drag|bump)\b/.test(t) && !DIVIDER_COMMAND_RE.test(t)
     && !/\b(?:up|down|left|right|upwards?|downwards?|above|below|under(?:neath)?|over|to|into|onto)\b/.test(t)) return true;
   if (/^(surround|enclose|wrap)\b/.test(t) && !/\b(with|in|inside|into|within|using)\b\s+\S+/.test(t)) return true;
   // connect / disconnect — missing the second operand ("connect them" is complete).

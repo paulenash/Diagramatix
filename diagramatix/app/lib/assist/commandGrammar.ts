@@ -8,6 +8,7 @@ import { SYMBOL_SYNONYMS, SYMBOL_PHRASES } from "./ops";
 import { namesNonContainerKind, laneWordIsAttached, looksPositionalNotAName, namesAContainer, namesOnlyTemplate } from "./greedyGuards";
 import { parseRenameType } from "./renameTargets";
 import { parsePoolBoundaryPhrase, mentionsPoolBoundary } from "./poolBoundaryPhrase";
+import { DIVIDER_COMMAND_RE } from "./dividerFlow";
 import { repairHeardWords } from "./selectedWord";
 import { hasCommandAfterName, COMPRESS_VERB_SOURCE, EXPAND_VERBS } from "./commandVerbs";
 import { parseCompressPhrase, parseExpandPhrase } from "./compressPhrase";
@@ -280,6 +281,10 @@ export function parseCommand(utterance: string): AssistOp[] | null {
       if (ref) return [{ op: "attachRiskControl", ref }];
     }
   }
+
+  // ── "Move dividers" (Paul, 2026-09-27): numbers ON the lane dividers, then
+  // "<n> up 100 pixels" — nothing to name, so nothing to mis-hear (dividerFlow.ts).
+  if (DIVIDER_COMMAND_RE.test(raw)) return [{ op: "numberDividers" }];
 
   // ── Task ↔ subprocess (Paul, 2026-09-27) ──
   // "convert Review Claim to a subprocess", "convert selected to a task",

@@ -104,7 +104,7 @@ describe("3 — 'stop' means one thing", () => {
     expect(ed).toContain("if (isFlowEndWord(low)) { cancelRenameFlow(\"rename finished\"); return; }");
     expect(ed).toContain("pick another or say “done”");
     // Stopping the mic drops whatever was parked.
-    expect(ed).toMatch(/setAbraConnecting\(false\);\s*\/\/[^\n]*\n\s*setRenameFlow\(null\);\s*setMessageFlow\(null\);\s*pendingConfirmRef\.current = null;/);
+    expect(ed).toMatch(/setAbraConnecting\(false\);\s*\/\/[^\n]*\n\s*setRenameFlow\(null\);\s*setMessageFlow\(null\);\s*setDividerFlow\(null\);\s*pendingConfirmRef\.current = null;/);   // + "move dividers", 2026-09-27
   });
 });
 
@@ -214,7 +214,7 @@ describe("6 & 7 — messages by number", () => {
     // that prop is `badgesOnScreen(...)`, which the voice-debug recording also
     // reads, so what it saves is what was drawn (T4886, T4893).
     expect(ed).toContain("renameBadges={onScreenBadges}");
-    expect(ed).toContain("const onScreenBadges = badgesOnScreen(renameFlow, messageFlow, pickFlow);");
+    expect(ed).toContain("const onScreenBadges = badgesOnScreen(renameFlow, messageFlow, pickFlow, dividerTargets);");
     const r = [{ id: "r", n: 1, kind: "element" as const, x: 0, y: 0, height: 0 }];
     const m = [{ ...r[0], id: "m" }], p = [{ ...r[0], id: "p" }];
     expect(badgesOnScreen({ phase: "pick", targets: r }, { targets: m }, { targets: p }), "the rename flow's targets").toBe(r);

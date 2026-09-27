@@ -261,7 +261,7 @@ export function checkEffect(op: AssistOp, before: DiagramData, after: DiagramDat
   switch (op.op) {
     // The screen, not the diagram.
     case "goldFlash": case "export": case "pickTemplate": case "again":
-    case "renameByType": case "addMessageByNumber": case "acceptGhost":
+    case "renameByType": case "addMessageByNumber": case "acceptGhost": case "numberDividers":
       return null;
 
     case "undo":

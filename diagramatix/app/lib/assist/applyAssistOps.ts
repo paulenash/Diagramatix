@@ -58,6 +58,7 @@ import { SEQUENCE_NODE_TYPES } from "@/app/lib/diagram/templates";
 import { eventSideRefusal } from "@/app/lib/diagram/eventSides";
 import { bandAt, planInsertBetween } from "@/app/lib/diagram/insertBetween";
 import { bandOf, planMoveContents, CONTENTS_STEP_PX } from "@/app/lib/diagram/moveContents";
+import { buildDividerFlow, type DividerFlow } from "./dividerFlow";
 import { contentCrossedBy, dividerRoom, laneEdgePlan } from "@/app/lib/diagram/laneBoundary";
 import { BOUNDARY_STEP_PX } from "./poolBoundaryPhrase";
 import { TEMPLATE_BEFORE_REFUSAL } from "./templatePhrase";
@@ -123,6 +124,8 @@ export interface AssistUi {
   setPickFlow(f: PickFlow | null): void;
   setRenameFlow(f: RenameFlow | null): void;
   setMessageFlow(f: MessagePick | null): void;
+  /** "move dividers" — open (or close) the numbered-divider flow. */
+  setDividerFlow(f: DividerFlow | null): void;
   setGoldFlash(on: boolean): void;
 }
 
@@ -184,7 +187,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
     swapLane, moveLane, moveElements, elementsMoveEnd, removeSpace, insertSpace, convertTaskSubprocess, moveLaneBoundary, laneBoundaryMoveEnd, updateConnectorEndpoint, movePoolTo,
     swapPools, resizeElement, resizeElementEnd, alignElements,
   } = ctx.actions;
-  const { setSelectedElementIds, setSelectedConnectorId, setPickFlow, setRenameFlow, setMessageFlow, setGoldFlash } = ctx.ui;
+  const { setSelectedElementIds, setSelectedConnectorId, setPickFlow, setRenameFlow, setMessageFlow, setDividerFlow, setGoldFlash } = ctx.ui;
   const { voiceLastId, pointerWorld, selectedIdsRef, selectedConnectorIdRef, nextStepRef, openTemplateWindowRef, exportJsonRef } = ctx.refs;
   const results: string[] = [];
   let anyFail = false;
@@ -1448,6 +1451,16 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
     // different things. Refusals are specific on purpose: "I don't know that
     // subtype" and "I know it, but not for a gateway" are different problems
     // and only the second one tells the user what to do next.
+    // "move dividers" (Paul, 2026-09-27): number every lane divider; the next
+    // utterance — "2 up 100 pixels" — is the editor's to read (dividerFlow.ts).
+    if (op.op === "numberDividers") {
+      const flow = buildDividerFlow(els);
+      if ("error" in flow) { results.push(flow.error); anyFail = true; continue; }
+      setDividerFlow(flow);
+      results.push(flow.prompt);
+      continue;
+    }
+
     // "convert Review Claim to a subprocess" / "convert selected to a task"
     // (Paul, 2026-09-27) — the right-click menu's toggle (CONVERT_TASK_SUBPROCESS),
     // on each named or selected element that is the other shape. A task's

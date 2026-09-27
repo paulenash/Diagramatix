@@ -14,7 +14,8 @@ export type RenameType =
 export interface RenameTarget {
   id: string;
   n: number;                       // 1-based badge number
-  kind: "element" | "connector";
+  /** "divider": a lane divider — the badge sits ON the line ("move dividers", dividerFlow.ts). */
+  kind: "element" | "connector" | "divider";
   x: number;                       // badge anchor (world coords) — centre of the item
   y: number;
   height: number;                  // item height (0 for connectors)

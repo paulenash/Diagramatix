@@ -129,6 +129,7 @@ export function headlessDiagram(initial: DiagramData): HeadlessDiagram {
     setPickFlow: (f: PickFlow | null) => { if (f) screen.push("pick"); },
     setRenameFlow: (f) => { if (f) screen.push("rename"); },
     setMessageFlow: (f) => { if (f) screen.push("message"); },
+    setDividerFlow: (f) => { if (f) screen.push("dividers"); },
     setGoldFlash: () => {},
   };
 

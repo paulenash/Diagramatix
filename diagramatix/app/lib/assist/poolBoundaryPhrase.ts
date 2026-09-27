@@ -159,7 +159,7 @@ const NUMBER_WORD: Record<string, number> = {
  *   "slightly" (10px). Returns the distance and which words it used, so none
  *   of them can become part of the name.
  */
-function readDistance(words: readonly string[], vertical: boolean): { px: number; used: Set<number> } | null {
+export function readDistance(words: readonly string[], vertical: boolean): { px: number; used: Set<number> } | null {
   const lower = words.map((w) => w.toLowerCase());
   const unitPx = (u: string | undefined): number | null => {
     if (!u) return null;

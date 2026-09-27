@@ -125,6 +125,7 @@ Op shapes (use element NAMES for refs — they are resolved against the diagram;
         // into a gateway (task <-> subprocess is convertActivity); if that is what was asked, return no ops rather than something adjacent.
   { "op":"convertActivity", "ref": <name>, "to": "task"|"subprocess" }  // change the SHAPE task <-> (collapsed) subprocess, as the right-click menu does: "convert Review to a subprocess", "convert selected to a task"
   { "op":"moveContents", "ref": <pool, lane or sub-lane name>, "direction": "left"|"right", "steps"?: number, "pixels"?: number }  // move EVERYTHING INSIDE the container, not the container; a step is 100px: "move everything in Underwriters two steps to the right". With "fromRef" (the step, e.g. "selected") only that step and what is after it move, in its own lane unless "ref" names one: "move everything from selected two steps to the right"
+  { "op":"numberDividers" }  // "move dividers": put numbers ON the lane dividers; the user then says "<n> up 100 pixels" — use it for any request to move lane dividers without naming one
   { "op":"clear" }                    // empty the whole diagram
   { "op":"export", "format":"json" }  // download the diagram as JSON
   { "op":"undo" }

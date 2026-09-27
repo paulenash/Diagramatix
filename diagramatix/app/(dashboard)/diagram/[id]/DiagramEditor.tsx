@@ -60,6 +60,7 @@ import { looksLikeElementId, notUnderstoodMessage, humaniseIds } from "@/app/lib
 import { isMicStopWord, isFlowEndWord } from "@/app/lib/assist/stopWords";
 import { aiInventedRename, INVENTED_RENAME_REFUSAL } from "@/app/lib/assist/aiGuards";
 import { interruptsPick } from "@/app/lib/assist/pickInterrupt";
+import { collectDividers, dividerOp, dividerReply, explainDividerMiss, parseDividerAnswer, type DividerFlow } from "@/app/lib/assist/dividerFlow";
 import { isIncompleteCommand } from "@/app/lib/assist/incompleteCommand";
 import { leadingSpokenNumber } from "@/app/lib/assist/spokenNumber";
 import { capitaliseFirstWord, needsCapital } from "@/app/lib/diagram/nameCase";
@@ -2841,6 +2842,12 @@ export function DiagramEditor({
   const [messageFlow, setMessageFlowState] = useState<MessagePick | null>(null);
   const messageFlowRef = useRef<MessagePick | null>(null);
   const setMessageFlow = useCallback((f: MessagePick | null) => { messageFlowRef.current = f; setMessageFlowState(f); }, []);
+  // "move dividers" (dividerFlow.ts): open while the numbers are on the dividers.
+  // The numbers are recomputed from the diagram, so they follow each move.
+  const [dividerFlow, setDividerFlowState] = useState<DividerFlow | null>(null);
+  const dividerFlowRef = useRef<DividerFlow | null>(null);
+  const setDividerFlow = useCallback((f: DividerFlow | null) => { dividerFlowRef.current = f; setDividerFlowState(f); }, []);
+  const dividerTargets = useMemo(() => (dividerFlow ? collectDividers(data.elements) : null), [dividerFlow, data.elements]);
   // ── R2: the disambiguation picker. Same numbered-badge mechanism as the
   //    rename and message flows — the point of R2 was never new UI, it was that
   //    a mechanism the product already had was not reached from the one place
@@ -2883,7 +2890,7 @@ export function DiagramEditor({
 
   // The numbered badges on the canvas — drawn by the Canvas, and saved by the
   // debug recording, from this one value, so what is saved is what was drawn.
-  const onScreenBadges = badgesOnScreen(renameFlow, messageFlow, pickFlow);
+  const onScreenBadges = badgesOnScreen(renameFlow, messageFlow, pickFlow, dividerTargets);
   /**
    * Save one state of the diagram into the debug recording, with what was on
    * screen: the selection, the pointer, what "it" means, the numbered badges
@@ -2904,7 +2911,7 @@ export function DiagramEditor({
         pointer: pointerWorld.current ? { ...pointerWorld.current } : null,
         voiceLastId: voiceLastId.current,
         badges: onScreenBadges ?? null,
-        flow: projectFlow({ template: templateFlow, pick: pickFlow, rename: renameFlow, message: messageFlow }),
+        flow: projectFlow({ template: templateFlow, pick: pickFlow, rename: renameFlow, message: messageFlow, dividers: dividerTargets }),
       },
     });
     debugLedgerRef.current = r.ledger;
@@ -3000,10 +3007,10 @@ export function DiagramEditor({
         swapLane, moveLane, moveElements, elementsMoveEnd, removeSpace, insertSpace, convertTaskSubprocess, moveLaneBoundary, laneBoundaryMoveEnd, updateConnectorEndpoint, movePoolTo,
         swapPools, resizeElement, resizeElementEnd, alignElements,
       },
-      ui: { setSelectedElementIds, setSelectedConnectorId, setPickFlow, setRenameFlow, setMessageFlow, setGoldFlash },
+      ui: { setSelectedElementIds, setSelectedConnectorId, setPickFlow, setRenameFlow, setMessageFlow, setDividerFlow, setGoldFlash },
       refs: { voiceLastId, pointerWorld, selectedIdsRef, selectedConnectorIdRef, nextStepRef, openTemplateWindowRef, exportJsonRef },
     });
-  }, [data.elements, data.connectors, data.poolFontSize, data.laneFontSize, data.connectorFontSize, data.relaxedLayout, riskCatalog, armDebugBefore, armGoldFlash, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, updateConnectorLabel, deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool, wrapInSubprocess, wrapInContainer, unwrapSubprocess, addPool, addLaneAt, compressPool, compressLane, expandLane, extendPools, swapLane, moveLane, moveElements, elementsMoveEnd, removeSpace, insertSpace, convertTaskSubprocess, moveLaneBoundary, laneBoundaryMoveEnd, updateConnectorEndpoint, movePoolTo, swapPools, resizeElement, resizeElementEnd, alignElements, setRenameFlow, setMessageFlow, setPickFlow]);
+  }, [data.elements, data.connectors, data.poolFontSize, data.laneFontSize, data.connectorFontSize, data.relaxedLayout, riskCatalog, armDebugBefore, armGoldFlash, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, updateConnectorLabel, deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool, wrapInSubprocess, wrapInContainer, unwrapSubprocess, addPool, addLaneAt, compressPool, compressLane, expandLane, extendPools, swapLane, moveLane, moveElements, elementsMoveEnd, removeSpace, insertSpace, convertTaskSubprocess, moveLaneBoundary, laneBoundaryMoveEnd, updateConnectorEndpoint, movePoolTo, swapPools, resizeElement, resizeElementEnd, alignElements, setRenameFlow, setMessageFlow, setPickFlow, setDividerFlow]);
 
   // Gold flashing, part two: the command has run, React has re-rendered, and
   // `data.elements` is now the after picture. Diff it against the snapshot taken
@@ -3232,8 +3239,10 @@ export function DiagramEditor({
       if (target.kind === "element") { setSelectedConnectorId(null); setSelectedElementIds(new Set([target.id])); beginLabelEdit(target.id); }
       else { setSelectedElementIds(new Set()); setSelectedConnectorId(target.id); }
       const trailing = picked.rest;
-      if (trailing) { applyRenameName(target, trailing, flow.itemType); }         // "14 Approve Invoice" in one breath
-      else { setRenameFlow({ phase: "name", itemType: flow.itemType, targetId: target.id, kind: target.kind }); } // wait for the name
+      // A rename target is an element or a connector — never a divider (dividerFlow.ts has its own flow).
+      const renameKind: "element" | "connector" = target.kind === "element" ? "element" : "connector";
+      if (trailing) { applyRenameName({ ...target, kind: renameKind }, trailing, flow.itemType); }         // "14 Approve Invoice" in one breath
+      else { setRenameFlow({ phase: "name", itemType: flow.itemType, targetId: target.id, kind: renameKind }); } // wait for the name
       return;
     }
     // phase "name" — the whole utterance is the new name.
@@ -3277,6 +3286,24 @@ export function DiagramEditor({
   const handleMessageUtteranceRef = useRef(handleMessageUtterance);
   handleMessageUtteranceRef.current = handleMessageUtterance;
 
+  // The answer while "move dividers" is open: "2 up 100 pixels", "two down 2
+  // tasks", "3 up" — or "done". Each answer runs the boundary command on the
+  // band below that divider (its top IS the line), so the same floor and the
+  // same never-through-anything rule apply, and the numbers stay up for the
+  // next nudge.
+  const handleDividerUtterance = useCallback((text: string) => {
+    const t = text.trim();
+    const log = (summary: string, ok: boolean) => appendLog({ heard: t, summary, ok });
+    if (isFlowEndWord(t)) { setDividerFlow(null); log("dividers closed", true); return; }
+    const targets = collectDividers(elementsRef.current);
+    const a = parseDividerAnswer(t, targets);
+    if (!a) { log(explainDividerMiss(t, targets), false); return; }
+    const r = applyGrouped([dividerOp(a)]);
+    log(`${a.target.n} → ${dividerReply(r.summary, a.target.n)}${r.ok ? " — another, or “done”" : ""}`, r.ok);
+  }, [applyGrouped, setDividerFlow, appendLog]);
+  const handleDividerUtteranceRef = useRef(handleDividerUtterance);
+  handleDividerUtteranceRef.current = handleDividerUtterance;
+
   // Interpret a raw command (deterministic first; AI fallback added in Stage 4).
   // `fromQueue`: the drain effect is running the queue's head, whose turn it is.
   const runVoiceCommand = useCallback(async (text: string, fromQueue = false) => {
@@ -3310,13 +3337,21 @@ export function DiagramEditor({
     // cannot disturb the pick, and the pick is exactly where you notice you
     // wanted it on (Paul, 2026-09-18). Without this the words are taken as the
     // new name for whichever item you had picked.
-    if (renameFlowRef.current || messageFlowRef.current) {
+    if (renameFlowRef.current || messageFlowRef.current || dividerFlowRef.current) {
       const toggle = parseCommand(heard);
       if (toggle && toggle.length === 1 && toggle[0].op === "goldFlash") {
         const r = applyGrouped(toggle);
         log({ heard, summary: r.summary, ok: r.ok });
         return;
       }
+    }
+    // "move dividers" is open. An answer, or "done", is its to read; a whole
+    // new command closes it and runs — the numbers are never a trap (as the
+    // pick, pickInterrupt.ts).
+    if (dividerFlowRef.current) {
+      const answer = parseDividerAnswer(heard, collectDividers(elementsRef.current));
+      if (!answer && !isFlowEndWord(heard) && parseCommand(heard)) setDividerFlow(null);
+      else { handleDividerUtteranceRef.current(heard); return; }
     }
     if (templateFlowRef.current) {
       const flow = templateFlowRef.current;
@@ -3513,9 +3548,10 @@ export function DiagramEditor({
     // "stop" ends everything: a numbered pick or a parked confirmation dies with the mic.
     setRenameFlow(null);
     setMessageFlow(null);
+    setDividerFlow(null);
     pendingConfirmRef.current = null;
     flushVoiceBuffer(true); // apply anything still buffered (force — no more is coming)
-  }, [flushVoiceBuffer, setRenameFlow, setMessageFlow]);
+  }, [flushVoiceBuffer, setRenameFlow, setMessageFlow, setDividerFlow]);
   stopAbraListeningRef.current = stopAbraListening;
 
   // (Re)arm the 2-minute idle auto-close; called on every voice fragment.
@@ -3579,7 +3615,7 @@ export function DiagramEditor({
           voiceWaits.current = 0;
           if (voiceFlushTimer.current) { clearTimeout(voiceFlushTimer.current); voiceFlushTimer.current = null; }
           setVoiceInterim("");
-          const anythingOpen = !!(renameFlowRef.current || messageFlowRef.current
+          const anythingOpen = !!(renameFlowRef.current || messageFlowRef.current || dividerFlowRef.current
             || templateFlowRef.current || pickFlowRef.current || pendingConfirmRef.current);
           if (anythingOpen) {
             // Let the runner close it properly — each flow has its own tidy-up.
@@ -3616,12 +3652,13 @@ export function DiagramEditor({
 
   // Escape cancels a guided pick (rename or message) at any phase.
   useEffect(() => {
-    if (!renameFlow && !messageFlow && !pickFlow && !templateFlow) return;
+    if (!renameFlow && !messageFlow && !pickFlow && !templateFlow && !dividerFlow) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       if (renameFlow) cancelRenameFlow("rename cancelled");
       if (messageFlow) { setMessageFlow(null); appendLog({ heard: "", summary: "message cancelled", ok: true }); }
       if (pickFlow) { setPickFlow(null); appendLog({ heard: "", summary: "cancelled", ok: true }); }
+      if (dividerFlow) { setDividerFlow(null); appendLog({ heard: "", summary: "dividers closed", ok: true }); }
       // Esc takes the provisional template back off with it — the window is
       // shut either way, and leaving a half-chosen template behind would be
       // the one outcome nobody asked for.
@@ -3632,7 +3669,7 @@ export function DiagramEditor({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [renameFlow, messageFlow, pickFlow, templateFlow, cancelRenameFlow, setMessageFlow, setPickFlow, appendLog]);
+  }, [renameFlow, messageFlow, pickFlow, templateFlow, dividerFlow, cancelRenameFlow, setMessageFlow, setPickFlow, setDividerFlow, appendLog]);
 
   // Stop the mic when the mode is turned off or the editor unmounts.
   useEffect(() => {

@@ -951,6 +951,7 @@ export const NOT_GENERATED: Record<string, string> = {
   // Numbered flows: the command opens a picker and the answer is a later
   // utterance, so one case cannot hold the whole exchange.
   addMessageByNumber: "opens a numbered picker; the answer is a second utterance",
+  numberDividers: "numbers the lane dividers; the move (“2 up 100 pixels”) is a second utterance",
   // Pool arrangement ops that need two pools in a known order.
   movePoolTo: "needs two pools and a stable vertical order",
   swapPools: "needs two pools and a stable vertical order",

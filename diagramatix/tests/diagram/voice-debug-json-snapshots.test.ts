@@ -431,10 +431,10 @@ describe("T4893 — the editor saves the diagram around every command, and takes
 
   it("the canvas and the recording read the badges from one value", () => {
     const ed = EDITOR();
-    expect(ed).toContain("const onScreenBadges = badgesOnScreen(renameFlow, messageFlow, pickFlow);");
+    expect(ed).toContain("const onScreenBadges = badgesOnScreen(renameFlow, messageFlow, pickFlow, dividerTargets);");
     expect(ed).toContain("renameBadges={onScreenBadges}");
     expect(ed).toContain("badges: onScreenBadges ?? null,");
-    expect(ed).toContain("flow: projectFlow({ template: templateFlow, pick: pickFlow, rename: renameFlow, message: messageFlow }),");
+    expect(ed).toContain("flow: projectFlow({ template: templateFlow, pick: pickFlow, rename: renameFlow, message: messageFlow, dividers: dividerTargets }),");
   });
 
   it("what was on screen is read from the editor's live refs, not left empty", () => {

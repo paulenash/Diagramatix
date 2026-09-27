@@ -106,6 +106,8 @@ export type AssistOp =
   | { op: "convert"; ref: Ref; subtype: string }
   /** "convert Review Claim to a subprocess" / "convert selected to a task" — the right-click menu's shape change (Paul, 2026-09-27). */
   | { op: "convertActivity"; ref: Ref; to: "task" | "subprocess" }
+  /** "move dividers" — number the lane dividers; the answer ("2 up 100 pixels") is the next utterance (dividerFlow.ts). */
+  | { op: "numberDividers" }
   /**
    * "move everything in Underwriters two steps to the right" — a container's
    * contents, not the container; "move everything from selected (in Finance
@@ -397,6 +399,8 @@ export function validateOp(raw: unknown): AssistOp | null {
       if (!isRef(o.ref) || typeof o.subtype !== "string" || !o.subtype.trim()) return null;
       return { op: "convert", ref: (o.ref as string).trim(), subtype: o.subtype.trim() };
     }
+    case "numberDividers":
+      return { op: "numberDividers" };
     case "convertActivity":
       if (!isRef(o.ref) || (o.to !== "task" && o.to !== "subprocess")) return null;
       return { op: "convertActivity", ref: (o.ref as string).trim(), to: o.to };

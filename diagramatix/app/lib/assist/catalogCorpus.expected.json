@@ -615,6 +615,11 @@
       "distance": 64
     }
   ],
+  "move dividers": [
+    {
+      "op": "numberDividers"
+    }
+  ],
   "add a lane to the pool": [
     {
       "op": "addLanes",

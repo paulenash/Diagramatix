@@ -420,7 +420,7 @@ interface Props {
   onSwapLane?: (laneId: string, direction: "up" | "down") => void;
   /** Guided "rename by number": green number badges to draw on matching
    *  elements/connectors while the voice rename-pick flow is active. */
-  renameBadges?: Array<{ id: string; n: number; x: number; y: number; height: number; kind: "element" | "connector"; place?: "below" | "above" | "header" }>;
+  renameBadges?: Array<{ id: string; n: number; x: number; y: number; height: number; kind: "element" | "connector" | "divider"; place?: "below" | "above" | "header" }>;
   /** Gold flashing: outline what the last Voice Assist command touched. `runId`
    *  is bumped per command so the overlay can tell a new run from a re-render. */
   goldFlash?: { runId: number; targets: readonly GoldFlashTarget[] };

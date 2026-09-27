@@ -40,8 +40,10 @@ export function badgesOnScreen(
   rename: { phase: string; targets?: RenameTarget[] } | null,
   message: { targets: RenameTarget[] } | null,
   pick: { targets: RenameTarget[] } | null,
+  /** "move dividers": the numbered dividers, when that flow is open. */
+  dividers?: RenameTarget[] | null,
 ): RenameTarget[] | undefined {
-  return rename?.phase === "pick" ? rename.targets : (message?.targets ?? pick?.targets);
+  return rename?.phase === "pick" ? rename.targets : (message?.targets ?? pick?.targets ?? dividers ?? undefined);
 }
 
 /** The editor's open flows, in the shapes they have there (only the fields read here). */
@@ -55,6 +57,8 @@ export interface OpenFlows {
   pick: { ref: string; prompt: string; targets: readonly RenameTarget[] } | null;
   rename: { phase: "pick"; itemType: string; targets: readonly RenameTarget[] } | { phase: "name"; itemType: string; targetId: string } | null;
   message: { mode: "pair"; targets: readonly RenameTarget[] } | { mode: "one"; targets: readonly RenameTarget[]; anchorId: string } | null;
+  /** "move dividers" — its numbered dividers. */
+  dividers?: readonly RenameTarget[] | null;
 }
 
 /**
@@ -89,6 +93,7 @@ export function projectFlow(open: OpenFlows): VoiceDebugFlow | null {
     const m = open.message;
     return { kind: "message", mode: m.mode, targetIds: ids(m.targets), ...(m.mode === "one" ? { anchorId: m.anchorId } : {}) };
   }
+  if (open.dividers) return { kind: "dividers", targetIds: ids(open.dividers) };
   return null;
 }
 

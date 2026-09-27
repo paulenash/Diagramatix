@@ -83,7 +83,7 @@ export type SnapshotRole = "start" | "before" | "after" | "marked";
  * diagram — copying the flow would bring the pictures straight back.
  */
 export interface VoiceDebugFlow {
-  kind: "rename" | "message" | "pick" | "template";
+  kind: "rename" | "message" | "pick" | "template" | "dividers";
   /** rename: numbered pick, or waiting for the name. */
   phase?: "pick" | "name";
   /** message: two numbers ("pair") or one end fixed ("one"). */
