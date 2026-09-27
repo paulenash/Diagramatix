@@ -40,7 +40,7 @@ const blockedStore: TileLayoutStore = {
   setItem: () => { throw new Error("QuotaExceededError"); },
 };
 
-describe("T_TILES — the layouts", () => {
+describe("T4950 — the layouts", () => {
   it("offers exactly 2-wide and 4-wide, and 2-wide is the default", () => {
     expect([...TILE_LAYOUTS]).toEqual(["2-wide", "4-wide"]);
     expect(DEFAULT_TILE_LAYOUT).toBe("2-wide");
@@ -62,7 +62,7 @@ describe("T_TILES — the layouts", () => {
   });
 });
 
-describe("T_TILES — column count", () => {
+describe("T4951 — column count", () => {
   it("before the pane is measured, the first paint is already the chosen layout", () => {
     expect(tileColumnsFor("2-wide", null)).toBe(2);
     expect(tileColumnsFor("4-wide", null)).toBe(4);
@@ -109,7 +109,7 @@ describe("T_TILES — column count", () => {
   });
 });
 
-describe("T_TILES — remembered per browser", () => {
+describe("T4952 — remembered per browser", () => {
   const realDescriptor = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
   afterEach(() => {
     if (realDescriptor) Object.defineProperty(globalThis, "localStorage", realDescriptor);
@@ -167,7 +167,7 @@ describe("T_TILES — remembered per browser", () => {
   });
 });
 
-describe("T_TILES — the Project screen wiring", () => {
+describe("T4953 — the Project screen wiring", () => {
   const src = read(...CLIENT);
   const main = src.slice(src.indexOf("{/* Right: Diagram tiles."), src.indexOf("</main>"));
   const scrollAt = main.indexOf("ref={tileScrollRef}");
