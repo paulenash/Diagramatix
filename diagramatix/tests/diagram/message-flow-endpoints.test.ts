@@ -394,7 +394,8 @@ describe("T4810 — headless, the apply layer asks the same rule (L4)", () => {
     const r = applyAssistOps([{ op: "addMessageByNumber", fromSelection: true }], h.context({ selectedIds: [ID["Message 1 Arrives"]] }));
     expect(r.ok).toBe(true);
     expect(h.screen).toEqual(["message"]);
-    expect(r.summary).toBe("numbers on what can exchange a message with Message 1\nArrives — say “from <n> labelled <text>” (or “done”)");
+    // A name typed on two lines is said on one (nameCase.ts spokenName, 2026-09-27).
+    expect(r.summary).toBe("numbers on what can exchange a message with Message 1 Arrives — say “from <n> labelled <text>” (or “done”)");
     const bare = applyAssistOps([{ op: "addMessageByNumber" }], headlessDiagram(paul()).context());
     expect(bare.summary).toBe("numbers on everything a message can start or end at — say “<n> to <m> labelled <text>” (or “done”)");
     const none = applyAssistOps([{ op: "addMessageByNumber", fromSelection: true }], headlessDiagram(paul()).context());

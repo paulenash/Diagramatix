@@ -12,7 +12,7 @@ import { fixtureDiagram } from "@/app/lib/assist/commandFixture";
 
 const read = (p: string) => readFileSync(p, "utf8");
 
-describe("T_TD — the test diagram: shown in a window, and created in the current project", () => {
+describe("T4936 — the test diagram: shown in a window, and created in the current project", () => {
   it("the create request is a fresh copy of the test diagram, in the given project", () => {
     const body = testDiagramCreateBody("proj-1");
     expect(body).toMatchObject({ name: TEST_DIAGRAM_NAME, type: "bpmn", projectId: "proj-1", displayMode: "normal" });

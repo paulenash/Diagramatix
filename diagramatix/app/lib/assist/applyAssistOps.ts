@@ -41,7 +41,7 @@ import { planLabelFill } from "./fillSelection";
 import { findRiskCatalogItem } from "./riskCatalogRef";
 import { parseGhostPick, resolveGhostPick } from "./ghostPick";
 import { looksLikeElementId } from "./refMentions";
-import { capitaliseFirstWord, needsCapital } from "@/app/lib/diagram/nameCase";
+import { capitaliseFirstWord, needsCapital, spokenName } from "@/app/lib/diagram/nameCase";
 import { goldFlashSummary } from "./goldFlash";
 import { planMovePool, planSwapPools, selectedPools, poolsInOrder } from "@/app/lib/diagram/poolOrder";
 import { collectMessageTargets, type MessagePick } from "./messageTargets";
@@ -153,7 +153,7 @@ export interface AssistApplyContext {
 }
 
 const elBox = (e: DiagramElement) => ({ x: e.x, y: e.y, width: e.width, height: e.height });
-const nameOf = (e: DiagramElement) => (e.label?.trim() || e.type);
+const nameOf = (e: DiagramElement) => (spokenName(e.label) || e.type);
 const sameName = (a: string | undefined, b: string | undefined) => (a ?? "").trim().toLowerCase() === (b ?? "").trim().toLowerCase();
 /** M7 — how the log says what an align just did. */
 const ALIGN_LABEL: Record<string, string> = {

@@ -71,9 +71,10 @@ export const COMMAND_CATALOG: CatalogFamily[] = [
     { does: "Message by number — numbers everything a message can start or end at (tasks, subprocesses, black-box pools and events), then say “3 to 7 labelled Order Placed”", say: ["add a message", "send a message"] },
     { does: "Message from/to the selected element — numbers its valid counterparts, then say “to 2 labelled Order Placed” or “from 2 labelled …”", say: ["add a message to the selected", "add a message from this"] },
   ] },
-  { family: "Gateways (select one or more gateways first)", items: [
+  { family: "Gateways and events (select one or more first)", items: [
     { does: "Swap two connection points, any pair of top / bottom / middle / left / right — the outgoing points of a decision, the incoming points of a merge; “middle” is the side in the flow direction. Naming the gateway is optional", say: ["swap top and bottom", "swap bottom and middle", "swap selected gateway, top and bottom", "swap top with centre", "swap top and right"] },
     { does: "Move ONE connector to a free point — the companion to swap, which needs both points taken. Say the other and it tells you", say: ["move top to bottom", "move middle to top", "move selected gateway, bottom to middle"] },
+    { does: "An event too — in line or on a boundary: move its flow to a free side. A Start Event’s flow never leaves to the left; an End Event’s never arrives from the right. A boundary event’s flow stays on its outer point", say: ["move the selected event, right to bottom", "move left to bottom"] },
   ] },
   { family: "Pools in order", items: [
     { does: "Move a pool above or below another — the stack is laid out again, so room is made automatically", say: ["move Claims System above Customer", "put Customer below Claims Processing"] },

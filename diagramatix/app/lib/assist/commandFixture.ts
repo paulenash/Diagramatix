@@ -36,10 +36,8 @@
 import type { Connector, DiagramData, DiagramElement } from "../diagram/types";
 import DIAGRAM from "./voiceTestDiagram.json";
 
-/** How a name is said: its line breaks and runs of spaces as one space. */
-export function spokenName(label: string | null | undefined): string {
-  return (label ?? "").replace(/\s+/g, " ").trim();
-}
+/** How a name is said — the one rule lives in nameCase.ts (the replies use it too). */
+export { spokenName } from "../diagram/nameCase";
 
 /** The elements, fresh. */
 export function fixtureElements(): DiagramElement[] {

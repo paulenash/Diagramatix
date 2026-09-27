@@ -158,6 +158,8 @@ export const CATALOG_CONTEXT: Readonly<Record<string, CatalogContext>> = {
   "move top to bottom": { needsSelection: ["p5fku96e"] },
   "move middle to top": { needsSelection: ["g"] },
   "move selected gateway, bottom to middle": { parseOnly: GATEWAY_POINTS },
+  "move the selected event, right to bottom": { needsSelection: ["start"] },
+  "move left to bottom": { needsSelection: ["end"] },
   "swap the selected pools": { needsSelection: ["cust", "sys"] },
 };
 

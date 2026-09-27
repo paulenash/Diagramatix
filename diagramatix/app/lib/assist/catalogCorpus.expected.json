@@ -793,6 +793,20 @@
       "to": "middle"
     }
   ],
+  "move the selected event, right to bottom": [
+    {
+      "op": "moveGatewayPoint",
+      "from": "right",
+      "to": "bottom"
+    }
+  ],
+  "move left to bottom": [
+    {
+      "op": "moveGatewayPoint",
+      "from": "left",
+      "to": "bottom"
+    }
+  ],
   "move Claims System above Customer": [
     {
       "op": "movePoolTo",

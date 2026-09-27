@@ -42,7 +42,7 @@ function run(said: string, selectedIds: string[]) {
   return { r, h, conn: (id: string) => h.data.connectors.find((c) => c.id === id)! };
 }
 
-describe("T_EV — “move {side} to {side}” on a selected event (Paul, 2026-09-27)", () => {
+describe("T4937 — “move {side} to {side}” on a selected event (Paul, 2026-09-27)", () => {
   it("parses with or without the word “event”", () => {
     expect(parseCommand("move right to bottom")).toEqual([{ op: "moveGatewayPoint", from: "right", to: "bottom" }]);
     expect(parseCommand("move the selected event, top to bottom")).toEqual([{ op: "moveGatewayPoint", from: "top", to: "bottom" }]);
@@ -99,7 +99,7 @@ describe("T_EV — “move {side} to {side}” on a selected event (Paul, 2026-0
   });
 });
 
-describe("T_SES — Paul's test-diagram session, 2026-09-27", () => {
+describe("T4938 — Paul's test-diagram session, 2026-09-27", () => {
   it("a spoken name writes its number as a digit — “rename selected to pool three” names it Pool 3", () => {
     expect(parseCommand("rename selected to pool three")).toEqual([{ op: "rename", ref: "selected", label: "Pool 3" }]);
     expect(parseCommand("add a lane called lane two")?.[0]).toMatchObject({ labels: ["lane 2"] });

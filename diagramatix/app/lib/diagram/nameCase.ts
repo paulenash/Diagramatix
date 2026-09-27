@@ -130,3 +130,13 @@ const KIND_THEN_NUMBER_WORD = new RegExp(String.raw`\b(${NUMBERED_KINDS})\s+(${O
 export function digitsAfterKindWord(name: string): string {
   return String(name ?? "").replace(KIND_THEN_NUMBER_WORD, (_m, kind: string, n: string) => `${kind} ${NUMBER_WORDS[n.toLowerCase()]}`);
 }
+
+/**
+ * How a name is SAID: its line breaks and runs of spaces as one space. Nobody
+ * says a line break — "Pass Claim⏎Check?" is spoken "Pass Claim Check?", and a
+ * reply that names it must not break the log line (Paul's second test diagram,
+ * 2026-09-27, types its gateway and event names on two and three lines).
+ */
+export function spokenName(label: string | null | undefined): string {
+  return (label ?? "").replace(/\s+/g, " ").trim();
+}
