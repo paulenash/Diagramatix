@@ -61,7 +61,9 @@ export type AssistOp =
   | { op: "nudgePool"; ref?: Ref; direction: "up" | "down" | "left" | "right"; distance?: number }
   /** Move ONE edge of a pool — a resize, not a move. Paul, 2026-09-21:
    *  "{Move, Nudge} Pool {left, right, top, bottom} boundary {left, right, up, down}". */
-  | { op: "movePoolBoundary"; ref?: Ref; boundary: PoolBoundary; direction: "up" | "down" | "left" | "right"; distance?: number }
+  | { op: "movePoolBoundary"; ref?: Ref; boundary: PoolBoundary; direction: "up" | "down" | "left" | "right"; distance?: number;
+      /** "move dividers" only (dividerFlow.ts): no constraint from the elements — only the names and the pool (Paul, 2026-09-28). */
+      overContent?: boolean }
   /** "label selected <text>" — the selected connector; no text → wait for it. */
   | { op: "labelSelected"; label?: string }
   /** "swap top and bottom" on the SELECTED gateway — outgoing points of a decision, incoming of a merge. */

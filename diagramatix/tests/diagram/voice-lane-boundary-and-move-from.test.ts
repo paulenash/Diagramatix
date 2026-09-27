@@ -217,7 +217,9 @@ describe("T4964 — “boundary” and “divider” always mean the boundary; a
   it("a move the reducer stops short reports whole pixels, and why", () => {
     const s = on();
     const r = s.say("move Lane 2 top boundary up by 400");
-    if (r.ok) expect(r.summary).toMatch(/^moved Lane 2's top boundary up \d+px( — .+ is as small as it can be)?$/);
-    else expect(r.summary).toMatch(/at most \d+px|as small as it can be/);
+    // Changed 2026-09-28: the reason names what the floor IS — the lane's name
+    // (laneMetrics), which "move dividers" may now wrap to go further (T4975).
+    if (r.ok) expect(r.summary).toMatch(/^moved Lane 2's top boundary up \d+px( — .+ is as small as its name allows)?$/);
+    else expect(r.summary).toMatch(/at most \d+px|as small as its name allows/);
   });
 });

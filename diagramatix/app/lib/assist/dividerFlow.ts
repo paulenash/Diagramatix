@@ -15,8 +15,16 @@
  * or two sub-lanes in a lane — found exactly as the boundary command finds
  * one (laneBoundary.ts: the bands with the same parent, top to bottom), so
  * the answer runs through the SAME move as "move <lane> top boundary up": the
- * mouse's MOVE_LANE_BOUNDARY, its floor, and the refusal to run the line
- * through anything, which says how far it can go.
+ * mouse's MOVE_LANE_BOUNDARY and its floor.
+ *
+ * But NOT the boundary command's refusal to run the line through anything
+ * (Paul, 2026-09-28): "move dividers should move the lane boundaries without
+ * any constraint concerning the elements on the diagram. The only constraints
+ * should be a) the new lane/sublane heights must allow the lane/sublane names
+ * to be displayed, BUT wrapping the lane/sublane name to 2 lines … must be
+ * tried if it is possible. b) the pool boundary, of course." So its op carries
+ * `overContent`: what the line passes joins the lane it is now in, nothing
+ * moves on the page, and a name at its floor wraps to let the band go on.
  *
  * The numbers stay up after each move — the next answer can nudge again —
  * until "done", Escape, stop, or a whole new command.
@@ -129,7 +137,106 @@ export function dividerOp(a: DividerAnswer): AssistOp {
     boundary: "top",
     direction: a.direction,
     ...(a.distance !== undefined ? { distance: a.distance } : {}),
+    // Paul, 2026-09-28: "move dividers" should move the lane boundaries
+    // "without any constraint concerning the elements on the diagram" — only
+    // the names (wrapped to two lines if that helps) and the pool.
+    overContent: true,
   };
 }
 
 const spoken = (e: DiagramElement) => (e.label ?? "").replace(/\s+/g, " ").trim() || e.type;
+
+/**
+ * What the flow remembers between utterances (Paul's first "move dividers"
+ * session, 2026-09-28). He paused inside his answers:
+ *   "one" … "down two tasks" — the bare "one" was taken as "accept the first
+ *     suggestion", which closed the flow; the rest went to the AI;
+ *   "one down" … "fifty pixels" — the first half moved 20px, the second was no
+ *     answer at all.
+ * So a bare number is HELD (which divider — the way comes next), and an amount
+ * said on its own after an answer makes that answer's move the amount IN ALL
+ * ("one down" moved 20px, "fifty pixels" moves 30 more; had "one down" been
+ * refused, the 50 is tried whole).
+ *
+ * Each is read only when it is nothing else: the way must come FIRST ("down two
+ * tasks", never "move Salesforce down…"), and the amount must be ALL there is
+ * ("fifty pixels", "by fifty", never "add Task 2") — so a whole new command
+ * still closes the flow and runs.
+ */
+export interface DividerMemory {
+  /** A number said on its own: the divider the next "up …"/"down …" is for. */
+  pendingN?: number;
+  /** The last answer — and how far it has moved, in its own direction, so far. */
+  last?: { n: number; direction: "up" | "down"; moved: number };
+}
+
+export type DividerUtterance =
+  | { kind: "move"; answer: DividerAnswer }
+  | { kind: "hold"; n: number }
+  | { kind: "adjust"; target: DividerTarget; direction: "up" | "down"; total: number }
+  /** A bare number that is no divider — the flow explains, and stays open. */
+  | { kind: "miss" };
+
+const WAY_FIRST = /^(?:up|upwards?|higher|raise|down|downwards?|lower)\b/i;
+/** Words that may sit round an amount said on its own: "by fifty", "make it fifty pixels in all". */
+const AMOUNT_FILLER = new Set(["by", "make", "it", "that", "to", "in", "all", "total", "altogether", "please", "instead", "actually", "no", "so", "and", "of", ""]);
+
+export function readDividerUtterance(text: string, targets: readonly DividerTarget[], mem: DividerMemory): DividerUtterance | null {
+  const t = String(text ?? "").trim().replace(/[.,!?]+$/g, "");
+  const answer = parseDividerAnswer(t, targets);
+  if (answer) return { kind: "move", answer };
+  const bareT = t.replace(/^(?:move|shift|nudge|put)\s+/i, "").replace(/^(?:divider|number)\s+/i, "");
+  // "down two tasks" after a held "one".
+  if (mem.pendingN !== undefined && WAY_FIRST.test(bareT)) {
+    const joined = parseDividerAnswer(`${mem.pendingN} ${bareT}`, targets);
+    if (joined) return { kind: "move", answer: joined };
+  }
+  const lead = leadingSpokenNumber(bareT);
+  // "one" — which divider; the way comes next.
+  if (lead && !lead.rest) return targets.some((d) => d.n === lead.n) ? { kind: "hold", n: lead.n } : { kind: "miss" };
+  // "fifty pixels" after an answer — that answer's move, to this much in all.
+  if (mem.last) {
+    const words = bareT.toLowerCase().split(/\s+/);
+    const amount = readDistance(words, true);
+    const target = targets.find((d) => d.n === mem.last!.n);
+    const onlyAmount = amount && words.every((w, i) => amount.used.has(i) || AMOUNT_FILLER.has(w));
+    if (onlyAmount && target) return { kind: "adjust", target, direction: mem.last.direction, total: amount.px };
+  }
+  return null;
+}
+
+/** The op that makes the last move `total` px in all: the difference, either way. */
+export function adjustOp(u: { target: DividerTarget; direction: "up" | "down"; total: number }, movedSoFar: number): AssistOp | null {
+  const delta = Math.round(u.total - movedSoFar);
+  if (!delta) return null;
+  const direction = delta > 0 ? u.direction : (u.direction === "up" ? "down" : "up");
+  return dividerOp({ target: u.target, direction, distance: Math.abs(delta) });
+}
+
+/** How far the boundary command says it moved ("… boundary down 60px …"), or 0 when it did not. */
+export function movedPx(summary: string): number {
+  const m = summary.match(/boundary (?:up|down) (\d+)px/);
+  return m ? Number(m[1]) : 0;
+}
+
+/**
+ * A ruler for "move dividers" (Paul, 2026-09-28: "mark the lane header inner
+ * vertical boundary with green ticks every 100 px"): per pool with lanes, the
+ * line where the lanes' name strips end, with a tick every 100px from the
+ * pool's top — so "up 100 pixels" can be judged by eye.
+ */
+export interface DividerRuler { x: number; top: number; bottom: number; ticks: number[] }
+export const RULER_STEP_PX = 100;
+export function dividerRulers(els: readonly DiagramElement[]): DividerRuler[] {
+  const out: DividerRuler[] = [];
+  for (const pool of els.filter((e) => e.type === "pool")) {
+    const lanes = els.filter((e) => isAnyLane(e) && e.parentId === pool.id);
+    if (!lanes.length) continue;
+    const x = Math.max(...lanes.map((l) => l.x + containerHeaderWidth(l)));
+    const top = pool.y, bottom = pool.y + pool.height;
+    const ticks: number[] = [];
+    for (let y = top + RULER_STEP_PX; y < bottom; y += RULER_STEP_PX) ticks.push(y);
+    out.push({ x, top, bottom, ticks });
+  }
+  return out;
+}

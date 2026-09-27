@@ -60,7 +60,7 @@ import { looksLikeElementId, notUnderstoodMessage, humaniseIds } from "@/app/lib
 import { isMicStopWord, isFlowEndWord } from "@/app/lib/assist/stopWords";
 import { aiInventedRename, INVENTED_RENAME_REFUSAL } from "@/app/lib/assist/aiGuards";
 import { interruptsPick } from "@/app/lib/assist/pickInterrupt";
-import { collectDividers, dividerOp, dividerReply, explainDividerMiss, parseDividerAnswer, type DividerFlow } from "@/app/lib/assist/dividerFlow";
+import { adjustOp, collectDividers, dividerOp, dividerReply, dividerRulers, explainDividerMiss, movedPx, readDividerUtterance, type DividerFlow, type DividerMemory } from "@/app/lib/assist/dividerFlow";
 import { isIncompleteCommand } from "@/app/lib/assist/incompleteCommand";
 import { leadingSpokenNumber } from "@/app/lib/assist/spokenNumber";
 import { capitaliseFirstWord, needsCapital } from "@/app/lib/diagram/nameCase";
@@ -2846,8 +2846,13 @@ export function DiagramEditor({
   // The numbers are recomputed from the diagram, so they follow each move.
   const [dividerFlow, setDividerFlowState] = useState<DividerFlow | null>(null);
   const dividerFlowRef = useRef<DividerFlow | null>(null);
-  const setDividerFlow = useCallback((f: DividerFlow | null) => { dividerFlowRef.current = f; setDividerFlowState(f); }, []);
+  // What the flow remembers between answers — a held number, the last move (dividerFlow.ts DividerMemory).
+  // Fresh each time the flow opens or closes.
+  const dividerMemRef = useRef<DividerMemory>({});
+  const setDividerFlow = useCallback((f: DividerFlow | null) => { dividerFlowRef.current = f; dividerMemRef.current = {}; setDividerFlowState(f); }, []);
   const dividerTargets = useMemo(() => (dividerFlow ? collectDividers(data.elements) : null), [dividerFlow, data.elements]);
+  // Green ticks every 100px down the lanes' name strips while it is open (Paul, 2026-09-28).
+  const onScreenRulers = useMemo(() => (dividerFlow ? dividerRulers(data.elements) : null), [dividerFlow, data.elements]);
   // ── R2: the disambiguation picker. Same numbered-badge mechanism as the
   //    rename and message flows — the point of R2 was never new UI, it was that
   //    a mechanism the product already had was not reached from the one place
@@ -3288,18 +3293,36 @@ export function DiagramEditor({
 
   // The answer while "move dividers" is open: "2 up 100 pixels", "two down 2
   // tasks", "3 up" — or "done". Each answer runs the boundary command on the
-  // band below that divider (its top IS the line), so the same floor and the
-  // same never-through-anything rule apply, and the numbers stay up for the
-  // next nudge.
+  // band below that divider (its top IS the line) — through whatever is in the
+  // way, down to what the names allow (Paul, 2026-09-28) — and the numbers stay
+  // up for the next nudge. An answer said in two halves is still one answer:
+  // "one" … "down two tasks"; "one down" … "fifty pixels" (dividerFlow.ts).
   const handleDividerUtterance = useCallback((text: string) => {
     const t = text.trim();
     const log = (summary: string, ok: boolean) => appendLog({ heard: t, summary, ok });
     if (isFlowEndWord(t)) { setDividerFlow(null); log("dividers closed", true); return; }
     const targets = collectDividers(elementsRef.current);
-    const a = parseDividerAnswer(t, targets);
-    if (!a) { log(explainDividerMiss(t, targets), false); return; }
+    const mem = dividerMemRef.current;
+    const u = readDividerUtterance(t, targets, mem);
+    if (!u || u.kind === "miss") { log(explainDividerMiss(t, targets), false); return; }
+    if (u.kind === "hold") { mem.pendingN = u.n; log(`${u.n} — now “up …” or “down …”`, true); return; }
+    const more = (ok: boolean) => (ok ? " — another, or “done”" : "");
+    if (u.kind === "adjust") {
+      const so = mem.last!.moved;
+      const op = adjustOp(u, so);
+      if (!op) { log(`${u.target.n} has moved ${u.total}px ${u.direction} already${more(true)}`, true); return; }
+      const r = applyGrouped([op]);
+      const m = movedPx(r.summary);
+      const total = so + (op.op === "movePoolBoundary" && op.direction === u.direction ? m : -m);
+      mem.last = { n: u.target.n, direction: u.direction, moved: total };
+      log(`${u.target.n} → ${dividerReply(r.summary, u.target.n)} (${Math.round(total)}px ${u.direction} in all)${more(r.ok)}`, r.ok);
+      return;
+    }
+    const a = u.answer;
+    mem.pendingN = undefined;
     const r = applyGrouped([dividerOp(a)]);
-    log(`${a.target.n} → ${dividerReply(r.summary, a.target.n)}${r.ok ? " — another, or “done”" : ""}`, r.ok);
+    mem.last = { n: a.target.n, direction: a.direction, moved: r.ok ? movedPx(r.summary) : 0 };
+    log(`${a.target.n} → ${dividerReply(r.summary, a.target.n)}${more(r.ok)}`, r.ok);
   }, [applyGrouped, setDividerFlow, appendLog]);
   const handleDividerUtteranceRef = useRef(handleDividerUtterance);
   handleDividerUtteranceRef.current = handleDividerUtterance;
@@ -3345,11 +3368,12 @@ export function DiagramEditor({
         return;
       }
     }
-    // "move dividers" is open. An answer, or "done", is its to read; a whole
-    // new command closes it and runs — the numbers are never a trap (as the
-    // pick, pickInterrupt.ts).
+    // "move dividers" is open. An answer — or half of one, or "done" — is its
+    // to read (a bare "one" was taken as "accept the suggestion", 2026-09-28);
+    // a whole new command closes it and runs — the numbers are never a trap
+    // (as the pick, pickInterrupt.ts).
     if (dividerFlowRef.current) {
-      const answer = parseDividerAnswer(heard, collectDividers(elementsRef.current));
+      const answer = readDividerUtterance(heard, collectDividers(elementsRef.current), dividerMemRef.current);
       if (!answer && !isFlowEndWord(heard) && parseCommand(heard)) setDividerFlow(null);
       else { handleDividerUtteranceRef.current(heard); return; }
     }
@@ -6456,6 +6480,7 @@ export function DiagramEditor({
           data={displayData}
           diagramType={diagramType}
           renameBadges={onScreenBadges}
+          dividerRulers={onScreenRulers}
           goldFlash={goldFlash}
           liftedIds={dragTravellingIds}
           onAddElement={addElementGated}

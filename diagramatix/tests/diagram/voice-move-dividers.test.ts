@@ -87,15 +87,18 @@ describe("T4967 — the answer: “<n> up 100 pixels”, “<n> down 2 tasks”,
     expect(h.data.elements.find((e) => e.id === "L2")!.y).toBeCloseTo(y0 - 40, 6);
   });
 
-  it("the constraints hold, on Paul's own diagram — and the reply says the room in this flow's words", () => {
+  // Changed 2026-09-28: Paul — "move dividers" moves "without any constraint
+  // concerning the elements on the diagram". This used to pin the refusal on
+  // his diagram; the answer now moves (T4974), and only the named boundary
+  // command still refuses to run a line through anything.
+  it("on Paul's own diagram the answer moves through the elements — and a room reply is still said in this flow's words", () => {
     const d = paul();
     const h = headlessDiagram(d);
     const answer = parseDividerAnswer("1 up 100 pixels", collectDividers(d.elements))!;
     const r = applyAssistOps([dividerOp(answer)], h.context());
-    expect(r.ok).toBe(false);
-    expect(r.summary).toMatch(/it can move up at most \d+px: say “up by \d+”$/);
-    expect(dividerReply(r.summary, 1)).toMatch(/it can move up at most (\d+)px: say “1 up \1”$/);
-    expect(h.data).toEqual(d);
+    expect(r).toEqual({ ok: true, summary: "moved Underwriters team's top boundary up 100px" });
+    expect(dividerReply("the divider would run through “Transform” — it can move up at most 12px: say “up by 12”", 1))
+      .toBe("the divider would run through “Transform” — it can move up at most 12px: say “1 up 12”");
   });
 });
 

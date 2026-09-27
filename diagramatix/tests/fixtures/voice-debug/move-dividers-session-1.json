@@ -1,0 +1,1312 @@
+{
+ "note": "Paul, 2026-09-28, first “move dividers” session (New-Command-Voice-Test-1-voice-debug-2026-09-27.dgx-voice.json): the diagram as it stood when he said “move dividers” — one divider, Office / Finance; “one down” was refused (“the divider would run through Main Subprocess …”), “fifty pixels” was no answer, a bare “one” closed the flow as “accept the suggestion”.",
+ "heard": [
+  "move dividers",
+  "one down",
+  "fifty pixels",
+  "one",
+  "down two tasks",
+  "move dividers",
+  "one down two tasks"
+ ],
+ "diagram": {
+  "elements": [
+   {
+    "id": "88mmfy5f",
+    "type": "pool",
+    "x": 146,
+    "y": -20.409538315207584,
+    "width": 1692.714316047458,
+    "height": 578.2428393606048,
+    "label": "My company",
+    "properties": {
+     "poolType": "white-box",
+     "poolHeaderWidth": 36
+    }
+   },
+   {
+    "x": 236,
+    "y": 182,
+    "id": "n5qmqpyx",
+    "type": "start-event",
+    "label": "Start",
+    "width": 36,
+    "height": 36,
+    "properties": {},
+    "parentId": "2uv54rys"
+   },
+   {
+    "x": 323,
+    "y": 167.5,
+    "id": "nlnyihwr",
+    "type": "task",
+    "label": "Double check email",
+    "width": 102,
+    "height": 65,
+    "properties": {},
+    "parentId": "2uv54rys"
+   },
+   {
+    "x": 476,
+    "y": 180,
+    "id": "nremetw5",
+    "type": "gateway",
+    "label": "Gateway?",
+    "width": 40,
+    "height": 40,
+    "properties": {
+     "gatewayRole": "decision",
+     "labelOffsetX": -30,
+     "labelOffsetY": -54
+    },
+    "parentId": "2uv54rys"
+   },
+   {
+    "x": 602.1428571428572,
+    "y": 297.35714285714295,
+    "id": "wejxoi2l",
+    "type": "task",
+    "label": "Do Nothing",
+    "width": 102,
+    "height": 65,
+    "properties": {},
+    "parentId": "6ry0lcpt"
+   },
+   {
+    "x": 597.0000000000001,
+    "y": 83.35714285714286,
+    "id": "pwicjkvk",
+    "type": "task",
+    "label": "Called gateway",
+    "width": 102,
+    "height": 65,
+    "properties": {},
+    "parentId": "2uv54rys"
+   },
+   {
+    "id": "kvvIcQmd2f6Sy8H8C7AG8",
+    "type": "gateway",
+    "x": 773.5110430036274,
+    "y": 182.21188136509483,
+    "width": 40,
+    "height": 40,
+    "label": "",
+    "properties": {
+     "labelOffsetX": -30,
+     "labelOffsetY": -54,
+     "gatewayRole": "merge"
+    },
+    "parentId": "2uv54rys"
+   },
+   {
+    "x": 864.5110430036274,
+    "y": 19.590461684792416,
+    "id": "ylzb0g57",
+    "type": "subprocess-expanded",
+    "label": "Main Subprocess",
+    "width": 607.6920626103404,
+    "height": 365.2428393606048,
+    "properties": {
+     "subprocessType": "normal"
+    },
+    "repeatType": "none",
+    "parentId": "2uv54rys"
+   },
+   {
+    "x": 846.5110430036274,
+    "y": 84.99519130161826,
+    "id": "bfefuhnp",
+    "type": "start-event",
+    "label": "Start",
+    "width": 36,
+    "height": 36,
+    "properties": {},
+    "boundaryHostId": "ylzb0g57"
+   },
+   {
+    "x": 1454.2031056139676,
+    "y": 84.8523341587611,
+    "id": "zph2gcq3",
+    "type": "end-event",
+    "label": "End",
+    "width": 36,
+    "height": 36,
+    "properties": {},
+    "boundaryHostId": "ylzb0g57"
+   },
+   {
+    "x": 934.3681173124248,
+    "y": 70.49519130161826,
+    "id": "8lw077eo",
+    "type": "task",
+    "label": "Task 1",
+    "width": 102,
+    "height": 65,
+    "parentId": "ylzb0g57",
+    "properties": {}
+   },
+   {
+    "x": 1115.6538315981393,
+    "y": 70.49519130161826,
+    "id": "2i5fmugz",
+    "type": "task",
+    "label": "Task 2",
+    "width": 102,
+    "height": 65,
+    "parentId": "ylzb0g57",
+    "properties": {}
+   },
+   {
+    "x": 1288.6538315981393,
+    "y": 70.49519130161826,
+    "id": "ynyeavhl",
+    "type": "task",
+    "label": "Task 3",
+    "width": 102,
+    "height": 65,
+    "parentId": "ylzb0g57",
+    "properties": {}
+   },
+   {
+    "x": 1005.3681173124248,
+    "y": 191.8523341587611,
+    "id": "fqphesge",
+    "type": "subprocess-expanded",
+    "label": "Handle Event in Parallel",
+    "width": 368.5714285714286,
+    "height": 153.71428571428572,
+    "parentId": "ylzb0g57",
+    "properties": {
+     "subprocessType": "event"
+    }
+   },
+   {
+    "x": 1038.7966887409962,
+    "y": 249.28090558733254,
+    "id": "p68bnauk",
+    "type": "start-event",
+    "label": "Non-Interrupting Event\nHappens",
+    "width": 36,
+    "height": 36,
+    "parentId": "fqphesge",
+    "eventType": "message",
+    "properties": {
+     "labelWidth": 128,
+     "interruptionType": "non-interrupting"
+    }
+   },
+   {
+    "x": 1128.6538315981393,
+    "y": 234.78090558733254,
+    "id": "g4f76zf6",
+    "type": "task",
+    "label": "Handle\nEvent",
+    "width": 102,
+    "height": 65,
+    "parentId": "fqphesge",
+    "properties": {}
+   },
+   {
+    "x": 1278.7966887409964,
+    "y": 249.28090558733254,
+    "id": "utwo6lh6",
+    "type": "end-event",
+    "label": "",
+    "width": 36,
+    "height": 36,
+    "parentId": "fqphesge",
+    "properties": {}
+   },
+   {
+    "id": "b1mjccy9",
+    "type": "intermediate-event",
+    "x": 1418.2031056139676,
+    "y": 366.8333010453972,
+    "width": 36,
+    "height": 36,
+    "label": "Event 1",
+    "properties": {
+     "boundarySide": "bottom",
+     "labelOffsetX": -40,
+     "labelOffsetY": 7
+    },
+    "eventType": "error",
+    "boundaryHostId": "ylzb0g57"
+   },
+   {
+    "id": "um49r5s6",
+    "type": "task",
+    "x": 1505.2031056139676,
+    "y": 452.8333010453972,
+    "width": 102,
+    "height": 65,
+    "label": "Task 8",
+    "properties": {},
+    "parentId": "6ry0lcpt"
+   },
+   {
+    "id": "lp6q40cs",
+    "type": "end-event",
+    "x": 1658.2031056139676,
+    "y": 467.3333010453972,
+    "width": 36,
+    "height": 36,
+    "label": "End",
+    "properties": {},
+    "parentId": "6ry0lcpt"
+   },
+   {
+    "id": "jx9v28sx",
+    "type": "gateway",
+    "x": 1523.2031056139676,
+    "y": 182.21188136509483,
+    "width": 40,
+    "height": 40,
+    "label": "Decision?",
+    "properties": {
+     "labelOffsetX": -30,
+     "labelOffsetY": -54,
+     "gatewayRole": "decision"
+    },
+    "gatewayType": "none",
+    "parentId": "2uv54rys"
+   },
+   {
+    "id": "799p84i7",
+    "type": "task",
+    "x": 1614.2031056139676,
+    "y": 169.7118813650948,
+    "width": 102,
+    "height": 65,
+    "label": "Task 9",
+    "properties": {},
+    "parentId": "2uv54rys"
+   },
+   {
+    "id": "d5714eo8",
+    "type": "task",
+    "x": 1614.2031056139676,
+    "y": 78.22309179858496,
+    "width": 102,
+    "height": 65,
+    "label": "Task 10",
+    "properties": {},
+    "parentId": "2uv54rys"
+   },
+   {
+    "id": "ndnt9r9f",
+    "type": "task",
+    "x": 1614.2031056139676,
+    "y": 272.2230917985851,
+    "width": 102,
+    "height": 65,
+    "label": "Task 11",
+    "properties": {},
+    "parentId": "6ry0lcpt"
+   },
+   {
+    "id": "37i6mlc2",
+    "type": "gateway",
+    "x": 1772.714316047458,
+    "y": 180.01009356227254,
+    "width": 40,
+    "height": 40,
+    "label": "Decision?",
+    "properties": {
+     "labelOffsetX": -30,
+     "labelOffsetY": -54,
+     "gatewayRole": "merge"
+    },
+    "gatewayType": "none",
+    "parentId": "2uv54rys"
+   },
+   {
+    "id": "2uv54rys",
+    "type": "lane",
+    "x": 182,
+    "y": -20.409538315207584,
+    "width": 1656.714316047458,
+    "height": 289,
+    "label": "Office",
+    "properties": {},
+    "parentId": "88mmfy5f"
+   },
+   {
+    "id": "6ry0lcpt",
+    "type": "lane",
+    "x": 182,
+    "y": 268.59046168479244,
+    "width": 1656.714316047458,
+    "height": 289.24283936060476,
+    "label": "Finance",
+    "properties": {},
+    "parentId": "88mmfy5f"
+   },
+   {
+    "id": "h3bjwg8v",
+    "type": "pool",
+    "x": 146,
+    "y": 653.2312897672219,
+    "width": 1692.714316047458,
+    "height": 116,
+    "label": "Salesforce",
+    "properties": {
+     "poolType": "black-box",
+     "poolHeaderWidth": 36
+    }
+   },
+   {
+    "id": "coe4tqbw",
+    "type": "pool",
+    "x": 146,
+    "y": -231.98577659611044,
+    "width": 1692.714316047458,
+    "height": 103,
+    "label": "Customer",
+    "properties": {
+     "poolType": "black-box"
+    }
+   }
+  ],
+  "viewport": {
+   "x": 0,
+   "y": 0,
+   "zoom": 1
+  },
+  "connectors": [
+   {
+    "id": "yd8zvp06",
+    "sourceId": "799p84i7",
+    "targetId": "37i6mlc2",
+    "sourceSide": "right",
+    "targetSide": "left",
+    "sourceOffsetAlong": 0.5,
+    "targetOffsetAlong": 0.5,
+    "type": "sequence",
+    "directionType": "directed",
+    "routingType": "rectilinear",
+    "sourceInvisibleLeader": true,
+    "targetInvisibleLeader": true,
+    "waypoints": [
+     {
+      "x": 1665.2031056139676,
+      "y": 202.2118813650948
+     },
+     {
+      "x": 1716.2031056139676,
+      "y": 202.2118813650948
+     },
+     {
+      "x": 1740.2031056139676,
+      "y": 202.2118813650948
+     },
+     {
+      "x": 1746.4587108307128,
+      "y": 202.2118813650948
+     },
+     {
+      "x": 1746.4587108307128,
+      "y": 200.01009356227254
+     },
+     {
+      "x": 1752.714316047458,
+      "y": 200.01009356227254
+     },
+     {
+      "x": 1772.714316047458,
+      "y": 200.01009356227254
+     },
+     {
+      "x": 1792.714316047458,
+      "y": 200.01009356227254
+     }
+    ],
+    "label": "",
+    "labelOffsetX": 0,
+    "labelOffsetY": -20,
+    "labelWidth": 80
+   },
+   {
+    "id": "w03si3w6",
+    "sourceId": "jx9v28sx",
+    "targetId": "799p84i7",
+    "sourceSide": "right",
+    "targetSide": "left",
+    "sourceOffsetAlong": 0.5,
+    "type": "sequence",
+    "directionType": "directed",
+    "routingType": "rectilinear",
+    "sourceInvisibleLeader": true,
+    "targetInvisibleLeader": true,
+    "waypoints": [
+     {
+      "x": 1543.2031056139676,
+      "y": 202.21188136509483
+     },
+     {
+      "x": 1563.2031056139676,
+      "y": 202.21188136509483
+     },
+     {
+      "x": 1583.2031056139676,
+      "y": 202.21188136509483
+     },
+     {
+      "x": 1591.2031056139676,
+      "y": 202.2118813650948
+     },
+     {
+      "x": 1614.2031056139676,
+      "y": 202.2118813650948
+     },
+     {
+      "x": 1665.2031056139676,
+      "y": 202.2118813650948
+     }
+    ],
+    "label": "",
+    "labelOffsetX": 8,
+    "labelOffsetY": 20,
+    "labelWidth": 60,
+    "labelAnchor": "source"
+   },
+   {
+    "id": "mev6tvoe",
+    "sourceId": "d5714eo8",
+    "targetId": "37i6mlc2",
+    "sourceSide": "right",
+    "targetSide": "top",
+    "sourceOffsetAlong": 0.5,
+    "targetOffsetAlong": 0.5,
+    "type": "sequence",
+    "directionType": "directed",
+    "routingType": "rectilinear",
+    "sourceInvisibleLeader": true,
+    "targetInvisibleLeader": true,
+    "waypoints": [
+     {
+      "x": 1665.2031056139676,
+      "y": 110.72309179858496
+     },
+     {
+      "x": 1716.2031056139676,
+      "y": 110.72309179858496
+     },
+     {
+      "x": 1792.714316047458,
+      "y": 110.72309179858496
+     },
+     {
+      "x": 1792.714316047458,
+      "y": 180.01009356227254
+     },
+     {
+      "x": 1792.714316047458,
+      "y": 200.01009356227254
+     }
+    ],
+    "label": "",
+    "labelOffsetX": 0,
+    "labelOffsetY": -20,
+    "labelWidth": 80
+   },
+   {
+    "id": "eos5ps03",
+    "sourceId": "ndnt9r9f",
+    "targetId": "37i6mlc2",
+    "sourceSide": "right",
+    "targetSide": "bottom",
+    "sourceOffsetAlong": 0.5,
+    "targetOffsetAlong": 0.5,
+    "type": "sequence",
+    "directionType": "directed",
+    "routingType": "rectilinear",
+    "sourceInvisibleLeader": true,
+    "targetInvisibleLeader": true,
+    "waypoints": [
+     {
+      "x": 1665.2031056139676,
+      "y": 304.7230917985851
+     },
+     {
+      "x": 1716.2031056139676,
+      "y": 304.7230917985851
+     },
+     {
+      "x": 1792.714316047458,
+      "y": 304.7230917985851
+     },
+     {
+      "x": 1792.714316047458,
+      "y": 220.01009356227254
+     },
+     {
+      "x": 1792.714316047458,
+      "y": 200.01009356227254
+     }
+    ],
+    "label": "",
+    "labelOffsetX": 0,
+    "labelOffsetY": -20,
+    "labelWidth": 80
+   },
+   {
+    "id": "i04s3z0u",
+    "sourceId": "pwicjkvk",
+    "targetId": "kvvIcQmd2f6Sy8H8C7AG8",
+    "sourceSide": "right",
+    "targetSide": "top",
+    "sourceOffsetAlong": 0.5,
+    "targetOffsetAlong": 0.5,
+    "type": "sequence",
+    "directionType": "directed",
+    "routingType": "rectilinear",
+    "sourceInvisibleLeader": true,
+    "targetInvisibleLeader": true,
+    "waypoints": [
+     {
+      "x": 648.0000000000001,
+      "y": 115.85714285714286
+     },
+     {
+      "x": 699.0000000000001,
+      "y": 115.85714285714286
+     },
+     {
+      "x": 793.5110430036274,
+      "y": 115.85714285714286
+     },
+     {
+      "x": 793.5110430036274,
+      "y": 182.21188136509483
+     },
+     {
+      "x": 793.5110430036274,
+      "y": 202.21188136509483
+     }
+    ],
+    "label": "",
+    "labelOffsetX": 0,
+    "labelOffsetY": -20,
+    "labelWidth": 80
+   },
+   {
+    "id": "2pmbazom",
+    "sourceId": "wejxoi2l",
+    "targetId": "kvvIcQmd2f6Sy8H8C7AG8",
+    "sourceSide": "right",
+    "targetSide": "bottom",
+    "sourceOffsetAlong": 0.5,
+    "targetOffsetAlong": 0.5,
+    "type": "sequence",
+    "directionType": "directed",
+    "routingType": "rectilinear",
+    "sourceInvisibleLeader": true,
+    "targetInvisibleLeader": true,
+    "waypoints": [
+     {
+      "x": 653.1428571428572,
+      "y": 329.85714285714295
+     },
+     {
+      "x": 704.1428571428572,
+      "y": 329.85714285714295
+     },
+     {
+      "x": 793.5110430036274,
+      "y": 329.85714285714295
+     },
+     {
+      "x": 793.5110430036274,
+      "y": 222.21188136509483
+     },
+     {
+      "x": 793.5110430036274,
+      "y": 202.21188136509483
+     }
+    ],
+    "label": "",
+    "labelOffsetX": 0,
+    "labelOffsetY": -20,
+    "labelWidth": 80
+   },
+   {
+    "id": "7jqvg0l6",
+    "type": "sequence",
+    "label": "",
+    "sourceId": "nremetw5",
+    "targetId": "pwicjkvk",
+    "waypoints": [
+     {
+      "x": 496,
+      "y": 200
+     },
+     {
+      "x": 496,
+      "y": 180
+     },
+     {
+      "x": 496,
+      "y": 115.85714285714286
+     },
+     {
+      "x": 597.0000000000001,
+      "y": 115.85714285714286
+     },
+     {
+      "x": 648.0000000000001,
+      "y": 115.85714285714286
+     }
+    ],
+    "labelWidth": 60,
+    "sourceSide": "top",
+    "targetSide": "left",
+    "labelAnchor": "source",
+    "routingType": "rectilinear",
+    "labelOffsetX": 53,
+    "labelOffsetY": -30.8,
+    "directionType": "directed",
+    "sourceOffsetAlong": 0.5,
+    "sourceInvisibleLeader": true,
+    "targetInvisibleLeader": true
+   },
+   {
+    "id": "3pl0vfhi",
+    "type": "sequence",
+    "label": "",
+    "sourceId": "nremetw5",
+    "targetId": "wejxoi2l",
+    "waypoints": [
+     {
+      "x": 496,
+      "y": 200
+     },
+     {
+      "x": 496,
+      "y": 220
+     },
+     {
+      "x": 496,
+      "y": 329.85714285714295
+     },
+     {
+      "x": 602.1428571428572,
+      "y": 329.85714285714295
+     },
+     {
+      "x": 653.1428571428572,
+      "y": 329.85714285714295
+     }
+    ],
+    "labelWidth": 60,
+    "sourceSide": "bottom",
+    "targetSide": "left",
+    "labelAnchor": "source",
+    "routingType": "rectilinear",
+    "labelOffsetX": 8,
+    "labelOffsetY": 20,
+    "directionType": "directed",
+    "sourceOffsetAlong": 0.5,
+    "sourceInvisibleLeader": true,
+    "targetInvisibleLeader": true
+   },
+   {
+    "id": "i503bx2y",
+    "type": "sequence",
+    "label": "",
+    "sourceId": "n5qmqpyx",
+    "targetId": "nlnyihwr",
+    "waypoints": [
+     {
+      "x": 254,
+      "y": 200
+     },
+     {
+      "x": 272,
+      "y": 200
+     },
+     {
+      "x": 290,
+      "y": 200
+     },
+     {
+      "x": 300,
+      "y": 200
+     },
+     {
+      "x": 323,
+      "y": 200
+     },
+     {
+      "x": 374,
+      "y": 200
+     }
+    ],
+    "labelWidth": 80,
+    "sourceSide": "right",
+    "targetSide": "left",
+    "routingType": "rectilinear",
+    "labelOffsetX": 0,
+    "labelOffsetY": -20,
+    "directionType": "directed",
+    "sourceInvisibleLeader": true,
+    "targetInvisibleLeader": true
+   },
+   {
+    "id": "afj9s64k",
+    "type": "sequence",
+    "label": "",
+    "sourceId": "nlnyihwr",
+    "targetId": "nremetw5",
+    "waypoints": [
+     {
+      "x": 374,
+      "y": 200
+     },
+     {
+      "x": 425,
+      "y": 200
+     },
+     {
+      "x": 448,
+      "y": 200
+     },
+     {
+      "x": 456,
+      "y": 200
+     },
+     {
+      "x": 476,
+      "y": 200
+     },
+     {
+      "x": 496,
+      "y": 200
+     }
+    ],
+    "labelWidth": 80,
+    "sourceSide": "right",
+    "targetSide": "left",
+    "routingType": "rectilinear",
+    "labelOffsetX": 0,
+    "labelOffsetY": -20,
+    "directionType": "directed",
+    "targetOffsetAlong": 0.5,
+    "sourceInvisibleLeader": true,
+    "targetInvisibleLeader": true
+   },
+   {
+    "id": "s21odl83",
+    "type": "sequence",
+    "label": "",
+    "sourceId": "2i5fmugz",
+    "targetId": "ynyeavhl",
+    "waypoints": [
+     {
+      "x": 1166.6538315981393,
+      "y": 102.99519130161826
+     },
+     {
+      "x": 1217.6538315981393,
+      "y": 102.99519130161826
+     },
+     {
+      "x": 1241.6538315981393,
+      "y": 102.99519130161826
+     },
+     {
+      "x": 1264.6538315981393,
+      "y": 102.99519130161826
+     },
+     {
+      "x": 1288.6538315981393,
+      "y": 102.99519130161826
+     },
+     {
+      "x": 1339.6538315981393,
+      "y": 102.99519130161826
+     }
+    ],
+    "labelWidth": 80,
+    "sourceSide": "right",
+    "targetSide": "left",
+    "routingType": "rectilinear",
+    "labelOffsetX": 0,
+    "labelOffsetY": -20,
+    "directionType": "directed",
+    "sourceOffsetAlong": 0.5,
+    "targetOffsetAlong": 0.5,
+    "sourceInvisibleLeader": true,
+    "targetInvisibleLeader": true
+   },
+   {
+    "id": "x4503ey1",
+    "type": "sequence",
+    "label": "",
+    "sourceId": "8lw077eo",
+    "targetId": "2i5fmugz",
+    "waypoints": [
+     {
+      "x": 985.3681173124248,
+      "y": 102.99519130161826
+     },
+     {
+      "x": 1036.3681173124248,
+      "y": 102.99519130161826
+     },
+     {
+      "x": 1060.3681173124248,
+      "y": 102.99519130161826
+     },
+     {
+      "x": 1091.6538315981393,
+      "y": 102.99519130161826
+     },
+     {
+      "x": 1115.6538315981393,
+      "y": 102.99519130161826
+     },
+     {
+      "x": 1166.6538315981393,
+      "y": 102.99519130161826
+     }
+    ],
+    "labelWidth": 80,
+    "sourceSide": "right",
+    "targetSide": "left",
+    "routingType": "rectilinear",
+    "labelOffsetX": 0,
+    "labelOffsetY": -20,
+    "directionType": "directed",
+    "sourceOffsetAlong": 0.5,
+    "targetOffsetAlong": 0.5,
+    "sourceInvisibleLeader": true,
+    "targetInvisibleLeader": true
+   },
+   {
+    "id": "z2o9bsl8",
+    "type": "sequence",
+    "label": "",
+    "sourceId": "bfefuhnp",
+    "targetId": "8lw077eo",
+    "waypoints": [
+     {
+      "x": 864.5110430036274,
+      "y": 102.99519130161826
+     },
+     {
+      "x": 882.5110430036274,
+      "y": 102.99519130161826
+     },
+     {
+      "x": 900.5110430036274,
+      "y": 102.99519130161826
+     },
+     {
+      "x": 911.3681173124248,
+      "y": 102.99519130161826
+     },
+     {
+      "x": 934.3681173124248,
+      "y": 102.99519130161826
+     },
+     {
+      "x": 985.3681173124248,
+      "y": 102.99519130161826
+     }
+    ],
+    "labelWidth": 80,
+    "sourceSide": "right",
+    "targetSide": "left",
+    "routingType": "rectilinear",
+    "labelOffsetX": 0,
+    "labelOffsetY": -20,
+    "directionType": "directed",
+    "sourceOffsetAlong": 0.5,
+    "targetOffsetAlong": 0.5,
+    "sourceInvisibleLeader": true,
+    "targetInvisibleLeader": true
+   },
+   {
+    "id": "m3kiarq6",
+    "type": "sequence",
+    "label": "",
+    "sourceId": "ynyeavhl",
+    "targetId": "zph2gcq3",
+    "waypoints": [
+     {
+      "x": 1339.6538315981393,
+      "y": 102.99519130161826
+     },
+     {
+      "x": 1390.6538315981393,
+      "y": 102.99519130161826
+     },
+     {
+      "x": 1414.6538315981393,
+      "y": 102.99519130161826
+     },
+     {
+      "x": 1436.2031056139676,
+      "y": 102.8523341587611
+     },
+     {
+      "x": 1454.2031056139676,
+      "y": 102.8523341587611
+     },
+     {
+      "x": 1472.2031056139676,
+      "y": 102.8523341587611
+     }
+    ],
+    "labelWidth": 80,
+    "sourceSide": "right",
+    "targetSide": "left",
+    "routingType": "rectilinear",
+    "labelOffsetX": 0,
+    "labelOffsetY": -20,
+    "directionType": "directed",
+    "sourceOffsetAlong": 0.5,
+    "targetOffsetAlong": 0.5,
+    "sourceInvisibleLeader": true,
+    "targetInvisibleLeader": true
+   },
+   {
+    "id": "lh078lj7",
+    "type": "sequence",
+    "label": "",
+    "sourceId": "p68bnauk",
+    "targetId": "g4f76zf6",
+    "waypoints": [
+     {
+      "x": 1056.7966887409962,
+      "y": 267.28090558733254
+     },
+     {
+      "x": 1074.7966887409962,
+      "y": 267.28090558733254
+     },
+     {
+      "x": 1092.7966887409962,
+      "y": 267.28090558733254
+     },
+     {
+      "x": 1104.6538315981393,
+      "y": 267.28090558733254
+     },
+     {
+      "x": 1128.6538315981393,
+      "y": 267.28090558733254
+     },
+     {
+      "x": 1179.6538315981393,
+      "y": 267.28090558733254
+     }
+    ],
+    "labelWidth": 80,
+    "sourceSide": "right",
+    "targetSide": "left",
+    "routingType": "rectilinear",
+    "labelOffsetX": 0,
+    "labelOffsetY": -20,
+    "directionType": "directed",
+    "sourceOffsetAlong": 0.5,
+    "targetOffsetAlong": 0.5,
+    "sourceInvisibleLeader": true,
+    "targetInvisibleLeader": true
+   },
+   {
+    "id": "84lowgwm",
+    "type": "sequence",
+    "label": "",
+    "sourceId": "g4f76zf6",
+    "targetId": "utwo6lh6",
+    "waypoints": [
+     {
+      "x": 1179.6538315981393,
+      "y": 267.28090558733254
+     },
+     {
+      "x": 1230.6538315981393,
+      "y": 267.28090558733254
+     },
+     {
+      "x": 1252.6538315981393,
+      "y": 267.28090558733254
+     },
+     {
+      "x": 1260.7966887409964,
+      "y": 267.28090558733254
+     },
+     {
+      "x": 1278.7966887409964,
+      "y": 267.28090558733254
+     },
+     {
+      "x": 1296.7966887409964,
+      "y": 267.28090558733254
+     }
+    ],
+    "labelWidth": 80,
+    "sourceSide": "right",
+    "targetSide": "left",
+    "routingType": "rectilinear",
+    "labelOffsetX": 0,
+    "labelOffsetY": -20,
+    "directionType": "directed",
+    "sourceOffsetAlong": 0.5,
+    "targetOffsetAlong": 0.5,
+    "sourceInvisibleLeader": true,
+    "targetInvisibleLeader": true
+   },
+   {
+    "id": "zdechagp",
+    "sourceId": "kvvIcQmd2f6Sy8H8C7AG8",
+    "targetId": "ylzb0g57",
+    "sourceSide": "right",
+    "targetSide": "left",
+    "sourceOffsetAlong": 0.5,
+    "type": "sequence",
+    "directionType": "directed",
+    "routingType": "rectilinear",
+    "sourceInvisibleLeader": true,
+    "targetInvisibleLeader": true,
+    "waypoints": [
+     {
+      "x": 793.5110430036274,
+      "y": 202.21188136509483
+     },
+     {
+      "x": 813.5110430036274,
+      "y": 202.21188136509483
+     },
+     {
+      "x": 833.5110430036274,
+      "y": 202.21188136509483
+     },
+     {
+      "x": 841.5110430036274,
+      "y": 202.21188136509483
+     },
+     {
+      "x": 864.5110430036274,
+      "y": 202.21188136509483
+     },
+     {
+      "x": 1168.3570743087976,
+      "y": 202.21188136509483
+     }
+    ],
+    "label": "",
+    "labelOffsetX": 8,
+    "labelOffsetY": 20,
+    "labelWidth": 60,
+    "labelAnchor": "source"
+   },
+   {
+    "id": "ntjlq06l",
+    "sourceId": "b1mjccy9",
+    "targetId": "um49r5s6",
+    "sourceSide": "bottom",
+    "targetSide": "left",
+    "sourceOffsetAlong": 0.5,
+    "type": "sequence",
+    "directionType": "directed",
+    "routingType": "rectilinear",
+    "sourceInvisibleLeader": true,
+    "targetInvisibleLeader": true,
+    "waypoints": [
+     {
+      "x": 1436.2031056139676,
+      "y": 384.8333010453972
+     },
+     {
+      "x": 1436.2031056139676,
+      "y": 402.8333010453972
+     },
+     {
+      "x": 1436.2031056139676,
+      "y": 485.3333010453972
+     },
+     {
+      "x": 1505.2031056139676,
+      "y": 485.3333010453972
+     },
+     {
+      "x": 1556.2031056139676,
+      "y": 485.3333010453972
+     }
+    ],
+    "label": "",
+    "labelOffsetX": 0,
+    "labelOffsetY": -20,
+    "labelWidth": 80
+   },
+   {
+    "id": "2h25fjnq",
+    "sourceId": "um49r5s6",
+    "targetId": "lp6q40cs",
+    "sourceSide": "right",
+    "targetSide": "left",
+    "type": "sequence",
+    "directionType": "directed",
+    "routingType": "rectilinear",
+    "sourceInvisibleLeader": true,
+    "targetInvisibleLeader": true,
+    "waypoints": [
+     {
+      "x": 1556.2031056139676,
+      "y": 485.3333010453972
+     },
+     {
+      "x": 1607.2031056139676,
+      "y": 485.3333010453972
+     },
+     {
+      "x": 1630.2031056139676,
+      "y": 485.3333010453972
+     },
+     {
+      "x": 1640.2031056139676,
+      "y": 485.3333010453972
+     },
+     {
+      "x": 1658.2031056139676,
+      "y": 485.3333010453972
+     },
+     {
+      "x": 1676.2031056139676,
+      "y": 485.3333010453972
+     }
+    ],
+    "label": "",
+    "labelOffsetX": 0,
+    "labelOffsetY": -20,
+    "labelWidth": 80
+   },
+   {
+    "id": "pq8w7rzy",
+    "sourceId": "ylzb0g57",
+    "targetId": "jx9v28sx",
+    "sourceSide": "right",
+    "targetSide": "left",
+    "targetOffsetAlong": 0.5,
+    "type": "sequence",
+    "directionType": "directed",
+    "routingType": "rectilinear",
+    "sourceInvisibleLeader": true,
+    "targetInvisibleLeader": true,
+    "waypoints": [
+     {
+      "x": 1168.3570743087976,
+      "y": 202.21188136509483
+     },
+     {
+      "x": 1472.2031056139676,
+      "y": 202.21188136509483
+     },
+     {
+      "x": 1495.2031056139676,
+      "y": 202.21188136509483
+     },
+     {
+      "x": 1503.2031056139676,
+      "y": 202.21188136509483
+     },
+     {
+      "x": 1523.2031056139676,
+      "y": 202.21188136509483
+     },
+     {
+      "x": 1543.2031056139676,
+      "y": 202.21188136509483
+     }
+    ],
+    "label": "",
+    "labelOffsetX": 0,
+    "labelOffsetY": -20,
+    "labelWidth": 80
+   },
+   {
+    "id": "t0lzqs3c",
+    "sourceId": "jx9v28sx",
+    "targetId": "d5714eo8",
+    "sourceSide": "top",
+    "targetSide": "left",
+    "sourceOffsetAlong": 0.5,
+    "type": "sequence",
+    "directionType": "directed",
+    "routingType": "rectilinear",
+    "sourceInvisibleLeader": true,
+    "targetInvisibleLeader": true,
+    "waypoints": [
+     {
+      "x": 1543.2031056139676,
+      "y": 202.21188136509483
+     },
+     {
+      "x": 1543.2031056139676,
+      "y": 182.21188136509483
+     },
+     {
+      "x": 1543.2031056139676,
+      "y": 110.72309179858496
+     },
+     {
+      "x": 1614.2031056139676,
+      "y": 110.72309179858496
+     },
+     {
+      "x": 1665.2031056139676,
+      "y": 110.72309179858496
+     }
+    ],
+    "label": "",
+    "labelOffsetX": 53,
+    "labelOffsetY": -30.8,
+    "labelWidth": 60,
+    "labelAnchor": "source"
+   },
+   {
+    "id": "t9p7q1pg",
+    "sourceId": "jx9v28sx",
+    "targetId": "ndnt9r9f",
+    "sourceSide": "bottom",
+    "targetSide": "left",
+    "sourceOffsetAlong": 0.5,
+    "type": "sequence",
+    "directionType": "directed",
+    "routingType": "rectilinear",
+    "sourceInvisibleLeader": true,
+    "targetInvisibleLeader": true,
+    "waypoints": [
+     {
+      "x": 1543.2031056139676,
+      "y": 202.21188136509483
+     },
+     {
+      "x": 1543.2031056139676,
+      "y": 222.21188136509483
+     },
+     {
+      "x": 1543.2031056139676,
+      "y": 304.7230917985851
+     },
+     {
+      "x": 1614.2031056139676,
+      "y": 304.7230917985851
+     },
+     {
+      "x": 1665.2031056139676,
+      "y": 304.7230917985851
+     }
+    ],
+    "label": "",
+    "labelOffsetX": 53,
+    "labelOffsetY": 30.8,
+    "labelWidth": 60,
+    "labelAnchor": "source"
+   }
+  ]
+ }
+}

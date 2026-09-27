@@ -14,6 +14,10 @@
  * must not do that. So a move that would put the line through, or past,
  * anything in either band is refused, naming what is in the way.
  *
+ * Except "move dividers" (dividerFlow.ts, Paul 2026-09-28), whose numbered
+ * answers go through the elements by design: only the names (wrapLabelInTwo
+ * lets one wrap first) and the pool limit them.
+ *
  * Pure.
  */
 import type { DiagramElement } from "./types";
@@ -84,6 +88,46 @@ export function dividerRoom(els: readonly DiagramElement[], aboveId: string, bel
   return direction === "up"
     ? line - Math.max(...content.map((e) => e.y + e.height))
     : Math.min(...content.map((e) => e.y)) - line;
+}
+
+/**
+ * A name on two lines, split at the word boundary that makes the longer line
+ * shortest — or null when it cannot wrap (one word, or already on two lines).
+ *
+ * Paul, 2026-09-28: "move dividers" — "the new lane/sublane heights must allow
+ * the lane/sublane names to be displayed, BUT wrapping the lane/sublane name
+ * to 2 lines to allow for a narrower lane must be tried if it is possible."
+ * A lane's floor is its name's length (containerMetrics laneMetrics: the
+ * longest LINE), so two lines nearly halve it.
+ */
+export function wrapLabelInTwo(label: string | undefined | null): string | null {
+  const text = (label ?? "").trim();
+  if (!text || text.includes("\n")) return null;
+  const words = text.split(/\s+/);
+  if (words.length < 2) return null;
+  let best: string | null = null, bestLong = Infinity;
+  for (let k = 1; k < words.length; k++) {
+    const a = words.slice(0, k).join(" "), b = words.slice(k).join(" ");
+    const long = Math.max(a.length, b.length);
+    if (long < bestLong) { bestLong = long; best = `${a}\n${b}`; }
+  }
+  return best;
+}
+
+/**
+ * The bands that give way when a divider moves into \`band\`: the band itself,
+ * and — as MOVE_LANE_BOUNDARY refits it — its edge sub-lane at each depth
+ * (the LAST for the band above the line, the FIRST for the band below).
+ */
+export function givingBands(els: readonly DiagramElement[], band: DiagramElement, edge: "first" | "last"): DiagramElement[] {
+  const out: DiagramElement[] = [band];
+  let cur: DiagramElement | undefined = band;
+  for (let i = 0; cur && i < 12; i++) {
+    const kids: DiagramElement[] = els.filter((e) => isAnyLane(e) && e.parentId === cur!.id).sort((a, b) => a.y - b.y);
+    cur = edge === "first" ? kids[0] : kids[kids.length - 1];
+    if (cur) out.push(cur);
+  }
+  return out;
 }
 
 /** The gap a pool keeps from its neighbour when its edge grows toward it. */

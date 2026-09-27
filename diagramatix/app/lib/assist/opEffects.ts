@@ -511,7 +511,8 @@ export function checkEffect(op: AssistOp, before: DiagramData, after: DiagramDat
       const want = op.direction === "right" || op.direction === "down" ? 1 : -1;
       if (moved * want < 0) return fail(`the ${op.boundary} edge of ${nameOf(a)} moved the wrong way (${moved}px)`);
       // A boundary never carries content into another lane (a lane divider, 2026-09-27).
-      const rehomed = before.elements.find((e) => !["pool", "lane", "sublane"].includes(e.type) && byId(after, e.id)?.parentId !== e.parentId);
+      // …unless it is "move dividers", which by Paul's rule (2026-09-28) moves through the elements.
+      const rehomed = op.overContent ? undefined : before.elements.find((e) => !["pool", "lane", "sublane"].includes(e.type) && byId(after, e.id)?.parentId !== e.parentId);
       return rehomed ? fail(`${nameOf(rehomed)} changed lane`) : pass;
     }
 

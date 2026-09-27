@@ -59,7 +59,7 @@ import { eventSideRefusal } from "@/app/lib/diagram/eventSides";
 import { bandAt, planInsertBetween } from "@/app/lib/diagram/insertBetween";
 import { bandOf, planMoveContents, CONTENTS_STEP_PX } from "@/app/lib/diagram/moveContents";
 import { buildDividerFlow, type DividerFlow } from "./dividerFlow";
-import { contentCrossedBy, dividerRoom, laneEdgePlan, poolEdgeRoom } from "@/app/lib/diagram/laneBoundary";
+import { contentCrossedBy, dividerRoom, givingBands, laneEdgePlan, poolEdgeRoom, wrapLabelInTwo } from "@/app/lib/diagram/laneBoundary";
 import { BOUNDARY_STEP_PX } from "./poolBoundaryPhrase";
 import { TEMPLATE_BEFORE_REFUSAL } from "./templatePhrase";
 import { refKind, unsaidRef, type RefKind } from "./refKinds";
@@ -997,11 +997,28 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
           const { aboveId, belowId } = edge.divider;
           const dy = op.direction === "up" ? -dist : dist;
           const above = els.find((e) => e.id === aboveId)!, below = els.find((e) => e.id === belowId)!;
-          const next = preview({ type: "MOVE_LANE_BOUNDARY", payload: { aboveLaneId: aboveId, belowLaneId: belowId, dy } });
-          const moved = next ? (next.elements.find((e) => e.id === aboveId)!.height - above.height) : 0;
+          const moveAction = { type: "MOVE_LANE_BOUNDARY" as const, payload: { aboveLaneId: aboveId, belowLaneId: belowId, dy } };
+          let next = preview(moveAction);
+          let moved = next ? (next.elements.find((e) => e.id === aboveId)!.height - above.height) : 0;
           const giver = dy < 0 ? above : below;
-          if (!moved) { results.push(`${nameOf(giver)} is as small as it can be — the divider can't move ${op.direction}`); anyFail = true; continue; }
-          const crossed = contentCrossedBy(els, aboveId, belowId, below.y + moved);
+          // "move dividers" (Paul, 2026-09-28): the names are the floor — but a
+          // name may WRAP onto two lines to let its band go narrower. Tried one
+          // band at a time (the band giving way, then its edge sub-lanes), and
+          // kept only where it lets the divider go further.
+          const wrapped: DiagramElement[] = [];
+          if (op.overContent && Math.abs(moved) < dist - 0.5) {
+            for (const band of givingBands(els, giver, dy < 0 ? "last" : "first")) {
+              const two = wrapLabelInTwo(band.label);
+              if (!two) continue;
+              const trial = els.map((e) => (e.id === band.id ? { ...e, label: two } : e));
+              const got = reducer({ ...ctx.settings, elements: trial, connectors: data.connectors, viewport: { x: 0, y: 0, zoom: 1 } } as DiagramData, moveAction);
+              const m2 = got.elements.find((e) => e.id === aboveId)!.height - above.height;
+              if (Math.abs(m2) > Math.abs(moved) + 0.5) { els = trial; moved = m2; next = got; wrapped.push(band); updateLabel(band.id, two); }
+              if (Math.abs(moved) >= dist - 0.5) break;
+            }
+          }
+          if (!moved) { results.push(`${nameOf(giver)} is as small as its name allows — the divider can't move ${op.direction}`); anyFail = true; continue; }
+          const crossed = op.overContent ? [] : contentCrossedBy(els, aboveId, belowId, below.y + moved);
           if (crossed.length) {
             // Say how far it CAN go (Paul, 2026-09-27: more flexibility than a
             // bare refusal) — the room before the first thing in the way.
@@ -1016,8 +1033,9 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
           laneBoundaryMoveEnd();
           setSelectedElementIds(new Set()); // selection protocol
           if (next) els = next.elements;
-          const short = Math.abs(moved) < dist ? ` — ${nameOf(giver)} is as small as it can be` : "";
-          results.push(`moved ${nameOf(target)}'s ${op.boundary} boundary ${op.direction} ${Math.round(Math.abs(moved))}px${short}`);
+          const short = Math.abs(moved) < dist - 0.5 ? ` — ${nameOf(giver)} is as small as its name allows` : "";
+          const wraps = wrapped.length ? ` — ${wrapped.map((b) => `“${nameOf(b)}”`).join(" and ")} now ${wrapped.length === 1 ? "wraps" : "wrap"} onto two lines` : "";
+          results.push(`moved ${nameOf(target)}'s ${op.boundary} boundary ${op.direction} ${Math.round(Math.abs(moved))}px${wraps}${short}`);
           continue;
         }
         target = els.find((e) => e.id === edge.poolEdge.poolId);

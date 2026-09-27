@@ -421,6 +421,9 @@ interface Props {
   /** Guided "rename by number": green number badges to draw on matching
    *  elements/connectors while the voice rename-pick flow is active. */
   renameBadges?: Array<{ id: string; n: number; x: number; y: number; height: number; kind: "element" | "connector" | "divider"; place?: "below" | "above" | "header" }>;
+  /** "move dividers": green ticks every 100px down the inner edge of the lanes'
+   *  name strips (dividerFlow.ts dividerRulers), so "up 100 pixels" can be judged by eye. */
+  dividerRulers?: ReadonlyArray<{ x: number; top: number; bottom: number; ticks: readonly number[] }> | null;
   /** Gold flashing: outline what the last Voice Assist command touched. `runId`
    *  is bumped per command so the overlay can tell a new run from a re-render. */
   goldFlash?: { runId: number; targets: readonly GoldFlashTarget[] };
@@ -648,6 +651,7 @@ export function Canvas({
   onAddSelfTransition,
   onSwapLane,
   renameBadges,
+  dividerRulers,
   goldFlash,
   liftedIds,
 }: Props) {
@@ -7377,6 +7381,21 @@ export function Canvas({
               Currently they are under the message connectors.") — messages,
               associations and ArchiMate connectors, the selected connector and the
               review notes all draw after the elements, and used to cover them. */}
+          {/* "move dividers" ruler (Paul, 2026-09-28: "mark the lane header inner
+              vertical boundary with green ticks every 100 px") — each tick
+              crosses the line, a constant size on screen; under the numbers. */}
+          {dividerRulers && dividerRulers.length > 0 && (
+            <g pointerEvents="none">
+              {dividerRulers.map((r, i) => (
+                <g key={`divider-ruler-${i}`}>
+                  {r.ticks.map((y) => (
+                    <line key={y} x1={r.x - 7 / zoom} y1={y} x2={r.x + 7 / zoom} y2={y} stroke="#16a34a" strokeWidth={2.5 / zoom} strokeLinecap="round" />
+                  ))}
+                </g>
+              ))}
+            </g>
+          )}
+
           {renameBadges && renameBadges.length > 0 && (
             <g pointerEvents="none">
               {renameBadges.map((b) => {
