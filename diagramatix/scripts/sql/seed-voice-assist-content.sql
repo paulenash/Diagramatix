@@ -107,6 +107,7 @@ The bar can be **dragged by its header**. The Symbols palette and the Properties
   (3, 'Things you can say or type', $UG$**Add and connect**
 
 - "add a task called Approve after Review" · "add a decision" · "insert a parallel gateway"
+- "insert a task called Check Stock between Receive Order and Pick Items" — goes into the flow between them. With no room, everything after the first step in its pool moves right. Two steps that were not connected are joined through it.
 - "connect Send Invoice to Receive Payment" · "connect them"
 - "add a boundary event called Cancel to the Repeat-Until subprocess"
 

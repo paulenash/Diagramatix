@@ -752,6 +752,36 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     // not, and the AI can. Checked anywhere before the name, with room for one
     // word inside the phrase ("boundary timer event").
     if (/\bboundary\s+(?:\w+\s+)?events?\b/i.test(rest.split(/\s+(?:called|named|labell?ed|titled)\s+/i)[0])) return null;
+
+    // "insert a task called Assess Risk between Review Claim and Check Claim"
+    // (Paul, 2026-09-27): spliced into the flow between them. Read BEFORE the
+    // name, or "called Assess Risk between …" would all become the name — and
+    // B5 (below) used to hand this whole sentence to the AI. Split at the first
+    // " and "; the apply layer re-tries the other splits when a name has "and"
+    // in it ("between Review and Approve and Pay").
+    const btw = rest.match(/^(.+?)\s+between\s+(.+?)\s+and\s+(.+)$/i);
+    if (btw) {
+      let head = btw[1].trim();
+      let before = btw[3].trim();
+      let label: string | undefined;
+      const tailName = before.match(/\s+(?:called|named|labell?ed|titled)\s+(.+)$/i);
+      if (tailName) { label = spokenLabel(tailName[1]); before = before.slice(0, tailName.index).trim(); }
+      const headName = head.match(/\s+(?:called|named|labell?ed|titled)\s+(.+)$/i);
+      if (headName) { label = spokenLabel(headName[1]); head = head.slice(0, headName.index).trim(); }
+      const sym = matchSymbol(head);
+      if (!label) {
+        const leftover = sym ? head.replace(new RegExp(sym.phrase, "i"), "") : head;
+        const implicit = clean(stripArticle(leftover.trim()));
+        if (implicit) label = spokenLabel(implicit);
+      }
+      if (!sym && !label) return null;
+      const op: AssistOp = { op: "insertBetween", symbolType: sym?.symbolType ?? "task", afterRef: clean(btw[2]), beforeRef: clean(before) };
+      if (sym?.eventType) op.eventType = sym.eventType;
+      if (sym?.gatewayType) op.gatewayType = sym.gatewayType;
+      if (label) op.label = label;
+      return [op];
+    }
+
     let afterRef: string | undefined;
     const after = rest.match(new RegExp(`\\s+${AFTER_WORDS}\\s+(.+)$`, "i"));
     if (after) { afterRef = clean(after[1]); rest = rest.slice(0, after.index).trim(); }

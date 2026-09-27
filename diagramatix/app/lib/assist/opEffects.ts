@@ -284,6 +284,24 @@ export function checkEffect(op: AssistOp, before: DiagramData, after: DiagramDat
       return pass;
     }
 
+    case "insertBetween": {
+      // One new step, A → it → B, no flow straight from A to B any more, and
+      // it overlaps nothing — the room was really made.
+      const added = newIn(before, after).filter((e) => e.type === op.symbolType);
+      if (added.length !== 1) return fail(`expected one new ${op.symbolType}, found ${added.length}`);
+      const c = added[0];
+      if (op.label && !sameText(c.label, op.label)) return fail(`the new ${op.symbolType} is called “${nameOf(c)}”, not “${op.label}”`);
+      const [a, b] = [refs.afterRef, refs.beforeRef];
+      if (!a || !b) return null;
+      const flows = (s: string, t: string) => after.connectors.some((k) => k.type === "sequence" && k.sourceId === s && k.targetId === t);
+      if (!flows(a, c.id)) return fail(`no flow from ${nameOf(byId(after, a))} into “${nameOf(c)}”`);
+      if (!flows(c.id, b)) return fail(`no flow from “${nameOf(c)}” on to ${nameOf(byId(after, b))}`);
+      if (flows(a, b)) return fail(`${nameOf(byId(after, a))} still flows straight to ${nameOf(byId(after, b))}`);
+      const hit = after.elements.find((e) => e.id !== c.id && !["pool", "lane", "sublane", "subprocess-expanded"].includes(e.type) && !e.boundaryHostId
+        && e.x < c.x + c.width && e.x + e.width > c.x && e.y < c.y + c.height && e.y + e.height > c.y);
+      return hit ? fail(`“${nameOf(c)}” sits on top of ${nameOf(hit)}`) : pass;
+    }
+
     case "connect": {
       const [a, b] = [refs.fromRef, refs.toRef];
       return a && b && linked(after, a, b, op.connectorType ?? "sequence")

@@ -25,6 +25,7 @@ export const COMMAND_CATALOG: CatalogFamily[] = [
   // Underwriters, Lane 2), Customer above it, Claims System below.
   { family: "Elements & flow", items: [
     { does: "Add an element (after another, connected)", say: ["add a task called Approve Claim after Review Claim", "add a decision", "insert a parallel gateway after Check Coverage", "add an end event called Done after Pay Claim"] },
+    { does: "Insert between two steps — spliced into the flow from the first to the second; with no room, everything after the first step in its pool moves right. Not connected? It joins them", say: ["insert a task called Assess Risk between Review Claim and Check Claim", "insert a subprocess called Investigate between Subprocess 3 and Check Coverage"] },
     { does: "Connect / disconnect", say: ["connect Check Coverage to Pay Claim", "connect them", "disconnect Review Claim from Check Claim"] },
     { does: "Rename", say: ["rename the gateway to Approved?", "rename Lane 3 to Claims Support", "rename Task 1 to Review Email"] },
     { does: "Spell a name the recogniser keeps mishearing — letters are never misheard as a word; the capital is added for you", say: ["rename Lane 3 to F I N A N C E"] },

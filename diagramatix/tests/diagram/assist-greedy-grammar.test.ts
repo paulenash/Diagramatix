@@ -51,7 +51,10 @@ describe("T4568 — the four sentences that used to fail", () => {
   });
 
   it("a positional phrase is not a name", () => {
-    expect(parseCommand("insert a parallel gateway between Check Stock and Pick Items")).toBeNull();
+    // Changed 2026-09-27: "between A and B" is a command of its own now
+    // (insertBetween, T4941) — still never a gateway NAMED "between …".
+    expect(parseCommand("insert a parallel gateway between Check Stock and Pick Items"))
+      .toEqual([{ op: "insertBetween", symbolType: "gateway", gatewayType: "parallel", afterRef: "Check Stock", beforeRef: "Pick Items" }]);
     expect(parseCommand("add a task before Review")).toBeNull();
     expect(parseCommand("add a gateway instead of Review")).toBeNull();
     // And with no type word at all, where the whole leftover is the "name".

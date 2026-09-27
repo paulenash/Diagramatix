@@ -98,6 +98,8 @@ export function headlessDiagram(initial: DiagramData): HeadlessDiagram {
       else run({ type: "CORRECT_ALL_CONNECTORS" });
     },
     removeSpace: (zone) => commit({ type: "REMOVE_SPACE", payload: { zone } }),
+    insertSpace: (markerX, markerY, dx, dy, scopeId) =>
+      commit({ type: "INSERT_SPACE", payload: { markerX, markerY, dx, dy, ...(scopeId ? { scopeId } : {}) } }),
     updateConnectorEndpoint: (connectorId, endpoint, newElementId, newSide, newOffsetAlong) =>
       commit({ type: "UPDATE_CONNECTOR_ENDPOINT", payload: { connectorId, endpoint, newElementId, newSide, newOffsetAlong } }),
     // useDiagram dispatches these two with no history entry of their own; so does this.

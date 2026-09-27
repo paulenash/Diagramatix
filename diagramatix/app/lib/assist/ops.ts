@@ -19,6 +19,8 @@ export type AssistOp =
    * "Put a task here."
    */
   | { op: "add"; symbolType: SymbolType; label?: string; eventType?: EventType; gatewayType?: GatewayType; afterRef?: Ref; at?: "pointer" }
+  /** "insert a task called C between A and B" — spliced into the flow A → B, room made in A's pool (Paul, 2026-09-27). */
+  | { op: "insertBetween"; symbolType: SymbolType; label?: string; eventType?: EventType; gatewayType?: GatewayType; afterRef: Ref; beforeRef: Ref }
   | { op: "connect"; fromRef: Ref; toRef: Ref; connectorType?: ConnectorType }
   | { op: "disconnect"; fromRef: Ref; toRef: Ref }
   | { op: "delete"; ref: Ref; compact?: boolean }
@@ -195,6 +197,15 @@ export function validateOp(raw: unknown): AssistOp | null {
       if (isRef(o.gatewayType)) op.gatewayType = o.gatewayType as GatewayType;
       if (isRef(o.afterRef)) op.afterRef = (o.afterRef as string).trim();
       if (o.at === "pointer") op.at = "pointer";
+      return op;
+    }
+    case "insertBetween": {
+      if (!isRef(o.symbolType) || !SYMBOL_VALUES.has(o.symbolType as SymbolType)) return null;
+      if (!isRef(o.afterRef) || !isRef(o.beforeRef)) return null;
+      const op: AssistOp = { op: "insertBetween", symbolType: o.symbolType as SymbolType, afterRef: (o.afterRef as string).trim(), beforeRef: (o.beforeRef as string).trim() };
+      if (isRef(o.label)) op.label = (o.label as string).trim();
+      if (isRef(o.eventType)) op.eventType = o.eventType as EventType;
+      if (isRef(o.gatewayType)) op.gatewayType = o.gatewayType as GatewayType;
       return op;
     }
     case "connect":

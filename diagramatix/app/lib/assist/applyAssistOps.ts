@@ -56,6 +56,7 @@ import { simPatch } from "@/app/lib/diagram/simParams";
 import { whyTemplateCantFollow } from "@/app/lib/diagram/templateAttach";
 import { SEQUENCE_NODE_TYPES } from "@/app/lib/diagram/templates";
 import { eventSideRefusal } from "@/app/lib/diagram/eventSides";
+import { bandAt, planInsertBetween } from "@/app/lib/diagram/insertBetween";
 import { TEMPLATE_BEFORE_REFUSAL } from "./templatePhrase";
 import { refKind, unsaidRef, type RefKind } from "./refKinds";
 import { connectorsOverElement } from "./connectorRef";
@@ -97,6 +98,8 @@ export interface AssistDiagramActions {
   moveElements(ids: string[], dx: number, dy: number): void;
   elementsMoveEnd(): void;
   removeSpace(zone: { x: number; y: number; width: number; height: number }): void;
+  /** The mouse's Insert Space, scoped to one container's contents ("insert between"). */
+  insertSpace(markerX: number, markerY: number, dx: number, dy: number, scopeId?: string): void;
   updateConnectorEndpoint(connectorId: string, endpoint: "source" | "target", newElementId: string, newSide: Side, newOffsetAlong?: number): void;
   movePoolTo(poolId: string, position: PoolPosition, relativeToId: string): void;
   swapPools(aId: string, bId: string): void;
@@ -170,7 +173,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
     addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, updateConnectorLabel,
     deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool,
     wrapInSubprocess, wrapInContainer, unwrapSubprocess, addPool, addLaneAt, compressPool, compressLane, expandLane, extendPools,
-    swapLane, moveLane, moveElements, elementsMoveEnd, removeSpace, updateConnectorEndpoint, movePoolTo,
+    swapLane, moveLane, moveElements, elementsMoveEnd, removeSpace, insertSpace, updateConnectorEndpoint, movePoolTo,
     swapPools, resizeElement, resizeElementEnd, alignElements,
   } = ctx.actions;
   const { setSelectedElementIds, setSelectedConnectorId, setPickFlow, setRenameFlow, setMessageFlow, setGoldFlash } = ctx.ui;
@@ -499,6 +502,73 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       els = withAdded(els, addedEl);
       setSelectedElementIds(new Set([newId]));
       if (!leftUnconnected) results.push(`added ${op.label ?? op.symbolType}${anchor && op.afterRef ? ` after ${nameOf(anchor)}` : ""}`);
+      continue;
+    }
+
+    // "insert a task called C between A and B" (Paul, 2026-09-27). Spliced into
+    // the flow A → B when there is one: that connector keeps its label and now
+    // ends at C, and C → B is drawn. With no flow between them, A → C → B.
+    // Where C goes, and whether A's pool must make room first, is
+    // insertBetween.ts; the room is the mouse's Insert Space, scoped to the pool.
+    if (op.op === "insertBetween") {
+      // A name may have "and" in it ("between Review and Approve and Pay"):
+      // the grammar's split first, then every other, the first where both ends
+      // name one element each.
+      const words = `${op.afterRef} and ${op.beforeRef}`.split(/\s+and\s+/i);
+      const splits: [string, string][] = [[op.afterRef, op.beforeRef]];
+      for (let k = 1; k < words.length; k++) splits.push([words.slice(0, k).join(" and "), words.slice(k).join(" and ")]);
+      const one = (ref: string) => {
+        const r = resolveRef(ref, els, voiceLastId.current, selectedIds, { strict: true, pointer: pointerWorld.current });
+        return r && "id" in r ? els.find((e) => e.id === r.id) : undefined;
+      };
+      const found = splits.map(([x, y]) => [one(x), one(y)] as const).find(([x, y]) => x && y);
+      if (!found) {
+        // Report as the grammar split it — an ambiguity there raises the picker (askWhich).
+        const x = resolve1(op.afterRef, { strict: true });
+        if ("err" in x) { results.push(x.err); anyFail = true; continue; }
+        const y = resolve1(op.beforeRef, { strict: true });
+        results.push("err" in y ? y.err : `couldn't tell which two steps “${op.afterRef} and ${op.beforeRef}” means`);
+        anyFail = true; continue;
+      }
+      const a = found[0]!, b0 = found[1]!;
+      if (a.id === b0.id) { results.push(`“${nameOf(a)}” twice — say the two steps it goes between`); anyFail = true; continue; }
+      const { w, h } = sizeOf(op.symbolType);
+      const flow = data.connectors.find((c) => c.type === "sequence" && c.sourceId === a.id && c.targetId === b0.id);
+      const plan = planInsertBetween(els, a, b0, flow?.sourceSide, w, h);
+      // Legal before anything moves: a refusal changes nothing.
+      const newId = nanoid();
+      const addedLabel = op.label && needsCapital(op.symbolType) ? capitaliseFirstWord(op.label) : op.label;
+      const probe = syntheticElement(newId, op.symbolType, plan.center, w, h, { label: addedLabel, eventType: op.eventType });
+      if (!flow && !canConnect(a, probe, "sequence", withAdded(els, probe))) {
+        results.push(`can't insert after ${nameOf(a)} — a sequence flow from it isn’t legal`); anyFail = true; continue;
+      }
+      if (!canConnect(probe, b0, "sequence", withAdded(els, probe))) {
+        results.push(`can't insert a ${op.symbolType.replace(/-/g, " ")} before ${nameOf(b0)} — a sequence flow from it to ${nameOf(b0)} isn’t legal`);
+        anyFail = true; continue;
+      }
+      let moved = "";
+      if (plan.shift) {
+        const { markerX, dx, scopeId } = plan.shift;
+        const next = preview({ type: "INSERT_SPACE", payload: { markerX, markerY: 0, dx, dy: 0, ...(scopeId ? { scopeId } : {}) } });
+        insertSpace(markerX, 0, dx, 0, scopeId);
+        if (next) els = next.elements;
+        const pool = scopeId ? els.find((e) => e.id === scopeId) : undefined;
+        moved = ` — moved ${pool ? `everything after ${nameOf(a)} in ${nameOf(pool)}` : `everything after ${nameOf(a)}`} ${dx}px right to make room`;
+      }
+      const b = els.find((e) => e.id === b0.id) ?? b0;
+      const parentId = bandAt(plan.center, els)?.id ?? followOnParentId(a, els);
+      addElementGated(op.symbolType, plan.center, undefined, op.eventType, newId, parentId ? { parentId } : undefined);
+      if (op.gatewayType) updateProperties(newId, { gatewayType: op.gatewayType });
+      if (addedLabel) updateLabel(newId, addedLabel);
+      const addedEl = syntheticElement(newId, op.symbolType, plan.center, w, h, { label: addedLabel, parentId, eventType: op.eventType });
+      els = withAdded(els, addedEl);
+      if (flow) updateConnectorEndpoint(flow.id, "target", newId, plan.inSide, 0.5);
+      else addConnector(a.id, newId, "sequence", "directed", "rectilinear", undefined, plan.inSide);
+      addConnector(newId, b.id, "sequence", "directed", "rectilinear", plan.outSide, flow?.targetSide);
+      if (parentId && els.some((e) => e.type === "pool" && e.x + e.width < plan.center.x + w / 2 + 40)) extendPools();
+      voiceLastId.current = newId;
+      setSelectedElementIds(new Set([newId]));
+      results.push(`inserted ${addedLabel ?? op.symbolType.replace(/-/g, " ")} between ${nameOf(a)} and ${nameOf(b)}${flow ? "" : " — they weren’t connected, so it now joins them"}${moved}`);
       continue;
     }
 

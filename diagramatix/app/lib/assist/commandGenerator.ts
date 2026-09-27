@@ -367,6 +367,30 @@ export const GENERATOR_FAMILIES: readonly OpTemplate[] = [
     },
   },
   {
+    // "insert a task called C between A and B" (Paul, 2026-09-27) — always a
+    // pair that really flows A → B on the test diagram, so the splice is what
+    // is measured; the tight pairs (Review Claim → Check Claim, Task 1 → Task 2)
+    // make room, the roomy one (Subprocess 3 → Check Coverage) does not.
+    family: "insertBetween",
+    applicable: (w) => w.has("task"),
+    build: (rng, w) => {
+      const pair = w.connectedPair(rng);
+      if (!pair) return null;
+      const [a, b] = pair;
+      const [word, symbolType] = pick(rng, [["a task", "task"], ["a subprocess", "subprocess"]] as const);
+      const label = w.activityLabel(rng);
+      return {
+        utterance: pick(rng, [
+          `insert ${word} called ${label} between ${a.spoken} and ${b.spoken}`,
+          `add ${word} called ${label} between ${a.spoken} and ${b.spoken}`,
+          `insert ${word} between ${a.spoken} and ${b.spoken} called ${label}`,
+        ]),
+        ops: [{ op: "insertBetween", symbolType, label, afterRef: a.spoken, beforeRef: b.spoken }],
+        refs: { [a.spoken]: a.id, [b.spoken]: b.id },
+      };
+    },
+  },
+  {
     family: "connect",
     applicable: (w) => w.has("task"),
     build: (rng, w) => {

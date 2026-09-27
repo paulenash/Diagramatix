@@ -56,7 +56,7 @@ export const GOLD = {
  */
 const FLASHING_OPS: ReadonlySet<AssistOp["op"]> = new Set<AssistOp["op"]>([
   // added
-  "add", "addBoundary", "addPool", "addLanes", "addLaneAt", "addSublanes", "addMessage",
+  "add", "insertBetween", "addBoundary", "addPool", "addLanes", "addLaneAt", "addSublanes", "addMessage",
   "addMessageByNumber",
   // enclosed
   "wrapInPool", "wrapInSubprocess", "wrapInContainer",

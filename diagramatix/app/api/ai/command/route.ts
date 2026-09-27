@@ -47,7 +47,7 @@ const SYSTEM = `You interpret ONE spoken (often mis-transcribed) instruction fro
 
 **canonical** (preferred): rewrite the instruction as ONE plain command using the exact phrasings below, keeping the user's names/numbers, and FIXING obvious speech mis-hears ("poll"/"pull"→pool, "line"→lane, "lane two"→Lane 2). A spoken name keeps ITS OWN kind word: "pool three" is Pool 3, never "Lane 3". A bare "the pool" / "the gateway" stays exactly that — never swap in a name: with several, the app asks the user which. The app re-parses this deterministically, so it's the safest path. Use "" if it doesn't fit any form.
 Canonical forms:
-  add a <type> called <name> after <name>   ·   connect <name> to <name>   ·   disconnect <name> from <name>
+  add a <type> called <name> after <name>   ·   insert a <type> called <name> between <name> and <name>   ·   connect <name> to <name>   ·   disconnect <name> from <name>
   rename <name> to <name>   ·   move <name> <n> elements <left|right|up|down>
   delete <name>   ·   delete <name> and compact   ·   add a boundary event called <name> to <name>
   add a pool   ·   add a black-box pool above|below existing pools   ·   add a pool called <name> above|below <pool>   ·   put a pool around everything (wraps loose elements)
@@ -72,6 +72,7 @@ Elements marked [selected] are the user's current mouse selection: "this", "thes
 
 Op shapes (use element NAMES for refs — they are resolved against the diagram; you may also use "it"/"the last"/"the previous"/"the <type>"/"this"/"these"/"the selected <type>"/"the one under the cursor"):
   { "op":"add", "symbolType": <type>, "label"?: string, "gatewayType"?: "exclusive"|"parallel"|"inclusive"|"event-based", "eventType"?: "message"|"timer"|"error"|..., "afterRef"?: <name>, "at"?: "pointer" }
+  { "op":"insertBetween", "symbolType": <type>, "label"?: string, "gatewayType"?: ..., "eventType"?: ..., "afterRef": <name>, "beforeRef": <name> }  // spliced into the flow between two steps; the app makes room
         // "at":"pointer" places it where the MOUSE is ("put a task here"/"there") and draws no connector.
   { "op":"connect", "fromRef": <name>, "toRef": <name> }
   { "op":"disconnect", "fromRef": <name>, "toRef": <name> }

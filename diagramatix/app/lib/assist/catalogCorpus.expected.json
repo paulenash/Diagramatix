@@ -29,6 +29,24 @@
       "afterRef": "Pay Claim"
     }
   ],
+  "insert a task called Assess Risk between Review Claim and Check Claim": [
+    {
+      "op": "insertBetween",
+      "symbolType": "task",
+      "afterRef": "Review Claim",
+      "beforeRef": "Check Claim",
+      "label": "Assess Risk"
+    }
+  ],
+  "insert a subprocess called Investigate between Subprocess 3 and Check Coverage": [
+    {
+      "op": "insertBetween",
+      "symbolType": "subprocess",
+      "afterRef": "Subprocess 3",
+      "beforeRef": "Check Coverage",
+      "label": "Investigate"
+    }
+  ],
   "connect Check Coverage to Pay Claim": [
     {
       "op": "connect",

@@ -24,7 +24,7 @@ import type { AssistOp } from "./ops";
 import type { DiagramData } from "../diagram/types";
 
 /** Every field of an op that holds a REF, including swapPools' a/b. */
-const REF_FIELDS = ["ref", "fromRef", "toRef", "afterRef", "hostRef", "poolRef", "refLane", "laneRef", "laneA", "laneB", "relativeTo"];
+const REF_FIELDS = ["ref", "fromRef", "toRef", "afterRef", "beforeRef", "hostRef", "poolRef", "refLane", "laneRef", "laneA", "laneB", "relativeTo"];
 
 const refFieldsOf = (op: AssistOp) => (op.op === "swapPools" ? [...REF_FIELDS, "a", "b"] : REF_FIELDS);
 

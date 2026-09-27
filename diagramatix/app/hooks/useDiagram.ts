@@ -461,7 +461,9 @@ export type Action =
   | { type: "SET_PCF"; payload: PcfClassification | undefined }
   | { type: "SET_AI_FEEDBACK"; payload: AiFeedback | undefined }
   | { type: "CORRECT_ALL_CONNECTORS" }
-  | { type: "INSERT_SPACE"; payload: { markerX: number; markerY: number; dx: number; dy: number } }
+  | { type: "INSERT_SPACE"; payload: { markerX: number; markerY: number; dx: number; dy: number;
+      /** Only this container's contents move (voice "insert between", 2026-09-27); containers the line crosses still grow. */
+      scopeId?: string } }
   | { type: "REMOVE_SPACE"; payload: { zone: { x: number; y: number; width: number; height: number }; preserveIds?: string[]; extraDeleteIds?: string[]; leaveAloneIds?: string[] } }
   | { type: "SET_VIEWPORT"; payload: { x: number; y: number; zoom: number } }
   | { type: "MOVE_END"; payload: { id: string; fromX?: number; fromY?: number;
@@ -8225,7 +8227,12 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       };
 
     case "INSERT_SPACE": {
-      const { markerX, markerY, dx, dy } = action.payload;
+      const { markerX, markerY, dx, dy, scopeId } = action.payload;
+      // SCOPED (voice "insert C between A and B", Paul 2026-09-27: "move
+      // everything in Task A's Pool … to the right"): only the scope and what
+      // it contains move. Outside it nothing moves, but a pool or lane the line
+      // crosses still grows by the same amount, so the pools stay one width.
+      const scoped = scopeId ? new Set([scopeId, ...getAllDescendantIds(state.elements, scopeId)]) : null;
 
       // First pass: shift / grow non-boundary-event elements. Boundary events
       // are handled in a second pass so they can be re-anchored to their
@@ -8244,6 +8251,15 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         // their boundary stretches when the marker line cuts through them so
         // that children straddling the marker stay inside the container.
         const isExpandedSp = el.type === "subprocess-expanded";
+
+        if (scoped && !scoped.has(el.id)) {
+          const cutX = dx > 0 && markerX > el.x && markerX < el.x + el.width;
+          const cutY = dy > 0 && markerY > el.y && markerY < el.y + el.height;
+          if ((isPool || isLane || isSublane) && (cutX || cutY)) {
+            return cutX ? { ...el, width: el.width + dx } : { ...el, height: el.height + dy };
+          }
+          return el;
+        }
 
         // Horizontal shift.
         //   dx > 0: push content right of marker further right; containers
@@ -10877,7 +10893,7 @@ export function useDiagram(initialData: DiagramData) {
     dispatch({ type: "CORRECT_ALL_CONNECTORS" });
   }, []);
 
-  const insertSpace = useCallback((markerX: number, markerY: number, dx: number, dy: number) => {
+  const insertSpace = useCallback((markerX: number, markerY: number, dx: number, dy: number, scopeId?: string) => {
     // ENG-11: the shift-drag fires insertSpace every mouse-move frame. Coalesce
     // into ONE undo entry — push the pre-drag snapshot on the first tick of the
     // gesture and skip the rest (same pattern as updateProperties). Otherwise
@@ -10888,7 +10904,7 @@ export function useDiagram(initialData: DiagramData) {
     } else {
       pushHistory(snapshotData());
     }
-    dispatch({ type: "INSERT_SPACE", payload: { markerX, markerY, dx, dy } });
+    dispatch({ type: "INSERT_SPACE", payload: { markerX, markerY, dx, dy, ...(scopeId ? { scopeId } : {}) } });
   }, []);
 
   const removeSpace = useCallback((

@@ -93,7 +93,7 @@ export function isJudged(o: Outcome): boolean {
  * scorer that compared text would report a failure for a command that worked.
  */
 const REF_FIELDS = new Set([
-  "ref", "fromRef", "toRef", "afterRef", "hostRef", "poolRef", "refLane",
+  "ref", "fromRef", "toRef", "afterRef", "beforeRef", "hostRef", "poolRef", "refLane",
   "laneRef", "laneA", "laneB", "relativeTo",
 ]);
 
