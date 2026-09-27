@@ -262,6 +262,22 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     }
   }
 
+  // ── Task ↔ subprocess (Paul, 2026-09-27) ──
+  // "convert Review Claim to a subprocess", "convert selected to a task",
+  // "make this a subprocess". The right-click menu's SHAPE change — not a
+  // marker, so not M3's table below. Only the bare shape words: "a user task"
+  // is still M3's marker, and "sub process" is how the recogniser often
+  // writes it.
+  for (const pat of [
+    /^(?:convert|turn|change|make)\s+(.+?)\s+(?:in)?to\s+(?:an?\s+)?(sub[\s-]?process|task)$/i,
+    /^(?:make|turn)\s+(.+?)\s+an?\s+(sub[\s-]?process|task)$/i,
+  ]) {
+    const c = raw.match(pat);
+    if (!c) continue;
+    const ref = clean(c[1]);
+    if (ref) return [{ op: "convertActivity", ref, to: /^sub/i.test(c[2]) ? "subprocess" : "task" }];
+  }
+
   // ── Convert in place (M3) ──
   // "make this a user task", "turn the selected gateway into a parallel
   // gateway", "make Review a service task". The right-click menu has offered
@@ -634,6 +650,29 @@ export function parseCommand(utterance: string): AssistOp[] | null {
       const rawRef = clean(mnudge[1] || "");
       const ref = rawRef && !new RegExp(`^${P}$`, "i").test(rawRef) ? rawRef : undefined; // bare "pool" → default target
       return [{ op: "nudgePool", ...(ref ? { ref } : {}), direction: mnudge[2].toLowerCase() as "up" | "down" | "left" | "right", ...(mnudge[3] ? { distance: Number(mnudge[3]) } : {}) }];
+    }
+  }
+
+  // ── Move everything in a pool, lane or sub-lane (Paul, 2026-09-27) ──
+  // "move everything in Underwriters two steps to the right", "move all the
+  // elements in Lane 2 50 pixels to the left". Before the element move, which
+  // would read "everything in Underwriters" as the name of one thing. The
+  // amount and the direction may come in either order.
+  m = raw.match(/^(?:move|shift|slide)\s+(?:everything|all(?:\s+(?:of\s+)?(?:the\s+)?(?:elements?|contents?|steps?|items?|things?|shapes?))?|the\s+(?:contents?|elements?))\s+(?:in(?:side)?|of|within)\s+(.+)$/i);
+  if (m) {
+    let tail = m[1];
+    const dirs = [...tail.matchAll(/\b(left|right)\b/gi)];
+    if (dirs.length) {
+      const direction = dirs[dirs.length - 1][1].toLowerCase() as "left" | "right";
+      const amt = tail.match(/\b(\d+|an?|one|two|three|four|five|six|seven|eight|nine|ten)\s*(steps?|places?|spaces?|pixels?|px)\b/i);
+      if (amt) tail = tail.replace(amt[0], " ");
+      tail = tail.replace(new RegExp(String.raw`(?:\s+to)?(?:\s+the)?\s+${direction}\b`, "i"), " ").replace(/\s+by\s*$/i, " ").replace(/\s+by\s+/i, " ");
+      const ref = clean(tail.replace(/\s+/g, " ").trim());
+      if (ref) {
+        const n = amt ? toCount(amt[1]) : undefined;
+        const px = amt && /^(?:pixels?|px)$/i.test(amt[2]);
+        return [{ op: "moveContents", ref, direction, ...(n ? (px ? { pixels: n } : { steps: n }) : {}) }];
+      }
     }
   }
 

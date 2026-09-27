@@ -346,6 +346,38 @@ export function checkEffect(op: AssistOp, before: DiagramData, after: DiagramDat
       return ok ? pass : fail(`${nameOf(a)} moved (${dx}, ${dy}), not ${op.direction}`);
     }
 
+    case "convertActivity": {
+      // Named: that element is now the other shape. Selected: nothing named — not judged here.
+      const id = refs.ref;
+      if (!id) return null;
+      const a = byId(after, id);
+      if (!a) return fail("the element went missing");
+      return a.type === op.to ? pass : fail(`${nameOf(a)} is a ${a.type}, not a ${op.to}`);
+    }
+
+    case "moveContents": {
+      // Everything that was inside moved by the same amount, and is still inside.
+      const id = refs.ref;
+      const c = id ? byId(before, id) : undefined;
+      if (!c) return null;
+      const under = (d: DiagramData, eid: string): boolean => {
+        let cur = byId(d, eid);
+        for (let i = 0; cur && i < 16; i++) { if (cur.parentId === c.id) return true; cur = byId(d, cur.parentId ?? ""); }
+        return false;
+      };
+      const inside = before.elements.filter((e) => !["pool", "lane", "sublane"].includes(e.type) && under(before, e.id));
+      if (!inside.length) return null;
+      const dist = op.pixels ?? 100 * (op.steps ?? 1);
+      const want = op.direction === "right" ? dist : -dist;
+      for (const e of inside) {
+        const a = byId(after, e.id);
+        if (!a) return fail(`${nameOf(e)} went missing`);
+        if (Math.abs(a.x - e.x - want) > 1 || Math.abs(a.y - e.y) > 1) return fail(`${nameOf(e)} moved (${Math.round(a.x - e.x)}, ${Math.round(a.y - e.y)}), not ${want}px ${op.direction}`);
+        if (!under(after, e.id)) return fail(`${nameOf(e)} fell out of ${nameOf(c)}`);
+      }
+      return pass;
+    }
+
     case "convert": {
       const b = byId(before, refs.ref), a = byId(after, refs.ref);
       if (!a || !b) return fail("the element went missing");

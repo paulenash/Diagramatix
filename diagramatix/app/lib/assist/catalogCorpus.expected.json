@@ -169,6 +169,22 @@
       "distance": 40
     }
   ],
+  "move everything in Underwriters two steps to the right": [
+    {
+      "op": "moveContents",
+      "ref": "Underwriters",
+      "direction": "right",
+      "steps": 2
+    }
+  ],
+  "move everything in Lane 2 50 pixels to the left": [
+    {
+      "op": "moveContents",
+      "ref": "Lane 2",
+      "direction": "left",
+      "pixels": 50
+    }
+  ],
   "make this a user task": [
     {
       "op": "convert",
@@ -195,6 +211,20 @@
       "op": "convert",
       "ref": "the selected event",
       "subtype": "timer event"
+    }
+  ],
+  "convert Review Claim to a subprocess": [
+    {
+      "op": "convertActivity",
+      "ref": "Review Claim",
+      "to": "subprocess"
+    }
+  ],
+  "convert selected to a task": [
+    {
+      "op": "convertActivity",
+      "ref": "selected",
+      "to": "task"
     }
   ],
   "delete Task 2": [

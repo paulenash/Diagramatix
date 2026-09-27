@@ -61,7 +61,7 @@ const FLASHING_OPS: ReadonlySet<AssistOp["op"]> = new Set<AssistOp["op"]>([
   // enclosed
   "wrapInPool", "wrapInSubprocess", "wrapInContainer",
   // moved / nudged
-  "move", "nudgePool", "moveLane", "swapLanes",
+  "move", "nudgePool", "moveLane", "swapLanes", "moveContents",
   // A boundary move changes the pool's shape without moving anything inside
   // it, so the outline is the only way to see what answered.
   "movePoolBoundary",

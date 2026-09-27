@@ -20,6 +20,8 @@ const TABLE: Readonly<Record<string, Readonly<Record<string, RefKind>>>> = {
   // No kind word said: a pool or a lane, and the apply decides by what it found.
   // A kind word the user DID say ("pool three") narrows it further, in resolveRef.
   compressPool: { poolRef: "container" },
+  // "move everything in Underwriters …" — a pool, lane or sub-lane (2026-09-27).
+  moveContents: { ref: "container" },
   movePoolBoundary: { ref: "pool" },
   addLanes: { poolRef: "pool" },
   movePoolTo: { ref: "pool", relativeTo: "pool" },

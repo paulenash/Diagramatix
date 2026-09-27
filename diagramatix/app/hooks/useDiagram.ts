@@ -10893,6 +10893,13 @@ export function useDiagram(initialData: DiagramData) {
     dispatch({ type: "CORRECT_ALL_CONNECTORS" });
   }, []);
 
+  // The right-click menu's task ↔ subprocess toggle — named, because voice
+  // calls it too ("convert Review Claim to a subprocess", 2026-09-27).
+  const convertTaskSubprocess = useCallback((id: string) => {
+    pushHistory(snapshotData());
+    dispatch({ type: "CONVERT_TASK_SUBPROCESS", payload: { id } });
+  }, []);
+
   const insertSpace = useCallback((markerX: number, markerY: number, dx: number, dy: number, scopeId?: string) => {
     // ENG-11: the shift-drag fires insertSpace every mouse-move frame. Coalesce
     // into ONE undo entry — push the pre-drag snapshot on the first tick of the
@@ -11249,10 +11256,7 @@ export function useDiagram(initialData: DiagramData) {
         dispatch({ type: "SET_AI_FEEDBACK", payload: feedback });
       }, []
     ),
-    convertTaskSubprocess: useCallback((id: string) => {
-      pushHistory(snapshotData());
-      dispatch({ type: "CONVERT_TASK_SUBPROCESS", payload: { id } });
-    }, []),
+    convertTaskSubprocess,
     convertProcessCollapsed: useCallback((id: string) => {
       pushHistory(snapshotData());
       dispatch({ type: "CONVERT_PROCESS_COLLAPSED", payload: { id } });

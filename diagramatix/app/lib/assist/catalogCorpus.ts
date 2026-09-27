@@ -169,6 +169,7 @@ export const CATALOG_CONTEXT: Readonly<Record<string, CatalogContext>> = {
   // Naming no pool means "the pool" (refKinds.ts unsaidRef) — the same rule.
   "nudge pool down": { needsSelection: ["sys"] },
   "move the pool left boundary right": { needsSelection: ["sys"] },
+  "convert selected to a task": { needsSelection: ["sub3"] },
 };
 
 /** `dgx-voice-catalog#<slug>` — from the words, so an inserted line moves nothing. */

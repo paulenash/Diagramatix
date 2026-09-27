@@ -98,6 +98,7 @@ export function headlessDiagram(initial: DiagramData): HeadlessDiagram {
       else run({ type: "CORRECT_ALL_CONNECTORS" });
     },
     removeSpace: (zone) => commit({ type: "REMOVE_SPACE", payload: { zone } }),
+    convertTaskSubprocess: (id) => commit({ type: "CONVERT_TASK_SUBPROCESS", payload: { id } }),
     insertSpace: (markerX, markerY, dx, dy, scopeId) =>
       commit({ type: "INSERT_SPACE", payload: { markerX, markerY, dx, dy, ...(scopeId ? { scopeId } : {}) } }),
     updateConnectorEndpoint: (connectorId, endpoint, newElementId, newSide, newOffsetAlong) =>

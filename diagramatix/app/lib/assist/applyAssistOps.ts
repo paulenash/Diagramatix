@@ -57,6 +57,7 @@ import { whyTemplateCantFollow } from "@/app/lib/diagram/templateAttach";
 import { SEQUENCE_NODE_TYPES } from "@/app/lib/diagram/templates";
 import { eventSideRefusal } from "@/app/lib/diagram/eventSides";
 import { bandAt, planInsertBetween } from "@/app/lib/diagram/insertBetween";
+import { planMoveContents, CONTENTS_STEP_PX } from "@/app/lib/diagram/moveContents";
 import { TEMPLATE_BEFORE_REFUSAL } from "./templatePhrase";
 import { refKind, unsaidRef, type RefKind } from "./refKinds";
 import { connectorsOverElement } from "./connectorRef";
@@ -100,6 +101,8 @@ export interface AssistDiagramActions {
   removeSpace(zone: { x: number; y: number; width: number; height: number }): void;
   /** The mouse's Insert Space, scoped to one container's contents ("insert between"). */
   insertSpace(markerX: number, markerY: number, dx: number, dy: number, scopeId?: string): void;
+  /** The right-click menu's task ↔ subprocess toggle. */
+  convertTaskSubprocess(id: string): void;
   updateConnectorEndpoint(connectorId: string, endpoint: "source" | "target", newElementId: string, newSide: Side, newOffsetAlong?: number): void;
   movePoolTo(poolId: string, position: PoolPosition, relativeToId: string): void;
   swapPools(aId: string, bId: string): void;
@@ -173,7 +176,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
     addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, updateConnectorLabel,
     deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool,
     wrapInSubprocess, wrapInContainer, unwrapSubprocess, addPool, addLaneAt, compressPool, compressLane, expandLane, extendPools,
-    swapLane, moveLane, moveElements, elementsMoveEnd, removeSpace, insertSpace, updateConnectorEndpoint, movePoolTo,
+    swapLane, moveLane, moveElements, elementsMoveEnd, removeSpace, insertSpace, convertTaskSubprocess, updateConnectorEndpoint, movePoolTo,
     swapPools, resizeElement, resizeElementEnd, alignElements,
   } = ctx.actions;
   const { setSelectedElementIds, setSelectedConnectorId, setPickFlow, setRenameFlow, setMessageFlow, setGoldFlash } = ctx.ui;
@@ -1153,7 +1156,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
         if (op.from === "middle" || op.to === "middle") { missed.push(`${nameOf(ev)}: say top, bottom, left or right for an event`); continue; }
         const attached = data.connectors.filter((c) => (c.sourceId === ev.id || c.targetId === ev.id) && (c.type === "sequence" || c.type === "messageBPMN"));
         const sideAt = (c: Connector) => (c.sourceId === ev.id ? c.sourceSide : c.targetSide);
-        const src = attached.find((c) => sideAt(c) === op.from);
+        const src: Connector | undefined = attached.find((c) => sideAt(c) === op.from);
         if (!src) { missed.push(`${nameOf(ev)}: no connector at the ${op.from}`); continue; }
         if (attached.some((c) => c.id !== src.id && sideAt(c) === op.to)) { missed.push(`${nameOf(ev)}: the ${op.to} already has one`); continue; }
         const endpoint: "source" | "target" = src.sourceId === ev.id ? "source" : "target";
@@ -1394,6 +1397,73 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
     // different things. Refusals are specific on purpose: "I don't know that
     // subtype" and "I know it, but not for a gateway" are different problems
     // and only the second one tells the user what to do next.
+    // "convert Review Claim to a subprocess" / "convert selected to a task"
+    // (Paul, 2026-09-27) — the right-click menu's toggle (CONVERT_TASK_SUBPROCESS),
+    // on each named or selected element that is the other shape. A task's
+    // marker and a subprocess's link to its sub-diagram do not survive the
+    // change, as with the menu — the log says so rather than losing them quietly.
+    if (op.op === "convertActivity") {
+      const from = op.to === "subprocess" ? "task" : "subprocess";
+      const sel = resolveSelectionRefs(op.ref, els, selectedIds);
+      let targets: DiagramElement[];
+      if (sel) {
+        if (!sel.length) { results.push("nothing is selected"); anyFail = true; continue; }
+        targets = sel.map((id) => els.find((e) => e.id === id)!).filter(Boolean);
+      } else {
+        const e = resolve1(op.ref);
+        if ("err" in e) { results.push(e.err); anyFail = true; continue; }
+        targets = [e];
+      }
+      const done: string[] = [], notes: string[] = [];
+      for (const e of targets) {
+        if (e.type === op.to) { results.push(`${nameOf(e)} is already a ${op.to}`); anyFail = true; continue; }
+        if (e.type !== from) {
+          results.push(e.type === "subprocess-expanded"
+            ? `${nameOf(e)} is an expanded subprocess — only a collapsed subprocess becomes a task`
+            : `${nameOf(e)} is a ${e.type.replace(/-/g, " ")} — only a ${from} becomes a ${op.to}`);
+          anyFail = true; continue;
+        }
+        const marker = e.type === "task" && e.taskType && e.taskType !== "none" ? e.taskType : undefined;
+        const linked = e.type === "subprocess" && e.properties?.linkedDiagramId;
+        convertTaskSubprocess(e.id);
+        els = els.map((x) => (x.id === e.id ? { ...x, type: op.to } : x));
+        done.push(nameOf(e));
+        if (marker) notes.push(`${nameOf(e)}'s ${marker} marker is dropped`);
+        if (linked) notes.push(`${nameOf(e)}'s link to its sub-diagram is removed`);
+      }
+      if (done.length) {
+        setSelectedElementIds(new Set());   // the standing selection protocol
+        results.push(`converted ${done.join(", ")} to a ${op.to}${notes.length ? ` — ${notes.join("; ")}` : ""}`);
+      }
+      continue;
+    }
+
+    // "move everything in Underwriters two steps to the right" (Paul,
+    // 2026-09-27): the container's contents move, the container does not.
+    // What moves, and whether it can, is moveContents.ts: moving right widens
+    // the pool FIRST (a group moved past its edge falls out of it) and then
+    // lines every pool up; a move left into a header is refused with the room.
+    if (op.op === "moveContents") {
+      const c = resolveField(op, "ref");
+      if ("err" in c) { results.push(c.err); anyFail = true; continue; }
+      if (c.type !== "pool" && !isAnyLane(c)) { results.push(`${nameOf(c)} is a ${c.type.replace(/-/g, " ")} — say a pool, lane or sub-lane`); anyFail = true; continue; }
+      const dist = op.pixels ?? CONTENTS_STEP_PX * (op.steps ?? 1);
+      const dx = op.direction === "right" ? dist : -dist;
+      const plan = planMoveContents(els, c, dx);
+      if ("error" in plan) { results.push(plan.error); anyFail = true; continue; }
+      if (plan.grow) {
+        const pool = els.find((e) => e.id === plan.grow!.poolId)!;
+        resizeElement(pool.id, pool.x, pool.y, plan.grow.width, pool.height);
+        resizeElementEnd(pool.id);
+        extendPools();   // every pool the same width, as "extend the pools" keeps them
+      }
+      moveElements(plan.ids, dx, 0);
+      elementsMoveEnd();
+      setSelectedElementIds(new Set());   // selection protocol
+      results.push(`moved everything in ${nameOf(c)} ${op.direction} ${dist}px${plan.grow ? " — the pools widened to make room" : ""}`);
+      continue;
+    }
+
     if (op.op === "convert") {
       const e = resolve1(op.ref);
       if ("err" in e) { results.push(e.err); anyFail = true; continue; }

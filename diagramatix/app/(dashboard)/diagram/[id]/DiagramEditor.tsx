@@ -2995,13 +2995,13 @@ export function DiagramEditor({
         addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, updateConnectorLabel,
         deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool,
         wrapInSubprocess, wrapInContainer, unwrapSubprocess, addPool, addLaneAt, compressPool, compressLane, expandLane, extendPools,
-        swapLane, moveLane, moveElements, elementsMoveEnd, removeSpace, insertSpace, updateConnectorEndpoint, movePoolTo,
+        swapLane, moveLane, moveElements, elementsMoveEnd, removeSpace, insertSpace, convertTaskSubprocess, updateConnectorEndpoint, movePoolTo,
         swapPools, resizeElement, resizeElementEnd, alignElements,
       },
       ui: { setSelectedElementIds, setSelectedConnectorId, setPickFlow, setRenameFlow, setMessageFlow, setGoldFlash },
       refs: { voiceLastId, pointerWorld, selectedIdsRef, selectedConnectorIdRef, nextStepRef, openTemplateWindowRef, exportJsonRef },
     });
-  }, [data.elements, data.connectors, data.poolFontSize, data.laneFontSize, data.connectorFontSize, data.relaxedLayout, riskCatalog, armDebugBefore, armGoldFlash, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, updateConnectorLabel, deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool, wrapInSubprocess, wrapInContainer, unwrapSubprocess, addPool, addLaneAt, compressPool, compressLane, expandLane, extendPools, swapLane, moveLane, moveElements, elementsMoveEnd, removeSpace, insertSpace, updateConnectorEndpoint, movePoolTo, swapPools, resizeElement, resizeElementEnd, alignElements, setRenameFlow, setMessageFlow, setPickFlow]);
+  }, [data.elements, data.connectors, data.poolFontSize, data.laneFontSize, data.connectorFontSize, data.relaxedLayout, riskCatalog, armDebugBefore, armGoldFlash, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, updateConnectorLabel, deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool, wrapInSubprocess, wrapInContainer, unwrapSubprocess, addPool, addLaneAt, compressPool, compressLane, expandLane, extendPools, swapLane, moveLane, moveElements, elementsMoveEnd, removeSpace, insertSpace, convertTaskSubprocess, updateConnectorEndpoint, movePoolTo, swapPools, resizeElement, resizeElementEnd, alignElements, setRenameFlow, setMessageFlow, setPickFlow]);
 
   // Gold flashing, part two: the command has run, React has re-rendered, and
   // `data.elements` is now the after picture. Diff it against the snapshot taken

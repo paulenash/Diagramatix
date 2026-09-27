@@ -31,6 +31,7 @@
  */
 import type { AssistOp } from "./ops";
 import type { DiagramElement } from "../diagram/types";
+import { planMoveContents } from "../diagram/moveContents";
 import { makeRng, pick, int, DEFAULT_CORPUS_SEED, type Rng } from "./rng";
 import {
   ACTIVITY_LABELS, LANE_LABELS, POOL_LABELS, PARTICIPANT_LABELS, SYSTEM_LABELS,
@@ -88,6 +89,15 @@ export interface World {
   laneWithRoom(rng: Rng): { lane: Named; where: "above" | "below" } | null;
   /** Two elements a flow already joins — "disconnect" asks for nothing otherwise. */
   connectedPair(rng: Rng): [Named, Named] | null;
+  /** A (collapsed) subprocess — what "convert X to a task" is said of. */
+  subprocess(rng: Rng): Named | null;
+  /**
+   * A pool, lane or sub-lane with something in it, and a move of its contents
+   * the planner says can happen: right always can (the pools widen), left only
+   * as far as the room before the headers (moveContents.ts — the rule itself,
+   * not a copy of it).
+   */
+  contentsMove(rng: Rng): { c: Named; direction: "left" | "right"; steps?: number; pixels?: number } | null;
   /** A lane with a neighbour on BOTH sides, and a direction. A lane move trades
    *  height between those two, so an edge lane cannot move at all; asking
    *  measures a refusal, not a move. */
@@ -277,6 +287,19 @@ export function worldOf(els: readonly DiagramElement[]): World {
       const p = pick(rng, born);
       return { id: p.id, spoken: spokenName(p.label) };
     },
+    subprocess: (rng) => {
+      const subsP = byType(els, "subprocess").filter((e) => e.label);
+      return subsP.length ? nameIt(rng, pick(rng, subsP), els, "subprocess") : null;
+    },
+    contentsMove: (rng) => {
+      const holders = [...white, ...lanes, ...subs].filter((c) => !("error" in planMoveContents(els, c, 1)));
+      if (!holders.length) return null;
+      const c = pick(rng, holders);
+      const amount: { steps?: number; pixels?: number } = pick(rng, [{ steps: 1 }, { steps: 2 }, { pixels: 50 }, { pixels: 150 }]);
+      const dist = amount.pixels ?? (amount.steps ?? 1) * 100;
+      const direction = rng.next() < 0.5 && !("error" in planMoveContents(els, c, -dist)) ? "left" : "right";
+      return { c: { id: c.id, spoken: spokenName(c.label) }, direction, ...amount };
+    },
     has: (kind) => ({
       task: tasks.length, gateway: gateways.length, event: events.length,
       pool: pools.length, lane: lanes.length, sublane: subs.length,
@@ -387,6 +410,40 @@ export const GENERATOR_FAMILIES: readonly OpTemplate[] = [
         ]),
         ops: [{ op: "insertBetween", symbolType, label, afterRef: a.spoken, beforeRef: b.spoken }],
         refs: { [a.spoken]: a.id, [b.spoken]: b.id },
+      };
+    },
+  },
+  {
+    // Task ↔ subprocess (Paul, 2026-09-27) — the right-click menu's convert.
+    family: "convertActivity",
+    applicable: (w) => w.has("task"),
+    build: (rng, w) => {
+      const sub = rng.next() < 0.5 ? w.subprocess(rng) : null;
+      const e = sub ?? w.task(rng);
+      const to = sub ? "task" : "subprocess";
+      return {
+        utterance: pick(rng, [`convert ${e.spoken} to a ${to}`, `turn ${e.spoken} into a ${to}`, `make ${e.spoken} a ${to}`]),
+        ops: [{ op: "convertActivity", ref: e.spoken, to }],
+        refs: { [e.spoken]: e.id },
+      };
+    },
+  },
+  {
+    // "move everything in Underwriters two steps to the right" (Paul, 2026-09-27).
+    family: "moveContents",
+    applicable: (w) => w.has("lane") || w.has("pool"),
+    build: (rng, w) => {
+      const m = w.contentsMove(rng);
+      if (!m) return null;
+      const amount = m.pixels ? `${m.pixels} pixels` : `${m.steps === 1 ? "one step" : `${m.steps} steps`}`;
+      return {
+        utterance: pick(rng, [
+          `move everything in ${m.c.spoken} ${amount} to the ${m.direction}`,
+          `move all the elements in ${m.c.spoken} ${amount} to the ${m.direction}`,
+          `move everything in ${m.c.spoken} to the ${m.direction} by ${amount}`,
+        ]),
+        ops: [{ op: "moveContents", ref: m.c.spoken, direction: m.direction, ...(m.pixels ? { pixels: m.pixels } : { steps: m.steps }) }],
+        refs: { [m.c.spoken]: m.c.id },
       };
     },
   },

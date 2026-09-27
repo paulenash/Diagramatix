@@ -122,7 +122,9 @@ Op shapes (use element NAMES for refs — they are resolved against the diagram;
         // shape — the same choices as the right-click menu. subtype is the spoken phrase, e.g. "user task",
         // "service task", "parallel gateway", "event-based gateway", "merge", "timer event", "error event",
         // "call subprocess", "transaction", "loop", "MI parallel", "input data object". This CANNOT change a task
-        // into a gateway; if that is what was asked, return no ops rather than something adjacent.
+        // into a gateway (task <-> subprocess is convertActivity); if that is what was asked, return no ops rather than something adjacent.
+  { "op":"convertActivity", "ref": <name>, "to": "task"|"subprocess" }  // change the SHAPE task <-> (collapsed) subprocess, as the right-click menu does: "convert Review to a subprocess", "convert selected to a task"
+  { "op":"moveContents", "ref": <pool, lane or sub-lane name>, "direction": "left"|"right", "steps"?: number, "pixels"?: number }  // move EVERYTHING INSIDE the container, not the container; a step is 100px: "move everything in Underwriters two steps to the right"
   { "op":"clear" }                    // empty the whole diagram
   { "op":"export", "format":"json" }  // download the diagram as JSON
   { "op":"undo" }
