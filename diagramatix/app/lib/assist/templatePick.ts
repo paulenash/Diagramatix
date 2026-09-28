@@ -228,6 +228,51 @@ export function cardsOf(sections: readonly TemplateSection[]): TemplateCard[] {
   return sections.flatMap((s) => s.cards).sort((a, b) => a.n - b.n);
 }
 
+/** Which way the template window scrolls. */
+export type TemplateScroll = "down" | "up" | "top" | "bottom";
+
+/**
+ * "scroll down", "scroll up", "scroll to the top", "scroll to the bottom" —
+ * and the ways they are said: "page down", "next page", "down", "back to the
+ * top", "go to the bottom", "scroll down a bit more". A bare "scroll" is down.
+ * "top"/"bottom" may be said alone; "start"/"end"/"beginning" only with a verb
+ * or "to", so a template's own words are never taken for them.
+ */
+export function parseTemplateScroll(utterance: string): TemplateScroll | null {
+  const t = String(utterance ?? "").toLowerCase().replace(/[.,!?;:]+/g, " ")
+    .replace(/\b(?:please|ok(?:ay)?|now|then|and|a bit|a little|some|more|again|further|the list|the window|the templates|it)\b/g, " ")
+    .replace(/\s+/g, " ").trim();
+  if (!t) return null;
+  if (/^(?:scroll|page|go|move)?\s*(?:back\s+)?(?:up|upwards?)$/.test(t) || t === "previous page") return "up";
+  if (/^(?:scroll|page|go|move)(?:\s+(?:down|downwards?))?$/.test(t) || /^(?:down|downwards?)$/.test(t) || t === "next page") return "down";
+  if (/^(?:top|(?:scroll|go|jump|page|move)?\s*(?:back\s+)?to\s+(?:the\s+)?(?:top|start|beginning)|(?:scroll|go|jump|page)\s+(?:the\s+)?top)$/.test(t)) return "top";
+  if (/^(?:bottom|(?:scroll|go|jump|page|move)?\s*to\s+(?:the\s+)?(?:bottom|end)|(?:scroll|go|jump|page)\s+(?:the\s+)?bottom)$/.test(t)) return "bottom";
+  return null;
+}
+
+/**
+ * Where "scroll <to>" takes the window from where it is — a page is most of
+ * what shows, so a row is never skipped — or that it is already there, so the
+ * reply can say so instead of claiming it moved.
+ */
+export function templateScrollTarget(
+  to: TemplateScroll,
+  box: { scrollTop: number; scrollHeight: number; clientHeight: number },
+): { top: number } | { already: "top" | "bottom" } {
+  const max = Math.max(0, box.scrollHeight - box.clientHeight);
+  if ((to === "down" || to === "bottom") && box.scrollTop >= max - 1) return { already: "bottom" };
+  if ((to === "up" || to === "top") && box.scrollTop <= 1) return { already: "top" };
+  const page = Math.round(box.clientHeight * 0.85);
+  const top = to === "top" ? 0 : to === "bottom" ? max : Math.max(0, Math.min(max, box.scrollTop + (to === "down" ? page : -page)));
+  return { top };
+}
+
+/** What the log says after "scroll <to>". */
+export function templateScrollReply(to: TemplateScroll, target: { top: number } | { already: "top" | "bottom" }): string {
+  if ("already" in target) return `already at the ${target.already} — say a number, or “scroll ${target.already === "bottom" ? "up" : "down"}”`;
+  return `scrolled ${to === "top" || to === "bottom" ? `to the ${to}` : to} — say a number`;
+}
+
 export type TemplateAnswer =
   /** Put this one on the diagram to be looked at (replacing any before it). */
   | { kind: "pick"; card: TemplateCard }
@@ -239,6 +284,8 @@ export type TemplateAnswer =
   | { kind: "anchor"; ref: string }
   /** "before X": refused — a template can only go after something. */
   | { kind: "before"; ref: string }
+  /** "scroll down" — the window moves; nothing else changes (Paul, 2026-09-28). */
+  | { kind: "scroll"; to: TemplateScroll }
   /** Not an answer to this question — the window stays as it is. */
   | null;
 
@@ -268,6 +315,12 @@ export function parseTemplateAnswer(
   // "After Hours Escalation" is that template, not "after “Hours Escalation”".
   const whole = matchCardByName(said, cards, { exactOnly: true });
   if (whole) return { kind: "pick", card: whole };
+
+  // "scroll down" (Paul, 2026-09-28: "New commands when Templates are
+  // displayed: scroll {down, up, to top, to bottom}") — it came back "say a
+  // number". Before the part names, so "the end" is never a template "… End …".
+  const scroll = parseTemplateScroll(said);
+  if (scroll) return { kind: "scroll", to: scroll };
 
   // "Add template." … "After selected." — the speaker paused, the window
   // opened on the first half, and the anchor arrives as an answer (verdict-5).

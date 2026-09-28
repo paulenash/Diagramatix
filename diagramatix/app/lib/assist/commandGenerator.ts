@@ -403,19 +403,22 @@ export const GENERATOR_FAMILIES: readonly OpTemplate[] = [
       const label = word.includes("event") ? w.eventLabel(rng) : w.activityLabel(rng);
       // Nothing flows INTO a start event, so "add a start event after X" asks
       // for a flow that can never be drawn. Say it without the anchor.
+      // "insert" says it goes INTO the flow (Paul, 2026-09-28), so the op
+      // says so too. The verb is drawn where the sentence used to be — the
+      // same draw — so every seeded set reads as it did.
+      const insertOf = (verb: string) => (verb === "insert" ? { insert: true as const } : {});
       if (!w.has("task") || base.symbolType === "start-event" || rng.next() < 0.4) {
+        const verb = pick(rng, ["add", "insert"]);
         return {
-          utterance: pick(rng, [`add ${word} called ${label}`, `insert ${word} called ${label}`]),
-          ops: [{ ...base, label }],
+          utterance: `${verb} ${word} called ${label}`,
+          ops: [{ ...base, label, ...insertOf(verb) }],
         };
       }
       const after = w.task(rng);
+      const verb = pick(rng, ["add", "insert"]);
       return {
-        utterance: pick(rng, [
-          `add ${word} called ${label} after ${after.spoken}`,
-          `insert ${word} called ${label} after ${after.spoken}`,
-        ]),
-        ops: [{ ...base, label, afterRef: after.spoken }],
+        utterance: `${verb} ${word} called ${label} after ${after.spoken}`,
+        ops: [{ ...base, label, afterRef: after.spoken, ...insertOf(verb) }],
         refs: { [after.spoken]: after.id },
       };
     },

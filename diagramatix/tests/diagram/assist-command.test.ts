@@ -39,7 +39,8 @@ describe("parseCommand — add", () => {
     ]);
   });
   it("insert a parallel gateway", () => {
-    expect(parseCommand("insert a parallel gateway")).toEqual([{ op: "add", symbolType: "gateway", gatewayType: "parallel" }]);
+    // Changed 2026-09-28: "insert" is marked — it goes into a selected connector (T4993).
+    expect(parseCommand("insert a parallel gateway")).toEqual([{ op: "add", symbolType: "gateway", gatewayType: "parallel", insert: true }]);
   });
   it("add Approve after Review (no type word → task)", () => {
     expect(parseCommand("add Approve after Review")).toEqual([{ op: "add", symbolType: "task", label: "Approve", afterRef: "Review" }]);

@@ -428,9 +428,37 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
     pickParked = true;
     return true;
   };
-  for (const op of ops) {
+  /**
+   * "insert" goes INTO the flow (Paul, 2026-09-28: "If a connector is selected
+   * and "insert task" then the new task should be added into the connector";
+   * "insert a Task after selected … should also insert into the outgoing
+   * connector on the selected element, if there is one"). Either way it is
+   * "insert … between" with both ends given exactly — the same placement, the
+   * same room made, the same re-joining. Otherwise the add is left as it was.
+   */
+  // Only what a flow can pass THROUGH goes into one: nothing leaves an end
+  // event or enters a start event, so those are added after, as before (the
+  // generated set, 2026-09-28: "insert an end event … after Check Claim").
+  const FLOWS_THROUGH = new Set<string>(["task", "subprocess", "subprocess-expanded", "gateway", "intermediate-event"]);
+  const intoFlow = (op: AssistOp): AssistOp => {
+    if (op.op !== "add" || !op.insert || op.at || !FLOWS_THROUGH.has(op.symbolType)) return op;
+    const between = (from: string, to: string): AssistOp => ({
+      op: "insertBetween", symbolType: op.symbolType, afterRef: `${ID_REF_PREFIX}${from}`, beforeRef: `${ID_REF_PREFIX}${to}`,
+      ...(op.label ? { label: op.label } : {}), ...(op.eventType ? { eventType: op.eventType } : {}), ...(op.gatewayType ? { gatewayType: op.gatewayType } : {}),
+    });
+    if (!op.afterRef) {
+      const c = selectedConnectorIdRef.current ? data.connectors.find((x) => x.id === selectedConnectorIdRef.current) : undefined;
+      return c && c.type === "sequence" && els.some((e) => e.id === c.sourceId) && els.some((e) => e.id === c.targetId) ? between(c.sourceId, c.targetId) : op;
+    }
+    const r = resolveRef(op.afterRef, els, voiceLastId.current, selectedIds, { strict: true, pointer: pointerWorld.current });
+    if (!r || !("id" in r)) return op;   // not found, or which one? — the add says so
+    const outs = data.connectors.filter((c) => c.type === "sequence" && c.sourceId === r.id && els.some((e) => e.id === c.targetId));
+    return outs.length === 1 ? between(r.id, outs[0].targetId) : op;
+  };
+  for (const op0 of ops) {
     opAt += 1;
     if (askWhich()) break;
+    const op = intoFlow(op0);
     if (op.op === "undo") { undo(); results.push("undid the last change"); continue; }
     if (op.op === "clear") { clearDiagram(); voiceLastId.current = null; results.push("cleared the diagram"); continue; }
     if (op.op === "export") { exportJsonRef.current?.(); results.push("exported to JSON"); continue; }
@@ -564,7 +592,10 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       voiceLastId.current = newId;
       els = withAdded(els, addedEl);
       setSelectedElementIds(new Set([newId]));
-      if (!leftUnconnected) results.push(`added ${op.label ?? op.symbolType}${anchor && op.afterRef ? ` after ${nameOf(anchor)}` : ""}`);
+      if (!leftUnconnected) {
+        const outs = op.insert && anchor ? data.connectors.filter((c) => c.type === "sequence" && c.sourceId === anchor!.id).length : 0;
+        results.push(`added ${op.label ?? op.symbolType}${anchor && op.afterRef ? ` after ${nameOf(anchor)}` : ""}${outs > 1 ? ` — ${nameOf(anchor!)} has ${outs} outgoing flows, so it is on a new one: say “insert a task between ${nameOf(anchor!)} and …” to put it into one` : ""}`);
+      }
       continue;
     }
 
@@ -631,6 +662,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       if (parentId && els.some((e) => e.type === "pool" && e.x + e.width < plan.center.x + w / 2 + 40)) extendPools();
       voiceLastId.current = newId;
       setSelectedElementIds(new Set([newId]));
+      setSelectedConnectorId(null);   // the connector it went into is no longer what is selected
       results.push(`inserted ${addedLabel ?? op.symbolType.replace(/-/g, " ")} between ${nameOf(a)} and ${nameOf(b)}${flow ? "" : " — they weren’t connected, so it now joins them"}${moved}`);
       continue;
     }

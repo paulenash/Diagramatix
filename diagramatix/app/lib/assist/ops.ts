@@ -18,7 +18,9 @@ export type AssistOp =
    * instead of inline after `afterRef` or right of the rightmost element.
    * "Put a task here."
    */
-  | { op: "add"; symbolType: SymbolType; label?: string; eventType?: EventType; gatewayType?: GatewayType; afterRef?: Ref; at?: "pointer" }
+  | { op: "add"; symbolType: SymbolType; label?: string; eventType?: EventType; gatewayType?: GatewayType; afterRef?: Ref; at?: "pointer";
+      /** Said with "insert" — it goes INTO the flow: a selected connector, or the anchor's one outgoing flow (Paul, 2026-09-28). */
+      insert?: true }
   /** "insert a task called C between A and B" — spliced into the flow A → B, room made in A's pool (Paul, 2026-09-27). */
   | { op: "insertBetween"; symbolType: SymbolType; label?: string; eventType?: EventType; gatewayType?: GatewayType; afterRef: Ref; beforeRef: Ref }
   | { op: "connect"; fromRef: Ref; toRef: Ref; connectorType?: ConnectorType }
@@ -210,6 +212,7 @@ export function validateOp(raw: unknown): AssistOp | null {
       if (isRef(o.gatewayType)) op.gatewayType = o.gatewayType as GatewayType;
       if (isRef(o.afterRef)) op.afterRef = (o.afterRef as string).trim();
       if (o.at === "pointer") op.at = "pointer";
+      if (o.insert === true) op.insert = true;
       return op;
     }
     case "insertBetween": {

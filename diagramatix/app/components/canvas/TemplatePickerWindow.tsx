@@ -21,6 +21,7 @@
  * The mouse works too. A voice feature that cannot be clicked is a feature with
  * one way to fail.
  */
+import type { Ref } from "react";
 import { TemplateThumbnail } from "@/app/(dashboard)/diagram/[id]/TemplateThumbnail";
 import type { TemplateCard, TemplateSection } from "@/app/lib/assist/templatePick";
 
@@ -36,10 +37,12 @@ interface Props {
   anchorName?: string;
   /** Why the last pick was refused — the window stays open for another number. */
   notice?: string | null;
+  /** The scrolling list, so "scroll down" can move it (templatePick.ts templateScrollTarget). */
+  scrollRef?: Ref<HTMLDivElement>;
 }
 
 export function TemplatePickerWindow({
-  sections, onPick, onCancel, hiddenNote = "", anchorName, notice,
+  sections, onPick, onCancel, hiddenNote = "", anchorName, notice, scrollRef,
 }: Props) {
   const total = sections.reduce((n, s) => n + s.cards.length, 0);
   const bySource = (source: "builtin" | "user") => sections.filter((s) => s.source === source && s.cards.length);
@@ -66,7 +69,7 @@ export function TemplatePickerWindow({
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 py-4 min-h-[20rem]">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-4 min-h-[20rem]">
           {total === 0 && (
             <p className="text-xs text-gray-500 py-10 text-center">No templates to offer for this diagram.</p>
           )}
@@ -114,7 +117,7 @@ export function TemplatePickerWindow({
 
         <div className="flex items-center justify-between gap-2 px-5 py-2.5 border-t border-gray-100">
           <span className="text-[11px] text-gray-500">
-            Say a number · “cancel” to stop
+            Say a number · “scroll down” / “scroll up” / “scroll to the top” · “cancel” to stop
           </span>
           {notice
             ? <span className="text-[11px] text-red-600">{notice}</span>

@@ -165,6 +165,23 @@ export function repairConvertWord(text: string): SelectedWordRepair {
  * command, so nothing that was heard right can change.
  */
 const MOVE_MISHEARD_RE = /^(mood)(?=[\s.,!?]|$)/i;
+
+/**
+ * "letter event send reply" → "delete event send reply" (Paul's session,
+ * 2026-09-28: it went to the AI and failed; he said it again straight after,
+ * as "delete event" … "send reply"). Only the FIRST word, and only with more
+ * after it — "letter" starts no command, so nothing heard right can change.
+ */
+const DELETE_MISHEARD_RE = /^(letter)(?=\s+\S)/i;
+export function repairDeleteWord(text: string): SelectedWordRepair {
+  if (!text) return { text, corrected: false };
+  let corrected = false;
+  const out = text.replace(DELETE_MISHEARD_RE, (heard: string) => {
+    corrected = true;
+    return /^[A-Z]/.test(heard) ? "Delete" : "delete";
+  });
+  return { text: out, corrected };
+}
 export function repairMoveWord(text: string): SelectedWordRepair {
   if (!text) return { text, corrected: false };
   let corrected = false;
@@ -265,7 +282,7 @@ export const MISHEARD_ADD_LEADING_WORDS = MISHEARD_ADD_LEADING;
 export function repairHeardWords(text: string): string {
   // A spelled-out name ("F I N A N C E") is joined first, so every rule below
   // and every name slot sees the word (spelledWord.ts).
-  return repairSelectedWord(repairAddWord(repairTurnWord(repairConvertWord(repairMoveWord(joinSpelledLetters(text)).text).text).text).text).text;
+  return repairSelectedWord(repairAddWord(repairTurnWord(repairConvertWord(repairMoveWord(repairDeleteWord(joinSpelledLetters(text)).text).text).text).text).text).text;
 }
 
 /** True when this word already refers to the selection. */

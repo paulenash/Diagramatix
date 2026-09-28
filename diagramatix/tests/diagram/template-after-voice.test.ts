@@ -411,7 +411,8 @@ describe("T4928 — a pick is final: no Keep it / Cancel step", () => {
     expect(win, "no Keep button").not.toMatch(/>\s*Keep it\s*</);
     expect(win).not.toContain("onConfirm");
     expect(win).not.toContain("provisionalId");
-    expect(win).toContain("Say a number · “cancel” to stop");
+    // Changed 2026-09-28: the footer names the scroll commands too (T4989).
+    expect(win).toContain("Say a number · “scroll down” / “scroll up” / “scroll to the top” · “cancel” to stop");
     expect(editor).toContain("say a number, or “cancel”");
     expect(editor).not.toContain("say a number, “yes” to keep it, or “cancel”");
   });

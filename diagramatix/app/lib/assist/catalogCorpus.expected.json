@@ -18,7 +18,8 @@
       "op": "add",
       "symbolType": "gateway",
       "gatewayType": "parallel",
-      "afterRef": "Check Coverage"
+      "afterRef": "Check Coverage",
+      "insert": true
     }
   ],
   "add an end event called Done after Pay Claim": [

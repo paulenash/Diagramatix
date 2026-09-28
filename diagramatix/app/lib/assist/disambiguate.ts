@@ -23,7 +23,7 @@
 import type { Connector, DiagramElement } from "../diagram/types";
 import type { AssistOp } from "./ops";
 import { numberConnectorTargets, numberTargets, type RenameTarget } from "./renameTargets";
-import { ID_REF_PREFIX, spokenNumbersAsDigits } from "./resolveRef";
+import { ID_REF_PREFIX, spokenNumbersAsDigits, spokenForm, namesOverlap } from "./resolveRef";
 import { phoneticMatches } from "./phonetic";
 import { leadingContainerWord } from "./containerWords";
 import { leadingSpokenNumber } from "./spokenNumber";
@@ -122,16 +122,17 @@ export function parsePickAnswer(utterance: string, flow: PickFlow): RenameTarget
  * the same ladder `resolveRef` climbs, over a field of two or three.
  */
 export function matchTargetByName(utterance: string, targets: readonly RenameTarget[]): RenameTarget | null {
-  const said = spokenNumbersAsDigits(
-    utterance.trim().toLowerCase().replace(/[.,!?;:]+$/g, "").replace(/^(?:the|a|an|it'?s|that'?s)\s+/i, "").trim(),
-  );
+  // The resolver's own reading of a name (resolveRef.ts spokenForm, namesOverlap):
+  // a two-line label is one name ("Send\nReply"), and nothing matches inside a
+  // word ("end" is not in "send reply") — 2026-09-28.
+  const said = spokenForm(utterance).replace(/^(?:the|a|an|it'?s|that'?s)\s+/i, "").trim();
   if (!said) return null;
-  const labelOf = (t: RenameTarget) => spokenNumbersAsDigits((t.label ?? "").trim().toLowerCase());
+  const labelOf = (t: RenameTarget) => spokenForm(t.label ?? "");
   const only = (hits: RenameTarget[]) => (hits.length === 1 ? hits[0] : null);
 
   const exact = only(targets.filter((t) => labelOf(t) === said));
   if (exact) return exact;
-  const contains = only(targets.filter((t) => labelOf(t).includes(said) || said.includes(labelOf(t))));
+  const contains = only(targets.filter((t) => namesOverlap(labelOf(t), said)));
   if (contains) return contains;
   return only(phoneticMatches(said, [...targets], (t) => t.label ?? undefined));
 }

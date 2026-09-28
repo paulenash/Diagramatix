@@ -25,7 +25,7 @@ export const COMMAND_CATALOG: CatalogFamily[] = [
   // Underwriters, Lane 2), Customer above it, Claims System below.
   { family: "Elements & flow", items: [
     { does: "Add an element (after another, connected)", say: ["add a task called Approve Claim after Review Claim", "add a decision", "insert a parallel gateway after Check Coverage", "add an end event called Done after Pay Claim"] },
-    { does: "Insert between two steps — spliced into the flow from the first to the second; with no room, everything after the first step in its pool moves right. Not connected? It joins them", say: ["insert a task called Assess Risk between Review Claim and Check Claim", "insert a subprocess called Investigate between Subprocess 3 and Check Coverage"] },
+    { does: "Insert between two steps — spliced into the flow from the first to the second; with no room, everything after the first step in its pool moves right. Not connected? It joins them. With a connector selected, “insert a task” goes into it; “insert a task after X” goes into X's outgoing flow when it has one", say: ["insert a task called Assess Risk between Review Claim and Check Claim", "insert a subprocess called Investigate between Subprocess 3 and Check Coverage"] },
     { does: "Connect / disconnect", say: ["connect Check Coverage to Pay Claim", "connect them", "disconnect Review Claim from Check Claim"] },
     { does: "Rename", say: ["rename the gateway to Approved?", "rename Lane 3 to Claims Support", "rename Task 1 to Review Email"] },
     { does: "Spell a name the recogniser keeps mishearing — letters are never misheard as a word; the capital is added for you", say: ["rename Lane 3 to F I N A N C E"] },
@@ -38,7 +38,7 @@ export const COMMAND_CATALOG: CatalogFamily[] = [
     { does: "Task ↔ subprocess — the right-click menu's convert. A task's marker, or a subprocess's link to its sub-diagram, does not survive the change", say: ["convert Review Claim to a subprocess", "convert selected to a task"] },
     { does: "Delete (and close the gap)", say: ["delete Task 2", "remove Task 1 and compact"] },
     { does: "Boundary event on a task or subprocess", say: ["add a boundary event called Cancel to Subprocess 3", "add a boundary event to Check Coverage called Timeout"] },
-    { does: "Templates — the numbered template window; say a number and it goes on the diagram. With a step selected (or “after X”) it goes after that step, in its lane, joined to it — a Start Event at its front is dropped and the lane grows to fit", say: ["add template", "add template after Review Claim"] },
+    { does: "Templates — the numbered template window; say a number and it goes on the diagram. With a step selected (or “after X”) it goes after that step, in its lane, joined to it — a Start Event at its front is dropped and the lane grows to fit. While it shows: “scroll down”, “scroll up”, “scroll to the top”, “scroll to the bottom”", say: ["add template", "add template after Review Claim"] },
   ] },
   { family: "The selection (mouse says which, voice says what)", items: [
     { does: "Refer to what is selected", say: ["rename the selected pool to Finance", "delete these", "connect this to Pay Claim", "move the selected task right", "add a boundary event called Timeout to this"] },

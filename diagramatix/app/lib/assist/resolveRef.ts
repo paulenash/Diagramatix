@@ -80,7 +80,27 @@ const NUM_WORDS: Record<string, string> = {
  * "Sublane 1" (Paul's log, 2026-09-23).
  */
 export const spokenNumbersAsDigits = (s: string) => s.replace(/\b(zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty)\b/g, (m) => NUM_WORDS[m]);
-const norm = (s: string) => spokenNumbersAsDigits(s.toLowerCase().replace(/[.,!?;:]+$/g, "").trim());
+/**
+ * A name as it is SAID: lower case, numbers as digits, trailing punctuation
+ * gone — and every line break or run of spaces one space, because a name drawn
+ * on two lines is spoken as one (Paul, 2026-09-28: the end event "Send\nReply"
+ * could not be found by "Send Reply", nor offered, nor picked by name).
+ */
+export const spokenForm = (s: string) => spokenNumbersAsDigits(s.toLowerCase().replace(/\s+/g, " ").replace(/[.,!?;:]+$/g, "").trim());
+const norm = spokenForm;
+
+/**
+ * Does a name overlap what was said, at WORD boundaries? What was said may
+ * start any word of the name ("review" → "Review Invoice", "revie" too), or the
+ * whole name may sit among what was said as whole words ("the review invoice
+ * step"). Never inside a word: "end" is not in "send reply" — that match
+ * offered the two "End" events for "delete send reply" (2026-09-28).
+ * Both sides already in `spokenForm`.
+ */
+export function namesOverlap(name: string, said: string): boolean {
+  if (!name || !said) return false;
+  return ` ${name}`.includes(` ${said}`) || ` ${said} `.includes(` ${name} `);
+}
 const stripArticle = (s: string) => s.replace(/^(the|a|an)\s+/i, "").trim();
 const tokens = (s: string) => norm(s).split(/\s+/).filter(Boolean);
 
@@ -410,6 +430,14 @@ export function resolveRef(spoken: string, elements: DiagramElement[], lastAdded
   if (cont) return cont;
   const t = typeNoun(s);
   if (t) return bareKindChoice(elements.filter((e) => e.type === t), selectedIds, lastAddedId, opts.strict);
+  // "the event", "events" — ANY event: start, intermediate or end, boundary
+  // ones too (Paul, 2026-09-28: "Include ALL events in "delete event" or
+  // "delete events""). There is no event type noun, so "delete event" searched
+  // NAMES for the word, offering a task and a subprocess called "… Event …" and
+  // not the end event Send Reply.
+  if (/^events?$/.test(stripArticle(s))) {
+    return bareKindChoice(elements.filter((e) => /-event$/.test(e.type) && (!opts.kind || isOfKind(opts.kind, e))), selectedIds, lastAddedId, opts.strict);
+  }
 
   const fullTarget = stripArticle(s);          // "lane 2"
   const target = stripKind(fullTarget);        // "2"
@@ -444,11 +472,8 @@ export function resolveRef(spoken: string, elements: DiagramElement[], lastAdded
   const exact = labelled.filter((e) => norm(e.label!) === target);
   if (exact.length) return pick(exact.map((e) => e.id));
 
-  // 2. Substring either way ("review" ↔ "Review Invoice").
-  const contains = labelled.filter((e) => {
-    const l = norm(e.label!);
-    return l.includes(target) || target.includes(l);
-  });
+  // 2. Substring either way ("review" ↔ "Review Invoice") — at word boundaries.
+  const contains = labelled.filter((e) => namesOverlap(norm(e.label!), target));
   if (contains.length) return pick(contains.map((e) => e.id));
 
   // 3. Token overlap — best-scoring label if it clears a threshold.

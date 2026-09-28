@@ -82,7 +82,7 @@ import { syntheticElement, withAdded, withDeleted, withLabel } from "@/app/lib/a
 import { needsConfirmation, parseConfirmation } from "@/app/lib/assist/confirm";
 import { collectRenameTargets, type RenameType, type RenameTarget } from "@/app/lib/assist/renameTargets";
 import { buildPickFlow, parsePickAnswer, substituteRef, type PickFlow } from "@/app/lib/assist/disambiguate";
-import { cardsOf, numberTemplates, templatesToOffer, canAttachInline, diagramHasWhiteBoxPool, hiddenTemplatesNote, templateWindowSummary, parseTemplateAnswer, type TemplateCard, type TemplateSection } from "@/app/lib/assist/templatePick";
+import { cardsOf, numberTemplates, templatesToOffer, canAttachInline, diagramHasWhiteBoxPool, hiddenTemplatesNote, templateWindowSummary, parseTemplateAnswer, type TemplateCard, type TemplateSection, templateScrollTarget, templateScrollReply } from "@/app/lib/assist/templatePick";
 import { TEMPLATE_BEFORE_REFUSAL } from "@/app/lib/assist/templatePhrase";
 import { joinSpelledLetters } from "@/app/lib/assist/spelledWord";
 import { planTemplateAttach, checkTemplateAttach, planTemplateShow, planTemplateDrop, whyTemplateCantFollow, anchorNameOf } from "@/app/lib/diagram/templateAttach";
@@ -2868,6 +2868,8 @@ export function DiagramEditor({
   // diagram it was applied to goes back, then the next goes on — one undo
   // entry however many are tried); only "yes" keeps it.
   const [templateFlow, setTemplateFlowState] = useState<TemplateFlow | null>(null);
+  // The template window's scrolling list — "scroll down" moves it (Paul, 2026-09-28).
+  const templateScrollRef = useRef<HTMLDivElement | null>(null);
   const templateFlowRef = useRef<TemplateFlow | null>(null);
   const setTemplateFlow = useCallback((f: TemplateFlow | null) => { templateFlowRef.current = f; setTemplateFlowState(f); }, []);
   // Every pick (and every close) takes a new number; a pick whose template
@@ -3396,6 +3398,14 @@ export function DiagramEditor({
         return;
       }
       if (answer.kind === "before") { log({ heard, summary: TEMPLATE_BEFORE_REFUSAL, ok: false }); return; }
+      if (answer.kind === "scroll") {
+        const list = templateScrollRef.current;
+        if (!list) { log({ heard, summary: "the template window isn't showing its list yet — say a number", ok: false }); return; }
+        const target = templateScrollTarget(answer.to, list);
+        if ("top" in target) list.scrollTo({ top: target.top, behavior: "smooth" });
+        log({ heard, summary: templateScrollReply(answer.to, target), ok: true });
+        return;
+      }
       // A number shows that one instead of whatever is showing now; "after X"
       // moves the window (and what is showing) to X. Each reports in the same
       // tick as its change, so the debug recording's "touched" lands on it.
@@ -7100,6 +7110,7 @@ export function DiagramEditor({
             hiddenNote={hiddenTemplatesNote(templateFlow.hiddenInitial, templateFlow.hiddenContainer)}
             anchorName={templateFlow.anchorName}
             notice={templateFlow.notice}
+            scrollRef={templateScrollRef}
             onPick={(card) => {
               void pickTemplateCardRef.current(card, (r) => appendLog({ heard: "", summary: r.summary, ok: r.ok }));
             }}

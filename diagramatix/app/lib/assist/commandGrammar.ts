@@ -875,9 +875,16 @@ export function parseCommand(utterance: string): AssistOp[] | null {
       return [op];
     }
 
+    // "insert" puts it INTO the flow (Paul, 2026-09-28): the apply layer
+    // splices it into a selected connector, or the anchor's one outgoing flow.
+    const inserting = /^insert\b/i.test(raw);
     let afterRef: string | undefined;
     const after = rest.match(new RegExp(`\\s+${AFTER_WORDS}\\s+(.+)$`, "i"));
     if (after) { afterRef = clean(after[1]); rest = rest.slice(0, after.index).trim(); }
+    // "insert a task after selected called Check" — the name said LAST belongs
+    // to the new task, not to the anchor ("selected called Check" found nothing).
+    const afterNamed = afterRef?.match(/\s+(?:called|named|labell?ed|titled)\s+(.+)$/i);
+    if (afterRef && afterNamed && afterNamed.index) { rest = `${rest} called ${afterNamed[1]}`; afterRef = afterRef.slice(0, afterNamed.index).trim(); }
 
     // M5 — "put a task here", "add a gateway over there". Stripped BEFORE the
     // name is read, or "add a task called Approve here" would be named
@@ -925,6 +932,7 @@ export function parseCommand(utterance: string): AssistOp[] | null {
       if (label) op.label = label;
       if (afterRef) op.afterRef = afterRef;
       if (atPointer) op.at = "pointer";
+      if (inserting) op.insert = true;
       return [op];
     }
     // "add Approve after Review" — no type word → a task named by the rest.
@@ -940,6 +948,7 @@ export function parseCommand(utterance: string): AssistOp[] | null {
       const op: AssistOp = { op: "add", symbolType: "task", label: implicit };
       if (afterRef) op.afterRef = afterRef;
       if (atPointer) op.at = "pointer";
+      if (inserting) op.insert = true;
       return [op];
     }
   }

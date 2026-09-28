@@ -107,9 +107,10 @@ The bar can be **dragged by its header**. The Symbols palette and the Properties
   (3, 'Things you can say or type', $UG$**Add and connect**
 
 - "add a task called Approve after Review" · "add a decision" · "insert a parallel gateway"
-- "insert a task called Check Stock between Receive Order and Pick Items" — goes into the flow between them. With no room, everything after the first step in its pool moves right. Two steps that were not connected are joined through it.
+- "insert a task called Check Stock between Receive Order and Pick Items" — goes into the flow between them. With no room, everything after the first step in its pool moves right. Two steps that were not connected are joined through it. With a connector selected, "insert a task" goes into that connector; "insert a task after Receive Order" goes into Receive Order's outgoing flow, when it has just one.
 - "connect Send Invoice to Receive Payment" · "connect them"
 - "add a boundary event called Cancel to the Repeat-Until subprocess"
+- "add template" · "add template after Review" — the numbered template window: say a number and it goes on the diagram. "scroll down", "scroll up", "scroll to the top" and "scroll to the bottom" move through the window; "cancel" closes it.
 
 **Pools and lanes**
 
@@ -134,7 +135,7 @@ The bar can be **dragged by its header**. The Symbols palette and the Properties
 
 - "rename the gateway to Approved?" · "nudge Approve right" · "move these up"
 - "convert Review to a subprocess" · "convert selected to a task" — the right-click menu's convert. A task's marker, or a subprocess's link to its sub-diagram, does not survive the change.
-- "delete Prepare and compact" · "clear the diagram" · "export the diagram to JSON"
+- "delete Prepare and compact" · "delete event" · "clear the diagram" · "export the diagram to JSON" — "delete event" (or "events") numbers every event to choose from. Compacting never deletes or overlaps anything else: if it would, the gap stays and it says why.
 - "undo that" · "again" (repeats the last command)
 
 Refer to things by **name** ("Review"), by **type** ("the gateway"), by **position** ("the middle pool"), by **number** ("Lane 2" or "lane two"), or with **it / the last one / the previous one**. A leading or trailing kind word is tolerated, so "the Sales lane" finds the lane named Sales.
