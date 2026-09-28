@@ -435,18 +435,22 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
    * connector on the selected element, if there is one"). Either way it is
    * "insert … between" with both ends given exactly — the same placement, the
    * same room made, the same re-joining. Otherwise the add is left as it was.
+   *
+   * "add … after X" too (Paul, 2026-09-28: "Should "add … after" also go into
+   * the outgoing connector? - Yes!!"). A selected connector is "insert" only.
    */
   // Only what a flow can pass THROUGH goes into one: nothing leaves an end
   // event or enters a start event, so those are added after, as before (the
   // generated set, 2026-09-28: "insert an end event … after Check Claim").
   const FLOWS_THROUGH = new Set<string>(["task", "subprocess", "subprocess-expanded", "gateway", "intermediate-event"]);
   const intoFlow = (op: AssistOp): AssistOp => {
-    if (op.op !== "add" || !op.insert || op.at || !FLOWS_THROUGH.has(op.symbolType)) return op;
+    if (op.op !== "add" || op.at || !FLOWS_THROUGH.has(op.symbolType)) return op;
     const between = (from: string, to: string): AssistOp => ({
       op: "insertBetween", symbolType: op.symbolType, afterRef: `${ID_REF_PREFIX}${from}`, beforeRef: `${ID_REF_PREFIX}${to}`,
       ...(op.label ? { label: op.label } : {}), ...(op.eventType ? { eventType: op.eventType } : {}), ...(op.gatewayType ? { gatewayType: op.gatewayType } : {}),
     });
     if (!op.afterRef) {
+      if (!op.insert) return op;
       const c = selectedConnectorIdRef.current ? data.connectors.find((x) => x.id === selectedConnectorIdRef.current) : undefined;
       return c && c.type === "sequence" && els.some((e) => e.id === c.sourceId) && els.some((e) => e.id === c.targetId) ? between(c.sourceId, c.targetId) : op;
     }
@@ -593,7 +597,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       els = withAdded(els, addedEl);
       setSelectedElementIds(new Set([newId]));
       if (!leftUnconnected) {
-        const outs = op.insert && anchor ? data.connectors.filter((c) => c.type === "sequence" && c.sourceId === anchor!.id).length : 0;
+        const outs = op.afterRef && anchor && FLOWS_THROUGH.has(op.symbolType) ? data.connectors.filter((c) => c.type === "sequence" && c.sourceId === anchor!.id).length : 0;
         results.push(`added ${op.label ?? op.symbolType}${anchor && op.afterRef ? ` after ${nameOf(anchor)}` : ""}${outs > 1 ? ` — ${nameOf(anchor!)} has ${outs} outgoing flows, so it is on a new one: say “insert a task between ${nameOf(anchor!)} and …” to put it into one` : ""}`);
       }
       continue;

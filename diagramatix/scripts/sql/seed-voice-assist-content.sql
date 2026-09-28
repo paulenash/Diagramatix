@@ -107,7 +107,7 @@ The bar can be **dragged by its header**. The Symbols palette and the Properties
   (3, 'Things you can say or type', $UG$**Add and connect**
 
 - "add a task called Approve after Review" · "add a decision" · "insert a parallel gateway"
-- "insert a task called Check Stock between Receive Order and Pick Items" — goes into the flow between them. With no room, everything after the first step in its pool moves right. Two steps that were not connected are joined through it. With a connector selected, "insert a task" goes into that connector; "insert a task after Receive Order" goes into Receive Order's outgoing flow, when it has just one.
+- "insert a task called Check Stock between Receive Order and Pick Items" — goes into the flow between them. With no room, everything after the first step in its pool moves right. Two steps that were not connected are joined through it. With a connector selected, "insert a task" goes into that connector; "add a task after Receive Order" (or "insert …") goes into Receive Order's outgoing flow, when it has just one.
 - "connect Send Invoice to Receive Payment" · "connect them"
 - "add a boundary event called Cancel to the Repeat-Until subprocess"
 - "add template" · "add template after Review" — the numbered template window: say a number and it goes on the diagram. "scroll down", "scroll up", "scroll to the top" and "scroll to the bottom" move through the window; "cancel" closes it.

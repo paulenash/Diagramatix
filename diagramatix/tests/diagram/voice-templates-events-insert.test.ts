@@ -183,15 +183,38 @@ describe("T4994 — “insert a task after X” goes INTO X's outgoing connector
     expect(parseCommand("insert a task after selected called Check")).toEqual([{ op: "add", symbolType: "task", label: "Check", afterRef: "selected", insert: true }]);
   });
 
-  it("with several outgoing flows it cannot tell which, so it says how to choose; “add … after” is as it was", () => {
+  it("with several outgoing flows it cannot tell which, so it says how to choose", () => {
     const f = fixtureDiagram();
     expect(run(f, "insert a task after selected", { selectedIds: ["g"] }).r).toEqual({ ok: true, summary: "added task after Claim Approved? — Claim Approved? has 2 outgoing flows, so it is on a new one: say “insert a task between Claim Approved? and …” to put it into one" });
     // Nothing leaves an end event, so it cannot go INTO a flow: added after, as before.
     const end = run(f, "insert an end event called Done after Pay Claim");
     expect(end.r).toEqual({ ok: true, summary: "added Done after Pay Claim" });
     expect(end.h.data.connectors.find((c) => c.id === "c4")!.targetId).toBe(f.connectors.find((c) => c.id === "c4")!.targetId);
-    const add = run(f, "add a task after selected", { selectedIds: ["t6"] });
-    expect(add.r).toEqual({ ok: true, summary: "added task after Pay Claim" });
-    expect(add.h.data.connectors.find((c) => c.id === "c4")!.targetId, "Pay Claim → Claim Closed untouched").toBe(f.connectors.find((c) => c.id === "c4")!.targetId);
+  });
+});
+
+describe("T4995 — “add … after X” goes INTO X's outgoing connector too (Paul, 2026-09-28: “Yes!!”)", () => {
+  it("“add a task after selected”, “add a task called Approve after Pay Claim” — the same splice as “insert”", () => {
+    for (const [said, sel, label] of [
+      ["add a task after selected", { selectedIds: ["t6"] }, undefined],
+      ["add a task called Approve after Pay Claim", {}, "Approve"],
+      ["add a parallel gateway after selected", { selectedIds: ["t6"] }, undefined],
+    ] as const) {
+      const f = fixtureDiagram();
+      const { h, r } = run(f, said, sel);
+      expect(r.summary, said).toMatch(/^inserted .+ between Pay Claim and Claim Closed/);
+      const added = h.data.elements.filter((e) => !f.elements.some((x) => x.id === e.id))[0];
+      if (label) expect(added.label, said).toBe(label);
+      expect(h.data.connectors.find((c) => c.id === "c4")!.targetId, said).toBe(added.id);
+      expect(checkElementOverlap(h.data), said).toEqual([]);
+    }
+  });
+
+  it("…but a selected connector is “insert” only; an end event, or a step with several flows, is joined on as before", () => {
+    const f = fixtureDiagram();
+    expect(run(f, "add a task called Check", { selectedConnectorId: "8klv7i1i" }).r).toEqual({ ok: true, summary: "added Check" });
+    expect(run(f, "add an end event called Done after Pay Claim").r).toEqual({ ok: true, summary: "added Done after Pay Claim" });
+    expect(run(f, "add a task after selected", { selectedIds: ["g"] }).r).toEqual({ ok: true, summary: "added task after Claim Approved? — Claim Approved? has 2 outgoing flows, so it is on a new one: say “insert a task between Claim Approved? and …” to put it into one" });
+    expect(run(f, "add a task called Check").r, "no “after”: as before").toEqual({ ok: true, summary: "added Check" });
   });
 });

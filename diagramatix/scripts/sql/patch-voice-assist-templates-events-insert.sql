@@ -19,17 +19,27 @@
 -- IDEMPOTENT. Each UPDATE acts only on a row that still has its old line and
 -- not yet the new one, so re-running it is a no-op.
 --
+-- REVISED the same day (Paul: "add … after" goes into the outgoing connector
+-- too). If the first version of this file was already run, run this one as
+-- well: the second UPDATE turns that version's sentence into this one's.
+--
 -- Run from the in-app Database tile (SuperAdmin → Database). Read-only report
 -- at the end, AFTER the commit, so the numbers shown are what was kept.
 
 BEGIN;
 
 UPDATE "HelpSection"
-SET "bodyMarkdown" = replace("bodyMarkdown", $OLD$- "insert a task called Check Stock between Receive Order and Pick Items" — goes into the flow between them. With no room, everything after the first step in its pool moves right. Two steps that were not connected are joined through it.$OLD$, $NEW$- "insert a task called Check Stock between Receive Order and Pick Items" — goes into the flow between them. With no room, everything after the first step in its pool moves right. Two steps that were not connected are joined through it. With a connector selected, "insert a task" goes into that connector; "insert a task after Receive Order" goes into Receive Order's outgoing flow, when it has just one.$NEW$),
+SET "bodyMarkdown" = replace("bodyMarkdown", $OLD$- "insert a task called Check Stock between Receive Order and Pick Items" — goes into the flow between them. With no room, everything after the first step in its pool moves right. Two steps that were not connected are joined through it.$OLD$, $NEW$- "insert a task called Check Stock between Receive Order and Pick Items" — goes into the flow between them. With no room, everything after the first step in its pool moves right. Two steps that were not connected are joined through it. With a connector selected, "insert a task" goes into that connector; "add a task after Receive Order" (or "insert …") goes into Receive Order's outgoing flow, when it has just one.$NEW$),
     "updatedAt" = NOW()
 WHERE collection = 'user-guide'
   AND "bodyMarkdown" LIKE '%Two steps that were not connected are joined through it.%'
   AND "bodyMarkdown" NOT LIKE '%With a connector selected, "insert a task" goes into that connector%';
+
+UPDATE "HelpSection"
+SET "bodyMarkdown" = replace("bodyMarkdown", $OLD$With a connector selected, "insert a task" goes into that connector; "insert a task after Receive Order" goes into Receive Order's outgoing flow, when it has just one.$OLD$, $NEW$With a connector selected, "insert a task" goes into that connector; "add a task after Receive Order" (or "insert …") goes into Receive Order's outgoing flow, when it has just one.$NEW$),
+    "updatedAt" = NOW()
+WHERE collection = 'user-guide'
+  AND "bodyMarkdown" LIKE '%"insert a task after Receive Order" goes into Receive Order''s outgoing flow%';
 
 UPDATE "HelpSection"
 SET "bodyMarkdown" = replace("bodyMarkdown", $OLD$- "add a boundary event called Cancel to the Repeat-Until subprocess"$OLD$, $NEW$- "add a boundary event called Cancel to the Repeat-Until subprocess"
@@ -51,11 +61,11 @@ COMMIT;
 -- Verification — run after the commit. Each column should read 1.
 -- ════════════════════════════════════════════════════════════════════════════
 SELECT
-  (SELECT count(*) FROM "HelpSection" WHERE collection = 'user-guide' AND "bodyMarkdown" LIKE '%With a connector selected, "insert a task" goes into that connector%') AS insert_line,
+  (SELECT count(*) FROM "HelpSection" WHERE collection = 'user-guide' AND "bodyMarkdown" LIKE '%"add a task after Receive Order" (or "insert …") goes into%') AS insert_line,
   (SELECT count(*) FROM "HelpSection" WHERE collection = 'user-guide' AND "bodyMarkdown" LIKE '%"scroll down", "scroll up", "scroll to the top"%') AS template_line,
   (SELECT count(*) FROM "HelpSection" WHERE collection = 'user-guide' AND "bodyMarkdown" LIKE '%"delete event" (or "events") numbers every event%') AS delete_line,
   CASE
-    WHEN (SELECT count(*) FROM "HelpSection" WHERE collection = 'user-guide' AND "bodyMarkdown" LIKE '%With a connector selected, "insert a task" goes into that connector%') = 1
+    WHEN (SELECT count(*) FROM "HelpSection" WHERE collection = 'user-guide' AND "bodyMarkdown" LIKE '%"add a task after Receive Order" (or "insert …") goes into%') = 1
      AND (SELECT count(*) FROM "HelpSection" WHERE collection = 'user-guide' AND "bodyMarkdown" LIKE '%"scroll down", "scroll up", "scroll to the top"%') = 1
      AND (SELECT count(*) FROM "HelpSection" WHERE collection = 'user-guide' AND "bodyMarkdown" LIKE '%"delete event" (or "events") numbers every event%') = 1
     THEN 'OK — the guide has template scrolling, "delete event", and "insert" into a connector'
