@@ -65,6 +65,9 @@ next-env.d.ts
 /new features/getai-api/*
 !/new features/getai-api/Partner API Plan.md
 !/new features/getai-api/Process API Proposed Design.md
+!/new features/mobile-voice/
+/new features/mobile-voice/*
+!/new features/mobile-voice/Create a Diagram by Voice on a Phone — Plan.md
 # Diagramatix Voice (spoken replies via Deepgram) — the plan only.
 !/new features/diagramatix-voice/
 /new features/diagramatix-voice/*
