@@ -15,6 +15,10 @@ import { collapseAllReviewComments } from "@/app/lib/diagram/reviewCollapse";
 import { isMobileSupportedType, MOBILE_SUPPORTED_LABEL } from "@/app/lib/diagram/mobileSupport";
 import { healOnLoad } from "@/app/lib/diagram/healOnLoad";
 import { effectiveSymbolColors } from "@/app/lib/diagram/colors";
+import { MobileCorrectionSheet } from "@/app/components/mobile/MobileCorrectionSheet";
+import {
+  correctionErrorText, correctionFromRun, correctionRefusalText, correctionRequest, correctionSource, reviewCommentCount,
+} from "@/app/lib/mobile/correction";
 import { MobileGenerateSheet } from "@/app/components/mobile/MobileGenerateSheet";
 import { useAiAllowed } from "@/app/lib/auth/useAiAllowed";
 import {
@@ -50,7 +54,8 @@ interface Loaded {
 type GenState =
   | { phase: "idle" }
   | { phase: "starting" }
-  | { phase: "running"; jobId: string; stage: string; since: number }
+  /** generate: filling the empty diagram; correct: re-generating it with a correction (stage 3). */
+  | { phase: "running"; jobId: string; stage: string; since: number; kind: "generate" | "correct" }
   | { phase: "failed"; message: string };
 
 const STAGE_LABEL: Record<string, string> = {
@@ -66,6 +71,9 @@ const fmtElapsed = (ms: number) => {
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
 };
 const hasContent = (x: Loaded | null) => (x?.data.elements?.length ?? 0) > 0;
+/** A failed re-generate, said in the message strip over the diagram — and, when there are words to go back to, where they are. */
+const correctionFailedText = (why: string, wordsKept: boolean) =>
+  `The correction wasn’t applied. ${why}${wordsKept ? " Your words are kept — tap ✎ Correct to try again." : ""}`;
 
 const isContainer = (e: DiagramElement) => e.type === "pool" || e.type === "lane" || e.type === "sublane";
 const stripHtml = (s: string) => s.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").trim();
@@ -152,23 +160,48 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
   const [startErr, setStartErr] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const canGenerate = !!d && d.canEdit && d.type === "bpmn" && aiAllowed;
+  // ✎ Correct (stage 3): the words, kept until a re-generate succeeds.
+  const [correcting, setCorrecting] = useState(false);
+  const [correction, setCorrection] = useState("");
+  const setCorrectionWords = useCallback((u: (w: string) => string) => setCorrection(u), []);
+  const [correctErr, setCorrectErr] = useState<string | null>(null);
+  // The diagram as last loaded, and the words, for the poll (which outlives renders).
+  const dRef = useRef(d);
+  dRef.current = d;
+  const correctionRef = useRef(correction);
+  correctionRef.current = correction;
 
   // A phone that reloaded (or came back to this diagram) mid-run picks the run
   // up again; one that failed within the hour says why and offers its words back.
+  // Over a diagram with content it is a re-generate when the run's prompt is
+  // this diagram's own plus a correction.
   const resumedRef = useRef(false);
   useEffect(() => {
-    if (!d || !d.canEdit || d.type !== "bpmn" || hasContent(d) || resumedRef.current) return;
+    if (!d || !d.canEdit || d.type !== "bpmn" || resumedRef.current) return;
     resumedRef.current = true;
+    const full = hasContent(d);
     fetch(`/api/diagrams/${diagramId}/generate`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((j: { job: GenerateJobView | null } | null) => {
         const job = j?.job;
         if (!job) return;
+        const words = full ? correctionFromRun(d.data, job.promptText) : null;
         if (job.status === "queued" || job.status === "running") {
-          setGen({ phase: "running", jobId: job.jobId, stage: job.stage, since: Date.now() - (job.elapsedMs ?? 0) });
+          setGen({ phase: "running", jobId: job.jobId, stage: job.stage, since: Date.now() - (job.elapsedMs ?? 0), kind: words !== null ? "correct" : "generate" });
+          // Anything opened before the run was found would go with the old diagram.
+          setCorrecting(false);
+          setPicking(false);
+          setAddTarget(null);
         } else if (job.status === "failed" && job.finishedAt && Date.now() - Date.parse(job.finishedAt) < RECENT_FAILURE_MS) {
-          setGen({ phase: "failed", message: job.error?.message ?? "The last generation failed." });
-          setDraftState((cur) => restoreFailedRun(cur, job));
+          if (!full) {
+            setGen({ phase: "failed", message: job.error?.message ?? "The last generation failed." });
+            setDraftState((cur) => restoreFailedRun(cur, job));
+            return;
+          }
+          // Only a failed correction OF THIS diagram is news here.
+          if (!words) return;
+          setCorrection((cur) => cur || words);
+          setSaveMsg({ ok: false, text: correctionFailedText(correctionErrorText(job.error?.code, job.error?.message ?? "The last re-generate failed."), true) });
         }
       })
       .catch(() => { /* nothing to resume */ });
@@ -176,8 +209,26 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
 
   // Poll the run. A phone coming back from a locked screen asks at once.
   const runningJobId = gen.phase === "running" ? gen.jobId : null;
+  const runningKind = gen.phase === "running" ? gen.kind : null;
   useEffect(() => {
     if (!runningJobId) return;
+    const isCorrection = runningKind === "correct";
+    /** A run that ended without saving: said where the person is looking, and their words kept. */
+    const ended = (why: string, job?: GenerateJobView) => {
+      const cur = dRef.current;
+      if (!isCorrection) {
+        // The empty-diagram panel shows a failure; over content, the strip does.
+        if (hasContent(cur)) { setGen({ phase: "idle" }); setSaveMsg({ ok: false, text: why }); return; }
+        setGen({ phase: "failed", message: why });
+        if (job) setDraftState((c) => restoreFailedRun(c, job));
+        return;
+      }
+      setGen({ phase: "idle" });
+      const words = job && cur ? correctionFromRun(cur.data, job.promptText) : null;
+      if (words) setCorrection((w) => w || words);
+      const kept = !!words || correctionRef.current.trim().length > 0;
+      setSaveMsg({ ok: false, text: correctionFailedText(correctionErrorText(job?.error?.code, why), kept) });
+    };
     let stopped = false;
     let inFlight = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -189,16 +240,32 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
         const r = await fetch(`/api/diagrams/${diagramId}/generate/${runningJobId}`, { cache: "no-store" });
         if (stopped) return;
         if (r.status === 404) {
-          setGen({ phase: "failed", message: "This generation could no longer be found. Tap Generate to try again." });
+          ended(isCorrection ? "It could no longer be found." : "This generation could no longer be found. Tap Generate to try again.");
           return;
         }
         if (r.ok) {
           const job: GenerateJobView = await r.json();
           if (stopped) return;
           if (job.status === "succeeded") {
+            const was = dRef.current;
             const fresh = await load();
             if (stopped) return;
             setGen({ phase: "idle" });
+            if (isCorrection) {
+              // The comments that were not saved went with the old diagram.
+              setDirty(false);
+              // A run started earlier (another tab) may have applied other words: keep these then.
+              const applied = was ? correctionFromRun(was.data, job.promptText) : null;
+              const pending = correctionRef.current.trim();
+              const mine = !pending || applied === pending;
+              if (mine) setCorrection("");
+              setSaveMsg({ ok: true, text: !fresh
+                ? "Re-generated ✓ — saved, but it couldn’t be shown. Reload the page to see it."
+                : mine
+                  ? "Re-generated with your correction ✓ — the previous version is in the diagram’s history."
+                  : "Re-generated ✓ with a correction started earlier — yours is kept: tap ✎ Correct to add it." });
+              return;
+            }
             setDraftState(EMPTY_DRAFT);
             try { sessionStorage.removeItem(draftStorageKey(diagramId)); } catch { /* nothing kept */ }
             setSaveMsg({ ok: true, text: fresh
@@ -207,8 +274,7 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
             return;
           }
           if (job.status === "failed") {
-            setGen({ phase: "failed", message: job.error?.message ?? "Generation failed." });
-            setDraftState((cur) => restoreFailedRun(cur, job));
+            ended(job.error?.message ?? (isCorrection ? "The re-generate failed." : "Generation failed."), job);
             return;
           }
           setGen((g) => (g.phase === "running" && g.jobId === runningJobId ? { ...g, stage: job.stage } : g));
@@ -221,7 +287,7 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
     const onVisible = () => { if (document.visibilityState === "visible") schedule(0); };
     document.addEventListener("visibilitychange", onVisible);
     return () => { stopped = true; clearTimeout(timer); document.removeEventListener("visibilitychange", onVisible); };
-  }, [runningJobId, diagramId, load]);
+  }, [runningJobId, runningKind, diagramId, load]);
 
   // The elapsed-time clock while a run is under way.
   useEffect(() => {
@@ -306,7 +372,7 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
         setNow(Date.now());
         setGen({
           phase: "running", jobId: j.jobId, stage: typeof j.stage === "string" ? j.stage : "queued",
-          since: Date.now() - (typeof j.elapsedMs === "number" ? j.elapsedMs : 0),
+          since: Date.now() - (typeof j.elapsedMs === "number" ? j.elapsedMs : 0), kind: "generate",
         });
         return;
       }
@@ -330,8 +396,68 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
     }
   }
 
+  // ── ✎ Correct (mobile voice stage 3) ─────────────────────────────────────
+  const correctSrc = d ? correctionSource(d.data) : null;
+
+  function openCorrect() {
+    if (correctSrc && !correctSrc.ok) {
+      setSaveMsg({ ok: false, text: correctionRefusalText(correctSrc.reason) });
+      return;
+    }
+    setCorrectErr(null);
+    setSaveMsg(null);
+    setCorrecting(true);
+  }
+
+  async function startCorrect(words: string) {
+    if (!d || gen.phase === "starting") return;
+    if (gen.phase === "running") { setCorrectErr("A re-generate is already under way — wait for it to finish, then try again."); return; }
+    const src = correctionSource(d.data);
+    if (!src.ok || !words.trim()) return;
+    const request = correctionRequest(src, words, d.version);
+    setGen({ phase: "starting" });
+    setCorrectErr(null);
+    try {
+      const r = await fetch(`/api/diagrams/${diagramId}/generate`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request),
+      });
+      const j = await r.json().catch(() => ({})) as Record<string, unknown>;
+      if (r.status === 202 && typeof j.jobId === "string") {
+        // A run this person started earlier (another tab, a lost reply) was
+        // handed back instead: follow it, and say these words are still to come.
+        const other = j.duplicate === true && j.promptText !== request.prompt;
+        setCorrecting(false);
+        setSaveMsg(other ? { ok: false, text: "A re-generate started earlier is still running, so it finishes first. Your words are kept — tap ✎ Correct again afterwards." } : null);
+        setNow(Date.now());
+        setGen({
+          phase: "running", jobId: j.jobId, stage: typeof j.stage === "string" ? j.stage : "queued",
+          since: Date.now() - (typeof j.elapsedMs === "number" ? j.elapsedMs : 0),
+          kind: !other || (typeof j.promptText === "string" && correctionFromRun(d.data, j.promptText) !== null) ? "correct" : "generate",
+        });
+        return;
+      }
+      setGen({ phase: "idle" });
+      if (r.status === 409 && j.error === "conflict") {
+        // Changed on another device: take the new copy here — the words stay in
+        // the sheet. Comments not saved yet were going with the old diagram anyway.
+        const hadUnsaved = dirty;
+        await load();
+        setDirty(false);
+        setCorrectErr(`This diagram changed on another device. It has been reloaded${hadUnsaved ? " — your unsaved comments could not be kept" : ""}. Look it over, then tap Re-generate again.`);
+        return;
+      }
+      const said = (typeof j.message === "string" && j.message) || (typeof j.error === "string" && j.error) || null;
+      setCorrectErr(correctionErrorText(typeof j.error === "string" ? j.error : null, said ?? "The re-generate couldn’t start. Try again in a moment."));
+    } catch {
+      setGen({ phase: "idle" });
+      setCorrectErr("Couldn’t reach Diagramatix — check your connection.");
+    }
+  }
+
   const empty = !!d && (d.data.elements?.length ?? 0) === 0;
   const unsupported = !!d && !isMobileSupportedType(d.type);
+  const busy = gen.phase === "running" || gen.phase === "starting";
 
   // Split the diagram: review comments render in the interactive overlay; the
   // backdrop (everything else) is the read-only picture. Same element set drives
@@ -486,7 +612,7 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
           <button onClick={toggleFullscreen} className="text-gray-600 text-lg leading-none px-1" title={fullscreen ? "Exit full screen" : "Full screen (landscape)"}>{fullscreen ? "⤢" : "⛶"}</button>
         )}
         {d?.canReview && !empty && !unsupported ? (
-          <button onClick={saveDiagram} disabled={saving || !dirty}
+          <button onClick={saveDiagram} disabled={saving || !dirty || busy}
             className="text-sm font-medium text-blue-600 disabled:text-gray-300">{saving ? "Saving…" : "Save"}</button>
         ) : canGenerate && empty && gen.phase !== "running" ? (
           <button onClick={openGenerate} className="text-sm font-medium text-blue-600">Generate</button>
@@ -495,6 +621,15 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
 
       {saveMsg && (
         <div className={`shrink-0 px-3 py-1.5 text-xs ${saveMsg.ok ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-800"}`}>{saveMsg.text}</div>
+      )}
+      {d && !empty && gen.phase === "running" && (
+        <div className="shrink-0 px-3 py-1.5 text-xs bg-blue-50 text-blue-800 flex items-center gap-2">
+          <span className="h-3.5 w-3.5 shrink-0 rounded-full border-2 border-blue-600 border-t-transparent animate-spin" />
+          <span>
+            {gen.kind === "correct" ? "Re-generating with your correction" : "Generating"} · {STAGE_LABEL[gen.stage] ?? "Working"} · {fmtElapsed(now - gen.since)}
+            <span className="block text-[11px] text-blue-700/80">You can lock your phone — it’s saved when it’s ready.</span>
+          </span>
+        </div>
       )}
 
       <div className="flex-1 relative">
@@ -564,8 +699,17 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
           </div>
         )}
 
+        {/* ✎ Correct FAB (owners/editors of a generated BPMN diagram), above Comment */}
+        {d && canGenerate && !empty && !unsupported && !picking && !busy && correctSrc
+          && (correctSrc.ok || correctSrc.reason !== "not_generated") && (
+          <button onClick={openCorrect}
+            className={`absolute ${d.canReview ? "bottom-[4.25rem]" : "bottom-3"} left-3 h-12 pl-3 pr-4 rounded-full bg-blue-600 text-white shadow-lg flex items-center gap-1.5 active:bg-blue-700`}>
+            <span className="text-lg leading-none">✎</span><span className="text-sm font-medium">Correct</span>
+          </button>
+        )}
+
         {/* Add-comment FAB (owners/editors/reviewers only) */}
-        {d?.canReview && !empty && !picking && (
+        {d?.canReview && !empty && !picking && !busy && (
           <button onClick={() => { setPicking(true); setSaveMsg(null); }}
             className="absolute bottom-3 left-3 h-12 pl-3 pr-4 rounded-full bg-pink-600 text-white shadow-lg flex items-center gap-1.5 active:bg-pink-700">
             <span className="text-lg leading-none">＋</span><span className="text-sm font-medium">Comment</span>
@@ -581,6 +725,13 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
         <MobileGenerateSheet diagramId={diagramId} draft={draft} setDraft={setDraft}
           starting={gen.phase === "starting"} error={startErr}
           onGenerate={(finished) => void startGenerate(finished)} onClose={() => setSheetOpen(false)} />
+      )}
+      {correcting && d && correctSrc?.ok && (
+        <MobileCorrectionSheet words={correction} setWords={setCorrectionWords}
+          basePrompt={correctSrc.basePrompt} imageName={correctSrc.imageName}
+          comments={reviewCommentCount(d.data)} unsaved={dirty}
+          starting={gen.phase === "starting"} error={correctErr}
+          onSubmit={(finished) => void startCorrect(finished)} onClose={() => setCorrecting(false)} />
       )}
       {addTarget && (
         <MobileCommentSheet mode="edit" targetLabel={elementLabel(addTarget)}

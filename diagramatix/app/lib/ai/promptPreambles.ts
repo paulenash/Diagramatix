@@ -2,6 +2,7 @@
  * The notes put in front of a spoken prompt so the AI reads it for what it is.
  * One place for both, so the desktop consoles and the phone cannot drift.
  */
+import { isLastPromptBlock } from "@/app/lib/diagram/clarifications";
 
 /**
  * A MEETING recording (the consoles' "Upload / record meeting"): several
@@ -83,4 +84,72 @@ export function photoNoteParts(prompt: string): { imageName: string; words: stri
     imageName: m ? m[1] : "",
     words: at >= 0 ? p.slice(at + PHOTO_CORRECTIONS_HEADING.length).trim() : "",
   };
+}
+
+// ── A correction, added after seeing the diagram (the phone's re-generate, stage 3) ──
+
+/**
+ * The heading corrections go under in a prompt that is not a photo's (a photo's
+ * go under PHOTO_CORRECTIONS_HEADING). They were written after seeing the
+ * diagram, so they win over anything above them — including an attached image
+ * (planBpmn: hasCorrections).
+ */
+export const CORRECTIONS_HEADING =
+  "CORRECTIONS — added after seeing the diagram; where these contradict anything above, follow them:";
+
+/** Does this prompt carry corrections (either heading)? */
+export function hasCorrections(prompt: string): boolean {
+  return prompt.includes(CORRECTIONS_HEADING) || prompt.includes(PHOTO_CORRECTIONS_HEADING);
+}
+
+/**
+ * The prompt with one more correction on the end. Corrections accumulate, so a
+ * second re-generate keeps the first one: under the photo's own corrections
+ * heading for a photo prompt, else as a bullet under CORRECTIONS_HEADING.
+ */
+export function withCorrection(prompt: string, correction: string): string {
+  const c = correction.trim();
+  const p = prompt.trim();
+  if (!c) return p;
+  // A bare photo's first words go under its own heading, as the phone's
+  // Generate writes them (photoNoteParts reads them back from there).
+  if (isWhiteboardPhotoPrompt(p) && !p.includes(PHOTO_CORRECTIONS_HEADING)) {
+    return `${p}\n\n${PHOTO_CORRECTIONS_HEADING}\n${c}`;
+  }
+  // Otherwise under CORRECTIONS, which outranks everything above it — the
+  // photo AND the words already there. Another bullet only while that block is
+  // still the last one: never inside a CLARIFICATIONS block added after it.
+  return isLastPromptBlock(p, CORRECTIONS_HEADING) ? `${p}\n- ${c}` : `${p}\n\n${CORRECTIONS_HEADING}\n- ${c}`;
+}
+
+/**
+ * The correction `withCorrection` added to `base` to make `full` — so a run
+ * that failed gives the person their words back. Null when `full` is not
+ * `base` plus one correction.
+ */
+export function correctionAdded(base: string, full: string): string | null {
+  const b = base.trim();
+  const f = full.trim();
+  if (!b || f.length <= b.length || !f.startsWith(b)) return null;
+  const rest = f.slice(b.length);
+  const joins = [`\n\n${PHOTO_CORRECTIONS_HEADING}\n`, `\n\n${CORRECTIONS_HEADING}\n- `, "\n- "];
+  for (const j of joins) {
+    if (!rest.startsWith(j)) continue;
+    const c = rest.slice(j.length).trim();
+    if (c && withCorrection(b, c) === f) return c;
+  }
+  return null;
+}
+
+/**
+ * The text a desktop re-generate starts from: the linked Prompt row's — unless
+ * the diagram's own record is that same text plus corrections the row never
+ * got (a correction made by an editor, who cannot write the owner's prompt).
+ * Then the record, so the correction is not dropped. A row edited since wins.
+ */
+export function regeneratePromptText(rowText: string, snapshot: string): string {
+  const row = rowText.trim();
+  const snap = snapshot.trim();
+  if (row && snap.length > row.length && snap.startsWith(row) && hasCorrections(snap.slice(row.length))) return snapshot;
+  return rowText;
 }

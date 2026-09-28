@@ -137,7 +137,7 @@ describe("T5017 — the phone screen: who is offered Generate, and a run that ou
     expect(screen).toContain("fetch(`/api/diagrams/${diagramId}/generate/${runningJobId}`, { cache: \"no-store\" })");
     expect(screen).toContain("document.addEventListener(\"visibilitychange\", onVisible);");
     expect(screen).toContain("fetch(`/api/diagrams/${diagramId}/generate`, { cache: \"no-store\" })");
-    expect(screen, "success reloads the saved diagram").toMatch(/job\.status === "succeeded"\) \{\s+const fresh = await load\(\);/);
+    expect(screen, "success reloads the saved diagram").toMatch(/job\.status === "succeeded"\) \{\s+(?:const was = dRef\.current;\s+)?const fresh = await load\(\);/);
     expect(screen, "a failure puts the words back").toContain("draftFromFailedJob(job.promptText)");
   });
 

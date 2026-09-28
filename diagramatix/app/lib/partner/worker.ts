@@ -169,6 +169,8 @@ export async function runJob(input: WorkerInput): Promise<void> {
       model: picked.model,
       generatedAt: new Date().toISOString(),
       source: "partner-api",
+      // What it was drawn from — neither is kept, so it cannot be re-generated without it.
+      ...(input.attachment ? { fromImage: input.attachment.type === "image", fromDocument: input.attachment.type !== "image" } : {}),
       ...(plan ? { plan } : {}),
       ...(run.diagnostics.length ? { diagnostics: run.diagnostics } : {}),
     };

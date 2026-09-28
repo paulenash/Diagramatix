@@ -15,7 +15,7 @@ import type { AiElement, AiConnection } from "@/app/lib/diagram/bpmnLayout";
 import { renderFlowchartMappingForPrompt } from "@/app/lib/diagram/translate/flowchartBpmnMap";
 import { renderEpcMappingForPrompt } from "@/app/lib/diagram/translate/epcBpmnMap";
 import { hardWrapProcessName } from "@/app/lib/diagram/textMetrics";
-import { isWhiteboardPhotoPrompt } from "./promptPreambles";
+import { hasCorrections, isWhiteboardPhotoPrompt } from "./promptPreambles";
 
 export type Attachment =
   | { type: "pdf"; data: string; name?: string }
@@ -57,6 +57,19 @@ export type ImageSource = "diagram" | "whiteboard";
  * phone writes it; a desktop re-generate re-sends it), so the rule travels with
  * the words. One answer for the request and the SuperAdmin prompt export.
  */
+/**
+ * Does the prompt carry corrections (added after seeing the diagram — the
+ * phone's re-generate) that must win over an attached image? A photo prompt's
+ * words already win (the whiteboard reading); this is the exception for an
+ * image that is otherwise the source of truth.
+ */
+export function correctionsOverrideImage(prompt: string, attachment: Attachment): boolean {
+  return attachment?.type === "image" && hasCorrections(prompt);
+}
+
+const CORRECTIONS_EXCEPTION =
+  " EXCEPT the CORRECTIONS at the end of the prompt: the person added them after seeing the diagram drawn from this image — follow them where they contradict it.";
+
 export function imageSourceFor(prompt: string, attachment: Attachment): ImageSource {
   return attachment?.type === "image" && isWhiteboardPhotoPrompt(prompt) ? "whiteboard" : "diagram";
 }
@@ -80,7 +93,7 @@ const WHITEBOARD_PRECEDENCE =
  * Keep this identical to the previous single-file implementation so the
  * generate-bpmn refactor is a no-behaviour-change swap.
  */
-export function buildSystemPrompt(rules: string, captureGeometry = false, imageSource: ImageSource = "diagram"): string {
+export function buildSystemPrompt(rules: string, captureGeometry = false, imageSource: ImageSource = "diagram", corrected = false): string {
   // A PHOTO of a whiteboard or sketch (the phone's Generate, 2026-09-28) is read
   // by intent, and the words that come with it CORRECT it — Paul's approved rule
   // "voice correction beats the photo". Every other image keeps its wording
@@ -101,7 +114,7 @@ GEOMETRY CAPTURE — for THIS request, reproduce the DRAWN layout exactly as it 
 - ${renderFlowchartMappingForPrompt()}
 - ${renderEpcMappingForPrompt()}
 ${whiteboard ? WHITEBOARD_READING : ""}- Read labels with OCR. ${whiteboard ? "Do NOT invent tasks, branches or roles that are neither drawn in the photo nor stated in the text prompt." : "Do NOT invent tasks, branches or roles that are not visible in the image."} If a label is unreadable, use a short descriptive placeholder rather than guessing.
-- ${whiteboard ? WHITEBOARD_PRECEDENCE : "Where the user's text prompt adds detail beyond the image (extra rules, role names, message flows), apply it. Where the prompt CONTRADICTS the image, prefer the image."}
+- ${whiteboard ? WHITEBOARD_PRECEDENCE : "Where the user's text prompt adds detail beyond the image (extra rules, role names, message flows), apply it. Where the prompt CONTRADICTS the image, prefer the image."}${!whiteboard && corrected ? CORRECTIONS_EXCEPTION : ""}
 
 ${rules ? `USER RULES AND PREFERENCES (follow these strictly):\n${rules}\n\n` : ""}CRITICAL FORMAT RULES — you MUST follow these exactly:
 - Use ONLY these type values: "pool", "lane", "start-event", "end-event", "task", "gateway", "subprocess", "subprocess-expanded", "intermediate-event", "data-object", "data-store", "text-annotation", "group"
@@ -604,7 +617,9 @@ export function buildBpmnRequest(opts: PlanBpmnOptions): BpmnRequest {
   // Geometry capture only makes sense with an image to measure.
   const wantGeometry = captureGeometry && attachment?.type === "image";
   const imageSource = imageSourceFor(prompt, attachment);
-  const systemPrompt = buildSystemPrompt(rules, wantGeometry, imageSource);
+  // Corrections the person added after seeing the result win over the image too.
+  const corrected = correctionsOverrideImage(prompt, attachment);
+  const systemPrompt = buildSystemPrompt(rules, wantGeometry, imageSource, corrected);
 
   const userContent: Anthropic.Messages.ContentBlockParam[] = [];
   if (attachment?.type === "pdf" && attachment.data) {
@@ -637,7 +652,7 @@ export function buildBpmnRequest(opts: PlanBpmnOptions): BpmnRequest {
         ? `A photo of a whiteboard or hand-drawn sketch of a process is attached above (${attachment.name ?? "whiteboard.jpg"}). Reverse-engineer the BPMN plan from what is drawn. The text below comes from the person who drew it and CORRECTS the photo: where the two disagree, follow the text, not the photo; where the text is silent, follow the photo.${wantGeometry
           ? " Also report each shape's `bounds` (normalised 0..1) and each connector's `sourceSide`/`targetSide` + `waypoints` as drawn — we are reproducing the photo's layout, not re-flowing it."
           : " Lay the process out normally — do not reproduce the photo's positions."}`
-        : `An image of an existing process diagram is attached above (${attachment.name ?? "diagram.png"}). Treat the image as the source of truth and reverse-engineer the BPMN plan from it. If the text prompt below adds or contradicts anything visible in the image, prefer what the image shows.${wantGeometry ? " Also report each shape's `bounds` (normalised 0..1) and each connector's `sourceSide`/`targetSide` + `waypoints` exactly as drawn — we are reproducing the original layout, not re-flowing it." : ""}`,
+        : `An image of an existing process diagram is attached above (${attachment.name ?? "diagram.png"}). Treat the image as the source of truth and reverse-engineer the BPMN plan from it. If the text prompt below adds or contradicts anything visible in the image, prefer what the image shows.${corrected ? " The one exception is the CORRECTIONS section at the end of the text: the person added it after seeing the diagram drawn from this image — follow it where it contradicts the image." : ""}${wantGeometry ? " Also report each shape's `bounds` (normalised 0..1) and each connector's `sourceSide`/`targetSide` + `waypoints` exactly as drawn — we are reproducing the original layout, not re-flowing it." : ""}`,
     });
   }
   // Append a final, extremely explicit "JSON only" instruction to the

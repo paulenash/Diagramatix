@@ -9,6 +9,25 @@ import { prisma } from "@/app/lib/db";
 /** How many snapshots a diagram keeps; older ones are pruned. */
 export const DIAGRAM_HISTORY_KEEP = 50;
 
+/**
+ * Make sure the diagram as it stands NOW is its newest history snapshot, before
+ * something replaces it wholesale (the phone's re-generate with a correction).
+ * Almost every save has already snapshotted it; one that did not (a script, a
+ * route that skips history) gets one now, so "the previous version is in
+ * history" is always true.
+ */
+export async function ensureCurrentInHistory(diagramId: string, userId: string): Promise<void> {
+  const [current, latest] = await Promise.all([
+    prisma.diagram.findUnique({ where: { id: diagramId }, select: { data: true } }),
+    prisma.diagramHistory.findFirst({ where: { diagramId }, orderBy: { createdAt: "desc" }, select: { snapshot: true } }),
+  ]);
+  if (!current) return;
+  // Both come back from jsonb, so the same content prints the same.
+  const held = (latest?.snapshot ?? null) as { data?: unknown } | null;
+  if (held && JSON.stringify(held.data ?? null) === JSON.stringify(current.data ?? null)) return;
+  await snapshotDiagramHistory(diagramId, userId);
+}
+
 /** Snapshot the diagram AS SAVED (call after the write), then prune to the newest 50. */
 export async function snapshotDiagramHistory(diagramId: string, userId: string): Promise<void> {
   const current = await prisma.diagram.findUnique({ where: { id: diagramId } });

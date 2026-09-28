@@ -29,7 +29,7 @@ import { gateElementCount, recordUsage } from "@/app/lib/subscription-route";
 import { decidePromptLink, mergeGeneratedDiagram, nextAiGeneration, type PlanJson } from "./applyGeneration";
 import { markPromptUsedDb, runPromptLinkDb } from "./promptLinkDb";
 import { deriveDiagramDenorm } from "@/app/lib/diagram/denorm";
-import { snapshotDiagramHistory } from "@/app/lib/diagram/diagramHistory";
+import { ensureCurrentInHistory, snapshotDiagramHistory } from "@/app/lib/diagram/diagramHistory";
 import { stripPromptAnnotationConnectors, stripPromptAnnotations } from "./promptAnnotation";
 import type { AiApplyMeta, DiagramData } from "@/app/lib/diagram/types";
 
@@ -49,7 +49,7 @@ export const KEEP_FINISHED_GENERATE_JOBS_MS = 7 * 24 * 60 * 60 * 1000;
 export type GenerateJobStage = "queued" | "planning" | "shaping" | "saving" | "done";
 export type GenerateJobErrorCode =
   | "ai_failed" | "plan_invalid" | "element_limit" | "diagram_gone" | "has_content" | "save_conflict"
-  | "server_error" | "worker_lost" | "image_gone" | "image_too_large";
+  | "server_error" | "worker_lost" | "image_gone" | "image_too_large" | "changed_meanwhile";
 
 /** The model's limit for one image, measured AFTER base64 encoding. The
  *  documented figure has been 5 MB on the API (10 MB in the claude.ai app);
@@ -73,7 +73,7 @@ export function hasDiagramContent(data: unknown): boolean {
 export type GenerateJobPromptMeta = Pick<
   AiApplyMeta,
   | "selectedPromptId" | "selectedPromptName" | "selectedPromptUnchanged" | "promptSource" | "promptRefined"
-  | "promptFromImage" | "freeForm" | "sourceImage"
+  | "promptFromImage" | "promptFromDocument" | "freeForm" | "sourceImage"
 >;
 
 export interface GenerateJobInput {
@@ -98,6 +98,13 @@ export interface GenerateJobInput {
   diagramOrgId?: string;
   /** A photographed whiteboard to read (AiSourceImage.id; stage 2). */
   sourceImageId?: string;
+  /**
+   * Replace the diagram's content — the phone's re-generate with a correction
+   * (stage 3), asked for explicitly. Saved only if the diagram is STILL the
+   * version the phone held: any change since, even a comment, and nothing is
+   * replaced. Without it a run only ever fills an empty diagram.
+   */
+  replace?: boolean;
 }
 
 /**
@@ -143,7 +150,7 @@ async function saveGenerated(
   input: GenerateJobInput,
   generated: DiagramData,
   plan: PlanJson,
-): Promise<{ version: number } | { failed: "diagram_gone" | "has_content" | "save_conflict" }> {
+): Promise<{ version: number } | { failed: "diagram_gone" | "has_content" | "changed_meanwhile" | "save_conflict" }> {
   const { diagramId } = input;
   const owner = { userId: input.promptOwnerId, orgId: input.orgId };
   const meta: AiApplyMeta = { ...input.promptMeta, promptText: input.prompt, model: input.model, planJson: plan };
@@ -151,13 +158,23 @@ async function saveGenerated(
 
   // A save made elsewhere during the run (the desktop open on the empty
   // diagram) is fine while the diagram is still empty — a moved view, say — but
-  // content that arrived meanwhile is never replaced unseen.
+  // content that arrived meanwhile is never replaced unseen. A replace asked
+  // for what the phone showed: any save since, and it is not what they saw.
   const changedUnderUs = (c: { version: number; data: unknown }) =>
-    c.version !== input.baseVersion && hasDiagramContent(c.data);
+    c.version !== input.baseVersion && (input.replace || hasDiagramContent(c.data));
+  const changedFailure = input.replace ? "changed_meanwhile" as const : "has_content" as const;
 
   let cur = await read();
   if (!cur) return { failed: "diagram_gone" };
-  if (changedUnderUs(cur)) return { failed: "has_content" };
+  if (changedUnderUs(cur)) return { failed: changedFailure };
+  // What is about to be replaced can be restored from the version history.
+  if (input.replace && hasDiagramContent(cur.data)) {
+    try { await ensureCurrentInHistory(diagramId, input.userId); }
+    catch (e) {
+      console.error(`[generate-job] ${input.jobId} could not keep the previous version:`, e instanceof Error ? e.message : e);
+      return { failed: "save_conflict" };
+    }
+  }
   const first = (cur.data ?? {}) as unknown as DiagramData;
   const linked = await runPromptLinkDb(
     decidePromptLink({ meta, prev: first.aiGeneration, diagramName: cur.name, diagramType: cur.type }),
@@ -169,7 +186,7 @@ async function saveGenerated(
     if (attempt > 0) {
       cur = await read();
       if (!cur) return { failed: "diagram_gone" };
-      if (changedUnderUs(cur)) return { failed: "has_content" };
+      if (changedUnderUs(cur)) return { failed: changedFailure };
     }
     const current = (cur.data ?? {}) as unknown as DiagramData;
     const aiGeneration = nextAiGeneration({ prev: current.aiGeneration, linked, meta, generatedAt });
@@ -273,6 +290,9 @@ export async function runGenerateJob(input: GenerateJobInput): Promise<void> {
       if (saved.failed === "diagram_gone") return fail(jobId, "diagram_gone", "This diagram was deleted before it could be saved.");
       if (saved.failed === "has_content") {
         return fail(jobId, "has_content", "The diagram was changed on another device while this was being generated, so the generated one was not saved.");
+      }
+      if (saved.failed === "changed_meanwhile") {
+        return fail(jobId, "changed_meanwhile", "The diagram was changed while this was being generated, so nothing was replaced.");
       }
       return fail(jobId, "save_conflict", "The diagram kept changing on another device, so the generated one was not saved. Try again.");
     }

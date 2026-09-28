@@ -2,9 +2,13 @@
  * The phone's Generate (2026-09-28, mobile voice stage 1).
  *
  *   POST — start a server-side generate job for this BPMN diagram
- *          { prompt, version?, promptSource?, selectedPromptId?, sourceImageId? } → 202 { jobId, … }
+ *          { prompt, version?, promptSource?, selectedPromptId?, sourceImageId?, replace? } → 202 { jobId, … }
  *          sourceImageId: a photo of a whiteboard the phone kept first
  *          (POST …/source-image) — stage 2; the words then CORRECT the photo.
+ *          Or the image this diagram was generated from (its aiGeneration), for a re-generate.
+ *          replace: true — stage 3's "✎ Correct": re-generate a diagram that HAS
+ *          content, with a correction on the end of its prompt. Needs the version
+ *          the phone holds, and saves only if the diagram is still that version.
  *   GET  — the caller's latest job on this diagram, so a phone that reloaded
  *          mid-generation picks the run up again → { job | null }
  *
@@ -15,7 +19,8 @@
  * Gates, in the plan route's order: signed in; not viewing someone read-only;
  * EDIT access (owners and editors — never a reviewer); a BPMN diagram; the
  * org's AI policy; a configured model; the AI-attempts cap. The diagram must be
- * EMPTY, and still the version the phone holds. One run at a time per diagram.
+ * EMPTY (unless replace was asked for), and still the version the phone holds.
+ * One run at a time per diagram.
  */
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
@@ -27,7 +32,9 @@ import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
 import { getEffectiveUserId } from "@/app/lib/superuser";
 import { resolveGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import { modelVision } from "@/app/lib/ai/models";
-import { isWhiteboardPhotoPrompt } from "@/app/lib/ai/promptPreambles";
+import { correctionAdded, isWhiteboardPhotoPrompt } from "@/app/lib/ai/promptPreambles";
+import { correctionRefusalText, correctionSource } from "@/app/lib/mobile/correction";
+import type { DiagramData } from "@/app/lib/diagram/types";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { resolveUserAiKey } from "@/app/lib/ai/userAiKey";
 import { resolveAiRouteContext } from "@/app/lib/ai/aiTelemetryRoute";
@@ -69,8 +76,15 @@ export async function POST(req: Request, { params }: Params) {
   if (diagram.type !== "bpmn") {
     return NextResponse.json({ error: "Only BPMN diagrams can be generated on the phone." }, { status: 400 });
   }
-  // The phone fills an EMPTY diagram; it never replaces content (stage 1).
-  if (hasDiagramContent(diagram.data)) {
+  let body: Record<string, unknown>;
+  try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 }); }
+  // Replacing content is only ever asked for, and only against a known version.
+  const replace = body.replace === true;
+  if (replace && typeof body.version !== "number") {
+    return NextResponse.json({ error: "version_required", message: "Reload the diagram, then try again." }, { status: 400 });
+  }
+  // Otherwise the phone fills an EMPTY diagram; it never replaces content (stage 1).
+  if (!replace && hasDiagramContent(diagram.data)) {
     return NextResponse.json({
       error: "has_content",
       message: "This diagram already has content. Generating on the phone fills an empty diagram.",
@@ -79,8 +93,6 @@ export async function POST(req: Request, { params }: Params) {
   const pol = await gateOrgPolicy(session, "allowAi");
   if (pol) return pol;
 
-  let body: Record<string, unknown>;
-  try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 }); }
   const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
   if (!prompt) return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
   if (prompt.length > MAX_GENERATE_PROMPT_CHARS) {
@@ -94,6 +106,22 @@ export async function POST(req: Request, { params }: Params) {
       message: "This diagram changed on another device. Reload it, then generate.",
       currentVersion: diagram.version,
     }, { status: 409 });
+  }
+  // A replace is "✎ Correct": this diagram's own prompt with a correction on
+  // the end, re-generated from its own image when it was drawn from one — by
+  // the same rule the phone offers it by. Nothing else may replace content:
+  // a diagram drawn from a document, an image that was not kept, or a Free
+  // Form layout would come back as something else.
+  if (replace) {
+    const src = correctionSource((diagram.data ?? {}) as unknown as DiagramData);
+    if (!src.ok) return NextResponse.json({ error: src.reason, message: correctionRefusalText(src.reason) }, { status: 400 });
+    if (correctionAdded(src.basePrompt, prompt) === null) {
+      return NextResponse.json({ error: "not_a_correction", message: "This diagram changed since it was opened. Reload it, then try again." }, { status: 400 });
+    }
+    const sent = typeof body.sourceImageId === "string" && body.sourceImageId ? body.sourceImageId : null;
+    if (sent !== src.sourceImageId) {
+      return NextResponse.json({ error: "image_mismatch", message: "The image this diagram was drawn from was not sent. Reload it, then try again." }, { status: 400 });
+    }
   }
 
   await reapStaleGenerateJobs();
@@ -112,11 +140,15 @@ export async function POST(req: Request, { params }: Params) {
 
   // The caller's OWN kept photo, in the diagram's organisation — never a
   // colleague's upload (naming it on this diagram would let everyone here see it).
+  // The one exception: the image THIS diagram was generated from, which everyone
+  // who can open the diagram can already see — a colleague's re-generate uses it.
   const promptOwnerIdForPhoto = getEffectiveUserId(session, cookieStore) ?? session.user.id; // whose prompts and photos these are
+  const diagramImageId = ((diagram.data ?? {}) as { aiGeneration?: { sourceImage?: { id?: unknown } } }).aiGeneration?.sourceImage?.id;
   let photo: { id: string; name: string; mimeType: string; width: number | null; height: number | null } | null = null;
   if (typeof body.sourceImageId === "string" && body.sourceImageId) {
+    const ownImage = body.sourceImageId === diagramImageId;
     photo = await prisma.aiSourceImage.findFirst({
-      where: { id: body.sourceImageId, orgId: diagramOrgId, createdById: promptOwnerIdForPhoto },
+      where: { id: body.sourceImageId, orgId: diagramOrgId, ...(ownImage ? {} : { createdById: promptOwnerIdForPhoto }) },
       select: { id: true, name: true, mimeType: true, width: true, height: true },
     });
     if (!photo) {
@@ -156,10 +188,12 @@ export async function POST(req: Request, { params }: Params) {
   // links only if it is the caller's own and the text is still unchanged.
   const promptMeta: GenerateJobPromptMeta = {
     ...(body.promptSource === "dictated" || body.promptSource === "typed" ? { promptSource: body.promptSource } : {}),
+    // Recorded either way, so a later ✎ Correct knows (no document on the phone).
+    promptFromImage: !!photo,
+    promptFromDocument: false,
     // A photo: drawn from an image, laid out normally (Free Form off — recorded,
     // so a desktop re-generate starts with it off too), and kept with the diagram.
     ...(photo ? {
-      promptFromImage: true,
       freeForm: false,
       sourceImage: {
         name: photo.name, mediaType: photo.mimeType, storedId: photo.id,
@@ -190,7 +224,7 @@ export async function POST(req: Request, { params }: Params) {
   void runGenerateJob({
     jobId: job.id, diagramId: id, userId: session.user.id, promptOwnerId, orgId,
     aiContext, ownKey, model, apiKey, prompt, promptMeta, baseVersion: diagram.version,
-    diagramOrgId, ...(photo ? { sourceImageId: photo.id } : {}),
+    diagramOrgId, ...(photo ? { sourceImageId: photo.id } : {}), ...(replace ? { replace: true } : {}),
   }).catch((e) => console.error(`[generate-job] ${job.id} escaped:`, e));
 
   return NextResponse.json({ ...viewGenerateJob(job), pollAfterSeconds: 3 }, { status: 202 });

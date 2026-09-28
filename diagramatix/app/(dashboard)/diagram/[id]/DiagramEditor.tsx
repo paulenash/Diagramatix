@@ -1,5 +1,6 @@
 "use client";
 
+import { regeneratePromptText } from "@/app/lib/ai/promptPreambles";
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { flushSync } from "react-dom";
 import { filterAnnotations, NO_ANNOTATIONS, hasAnnotations, type AnnotationInclude } from "@/app/lib/diagram/annotationFilter";
@@ -2011,7 +2012,9 @@ export function DiagramEditor({
       const res = await fetch(`/api/prompts/${gen.promptId}`);
       if (res.ok) {
         const p = await res.json();
-        if (typeof p.text === "string" && p.text.trim()) promptText = p.text;
+        // The row's text — unless the diagram's record is it plus corrections
+        // (an editor's, on the phone) the row never got.
+        if (typeof p.text === "string" && p.text.trim()) promptText = regeneratePromptText(p.text, gen.promptText);
         fromImage = p.fromImage === true;
       }
     } catch { /* fall back to the snapshot text */ }

@@ -526,6 +526,12 @@ export interface AiGeneration {
    */
   fromImage?: boolean;
   /**
+   * Whether THIS generation was drawn from an attached document (PDF, Word,
+   * text) — never kept, so it cannot be re-generated without it (the phone's
+   * "✎ Correct" refuses; 2026-09-29).
+   */
+  fromDocument?: boolean;
+  /**
    * The image this was generated from, kept (app/lib/ai/sourceImage.ts):
    * "View source image" in Diagram Properties, and re-attached on a re-generate
    * (Paul, 2026-09-28: "I need a way to view the image after the diagram has
@@ -577,6 +583,8 @@ export interface AiApplyMeta {
    */
   promptSource?: "typed" | "dictated";
   promptFromImage?: boolean;
+  /** A document (not an image) was attached — see AiGeneration.fromDocument. */
+  promptFromDocument?: boolean;
   promptRefined?: boolean;
   /** "Free Form" was ticked with an image attached (see AiGeneration.freeForm). */
   freeForm?: boolean;

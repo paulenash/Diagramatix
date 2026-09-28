@@ -126,6 +126,7 @@ export function nextAiGeneration(a: {
     // can offer both again (Paul, 2026-09-28).
     ...(meta.freeForm !== undefined ? { freeForm: meta.freeForm } : {}),
     ...(meta.promptFromImage !== undefined ? { fromImage: meta.promptFromImage } : {}),
+    ...(meta.promptFromDocument !== undefined ? { fromDocument: meta.promptFromDocument } : {}),
     // An image ALREADY kept (it has a stored id) is recorded with the
     // generation — the phone's photo (its run saves on the server), or an image
     // a desktop re-generate re-attached. One still to upload lands afterwards

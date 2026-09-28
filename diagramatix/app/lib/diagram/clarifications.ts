@@ -17,6 +17,18 @@ export function appendClarifications(prompt: string, feedback: AiFeedback): stri
 }
 
 const REFINE_HEADER = "CLARIFICATIONS (answers to open questions — incorporate these):";
+/** The heading of the answered-questions block (shared with the phone's corrections, which must not land inside it). */
+export const CLARIFICATIONS_HEADER = REFINE_HEADER;
+
+/**
+ * Is the block that `header` starts the LAST one in the prompt? Blocks are
+ * separated by a blank line; a later block — the phone's CORRECTIONS, say —
+ * means new lines must not be merged into this one.
+ */
+export function isLastPromptBlock(prompt: string, header: string): boolean {
+  const at = prompt.lastIndexOf(header);
+  return at >= 0 && !/\n\s*\n\S/.test(prompt.trimEnd().slice(at + header.length));
+}
 
 /**
  * Append answered "Refine" questions to a generation prompt as deterministic
@@ -33,9 +45,10 @@ export function appendRefinements(
     .filter((x) => (x.answer ?? "").trim().length > 0)
     .map((x) => `- ${x.label.trim()}: ${x.answer.trim()}`);
   if (lines.length === 0) return prompt;
-  // A CLARIFICATIONS block already exists (prior round) → just add the new
-  // bullets to the end; the block is always the last thing in the prompt.
-  if (prompt.includes(REFINE_HEADER)) {
+  // A CLARIFICATIONS block already exists (prior round) and is still the last
+  // block → just add the new bullets to its end. One followed by another block
+  // (a correction added on the phone) gets a fresh block after it.
+  if (isLastPromptBlock(prompt, REFINE_HEADER)) {
     return `${prompt.trimEnd()}\n${lines.join("\n")}`;
   }
   const block = [REFINE_HEADER, ...lines].join("\n");

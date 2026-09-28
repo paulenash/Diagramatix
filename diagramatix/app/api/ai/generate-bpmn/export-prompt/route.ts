@@ -17,7 +17,7 @@ import { resolveGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import { chooseModel } from "@/app/lib/ai/modelAccess";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
 import { groundRulesWithPcf } from "@/app/lib/pcf/promptGrounding";
-import { buildBpmnRequest, buildSystemPrompt, imageSourceFor } from "@/app/lib/ai/planBpmn";
+import { buildBpmnRequest, buildSystemPrompt, correctionsOverrideImage, imageSourceFor } from "@/app/lib/ai/planBpmn";
 import { providerForModel } from "@/app/lib/ai/models";
 import { safeExportName } from "@/app/lib/exportFilename";
 
@@ -84,7 +84,7 @@ export async function POST(req: Request) {
   zip.file("request.json", JSON.stringify(request, null, 2));
   // Readable splits.
   zip.file("system-prompt.txt", request.system);
-  zip.file("framework.txt", buildSystemPrompt("", wantGeometry, imageSourceFor(promptText ?? "", attachment ?? undefined))); // (b) the scaffold, rules omitted
+  zip.file("framework.txt", buildSystemPrompt("", wantGeometry, imageSourceFor(promptText ?? "", attachment ?? undefined), correctionsOverrideImage(promptText ?? "", attachment ?? undefined))); // (b) the scaffold, rules omitted
   zip.file("green-rules.md", grounded || "(no green rules configured)"); // (c) rules as injected
   zip.file("user-prompt.txt", promptText || "(no text prompt — attachment only)"); // (a) the user's text
 

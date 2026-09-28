@@ -433,6 +433,7 @@ export function AiPanel({
           selectedPromptUnchanged: sel ? sel.text.trim() === effPrompt : undefined,
           promptSource: dictatedRef.current ? "dictated" : "typed",
           promptFromImage: attachment?.type === "image",
+          promptFromDocument: !!attachment && attachment.type !== "image",
           // The image goes with the diagram, to be looked at again (2026-09-28).
           sourceImage: attachment?.type === "image" && attachment.mediaType
             ? { name: attachment.name, mediaType: attachment.mediaType, ...(attachment.storedId ? { storedId: attachment.storedId } : { data: attachment.data }) } : undefined,
@@ -479,6 +480,7 @@ export function AiPanel({
           selectedPromptUnchanged: sel ? sel.text.trim() === effPrompt : undefined,
           promptSource: dictatedRef.current ? "dictated" : "typed",
           promptFromImage: attachment?.type === "image",
+          promptFromDocument: !!attachment && attachment.type !== "image",
           // The image goes with the diagram, to be looked at again (2026-09-28).
           sourceImage: attachment?.type === "image" && attachment.mediaType
             ? { name: attachment.name, mediaType: attachment.mediaType, ...(attachment.storedId ? { storedId: attachment.storedId } : { data: attachment.data }) } : undefined,

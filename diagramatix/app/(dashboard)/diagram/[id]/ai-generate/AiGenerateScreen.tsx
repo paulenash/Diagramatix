@@ -432,6 +432,7 @@ export function AiGenerateScreen({
         selectedPromptUnchanged: sel ? sel.text.trim() === effPrompt : undefined,
         promptSource: dictatedRef.current ? "dictated" : "typed",
         promptFromImage: attachment?.type === "image",
+        promptFromDocument: !!attachment && attachment.type !== "image",
         promptRefined: refinedRef.current,
         planJson: plan,
         // Free Form and the image go with the diagram (2026-09-28).
@@ -712,6 +713,7 @@ export function AiGenerateScreen({
           selectedPromptUnchanged: sel ? sel.text.trim() === effPrompt : undefined,
           promptSource: dictatedRef.current ? "dictated" : "typed",
           promptFromImage: attachment?.type === "image",
+          promptFromDocument: !!attachment && attachment.type !== "image",
           promptRefined: refinedRef.current,
           // As the plain apply does: Free Form and the image go with the diagram.
           freeForm: !flatPlan && attachment?.type === "image" ? preserveLayout : undefined,
