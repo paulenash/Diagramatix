@@ -28,7 +28,7 @@ import { planWrapInSubprocess, planUnwrapSubprocess, planWrapInContainer, type W
 import { isUmlConnType } from "@/app/lib/diagram/types";
 import { capitaliseFirstWord, needsCapital, decisionLabel, isDecisionGateway } from "@/app/lib/diagram/nameCase";
 import { contentBoundsOf, clampRectToContent, clampRectToLimits, poolFollowsLanes, leftGapShortfall, MIN_LEFT_GAP } from "@/app/lib/diagram/poolLaneBounds";
-import { getLaneHeaderWidth, getPoolHeaderWidth, laneMetrics, minHeightForContainer, poolMetrics } from "@/app/lib/diagram/containerMetrics";
+import { getLaneHeaderWidth, getPoolHeaderWidth, healPoolHeaderWidths, laneMetrics, minHeightForContainer, poolMetrics } from "@/app/lib/diagram/containerMetrics";
 import { carveGeometry, refitStackAtEdge, shiftSublanesBy } from "@/app/lib/diagram/laneStack";
 import { uniqueContainerLabel } from "@/app/lib/diagram/containerNames";
 import { planCarve, planLaneDrop, type CarvePlan } from "@/app/lib/diagram/laneDropPlan";
@@ -1079,30 +1079,10 @@ function updatePoolTypes(elements: DiagramElement[]): DiagramElement[] {
  * into more lines (each line gets shorter).
  */
 
-/** One-time load heal: bring every pool's header strip up to a width that fits its
- *  (multi-line) label at the pool font. Older diagrams (and any generated before the
- *  header-sizing fix) stored a strip sized for a smaller font and tripped the B32
- *  "Pool label overflows the header region" warning. White-box pools grow LEFT by
- *  the shortfall so their lanes stay exactly where they are; black-box pools (no
- *  lanes) just widen the strip. Returns the SAME reference when nothing needs it, so
- *  a healthy diagram isn't marked dirty. */
-export function healPoolHeaderWidths(d: DiagramData): DiagramData {
-  const poolFs = d.poolFontSize ?? 16;
-  let changed = false;
-  const elements = d.elements.map((e) => {
-    if (e.type !== "pool") return e;
-    const need = poolMetrics(e.label ?? "", poolFs).headerWidth;
-    const stored = typeof e.properties?.poolHeaderWidth === "number" ? (e.properties.poolHeaderWidth as number) : 36;
-    if (stored >= need) return e;
-    changed = true;
-    const delta = need - stored;
-    const isBlackBox = (e.properties?.poolType as string | undefined) === "black-box";
-    const next: DiagramElement = { ...e, properties: { ...e.properties, poolHeaderWidth: need } };
-    if (!isBlackBox) { next.x = e.x - delta; next.width = e.width + delta; } // grow left; lanes unmoved
-    return next;
-  });
-  return changed ? { ...d, elements } : d;
-}
+// healPoolHeaderWidths — the one-time load heal of pool header widths — lives in
+// containerMetrics.ts (pure), so the phone and the partner PDF can apply it too;
+// re-exported here for the reducer's own callers.
+export { healPoolHeaderWidths };
 
 /**
  * Shift a set of root lanes plus EVERY descendant (sublanes, sub-sublanes,

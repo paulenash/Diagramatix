@@ -10,7 +10,7 @@
  *
  * Pure.
  */
-import type { DiagramElement } from "./types";
+import type { DiagramData, DiagramElement } from "./types";
 import { isAnyLane } from "./laneKind";
 
 /** Read a pool's effective header width (stored property override, else 36). */
@@ -99,3 +99,34 @@ export function minHeightForContainer(
  * already applied the new (x, y, width, height) to `parentLane` itself in
  * `elementsArr`.
  */
+
+/** One-time load heal: bring every pool's header strip up to a width that fits its
+ *  (multi-line) label at the pool font. Older diagrams (and any generated before the
+ *  header-sizing fix) stored a strip sized for a smaller font and tripped the B32
+ *  "Pool label overflows the header region" warning. White-box pools grow LEFT by
+ *  the shortfall so their lanes stay exactly where they are; black-box pools (no
+ *  lanes) just widen the strip. Returns the SAME reference when nothing needs it, so
+ *  a healthy diagram isn't marked dirty.
+ *
+ *  The desktop editor applies it on open (useDiagram's healOnLoad). It lives here,
+ *  pure, so every other place that DRAWS a stored diagram — the phone viewer, the
+ *  partner PDF — draws the pool the desktop draws (2026-09-28: a three-line pool
+ *  name in an unhealed 36px strip ran out of the pool and under its lanes). */
+export function healPoolHeaderWidths(d: DiagramData): DiagramData {
+  if (!Array.isArray(d.elements)) return d;
+  const poolFs = d.poolFontSize ?? 16;
+  let changed = false;
+  const elements = d.elements.map((e) => {
+    if (e.type !== "pool") return e;
+    const need = poolMetrics(e.label ?? "", poolFs).headerWidth;
+    const stored = typeof e.properties?.poolHeaderWidth === "number" ? (e.properties.poolHeaderWidth as number) : 36;
+    if (stored >= need) return e;
+    changed = true;
+    const delta = need - stored;
+    const isBlackBox = (e.properties?.poolType as string | undefined) === "black-box";
+    const next: DiagramElement = { ...e, properties: { ...e.properties, poolHeaderWidth: need } };
+    if (!isBlackBox) { next.x = e.x - delta; next.width = e.width + delta; } // grow left; lanes unmoved
+    return next;
+  });
+  return changed ? { ...d, elements } : d;
+}

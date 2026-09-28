@@ -7,8 +7,10 @@
  */
 import type { TemplateData, DiagramElement, Connector } from "./types";
 import type { SymbolColorConfig } from "./colors";
-import { elementFill } from "./canvasPaint";
+import { elementFill, lanePaint, poolPaint, SHAPE_STROKE } from "./canvasPaint";
 import { wrapText } from "./textMetrics";
+import { containerHeaderWidth } from "./containerHeader";
+import { laneDepths, sublaneIdsOf } from "./nestingDepth";
 
 /**
  * Options for a higher-fidelity render (used by the mobile viewer): the diagram's
@@ -102,20 +104,55 @@ function belowLabel(e: DiagramElement, tx: number, ty: number, full: boolean): s
   ).join("");
 }
 
-// Pool / lane / sublane NAME — rotated vertically inside the left header strip,
-// like the desktop. Only drawn for the fuller (mobile) render.
-function stripLabel(e: DiagramElement, tx: number, ty: number): string {
+/**
+ * Pool / lane NAME — rotated to read bottom-to-top, centred in the header strip,
+ * as the desktop draws it (SymbolRenderer PoolShape / LaneShape): the pool and
+ * lane font sizes, the same line spacing and the same column position. Only
+ * drawn for the fuller (mobile / partner) render.
+ *
+ * The name's own lines (its line breaks) are the desktop's, and the strip is
+ * sized for them. One difference, kept on purpose: a one-line name longer than
+ * its band — which the desktop lets run past the band's ends — is wrapped along
+ * the band into the columns the strip has room for, and shortened with "…" only
+ * if even those are not enough. A name with line breaks of its own is never
+ * re-wrapped or cut.
+ */
+export function stripLabelLines(label: string, bandLength: number, headerW: number, fs: number, colW: number): string[] {
+  const own = label.split("\n").map((l) => l.trim()).filter(Boolean);
+  if (own.length !== 1) return own;
+  const maxCols = Math.max(1, Math.floor((headerW - 4) / colW));
+  const wrapped = wrapText(own[0], Math.max(12, bandLength - 8), fs);
+  if (wrapped.length <= maxCols) return wrapped;
+  const kept = wrapped.slice(0, maxCols);
+  kept[maxCols - 1] = kept[maxCols - 1].replace(/\s*\S?$/, "") + "…";
+  return kept;
+}
+
+function stripLabel(e: DiagramElement, tx: number, ty: number, headerW: number, fontSizes: HeaderFonts): string {
   const t = (e.label ?? "").trim();
   if (!t) return "";
-  // Rotated name; wrap along the element HEIGHT into vertical columns for readability.
-  const fs = 10, colW = fs * 1.15;
-  const lines = wrapText(t, Math.max(12, e.height - 8), fs);
+  const pool = e.type === "pool";
+  const fs = Math.round((pool ? fontSizes.pool : fontSizes.lane) * 10) / 10;
+  const colW = Math.round((pool ? fontSizes.pool * 1.18 : fontSizes.lane * 1.2));
+  const lines = stripLabelLines(t, e.height, headerW, fs, colW);
   const midY = e.y + ty + e.height / 2;
-  const startX = e.x + tx + 9 - ((lines.length - 1) * colW) / 2;
+  const startX = e.x + tx + headerW / 2 + 3 - ((lines.length - 1) * colW) / 2;
   return lines.map((ln, i) => {
     const lx = startX + i * colW;
-    return `<text x="${lx.toFixed(1)}" y="${midY.toFixed(1)}" transform="rotate(-90 ${lx.toFixed(1)} ${midY.toFixed(1)})" text-anchor="middle" font-size="${fs}" fill="#0f172a" font-family="sans-serif">${esc(ln)}</text>`;
+    return `<text x="${lx.toFixed(1)}" y="${midY.toFixed(1)}" transform="rotate(-90 ${lx.toFixed(1)} ${midY.toFixed(1)})" text-anchor="middle" font-size="${fs}" fill="#3b1a08" font-family="sans-serif">${esc(ln)}</text>`;
   }).join("");
+}
+
+/** The pool and lane name font sizes the desktop uses (Canvas: data.poolFontSize ?? 16, data.laneFontSize ?? 14). */
+interface HeaderFonts { pool: number; lane: number }
+
+/** What a pool / lane needs from the rest of the diagram to be painted like the desktop. */
+interface RenderCtx {
+  fonts: HeaderFonts;
+  /** Lanes whose parent is a lane (they take the sub-lane colour). */
+  sublanes: Set<string>;
+  /** Lane ancestors per lane (each level past a sub-lane lightens). */
+  laneDepth: Map<string, number>;
 }
 
 // Label anchored to the TOP of an element (expanded subprocess / value-chain
@@ -179,19 +216,35 @@ function boxEdge(cxp: number, cyp: number, hw: number, hh: number, tx0: number, 
   return { x: cxp + dx * s, y: cyp + dy * s };
 }
 
-function shapeFor(e: DiagramElement, tx: number, ty: number, opts?: ThumbnailOpts): string {
+function shapeFor(e: DiagramElement, tx: number, ty: number, opts?: ThumbnailOpts, ctx?: RenderCtx): string {
   const x = e.x + tx, y = e.y + ty, w = e.width, h = e.height;
   const t = e.type as string;
   const fill = fillFor(e, opts), stroke = strokeFor(e, opts);
   const full = !!opts?.fullLabels;
 
   if (t === "pool" || t === "lane" || t === "sublane") {
-    // rect with a header strip on the left; the strip is tinted with the real
-    // pool/lane colour when available (that's what colorConfig drives on desktop).
-    const stripFill = opts?.trueColors ? fill : "#e2e8f0";
-    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${opts?.trueColors ? "#ffffff" : fill}" stroke="${stroke}" stroke-width="1"${VE}/>`
-      + `<rect x="${x}" y="${y}" width="18" height="${h}" fill="${stripFill}" stroke="${stroke}" stroke-width="1"${VE}/>`
-      + (full ? stripLabel(e, tx, ty) : "");
+    // A body with its header strip down the left, the strip as wide as the
+    // desktop draws it: the container's own header width (36 unless resized).
+    // A lane starts exactly where its pool's strip ends, so the strips meet.
+    // It used to be a fixed 18px, which left a white gap between the pool's
+    // strip and its lanes' (Paul, 2026-09-28: "the pool header and lane headers
+    // are too narrow and are separated by a gap").
+    const hw = Math.min(containerHeaderWidth(e), w);
+    if (opts?.trueColors) {
+      // The desktop's own paint (canvasPaint): header colour, a light tint of it
+      // for the body, the sub-lane colour for a lane inside a lane.
+      const kind: "lane" | "sublane" = t === "sublane" || ctx?.sublanes.has(e.id) ? "sublane" : "lane";
+      const paint = t === "pool"
+        ? poolPaint(opts.colorConfig)
+        : lanePaint(ctx?.laneDepth.get(e.id) ?? (kind === "sublane" ? 1 : 0), kind, opts.colorConfig);
+      const sw = t === "pool" ? 1.5 : 1;
+      return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${paint.body}" stroke="${SHAPE_STROKE}" stroke-width="${sw}"${VE}/>`
+        + `<rect x="${x}" y="${y}" width="${hw}" height="${h}" fill="${paint.header}" stroke="${SHAPE_STROKE}" stroke-width="${sw}"${VE}/>`
+        + (full ? stripLabel(e, tx, ty, hw, ctx?.fonts ?? { pool: 16, lane: 14 }) : "");
+    }
+    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" stroke="${stroke}" stroke-width="1"${VE}/>`
+      + `<rect x="${x}" y="${y}" width="${hw}" height="${h}" fill="#e2e8f0" stroke="${stroke}" stroke-width="1"${VE}/>`
+      + (full ? stripLabel(e, tx, ty, hw, ctx?.fonts ?? { pool: 16, lane: 14 }) : "");
   }
   if (t === "subprocess-expanded" || t === "process-group") {
     // Container — drawn in the BACK pass so its child elements + connectors render
@@ -325,7 +378,16 @@ export function renderTemplateThumbnailSvg(data: TemplateData, opts?: ThumbnailO
     e.type === "pool" || e.type === "lane" || e.type === "sublane" ||
     e.type === "subprocess-expanded" || e.type === "process-group";
   const containers = els.filter(isContainer).slice().sort((a, b) => b.width * b.height - a.width * a.height);
-  const back = containers.map((e) => shapeFor(e, tx, ty, opts)).join("");
+  const fontData = data as { poolFontSize?: unknown; laneFontSize?: unknown };
+  const ctx: RenderCtx = {
+    fonts: {
+      pool: typeof fontData.poolFontSize === "number" && fontData.poolFontSize > 0 ? fontData.poolFontSize : 16,
+      lane: typeof fontData.laneFontSize === "number" && fontData.laneFontSize > 0 ? fontData.laneFontSize : 14,
+    },
+    sublanes: sublaneIdsOf(els),
+    laneDepth: laneDepths(els),
+  };
+  const back = containers.map((e) => shapeFor(e, tx, ty, opts, ctx)).join("");
   const conns = (data.connectors ?? []).map((c) => connFor(c, els, tx, ty, opts)).join("");
   const front = els.filter((e) => !isContainer(e)).map((e) => shapeFor(e, tx, ty, opts)).join("");
 

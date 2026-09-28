@@ -23,6 +23,7 @@
  */
 import type { DiagramData } from "@/app/lib/diagram/types";
 import { renderTemplateThumbnailSvg, thumbnailTransform, THUMBNAIL_PAD } from "@/app/lib/diagram/templateThumbnail";
+import { healPoolHeaderWidths } from "@/app/lib/diagram/containerMetrics";
 
 /** Matches the fonts installed in the Docker runner stage. */
 const FONT_STACK = "Liberation Sans, Noto Sans, DejaVu Sans, Arial, sans-serif";
@@ -31,7 +32,10 @@ export class NothingToRenderError extends Error {
   constructor() { super("That diagram has no elements to render."); this.name = "NothingToRenderError"; }
 }
 
-export function renderDiagramSvg(data: DiagramData): string {
+export function renderDiagramSvg(stored: DiagramData): string {
+  // The pools as the desktop draws them: a multi-line name gets the header width
+  // it needs (the editor applies the same heal on open).
+  const data = healPoolHeaderWidths(stored);
   const els = data.elements ?? [];
   if (els.length === 0) throw new NothingToRenderError();
 

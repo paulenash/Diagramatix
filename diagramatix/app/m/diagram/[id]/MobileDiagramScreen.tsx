@@ -12,6 +12,7 @@ import { thumbnailTransform } from "@/app/lib/diagram/templateThumbnail";
 import { buildReviewComment } from "@/app/lib/diagram/reviewComment";
 import { collapseAllReviewComments } from "@/app/lib/diagram/reviewCollapse";
 import { isMobileSupportedType, MOBILE_SUPPORTED_LABEL } from "@/app/lib/diagram/mobileSupport";
+import { healPoolHeaderWidths } from "@/app/lib/diagram/containerMetrics";
 import { MobileGenerateSheet } from "@/app/components/mobile/MobileGenerateSheet";
 import { useAiAllowed } from "@/app/lib/auth/useAiAllowed";
 import { EMPTY_DRAFT, draftFromFailedJob, draftToRequest, type GenerateDraft } from "@/app/lib/mobile/generateDraft";
@@ -96,7 +97,8 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
       const next: Loaded = {
         name: j.name,
         type: j.type ?? "",
-        data: (j.data ?? { elements: [], connectors: [] }) as DiagramData,
+        // As the desktop opens it (healOnLoad): a pool's header as wide as its name needs.
+        data: healPoolHeaderWidths((j.data ?? { elements: [], connectors: [] }) as DiagramData),
         projectId: j.projectId ?? null,
         version: j.version ?? 0,
         canReview: !!j.canReview,
