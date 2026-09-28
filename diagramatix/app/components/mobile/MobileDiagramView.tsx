@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DiagramData } from "@/app/lib/diagram/types";
 import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
-import { renderTemplateThumbnailSvg, thumbnailTransform } from "@/app/lib/diagram/templateThumbnail";
+import { renderTemplateThumbnailSvg, thumbnailFrameFor } from "@/app/lib/diagram/templateThumbnail";
 
 interface Transform { s: number; x: number; y: number }
 
@@ -41,7 +41,8 @@ export function MobileDiagramView({
   );
   // Same transform the SVG uses internally, so the overlay lines up exactly.
   const dims = useMemo(() => {
-    const { w, h } = thumbnailTransform((data.elements ?? []) as never);
+    // The frame the picture is drawn in (connector routes and labels included).
+    const { w, h } = thumbnailFrameFor(data as never, { trueColors: true, fullLabels: true });
     return { w, h };
   }, [data]);
 

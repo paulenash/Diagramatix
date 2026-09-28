@@ -10,7 +10,8 @@
 import { describe, it, expect } from "vitest";
 import { layoutBpmnDiagram, type AiElement, type AiConnection } from "@/app/lib/diagram/bpmnLayout";
 import { renderDiagramSvg, NothingToRenderError } from "@/app/lib/partner/renderDiagramSvg";
-import { thumbnailTransform } from "@/app/lib/diagram/templateThumbnail";
+import { thumbnailFrameFor } from "@/app/lib/diagram/templateThumbnail";
+import { healOnLoad } from "@/app/lib/diagram/healOnLoad";
 
 function sample() {
   const els: AiElement[] = [
@@ -30,7 +31,9 @@ describe("renderDiagramSvg", () => {
     // wrong, which is worse than a failure because nobody investigates it.
     const data = sample();
     const svg = renderDiagramSvg(data);
-    const { w, h } = thumbnailTransform(data.elements);
+    // Changed 2026-09-28: the page is the picture's own frame — the healed diagram,
+    // its connector routes and labels included (thumbnailFrameFor).
+    const { w, h } = thumbnailFrameFor(healOnLoad(data), { trueColors: true, fullLabels: true });
 
     const width = Number(/width="(\d+)"/.exec(svg)?.[1]);
     const height = Number(/height="(\d+)"/.exec(svg)?.[1]);

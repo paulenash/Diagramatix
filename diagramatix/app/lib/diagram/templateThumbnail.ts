@@ -5,12 +5,24 @@
  * popup can blow it up without pixelation. Simplified shapes (recognisable, not
  * pixel-perfect) keyed by element type.
  */
-import type { TemplateData, DiagramElement, Connector } from "./types";
+import type { TemplateData, DiagramElement, Connector, Point } from "./types";
+import { isUmlConnType } from "./types";
 import type { SymbolColorConfig } from "./colors";
-import { elementFill, lanePaint, poolPaint, SHAPE_STROKE } from "./canvasPaint";
-import { wrapText } from "./textMetrics";
+import {
+  CONTAINER_HEADER_H, GROUP_DASH, SHAPE_STROKE, connectorDash, connectorStroke, elementFill,
+  headedContainerPaint, lanePaint, poolPaint, visibleWaypoints,
+} from "./canvasPaint";
+import { connectorLabelSize, wrapText } from "./textMetrics";
 import { containerHeaderWidth } from "./containerHeader";
 import { laneDepths, sublaneIdsOf } from "./nestingDepth";
+import { compositeRegions } from "./compositeRegions";
+import { isHiddenOnCanvas } from "./diagramThumbnail";
+import { connectorLabelBox } from "./checks/layoutViolations";
+import { waypointsToSvgPath } from "./routing";
+import {
+  branchLabelAdrift, branchPercentPlacement, connectorPathD, connectorShowsLabel, flowMarkerShape,
+  humpOthersById, isBranchLabelSuppressed, labelTetherLine, tetherPointOf,
+} from "./connectorPath";
 
 /**
  * Options for a higher-fidelity render (used by the mobile viewer): the diagram's
@@ -143,8 +155,9 @@ function stripLabel(e: DiagramElement, tx: number, ty: number, headerW: number, 
   }).join("");
 }
 
-/** The pool and lane name font sizes the desktop uses (Canvas: data.poolFontSize ?? 16, data.laneFontSize ?? 14). */
-interface HeaderFonts { pool: number; lane: number }
+/** The pool and lane name font sizes the desktop uses (Canvas: data.poolFontSize ?? 16, data.laneFontSize ?? 14),
+ *  and the element font (data.fontSize ?? 12) that a container's title is set in. */
+interface HeaderFonts { pool: number; lane: number; element?: number }
 
 /** What a pool / lane needs from the rest of the diagram to be painted like the desktop. */
 interface RenderCtx {
@@ -153,6 +166,15 @@ interface RenderCtx {
   sublanes: Set<string>;
   /** Lane ancestors per lane (each level past a sub-lane lightens). */
   laneDepth: Map<string, number>;
+}
+
+// A composite state's / system boundary's / group's name, as the desktop sets
+// it: one line (line breaks read as spaces), centred, in the middle of the
+// 28px header band, at the element font size.
+function containerTitle(e: DiagramElement, tx: number, ty: number, fs: number): string {
+  const t = (e.label ?? "").replace(/\s*\n\s*/g, " ").trim();
+  if (!t) return "";
+  return `<text x="${(cx(e) + tx).toFixed(1)}" y="${(e.y + ty + CONTAINER_HEADER_H / 2 + fs * 0.35).toFixed(1)}" text-anchor="middle" font-size="${fs}" fill="#111827" font-family="sans-serif">${esc(t)}</text>`;
 }
 
 // Label anchored to the TOP of an element (expanded subprocess / value-chain
@@ -291,6 +313,41 @@ function shapeFor(e: DiagramElement, tx: number, ty: number, opts?: ThumbnailOpt
     return `<ellipse cx="${cx(e) + tx}" cy="${y + 6}" rx="${w / 2}" ry="5" fill="${fill}" stroke="${stroke}" stroke-width="1"${VE}/>`
       + `<rect x="${x}" y="${y + 6}" width="${w}" height="${h - 6}" fill="${fill}" stroke="${stroke}" stroke-width="1"${VE}/>`;
   }
+  if (t === "composite-state" || t === "system-boundary") {
+    // A HEADED container, as the desktop draws it (CompositeStateShape): a
+    // see-through body — the states and transitions inside show through — a
+    // solid header band with a rounded top, the line under it, a composite
+    // state's dashed region dividers, and the outline last so nothing covers it.
+    // Drawn BEHIND the connectors (paintOrder). It used to be an opaque box
+    // drawn over its own transitions.
+    const rx = t === "composite-state" ? 12 : 2;
+    const hh = Math.min(CONTAINER_HEADER_H, h);
+    const paint = opts?.trueColors
+      ? headedContainerPaint(t, opts.colorConfig)
+      : { header: fill, body: fill, bodyOpacity: 0.4 };
+    let out = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}" fill="${paint.body}" fill-opacity="${paint.bodyOpacity}" stroke="none"/>`
+      + `<path d="M ${x} ${y + hh} V ${y + rx} Q ${x} ${y} ${x + rx} ${y} H ${x + w - rx} Q ${x + w} ${y} ${x + w} ${y + rx} V ${y + hh} Z" fill="${paint.header}" stroke="none"/>`
+      + `<line x1="${x}" y1="${y + hh}" x2="${x + w}" y2="${y + hh}" stroke="${SHAPE_STROKE}" stroke-width="1"${VE}/>`;
+    if (t === "composite-state") {
+      const { orientation, fracs } = compositeRegions(e);
+      const top = y + hh, bodyH = h - hh;
+      for (const f of fracs) {
+        out += orientation === "vertical"
+          ? `<line x1="${(x + f * w).toFixed(1)}" y1="${top}" x2="${(x + f * w).toFixed(1)}" y2="${y + h}" stroke="${SHAPE_STROKE}" stroke-width="1" stroke-dasharray="6 4"${VE}/>`
+          : `<line x1="${x}" y1="${(top + f * bodyH).toFixed(1)}" x2="${x + w}" y2="${(top + f * bodyH).toFixed(1)}" stroke="${SHAPE_STROKE}" stroke-width="1" stroke-dasharray="6 4"${VE}/>`;
+      }
+    }
+    out += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}" fill="none" stroke="${opts?.trueColors ? SHAPE_STROKE : stroke}" stroke-width="1.5"${VE}/>`;
+    return out + (full ? containerTitle(e, tx, ty, ctx?.fonts.element ?? 12) : "");
+  }
+  if (t === "group") {
+    // A BPMN group is an OUTLINE (dashed, the group colour) around what it
+    // groups, with the faintest wash — never a filled box over its contents,
+    // which it used to be.
+    const line = opts?.trueColors ? elementFill(e, opts.colorConfig) : stroke;
+    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="8" fill="#f9fafb" fill-opacity="${opts?.trueColors ? 0.15 : 0}" stroke="${line}" stroke-width="1.5" stroke-dasharray="${GROUP_DASH}"${VE}/>`
+      + (full ? containerTitle(e, tx, ty, ctx?.fonts.element ?? 12) : "");
+  }
   // fallback
   return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="${fill}" stroke="${stroke}" stroke-width="1"${VE}/>` + label(e, tx, ty, 4, full);
 }
@@ -341,6 +398,180 @@ function connFor(c: Connector, els: DiagramElement[], tx: number, ty: number, op
   return out;
 }
 
+/** Arrowheads and ends, exactly as the canvas's markers (ConnectorRenderer), one per kind and colour. */
+type MarkerKind = "arrow" | "open" | "openStart" | "thin" | "thinStart" | "msgEnd" | "msgStart";
+
+function markerDef(id: string, kind: MarkerKind, color: string): string {
+  const open = `<polyline points="0,0 10,3.5 0,7" fill="none" stroke="${color}" stroke-width="1.5"/>`;
+  const thin = `<polyline points="1.05,0.8 7,2.5 1.05,4.2" fill="none" stroke="${color}" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>`;
+  switch (kind) {
+    case "arrow": return `<marker id="${id}" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" overflow="visible"><polygon points="0 0, 10 3.5, 0 7" fill="${color}"/></marker>`;
+    case "open": return `<marker id="${id}" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" overflow="visible">${open}</marker>`;
+    case "openStart": return `<marker id="${id}" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto-start-reverse" overflow="visible">${open}</marker>`;
+    case "thin": return `<marker id="${id}" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto" overflow="visible">${thin}</marker>`;
+    case "thinStart": return `<marker id="${id}" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto-start-reverse" overflow="visible">${thin}</marker>`;
+    case "msgEnd": return `<marker id="${id}" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" overflow="visible"><polygon points="0,0.5 0,9.5 7.8,5" fill="white" stroke="${color}" stroke-width="1.5"/></marker>`;
+    case "msgStart": return `<marker id="${id}" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto-start-reverse" overflow="visible"><circle cx="4" cy="4" r="3" fill="white" stroke="${color}" stroke-width="1.5"/></marker>`;
+  }
+}
+
+/** Everything a connector needs to be drawn as the canvas draws it. */
+interface ConnCtx {
+  tx: number; ty: number;
+  els: DiagramElement[];
+  byId: Map<string, DiagramElement>;
+  /** For each hump-taking connector, the routes it jumps over. */
+  humps: Map<string, Point[][]>;
+  /** Marker ids used → their definitions. */
+  markers: Map<string, string>;
+  labelFs: number;
+  full: boolean;
+}
+
+function markerRef(k: ConnCtx, kind: MarkerKind, color: string): string {
+  const id = `dgxm-${kind}-${color.replace(/[^0-9a-z]/gi, "")}`;
+  if (!k.markers.has(id)) k.markers.set(id, markerDef(id, kind, color));
+  return `url(#${id})`;
+}
+
+/**
+ * One connector, drawn as the canvas draws it (ConnectorRenderer), with the
+ * shared rules in connectorPath.ts: the route's visible waypoints; the curve,
+ * the rounded corners and the humps over earlier connectors; the stroke, width
+ * and dash of its type; the canvas's arrowheads and message-flow ends; the
+ * default / conditional marks at the source; the label where the canvas puts
+ * it, with its tether when a gateway branch's label has drifted.
+ */
+function connTrue(c: Connector, k: ConnCtx): string {
+  const T = (p: Point): Point => ({ x: p.x + k.tx, y: p.y + k.ty });
+  const vis = Array.isArray(c.waypoints) && c.waypoints.length >= 2 ? visibleWaypoints(c) : [];
+  let visT: Point[];
+  let d: string;
+  if (vis.length >= 2) {
+    visT = vis.map(T);
+    d = connectorPathD(c, visT, k.humps.get(c.id)?.map((route) => route.map(T)));
+  } else {
+    // No stored route: boundary to boundary.
+    const s = k.byId.get(c.sourceId), t = k.byId.get(c.targetId);
+    if (!s || !t) return "";
+    const sC = T({ x: cx(s), y: cy(s) }), tC = T({ x: cx(t), y: cy(t) });
+    visT = [boxEdge(sC.x, sC.y, s.width / 2, s.height / 2, tC.x, tC.y), boxEdge(tC.x, tC.y, t.width / 2, t.height / 2, sC.x, sC.y)];
+    d = waypointsToSvgPath(visT);
+  }
+  const type = c.type as string;
+  const isAssocBPMN = type === "associationBPMN";
+  const stroke = connectorStroke(type);
+  const weighted = (type === "uml-association" || type === "sequence") ? Number(c.weight) || 0 : 0;
+  const width = weighted > 0 ? weighted : isAssocBPMN ? 2 : 1.5;
+  const dash = connectorDash(c);
+  const cap = isAssocBPMN || type === "flowchart-association" ? ' stroke-linecap="round"' : "";
+  let start = "", end = "";
+  if (type === "messageBPMN") {
+    start = markerRef(k, "msgStart", stroke);
+    end = markerRef(k, "msgEnd", stroke);
+  } else if (!isUmlConnType(c.type) && c.directionType !== "non-directed") {
+    const both = c.directionType === "both";
+    const open = c.directionType === "open-directed" || both
+      || (isAssocBPMN && c.directionType === "directed")
+      || (type === "review-comment-link" && c.directionType === "directed");
+    end = markerRef(k, isAssocBPMN ? "thin" : open ? "open" : "arrow", stroke);
+    if (both) start = markerRef(k, isAssocBPMN ? "thinStart" : "openStart", stroke);
+  }
+
+  const source = k.byId.get(c.sourceId);
+  let out = "";
+  // Default / conditional mark, drawn first so the line runs through it.
+  const fm = flowMarkerShape(c, visT, source?.type);
+  if (fm?.kind === "slash") out += `<line x1="${fm.x1}" y1="${fm.y1}" x2="${fm.x2}" y2="${fm.y2}" stroke="#374151" stroke-width="1.5" stroke-linecap="round"${VE}/>`;
+  if (fm?.kind === "diamond") out += `<polygon points="${fm.points}" fill="white" stroke="#374151" stroke-width="1.2"${VE}/>`;
+  out += `<path data-id="${esc(c.id)}" d="${d}" fill="none" stroke="${stroke}" stroke-width="${width}"${dash ? ` stroke-dasharray="${dash}"` : ""}${cap}${VE}`
+    + `${start ? ` marker-start="${start}"` : ""}${end ? ` marker-end="${end}"` : ""}/>`;
+  if (!k.full) return out;
+
+  const pct = branchPercentPlacement(c, visT);
+  if (pct) out += `<text x="${pct.x.toFixed(1)}" y="${(pct.y + 3).toFixed(1)}" text-anchor="middle" font-size="9" fill="#6b7280" font-family="sans-serif">${esc(pct.text)}</text>`;
+
+  // The label, where the canvas puts it (connectorLabelBox: stored offsets,
+  // source-anchored branches, a message's pool-end rule).
+  const text = c.label ?? "";
+  if (!connectorShowsLabel(c) || !text.trim()) return out;
+  const gwType = source?.type === "gateway" ? (source.gatewayType ?? "exclusive") : undefined;
+  if (isBranchLabelSuppressed(c, gwType)) return out;
+  const box = connectorLabelBox(c, k.els, k.labelFs);
+  if (!box) return out;
+  const { lines } = connectorLabelSize(text, k.labelFs);
+  const lCx = box.x + box.w / 2 + k.tx, lTy = box.y + k.ty, lh = box.h;
+  if (source?.type === "gateway") {
+    const tp = tetherPointOf(visT);
+    if (tp && branchLabelAdrift({
+      hasLabel: true, sourceIsGateway: true, mode: c.labelTether,
+      tetherPoint: tp, lCx, lMidY: lTy + lh / 2, lWidth: box.w, lHeight: lh,
+    })) {
+      const L = labelTetherLine(tp, lines, k.labelFs, lCx, lTy, lh);
+      out += `<line x1="${L.x1.toFixed(1)}" y1="${L.y1.toFixed(1)}" x2="${L.x2.toFixed(1)}" y2="${L.y2.toFixed(1)}" stroke="#6b7280" stroke-width="1" stroke-dasharray="4 3"${VE}/>`;
+    }
+  }
+  out += `<text text-anchor="middle" font-size="${k.labelFs}" fill="#374151" paint-order="stroke" stroke="#ffffff" stroke-width="2.5" stroke-linejoin="round" font-family="sans-serif">`
+    + lines.map((ln, i) => `<tspan x="${lCx.toFixed(1)}" y="${(lTy + i * 14 + 14 * 0.85).toFixed(1)}">${esc(ln)}</tspan>`).join("")
+    + `</text>`;
+  return out;
+}
+
+/**
+ * The canvas's layers, back to front (Canvas.tsx): pools; headed containers
+ * (system boundary, composite state, process group, UML package); lanes,
+ * parents first; expanded subprocesses, largest first; — the ordinary
+ * connectors go here —; flow elements; boundary events; data artifacts;
+ * groups; pain points and issues; — message flows and data associations go
+ * here, above every element —; review notes. Painting containers by size
+ * alone hid an expanded subprocess that spans lanes under the lanes' bodies.
+ */
+const HEADED_CONTAINERS = new Set(["system-boundary", "composite-state", "process-group", "uml-package"]);
+const DATA_ARTIFACTS = new Set(["data-object", "data-store", "text-annotation"]);
+function layerOf(e: DiagramElement): number {
+  const t = e.type as string;
+  if (t === "pool" || t === "flowchart-vswimlane") return 0;
+  if (HEADED_CONTAINERS.has(t)) return 1;
+  if (t === "lane" || t === "sublane") return 2;
+  if (t === "subprocess-expanded") return 3;
+  if (t === "group") return 7;
+  if (t === "uml-pain-point" || t === "uml-issue") return 8;
+  if (t === "review-comment") return 10;
+  if (e.boundaryHostId) return 5;
+  if (DATA_ARTIFACTS.has(t)) return 6;
+  return 4;
+}
+/** The last layer drawn BEHIND the ordinary connectors. */
+const LAST_BACK_LAYER = 3;
+/** The first layer drawn above the message flows and data associations. */
+const FIRST_TOP_LAYER = 10;
+
+function paintOrder(els: DiagramElement[], ctx: RenderCtx): { el: DiagramElement; layer: number }[] {
+  const byId = new Map(els.map((e) => [e.id, e] as const));
+  const depthOf = (e: DiagramElement): number => {
+    let n = 0;
+    let cur: DiagramElement | undefined = e;
+    const seen = new Set<string>();
+    while (cur?.parentId && !seen.has(cur.id)) {
+      seen.add(cur.id);
+      cur = byId.get(cur.parentId);
+      if (!cur) break;
+      n++;
+    }
+    return n;
+  };
+  const laneDepth = (e: DiagramElement) => ctx.laneDepth.get(e.id) ?? (e.type === "sublane" ? 1 : 0);
+  return els
+    .map((el, i) => ({ el, i, layer: layerOf(el), depth: depthOf(el), area: el.width * el.height }))
+    .sort((a, b) => {
+      if (a.layer !== b.layer) return a.layer - b.layer;
+      if (a.layer === 2) return laneDepth(a.el) - laneDepth(b.el) || a.i - b.i;
+      if (a.layer === 3 && Math.abs(a.area - b.area) > 1) return b.area - a.area;
+      return a.depth - b.depth || a.i - b.i;
+    })
+    .map(({ el, layer }) => ({ el, layer }));
+}
+
 /** Padding (px) around the diagram bounds in the thumbnail SVG. */
 export const THUMBNAIL_PAD = 14;
 
@@ -365,38 +596,115 @@ export function thumbnailTransform(els: { x: number; y: number; width: number; h
   };
 }
 
-export function renderTemplateThumbnailSvg(data: TemplateData, opts?: ThumbnailOpts): string {
-  const els = data.elements ?? [];
-  if (els.length === 0) return "";
-  const { tx, ty, w, h } = thumbnailTransform(els);
+/** The connector-label font the canvas uses: round(10 × (connectorFontSize ?? 10) / 10, 1dp). */
+function connectorLabelFontSize(data: { connectorFontSize?: unknown }): number {
+  const v = data.connectorFontSize;
+  return Math.round(10 * ((typeof v === "number" && v > 0 ? v : 10) / 10) * 10) / 10;
+}
 
-  // Containers (pools/lanes AND expanded subprocesses / value-chain groups) draw
-  // BEHIND — largest first — so connectors + child elements render on top of them
-  // (previously a subprocess-expanded fill hid the connectors inside it). Then
-  // connectors, then leaf shapes on top.
-  const isContainer = (e: DiagramElement) =>
-    e.type === "pool" || e.type === "lane" || e.type === "sublane" ||
-    e.type === "subprocess-expanded" || e.type === "process-group";
-  const containers = els.filter(isContainer).slice().sort((a, b) => b.width * b.height - a.width * a.height);
-  const fontData = data as { poolFontSize?: unknown; laneFontSize?: unknown };
+/**
+ * The frame renderTemplateThumbnailSvg draws in, for the same options.
+ *
+ * The compact template preview is framed on its elements (thumbnailTransform).
+ * The full render (the phone viewer, the partner PDF) also takes in every
+ * connector's route and every label where the canvas puts it: since labels sit
+ * at their stored offsets (2026-09-28), a label dragged away from its line —
+ * above the top row, say — fell outside an elements-only frame and was not
+ * drawn at all. Anything that must line up with the picture — the phone's
+ * review pins and taps, its pan/zoom size, the PDF page — takes its frame from
+ * here, with the options the picture was drawn with.
+ */
+export function thumbnailFrameFor(
+  data: { elements?: DiagramElement[]; connectors?: Connector[]; connectorFontSize?: unknown },
+  opts?: ThumbnailOpts,
+): { tx: number; ty: number; w: number; h: number } {
+  const els = data.elements ?? [];
+  if (!opts?.trueColors || els.length === 0) return thumbnailTransform(els);
+  const boxes: { x: number; y: number; width: number; height: number }[] = els.map((e) => ({ x: e.x, y: e.y, width: e.width, height: e.height }));
+  const fs = connectorLabelFontSize(data);
+  for (const c of data.connectors ?? []) {
+    if (Array.isArray(c.waypoints)) {
+      for (const p of visibleWaypoints(c)) {
+        if (Number.isFinite(p?.x) && Number.isFinite(p?.y)) boxes.push({ x: p.x, y: p.y, width: 0, height: 0 });
+      }
+    }
+    if (opts.fullLabels && connectorShowsLabel(c) && (c.label ?? "").trim()) {
+      const b = connectorLabelBox(c, els, fs);
+      if (b) boxes.push({ x: b.x, y: b.y, width: b.w, height: b.h });
+    }
+  }
+  return thumbnailTransform(boxes);
+}
+
+export function renderTemplateThumbnailSvg(data: TemplateData, opts?: ThumbnailOpts): string {
+  const all = data.elements ?? [];
+  if (all.length === 0) return "";
+  // Framed on everything it was given (thumbnailFrameFor), so an overlay using
+  // the same frame (the phone's review pins) lines up.
+  const { tx, ty, w, h } = thumbnailFrameFor(data as never, opts);
+  const flags = data as { showPainPoints?: boolean; showIssues?: boolean; showReviewComments?: boolean };
+  const els = all.filter((e) => !isHiddenOnCanvas(e, flags));
+
+  const fontData = data as { poolFontSize?: unknown; laneFontSize?: unknown; fontSize?: unknown; connectorFontSize?: unknown };
+  const num = (v: unknown, dflt: number) => (typeof v === "number" && v > 0 ? v : dflt);
   const ctx: RenderCtx = {
     fonts: {
-      pool: typeof fontData.poolFontSize === "number" && fontData.poolFontSize > 0 ? fontData.poolFontSize : 16,
-      lane: typeof fontData.laneFontSize === "number" && fontData.laneFontSize > 0 ? fontData.laneFontSize : 14,
+      pool: num(fontData.poolFontSize, 16),
+      lane: num(fontData.laneFontSize, 14),
+      element: num(fontData.fontSize, 12),
     },
     sublanes: sublaneIdsOf(els),
     laneDepth: laneDepths(els),
   };
-  const back = containers.map((e) => shapeFor(e, tx, ty, opts, ctx)).join("");
-  const conns = (data.connectors ?? []).map((c) => connFor(c, els, tx, ty, opts)).join("");
-  const front = els.filter((e) => !isContainer(e)).map((e) => shapeFor(e, tx, ty, opts)).join("");
+  const order = paintOrder(els, ctx);
+  const shapes = (from: number, to: number) =>
+    order.filter((o) => o.layer >= from && o.layer <= to).map((o) => shapeFor(o.el, tx, ty, opts, ctx)).join("");
 
+  const conns = data.connectors ?? [];
+  const onTop = (c: Connector) => c.type === "messageBPMN" || c.type === "associationBPMN";
+  const isLink = (c: Connector) => c.type === "review-comment-link";
+  // A note's tether hides with the notes, as on the canvas.
+  const linksShown = flags.showReviewComments !== false;
+  let draw: (c: Connector) => string;
+  let defs: string;
+  if (opts?.trueColors) {
+    const k: ConnCtx = {
+      tx, ty, els: all,
+      byId: new Map(all.map((e) => [e.id, e] as const)),
+      humps: humpOthersById(conns),
+      markers: new Map(),
+      labelFs: connectorLabelFontSize(fontData),
+      full: !!opts.fullLabels,
+    };
+    draw = (c) => connTrue(c, k);
+    defs = ""; // filled below, once every connector has asked for its markers
+    const body = shapes(0, LAST_BACK_LAYER)
+      + conns.filter((c) => !onTop(c) && !isLink(c)).map(draw).join("")
+      + shapes(LAST_BACK_LAYER + 1, FIRST_TOP_LAYER - 1)
+      + conns.filter(onTop).map(draw).join("")
+      + (linksShown ? conns.filter(isLink).map(draw).join("") : "")
+      + shapes(FIRST_TOP_LAYER, Infinity);
+    defs = [...k.markers.values()].join("");
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w.toFixed(0)} ${h.toFixed(0)}" preserveAspectRatio="xMidYMid meet">`
+      + `<defs>${defs}</defs>`
+      + body
+      + `</svg>`;
+  }
+  // The compact template preview keeps its own simple connectors (in step with
+  // TemplateThumbnail.tsx's live fallback); it takes the canvas's layers.
+  draw = (c) => connFor(c, els, tx, ty, opts);
+  const body = shapes(0, LAST_BACK_LAYER)
+    + conns.filter((c) => !onTop(c) && !isLink(c)).map(draw).join("")
+    + shapes(LAST_BACK_LAYER + 1, FIRST_TOP_LAYER - 1)
+    + conns.filter(onTop).map(draw).join("")
+    + (linksShown ? conns.filter(isLink).map(draw).join("") : "")
+    + shapes(FIRST_TOP_LAYER, Infinity);
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w.toFixed(0)} ${h.toFixed(0)}" preserveAspectRatio="xMidYMid meet">`
     + `<defs>`
     + `<marker id="tmarr" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#475569"/></marker>`
     + `<marker id="tmopen" markerWidth="8" markerHeight="8" refX="6.5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" fill="none" stroke="#475569" stroke-width="1"/></marker>`
     + `<marker id="tmcirc" markerWidth="7" markerHeight="7" refX="3.2" refY="3" orient="auto"><circle cx="3" cy="3" r="2" fill="#ffffff" stroke="#475569" stroke-width="1"/></marker>`
     + `</defs>`
-    + back + conns + front
+    + body
     + `</svg>`;
 }

@@ -22,8 +22,8 @@
  * they should know that — which is why `diagram.bpmn` ships alongside it.
  */
 import type { DiagramData } from "@/app/lib/diagram/types";
-import { renderTemplateThumbnailSvg, thumbnailTransform, THUMBNAIL_PAD } from "@/app/lib/diagram/templateThumbnail";
-import { healPoolHeaderWidths } from "@/app/lib/diagram/containerMetrics";
+import { renderTemplateThumbnailSvg, thumbnailFrameFor, THUMBNAIL_PAD } from "@/app/lib/diagram/templateThumbnail";
+import { healOnLoad } from "@/app/lib/diagram/healOnLoad";
 
 /** Matches the fonts installed in the Docker runner stage. */
 const FONT_STACK = "Liberation Sans, Noto Sans, DejaVu Sans, Arial, sans-serif";
@@ -33,17 +33,19 @@ export class NothingToRenderError extends Error {
 }
 
 export function renderDiagramSvg(stored: DiagramData): string {
-  // The pools as the desktop draws them: a multi-line name gets the header width
-  // it needs (the editor applies the same heal on open).
-  const data = healPoolHeaderWidths(stored);
+  // As the editor opens it (healOnLoad): a multi-line pool name gets the header
+  // width it needs, and a message label that was never placed is placed.
+  const data = healOnLoad(stored);
   const els = data.elements ?? [];
   if (els.length === 0) throw new NothingToRenderError();
 
-  const body = renderTemplateThumbnailSvg(data, { trueColors: true, fullLabels: true });
+  const OPTS = { trueColors: true, fullLabels: true } as const;
+  const body = renderTemplateThumbnailSvg(data, OPTS);
   // The renderer returns "" for an empty diagram; never hand that to soffice.
   if (!body.trim()) throw new NothingToRenderError();
 
-  const { w, h } = thumbnailTransform(els);
+  // The page is the picture's own frame (routes and labels included).
+  const { w, h } = thumbnailFrameFor(data, OPTS);
   const width = Math.max(1, Math.round(w));
   const height = Math.max(1, Math.round(h));
 

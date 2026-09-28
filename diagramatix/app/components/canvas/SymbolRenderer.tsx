@@ -3,6 +3,7 @@
 import { useState, createContext, useContext, useRef, useEffect, useLayoutEffect, memo } from "react";
 import { canvasMemoEqual } from "./memoEqual";
 import type { BpmnTaskType, GatewayType, EventType, DiagramElement, Point, Side, SymbolType } from "@/app/lib/diagram/types";
+import { compositeRegions } from "@/app/lib/diagram/compositeRegions";
 import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
 // Every colour a shape is painted with comes from here, shared with the
 // Project-screen tile picture (diagramThumbnail.ts) so the two cannot drift.
@@ -784,19 +785,9 @@ function SystemBoundaryShape({ el }: { el: DiagramElement }) {
   );
 }
 
-/** Region dividers of a composite state: the fractional (0–1) positions along
- *  the split axis of each of the (regionCount − 1) dashed boundaries. Even
- *  spacing when none are stored. Exported so the canvas drag handles + the
- *  region-membership checks share one definition. */
-export function compositeRegions(el: DiagramElement): { count: number; orientation: "horizontal" | "vertical"; fracs: number[] } {
-  const count = Math.max(1, Math.min(5, Math.round(Number(el.properties?.regionCount) || 1)));
-  const orientation = (el.properties?.regionOrientation as string) === "vertical" ? "vertical" : "horizontal";
-  const stored = el.properties?.regionDividers;
-  const fracs = Array.isArray(stored) && stored.length === count - 1
-    ? (stored as number[]).map((f) => Math.max(0.05, Math.min(0.95, Number(f))))
-    : Array.from({ length: count - 1 }, (_, i) => (i + 1) / count);
-  return { count, orientation, fracs };
-}
+// Region dividers of a composite state — pure, in app/lib/diagram/compositeRegions.ts
+// (shared with the phone viewer); re-exported for the canvas.
+export { compositeRegions };
 
 function CompositeStateShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);

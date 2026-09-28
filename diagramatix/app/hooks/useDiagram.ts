@@ -44,6 +44,7 @@ import { retypeTasksForSystemFlag, applyTaskTypeChanges } from "@/app/lib/diagra
 import { emieMountProps } from "@/app/lib/diagram/emieLabel";
 import { BOUNDARY_HOST_TYPES } from "@/app/lib/diagram/boundaryHosts";
 import { settleMessageLabels, movedElementIds, placeMessageLabel, messageLabelSide, healMessageLabels, followMessageLabel } from "@/app/lib/diagram/messageLabel";
+import { healOnLoad } from "@/app/lib/diagram/healOnLoad";
 import { growPoolToAdopt } from "@/app/lib/diagram/growPool";
 import { planWrapInPool } from "@/app/lib/diagram/wrapInPoolPlan";
 import { planMovePool, planSwapPools, type PoolPosition } from "@/app/lib/diagram/poolOrder";
@@ -10282,11 +10283,10 @@ export function connectorLabelPayload(
   };
 }
 
-/** Load heals, once per open: pool header strips too narrow for their name
- *  (B32), then message labels that were never placed (messageLabel.ts). Each
- *  returns the same diagram when it has nothing to do. The headless diagram
- *  opens with it too, so L4 scores the diagram the editor shows. */
-export const healOnLoad = (d: DiagramData): DiagramData => healMessageLabels(healPoolHeaderWidths(d));
+// healOnLoad — the heals a diagram gets once, when it is opened — lives in
+// app/lib/diagram/healOnLoad.ts (pure), shared with the phone viewer and the
+// partner PDF; re-exported for the editor, the headless diagram and the tests.
+export { healOnLoad };
 
 export function useDiagram(initialData: DiagramData) {
   // Heal stale/too-narrow pool header strips once on load so old diagrams stop

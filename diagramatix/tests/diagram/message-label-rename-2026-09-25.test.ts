@@ -272,8 +272,11 @@ describe("T4828 — a label that was never placed is placed when the diagram ope
   });
 
   it("the editor runs the heal on load, after the pool-header heal", () => {
+    // Changed 2026-09-28: healOnLoad moved to app/lib/diagram/healOnLoad.ts (pure,
+    // shared with the phone viewer and the partner PDF); the hook re-exports it.
     const hook = src("app", "hooks", "useDiagram.ts");
-    expect(hook).toContain("healMessageLabels(healPoolHeaderWidths(d))");
+    expect(src("app", "lib", "diagram", "healOnLoad.ts")).toContain("healMessageLabels(healPoolHeaderWidths(d))");
+    expect(hook).toContain("export { healOnLoad };");
     expect(hook).toContain("useReducer(reducer, initialData, healOnLoad)");
   });
 });

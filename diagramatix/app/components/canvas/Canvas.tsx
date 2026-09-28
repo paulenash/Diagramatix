@@ -37,6 +37,8 @@ import { messageLabelsHiddenWhileDragging } from "@/app/lib/diagram/labelVisibil
 import { movedBandIds, movedBands, planLaneDrop, previewBands, samePlan, type LaneDropPlan } from "@/app/lib/diagram/laneDropPlan";
 import { getLaneHeaderWidth, getPoolHeaderWidth } from "@/app/lib/diagram/containerMetrics";
 import { sublaneIdsOf, laneDepths, sameTypeAncestorDepths, archimateDescendantDepths } from "@/app/lib/diagram/nestingDepth";
+import { isBranchLabelSuppressed, isHumpType } from "@/app/lib/diagram/connectorPath";
+import { visibleWaypoints as visibleWaypointsOf } from "@/app/lib/diagram/canvasPaint";
 import { poolGuideNext, type PoolBoundaryGuide, type PoolGuideEvent } from "@/app/lib/diagram/poolGuide";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { canConnect } from "@/app/lib/diagram/canConnect";
@@ -4761,9 +4763,8 @@ export function Canvas({
     const gwMarker = new Map<string, string>();
     for (const e of data.elements) if (e.type === "gateway") gwMarker.set(e.id, e.gatewayType ?? "exclusive");
     for (const c of data.connectors) {
-      if (c.labelAnchor !== "source") continue;
-      const m = gwMarker.get(c.sourceId);
-      if (m === "parallel" || m === "event-based") hiddenLabelConnIds.add(c.id);
+      // The rule is connectorPath.isBranchLabelSuppressed (shared with the phone viewer).
+      if (isBranchLabelSuppressed(c, gwMarker.get(c.sourceId))) hiddenLabelConnIds.add(c.id);
     }
     // Paul: "Hide the message labels when moving a Pool across another Pool or
     // group of pool-less elements until they are finally placed correctly."
@@ -5033,13 +5034,13 @@ export function Canvas({
   // version; this hoists it so the refs are stable.)
   const { regularConns, humpVisibleWps, humpIndexById } = useMemo(() => {
     const rc = data.connectors.filter(c => c.type !== "associationBPMN" && c.type !== "messageBPMN" && c.type !== "review-comment-link" && !(c.type.startsWith("archi-") || diagramType === "archimate"));
-    const he = rc.filter(c => c.type === "sequence" || c.type === "association" || c.type === "uml-association");
+    // Who jumps over whom is connectorPath.isHumpType (shared with the phone
+    // viewer and the partner PDF): each jumps over the earlier ones.
+    const he = rc.filter(c => isHumpType(c.type));
     const idx = new Map<string, number>();
     const wps = he.map((c, i) => {
       idx.set(c.id, i);
-      const vs = c.sourceInvisibleLeader ? 1 : 0;
-      const ve = c.targetInvisibleLeader ? c.waypoints.length - 2 : c.waypoints.length - 1;
-      return c.waypoints.slice(vs, ve + 1);
+      return visibleWaypointsOf(c);
     });
     return { regularConns: rc, humpVisibleWps: wps, humpIndexById: idx };
   }, [data.connectors, diagramType]);
@@ -5790,7 +5791,7 @@ export function Canvas({
                   : undefined}
                 onUpdateCurveHandles={onUpdateCurveHandles}
                 otherConnectorWaypoints={
-                  (conn.type === "sequence" || conn.type === "association" || conn.type === "uml-association")
+                  isHumpType(conn.type)
                     ? humpVisibleWps.slice(0, humpIndexById.get(conn.id) ?? 0)
                     : undefined
                 }
@@ -6493,7 +6494,7 @@ export function Canvas({
           {selectedConnectorId && (() => {
             const conn = data.connectors.find(c => c.id === selectedConnectorId && c.type !== "associationBPMN" && c.type !== "messageBPMN" && !(c.type.startsWith("archi-") || diagramType === "archimate"));
             if (!conn) return null;
-            const allHumpConns = data.connectors.filter(c => c.type === "sequence" || c.type === "association" || c.type === "uml-association");
+            const allHumpConns = data.connectors.filter(c => isHumpType(c.type));
             const connIdx = allHumpConns.findIndex(c => c.id === conn.id);
             // Only hump over connectors added before this one
             const priorHumpConns = allHumpConns.slice(0, connIdx);
@@ -6514,12 +6515,8 @@ export function Canvas({
                   : undefined}
                 onUpdateCurveHandles={onUpdateCurveHandles}
                 otherConnectorWaypoints={
-                  (conn.type === "sequence" || conn.type === "association" || conn.type === "uml-association") && priorHumpConns.length > 0
-                    ? priorHumpConns.map(c => {
-                        const vs = c.sourceInvisibleLeader ? 1 : 0;
-                        const ve = c.targetInvisibleLeader ? c.waypoints.length - 2 : c.waypoints.length - 1;
-                        return c.waypoints.slice(vs, ve + 1);
-                      })
+                  isHumpType(conn.type) && priorHumpConns.length > 0
+                    ? priorHumpConns.map(c => visibleWaypointsOf(c))
                     : undefined
                 }
                 debugMode={debugMode}

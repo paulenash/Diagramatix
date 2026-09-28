@@ -58,7 +58,10 @@ export const THUMB_MIN_STROKE_ZOOM = 1 / 3;
 const DATA_ARTIFACTS = new Set(["data-object", "data-store", "text-annotation"]);
 const CONTAINERS = new Set(["system-boundary", "composite-state", "process-group", "uml-package"]);
 
-function isHidden(el: DiagramElement, data: DiagramData): boolean {
+/** Elements the canvas never draws: a return-link subprocess, and pain points,
+ *  issues and review notes while their layer is switched off. Shared with the
+ *  phone viewer / partner PDF (templateThumbnail.ts). */
+export function isHiddenOnCanvas(el: DiagramElement, data: Pick<DiagramData, "showPainPoints" | "showIssues" | "showReviewComments">): boolean {
   if (el.type === "subprocess" && el.properties?.isReturnLink) return true; // never drawn on the canvas
   if (el.type === "uml-pain-point" && data.showPainPoints === false) return true;
   if (el.type === "uml-issue" && data.showIssues === false) return true;
@@ -98,7 +101,7 @@ export function buildDiagramThumbnail(
   if (!data || typeof data !== "object" || Array.isArray(data)) return null;
   const d = data as DiagramData;
   const all = Array.isArray(d.elements) ? d.elements : [];
-  const els = all.filter((el) => el && typeof el.x === "number" && !isHidden(el, d));
+  const els = all.filter((el) => el && typeof el.x === "number" && !isHiddenOnCanvas(el, d));
   if (!els.length) return null;
 
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;

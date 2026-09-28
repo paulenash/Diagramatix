@@ -8,11 +8,13 @@ import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { MobileDiagramView } from "@/app/components/mobile/MobileDiagramView";
 import { MobileReviewLayer } from "@/app/components/mobile/MobileReviewLayer";
 import { MobileCommentSheet } from "@/app/components/mobile/MobileCommentSheet";
-import { thumbnailTransform } from "@/app/lib/diagram/templateThumbnail";
+import { thumbnailFrameFor } from "@/app/lib/diagram/templateThumbnail";
+import { isHiddenOnCanvas } from "@/app/lib/diagram/diagramThumbnail";
 import { buildReviewComment } from "@/app/lib/diagram/reviewComment";
 import { collapseAllReviewComments } from "@/app/lib/diagram/reviewCollapse";
 import { isMobileSupportedType, MOBILE_SUPPORTED_LABEL } from "@/app/lib/diagram/mobileSupport";
-import { healPoolHeaderWidths } from "@/app/lib/diagram/containerMetrics";
+import { healOnLoad } from "@/app/lib/diagram/healOnLoad";
+import { effectiveSymbolColors } from "@/app/lib/diagram/colors";
 import { MobileGenerateSheet } from "@/app/components/mobile/MobileGenerateSheet";
 import { useAiAllowed } from "@/app/lib/auth/useAiAllowed";
 import { EMPTY_DRAFT, draftFromFailedJob, draftToRequest, type GenerateDraft } from "@/app/lib/mobile/generateDraft";
@@ -97,14 +99,17 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
       const next: Loaded = {
         name: j.name,
         type: j.type ?? "",
-        // As the desktop opens it (healOnLoad): a pool's header as wide as its name needs.
-        data: healPoolHeaderWidths((j.data ?? { elements: [], connectors: [] }) as DiagramData),
+        // As the editor opens it (healOnLoad): a pool's header as wide as its name
+        // needs, and any message label that was never placed, placed.
+        data: healOnLoad((j.data ?? { elements: [], connectors: [] }) as DiagramData),
         projectId: j.projectId ?? null,
         version: j.version ?? 0,
         canReview: !!j.canReview,
         canEdit: !!j.canEdit,
         viewer: j.viewer ?? { id: "", name: "" },
-        colorConfig: j.colorConfig ?? undefined,
+        // The colours the editor paints with: the project's scheme under the
+        // diagram's own, or black and white in hand-drawn mode.
+        colorConfig: effectiveSymbolColors(j.projectColorConfig, j.colorConfig, j.displayMode),
       };
       if (seq === loadSeq.current) { setD(next); setErr(null); }
       return next;
@@ -273,7 +278,8 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
         (c) => c.type !== "review-comment-link" && !overlayIds.has(c.sourceId) && !overlayIds.has(c.targetId),
       ),
     };
-    const tr = thumbnailTransform(backdrop.elements as never);
+    // The same frame MobileDiagramView draws the picture in, so pins and taps line up.
+    const tr = thumbnailFrameFor(backdrop as never, { trueColors: true, fullLabels: true });
     return { backdrop, comments, annotations, tx: tr.tx, ty: tr.ty };
   }, [d]);
 
@@ -281,9 +287,10 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
     setPicking(false);
     if (!d) return;
     const dx = svgX - tx, dy = svgY - ty;   // → diagram coordinates
-    // Topmost (last-drawn) non-review element under the point.
+    // Topmost (last-drawn) non-review element under the point — never one the
+    // picture does not show (a pain point with pain points switched off).
     const hit = [...d.data.elements].reverse().find(
-      (e) => e.type !== "review-comment" && dx >= e.x && dx <= e.x + e.width && dy >= e.y && dy <= e.y + e.height,
+      (e) => e.type !== "review-comment" && !isHiddenOnCanvas(e, d.data) && dx >= e.x && dx <= e.x + e.width && dy >= e.y && dy <= e.y + e.height,
     );
     if (hit) setAddTarget(hit);
   }
@@ -295,7 +302,7 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
     if (!d) return;
     const dx = svgX - tx, dy = svgY - ty;
     const hit = [...d.data.elements].reverse().find(
-      (e) => e.type !== "review-comment" && e.type !== "text-annotation" && dx >= e.x && dx <= e.x + e.width && dy >= e.y && dy <= e.y + e.height,
+      (e) => e.type !== "review-comment" && e.type !== "text-annotation" && !isHiddenOnCanvas(e, d.data) && dx >= e.x && dx <= e.x + e.width && dy >= e.y && dy <= e.y + e.height,
     );
     if (!hit) return;
     const linked = hit.properties?.linkedDiagramId as string | undefined;

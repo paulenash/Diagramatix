@@ -13,7 +13,10 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { layoutBpmnPlan } from "@/app/lib/ai/layoutBpmnPlan";
-import { renderTemplateThumbnailSvg, stripLabelLines, thumbnailTransform } from "@/app/lib/diagram/templateThumbnail";
+import { renderTemplateThumbnailSvg, stripLabelLines, thumbnailFrameFor, thumbnailTransform } from "@/app/lib/diagram/templateThumbnail";
+
+/** The phone / partner render — and the frame it is drawn in (thumbnailFrameFor). */
+const FULL = { trueColors: true, fullLabels: true } as const;
 import { containerHeaderWidth } from "@/app/lib/diagram/containerHeader";
 import { poolPaint, lanePaint } from "@/app/lib/diagram/canvasPaint";
 import type { DiagramData, DiagramElement } from "@/app/lib/diagram/types";
@@ -60,7 +63,7 @@ function stripOf(svg: string, e: DiagramElement, tx: number, ty: number): Rect |
 describe("T5022 — the headers meet: each strip is as wide as the desktop draws it (Paul, 2026-09-28)", () => {
   it("a generated pool's strip ends exactly where its lanes' strips begin — no gap — on the phone render", () => {
     const d = generated();
-    const { tx, ty } = thumbnailTransform(d.elements);
+    const { tx, ty } = thumbnailFrameFor(d, FULL);
     const svg = renderTemplateThumbnailSvg(d, { trueColors: true, fullLabels: true });
     const pool = d.elements.find((e) => e.id === "p1")!;
     const lanes = d.elements.filter((e) => e.type === "lane" && e.parentId === "p1");
@@ -103,7 +106,7 @@ describe("T5023 — a resized header and a sub-lane are honoured", () => {
     ],
     connectors: [],
   } as unknown as DiagramData;
-  const { tx, ty } = thumbnailTransform(d.elements);
+  const { tx, ty } = thumbnailFrameFor(d, FULL);
   const svg = renderTemplateThumbnailSvg(d, { trueColors: true, fullLabels: true });
   const el = (id: string) => d.elements.find((e) => e.id === id)!;
   /** The body drawn for `e`: the rect exactly covering it. */
@@ -174,7 +177,7 @@ describe("T5024 — the names sit inside their strips, as the desktop sets them"
 
   it("a lane name is centred in its 36px strip at the desktop's 14px; a pool name at 16px", () => {
     const d = generated();
-    const { tx } = thumbnailTransform(d.elements);
+    const { tx } = thumbnailFrameFor(d, FULL);
     const svg = renderTemplateThumbnailSvg(d, { trueColors: true, fullLabels: true });
     const lane = d.elements.find((e) => e.id === "l2")!;
     const [w] = baselines(svg, "Warehouse");
@@ -208,7 +211,7 @@ describe("T5025 — the partner PDF (same renderer) gets the same headers", () =
   it("renderDiagramSvg: the desktop's colours, a pool strip flush with its lanes', and the names", async () => {
     const { renderDiagramSvg } = await import("@/app/lib/partner/renderDiagramSvg");
     const d = generated();
-    const { tx, ty } = thumbnailTransform(d.elements);
+    const { tx, ty } = thumbnailFrameFor(d, FULL);
     const svg = renderDiagramSvg(d as never);
     const pool = d.elements.find((e) => e.id === "p1")!;
     const lane = d.elements.find((e) => e.id === "l1")!;
@@ -253,7 +256,7 @@ describe("T5026 — a pool name with lines of its own gets the header the deskto
     const { healPoolHeaderWidths } = await import("@/app/lib/diagram/containerMetrics");
     const healed = healPoolHeaderWidths(stored);
     const pool = healed.elements.find((e) => e.id === "p")!;
-    const { tx, ty } = thumbnailTransform(healed.elements);
+    const { tx, ty } = thumbnailFrameFor(healed, FULL);
     const svg = renderDiagramSvg(stored);
     const strip = stripOf(svg, pool, tx, ty)!;
     expect(strip.w).toBe(pool.properties.poolHeaderWidth);
@@ -269,7 +272,8 @@ describe("T5026 — a pool name with lines of its own gets the header the deskto
   });
 
   it("the phone heals once, where it loads the diagram, so the picture, the pins and the taps agree", () => {
+    // Changed 2026-09-28: the whole of the editor's heal-on-open (healOnLoad), not just the pool part.
     const src = readFileSync("app/m/diagram/[id]/MobileDiagramScreen.tsx", "utf8");
-    expect(src).toContain("data: healPoolHeaderWidths((j.data ?? { elements: [], connectors: [] }) as DiagramData),");
+    expect(src).toContain("data: healOnLoad((j.data ?? { elements: [], connectors: [] }) as DiagramData),");
   });
 });

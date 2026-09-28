@@ -62,10 +62,15 @@ export async function GET(_req: Request, { params }: Params) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const diagram = await prisma.diagram.findUnique({ where: { id } });
-  if (!diagram) {
+  // With the project's colour scheme: the phone paints with the same effective
+  // colours as the editor (effectiveSymbolColors(project, diagram, displayMode)).
+  // An assigned reviewer can read the diagram without project access, so the
+  // scheme comes with the diagram rather than from /api/projects/[id].
+  const found = await prisma.diagram.findUnique({ where: { id }, include: { project: { select: { colorConfig: true } } } });
+  if (!found) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+  const { project, ...diagram } = found as typeof found & { project?: { colorConfig: unknown } | null };
 
   // canReview = may this user PUT `data`? Editors/owners (edit access) OR assigned
   // reviewers (data-only write). Powers the mobile Add-comment / Save affordances.
@@ -83,6 +88,7 @@ export async function GET(_req: Request, { params }: Params) {
   }
   return NextResponse.json({
     ...diagram,
+    projectColorConfig: project?.colorConfig ?? null,
     canReview,
     canEdit,
     viewer: { id: session.user.id, name: session.user.name ?? session.user.email ?? "" },

@@ -8,11 +8,15 @@ import { isUmlConnType } from "@/app/lib/diagram/types";
 import { dedupeHoles } from "@/app/lib/diagram/hitMask";
 import { buildConstraintText } from "@/app/lib/diagram/umlConstraints";
 import { DisplayModeCtx, ConnectorFontScaleCtx, sketchyFilter } from "@/app/lib/diagram/displayMode";
-import { waypointsToSvgPath, waypointsToCurvePath, waypointsToRoundedPath } from "@/app/lib/diagram/routing";
+import { waypointsToSvgPath } from "@/app/lib/diagram/routing";
 import { connectorLabelSize } from "@/app/lib/diagram/textMetrics";
 import { ArchimateConnectorRenderer, isArchimateConnectorType } from "./ArchimateConnectorRenderer";
 import { ShowReviewCommentsCtx } from "./SymbolRenderer";
 import { connectorStroke, connectorDash, visibleWaypoints as visibleWaypointsOf } from "@/app/lib/diagram/canvasPaint";
+import {
+  branchLabelAdrift as isBranchLabelAdrift, branchPercentPlacement, connectorPathD, connectorShowsLabel, flowMarkerShape,
+  labelTetherLine, tetherPointOf,
+} from "@/app/lib/diagram/connectorPath";
 
 interface Props {
   connector: Connector;
@@ -78,110 +82,10 @@ interface Props {
   hideLabel?: boolean;
 }
 
-// Line segment intersection: returns the parameter t along segment (a1→a2) where it crosses (b1→b2), or null
-function segmentIntersection(a1: Point, a2: Point, b1: Point, b2: Point): number | null {
-  const dx = a2.x - a1.x, dy = a2.y - a1.y;
-  const ex = b2.x - b1.x, ey = b2.y - b1.y;
-  const denom = dx * ey - dy * ex;
-  if (Math.abs(denom) < 1e-10) return null; // parallel
-  const t = ((b1.x - a1.x) * ey - (b1.y - a1.y) * ex) / denom;
-  const u = ((b1.x - a1.x) * dy - (b1.y - a1.y) * dx) / denom;
-  if (t > 0.01 && t < 0.99 && u > 0.01 && u < 0.99) return t;
-  return null;
-}
-
-// Build SVG path with small semicircular humps at crossing points
-function pathWithHumps(rawWaypoints: Point[], otherWaypoints: Point[][], humpRadius = 6, cornerRadius = 8): string {
-  if (rawWaypoints.length < 2) return "";
-
-  // Remove collinear intermediate points
-  const waypoints = [rawWaypoints[0]];
-  for (let i = 1; i < rawWaypoints.length - 1; i++) {
-    const prev = waypoints[waypoints.length - 1];
-    const curr = rawWaypoints[i];
-    const next = rawWaypoints[i + 1];
-    if (Math.abs((curr.x - prev.x) * (next.y - curr.y) - (curr.y - prev.y) * (next.x - curr.x)) > 0.5) {
-      waypoints.push(curr);
-    }
-  }
-  waypoints.push(rawWaypoints[rawWaypoints.length - 1]);
-
-  // Collect all crossing t-values per segment
-  const segCrossings: { segIdx: number; t: number }[] = [];
-  for (let i = 0; i < waypoints.length - 1; i++) {
-    const a1 = waypoints[i], a2 = waypoints[i + 1];
-    for (const other of otherWaypoints) {
-      for (let j = 0; j < other.length - 1; j++) {
-        const t = segmentIntersection(a1, a2, other[j], other[j + 1]);
-        if (t !== null) segCrossings.push({ segIdx: i, t });
-      }
-    }
-  }
-
-  if (segCrossings.length === 0) return "";
-
-  // Sort by segment then by t
-  segCrossings.sort((a, b) => a.segIdx - b.segIdx || a.t - b.t);
-
-  const d: string[] = [`M ${waypoints[0].x} ${waypoints[0].y}`];
-
-  // Precompute corner rounding for each interior waypoint
-  const cornerArcs = new Map<number, { ax: number; ay: number; bx: number; by: number }>();
-  for (let i = 1; i < waypoints.length - 1; i++) {
-    const prev = waypoints[i - 1], curr = waypoints[i], next = waypoints[i + 1];
-    const d1x = curr.x - prev.x, d1y = curr.y - prev.y;
-    const d2x = next.x - curr.x, d2y = next.y - curr.y;
-    const len1 = Math.hypot(d1x, d1y), len2 = Math.hypot(d2x, d2y);
-    if (len1 >= 1 && len2 >= 1) {
-      const cr = Math.min(cornerRadius, len1 * 0.45, len2 * 0.45);
-      if (cr >= 1) {
-        cornerArcs.set(i, {
-          ax: curr.x - (d1x / len1) * cr, ay: curr.y - (d1y / len1) * cr,
-          bx: curr.x + (d2x / len2) * cr, by: curr.y + (d2y / len2) * cr,
-        });
-      }
-    }
-  }
-
-  for (let i = 0; i < waypoints.length - 1; i++) {
-    const curr = waypoints[i];
-    const next = waypoints[i + 1];
-
-    // Approach point for corner at end of this segment (if any)
-    const endCorner = cornerArcs.get(i + 1);
-    // The effective end of this segment is the approach point of the next corner, or next waypoint
-    const segEnd = endCorner ? { x: endCorner.ax, y: endCorner.ay } : next;
-
-    // Crossing humps on this segment (use original curr→next for t-value calculation)
-    const crossings = segCrossings.filter((c) => c.segIdx === i);
-    if (crossings.length > 0) {
-      const segDx = next.x - curr.x, segDy = next.y - curr.y;
-      const segLen = Math.hypot(segDx, segDy);
-      if (segLen >= 1) {
-        const ux = segDx / segLen, uy = segDy / segLen;
-        for (const cross of crossings) {
-          const cx = curr.x + segDx * cross.t;
-          const cy = curr.y + segDy * cross.t;
-          const r = Math.min(humpRadius, segLen * cross.t * 0.4, segLen * (1 - cross.t) * 0.4);
-          if (r < 1) continue;
-          d.push(`L ${cx - ux * r} ${cy - uy * r}`);
-          d.push(`A ${r} ${r} 0 0 1 ${cx + ux * r} ${cy + uy * r}`);
-        }
-      }
-    }
-
-    // Draw to effective end of segment
-    d.push(`L ${segEnd.x} ${segEnd.y}`);
-
-    // Corner arc at the end of this segment
-    if (endCorner) {
-      d.push(`Q ${next.x} ${next.y} ${endCorner.bx} ${endCorner.by}`);
-    }
-  }
-
-  return d.join(" ");
-}
-
+// The line itself — segment intersection, humps, rounded corners, the curve,
+// the source-end decorations and the label tether — is drawn by the pure
+// functions in app/lib/diagram/connectorPath.ts (shared with the phone viewer
+// and the partner PDF, 2026-09-28).
 
 function wrapText(text: string, maxWidth: number, fontSize = 10): string[] {
   const avgCharWidth = fontSize * 0.6;
@@ -518,8 +422,7 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
    * diamond edge and any other branch all meet there.
    */
   if (sourceType === "gateway" && visibleWaypoints.length >= 2) {
-    const a = visibleWaypoints[0], b = visibleWaypoints[1];
-    tetherPoint = { x: a.x + (b.x - a.x) / 3, y: a.y + (b.y - a.y) / 3 };
+    tetherPoint = tetherPointOf(visibleWaypoints) ?? tetherPoint;
   }
 
   const hasLabel = label.trim().length > 0;
@@ -533,22 +436,19 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
    * is meant. A label still touching its line needs no tether — the box test
    * below is what keeps the extra ink to the cases that earn it.
    */
-  const branchLabelAdrift = (() => {
-    if (!hasLabel || sourceType !== "gateway") return false;
-    // Paul, 2026-09-21: a generated diagram, and a connector made by a
-    // group-selection connect, show the tether ALWAYS — nobody has placed
-    // those labels by hand, so the leader is what explains them. And once the
-    // user MOVES a label the tether is gone permanently: they have said where
-    // it belongs, and a leader pointing at a decision they already made is
-    // clutter. `never` beats `always`, which is the common case — a generated
-    // connector that was then tidied by hand.
-    const stored = connector.labelTether;
-    if (stored === "never") return false;
-    if (stored === "always") return true;
-    const padX = effectiveLWidth / 2 + 6;
-    const padY = lHeight / 2 + 6;
-    return Math.abs(tetherPoint.x - lCx) > padX || Math.abs(tetherPoint.y - lMidY) > padY;
-  })();
+  // Paul, 2026-09-21: a generated diagram, and a connector made by a
+  // group-selection connect, show the tether ALWAYS — nobody has placed
+  // those labels by hand, so the leader is what explains them. And once the
+  // user MOVES a label the tether is gone permanently: they have said where
+  // it belongs, and a leader pointing at a decision they already made is
+  // clutter. `never` beats `always`, which is the common case — a generated
+  // connector that was then tidied by hand.
+  // The rule: connectorPath.branchLabelAdrift (→ labelTether.showLabelTether),
+  // shared with the phone viewer and the partner PDF.
+  const branchLabelAdrift = isBranchLabelAdrift({
+    hasLabel, sourceIsGateway: sourceType === "gateway", mode: connector.labelTether,
+    tetherPoint, lCx, lMidY, lWidth: effectiveLWidth, lHeight,
+  });
 
   // Show the (empty) label box when the connector is SELECTED so the user
   // can see where to click to add a label (item 4).
@@ -651,25 +551,7 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
         // text rather than the padding. The layout width is untouched: it is
         // what the collision rules reason about, and shrinking it there would
         // let labels sit closer than they may.
-        const inkW = Math.max(...lines.map(l => l.length * avgCharWidth));
-        const boxL = lCx - inkW / 2;
-        const boxR = lCx + inkW / 2;
-        const boxT = lTy;
-        const boxB = lTy + lHeight;
-        const boxCx = (boxL + boxR) / 2;
-        const boxCy = (boxT + boxB) / 2;
-        const dx = tetherPoint.x - boxCx;
-        const dy = tetherPoint.y - boxCy;
-        let tx = lCx, ty = lMidY;
-        if (Math.abs(dx) > 0.01 || Math.abs(dy) > 0.01) {
-          const halfW = (boxR - boxL) / 2;
-          const halfH = (boxB - boxT) / 2;
-          const scaleX = Math.abs(dx) > 0 ? halfW / Math.abs(dx) : Infinity;
-          const scaleY = Math.abs(dy) > 0 ? halfH / Math.abs(dy) : Infinity;
-          const s = Math.min(scaleX, scaleY);
-          tx = boxCx + dx * s;
-          ty = boxCy + dy * s;
-        }
+        const { x2: tx, y2: ty } = labelTetherLine(tetherPoint, lines, fontSize, lCx, lTy, lHeight);
         return (
           <line
             x1={tetherPoint.x} y1={tetherPoint.y} x2={tx} y2={ty}
@@ -979,77 +861,35 @@ function ConnectorRendererInner({ connector, selected, onSelect, svgToWorld, onU
   const visEnd = connector.targetInvisibleLeader ? waypoints.length - 2 : waypoints.length - 1;
   const visibleWaypoints = visibleWaypointsOf(connector);
 
-  const visibleD = (() => {
-    if ((connector.type === "transition" || connector.type === "flow") && connector.routingType === "curvilinear"
-        && visibleWaypoints.length === 4) {
-      const [P0, P1, P2, P3] = visibleWaypoints;
-      const STUB = 4;
-      // Stub directions derived from control points (perpendicular for rects, radial for circles)
-      const srcDir = { x: P1.x - P0.x, y: P1.y - P0.y };
-      const srcLen = Math.sqrt(srcDir.x ** 2 + srcDir.y ** 2) || 1;
-      const s1 = { x: P0.x + (srcDir.x / srcLen) * STUB, y: P0.y + (srcDir.y / srcLen) * STUB };
-      const tgtDir = { x: P2.x - P3.x, y: P2.y - P3.y };
-      const tgtLen = Math.sqrt(tgtDir.x ** 2 + tgtDir.y ** 2) || 1;
-      const s2 = { x: P3.x + (tgtDir.x / tgtLen) * STUB, y: P3.y + (tgtDir.y / tgtLen) * STUB };
-      // Path: source edge → stub → curve → stub → target edge
-      // Arrowhead on last segment (s2→P3) aligns perpendicular to element edge
-      return `M ${P0.x} ${P0.y} L ${s1.x} ${s1.y} C ${P1.x} ${P1.y}, ${P2.x} ${P2.y}, ${s2.x} ${s2.y} L ${P3.x} ${P3.y}`;
-    }
-    // Crossing humps for sequence and association connectors
-    if (otherConnectorWaypoints && otherConnectorWaypoints.length > 0
-        && (connector.type === "sequence" || connector.type === "flowline" || connector.type === "association" || connector.type === "uml-association")
-        && (connector.routingType === "rectilinear" || connector.routingType === "direct")) {
-      const humpPath = pathWithHumps(visibleWaypoints, otherConnectorWaypoints);
-      if (humpPath) return humpPath;
-    }
-    if (connector.routingType === "curvilinear") return waypointsToCurvePath(visibleWaypoints);
-    if (connector.routingType === "rectilinear") return waypointsToRoundedPath(visibleWaypoints);
-    return waypointsToSvgPath(visibleWaypoints);
-  })();
+  // Curve, rounded corners, crossing humps: connectorPath.ts (one copy, shared
+  // with the phone viewer and the partner PDF).
+  const visibleD = connectorPathD(connector, visibleWaypoints, otherConnectorWaypoints);
 
   const fullD = waypointsToSvgPath(waypoints);
 
   // BPMN sequence-flow source-end decorations: a slash for the DEFAULT flow, and a
   // small hollow diamond for a CONDITIONAL flow leaving an activity (never a gateway).
   const flowMarker = (() => {
-    if (connector.type !== "sequence" || visibleWaypoints.length < 2) return null;
-    const isDefault = connector.isDefaultFlow === true;
-    const isConditional = !isDefault && !!connector.branchCondition?.trim()
-      && sourceType !== "gateway" && sourceType !== "fork-join";
-    if (!isDefault && !isConditional) return null;
-    const p0 = visibleWaypoints[0], p1 = visibleWaypoints[1];
-    const len = Math.hypot(p1.x - p0.x, p1.y - p0.y) || 1;
-    const ux = (p1.x - p0.x) / len, uy = (p1.y - p0.y) / len; // along the flow
-    const px = -uy, py = ux;                                   // perpendicular
-    const mx = p0.x + ux * 14, my = p0.y + uy * 14;            // 14px from the source
-    if (isDefault) {
-      const s = 5, ax = (ux + px) * s, ay = (uy + py) * s;
-      return <line x1={mx - ax} y1={my - ay} x2={mx + ax} y2={my + ay} stroke="#374151" strokeWidth={1.5} strokeLinecap="round" />;
+    const m = flowMarkerShape(connector, visibleWaypoints, sourceType);
+    if (!m) return null;
+    if (m.kind === "slash") {
+      return <line x1={m.x1} y1={m.y1} x2={m.x2} y2={m.y2} stroke="#374151" strokeWidth={1.5} strokeLinecap="round" />;
     }
-    const r = 5;
-    const pts = `${mx + ux * r},${my + uy * r} ${mx + px * r},${my + py * r} ${mx - ux * r},${my - uy * r} ${mx - px * r},${my - py * r}`;
-    return <polygon points={pts} fill="white" stroke="#374151" strokeWidth={1.2} />;
+    return <polygon points={m.points} fill="white" stroke="#374151" strokeWidth={1.2} />;
   })();
 
   // Documented branch share on a gateway's outgoing edge — drawn just past the
   // source-end marker so it reads as "this much of the flow goes this way".
   // Offset perpendicular to the line so it never sits on top of the path.
   const branchPercentLabel = (() => {
-    const pct = connector.branchPercent;
-    if (pct === undefined || connector.type !== "sequence" || visibleWaypoints.length < 2) return null;
-    const p0 = visibleWaypoints[0], p1 = visibleWaypoints[1];
-    const len = Math.hypot(p1.x - p0.x, p1.y - p0.y) || 1;
-    const ux = (p1.x - p0.x) / len, uy = (p1.y - p0.y) / len;
-    const px = -uy, py = ux;
-    const along = Math.min(26, len * 0.45);
-    const x = p0.x + ux * along + px * 8;
-    const y = p0.y + uy * along + py * 8;
+    const p = branchPercentPlacement(connector, visibleWaypoints);
+    if (!p) return null;
     return (
       <text
-        x={x} y={y} textAnchor="middle" dominantBaseline="middle"
+        x={p.x} y={p.y} textAnchor="middle" dominantBaseline="middle"
         fontSize={9} fill="#6b7280" style={{ pointerEvents: "none", userSelect: "none" }}
       >
-        {Number.isInteger(pct) ? pct : pct.toFixed(1)}%
+        {p.text}
       </text>
     );
   })();
@@ -1391,10 +1231,7 @@ function ConnectorRendererInner({ connector, selected, onSelect, svgToWorld, onU
 
       {/* Floating connector label. uml-dependency uses it for its «stereotype»
           label (on top of the line, movable via labelOffsetX/Y). */}
-      {(connector.type === "transition" || connector.type === "flow" || connector.type === "messageBPMN"
-        || connector.type === "flowline"
-        || (connector.type === "uml-dependency" && !!connector.label)
-        || (connector.type === "sequence" && connector.label !== undefined)) && (
+      {connectorShowsLabel(connector) && (
         <InteractionLabel
           editRequest={labelEditRequest}
           connector={connector}
