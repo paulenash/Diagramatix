@@ -515,6 +515,10 @@ model DiagramGenerateJob {
   stage        String    @default("queued")
   /// What was sent, so a failed run can be tried again from the phone.
   promptText   String    @db.Text
+  /// The photo it was generated from (AiSourceImage.id), when it was — so a failed or
+  /// reloaded run is tried again without sending the photo again. Plain field, no FK
+  /// (eraseUser deletes images with raw SQL; a dangling id reads as "photo gone").
+  sourceImageId String?
   model        String?
   errorCode    String?
   /// Curated for the user — never a raw exception string.

@@ -17,7 +17,25 @@ import { healOnLoad } from "@/app/lib/diagram/healOnLoad";
 import { effectiveSymbolColors } from "@/app/lib/diagram/colors";
 import { MobileGenerateSheet } from "@/app/components/mobile/MobileGenerateSheet";
 import { useAiAllowed } from "@/app/lib/auth/useAiAllowed";
-import { EMPTY_DRAFT, draftFromFailedJob, draftToRequest, type GenerateDraft } from "@/app/lib/mobile/generateDraft";
+import {
+  EMPTY_DRAFT, draftFromFailedJob, draftToRequest, draftWordsForStorage, draftWordsFromStorage, photoToUpload,
+  withRestoredPhoto, type GenerateDraft,
+} from "@/app/lib/mobile/generateDraft";
+
+/**
+ * A failed run's words — and its photo — put back. A photo run wins over words
+ * kept for the camera (they are its own words, from before it started); a
+ * draft already holding a photo is left alone.
+ */
+function restoreFailedRun(cur: GenerateDraft, job: { promptText: string; sourceImageId: string | null }): GenerateDraft {
+  if (cur.photo) return cur;
+  const back = withRestoredPhoto(draftFromFailedJob(job.promptText), job);
+  if (back.photo) return back;
+  return cur.prompt ? cur : back;
+}
+import { draftStorageKey, photoFromFile } from "@/app/lib/mobile/pickPhoto";
+import { sourceImageUrl, uploadSourceImageBlob } from "@/app/lib/ai/sourceImage";
+import { MobilePhotoViewer } from "@/app/components/mobile/MobilePhotoViewer";
 import type { GenerateJobView } from "@/app/lib/ai/generateJob";
 
 interface Loaded {
@@ -150,7 +168,7 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
           setGen({ phase: "running", jobId: job.jobId, stage: job.stage, since: Date.now() - (job.elapsedMs ?? 0) });
         } else if (job.status === "failed" && job.finishedAt && Date.now() - Date.parse(job.finishedAt) < RECENT_FAILURE_MS) {
           setGen({ phase: "failed", message: job.error?.message ?? "The last generation failed." });
-          setDraftState((cur) => (cur.prompt ? cur : draftFromFailedJob(job.promptText)));
+          setDraftState((cur) => restoreFailedRun(cur, job));
         }
       })
       .catch(() => { /* nothing to resume */ });
@@ -182,6 +200,7 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
             if (stopped) return;
             setGen({ phase: "idle" });
             setDraftState(EMPTY_DRAFT);
+            try { sessionStorage.removeItem(draftStorageKey(diagramId)); } catch { /* nothing kept */ }
             setSaveMsg({ ok: true, text: fresh
               ? "Generated ✓ — saved to this diagram."
               : "Generated ✓ — saved, but it couldn’t be shown. Reload the page to see it." });
@@ -189,7 +208,7 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
           }
           if (job.status === "failed") {
             setGen({ phase: "failed", message: job.error?.message ?? "Generation failed." });
-            setDraftState((cur) => (cur.prompt ? cur : draftFromFailedJob(job.promptText)));
+            setDraftState((cur) => restoreFailedRun(cur, job));
             return;
           }
           setGen((g) => (g.phase === "running" && g.jobId === runningJobId ? { ...g, stage: job.stage } : g));
@@ -216,12 +235,63 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
     setSheetOpen(true);
   }
 
+  // Straight from the empty diagram to the camera; the sheet opens holding the photo.
+  const [photoBusy, setPhotoBusy] = useState(false);
+  async function photographWhiteboard(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setPhotoBusy(true);
+    const r = await photoFromFile(file);
+    setPhotoBusy(false);
+    if (!r.ok) { setStartErr(r.message); setSheetOpen(true); return; }
+    setDraftState((cur) => ({ ...cur, photo: r.photo, selected: null }));
+    openGenerate();
+  }
+
+  // The words said before the camera took the screen, if the page was reloaded meanwhile.
+  const restoredWordsRef = useRef(false);
+  useEffect(() => {
+    if (!d || hasContent(d) || restoredWordsRef.current) return;
+    restoredWordsRef.current = true;
+    let raw: string | null = null;
+    try { raw = sessionStorage.getItem(draftStorageKey(diagramId)); } catch { /* none */ }
+    const words = draftWordsFromStorage(raw);
+    if (!words || !words.prompt.trim()) return;
+    setDraftState((cur) => (cur.prompt || cur.photo ? cur : { ...cur, ...words }));
+  }, [d, diagramId]);
+
+  // "View photo": the whiteboard this diagram was generated from.
+  const [viewingPhoto, setViewingPhoto] = useState(false);
+
   async function startGenerate(finished?: GenerateDraft) {
     if (!d || gen.phase === "starting" || gen.phase === "running") return;
-    const body = draftToRequest(finished ?? draft);
-    if (!body.prompt) return;
+    const src = finished ?? draft;
+    const request = draftToRequest(src);
+    if (!request.prompt) return;
     setGen({ phase: "starting" });
     setStartErr(null);
+    // A photo is kept first (the diagram's source-image store), once: a retry
+    // reuses it. Unlike the desktop, a photo that cannot be kept stops the run —
+    // it IS the content.
+    let sourceImageId = src.photo?.storedId;
+    const photoStep = photoToUpload(src);
+    if (photoStep === "missing") { setGen({ phase: "idle" }); setStartErr("The photo is missing — take it again."); return; }
+    if (photoStep === "upload" && src.photo?.blob) {
+      const sent = src.photo.blob;
+      const kept = await uploadSourceImageBlob(diagramId, sent, src.photo.name, src.photo.width, src.photo.height);
+      if (!kept.ok) {
+        setGen({ phase: "idle" });
+        setStartErr(kept.status === 413 ? "The photo is too large to keep — take it again."
+          : kept.status === 403 ? "You can't add a photo to this diagram."
+          : kept.error ?? "The photo couldn’t be sent — check your connection and tap Generate again.");
+        return;
+      }
+      sourceImageId = kept.image.id;
+      // Only onto the photo that was sent — it may have been replaced meanwhile.
+      setDraftState((cur) => (cur.photo && cur.photo.blob === sent ? { ...cur, photo: { ...cur.photo, storedId: kept.image.id } } : cur));
+    }
+    const body = { ...request, ...(sourceImageId ? { sourceImageId } : {}) };
     try {
       const r = await fetch(`/api/diagrams/${diagramId}/generate`, {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -229,6 +299,8 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
       });
       const j = await r.json().catch(() => ({})) as Record<string, unknown>;
       if (r.status === 202 && typeof j.jobId === "string") {
+        // The run holds the words (and the photo) from here; a failure gives them back.
+        try { sessionStorage.removeItem(draftStorageKey(diagramId)); } catch { /* nothing kept */ }
         setSheetOpen(false);
         setSaveMsg(null);
         setNow(Date.now());
@@ -404,6 +476,9 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
         <button onClick={() => router.push(fromParam || (d?.projectId ? `/m/project/${d.projectId}` : "/m"))}
           className="text-blue-600 text-sm">‹ Back</button>
         <span className="flex-1 text-sm font-medium text-gray-900 truncate text-center">{d?.name ?? "Diagram"}</span>
+        {d && !empty && !unsupported && d.data.aiGeneration?.sourceImage && (
+          <button onClick={() => setViewingPhoto(true)} className="text-gray-600 text-lg leading-none px-1" title="View the photo this was generated from">📷</button>
+        )}
         {d && !empty && !unsupported && (d.data.parentDiagramIds?.length ?? 0) > 0 && (
           <button onClick={() => setShowParents(true)} className="text-blue-600 text-lg leading-none px-1" title="Linked from (parent diagrams)">↩</button>
         )}
@@ -444,11 +519,17 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
                 {gen.phase === "failed" && (
                   <p className="text-[12px] text-amber-800 bg-amber-50 rounded-md px-2 py-1.5 mb-3">{gen.message}</p>
                 )}
-                <p className="text-sm text-gray-600 mb-4">This diagram is empty. Describe the process out loud — or type it — and the AI draws it.</p>
+                <p className="text-sm text-gray-600 mb-4">This diagram is empty. Describe the process out loud, type it, or photograph a whiteboard — and the AI draws it.</p>
                 <button onClick={openGenerate}
                   className="h-12 px-5 rounded-full bg-blue-600 text-white text-sm font-medium shadow active:bg-blue-700">
                   🎤 Generate from your description
                 </button>
+                <label className="mt-3 h-11 px-5 rounded-full border border-gray-300 bg-white text-sm text-gray-700 flex items-center justify-center gap-1.5 active:bg-gray-50"
+                  onClick={() => { try { if (draft.prompt.trim()) sessionStorage.setItem(draftStorageKey(diagramId), draftWordsForStorage(draft)); } catch { /* in memory only */ } }}>
+                  {photoBusy ? "Preparing photo…" : "📷 Photograph a whiteboard"}
+                  <input type="file" accept="image/*" capture="environment" className="sr-only" disabled={photoBusy || gen.phase === "starting"}
+                    onChange={(e) => void photographWhiteboard(e)} />
+                </label>
               </div>
             ) : (
               <p className="text-sm text-gray-400">
@@ -492,8 +573,12 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
         )}
       </div>
 
+      {viewingPhoto && d?.data.aiGeneration?.sourceImage && (
+        <MobilePhotoViewer src={sourceImageUrl(diagramId, d.data.aiGeneration.sourceImage.id)}
+          alt={d.data.aiGeneration.sourceImage.name} onClose={() => setViewingPhoto(false)} />
+      )}
       {sheetOpen && d && (
-        <MobileGenerateSheet draft={draft} setDraft={setDraft}
+        <MobileGenerateSheet diagramId={diagramId} draft={draft} setDraft={setDraft}
           starting={gen.phase === "starting"} error={startErr}
           onGenerate={(finished) => void startGenerate(finished)} onClose={() => setSheetOpen(false)} />
       )}

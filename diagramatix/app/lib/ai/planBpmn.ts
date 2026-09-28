@@ -15,6 +15,7 @@ import type { AiElement, AiConnection } from "@/app/lib/diagram/bpmnLayout";
 import { renderFlowchartMappingForPrompt } from "@/app/lib/diagram/translate/flowchartBpmnMap";
 import { renderEpcMappingForPrompt } from "@/app/lib/diagram/translate/epcBpmnMap";
 import { hardWrapProcessName } from "@/app/lib/diagram/textMetrics";
+import { isWhiteboardPhotoPrompt } from "./promptPreambles";
 
 export type Attachment =
   | { type: "pdf"; data: string; name?: string }
@@ -48,16 +49,47 @@ export type PlanBpmnResult =
 
 const DEFAULT_MODEL = "claude-haiku-4-5-20251001"; // AI Generate default (see app/lib/ai/models.ts)
 
+/** What an attached image is: a diagram (the source of truth), or a photographed whiteboard / sketch (read by intent, corrected by the words). */
+export type ImageSource = "diagram" | "whiteboard";
+
+/**
+ * Which it is. A photographed whiteboard is recognised by its own prompt (the
+ * phone writes it; a desktop re-generate re-sends it), so the rule travels with
+ * the words. One answer for the request and the SuperAdmin prompt export.
+ */
+export function imageSourceFor(prompt: string, attachment: Attachment): ImageSource {
+  return attachment?.type === "image" && isWhiteboardPhotoPrompt(prompt) ? "whiteboard" : "diagram";
+}
+
+const WHITEBOARD_IMAGE_INPUT =
+  "The image is a PHOTO of a whiteboard, flip chart or paper sketch of a process, drawn by hand. Reverse-engineer the process from what is drawn, then express it in the BPMN JSON format below. The text prompt comes from the person who drew it and CORRECTS the photo (see the last bullet).";
+
+const WHITEBOARD_READING = [
+  "- A hand-drawn process is rarely strict BPMN; read it by intent: a box, rounded box or sticky note with a step written on it → \"task\"; a diamond, or a step with two or more labelled outgoing arrows (yes/no, approved/rejected) → an exclusive \"gateway\", its arrow labels as sequence-flow labels; a circle, oval, or a word such as Start/End/Done → \"start-event\"/\"end-event\"; an arrow → a sequence flow in the direction it points.",
+  "- On a whiteboard a sticky note is usually a STEP, not a comment — make it a \"task\" unless it is plainly a side note on another step (this overrides \"sticky-note → text-annotation\" above).",
+  "- Bands or columns headed with a role, team or system name are lanes; a band for an outside party or an IT system is a black-box pool. If nothing like a band is drawn, wrap everything in a single white-box pool named after the process.",
+  "- Ignore what is not the process: crossed-out or half-erased marks, doodles, dates, attendee names, meeting notes, the board's frame, people or objects in the shot, glare. Read the order from the arrows; where there are none, left to right, then top to bottom.",
+  "",
+].join("\n");
+
+const WHITEBOARD_PRECEDENCE =
+  "Where the text prompt adds detail beyond the photo, apply it. Where the text prompt CONTRADICTS the photo — a renamed, removed or re-ordered step, a different role, a branch that is not drawn — FOLLOW THE TEXT PROMPT: it is the author correcting their own sketch. Only where the text says nothing about part of the photo does the photo decide.";
+
 /**
  * Build the system prompt instructing Sonnet to return normalised BPMN JSON.
  * Keep this identical to the previous single-file implementation so the
  * generate-bpmn refactor is a no-behaviour-change swap.
  */
-export function buildSystemPrompt(rules: string, captureGeometry = false): string {
+export function buildSystemPrompt(rules: string, captureGeometry = false, imageSource: ImageSource = "diagram"): string {
+  // A PHOTO of a whiteboard or sketch (the phone's Generate, 2026-09-28) is read
+  // by intent, and the words that come with it CORRECT it — Paul's approved rule
+  // "voice correction beats the photo". Every other image keeps its wording
+  // exactly: the image is the source of truth.
+  const whiteboard = imageSource === "whiteboard";
   return `You are a BPMN process modelling expert. Given a description of a business process, output a valid JSON object that defines the process as BPMN elements and connections.
 
 IMAGE INPUT — when an image of an existing diagram is attached:
-- Treat the image as the source of truth. Reverse-engineer the process from what is drawn, then express it in the BPMN JSON format below.${captureGeometry ? `
+- ${whiteboard ? WHITEBOARD_IMAGE_INPUT : "Treat the image as the source of truth. Reverse-engineer the process from what is drawn, then express it in the BPMN JSON format below."}${captureGeometry ? `
 
 GEOMETRY CAPTURE — for THIS request, reproduce the DRAWN layout exactly as it appears (this diagram is being imported from another tool and must not be re-flowed):
 - For EVERY element (pool, lane, task, gateway, event, subprocess, data object, annotation) add a "bounds" object: { "x": <left>, "y": <top>, "w": <width>, "h": <height> }, where each value is a number 0..1 expressed as a fraction of the WHOLE image (x,y = the shape's top-left corner; origin at the image's top-left). Use 2-3 decimal places.
@@ -68,8 +100,8 @@ GEOMETRY CAPTURE — for THIS request, reproduce the DRAWN layout exactly as it 
 - If the image is already a BPMN diagram: copy the structure faithfully. Read pool names, lane names, task labels, gateway labels and event labels off the image. Map every shape to its hyphenated type: rounded rectangle → "task" (or "subprocess" / "subprocess-expanded" if it contains its own sub-flow), diamond → "gateway", circle with thin border → "start-event", circle with thick border → "end-event", circle with double border → "intermediate-event", parallel horizontal lines → "pool" / "lane" (a lane visibly split into stacked sub-bands → the inner bands are SUB-lanes: give each a "parentLane"), dashed-rectangle around tasks → "group", document icon → "data-object", cylinder → "data-store", sticky-note → "text-annotation". A diamond containing a SMALL ASTERISK / SIX-POINTED STAR (✳) → "gateway" with gatewayType "complex". A double-border circle containing a PENTAGON → "intermediate-event" with eventType "multiple"; containing a PLUS (✚) → eventType "parallel-multiple". A rounded rectangle drawn with a THICK / BOLD border → "subprocess" with properties.subprocessType "call" (a Call Activity). A small double-left-triangle "rewind" (◀◀) marker at the bottom-centre of an activity → set properties.isForCompensation true (a compensation handler). A data-object with three short vertical bars at its base → set properties.multiplicity "collection"; a data-object with a small hollow arrow → an input, a filled arrow → an output (usually auto-derived from its associations).
 - ${renderFlowchartMappingForPrompt()}
 - ${renderEpcMappingForPrompt()}
-- Read labels with OCR. Do NOT invent tasks, branches or roles that are not visible in the image. If a label is unreadable, use a short descriptive placeholder rather than guessing.
-- Where the user's text prompt adds detail beyond the image (extra rules, role names, message flows), apply it. Where the prompt CONTRADICTS the image, prefer the image.
+${whiteboard ? WHITEBOARD_READING : ""}- Read labels with OCR. ${whiteboard ? "Do NOT invent tasks, branches or roles that are neither drawn in the photo nor stated in the text prompt." : "Do NOT invent tasks, branches or roles that are not visible in the image."} If a label is unreadable, use a short descriptive placeholder rather than guessing.
+- ${whiteboard ? WHITEBOARD_PRECEDENCE : "Where the user's text prompt adds detail beyond the image (extra rules, role names, message flows), apply it. Where the prompt CONTRADICTS the image, prefer the image."}
 
 ${rules ? `USER RULES AND PREFERENCES (follow these strictly):\n${rules}\n\n` : ""}CRITICAL FORMAT RULES — you MUST follow these exactly:
 - Use ONLY these type values: "pool", "lane", "start-event", "end-event", "task", "gateway", "subprocess", "subprocess-expanded", "intermediate-event", "data-object", "data-store", "text-annotation", "group"
@@ -571,7 +603,8 @@ export function buildBpmnRequest(opts: PlanBpmnOptions): BpmnRequest {
   const { prompt, attachment, rules, model = DEFAULT_MODEL, captureGeometry = false } = opts;
   // Geometry capture only makes sense with an image to measure.
   const wantGeometry = captureGeometry && attachment?.type === "image";
-  const systemPrompt = buildSystemPrompt(rules, wantGeometry);
+  const imageSource = imageSourceFor(prompt, attachment);
+  const systemPrompt = buildSystemPrompt(rules, wantGeometry, imageSource);
 
   const userContent: Anthropic.Messages.ContentBlockParam[] = [];
   if (attachment?.type === "pdf" && attachment.data) {
@@ -600,7 +633,11 @@ export function buildBpmnRequest(opts: PlanBpmnOptions): BpmnRequest {
     } as Anthropic.Messages.ContentBlockParam);
     userContent.push({
       type: "text",
-      text: `An image of an existing process diagram is attached above (${attachment.name ?? "diagram.png"}). Treat the image as the source of truth and reverse-engineer the BPMN plan from it. If the text prompt below adds or contradicts anything visible in the image, prefer what the image shows.${wantGeometry ? " Also report each shape's `bounds` (normalised 0..1) and each connector's `sourceSide`/`targetSide` + `waypoints` exactly as drawn — we are reproducing the original layout, not re-flowing it." : ""}`,
+      text: imageSource === "whiteboard"
+        ? `A photo of a whiteboard or hand-drawn sketch of a process is attached above (${attachment.name ?? "whiteboard.jpg"}). Reverse-engineer the BPMN plan from what is drawn. The text below comes from the person who drew it and CORRECTS the photo: where the two disagree, follow the text, not the photo; where the text is silent, follow the photo.${wantGeometry
+          ? " Also report each shape's `bounds` (normalised 0..1) and each connector's `sourceSide`/`targetSide` + `waypoints` as drawn — we are reproducing the photo's layout, not re-flowing it."
+          : " Lay the process out normally — do not reproduce the photo's positions."}`
+        : `An image of an existing process diagram is attached above (${attachment.name ?? "diagram.png"}). Treat the image as the source of truth and reverse-engineer the BPMN plan from it. If the text prompt below adds or contradicts anything visible in the image, prefer what the image shows.${wantGeometry ? " Also report each shape's `bounds` (normalised 0..1) and each connector's `sourceSide`/`targetSide` + `waypoints` exactly as drawn — we are reproducing the original layout, not re-flowing it." : ""}`,
     });
   }
   // Append a final, extremely explicit "JSON only" instruction to the

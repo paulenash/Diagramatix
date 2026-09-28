@@ -22,7 +22,7 @@ export async function GET(_req: Request, { params }: Params) {
     where: { id: jobId, diagramId: id, userId: session.user.id },
     select: {
       id: true, status: true, stage: true, promptText: true, version: true,
-      errorCode: true, errorMessage: true, startedAt: true, finishedAt: true,
+      errorCode: true, errorMessage: true, startedAt: true, finishedAt: true, sourceImageId: true,
     },
   });
   if (!job) return NextResponse.json({ error: "Not found" }, { status: 404 });

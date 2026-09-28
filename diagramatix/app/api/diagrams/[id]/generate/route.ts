@@ -2,7 +2,9 @@
  * The phone's Generate (2026-09-28, mobile voice stage 1).
  *
  *   POST — start a server-side generate job for this BPMN diagram
- *          { prompt, version?, promptSource?, selectedPromptId? } → 202 { jobId, … }
+ *          { prompt, version?, promptSource?, selectedPromptId?, sourceImageId? } → 202 { jobId, … }
+ *          sourceImageId: a photo of a whiteboard the phone kept first
+ *          (POST …/source-image) — stage 2; the words then CORRECT the photo.
  *   GET  — the caller's latest job on this diagram, so a phone that reloaded
  *          mid-generation picks the run up again → { job | null }
  *
@@ -24,6 +26,8 @@ import { blockReadOnlyImpersonation } from "@/app/lib/routeGuard";
 import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
 import { getEffectiveUserId } from "@/app/lib/superuser";
 import { resolveGenerateModel } from "@/app/lib/ai/aiModelSetting";
+import { modelVision } from "@/app/lib/ai/models";
+import { isWhiteboardPhotoPrompt } from "@/app/lib/ai/promptPreambles";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { resolveUserAiKey } from "@/app/lib/ai/userAiKey";
 import { resolveAiRouteContext } from "@/app/lib/ai/aiTelemetryRoute";
@@ -42,7 +46,7 @@ type Params = { params: Promise<{ id: string }> };
 
 const JOB_SELECT = {
   id: true, userId: true, status: true, stage: true, promptText: true, version: true,
-  errorCode: true, errorMessage: true, startedAt: true, finishedAt: true,
+  errorCode: true, errorMessage: true, startedAt: true, finishedAt: true, sourceImageId: true,
 } as const;
 
 export async function POST(req: Request, { params }: Params) {
@@ -106,8 +110,32 @@ export async function POST(req: Request, { params }: Params) {
     return NextResponse.json({ error: "busy", message: "Someone else is generating this diagram right now." }, { status: 409 });
   }
 
-  // The default model, as the partner API uses: no picker on the phone.
-  const model = await resolveGenerateModel(false);
+  // The caller's OWN kept photo, in the diagram's organisation — never a
+  // colleague's upload (naming it on this diagram would let everyone here see it).
+  const promptOwnerIdForPhoto = getEffectiveUserId(session, cookieStore) ?? session.user.id; // whose prompts and photos these are
+  let photo: { id: string; name: string; mimeType: string; width: number | null; height: number | null } | null = null;
+  if (typeof body.sourceImageId === "string" && body.sourceImageId) {
+    photo = await prisma.aiSourceImage.findFirst({
+      where: { id: body.sourceImageId, orgId: diagramOrgId, createdById: promptOwnerIdForPhoto },
+      select: { id: true, name: true, mimeType: true, width: true, height: true },
+    });
+    if (!photo) {
+      return NextResponse.json({ error: "image_gone", message: "The photo could not be found. Take it again, then generate." }, { status: 400 });
+    }
+  }
+
+  // A prompt written for a photo (a saved one picked again) is not run without
+  // it: the model would be told about a photo it never gets.
+  if (!photo && isWhiteboardPhotoPrompt(prompt)) {
+    return NextResponse.json({ error: "photo_needed", message: "This prompt was written for a whiteboard photo — take the photo, then generate." }, { status: 400 });
+  }
+
+  // The default model, as the partner API uses: no picker on the phone. A photo
+  // uses the vision model when one is set, as the consoles do.
+  const model = await resolveGenerateModel(!!photo);
+  if (photo && modelVision(model) === false) {
+    return NextResponse.json({ error: "Photos need an AI model that can read images. An administrator can set one under AI Model → Vision model." }, { status: 503 });
+  }
   // The caller's OWN key wins when they have supplied one for this provider.
   const ownKey = await resolveUserAiKey(session.user.id, model);
   const apiKey = ownKey?.apiKey ?? aiApiKey(model);
@@ -122,14 +150,26 @@ export async function POST(req: Request, { params }: Params) {
   // Request-scoped values are resolved here: the job outlives the request.
   const aiContext = await resolveAiRouteContext(session, AI_INVOCATION_POINTS.MobileGenerate);
   const orgId = aiContext.orgId ?? diagramOrgId;
-  const promptOwnerId = getEffectiveUserId(session, cookieStore) ?? session.user.id;
+  const promptOwnerId = promptOwnerIdForPhoto;
 
   // Where the words came from. A saved prompt is looked up, not trusted: it
   // links only if it is the caller's own and the text is still unchanged.
   const promptMeta: GenerateJobPromptMeta = {
     ...(body.promptSource === "dictated" || body.promptSource === "typed" ? { promptSource: body.promptSource } : {}),
+    // A photo: drawn from an image, laid out normally (Free Form off — recorded,
+    // so a desktop re-generate starts with it off too), and kept with the diagram.
+    ...(photo ? {
+      promptFromImage: true,
+      freeForm: false,
+      sourceImage: {
+        name: photo.name, mediaType: photo.mimeType, storedId: photo.id,
+        ...(photo.width ? { width: photo.width } : {}),
+        ...(photo.height ? { height: photo.height } : {}),
+      },
+    } : {}),
   };
-  if (typeof body.selectedPromptId === "string" && body.selectedPromptId) {
+  // A photo run is the photo plus the words: it never links a saved prompt.
+  if (!photo && typeof body.selectedPromptId === "string" && body.selectedPromptId) {
     const sel = await prisma.prompt.findFirst({
       where: { id: body.selectedPromptId, userId: promptOwnerId, orgId },
       select: { id: true, name: true, text: true },
@@ -142,7 +182,7 @@ export async function POST(req: Request, { params }: Params) {
   }
 
   const job = await prisma.diagramGenerateJob.create({
-    data: { diagramId: id, userId: session.user.id, orgId, promptText: prompt },
+    data: { diagramId: id, userId: session.user.id, orgId, promptText: prompt, sourceImageId: photo?.id ?? null },
     select: JOB_SELECT,
   });
   // Deliberately NOT awaited: the phone gets its 202 now. Every path inside
@@ -150,6 +190,7 @@ export async function POST(req: Request, { params }: Params) {
   void runGenerateJob({
     jobId: job.id, diagramId: id, userId: session.user.id, promptOwnerId, orgId,
     aiContext, ownKey, model, apiKey, prompt, promptMeta, baseVersion: diagram.version,
+    diagramOrgId, ...(photo ? { sourceImageId: photo.id } : {}),
   }).catch((e) => console.error(`[generate-job] ${job.id} escaped:`, e));
 
   return NextResponse.json({ ...viewGenerateJob(job), pollAfterSeconds: 3 }, { status: 202 });

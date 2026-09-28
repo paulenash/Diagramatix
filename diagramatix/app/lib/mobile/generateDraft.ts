@@ -4,9 +4,21 @@
  * Pure, so the rules are tested without a phone.
  */
 import { appendClarifications } from "@/app/lib/diagram/clarifications";
-import { hasSpokenPreamble, stripSpokenPreamble, withSpokenPreamble } from "@/app/lib/ai/promptPreambles";
+import { hasSpokenPreamble, photoNoteParts, stripSpokenPreamble, withPhotoNote, withSpokenPreamble } from "@/app/lib/ai/promptPreambles";
 
 export interface SavedPromptPick { id: string; name: string; text: string }
+
+/** A photographed whiteboard (stage 2): shrunk on the phone, then kept in the diagram's store. */
+export interface DraftPhoto {
+  /** The phone-shrunk JPEG. Absent for a photo restored from a failed run — that one is already kept. */
+  blob?: Blob;
+  /** Its id in the source-image store, once kept — a retry never sends it again. */
+  storedId?: string;
+  name: string;
+  /** Its size as sent (0 when restored — not needed then). */
+  width: number;
+  height: number;
+}
 
 export interface GenerateDraft {
   /** The description, as the person sees and edits it. */
@@ -17,9 +29,11 @@ export interface GenerateDraft {
   selected: SavedPromptPick | null;
   /** Tidy's open questions, with whatever answers were given. */
   questions: { q: string; a: string }[];
+  /** A photo of a whiteboard; the words then CORRECT it. */
+  photo: DraftPhoto | null;
 }
 
-export const EMPTY_DRAFT: GenerateDraft = { prompt: "", dictated: false, selected: null, questions: [] };
+export const EMPTY_DRAFT: GenerateDraft = { prompt: "", dictated: false, selected: null, questions: [], photo: null };
 
 /** Add a spoken phrase to what is already there, with one space between. */
 export function joinSpoken(prev: string, text: string): string {
@@ -54,7 +68,8 @@ export function withAnswers(draft: GenerateDraft): string {
 
 export interface GenerateRequestBody {
   prompt: string;
-  promptSource: "dictated" | "typed";
+  /** Absent for a photo with no words. */
+  promptSource?: "dictated" | "typed";
   selectedPromptId?: string;
 }
 
@@ -68,6 +83,16 @@ export interface GenerateRequestBody {
  *     matches.
  */
 export function draftToRequest(draft: GenerateDraft): GenerateRequestBody {
+  // A photo: the photo note, then the person's words under the corrections
+  // heading — they win over the photo. No spoken-description note (the photo is
+  // the description) and never a saved prompt.
+  if (draft.photo) {
+    const words = withAnswers(draft);
+    return {
+      prompt: withPhotoNote(draft.photo.name, words),
+      ...(words ? { promptSource: draft.dictated ? "dictated" as const : "typed" as const } : {}),
+    };
+  }
   let text = withAnswers(draft);
   const unchangedSaved = !!draft.selected && draft.selected.text.trim() === text;
   if (text && draft.dictated && !unchangedSaved) text = withSpokenPreamble(text);
@@ -81,4 +106,47 @@ export function draftToRequest(draft: GenerateDraft): GenerateRequestBody {
 /** A failed run's prompt, put back in the sheet for another go — without the note. */
 export function draftFromFailedJob(promptText: string): GenerateDraft {
   return { ...EMPTY_DRAFT, prompt: stripSpokenPreamble(promptText), dictated: hasSpokenPreamble(promptText) };
+}
+
+/**
+ * A failed PHOTO run, put back: the photo (already kept — by its id) and the
+ * person's own words, without the photo note. Anything else is left as it is.
+ */
+export function withRestoredPhoto(draft: GenerateDraft, job: { promptText: string; sourceImageId: string | null }): GenerateDraft {
+  const parts = job.sourceImageId ? photoNoteParts(job.promptText) : null;
+  if (!parts || !job.sourceImageId) return draft;
+  return {
+    ...EMPTY_DRAFT,
+    prompt: parts.words,
+    dictated: false,
+    photo: { storedId: job.sourceImageId, name: parts.imageName || "Whiteboard photo.jpg", width: 0, height: 0 },
+  };
+}
+
+/** The words a person has said or typed, kept for the moment the camera takes the screen (the page may be reloaded meanwhile). */
+export function draftWordsForStorage(draft: GenerateDraft): string {
+  return JSON.stringify({ prompt: draft.prompt, dictated: draft.dictated, questions: draft.questions });
+}
+
+export function draftWordsFromStorage(raw: string | null): Pick<GenerateDraft, "prompt" | "dictated" | "questions"> | null {
+  if (!raw) return null;
+  try {
+    const j = JSON.parse(raw) as { prompt?: unknown; dictated?: unknown; questions?: unknown };
+    if (typeof j.prompt !== "string") return null;
+    const questions = Array.isArray(j.questions)
+      ? j.questions.filter((x): x is { q: string; a: string } => !!x && typeof (x as { q?: unknown }).q === "string" && typeof (x as { a?: unknown }).a === "string")
+      : [];
+    return { prompt: j.prompt, dictated: j.dictated === true, questions };
+  } catch { return null; }
+}
+
+/**
+ * At Generate: the draft's photo is already kept (reuse its id), still to
+ * upload, missing (restored without its bytes and without an id — cannot be
+ * sent), or there is none.
+ */
+export function photoToUpload(draft: GenerateDraft): "none" | "reuse" | "upload" | "missing" {
+  if (!draft.photo) return "none";
+  if (draft.photo.storedId) return "reuse";
+  return draft.photo.blob ? "upload" : "missing";
 }

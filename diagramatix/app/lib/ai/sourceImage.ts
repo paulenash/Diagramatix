@@ -92,17 +92,38 @@ export async function storeSourceImage(
   const size = { ...(img.width ? { width: img.width } : {}), ...(img.height ? { height: img.height } : {}) };
   if (img.storedId) return { id: img.storedId, name: img.name, mimeType: img.mediaType, ...size };
   if (!img.data || !SOURCE_IMAGE_TYPES.includes(img.mediaType)) return null;
+  const blob = new Blob([base64ToBytes(img.data) as BlobPart], { type: img.mediaType });
+  const kept = await uploadSourceImageBlob(diagramId, blob, img.name, img.width, img.height, fetchImpl);
+  return kept.ok ? { ...kept.image, mimeType: kept.image.mimeType || img.mediaType, ...size } : null;
+}
+
+/**
+ * Upload an image to the diagram's source-image store (multipart: file, width,
+ * height) — the one upload path. Says why when it could not be kept, so the
+ * phone can tell the person (a photo that fails to upload stops its run).
+ */
+export async function uploadSourceImageBlob(
+  diagramId: string,
+  blob: Blob,
+  name: string,
+  width?: number,
+  height?: number,
+  fetchImpl: typeof fetch = fetch,
+): Promise<{ ok: true; image: StoredSourceImage } | { ok: false; status: number | null; error: string | null }> {
   try {
     const form = new FormData();
-    form.append("file", new Blob([base64ToBytes(img.data) as BlobPart], { type: img.mediaType }), img.name);
-    if (img.width) form.append("width", String(Math.round(img.width)));
-    if (img.height) form.append("height", String(Math.round(img.height)));
+    form.append("file", blob, name);
+    if (width) form.append("width", String(Math.round(width)));
+    if (height) form.append("height", String(Math.round(height)));
     const res = await fetchImpl(`/api/diagrams/${encodeURIComponent(diagramId)}/source-image`, { method: "POST", body: form });
-    if (!res.ok) return null;
-    const j = await res.json() as Partial<StoredSourceImage>;
-    return typeof j.id === "string" ? { id: j.id, name: j.name ?? img.name, mimeType: j.mimeType ?? img.mediaType, ...size } : null;
+    const j = await res.json().catch(() => ({})) as Partial<StoredSourceImage> & { error?: string };
+    if (!res.ok || typeof j.id !== "string") {
+      return { ok: false, status: res.status, error: typeof j.error === "string" ? j.error : null };
+    }
+    const size = { ...(width ? { width: Math.round(width) } : {}), ...(height ? { height: Math.round(height) } : {}) };
+    return { ok: true, image: { id: j.id, name: j.name ?? name, mimeType: j.mimeType ?? blob.type, ...size } };
   } catch {
-    return null;
+    return { ok: false, status: null, error: null };
   }
 }
 

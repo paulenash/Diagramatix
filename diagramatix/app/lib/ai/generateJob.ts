@@ -18,7 +18,8 @@
  * link-and-save rules in applyGeneration.ts (as DiagramEditor.applyAiResult).
  */
 import { prisma } from "@/app/lib/db";
-import { planBpmn } from "./planBpmn";
+import { planBpmn, type Attachment } from "./planBpmn";
+import { sniff } from "./attachmentFromFile";
 import { layoutBpmnPlan } from "./layoutBpmnPlan";
 import { loadAiRulesForType } from "./loadAiRules";
 import { describeAiError } from "./aiErrors";
@@ -48,7 +49,15 @@ export const KEEP_FINISHED_GENERATE_JOBS_MS = 7 * 24 * 60 * 60 * 1000;
 export type GenerateJobStage = "queued" | "planning" | "shaping" | "saving" | "done";
 export type GenerateJobErrorCode =
   | "ai_failed" | "plan_invalid" | "element_limit" | "diagram_gone" | "has_content" | "save_conflict"
-  | "server_error" | "worker_lost";
+  | "server_error" | "worker_lost" | "image_gone" | "image_too_large";
+
+/** The model's limit for one image, measured AFTER base64 encoding. The
+ *  documented figure has been 5 MB on the API (10 MB in the claude.ai app);
+ *  the conservative one is used. A phone photo is ~1–2 MB. */
+export const MAX_ENCODED_IMAGE_BYTES = 5 * 1024 * 1024;
+
+/** How long an unused phone photo is kept before the sweep deletes it. */
+export const KEEP_UNUSED_PHOTOS_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * Does the diagram have content — anything besides a prompt note? Generate on
@@ -63,7 +72,8 @@ export function hasDiagramContent(data: unknown): boolean {
 /** How the phone described the prompt — the parts of AiApplyMeta the job cannot know itself. */
 export type GenerateJobPromptMeta = Pick<
   AiApplyMeta,
-  "selectedPromptId" | "selectedPromptName" | "selectedPromptUnchanged" | "promptSource" | "promptRefined"
+  | "selectedPromptId" | "selectedPromptName" | "selectedPromptUnchanged" | "promptSource" | "promptRefined"
+  | "promptFromImage" | "freeForm" | "sourceImage"
 >;
 
 export interface GenerateJobInput {
@@ -84,6 +94,10 @@ export interface GenerateJobInput {
   promptMeta: GenerateJobPromptMeta;
   /** The diagram's version when the run was asked for (the phone's copy). */
   baseVersion: number;
+  /** The diagram's own organisation — where its kept photo lives. */
+  diagramOrgId?: string;
+  /** A photographed whiteboard to read (AiSourceImage.id; stage 2). */
+  sourceImageId?: string;
 }
 
 /**
@@ -206,10 +220,30 @@ export async function runGenerateJob(input: GenerateJobInput): Promise<void> {
     const pcfNodeId = ((stored.data ?? {}) as unknown as DiagramData).pcf?.nodeId;
     const rules = await loadAiRulesForType("bpmn", pcfNodeId);
 
+    // A photographed whiteboard: its bytes, as the model takes an image. The
+    // prompt the phone wrote says it is a photo, and that its words correct it
+    // (planBpmn's whiteboard reading). Free Form off: laid out normally.
+    let attachment: Attachment | undefined;
+    if (input.sourceImageId) {
+      const img = await prisma.aiSourceImage.findFirst({
+        where: { id: input.sourceImageId, ...(input.diagramOrgId ? { orgId: input.diagramOrgId } : {}) },
+        select: { bytes: true, name: true },
+      });
+      if (!img) return fail(jobId, "image_gone", "The photo could not be found. Take it again, then generate.");
+      const bytes = Buffer.from(img.bytes);
+      const kind = sniff(bytes);
+      const mediaType = kind === "jpeg" ? "image/jpeg" : kind === "png" ? "image/png" : kind === "webp" ? "image/webp" : kind === "gif" ? "image/gif" : null;
+      if (!mediaType) return fail(jobId, "image_gone", "The photo could not be read. Take it again, then generate.");
+      if (Math.ceil(bytes.length / 3) * 4 > MAX_ENCODED_IMAGE_BYTES) {
+        return fail(jobId, "image_too_large", "The photo is too large for the AI to read. Take it again, then generate.");
+      }
+      attachment = { type: "image", data: bytes.toString("base64"), mediaType, name: img.name };
+    }
+
     // Phase 1 — the plan (POST /api/ai/bpmn/plan's steps).
     let plan: PlanJson;
     try {
-      const res = await planBpmn({ apiKey: input.apiKey, prompt: input.prompt, rules, model: input.model });
+      const res = await planBpmn({ apiKey: input.apiKey, prompt: input.prompt, rules, model: input.model, ...(attachment ? { attachment } : {}) });
       if (!res.ok) return fail(jobId, "ai_failed", `AI planning failed: ${describeAiError(res.error)}`);
       plan = res.plan;
     } catch (err) {
@@ -279,9 +313,29 @@ export async function reapStaleGenerateJobs(now: number = Date.now()): Promise<v
     await prisma.diagramGenerateJob.deleteMany({
       where: { finishedAt: { lt: new Date(now - KEEP_FINISHED_GENERATE_JOBS_MS) } },
     });
+    await sweepUnusedPhonePhotos(now);
   } catch (e) {
     console.error("[generate-job] reap failed:", e instanceof Error ? e.message : e);
   }
+}
+
+/**
+ * Delete phone whiteboard photos nothing uses (the 2026-09-28 review): kept
+ * before the run starts, a photo whose run was refused or failed and was never
+ * tried again — or that was retaken — would otherwise stay for good, and a
+ * whiteboard shot can show people and meeting notes. Only the phone's own
+ * photos (named "Whiteboard photo …" by photoShrink.photoName), only after a
+ * week, and never one a diagram, a saved version of one, or a live run names.
+ */
+export async function sweepUnusedPhonePhotos(now: number = Date.now()): Promise<number> {
+  const cutoff = new Date(now - KEEP_UNUSED_PHOTOS_MS);
+  return prisma.$executeRaw`
+    DELETE FROM "AiSourceImage" a
+     WHERE a.name LIKE 'Whiteboard photo %'
+       AND a."createdAt" < ${cutoff}
+       AND NOT EXISTS (SELECT 1 FROM "Diagram" d WHERE d.data -> 'aiGeneration' -> 'sourceImage' ->> 'id' = a.id)
+       AND NOT EXISTS (SELECT 1 FROM "DiagramHistory" h WHERE h.snapshot -> 'data' -> 'aiGeneration' -> 'sourceImage' ->> 'id' = a.id)
+       AND NOT EXISTS (SELECT 1 FROM "DiagramGenerateJob" j WHERE j."sourceImageId" = a.id AND j.status IN ('queued', 'running'))`;
 }
 
 /** A job as the phone sees it on a poll. */
@@ -293,6 +347,8 @@ export interface GenerateJobView {
   /** ISO; when it succeeded or failed. */
   finishedAt: string | null;
   version: number | null;
+  /** The photo it was generated from, if any — a failed run is tried again with it. */
+  sourceImageId: string | null;
   promptText: string;
   error: { code: string; message: string } | null;
 }
@@ -300,6 +356,7 @@ export interface GenerateJobView {
 export function viewGenerateJob(job: {
   id: string; status: string; stage: string; promptText: string; version: number | null;
   errorCode: string | null; errorMessage: string | null; startedAt: Date | null; finishedAt: Date | null;
+  sourceImageId?: string | null;
 }, now: number = Date.now()): GenerateJobView {
   return {
     jobId: job.id,
@@ -307,6 +364,7 @@ export function viewGenerateJob(job: {
     stage: job.stage,
     elapsedMs: job.startedAt ? (job.finishedAt?.getTime() ?? now) - job.startedAt.getTime() : null,
     finishedAt: job.finishedAt ? job.finishedAt.toISOString() : null,
+    sourceImageId: job.sourceImageId ?? null,
     version: job.version,
     promptText: job.promptText,
     error: job.status === "failed"

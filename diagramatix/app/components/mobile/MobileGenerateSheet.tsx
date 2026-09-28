@@ -10,6 +10,11 @@
  * Assist uses. One microphone at a time — the description, or one answer — run
  * by app/lib/mobile/micController.ts, which also keeps the phrase still on
  * screen when Stop, Tidy or Generate is tapped.
+ *
+ * Stage 2: a PHOTO of a whiteboard or sketch instead of (or as well as) the
+ * words. The photo alone is enough to Generate; words said or typed with it
+ * are CORRECTIONS, and they win over the photo. While a photo is attached,
+ * Tidy and saved prompts are put away — they describe a process from scratch.
  */
 import { useEffect, useRef, useState } from "react";
 import { startDictation } from "@/app/lib/dictation";
@@ -17,11 +22,18 @@ import {
   addSpokenTo, withAnswers, type GenerateDraft, type SavedPromptPick, type SpokenTarget,
 } from "@/app/lib/mobile/generateDraft";
 import { createMicController } from "@/app/lib/mobile/micController";
+import { draftStorageKey, photoFromFile } from "@/app/lib/mobile/pickPhoto";
+import { draftWordsForStorage } from "@/app/lib/mobile/generateDraft";
+import { isWhiteboardPhotoPrompt, photoNoteParts } from "@/app/lib/ai/promptPreambles";
+import { sourceImageUrl } from "@/app/lib/ai/sourceImage";
 import { MicTest } from "./MicTest";
+import { MobilePhotoViewer } from "./MobilePhotoViewer";
 
 export function MobileGenerateSheet({
-  draft, setDraft, onGenerate, onClose, starting, error,
+  diagramId, draft, setDraft, onGenerate, onClose, starting, error,
 }: {
+  /** The diagram — where a restored photo is shown from. */
+  diagramId: string;
   draft: GenerateDraft;
   setDraft: (update: (d: GenerateDraft) => GenerateDraft) => void;
   /** Called with the finished draft (it may hold words the last render has not shown yet). */
@@ -33,6 +45,10 @@ export function MobileGenerateSheet({
   error: string | null;
 }) {
   const [mic, setMic] = useState<{ target: SpokenTarget; ready: boolean } | null>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoMsg, setPhotoMsg] = useState<string | null>(null);
+  const [viewing, setViewing] = useState(false);
+  const photoUrl = usePhotoUrl(draft.photo, diagramId);
   const [interim, setInterim] = useState("");
   const [micMsg, setMicMsg] = useState<string | null>(null);
   const [showMicTest, setShowMicTest] = useState(false);
@@ -92,7 +108,16 @@ export function MobileGenerateSheet({
 
   function pickSaved(p: SavedPromptPick) {
     micRef.current?.stop();
-    setDraft(() => ({ prompt: p.text, dictated: false, selected: p, questions: [] }));
+    if (isWhiteboardPhotoPrompt(p.text)) {
+      // Written for a photo that is not here: keep its corrections, ask for the photo.
+      setDraft(() => ({ prompt: photoNoteParts(p.text)?.words ?? "", dictated: false, selected: null, questions: [], photo: null }));
+      setPhotoMsg("That prompt was written for a whiteboard photo — take or choose the photo, then generate.");
+      setShowSaved(false);
+      setTidyMsg(null);
+      setBeforeTidy(null);
+      return;
+    }
+    setDraft(() => ({ prompt: p.text, dictated: false, selected: p, questions: [], photo: null }));
     setShowSaved(false);
     setTidyMsg(null);
     setBeforeTidy(null);
@@ -145,11 +170,47 @@ export function MobileGenerateSheet({
     setTidyMsg(null);
   }
 
+  /** The camera or the photo picker is about to take the screen: keep the words (the page may be reloaded meanwhile). */
+  function beforePicker() {
+    const d = stopKeepingWords();
+    try { sessionStorage.setItem(draftStorageKey(diagramId), draftWordsForStorage(d)); } catch { /* private mode: the words stay in memory */ }
+  }
+
+  async function onPhotoPicked(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // the same file again must still fire
+    if (!file) return;
+    setPhotoBusy(true);
+    setPhotoMsg(null);
+    const r = await photoFromFile(file);
+    if (!mountedRef.current) return;
+    setPhotoBusy(false);
+    if (!r.ok) { setPhotoMsg(r.message); return; }
+    // A photo and a saved prompt are one or the other; Tidy's questions were about the words alone.
+    setDraft((d) => ({ ...d, photo: r.photo, selected: null }));
+    setTidyMsg(null);
+    setBeforeTidy(null);
+  }
+
+  function removePhoto() {
+    setDraft((d) => ({ ...d, photo: null }));
+    setPhotoMsg(null);
+  }
+
   function generate() {
     onGenerate(stopKeepingWords());
   }
 
   const hasText = draft.prompt.trim().length > 0 || (mic?.target === "prompt" && interim.trim().length > 0);
+  const hasPhoto = !!draft.photo;
+  // The photo alone is enough.
+  const canSend = hasText || hasPhoto;
+  const photoInput = (capture: boolean, label: string, cls: string) => (
+    <label className={cls} onClick={beforePicker}>
+      {label}
+      <input type="file" accept="image/*" {...(capture ? { capture: "environment" as const } : {})} onChange={(e) => void onPhotoPicked(e)} className="sr-only" disabled={photoBusy || tidying || starting} />
+    </label>
+  );
   const listeningLabel = (target: SpokenTarget) =>
     mic?.target === target ? (mic.ready ? "listening…" : "connecting…") : null;
 
@@ -163,8 +224,34 @@ export function MobileGenerateSheet({
           <button onClick={onClose} className="text-gray-400 text-xl leading-none px-1" aria-label="Close">×</button>
         </div>
         <p className="text-[11px] text-gray-500 mb-2">
-          Describe it the way you would to a colleague: who does what, in what order, and any decisions along the way.
+          {hasPhoto
+            ? "Anything the photo gets wrong or leaves out — say it or type it. Your words win over the photo."
+            : "Describe it the way you would to a colleague: who does what, in what order, and any decisions along the way — or photograph a whiteboard or sketch of it."}
         </p>
+
+        {hasPhoto ? (
+          <div className="flex items-start gap-3 mb-2">
+            {photoUrl && (
+              <button type="button" onClick={() => setViewing(true)} className="shrink-0" aria-label="View the photo">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={photoUrl} alt="The whiteboard photo" className="h-28 w-auto max-w-[45vw] rounded-lg border border-gray-200 object-contain bg-gray-50" />
+              </button>
+            )}
+            <div className="flex flex-col gap-1.5 text-sm">
+              <span className="text-[11px] text-gray-500">📷 {draft.photo!.width ? `${draft.photo!.width} × ${draft.photo!.height}` : "Photo kept"}</span>
+              {photoInput(true, "Retake", "text-blue-600 underline")}
+              {photoInput(false, "Replace", "text-blue-600 underline")}
+              <button type="button" onClick={removePhoto} disabled={starting} className="text-left text-blue-600 underline disabled:opacity-40">Remove</button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex gap-2 mb-2">
+            {photoInput(true, "📷 Take photo", "h-11 px-4 text-sm text-gray-700 border border-gray-300 rounded-lg active:bg-gray-50 flex items-center")}
+            {photoInput(false, "🖼 Choose photo", "h-11 px-4 text-sm text-gray-700 border border-gray-300 rounded-lg active:bg-gray-50 flex items-center")}
+          </div>
+        )}
+        {photoBusy && <p className="text-[11px] text-gray-500 mb-2">Preparing photo…</p>}
+        {photoMsg && <p className="text-[11px] text-amber-600 mb-2">{photoMsg}</p>}
 
         <textarea
           value={draft.prompt}
@@ -174,7 +261,7 @@ export function MobileGenerateSheet({
           }}
           readOnly={tidying}
           rows={7}
-          placeholder="e.g. A customer submits a claim online. The claims officer checks the policy…"
+          placeholder={hasPhoto ? "e.g. The approval happens before payment…" : "e.g. A customer submits a claim online. The claims officer checks the policy…"}
           className="w-full text-base text-gray-900 border border-gray-300 rounded-lg p-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 read-only:bg-gray-50"
         />
         {mic?.target === "prompt" && interim && (
@@ -194,9 +281,11 @@ export function MobileGenerateSheet({
           </button>
           {listeningLabel("prompt") && <span className="text-[11px] text-gray-500">{listeningLabel("prompt")}</span>}
           <span className="flex-1" />
-          <button onClick={() => void openSaved()} disabled={tidying} className="text-sm text-blue-600 px-1 py-2 disabled:opacity-40">
-            {showSaved ? "Hide saved" : "Saved prompts"}
-          </button>
+          {!hasPhoto && (
+            <button onClick={() => void openSaved()} disabled={tidying} className="text-sm text-blue-600 px-1 py-2 disabled:opacity-40">
+              {showSaved ? "Hide saved" : "Saved prompts"}
+            </button>
+          )}
         </div>
         {micMsg && <p className="text-[11px] text-amber-600 mt-1">{micMsg}</p>}
         <button type="button" onClick={() => setShowMicTest((v) => !v)}
@@ -205,7 +294,7 @@ export function MobileGenerateSheet({
         </button>
         {showMicTest && <div className="mt-2"><MicTest compact /></div>}
 
-        {showSaved && (
+        {showSaved && !hasPhoto && (
           <div className="mt-2 border border-gray-200 rounded-lg max-h-[35vh] overflow-y-auto">
             {saved === null && <p className="text-[11px] text-gray-500 p-3">Loading…</p>}
             {savedErr && <p className="text-[11px] text-amber-600 p-3">{savedErr}</p>}
@@ -228,8 +317,8 @@ export function MobileGenerateSheet({
           </p>
         )}
 
-        <div className="flex items-center gap-2 mt-3">
-          <button onClick={() => void tidy()} disabled={!hasText || tidying}
+        {!hasPhoto && <div className="flex items-center gap-2 mt-3">
+          <button onClick={() => void tidy()} disabled={!hasText || tidying || photoBusy}
             className="h-10 px-4 text-sm text-gray-700 border border-gray-300 rounded-lg disabled:opacity-40 active:bg-gray-50">
             {tidying ? "Tidying…" : "✨ Tidy"}
           </button>
@@ -237,7 +326,7 @@ export function MobileGenerateSheet({
             {tidyMsg ?? "Optional: the AI orders your words into clear steps and asks about anything unclear."}
           </span>
           {beforeTidy && !tidying && <button onClick={undoTidy} className="text-[11px] text-blue-600 underline px-1">Undo</button>}
-        </div>
+        </div>}
 
         {draft.questions.length > 0 && (
           <div className="mt-3 space-y-3">
@@ -278,12 +367,30 @@ export function MobileGenerateSheet({
         {error && <p className="text-[12px] text-amber-800 bg-amber-50 rounded-md px-2 py-1.5 mt-2">{error}</p>}
         <div className="flex gap-2 mt-3">
           <button onClick={onClose} className="flex-1 py-2.5 text-sm text-gray-700 border border-gray-300 rounded-lg active:bg-gray-50">Cancel</button>
-          <button onClick={generate} disabled={!hasText || starting || tidying}
+          <button onClick={generate} disabled={!canSend || starting || tidying || photoBusy}
             className="flex-1 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg disabled:opacity-40 active:bg-blue-700">
-            {starting ? "Starting…" : "Generate"}
+            {starting ? (hasPhoto && !draft.photo?.storedId ? "Sending photo…" : "Starting…") : "Generate"}
           </button>
         </div>
       </div>
+      {viewing && photoUrl && <MobilePhotoViewer src={photoUrl} alt="The whiteboard photo" onClose={() => setViewing(false)} />}
     </div>
   );
+}
+
+/** A URL to show the draft's photo: its local copy, or — restored from a failed run — the kept one. */
+function usePhotoUrl(photo: GenerateDraft["photo"], diagramId: string): string | null {
+  const [url, setUrl] = useState<string | null>(null);
+  const blob = photo?.blob;
+  const storedId = photo?.storedId;
+  useEffect(() => {
+    if (blob) {
+      const u = URL.createObjectURL(blob);
+      setUrl(u);
+      return () => URL.revokeObjectURL(u);
+    }
+    setUrl(storedId ? sourceImageUrl(diagramId, storedId) : null);
+    return undefined;
+  }, [blob, storedId, diagramId]);
+  return url;
 }
