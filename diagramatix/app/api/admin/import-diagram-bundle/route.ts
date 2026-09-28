@@ -4,7 +4,10 @@
  * with fresh ids throughout:
  *   1. create the linked Prompt (incl. planJson via raw SQL)
  *   2. create the per-model comparison diagrams
- *   3. create the main diagram, rewriting data.aiGeneration.promptId → new prompt
+ *   2b. keep each bundled source image in the TARGET org (type and size checked
+ *      again, hash recomputed; the importer's own identical image is reused)
+ *   3. create the main diagram, rewriting data.aiGeneration.promptId → new prompt,
+ *      data.aiGeneration.sourceImage.id → the kept image,
  *      and aiComparison.models[].diagramId → the new per-model diagrams
  *
  * Not wrapped in a cross-store transaction (Prisma + pgPool) — an admin tool; a
@@ -12,15 +15,17 @@
  */
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { createHash } from "node:crypto";
 import { auth } from "@/auth";
 import { prisma, pgPool } from "@/app/lib/db";
 import { isSuperuser } from "@/app/lib/superuser";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 import { checkSchemaCompatibility } from "@/app/lib/diagram/types";
 import {
-  isDiagramBundle, remapDiagramData, remapAiComparison,
+  isDiagramBundle, remapDiagramData, remapAiComparison, sourceImageIdOf,
   type BundledDiagram,
 } from "@/app/lib/diagram/diagramBundle";
+import { MAX_SOURCE_IMAGE_BYTES, SOURCE_IMAGE_TYPES } from "@/app/lib/ai/sourceImage";
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -87,16 +92,47 @@ export async function POST(req: Request) {
       promptIdMap.set(p.originalId, created.id);
     }
 
+    // 1b. The images the diagrams were generated from (bundle 1.1+). Nothing in
+    //     a bundle is trusted: only the four types the model reads, up to the
+    //     same 10 MB, and the hash is recomputed. Kept in the TARGET org as the
+    //     importer's; importing the same image again reuses the row. One that
+    //     fails the checks is skipped — the diagram still imports, and its
+    //     "View source image" says the image is not available.
+    const imageIdMap = new Map<string, string>();
+    // Only an image a diagram in the bundle actually names — an edited bundle
+    // cannot leave unreachable image rows behind in the target org.
+    const named = new Set([bundle.diagram, ...(bundle.comparisonDiagrams ?? [])]
+      .map((d) => sourceImageIdOf(d?.data)).filter((x): x is string => !!x));
+    for (const im of Array.isArray(bundle.sourceImages) ? bundle.sourceImages : []) {
+      if (!im || typeof im.originalId !== "string" || typeof im.data !== "string" || !named.has(im.originalId)) continue;
+      const mimeType = String(im.mimeType ?? "").toLowerCase();
+      if (!SOURCE_IMAGE_TYPES.includes(mimeType)) continue;
+      const bytes = Buffer.from(im.data, "base64");
+      if (!bytes.length || bytes.length > MAX_SOURCE_IMAGE_BYTES) continue;
+      const sha256 = createHash("sha256").update(bytes).digest("hex");
+      const where = { orgId_createdById_sha256: { orgId, createdById: userId, sha256 } };
+      const size = (n: unknown) => (typeof n === "number" && Number.isFinite(n) && n > 0 && n < 100_000 ? Math.round(n) : null);
+      const kept = await prisma.aiSourceImage.findUnique({ where, select: { id: true } })
+        ?? await prisma.aiSourceImage.create({
+          data: {
+            orgId, createdById: userId, sha256, mimeType, bytes,
+            name: String(im.name ?? "image").slice(0, 255), width: size(im.width), height: size(im.height),
+          },
+          select: { id: true },
+        }).catch(() => prisma.aiSourceImage.findUnique({ where, select: { id: true } }));   // the same image, kept a moment ago
+      if (kept) imageIdMap.set(im.originalId, kept.id);
+    }
+
     // 2. Per-model comparison diagrams → new ids (also remap any embedded prompt
-    //    reference, defensively — Compare-created diagrams usually carry none).
+    //    or image reference, defensively — Compare-created diagrams usually carry none).
     const diagramIdMap = new Map<string, string>();
     for (const cd of bundle.comparisonDiagrams ?? []) {
-      const remapped: BundledDiagram = { ...cd, data: remapDiagramData(cd.data, promptIdMap) };
+      const remapped: BundledDiagram = { ...cd, data: remapDiagramData(cd.data, promptIdMap, imageIdMap) };
       diagramIdMap.set(cd.originalId, await createDiagram(remapped));
     }
 
-    // 3. Main diagram — rewrite the embedded prompt + comparison references first.
-    const data = remapDiagramData(bundle.diagram.data, promptIdMap);
+    // 3. Main diagram — rewrite the embedded prompt, image + comparison references first.
+    const data = remapDiagramData(bundle.diagram.data, promptIdMap, imageIdMap);
     const aiComparison = remapAiComparison(bundle.diagram.aiComparison, diagramIdMap);
     const main = await prisma.diagram.create({
       data: {

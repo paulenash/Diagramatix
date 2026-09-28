@@ -1,8 +1,9 @@
 /**
  * SuperAdmin diagram-bundle EXPORT. Assembles a self-contained package for one
  * diagram — the diagram + its linked Prompt (incl. planJson) + its aiComparison
- * matrix + the per-model comparison diagrams — so it can be transferred and
- * re-imported via /api/admin/import-diagram-bundle.
+ * matrix + the per-model comparison diagrams + the image each was generated
+ * from, when it was kept — so it can be transferred and re-imported via
+ * /api/admin/import-diagram-bundle.
  *
  * Server-side because the client doesn't hold aiComparison (a DB column), the
  * prompt's planJson (JSON column read via raw SQL), or the per-model rows.
@@ -13,8 +14,8 @@ import { prisma, pgPool } from "@/app/lib/db";
 import { isSuperuser } from "@/app/lib/superuser";
 import { SCHEMA_VERSION, PRODUCT_VERSION } from "@/app/lib/diagram/types";
 import {
-  BUNDLE_KIND, BUNDLE_VERSION, comparisonDiagramIds,
-  type DiagramBundle, type BundledDiagram, type BundledPrompt,
+  BUNDLE_KIND, BUNDLE_VERSION, comparisonDiagramIds, sourceImageIdOf,
+  type DiagramBundle, type BundledDiagram, type BundledPrompt, type BundledSourceImage,
 } from "@/app/lib/diagram/diagramBundle";
 
 type Params = { params: Promise<{ id: string }> };
@@ -61,9 +62,29 @@ export async function GET(_req: Request, { params }: Params) {
 
   // Per-model comparison diagrams referenced by the aiComparison matrix.
   const compIds = comparisonDiagramIds(diagram.aiComparison);
-  const comparisonDiagrams: BundledDiagram[] = compIds.length
-    ? (await prisma.diagram.findMany({ where: { id: { in: compIds } } })).map(toBundled)
-    : [];
+  const comparisonRows = compIds.length ? await prisma.diagram.findMany({ where: { id: { in: compIds } } }) : [];
+  const comparisonDiagrams: BundledDiagram[] = comparisonRows.map(toBundled);
+
+  // The images they were generated from (Paul, 2026-09-28: "Add image to
+  // diagram-bundle"). Each only from the organisation of the diagram that
+  // names it — diagram data is editable, so an id written into it must never
+  // carry another organisation's image out in a bundle.
+  const sourceImages: BundledSourceImage[] = [];
+  const seen = new Set<string>();
+  for (const d of [diagram, ...comparisonRows]) {
+    const imageId = sourceImageIdOf(d.data);
+    if (!imageId || seen.has(imageId)) continue;
+    const img = await prisma.aiSourceImage.findFirst({
+      where: { id: imageId, orgId: d.orgId },
+      select: { id: true, name: true, mimeType: true, width: true, height: true, bytes: true },
+    });
+    if (!img) continue;
+    seen.add(imageId);
+    sourceImages.push({
+      originalId: img.id, name: img.name, mimeType: img.mimeType, width: img.width, height: img.height,
+      data: Buffer.from(img.bytes as Uint8Array).toString("base64"),
+    });
+  }
 
   const bundle: DiagramBundle = {
     bundleVersion: BUNDLE_VERSION,
@@ -74,6 +95,7 @@ export async function GET(_req: Request, { params }: Params) {
     diagram: { ...toBundled(diagram), aiComparison: diagram.aiComparison },
     prompt,
     comparisonDiagrams,
+    sourceImages,
   };
 
   return NextResponse.json(bundle);
