@@ -40,8 +40,11 @@ describe("layout diagnostics reach the editor", () => {
     "app/api/ai/epc/apply-layout/route.ts",
   ]) {
     it(`T2940 — ${route} collects and returns them`, () => {
+      // Changed 2026-09-28: BPMN apply-layout lays out through the shared
+      // layoutBpmnPlan (also the phone's generate job), which does the passing.
       const src = read(route);
-      expect(src, "must pass onDiagnostic into the layout").toMatch(/onDiagnostic:/);
+      const lays = src.includes("layoutBpmnPlan(") ? read("app/lib/ai/layoutBpmnPlan.ts") : src;
+      expect(lays, "must pass onDiagnostic into the layout").toMatch(/onDiagnostic:/);
       expect(src, "must return them to the caller").toMatch(/\bdiagnostics,/);
     });
   }

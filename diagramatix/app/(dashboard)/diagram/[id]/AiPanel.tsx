@@ -260,6 +260,8 @@ export function AiPanel({
     setError(null);
     dictatedRef.current = true;
     const handle = await startDictation({
+      // A prompt is prose: capitals and full stops (asrParams.ts).
+      prose: true,
       onText: (text) => setPrompt(prev => {
         const base = prev && !prev.endsWith(" ") && !prev.endsWith("\n") ? prev + " " : prev;
         return base + text;

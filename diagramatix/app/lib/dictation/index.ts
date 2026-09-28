@@ -26,6 +26,11 @@ export interface DictationCallbacks {
    * `diagramKeyterms` — see that module for why the timidity is deliberate.
    */
   keyterms?: readonly string[];
+  /**
+   * Punctuated prose (capitals, full stops) — for a spoken PROMPT, never for a
+   * command. Deepgram only: the browser engine has no such setting.
+   */
+  prose?: boolean;
 }
 import { createPcmQueue, PCM_QUEUE_MAX_CHUNKS } from "./pcmQueue";
 import { liveStreamParams, ASR_LANGUAGE } from "./asrParams";
@@ -186,7 +191,7 @@ async function startDeepgram(token: string, scheme: string, cb: DictationCallbac
   // Every recogniser setting — model, language, endpointing, and the keyword
   // boosts with their long-won reasoning — lives in `asrParams.ts`, so the live
   // microphone and a replayed clip cannot drift apart. (2026-09-24.)
-  const params = liveStreamParams({ sampleRate: ctx.sampleRate, keyterms: cb.keyterms });
+  const params = liveStreamParams({ sampleRate: ctx.sampleRate, keyterms: cb.keyterms, prose: cb.prose });
   const ws = new WebSocket(`wss://api.deepgram.com/v1/listen?${params.toString()}`, [scheme, token]);
   ws.binaryType = "arraybuffer";
 

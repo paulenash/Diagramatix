@@ -31,6 +31,11 @@ export async function eraseUser(userId: string): Promise<{ orgsRemoved: number }
         WHERE d.data -> 'aiGeneration' -> 'sourceImage' ->> 'id' = a.id
       )`;
 
+  // Their phone Generate runs (DiagramGenerateJob) hold the words they spoke.
+  // Runs on their own diagrams went with the cascade; runs on diagrams they
+  // could edit but did not own go here.
+  await prisma.diagramGenerateJob.deleteMany({ where: { userId } });
+
   let orgsRemoved = 0;
   for (const orgId of orgIds) {
     const counts = await prisma.org.findUnique({

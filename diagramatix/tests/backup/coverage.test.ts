@@ -173,6 +173,10 @@ const SCOPED_OMITTED = new Set<string>([
   // scoped org/user backup — a diagram restored from one keeps its link, and
   // "View source image" answers "not found" rather than failing.
   "AiSourceImage",
+  // The phone's Generate runs (2026-09-28): a transient work queue, like
+  // PartnerJob — a run's RESULT is the diagram it saved, which the backup
+  // carries. Finished rows are deleted after a week; a backup would outlive that.
+  "DiagramGenerateJob",
   // Diagram-JSON schema-validation findings are app-side observability, not
   // per-user/org data — carried by the SuperAdmin full backup only.
   "SchemaValidationIssue",

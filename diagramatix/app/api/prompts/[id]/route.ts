@@ -60,7 +60,14 @@ export async function PUT(req: Request, { params }: Params) {
 
   const { id } = await params;
   const existing = await prisma.prompt.findFirst({ where: { id, userId, orgId } });
-  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!existing) {
+    // `gone`: no such prompt at all (deleted) — as opposed to one that is
+    // somebody else's. A generation re-links only when it is gone: another
+    // editor's prompt stays linked, or every regeneration by a different editor
+    // would add another "— AI prompt" copy (the 2026-09-28 review).
+    const any = await prisma.prompt.findUnique({ where: { id }, select: { id: true } });
+    return NextResponse.json({ error: "Not found", gone: !any }, { status: 404 });
+  }
 
   const { name, text, planJson } = await req.json();
   const data: Record<string, string> = {};

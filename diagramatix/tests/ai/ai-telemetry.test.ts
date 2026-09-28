@@ -114,7 +114,7 @@ describe("aiTelemetry", () => {
     expect(created[0].userId).toBeNull();
   });
 
-  it("T1094 — AI_USER_METERED_POINTS = the 15 quota-metered routes; AI Tidy/Vectorize/Compare excluded", () => {
+  it("T1094 — AI_USER_METERED_POINTS = the 16 quota-metered points; AI Tidy/Vectorize/Compare excluded", () => {
     // These MUST match the routes that call recordUsage(userId, "aiAttempts").
     const expected = new Set([
       AI_INVOCATION_POINTS.BpmnPlan, AI_INVOCATION_POINTS.BpmnGenerate, AI_INVOCATION_POINTS.BpmnRefine,
@@ -126,6 +126,8 @@ describe("aiTelemetry", () => {
       // The partner API is metered like any other generation — the quota comes
       // from the service user's tier, so a partner cannot outrun their plan.
       AI_INVOCATION_POINTS.PartnerProcessMap,
+      // Changed 2026-09-28: the phone's Generate job, metered like the plan route.
+      AI_INVOCATION_POINTS.MobileGenerate,
     ]);
     expect(new Set(AI_USER_METERED_POINTS)).toEqual(expected);
     // Raw-only points must NOT count as a User Attempt.
@@ -167,6 +169,8 @@ describe("aiTelemetry", () => {
     // named here explicitly — the alternative is a scan broad enough to sweep up
     // helpers that merely mention a point.
     meteredInCode.add(AI_INVOCATION_POINTS.PartnerProcessMap);
+    // The phone's Generate meters from its job worker too (app/lib/ai/generateJob.ts).
+    meteredInCode.add(AI_INVOCATION_POINTS.MobileGenerate);
 
     expect([...meteredInCode].sort()).toEqual([...AI_USER_METERED_POINTS].sort());
   });

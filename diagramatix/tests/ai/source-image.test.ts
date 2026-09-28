@@ -200,9 +200,14 @@ describe("T4999 — wired: kept at apply, shown in Properties, re-attached with 
   it("apply shows the diagram at once; the image lands on THAT generation when its upload does; Free Form is never wiped", () => {
     expect(ed).toContain("void storeSourceImage(diagramId, meta.sourceImage).then((img) => { if (img) setAiSourceImage(stamp, img); });");
     expect(ed, "no longer held back for the upload").not.toContain("Promise.all([");
-    expect(ed).toContain("...(meta.freeForm !== undefined ? { freeForm: meta.freeForm } : {}),");
-    expect(ed).toContain("...(meta.promptFromImage !== undefined ? { fromImage: meta.promptFromImage } : {}),");
-    expect(ed).toContain("relaxedLayout: aiData.relaxedLayout ?? (meta?.freeForm ? true : undefined),");
+    // Changed 2026-09-28 (mobile voice stage 1): the record and merge rules moved
+    // to app/lib/ai/applyGeneration.ts, shared with the phone's server job; the
+    // editor calls them (T5009).
+    const rules = readFileSync("app/lib/ai/applyGeneration.ts", "utf8");
+    expect(rules).toContain("...(meta.freeForm !== undefined ? { freeForm: meta.freeForm } : {}),");
+    expect(rules).toContain("...(meta.promptFromImage !== undefined ? { fromImage: meta.promptFromImage } : {}),");
+    expect(rules).toContain("relaxedLayout: aiData.relaxedLayout ?? (meta?.freeForm ? true : undefined),");
+    expect(ed).toContain("setData(mergeGeneratedDiagram({ current: data, generated: aiData, aiGeneration, meta }));");
     for (const f of ["app/(dashboard)/diagram/[id]/PlanPanel.tsx", "app/(dashboard)/diagram/[id]/ai-generate/AiGenerateScreen.tsx"]) {
       const src = readFileSync(f, "utf8");
       // The plain apply AND the compare fill.

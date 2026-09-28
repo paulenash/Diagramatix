@@ -487,11 +487,47 @@ model Diagram {
   updatedAt                 DateTime                   @updatedAt
   diffRunsA                 ProcessDiffRun[]           @relation("ProcessDiffRunA")
   diffRunsB                 ProcessDiffRun[]           @relation("ProcessDiffRunB")
+  generateJobs              DiagramGenerateJob[]
 
   @@index([orgId])
   @@index([diagramOwnerId])
   @@index([lifecycle])
   @@index([orgId, lifecycle])
+}
+
+/// A phone "Generate" run (2026-09-28, mobile voice stage 1): plan, lay out
+/// and save ON THE SERVER, so a phone that locks during the minute-or-two a
+/// generation takes still gets its diagram. The worker runs in the request's own
+/// process (the Partner API's pattern); `reapStaleGenerateJobs` turns an
+/// abandoned `running` row into an honest failure, and finished rows are
+/// deleted after a week. All-scalar on purpose: no Json column to write through
+/// pgPool. See app/lib/ai/generateJob.ts.
+model DiagramGenerateJob {
+  id           String    @id @default(cuid())
+  diagramId    String
+  diagram      Diagram   @relation(fields: [diagramId], references: [id], onDelete: Cascade)
+  /// The signed-in user who asked (plain field; eraseUser deletes their rows).
+  userId       String
+  orgId        String
+  /// queued | running | succeeded | failed
+  status       String    @default("queued")
+  /// queued | planning | shaping | saving | done
+  stage        String    @default("queued")
+  /// What was sent, so a failed run can be tried again from the phone.
+  promptText   String    @db.Text
+  model        String?
+  errorCode    String?
+  /// Curated for the user — never a raw exception string.
+  errorMessage String?
+  /// The diagram's version after the job saved it.
+  version      Int?
+  startedAt    DateTime?
+  finishedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([diagramId, userId, createdAt])
+  @@index([status])
 }
 
 // Live co-authoring presence: one row per (diagram, user) currently in the

@@ -7,9 +7,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
-import { layoutBpmnDiagram, type AiElement, type AiConnection, type LayoutDiagnostic } from "@/app/lib/diagram/bpmnLayout";
-import { validatePlan } from "@/app/lib/ai/planSchema";
-import { normaliseAiPlan } from "@/app/lib/ai/planBpmn";
+import { layoutBpmnPlan } from "@/app/lib/ai/layoutBpmnPlan";
 import { isSuperuser } from "@/app/lib/superuser";
 import { tryGetCurrentOrgId } from "@/app/lib/auth/orgContext";
 import { recordDiagramGenerated } from "@/app/lib/ai/aiTelemetry";
@@ -60,31 +58,18 @@ export async function POST(req: Request) {
   }
 
   trace("[apply-layout] validating plan");
-  const result = validatePlan(plan);
-  if (!result.ok) {
-    trace(`[apply-layout] validation failed: ${JSON.stringify(result.issues?.slice(0, 3))}`);
-    return NextResponse.json({ error: "Plan failed validation", issues: result.issues }, { status: 400 });
-  }
-
-  trace("[apply-layout] normalising");
-  // Defence-in-depth: run the same normaliser the Sonnet path uses so any
-  // camelCase-typed plan hand-edited in the JSON view still lays out correctly.
-  const normalised = {
-    elements: result.plan.elements as unknown as AiElement[],
-    connections: result.plan.connections as unknown as AiConnection[],
-  };
-  normaliseAiPlan(normalised);
-
-  trace(`[apply-layout] validated: ${normalised.elements.length} elements, ${normalised.connections.length} connections`);
   const t0 = Date.now();
 
   try {
-    // See generate-bpmn: the layout reports what it could not take at face
-    // value, and the Plan flow must surface it too — this is the step that
-    // actually produces the diagram, so it is where the damage would show.
-    const diagnostics: LayoutDiagnostic[] = [];
-    const diagramData = layoutBpmnDiagram(normalised.elements, normalised.connections,
-      { promptLabel, preservePositions, imageAspect, mode, onDiagnostic: (d) => diagnostics.push(d) });
+    // Validate → normalise → lay out, shared with the phone's generate job
+    // (app/lib/ai/layoutBpmnPlan.ts). The layout's diagnostics come back with
+    // the diagram: this is the step that produces it, so the damage shows here.
+    const laid = layoutBpmnPlan(plan, { promptLabel, preservePositions, imageAspect, mode });
+    if (!laid.ok) {
+      trace(`[apply-layout] validation failed: ${JSON.stringify((laid.issues as unknown[] | undefined)?.slice(0, 3))}`);
+      return NextResponse.json({ error: "Plan failed validation", issues: laid.issues }, { status: 400 });
+    }
+    const { diagramData, diagnostics, elementCount, connectionCount } = laid;
     trace(`[apply-layout] ok in ${Date.now() - t0}ms: ${diagramData.elements.length} rendered elements, ${diagramData.connectors.length} connectors`);
     // "# diagrams generated using AI": the Plan-flow diagram is PRODUCED here
     // (Phase 2). No AI call happens at this step, so resolve org directly.
@@ -92,8 +77,8 @@ export async function POST(req: Request) {
     await recordDiagramGenerated({ userId: session.user.id, orgId, diagramType: "bpmn", source: "bpmn-apply" });
     return NextResponse.json({
       diagramData,
-      elementCount: normalised.elements.length,
-      connectionCount: normalised.connections.length,
+      elementCount,
+      connectionCount,
       diagnostics,
     });
   } catch (err) {

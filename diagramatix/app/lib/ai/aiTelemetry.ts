@@ -19,6 +19,9 @@ export const AI_INVOCATION_POINTS = {
   /** The partner API's process-map call. Metered like any other generation:
    *  the service user's tier is what the quota is drawn from. */
   PartnerProcessMap: "partner.process-map",
+  /** The phone's Generate: plan + layout + save as a server job (2026-09-28).
+   *  Metered from the job worker, like the partner API. */
+  MobileGenerate: "mobile.generate",
   BpmnCompare: "bpmn.compare", // SuperAdmin multi-model comparison (one row per model)
   BpmnRefine: "bpmn.refine", // clarifying-questions refine
   FlowchartPlan: "flowchart.plan",
@@ -82,6 +85,7 @@ export const AI_USER_METERED_POINTS: ReadonlySet<string> = new Set<string>([
   AI_INVOCATION_POINTS.GenerateSop,
   AI_INVOCATION_POINTS.ProcessDiff,
   AI_INVOCATION_POINTS.PartnerProcessMap,
+  AI_INVOCATION_POINTS.MobileGenerate,
   AI_INVOCATION_POINTS.MiningDiscover,
   AI_INVOCATION_POINTS.MiningDiscoverSm,
   AI_INVOCATION_POINTS.MiningExplain,
@@ -93,6 +97,7 @@ export const AI_INVOCATION_POINT_LABELS: Record<string, string> = {
   [AI_INVOCATION_POINTS.BpmnGenerate]: "BPMN Generate",
   [AI_INVOCATION_POINTS.BpmnCompare]: "AI Compare",
   [AI_INVOCATION_POINTS.PartnerProcessMap]: "Process API",
+  [AI_INVOCATION_POINTS.MobileGenerate]: "Phone Generate",
   [AI_INVOCATION_POINTS.ProcessDiff]: "Diff Processes Summary",
   [AI_INVOCATION_POINTS.BpmnRefine]: "BPMN Refine",
   [AI_INVOCATION_POINTS.FlowchartPlan]: "Flowchart Plan",

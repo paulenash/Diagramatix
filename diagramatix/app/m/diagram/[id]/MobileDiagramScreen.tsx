@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { sanitizeRichText } from "@/app/lib/diagram/richText";
 import type { DiagramData, DiagramElement } from "@/app/lib/diagram/types";
@@ -12,12 +12,39 @@ import { thumbnailTransform } from "@/app/lib/diagram/templateThumbnail";
 import { buildReviewComment } from "@/app/lib/diagram/reviewComment";
 import { collapseAllReviewComments } from "@/app/lib/diagram/reviewCollapse";
 import { isMobileSupportedType, MOBILE_SUPPORTED_LABEL } from "@/app/lib/diagram/mobileSupport";
+import { MobileGenerateSheet } from "@/app/components/mobile/MobileGenerateSheet";
+import { useAiAllowed } from "@/app/lib/auth/useAiAllowed";
+import { EMPTY_DRAFT, draftFromFailedJob, draftToRequest, type GenerateDraft } from "@/app/lib/mobile/generateDraft";
+import type { GenerateJobView } from "@/app/lib/ai/generateJob";
 
 interface Loaded {
   name: string; type: string; data: DiagramData; projectId: string | null;
   version: number; canReview: boolean; viewer: { id: string; name: string };
+  /** May change the CONTENT (owners/editors; never a reviewer) — the Generate gate. */
+  canEdit: boolean;
   colorConfig?: SymbolColorConfig;
 }
+
+/** Where a phone Generate run stands (the run itself is a server job). */
+type GenState =
+  | { phase: "idle" }
+  | { phase: "starting" }
+  | { phase: "running"; jobId: string; stage: string; since: number }
+  | { phase: "failed"; message: string };
+
+const STAGE_LABEL: Record<string, string> = {
+  queued: "Starting",
+  planning: "The AI is working out the process",
+  shaping: "Laying it out",
+  saving: "Saving",
+};
+/** A failed run older than this is history, not news. */
+const RECENT_FAILURE_MS = 60 * 60 * 1000;
+const fmtElapsed = (ms: number) => {
+  const t = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
+};
+const hasContent = (x: Loaded | null) => (x?.data.elements?.length ?? 0) > 0;
 
 const isContainer = (e: DiagramElement) => e.type === "pool" || e.type === "lane" || e.type === "sublane";
 const stripHtml = (s: string) => s.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").trim();
@@ -29,7 +56,9 @@ function elementLabel(e: DiagramElement): string {
 /**
  * Mobile diagram screen: read-only pan/zoom viewer + (for owners/editors/assigned
  * reviewers) the ability to attach Review Comments to elements — typed or dictated —
- * and Save. Review comments are ALWAYS collapsed on save. Everything else is view-only.
+ * and Save. Review comments are ALWAYS collapsed on save. Everything else is view-only,
+ * except Generate: an owner or editor can fill an EMPTY BPMN diagram by describing
+ * the process (MobileGenerateSheet → a server job that saves it; 2026-09-28).
  */
 export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
   const router = useRouter();
@@ -55,24 +84,172 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
   const [parents, setParents] = useState<{ id: string; name: string }[]>([]);
   const rootRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    let on = true;
-    fetch(`/api/diagrams/${diagramId}`, { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("Could not load diagram"))))
-      .then((j) => { if (on) setD({
+  // Loaded on open, and again when a Generate run has saved the diagram. Only
+  // the latest request may land (a reload racing the first load).
+  const loadSeq = useRef(0);
+  const load = useCallback(async (): Promise<Loaded | null> => {
+    const seq = ++loadSeq.current;
+    try {
+      const r = await fetch(`/api/diagrams/${diagramId}`, { cache: "no-store" });
+      if (!r.ok) throw new Error("Could not load diagram");
+      const j = await r.json();
+      const next: Loaded = {
         name: j.name,
         type: j.type ?? "",
         data: (j.data ?? { elements: [], connectors: [] }) as DiagramData,
         projectId: j.projectId ?? null,
         version: j.version ?? 0,
         canReview: !!j.canReview,
+        canEdit: !!j.canEdit,
         viewer: j.viewer ?? { id: "", name: "" },
         colorConfig: j.colorConfig ?? undefined,
-      }); })
-      .catch((e) => { if (on) setErr(e.message); })
-      .finally(() => { if (on) setLoading(false); });
-    return () => { on = false; };
+      };
+      if (seq === loadSeq.current) { setD(next); setErr(null); }
+      return next;
+    } catch (e) {
+      if (seq === loadSeq.current) setErr(e instanceof Error ? e.message : "Could not load diagram");
+      return null;
+    } finally {
+      if (seq === loadSeq.current) setLoading(false);
+    }
   }, [diagramId]);
+  useEffect(() => {
+    void load();
+    return () => { loadSeq.current++; };
+  }, [load]);
+
+  // ── Generate (mobile voice stage 1) ──────────────────────────────────────
+  const aiAllowed = useAiAllowed();
+  const [gen, setGen] = useState<GenState>({ phase: "idle" });
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [draft, setDraftState] = useState<GenerateDraft>(EMPTY_DRAFT);
+  const setDraft = useCallback((u: (cur: GenerateDraft) => GenerateDraft) => setDraftState(u), []);
+  const [startErr, setStartErr] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const canGenerate = !!d && d.canEdit && d.type === "bpmn" && aiAllowed;
+
+  // A phone that reloaded (or came back to this diagram) mid-run picks the run
+  // up again; one that failed within the hour says why and offers its words back.
+  const resumedRef = useRef(false);
+  useEffect(() => {
+    if (!d || !d.canEdit || d.type !== "bpmn" || hasContent(d) || resumedRef.current) return;
+    resumedRef.current = true;
+    fetch(`/api/diagrams/${diagramId}/generate`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: { job: GenerateJobView | null } | null) => {
+        const job = j?.job;
+        if (!job) return;
+        if (job.status === "queued" || job.status === "running") {
+          setGen({ phase: "running", jobId: job.jobId, stage: job.stage, since: Date.now() - (job.elapsedMs ?? 0) });
+        } else if (job.status === "failed" && job.finishedAt && Date.now() - Date.parse(job.finishedAt) < RECENT_FAILURE_MS) {
+          setGen({ phase: "failed", message: job.error?.message ?? "The last generation failed." });
+          setDraftState((cur) => (cur.prompt ? cur : draftFromFailedJob(job.promptText)));
+        }
+      })
+      .catch(() => { /* nothing to resume */ });
+  }, [d, diagramId]);
+
+  // Poll the run. A phone coming back from a locked screen asks at once.
+  const runningJobId = gen.phase === "running" ? gen.jobId : null;
+  useEffect(() => {
+    if (!runningJobId) return;
+    let stopped = false;
+    let inFlight = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const schedule = (ms: number) => { clearTimeout(timer); timer = setTimeout(() => void poll(), ms); };
+    async function poll() {
+      if (stopped || inFlight) return;
+      inFlight = true;
+      try {
+        const r = await fetch(`/api/diagrams/${diagramId}/generate/${runningJobId}`, { cache: "no-store" });
+        if (stopped) return;
+        if (r.status === 404) {
+          setGen({ phase: "failed", message: "This generation could no longer be found. Tap Generate to try again." });
+          return;
+        }
+        if (r.ok) {
+          const job: GenerateJobView = await r.json();
+          if (stopped) return;
+          if (job.status === "succeeded") {
+            const fresh = await load();
+            if (stopped) return;
+            setGen({ phase: "idle" });
+            setDraftState(EMPTY_DRAFT);
+            setSaveMsg({ ok: true, text: fresh
+              ? "Generated ✓ — saved to this diagram."
+              : "Generated ✓ — saved, but it couldn’t be shown. Reload the page to see it." });
+            return;
+          }
+          if (job.status === "failed") {
+            setGen({ phase: "failed", message: job.error?.message ?? "Generation failed." });
+            setDraftState((cur) => (cur.prompt ? cur : draftFromFailedJob(job.promptText)));
+            return;
+          }
+          setGen((g) => (g.phase === "running" && g.jobId === runningJobId ? { ...g, stage: job.stage } : g));
+        }
+      } catch { /* offline for a moment — keep asking */ }
+      finally { inFlight = false; }
+      if (!stopped) schedule(3000);
+    }
+    schedule(1500);
+    const onVisible = () => { if (document.visibilityState === "visible") schedule(0); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { stopped = true; clearTimeout(timer); document.removeEventListener("visibilitychange", onVisible); };
+  }, [runningJobId, diagramId, load]);
+
+  // The elapsed-time clock while a run is under way.
+  useEffect(() => {
+    if (gen.phase !== "running") return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [gen.phase]);
+
+  function openGenerate() {
+    setStartErr(null);
+    setSheetOpen(true);
+  }
+
+  async function startGenerate(finished?: GenerateDraft) {
+    if (!d || gen.phase === "starting" || gen.phase === "running") return;
+    const body = draftToRequest(finished ?? draft);
+    if (!body.prompt) return;
+    setGen({ phase: "starting" });
+    setStartErr(null);
+    try {
+      const r = await fetch(`/api/diagrams/${diagramId}/generate`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...body, version: d.version }),
+      });
+      const j = await r.json().catch(() => ({})) as Record<string, unknown>;
+      if (r.status === 202 && typeof j.jobId === "string") {
+        setSheetOpen(false);
+        setSaveMsg(null);
+        setNow(Date.now());
+        setGen({
+          phase: "running", jobId: j.jobId, stage: typeof j.stage === "string" ? j.stage : "queued",
+          since: Date.now() - (typeof j.elapsedMs === "number" ? j.elapsedMs : 0),
+        });
+        return;
+      }
+      setGen({ phase: "idle" });
+      if (r.status === 409 && (j.error === "conflict" || j.error === "has_content")) {
+        // Changed on another device since it was opened: take the new copy first.
+        const fresh = await load();
+        if (hasContent(fresh)) {
+          setSheetOpen(false);
+          setSaveMsg({ ok: false, text: "This diagram was changed on another device, so nothing was generated." });
+        } else {
+          setStartErr("This diagram changed on another device. It has been reloaded — tap Generate again.");
+        }
+        return;
+      }
+      const said = (typeof j.message === "string" && j.message) || (typeof j.error === "string" && j.error) || null;
+      setStartErr(said ?? "Generate couldn’t start. Try again in a moment.");
+    } catch {
+      setGen({ phase: "idle" });
+      setStartErr("Couldn’t reach Diagramatix — check your connection.");
+    }
+  }
 
   const empty = !!d && (d.data.elements?.length ?? 0) === 0;
   const unsupported = !!d && !isMobileSupportedType(d.type);
@@ -227,6 +404,8 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
         {d?.canReview && !empty && !unsupported ? (
           <button onClick={saveDiagram} disabled={saving || !dirty}
             className="text-sm font-medium text-blue-600 disabled:text-gray-300">{saving ? "Saving…" : "Save"}</button>
+        ) : canGenerate && empty && gen.phase !== "running" ? (
+          <button onClick={openGenerate} className="text-sm font-medium text-blue-600">Generate</button>
         ) : <span className="w-8" />}
       </div>
 
@@ -244,7 +423,33 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
         )}
         {d && empty && !unsupported && (
           <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
-            <p className="text-sm text-gray-400">This diagram is empty. Generating from a prompt is coming in the next update.</p>
+            {gen.phase === "running" ? (
+              <div className="max-w-xs">
+                <div className="mx-auto mb-3 h-8 w-8 rounded-full border-2 border-blue-600 border-t-transparent animate-spin" />
+                <p className="text-sm font-medium text-gray-900">Generating…</p>
+                <p className="text-[13px] text-gray-600 mt-1">{STAGE_LABEL[gen.stage] ?? "Working"} · {fmtElapsed(now - gen.since)}</p>
+                <p className="text-[11px] text-gray-500 mt-3">You can lock your phone or leave this screen — the diagram is saved when it’s ready.</p>
+              </div>
+            ) : canGenerate ? (
+              <div className="max-w-xs">
+                {gen.phase === "failed" && (
+                  <p className="text-[12px] text-amber-800 bg-amber-50 rounded-md px-2 py-1.5 mb-3">{gen.message}</p>
+                )}
+                <p className="text-sm text-gray-600 mb-4">This diagram is empty. Describe the process out loud — or type it — and the AI draws it.</p>
+                <button onClick={openGenerate}
+                  className="h-12 px-5 rounded-full bg-blue-600 text-white text-sm font-medium shadow active:bg-blue-700">
+                  🎤 Generate from your description
+                </button>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400">
+                {d.type === "bpmn" && d.canEdit && !aiAllowed
+                  ? "This diagram is empty. AI generation is turned off by your organisation’s policy."
+                  : d.type !== "bpmn" && d.canEdit
+                    ? "This diagram is empty. Generating on the phone is available for BPMN diagrams."
+                    : "This diagram is empty."}
+              </p>
+            )}
           </div>
         )}
         {d && !empty && !unsupported && (
@@ -278,6 +483,11 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
         )}
       </div>
 
+      {sheetOpen && d && (
+        <MobileGenerateSheet draft={draft} setDraft={setDraft}
+          starting={gen.phase === "starting"} error={startErr}
+          onGenerate={(finished) => void startGenerate(finished)} onClose={() => setSheetOpen(false)} />
+      )}
       {addTarget && (
         <MobileCommentSheet mode="edit" targetLabel={elementLabel(addTarget)}
           onSave={saveNote} onClose={() => setAddTarget(null)} />

@@ -41,7 +41,8 @@ function clientSources(dir: string): string[] {
  */
 function promptCreateBodies(src: string): string[] {
   const out: string[] = [];
-  const re = /fetch\(\s*[`"']\/api\/prompts[`"']\s*,\s*\{/g;
+  // fetch, or an injected fetchImpl (promptLinkFetch.ts) — Changed 2026-09-28.
+  const re = /fetch\w*\(\s*[`"']\/api\/prompts[`"']\s*,\s*\{/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(src)) !== null) {
     const chunk = src.slice(m.index, m.index + 900);
@@ -94,7 +95,9 @@ describe("every prompt creation records its provenance", () => {
     // The path somebody takes without ever pressing Save: generate, and a
     // prompt is created for them. It was the one most likely to be missed and
     // the one most likely to be used.
-    const src = readFileSync(join(process.cwd(), "app/(dashboard)/diagram/[id]/DiagramEditor.tsx"), "utf8");
+    // Changed 2026-09-28: the rule moved from DiagramEditor into
+    // app/lib/ai/applyGeneration.ts (shared with the phone's server job).
+    const src = readFileSync(join(process.cwd(), "app/lib/ai/applyGeneration.ts"), "utf8");
     expect(src).toMatch(/meta\.promptSource \? \{ source: meta\.promptSource \} : \{\}/);
     expect(src).toMatch(/meta\.promptFromImage \? \{ fromImage: true \} : \{\}/);
     expect(src).toMatch(/meta\.promptRefined \? \{ refined: true \} : \{\}/);

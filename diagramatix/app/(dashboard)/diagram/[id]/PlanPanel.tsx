@@ -37,6 +37,7 @@ import { ClarificationDialog } from "@/app/components/ClarificationDialog";
 import { RefineQuestionsDialog } from "@/app/components/RefineQuestionsDialog";
 import { SaveChangesDialog } from "@/app/components/SaveChangesDialog";
 import { startDictation, type DictationHandle } from "@/app/lib/dictation";
+import { MEETING_TRANSCRIPT_PREAMBLE } from "@/app/lib/ai/promptPreambles";
 import { appendClarifications, appendRefinements } from "@/app/lib/diagram/clarifications";
 import type { RefineQuestion } from "@/app/lib/ai/refineQuestions";
 import type { AiFeedback } from "@/app/lib/diagram/types";
@@ -508,6 +509,8 @@ export function PlanPanel({
     setListening(true);
     dictatedRef.current = true;
     const handle = await startDictation({
+      // A prompt is prose: capitals and full stops (asrParams.ts).
+      prose: true,
       onText: (text) => setPrompt(prev => {
         const base = prev && !prev.endsWith(" ") && !prev.endsWith("\n") ? prev + " " : prev;
         return base + text;
@@ -1317,7 +1320,7 @@ export function PlanPanel({
               })}
               onTranscript={(text) => setPrompt(prev => prev.trim()
                 ? prev.trimEnd() + "\n" + text
-                : "Build the BPMN process from this meeting transcript. Treat each distinct speaker as a role / lane, and use roles or job functions — never an individual person's name — in pool, lane, task and annotation names. Ignore small talk.\n\n" + text)}
+                : MEETING_TRANSCRIPT_PREAMBLE + text)}
             />
             {aiFeedback && aiFeedback.questions.length > 0 && (
               <button

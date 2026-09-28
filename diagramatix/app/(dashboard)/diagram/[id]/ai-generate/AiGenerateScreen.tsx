@@ -37,6 +37,7 @@ import { planTypeConfig } from "@/app/lib/ai/planTypes";
 import { buildPromptFromDiagram } from "@/app/lib/diagram/prompt-from-diagram";
 import { appendClarifications, appendRefinements } from "@/app/lib/diagram/clarifications";
 import { startDictation, type DictationHandle } from "@/app/lib/dictation";
+import { MEETING_TRANSCRIPT_PREAMBLE } from "@/app/lib/ai/promptPreambles";
 import { useMicTest } from "@/app/lib/dictation/useMicTest";
 import { useFeatureColors } from "@/app/lib/theme/useFeatureColors";
 import { tonesFor } from "@/app/lib/theme/featureColors";
@@ -74,11 +75,6 @@ const IMAGE_TYPES: Record<string, string> = {
   "image/webp": "image/webp",
   "image/gif": "image/gif",
 };
-
-const TRANSCRIPT_PREAMBLE =
-  "Build the BPMN process from this meeting transcript. Treat each distinct speaker as a role / lane, "
-  + "and use roles or job functions — never an individual person's name — in pool, lane, task and "
-  + "annotation names. Ignore small talk.\n\n";
 
 interface Props {
   diagramType: string;
@@ -538,6 +534,8 @@ export function AiGenerateScreen({
     setListening(true);
     dictatedRef.current = true;
     const handle = await startDictation({
+      // A prompt is prose: capitals and full stops (asrParams.ts).
+      prose: true,
       onText: (text) => setPrompt((prev) => {
         const base = prev && !prev.endsWith(" ") && !prev.endsWith("\n") ? prev + " " : prev;
         return base + text;
@@ -932,7 +930,7 @@ export function AiGenerateScreen({
               })}
               onTranscript={(text) => setPrompt((prev) => prev.trim()
                 ? prev.trimEnd() + "\n" + text
-                : TRANSCRIPT_PREAMBLE + text)}
+                : MEETING_TRANSCRIPT_PREAMBLE + text)}
               clarifyCount={aiFeedback?.questions.length ?? 0}
               onOpenClarify={() => setClarifyOpen(true)}
             />

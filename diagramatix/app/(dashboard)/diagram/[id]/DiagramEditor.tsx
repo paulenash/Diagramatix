@@ -22,7 +22,7 @@ import {
   type TemplateData,
 } from "@/app/lib/diagram/types";
 import { mergeDiagram, type MergeConflict } from "@/app/lib/diagram/mergeDiagram";
-import { AI_PROMPT_ANNOTATION_ID, buildPromptAnnotation, contentBBox, stripPromptAnnotations, stripPromptAnnotationConnectors } from "@/app/lib/ai/promptAnnotation";
+import { AI_PROMPT_ANNOTATION_ID, buildPromptAnnotation, contentBBox, stripPromptAnnotations } from "@/app/lib/ai/promptAnnotation";
 import { usesPlanFlow } from "@/app/lib/ai/planTypes";
 import { useAllowedModels } from "./ModelSelect";
 import { DEFAULT_SYMBOL_COLORS, effectiveSymbolColors, type SymbolColorConfig } from "@/app/lib/diagram/colors";
@@ -63,6 +63,8 @@ import { interruptsPick } from "@/app/lib/assist/pickInterrupt";
 import { adjustOp, collectDividers, dividerOp, dividerReply, dividerRulers, explainDividerMiss, movedPx, readDividerUtterance, type DividerFlow, type DividerMemory } from "@/app/lib/assist/dividerFlow";
 import { readBoundaryFollowUp, type BoundaryMemory } from "@/app/lib/assist/boundaryFollowUp";
 import { imageNameInPrompt, regenerateFreeForm, storeSourceImage, type StoredSourceImage } from "@/app/lib/ai/sourceImage";
+import { decidePromptLink, mergeGeneratedDiagram, nextAiGeneration, type LinkedPrompt } from "@/app/lib/ai/applyGeneration";
+import { markPromptUsedFetch, runPromptLinkFetch } from "@/app/lib/ai/promptLinkFetch";
 import { isIncompleteCommand } from "@/app/lib/assist/incompleteCommand";
 import { leadingSpokenNumber } from "@/app/lib/assist/spokenNumber";
 import { capitaliseFirstWord, needsCapital } from "@/app/lib/diagram/nameCase";
@@ -1646,47 +1648,12 @@ export function DiagramEditor({
   const aiJustGeneratedRef = useRef(false);
 
   // Link/auto-save the Prompt that generated this diagram, returning its id+name.
-  // Rules (Paul, 2026-07-26 — "auto-save a Prompt every time"):
-  //   • generated from an UNCHANGED saved Prompt → link to it, never overwrite;
-  //   • else reuse this diagram's own auto-created Prompt (update its text) or
-  //     create one (auto-named from the diagram title). One linked prompt per diagram.
+  // The rules live in app/lib/ai/applyGeneration.ts (shared with the phone's
+  // server-side generate job); this is only the desktop's fetch half.
   const ensureLinkedPrompt = useCallback(async (
     meta: AiApplyMeta,
-  ): Promise<{ id: string; name: string; autoNamed: boolean } | null> => {
-    try {
-      if (meta.selectedPromptId && meta.selectedPromptUnchanged) {
-        return { id: meta.selectedPromptId, name: meta.selectedPromptName ?? "Saved prompt", autoNamed: false };
-      }
-      const prev = data.aiGeneration;
-      const autoName = `${(diagramName || "Untitled").trim()} — AI prompt`;
-      // Auto-persist the generated plan (when the generator supplied one) onto
-      // the linked Prompt so the diagram retains its plan for re-layout /
-      // inspection without re-calling the model. Only auto-named prompts are
-      // (over)written — a user's own saved Prompt is never modified.
-      const planField = meta.planJson ? { planJson: meta.planJson } : {};
-      if (prev?.promptId && prev.autoNamed) {
-        await fetch(`/api/prompts/${prev.promptId}`, {
-          method: "PUT", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: meta.promptText, ...planField }),
-        });
-        return { id: prev.promptId, name: prev.promptName, autoNamed: true };
-      }
-      const res = await fetch(`/api/prompts`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: autoName, text: meta.promptText, diagramType, ...planField,
-          // Whatever the panel knew. Omitted fields stay NULL rather than
-          // defaulting to "typed" — an auto-created prompt whose provenance
-          // nobody reported is genuinely unknown.
-          ...(meta.promptSource ? { source: meta.promptSource } : {}),
-          ...(meta.promptFromImage ? { fromImage: true } : {}),
-          ...(meta.promptRefined ? { refined: true } : {}),
-        }),
-      });
-      if (!res.ok) return null;
-      const created = await res.json();
-      return { id: created.id as string, name: (created.name as string) ?? autoName, autoNamed: true };
-    } catch { return null; }
+  ): Promise<LinkedPrompt | null> => {
+    return runPromptLinkFetch(decidePromptLink({ meta, prev: data.aiGeneration, diagramName, diagramType }));
   }, [data.aiGeneration, diagramName, diagramType]);
 
   // Apply an AI-generated result — shared by AiPanel + PlanPanel. Replaces the
@@ -1699,56 +1666,12 @@ export function DiagramEditor({
       if (linked) {
         // Every generable type funnels through here, from both the one-shot
         // panel and the two-phase one — so this is the only place usage has to
-        // be recorded. Fire-and-forget: the diagram is already on screen, and
-        // losing a count must never cost somebody their work.
-        void fetch(`/api/prompts/${linked.id}/used`, {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ model: meta.model }),
-        }).catch(() => {});
-        aiGeneration = {
-          promptId: linked.id, promptName: linked.name, promptText: meta.promptText,
-          model: meta.model, generatedAt: new Date().toISOString(), autoNamed: linked.autoNamed,
-          // Keep the plan ON THE DIAGRAM. It was only ever written to the linked
-          // Prompt, so regenerating in the editor silently dropped the diagram's
-          // own copy — and the Properties panel then said, correctly by its own
-          // reading and uselessly to anyone looking at it, that the diagram it
-          // had just regenerated had no plan.
-          ...(meta.planJson ? { plan: meta.planJson } : {}),
-          // A regeneration does not change WHICH repository prompt this diagram
-          // came from. Dropping the stamp lost the template-version warning for
-          // good the first time anyone regenerated.
-          ...(data.aiGeneration?.source ? { source: data.aiGeneration.source } : {}),
-          // Free Form and the image travel with the diagram, so a re-generate
-          // can offer both again (Paul, 2026-09-28).
-          ...(meta.freeForm !== undefined ? { freeForm: meta.freeForm } : {}),
-          ...(meta.promptFromImage !== undefined ? { fromImage: meta.promptFromImage } : {}),
-        };
+        // be recorded.
+        markPromptUsedFetch(linked.id, meta.model);
+        aiGeneration = nextAiGeneration({ prev: data.aiGeneration, linked, meta, generatedAt: new Date().toISOString() });
       }
     }
-    const prevAnnotation = data.elements.find((e) => e.id === AI_PROMPT_ANNOTATION_ID) ?? null;
-    let elements = stripPromptAnnotations(aiData.elements);
-    // The on-canvas prompt annotation is OFF by default now — only add it when the
-    // user has explicitly ticked "Show original generation prompt".
-    if (aiGeneration && meta && data.showAiPromptAnnotation === true) {
-      elements = [buildPromptAnnotation(
-        { name: aiGeneration.promptName, text: aiGeneration.promptText, generatedAt: aiGeneration.generatedAt },
-        contentBBox(elements),
-        prevAnnotation,
-      ), ...elements];
-    }
-    setData({
-      ...data,
-      elements,
-      // Drop the legacy R56 association that linked the old "AI Generated" note
-      // to the start event — its note element is stripped above, so the line
-      // would otherwise dangle.
-      connectors: stripPromptAnnotationConnectors(aiData.connectors),
-      viewport: aiData.viewport ?? data.viewport,
-      // Free Form asked for stays Free Form even when the model returned no
-      // positions to reproduce — it used to be overwritten with nothing.
-      relaxedLayout: aiData.relaxedLayout ?? (meta?.freeForm ? true : undefined),
-      aiGeneration,
-    });
+    setData(mergeGeneratedDiagram({ current: data, generated: aiData, aiGeneration, meta }));
     // The image is kept AFTER the diagram is on screen (the 2026-09-28 review:
     // holding the apply back for a 10 MB upload left the old diagram showing
     // under an "Applied" status, and edits made meanwhile were overwritten).

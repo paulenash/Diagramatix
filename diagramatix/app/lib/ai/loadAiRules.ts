@@ -13,8 +13,10 @@ import { groundRulesWithPcf } from "@/app/lib/pcf/promptGrounding";
  * Returns the green-filtered, PCF-grounded rules markdown for `diagramType`
  * (the Diagram.type key: "bpmn", "value-chain", "context", "process-context",
  * "archimate", …). Never throws — returns "" if the rules tables are empty.
+ * `pcfNodeId` grounds the brief in the diagram's APQC process, as the
+ * consoles do when the diagram is linked to one (the phone's generate job).
  */
-export async function loadAiRulesForType(diagramType: string): Promise<string> {
+export async function loadAiRulesForType(diagramType: string, pcfNodeId?: string): Promise<string> {
   let rules = "";
   try {
     for (const category of ["general", diagramType]) {
@@ -28,6 +30,6 @@ export async function loadAiRulesForType(diagramType: string): Promise<string> {
     /* proceed without rules — matches the routes' behaviour */
   }
   rules = splitRulesByEnforcement(rules).aiRules;
-  rules = await groundRulesWithPcf(prisma, rules, undefined);
+  rules = await groundRulesWithPcf(prisma, rules, pcfNodeId);
   return rules;
 }

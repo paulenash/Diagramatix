@@ -127,6 +127,12 @@ export function liveStreamParams(o: {
   keyterms?: readonly string[];
   /** Harness only — an alternative command vocabulary to measure. */
   commandWords?: readonly string[];
+  /**
+   * PROSE — capitals and full stops, for a spoken PROMPT that a person and the
+   * AI then read (the phone's Generate, the desktop prompt consoles). Never for
+   * commands: see below for what punctuation does to a command.
+   */
+  prose?: boolean;
 }): URLSearchParams {
   const p = new URLSearchParams({
     model: ASR_MODEL,
@@ -151,6 +157,9 @@ export function liveStreamParams(o: {
     language: ASR_LANGUAGE,
     endpointing: String(ASR_ENDPOINTING_MS),
   });
+  // A prompt is prose: without these a dictated process description arrives as
+  // one unpunctuated run (2026-09-28, mobile voice stage 1).
+  if (o.prose) { p.set("smart_format", "true"); p.set("punctuate", "true"); }
   appendKeyterms(p, o.keyterms, o.commandWords);
   return p;
 }
