@@ -460,6 +460,8 @@ export type Action =
   | { type: "SET_PROCEDURE_DOC"; payload: { url?: string; name?: string } | undefined }
   | { type: "SET_PCF"; payload: PcfClassification | undefined }
   | { type: "SET_AI_FEEDBACK"; payload: AiFeedback | undefined }
+  /** The kept source image, once its upload lands — only onto the generation it belongs to (matched by generatedAt). */
+  | { type: "SET_AI_SOURCE_IMAGE"; payload: { generatedAt: string; sourceImage: NonNullable<NonNullable<DiagramData["aiGeneration"]>["sourceImage"]> } }
   | { type: "CORRECT_ALL_CONNECTORS" }
   | { type: "INSERT_SPACE"; payload: { markerX: number; markerY: number; dx: number; dy: number;
       /** Only this container's contents move (voice "insert between", 2026-09-27); containers the line crosses still grow. */
@@ -8229,6 +8231,12 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         aiFeedback: action.payload && action.payload.questions.length > 0 ? action.payload : undefined,
       };
 
+    case "SET_AI_SOURCE_IMAGE":
+      // The diagram was applied at once; its image lands when the upload does.
+      // A later generation (or none) means this image is not its picture.
+      if (state.aiGeneration?.generatedAt !== action.payload.generatedAt) return state;
+      return { ...state, aiGeneration: { ...state.aiGeneration, sourceImage: action.payload.sourceImage } };
+
     case "INSERT_SPACE": {
       const { markerX, markerY, dx, dy, scopeId } = action.payload;
       // SCOPED (voice "insert C between A and B", Paul 2026-09-27: "move
@@ -11257,6 +11265,12 @@ export function useDiagram(initialData: DiagramData) {
       (feedback: AiFeedback | undefined) => {
         pushHistory(snapshotData());
         dispatch({ type: "SET_AI_FEEDBACK", payload: feedback });
+      }, []
+    ),
+    // Part of the generation it belongs to — not an undo step of its own.
+    setAiSourceImage: useCallback(
+      (generatedAt: string, sourceImage: NonNullable<NonNullable<DiagramData["aiGeneration"]>["sourceImage"]>) => {
+        dispatch({ type: "SET_AI_SOURCE_IMAGE", payload: { generatedAt, sourceImage } });
       }, []
     ),
     convertTaskSubprocess,

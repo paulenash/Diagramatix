@@ -1,4 +1,6 @@
 "use client";
+import type { StoredSourceImage } from "@/app/lib/ai/sourceImage";
+import { useReattachSourceImage } from "./useReattachSourceImage";
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSession } from "next-auth/react";
@@ -34,6 +36,9 @@ interface Props {
    *  onPrefillConsumed so it's applied once. */
   initialPrompt?: string;
   initialModel?: string;
+  /** Re-generate: the kept image to re-attach, or the name of one that was not kept. */
+  initialSourceImage?: StoredSourceImage;
+  initialImageNotKept?: string;
   onPrefillConsumed?: () => void;
   /** Cost-gated generate models the user may pick + the current default id. */
   aiModels?: AllowedModel[];
@@ -80,7 +85,7 @@ export function AiPanel({
   diagramType, onApplyDiagram, onClose, onGeneratingChange,
   isAdmin, currentElements, currentConnectors, onNarrativeGeneratingChange,
   onAudioPhaseChange, aiFeedback, onAiFeedback, diagramId, onComparison, pcf,
-  initialPrompt, initialModel, onPrefillConsumed, aiModels = [], currentAiModelId,
+  initialPrompt, initialModel, initialSourceImage, initialImageNotKept, onPrefillConsumed, aiModels = [], currentAiModelId,
   noObstacleAvoidance, onNoObstacleAvoidanceChange,
 }: Props) {
   const { data: authSession } = useSession();
@@ -101,6 +106,16 @@ export function AiPanel({
     if (initialPrompt !== undefined) {
       setPrompt(initialPrompt);
       if (initialModel) setModel(initialModel);
+      // Re-generate of a diagram drawn from an image: the kept image goes back
+      // on, as in the plan console (2026-09-28).
+      setImageNotKept(initialImageNotKept ?? null);
+      const stored = initialSourceImage;
+      if (stored) {
+        reattach.start(stored, (img) => {
+          setAttachment({ name: stored.name, type: "image", data: img.data, mediaType: img.mediaType, storedId: stored.id });
+          setImageNotKept(null);
+        }, () => setImageNotKept(stored.name));
+      }
       onPrefillConsumed?.();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -139,7 +154,10 @@ export function AiPanel({
   const pendingClearRef = useRef(false);
 
   // File attachment
-  const [attachment, setAttachment] = useState<{ name: string; type: string; data: string; mediaType?: string } | null>(null);
+  const [attachment, setAttachment] = useState<{ name: string; type: string; data: string; mediaType?: string; storedId?: string } | null>(null);
+  // A re-generate's kept image, loading (Generate waits) — or the name of one that was not kept.
+  const reattach = useReattachSourceImage(diagramId);
+  const [imageNotKept, setImageNotKept] = useState<string | null>(null);
   const [showAttachPreview, setShowAttachPreview] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Natural pixel dimensions of an attached image — lets the preserved layout
@@ -413,6 +431,9 @@ export function AiPanel({
           selectedPromptUnchanged: sel ? sel.text.trim() === effPrompt : undefined,
           promptSource: dictatedRef.current ? "dictated" : "typed",
           promptFromImage: attachment?.type === "image",
+          // The image goes with the diagram, to be looked at again (2026-09-28).
+          sourceImage: attachment?.type === "image" && attachment.mediaType
+            ? { name: attachment.name, mediaType: attachment.mediaType, ...(attachment.storedId ? { storedId: attachment.storedId } : { data: attachment.data }) } : undefined,
         });
       }
     } catch (err) {
@@ -456,6 +477,9 @@ export function AiPanel({
           selectedPromptUnchanged: sel ? sel.text.trim() === effPrompt : undefined,
           promptSource: dictatedRef.current ? "dictated" : "typed",
           promptFromImage: attachment?.type === "image",
+          // The image goes with the diagram, to be looked at again (2026-09-28).
+          sourceImage: attachment?.type === "image" && attachment.mediaType
+            ? { name: attachment.name, mediaType: attachment.mediaType, ...(attachment.storedId ? { storedId: attachment.storedId } : { data: attachment.data }) } : undefined,
         });
       }
       onComparison?.(result.comparison);
@@ -478,6 +502,8 @@ export function AiPanel({
     setEditingPromptId(null);
     setSaveName("");
     setShowSave(false);
+    reattach.cancel();
+    setImageNotKept(null);
     setAttachment(null);
     imageDimsRef.current = null;
     setError(null);
@@ -680,7 +706,7 @@ export function AiPanel({
               <div className="flex items-center gap-1 flex-1 min-w-0">
                 <button onClick={() => setShowAttachPreview(true)} className="text-[10px] text-blue-600 truncate flex-1 text-left hover:underline" title="Preview attachment">{attachment.name}</button>
                 <button onClick={() => setShowAttachPreview(true)} className="text-gray-400 hover:text-blue-500 text-[10px] shrink-0" title="Preview attachment">Preview</button>
-                <button onClick={() => setAttachment(null)} className="text-gray-400 hover:text-red-500 text-[10px] shrink-0" title="Remove attachment">&times;</button>
+                <button onClick={() => { reattach.cancel(); setAttachment(null); }} className="text-gray-400 hover:text-red-500 text-[10px] shrink-0" title="Remove attachment">&times;</button>
               </div>
             )}
           </div>
@@ -768,7 +794,7 @@ export function AiPanel({
         )}
 
         <div className="flex gap-1.5">
-          <button onClick={() => handleGenerate()} disabled={generating || !prompt.trim()}
+          <button onClick={() => handleGenerate()} disabled={generating || !prompt.trim() || !!reattach.pending}
             style={{ ["--ai" as string]: aiColor }}
             className="ai-solid flex-1 px-3 py-1.5 text-xs rounded disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5">
             {generating && (

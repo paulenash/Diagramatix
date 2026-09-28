@@ -1,4 +1,6 @@
 "use client";
+import type { StoredSourceImage } from "@/app/lib/ai/sourceImage";
+import { useReattachSourceImage } from "../useReattachSourceImage";
 
 /**
  * NEW AI Generate — the full-screen console.
@@ -63,7 +65,7 @@ type Busy = "plan" | "apply" | "save" | "load" | "narrative" | "compare" | "refi
 
 type Attachment =
   | { name: string; type: "pdf" | "text"; data: string }
-  | { name: string; type: "image"; data: string; mediaType: string };
+  | { name: string; type: "image"; data: string; mediaType: string; storedId?: string };
 
 const IMAGE_TYPES: Record<string, string> = {
   "image/png": "image/png",
@@ -86,6 +88,10 @@ interface Props {
   isAdmin?: boolean;
   initialPrompt?: string;
   initialModel?: string;
+  /** Re-generate: Free Form as it was chosen, the kept image to re-attach, or the name of one that was not kept. */
+  initialFreeForm?: boolean;
+  initialSourceImage?: StoredSourceImage;
+  initialImageNotKept?: string;
   onPrefillConsumed?: () => void;
   aiModels?: AllowedModel[];
   currentAiModelId?: string;
@@ -104,7 +110,7 @@ export function AiGenerateScreen({
   diagramType, diagramName, onApplyDiagram, onClose, isAdmin = false,
   currentElements, currentConnectors, onBusyChange, onAudioPhaseChange,
   aiFeedback, onAiFeedback, diagramId, onComparison, pcf,
-  initialPrompt, initialModel, onPrefillConsumed, aiModels = [], currentAiModelId,
+  initialPrompt, initialModel, initialFreeForm, initialSourceImage, initialImageNotKept, onPrefillConsumed, aiModels = [], currentAiModelId,
 }: Props) {
   const { data: authSession } = useSession();
   const accent = tonesFor(useFeatureColors(), "ai").text;
@@ -173,6 +179,19 @@ export function AiGenerateScreen({
     if (initialPrompt !== undefined) {
       setPrompt(initialPrompt);
       if (initialModel) setModel(initialModel);
+      // Re-generate of a diagram drawn from an image — as the side panel does
+      // (Paul, 2026-09-28: "Don't forget to check New AI Generate!!"): the kept
+      // image goes back on, with Free Form as it was chosen.
+      if (initialFreeForm !== undefined) setPreserveLayout(initialFreeForm);
+      setImageNotKept(initialImageNotKept ?? null);
+      const stored = initialSourceImage;
+      if (stored) {
+        reattach.start(stored, (img) => {
+          setAttachment({ name: stored.name, type: "image", data: img.data, mediaType: img.mediaType, storedId: stored.id });
+          imageDimsRef.current = stored.width && stored.height ? { w: stored.width, h: stored.height } : null;
+          setImageNotKept(null);
+        }, () => setImageNotKept(stored.name));
+      }
       onPrefillConsumed?.();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -204,6 +223,8 @@ export function AiGenerateScreen({
 
   const loadSavedPrompt = useCallback(async (sp: SavedPrompt) => {
     if (busy) return;
+    reattach.cancel();
+    setImageNotKept(null);
     setBusy("load");
     setError(null);
     setStatus(null);
@@ -235,6 +256,9 @@ export function AiGenerateScreen({
   const [showAttachPreview, setShowAttachPreview] = useState(false);
   const [preserveLayout, setPreserveLayout] = useState(true);
   const imageDimsRef = useRef<{ w: number; h: number } | null>(null);
+  // A re-generate's kept image, loading (Plan waits), or the name of one that was not kept.
+  const reattach = useReattachSourceImage(diagramId);
+  const [imageNotKept, setImageNotKept] = useState<string | null>(null);
 
   const clearForNew = useCallback(() => {
     setPrompt("");
@@ -242,6 +266,8 @@ export function AiGenerateScreen({
     setSaveName("");
     setShowSave(false);
     setPlan({ elements: [], connections: [] });
+    reattach.cancel();
+    setImageNotKept(null);
     setAttachment(null);
     imageDimsRef.current = null;
     setRefineQs(null);
@@ -412,6 +438,13 @@ export function AiGenerateScreen({
         promptFromImage: attachment?.type === "image",
         promptRefined: refinedRef.current,
         planJson: plan,
+        // Free Form and the image go with the diagram (2026-09-28).
+        freeForm: !flatPlan && attachment?.type === "image" ? preserveLayout : undefined,
+        sourceImage: attachment?.type === "image" ? {
+          name: attachment.name, mediaType: attachment.mediaType,
+          ...(attachment.storedId ? { storedId: attachment.storedId } : { data: attachment.data }),
+          ...(imageDimsRef.current ? { width: imageDimsRef.current.w, height: imageDimsRef.current.h } : {}),
+        } : undefined,
       });
       if (flatPlan) {
         setStatus(`Applied: ${json.elementCount} elements, ${json.connectionCount} ${planCfg.connectorNoun}s`);
@@ -530,6 +563,7 @@ export function AiGenerateScreen({
 
   // ── File attach (one reader; two buttons) ─────────────────────────────────
   const handleFileAttach = useCallback(async (file: File) => {
+    reattach.cancel();
     const MAX_SIZE = 10 * 1024 * 1024; // 10MB
     if (file.size > MAX_SIZE) { setError("File too large (max 10MB)"); return; }
     if (file.type === "application/pdf") {
@@ -681,6 +715,13 @@ export function AiGenerateScreen({
           promptSource: dictatedRef.current ? "dictated" : "typed",
           promptFromImage: attachment?.type === "image",
           promptRefined: refinedRef.current,
+          // As the plain apply does: Free Form and the image go with the diagram.
+          freeForm: !flatPlan && attachment?.type === "image" ? preserveLayout : undefined,
+          sourceImage: attachment?.type === "image" ? {
+            name: attachment.name, mediaType: attachment.mediaType,
+          ...(attachment.storedId ? { storedId: attachment.storedId } : { data: attachment.data }),
+            ...(imageDimsRef.current ? { width: imageDimsRef.current.w, height: imageDimsRef.current.h } : {}),
+          } : undefined,
         });
       }
       onComparison?.(result.comparison);
@@ -874,7 +915,12 @@ export function AiGenerateScreen({
               onFile={(f) => { void handleFileAttach(f); }}
               attachment={attachment}
               onPreviewAttachment={() => setShowAttachPreview(true)}
-              onRemoveAttachment={() => { setAttachment(null); imageDimsRef.current = null; }}
+              onRemoveAttachment={() => { reattach.cancel(); setAttachment(null); imageDimsRef.current = null; }}
+              sourceNote={reattach.pending && !attachment
+                ? `Attaching the source image (${reattach.pending})…`
+                : imageNotKept && !attachment
+                  ? `This diagram was generated from an image (${imageNotKept}) that wasn't kept. Attach it again to use it — and to reproduce its layout (Free Form). Without it the model sees only the words.`
+                  : null}
               showPreserveLayout={!flatPlan && attachment?.type === "image"}
               preserveLayout={preserveLayout}
               onPreserveLayoutChange={setPreserveLayout}
@@ -895,7 +941,7 @@ export function AiGenerateScreen({
             <AiPanel title="Generate" tones={tones} hint={hasPlan ? `plan: ${plan.elements.length} elements · ${plan.connections.length} ${planCfg.connectorNoun}s` : "no plan yet"}>
               <div className="flex flex-wrap items-center gap-2">
                 <AiButton tones={tones} variant="solid" onClick={() => { void callPlan(); }}
-                  disabled={!prompt.trim() || busy !== null}
+                  disabled={!prompt.trim() || busy !== null || !!reattach.pending}
                   title="Ask the AI for a structured plan — no shapes are drawn yet">
                   {planning && <AiSpinner />}
                   {planning ? "Planning…" : hasPlan ? "Re-plan" : "Plan"}

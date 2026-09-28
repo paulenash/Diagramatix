@@ -15,7 +15,7 @@ const FEATURES: Array<{ name: string; summary: string; details: string; sortOrde
     summary:
       "Bring a BPMN diagram drawn in another tool into Diagramatix exactly as it looks — pools any size or side-by-side, message flows drawn straight between elements that aren't lined up — without a wall of layout warnings.",
     details: [
-      "- **Reproduce from an image:** attach a picture of the diagram to AI Generate, tick “Reproduce original layout”, and Diagramatix rebuilds it at the positions it was drawn — pools, lanes, tasks, gateways and the connectors between them, kept where they are",
+      "- **Reproduce from an image:** attach a picture of the diagram to AI Generate, tick “Free Form — reproduce the image's layout”, and Diagramatix rebuilds it at the positions it was drawn — pools, lanes, tasks, gateways and the connectors between them, kept where they are",
       "- **Free-form / imported layout:** a per-diagram switch (Diagram Properties) that lets pools be any size and sit anywhere (not forced into stacked full-width bands) and lets message flows run rectilinearly between elements that aren't vertically aligned",
       "- **No false errors:** the layout validation that enforces Diagramatix's own conventions is relaxed for these diagrams, so an imported foreign model isn't buried in red flags",
       "- **Still fully editable:** an imported diagram is a normal Diagramatix diagram — move things, edit labels, and draw more, all without the editor snapping pools back into a column or messages back to vertical",

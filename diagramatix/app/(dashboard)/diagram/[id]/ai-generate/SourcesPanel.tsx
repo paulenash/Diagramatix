@@ -26,7 +26,7 @@ export interface Attachment {
 export function SourcesPanel({
   tones, busy, diagramType, onFile,
   attachment, onPreviewAttachment, onRemoveAttachment,
-  showPreserveLayout, preserveLayout, onPreserveLayoutChange,
+  showPreserveLayout, preserveLayout, onPreserveLayoutChange, sourceNote,
   onAudioPhaseChange, onAudioError, onAudioFeedback, onTranscript,
   clarifyCount, onOpenClarify,
 }: {
@@ -40,6 +40,8 @@ export function SourcesPanel({
   showPreserveLayout: boolean;
   preserveLayout: boolean;
   onPreserveLayoutChange: (next: boolean) => void;
+  /** A re-generate's image: "Attaching…", or that it was not kept and should be attached again. */
+  sourceNote?: string | null;
   onAudioPhaseChange: (phase: null | "transcribing" | "reading" | "tidying") => void;
   onAudioError: (message: string) => void;
   onAudioFeedback: (questions: string[]) => void;
@@ -116,12 +118,16 @@ export function SourcesPanel({
         </div>
       )}
 
+      {sourceNote && (
+        <p className="mt-2 rounded border border-amber-400/40 bg-amber-400/10 px-2 py-1 text-[11px] leading-snug text-amber-200">{sourceNote}</p>
+      )}
+
       {showPreserveLayout && (
         <label className="flex items-center gap-1.5 mt-2 cursor-pointer select-none"
           title="Rebuild the diagram at the positions drawn in the image (pools any size/placement, rectilinear messages) instead of Diagramatix's auto-layout.">
           <input type="checkbox" className="cursor-pointer" checked={preserveLayout}
             onChange={(e) => onPreserveLayoutChange(e.target.checked)} />
-          <span className="text-[11px] text-white/70">Reproduce original layout</span>
+          <span className="text-[11px] text-white/70">Free Form — reproduce the image&apos;s layout</span>
         </label>
       )}
     </AiPanel>

@@ -17,6 +17,8 @@ import type {
   UmlOperation,
 } from "@/app/lib/diagram/types";
 import { RichTextEditor } from "./RichTextEditor";
+import { AttachmentPreviewDialog } from "@/app/components/AttachmentPreviewDialog";
+import { sourceImageUrl } from "@/app/lib/ai/sourceImage";
 import { DiffRunsButton } from "@/app/components/diff/DiffRunsButton";
 import { richToLines } from "@/app/lib/diagram/richText";
 import { SimulationSection } from "./SimulationSection";
@@ -57,10 +59,12 @@ const ARCHI_REL_META: Record<string, { type: string; group: ArchiRelGroup }> = {
 
 /** Diagram-Properties "Regenerate from prompt" control: pick a (cost-gated) model
  *  and re-run the linked prompt's CURRENT text over the current diagram. */
-function RegenerateControl({ models, initialModel, onRegenerate, canSeeModel, showCost }: {
+function RegenerateControl({ models, initialModel, onRegenerate, onRegenerateNew, canSeeModel, showCost }: {
   models: AllowedModel[];
   initialModel: string;
   onRegenerate?: (model: string) => void;
+  /** Regenerate in the NEW (full-screen) AI Generate console — offered to whoever can open it. */
+  onRegenerateNew?: (model: string) => void;
   /** The AI model picker is a SuperAdmin-only detail; others regenerate with
    *  the recorded/default model (no dropdown shown). */
   canSeeModel?: boolean;
@@ -89,6 +93,16 @@ function RegenerateControl({ models, initialModel, onRegenerate, canSeeModel, sh
       >
         Regenerate
       </button>
+      {onRegenerateNew && (
+        <button
+          type="button"
+          onClick={() => onRegenerateNew(canSeeModel ? model : initialModel)}
+          className="text-[9px] px-2 py-0.5 rounded border border-fuchsia-300 text-fuchsia-700 hover:bg-fuchsia-50 shrink-0"
+          title="Regenerate in the NEW full-screen AI Generate console — with the kept image and Free Form, as in the side panel"
+        >
+          in ✨ NEW
+        </button>
+      )}
     </div>
   );
 }
@@ -169,6 +183,8 @@ interface Props {
   currentAiModelId?: string;
   /** Regenerate the diagram from the linked prompt's CURRENT text with `model`. */
   onRegenerate?: (model: string) => void;
+  /** …the same, in the NEW AI Generate console (SuperAdmin, BPMN, while it is judged). */
+  onRegenerateNew?: (model: string) => void;
   /** Whether the on-canvas AI-Prompt annotation is shown (absent/true = shown). */
   showAiPromptAnnotation?: boolean;
   onToggleAiPromptAnnotation?: (show: boolean) => void;
@@ -837,6 +853,7 @@ export function PropertiesPanel({
   aiModels = [],
   currentAiModelId,
   onRegenerate,
+  onRegenerateNew,
   showAiPromptAnnotation,
   onToggleAiPromptAnnotation,
   onFlipForkJoin,
@@ -932,6 +949,7 @@ export function PropertiesPanel({
   const [propsOpen, setPropsOpen] = useState(true);
   // AI-Prompt editor popup (opened from the "AI Prompt" link) — movable, edit + save.
   const [showPromptEdit, setShowPromptEdit] = useState(false);
+  const [showSourceImage, setShowSourceImage] = useState(false);
   // Sub-sections inside the new "Diagram Properties" group. Each
   // collapses independently so the user can fold away parts they don't
   // care about. Defaults: title open, database/process-owner open,
@@ -1160,6 +1178,18 @@ export function PropertiesPanel({
                 >
                   {aiGeneration.promptName}
                 </button>
+                {/* The image it was drawn from (Paul, 2026-09-28: "I need a way to view
+                    the image after the diagram has been generated"). */}
+                {aiGeneration.sourceImage && diagramId && (
+                  <button
+                    type="button"
+                    onClick={() => setShowSourceImage(true)}
+                    className="text-[9px] text-blue-600 hover:underline truncate block text-left w-full"
+                    title={`The image this diagram was generated from — ${aiGeneration.sourceImage.name}`}
+                  >
+                    View source image
+                  </button>
+                )}
                 {onToggleAiPromptAnnotation && (
                   <label className="mt-0.5 flex items-center gap-1 text-[9px] text-gray-600 cursor-pointer">
                     <input type="checkbox" className="w-3 h-3"
@@ -1191,11 +1221,20 @@ export function PropertiesPanel({
                   // default only when the diagram has no recorded model).
                   initialModel={aiGeneration.model || currentAiModelId || ""}
                   onRegenerate={onRegenerate}
+                  onRegenerateNew={onRegenerateNew}
                   canSeeModel={_isAdmin}
                   showCost={showModelCost}
                 />
               </div>
             </div>
+            {showSourceImage && aiGeneration.sourceImage && diagramId && (
+              <AttachmentPreviewDialog
+                attachment={{ name: aiGeneration.sourceImage.name, type: "image", data: "", url: sourceImageUrl(diagramId, aiGeneration.sourceImage.id) }}
+                onClose={() => setShowSourceImage(false)}
+                wide
+                closeLabel="Close"
+              />
+            )}
             {showPromptEdit && (
               <PromptEditPopup
                 promptId={aiGeneration.promptId}

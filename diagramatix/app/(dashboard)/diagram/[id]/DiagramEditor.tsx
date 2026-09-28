@@ -62,6 +62,7 @@ import { aiInventedRename, INVENTED_RENAME_REFUSAL } from "@/app/lib/assist/aiGu
 import { interruptsPick } from "@/app/lib/assist/pickInterrupt";
 import { adjustOp, collectDividers, dividerOp, dividerReply, dividerRulers, explainDividerMiss, movedPx, readDividerUtterance, type DividerFlow, type DividerMemory } from "@/app/lib/assist/dividerFlow";
 import { readBoundaryFollowUp, type BoundaryMemory } from "@/app/lib/assist/boundaryFollowUp";
+import { imageNameInPrompt, regenerateFreeForm, storeSourceImage, type StoredSourceImage } from "@/app/lib/ai/sourceImage";
 import { isIncompleteCommand } from "@/app/lib/assist/incompleteCommand";
 import { leadingSpokenNumber } from "@/app/lib/assist/spokenNumber";
 import { capitaliseFirstWord, needsCapital } from "@/app/lib/diagram/nameCase";
@@ -1105,7 +1106,11 @@ export function DiagramEditor({
           name: saveAsName.trim(),
           type: diagramType,
           projectId: projectId ?? undefined,
-          data,
+          // The copy links to the original's prompt but never rewrites it: a
+          // re-generate of the copy used to PUT its text onto the prompt the
+          // ORIGINAL still links to (2026-09-28). Not auto-named here, the
+          // copy's first re-generate makes a prompt of its own.
+          data: data.aiGeneration?.autoNamed ? { ...data, aiGeneration: { ...data.aiGeneration, autoNamed: false } } : data,
           colorConfig: diagramColorConfig,
           displayMode,
         }),
@@ -1247,6 +1252,7 @@ export function DiagramEditor({
     setProcedureDoc,
     setPcf,
     setAiFeedback,
+    setAiSourceImage,
     elementMoveEnd,
     flipForkJoin,
     convertTaskSubprocess,
@@ -1630,7 +1636,12 @@ export function DiagramEditor({
     });
   }, [data.aiGeneration, promptFacts]);
 
-  const [aiPrefill, setAiPrefill] = useState<{ prompt: string; model: string } | null>(null);
+  // A re-generate's prefill: the prompt and model, and — for a diagram drawn
+  // from an image — Free Form as it was chosen, and the kept image to re-attach
+  // (or, for one generated before images were kept, the name to ask for).
+  const [aiPrefill, setAiPrefill] = useState<{
+    prompt: string; model: string; freeForm?: boolean; sourceImage?: StoredSourceImage; imageNotKept?: string;
+  } | null>(null);
   // Armed by applyAiResult after a generation; the next canvas click dismisses the AI panel.
   const aiJustGeneratedRef = useRef(false);
 
@@ -1707,6 +1718,10 @@ export function DiagramEditor({
           // came from. Dropping the stamp lost the template-version warning for
           // good the first time anyone regenerated.
           ...(data.aiGeneration?.source ? { source: data.aiGeneration.source } : {}),
+          // Free Form and the image travel with the diagram, so a re-generate
+          // can offer both again (Paul, 2026-09-28).
+          ...(meta.freeForm !== undefined ? { freeForm: meta.freeForm } : {}),
+          ...(meta.promptFromImage !== undefined ? { fromImage: meta.promptFromImage } : {}),
         };
       }
     }
@@ -1729,14 +1744,25 @@ export function DiagramEditor({
       // would otherwise dangle.
       connectors: stripPromptAnnotationConnectors(aiData.connectors),
       viewport: aiData.viewport ?? data.viewport,
-      relaxedLayout: aiData.relaxedLayout,
+      // Free Form asked for stays Free Form even when the model returned no
+      // positions to reproduce — it used to be overwritten with nothing.
+      relaxedLayout: aiData.relaxedLayout ?? (meta?.freeForm ? true : undefined),
       aiGeneration,
     });
+    // The image is kept AFTER the diagram is on screen (the 2026-09-28 review:
+    // holding the apply back for a 10 MB upload left the old diagram showing
+    // under an "Applied" status, and edits made meanwhile were overwritten).
+    // It lands on THIS generation only — matched by its timestamp. A failure
+    // costs only the "View source image" link, never the generation.
+    if (meta?.sourceImage && diagramId && aiGeneration && aiGeneration !== data.aiGeneration) {
+      const stamp = aiGeneration.generatedAt;
+      void storeSourceImage(diagramId, meta.sourceImage).then((img) => { if (img) setAiSourceImage(stamp, img); });
+    }
     // Arm the "first canvas click dismisses the AI panel" behaviour (only for a real
     // generation, i.e. when meta is present).
     if (meta) aiJustGeneratedRef.current = true;
     requestAnimationFrame(() => window.dispatchEvent(new CustomEvent("dgx:fitToContent")));
-  }, [data, setData, ensureLinkedPrompt]);
+  }, [data, setData, ensureLinkedPrompt, diagramId, setAiSourceImage]);
 
   // After an AI generation, the FIRST click on the canvas (select an element,
   // click a connector, or click empty space) closes the still-open AI/Plan panel —
@@ -2053,18 +2079,39 @@ export function DiagramEditor({
   const { models: aiModels, current: currentAiModel } = useAllowedModels(isActingAdmin);
   // "Regenerate" from Diagram Properties: pull the linked prompt's CURRENT text and
   // open the AI/Plan panel prefilled with it + the chosen model.
-  const handleRegenerate = useCallback(async (model: string) => {
+  const handleRegenerate = useCallback(async (model: string, console: "panel" | "new" = "panel") => {
     const gen = data.aiGeneration;
     if (!gen) return;
     let promptText = gen.promptText;
+    let fromImage = false;
     try {
       const res = await fetch(`/api/prompts/${gen.promptId}`);
-      if (res.ok) { const p = await res.json(); if (typeof p.text === "string" && p.text.trim()) promptText = p.text; }
+      if (res.ok) {
+        const p = await res.json();
+        if (typeof p.text === "string" && p.text.trim()) promptText = p.text;
+        fromImage = p.fromImage === true;
+      }
     } catch { /* fall back to the snapshot text */ }
-    setAiPrefill({ prompt: promptText, model });
-    if (usesPlanPanel) { setShowPlanPanel(true); setShowAiPanel(false); }
+    // Drawn from an image that was not kept (before 2026-09-28): the model
+    // would see only the words — say so, and ask for the image again. Whether
+    // it was drawn from one is the generation's own record where there is one;
+    // the prompt's flag never clears, so it only speaks for older diagrams.
+    const drawnFromImage = gen.fromImage ?? (fromImage || !!imageNameInPrompt(promptText));
+    const lost = gen.sourceImage || !drawnFromImage ? null
+      : (imageNameInPrompt(promptText) ?? imageNameInPrompt(gen.promptText) ?? "the original image");
+    const freeForm = regenerateFreeForm(gen, data.relaxedLayout);
+    setAiPrefill({
+      prompt: promptText, model,
+      ...(freeForm !== undefined ? { freeForm } : {}),
+      ...(gen.sourceImage ? { sourceImage: gen.sourceImage } : {}),
+      ...(lost ? { imageNotKept: lost } : {}),
+    });
+    // The NEW console takes the same prefill — the kept image, Free Form, the
+    // "not kept" note (Paul, 2026-09-28: "Don't forget to check New AI Generate!!").
+    if (console === "new") { setShowAiGenerateScreen(true); setShowPlanPanel(false); setShowAiPanel(false); }
+    else if (usesPlanPanel) { setShowPlanPanel(true); setShowAiPanel(false); }
     else { setShowAiPanel(true); setShowPlanPanel(false); }
-  }, [data.aiGeneration, usesPlanPanel]);
+  }, [data.aiGeneration, data.relaxedLayout, usesPlanPanel]);
   type TemplateRow = { id: string; name: string; group: string | null; description?: string | null; thumbnailSvg?: string | null; hasContainer?: boolean; hasWhiteBoxPool?: boolean };
   const [userTemplates, setUserTemplates] = useState<TemplateRow[]>([]);
   const [builtInTemplates, setBuiltInTemplates] = useState<TemplateRow[]>([]);
@@ -6807,6 +6854,7 @@ export function DiagramEditor({
             aiModels={aiModels}
             currentAiModelId={currentAiModel?.id}
             onRegenerate={handleRegenerate}
+            onRegenerateNew={!readOnly && diagramType === "bpmn" && aiAllowedHere && isActingAdmin ? (m: string) => { void handleRegenerate(m, "new"); } : undefined}
             showAiPromptAnnotation={data.showAiPromptAnnotation}
             onToggleAiPromptAnnotation={toggleAiPromptAnnotation}
             onFlipForkJoin={flipForkJoin}
@@ -6825,6 +6873,8 @@ export function DiagramEditor({
             onApplyDiagram={(aiData: DiagramData, meta?: AiApplyMeta) => { void applyAiResult(aiData, meta); }}
             initialPrompt={aiPrefill?.prompt}
             initialModel={aiPrefill?.model}
+            initialSourceImage={aiPrefill?.sourceImage}
+            initialImageNotKept={aiPrefill?.imageNotKept}
             onPrefillConsumed={() => setAiPrefill(null)}
             aiModels={aiModels}
             currentAiModelId={currentAiModel?.id}
@@ -6933,6 +6983,9 @@ export function DiagramEditor({
             onApplyDiagram={(aiData: DiagramData, meta?: AiApplyMeta) => { void applyAiResult(aiData, meta); }}
             initialPrompt={aiPrefill?.prompt}
             initialModel={aiPrefill?.model}
+            initialFreeForm={aiPrefill?.freeForm}
+            initialSourceImage={aiPrefill?.sourceImage}
+            initialImageNotKept={aiPrefill?.imageNotKept}
             onPrefillConsumed={() => setAiPrefill(null)}
             aiModels={aiModels}
             currentAiModelId={currentAiModel?.id}
@@ -6957,6 +7010,9 @@ export function DiagramEditor({
             onApplyDiagram={(aiData: DiagramData, meta?: AiApplyMeta) => { void applyAiResult(aiData, meta); }}
             initialPrompt={aiPrefill?.prompt}
             initialModel={aiPrefill?.model}
+            initialFreeForm={aiPrefill?.freeForm}
+            initialSourceImage={aiPrefill?.sourceImage}
+            initialImageNotKept={aiPrefill?.imageNotKept}
             onPrefillConsumed={() => setAiPrefill(null)}
             aiModels={aiModels}
             currentAiModelId={currentAiModel?.id}

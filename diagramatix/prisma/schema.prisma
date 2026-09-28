@@ -118,6 +118,7 @@ model Org {
   memberTeams          OrgMemberTeam[]
   projects             Project[]
   diagrams             Diagram[]
+  aiSourceImages       AiSourceImage[]
   prompts              Prompt[]
   diagramRules         DiagramRules[]
   collaborationGroups  CollaborationGroup[]
@@ -1952,6 +1953,30 @@ model HelpSection {
 // public/ is read-only at runtime), served by GET /api/help/images/[id]. Named by
 // the screen and (if a diagram screen) the diagram. Authored via the global
 // SuperAdmin capture tool; referenced from a HelpSection.image as /api/help/images/<id>.
+/// The image an AI generation was drawn from (Paul, 2026-09-28: "I need a way
+/// to view the image after the diagram has been generated"). Kept once per org
+/// (by uploader + SHA-256 — their re-generate or copy reuses it; another user's
+/// identical image is never revealed to them); a diagram names it in
+/// data.aiGeneration.sourceImage, and it is served only through a diagram that
+/// names it (app/api/diagrams/[id]/source-image/[imageId]). Customer content:
+/// goes with its org.
+model AiSourceImage {
+  id          String   @id @default(cuid())
+  orgId       String
+  org         Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name        String
+  mimeType    String
+  bytes       Bytes
+  width       Int?
+  height      Int?
+  sha256      String
+  // The uploader's userId — plain field, no FK (survives user deletion).
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@unique([orgId, createdById, sha256])
+}
+
 model HelpImage {
   id          String   @id @default(cuid())
   filename    String

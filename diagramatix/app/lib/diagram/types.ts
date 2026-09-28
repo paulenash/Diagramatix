@@ -512,6 +512,26 @@ export interface AiGeneration {
    * unmeasurable.
    */
   plan?: { elements: unknown[]; connections: unknown[] };
+  /**
+   * "Free Form" — the image's own layout was asked for (the consoles'
+   * "reproduce the image's layout"). Recorded so a re-generate offers it again,
+   * ticked (Paul, 2026-09-28: "When re-generating there is no way to check
+   * "Free Form""). Absent when no image was attached, or before it was recorded.
+   */
+  freeForm?: boolean;
+  /**
+   * Whether THIS generation was drawn from an image — so a re-generate asks for
+   * a lost image only when the diagram really was drawn from one (the linked
+   * prompt's own "from image" flag never clears; the 2026-09-28 review).
+   */
+  fromImage?: boolean;
+  /**
+   * The image this was generated from, kept (app/lib/ai/sourceImage.ts):
+   * "View source image" in Diagram Properties, and re-attached on a re-generate
+   * (Paul, 2026-09-28: "I need a way to view the image after the diagram has
+   * been generated").
+   */
+  sourceImage?: { id: string; name: string; mimeType: string; width?: number; height?: number };
 }
 
 /** Where a generated diagram prompt came from in the Process Repository. */
@@ -558,6 +578,10 @@ export interface AiApplyMeta {
   promptSource?: "typed" | "dictated";
   promptFromImage?: boolean;
   promptRefined?: boolean;
+  /** "Free Form" was ticked with an image attached (see AiGeneration.freeForm). */
+  freeForm?: boolean;
+  /** The attached image, to keep with the diagram: base64, or the stored one it was re-attached from. */
+  sourceImage?: { name: string; mediaType: string; data?: string; storedId?: string; width?: number; height?: number };
 }
 
 export interface ProcessOwner {

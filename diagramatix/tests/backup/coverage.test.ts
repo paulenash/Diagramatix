@@ -168,6 +168,11 @@ const SCOPED_OMITTED = new Set<string>([
   // source image), like HelpImage / DiagramTypeStyle — not per-user/org data.
   // Carried by the SuperAdmin full backup (catalog-driven) only.
   "ArchimateIconLibrary",
+  // The images AI generations were drawn from (2026-09-28): customer content,
+  // carried by the SuperAdmin full backup (catalog-driven). Not yet by the
+  // scoped org/user backup — a diagram restored from one keeps its link, and
+  // "View source image" answers "not found" rather than failing.
+  "AiSourceImage",
   // Diagram-JSON schema-validation findings are app-side observability, not
   // per-user/org data — carried by the SuperAdmin full backup only.
   "SchemaValidationIssue",

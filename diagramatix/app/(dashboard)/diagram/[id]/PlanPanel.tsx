@@ -30,6 +30,8 @@ import { PlanStructureModal } from "./ai-plan/PlanStructureModal";
 import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { AttachmentPreviewDialog } from "@/app/components/AttachmentPreviewDialog";
+import type { StoredSourceImage } from "@/app/lib/ai/sourceImage";
+import { useReattachSourceImage } from "./useReattachSourceImage";
 import { AudioToProcessButton } from "@/app/components/AudioToProcessButton";
 import { ClarificationDialog } from "@/app/components/ClarificationDialog";
 import { RefineQuestionsDialog } from "@/app/components/RefineQuestionsDialog";
@@ -67,6 +69,10 @@ interface Props {
   /** Regenerate prefill — seed the prompt + model on open, then onPrefillConsumed. */
   initialPrompt?: string;
   initialModel?: string;
+  /** Re-generate: Free Form as it was chosen, the kept image to re-attach, or the name of one that was not kept. */
+  initialFreeForm?: boolean;
+  initialSourceImage?: StoredSourceImage;
+  initialImageNotKept?: string;
   onPrefillConsumed?: () => void;
   /** Cost-gated generate models the user may pick + the current default id. */
   aiModels?: AllowedModel[];
@@ -113,7 +119,7 @@ export function PlanPanel({
   diagramId,
   onComparison,
   pcf,
-  initialPrompt, initialModel, onPrefillConsumed, aiModels = [], currentAiModelId,
+  initialPrompt, initialModel, initialFreeForm, initialSourceImage, initialImageNotKept, onPrefillConsumed, aiModels = [], currentAiModelId,
 }: Props) {
   const { data: authSession } = useSession();
   const aiColor = tonesFor(useFeatureColors(), "ai").text;
@@ -159,6 +165,19 @@ export function PlanPanel({
     if (initialPrompt !== undefined) {
       setPrompt(initialPrompt);
       if (initialModel) setModel(initialModel);
+      // Re-generate of a diagram drawn from an image (Paul, 2026-09-28): the
+      // kept image goes back on, with Free Form as it was chosen — so the model
+      // sees the picture again and the layout can be reproduced again.
+      if (initialFreeForm !== undefined) setPreserveLayout(initialFreeForm);
+      setImageNotKept(initialImageNotKept ?? null);
+      const stored = initialSourceImage;
+      if (stored) {
+        reattach.start(stored, (img) => {
+          setAttachment({ name: stored.name, type: "image", data: img.data, mediaType: img.mediaType, storedId: stored.id });
+          imageDimsRef.current = stored.width && stored.height ? { w: stored.width, h: stored.height } : null;
+          setImageNotKept(null);
+        }, () => setImageNotKept(stored.name));
+      }
       onPrefillConsumed?.();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -289,6 +308,13 @@ export function PlanPanel({
           promptSource: dictatedRef.current ? "dictated" : "typed",
           promptFromImage: attachment?.type === "image",
           promptRefined: refinedRef.current,
+          // As the plain apply does: Free Form and the image go with the diagram.
+          freeForm: !flatPlan && attachment?.type === "image" ? preserveLayout : undefined,
+          sourceImage: attachment?.type === "image" ? {
+            name: attachment.name, mediaType: attachment.mediaType,
+            ...(attachment.storedId ? { storedId: attachment.storedId } : { data: attachment.data }),
+            ...(imageDimsRef.current ? { width: imageDimsRef.current.w, height: imageDimsRef.current.h } : {}),
+          } : undefined,
         });
       }
       onComparison?.(result.comparison);
@@ -365,9 +391,14 @@ export function PlanPanel({
   // everything else is read as plain text.
   const [attachment, setAttachment] = useState<
     | { name: string; type: "pdf" | "text"; data: string }
-    | { name: string; type: "image"; data: string; mediaType: string }
+    | { name: string; type: "image"; data: string; mediaType: string; storedId?: string }
     | null
   >(null);
+  // A re-generate of a diagram whose image was not kept: its name, to ask for it again.
+  const [imageNotKept, setImageNotKept] = useState<string | null>(null);
+  // A re-generate's kept image, loading: Plan waits for it, and any choice the
+  // user makes meanwhile wins (useReattachSourceImage).
+  const reattach = useReattachSourceImage(diagramId);
   const [showAttachPreview, setShowAttachPreview] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Image import "reproduce original layout": when on, the plan is generated
@@ -387,6 +418,7 @@ export function PlanPanel({
   };
 
   async function handleFileAttach(file: File) {
+    reattach.cancel();
     const MAX_SIZE = 10 * 1024 * 1024; // 10MB
     if (file.size > MAX_SIZE) { setError("File too large (max 10MB)"); return; }
     if (file.type === "application/pdf") {
@@ -683,6 +715,8 @@ export function PlanPanel({
   // Select a saved prompt → fetch its planJson and load into state.
   const loadSavedPrompt = useCallback(async (sp: SavedPrompt) => {
     if (busy) return;
+    reattach.cancel();
+    setImageNotKept(null);
     setBusy("load");
     setError(null);
     setStatus(null);
@@ -719,6 +753,8 @@ export function PlanPanel({
     setSaveName("");
     setShowSave(false);
     setPlan({ elements: [], connections: [] });
+    reattach.cancel();
+    setImageNotKept(null);
     setAttachment(null);
     imageDimsRef.current = null;
     setRefineQs(null);
@@ -831,7 +867,7 @@ export function PlanPanel({
     } finally {
       setBusy(null);
     }
-  }, [prompt, setPlan, attachment, apiBase, preserveLayout, pcf?.nodeId]);
+  }, [prompt, setPlan, attachment, apiBase, preserveLayout, pcf?.nodeId, model]);
 
   const callPlan = useCallback(async () => {
     if (!prompt.trim() || busy) return;
@@ -958,6 +994,13 @@ export function PlanPanel({
           // Retain the generated plan on the linked Prompt (Prompt.planJson) so
           // the diagram keeps its plan for re-layout / inspection.
           planJson: plan,
+          // Free Form and the image go with the diagram (2026-09-28).
+          freeForm: !flatPlan && attachment?.type === "image" ? preserveLayout : undefined,
+          sourceImage: attachment?.type === "image" ? {
+            name: attachment.name, mediaType: attachment.mediaType,
+            ...(attachment.storedId ? { storedId: attachment.storedId } : { data: attachment.data }),
+            ...(imageDimsRef.current ? { width: imageDimsRef.current.w, height: imageDimsRef.current.h } : {}),
+          } : undefined,
         });
       }
       if (flatPlan) {
@@ -972,7 +1015,7 @@ export function PlanPanel({
     } finally {
       setBusy(null);
     }
-  }, [plan, hasPlan, busy, onApplyDiagram, activeTab, jsonDraft, asJson, commitJson, apiBase, flatPlan, preserveLayout, prompt, editingPromptId, savedPrompts, layoutMode]);
+  }, [plan, hasPlan, busy, onApplyDiagram, activeTab, jsonDraft, asJson, commitJson, apiBase, flatPlan, preserveLayout, prompt, editingPromptId, savedPrompts, layoutMode, attachment, model]);
 
   return (
     <div className="w-96 border-l border-gray-200 bg-white flex flex-col shrink-0 overflow-hidden">
@@ -1183,7 +1226,7 @@ export function PlanPanel({
                 </div>
               )}
               <div className="flex gap-1">
-                <button onClick={() => handleCompare()} disabled={comparing || exporting || (!prompt.trim() && !attachment) || !diagramId || pickedModels.size === 0}
+                <button onClick={() => handleCompare()} disabled={comparing || exporting || (!prompt.trim() && !attachment) || !diagramId || pickedModels.size === 0 || !!reattach.pending}
                   className="flex-1 px-2 py-1 text-[11px] text-white bg-red-600 rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5"
                   title="SuperAdmin: generate the ticked models from the prompt and/or attachment, fill this diagram with the best result, and save one diagram per model">
                   {comparing && (<svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none" aria-hidden><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" /><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg>)}
@@ -1307,7 +1350,7 @@ export function PlanPanel({
               <div className="flex items-center gap-1 flex-1 min-w-0">
                 <button onClick={() => setShowAttachPreview(true)} className="text-[10px] text-blue-600 truncate flex-1 text-left hover:underline" title="Preview attachment">{attachment.name}</button>
                 <button onClick={() => setShowAttachPreview(true)} className="text-gray-400 hover:text-blue-500 text-[10px] shrink-0" title="Preview attachment">Preview</button>
-                <button onClick={() => setAttachment(null)} className="text-gray-400 hover:text-red-500 text-[10px] shrink-0" title="Remove attachment">&times;</button>
+                <button onClick={() => { reattach.cancel(); setAttachment(null); }} className="text-gray-400 hover:text-red-500 text-[10px] shrink-0" title="Remove attachment">&times;</button>
               </div>
             )}
           </div>
@@ -1315,8 +1358,17 @@ export function PlanPanel({
             <label className="flex items-center gap-1 mt-1 cursor-pointer select-none" title="Rebuild the diagram at the positions drawn in the image (pools any size/placement, rectilinear messages) instead of Diagramatix's auto-layout.">
               <input type="checkbox" className="cursor-pointer" checked={preserveLayout}
                 onChange={e => setPreserveLayout(e.target.checked)} />
-              <span className="text-[10px] text-gray-600">Reproduce original layout</span>
+              <span className="text-[10px] text-gray-600">Free Form — reproduce the image&apos;s layout</span>
             </label>
+          )}
+          {reattach.pending && !attachment && (
+            <p className="mt-1 text-[10px] text-gray-500">Attaching the source image ({reattach.pending})…</p>
+          )}
+          {imageNotKept && !attachment && (
+            <p className="mt-1 rounded border border-amber-200 bg-amber-50 px-1.5 py-1 text-[10px] leading-snug text-amber-800">
+              This diagram was generated from an image ({imageNotKept}) that wasn&apos;t kept. Attach it again to use it — and to
+              reproduce its layout (Free Form). Without it the model sees only the words.
+            </p>
           )}
         </div>
 
@@ -1378,7 +1430,7 @@ export function PlanPanel({
         <div className="shrink-0 flex items-center gap-1.5 mb-2">
           <button
             onClick={callPlan}
-            disabled={!prompt.trim() || busy !== null}
+            disabled={!prompt.trim() || busy !== null || !!reattach.pending}
             style={{ ["--ai" as string]: aiColor }}
             className="ai-solid flex-1 px-2 py-1 text-[11px] font-medium rounded disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5"
           >

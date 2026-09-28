@@ -20,6 +20,17 @@ export async function eraseUser(userId: string): Promise<{ orgsRemoved: number }
 
   await prisma.user.delete({ where: { id: userId } });
 
+  // The images their AI generations were drawn from (AiSourceImage, 2026-09-28)
+  // hang off the org, not the user, so the cascade leaves them. Their diagrams
+  // are gone now; an image no remaining diagram names is erased with them.
+  await prisma.$executeRaw`
+    DELETE FROM "AiSourceImage" a
+    WHERE a."createdById" = ${userId}
+      AND NOT EXISTS (
+        SELECT 1 FROM "Diagram" d
+        WHERE d.data -> 'aiGeneration' -> 'sourceImage' ->> 'id' = a.id
+      )`;
+
   let orgsRemoved = 0;
   for (const orgId of orgIds) {
     const counts = await prisma.org.findUnique({
