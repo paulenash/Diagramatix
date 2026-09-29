@@ -22,6 +22,7 @@ import {
   type TemplateData,
 } from "@/app/lib/diagram/types";
 import { useAutoSave } from "@/app/hooks/useAutoSave";
+import { elementLimitBlock } from "@/app/lib/diagram/elementLimit";
 import { useVoiceSession } from "@/app/hooks/useVoiceSession";
 import type { TemplateFlow, TemplateReport } from "@/app/hooks/voiceTemplateTypes";
 export type { SaveConflict } from "@/app/hooks/useAutoSave";
@@ -1048,7 +1049,6 @@ export function DiagramEditor({
   // node count is at or above it, we show a brief toast banner and
   // refuse the add. Artifacts (data-object / data-store / text-
   // annotation) don't count toward the cap, so we let them through.
-  const ARTIFACT_TYPES_GATED = new Set(["data-object", "data-store", "text-annotation"]);
   const [elementLimitToast, setElementLimitToast] = useState<string | null>(null);
   useEffect(() => {
     if (!elementLimitToast) return;
@@ -1056,15 +1056,9 @@ export function DiagramEditor({
     return () => clearTimeout(t);
   }, [elementLimitToast]);
   const addElementGated: typeof addElement = (symbolType, position, taskType, eventType, id, initial) => {
-    if (typeof elementCountLimit === "number" && !ARTIFACT_TYPES_GATED.has(symbolType)) {
-      const nodes = data.elements.filter(e => !ARTIFACT_TYPES_GATED.has(e.type)).length;
-      if (nodes >= elementCountLimit) {
-        setElementLimitToast(
-          `Element limit reached (${nodes}/${elementCountLimit}). Upgrade your subscription to add more.`,
-        );
-        return;
-      }
-    }
+    // The cap is app/lib/diagram/elementLimit.ts (shared with the phone's Voice Assist).
+    const blocked = elementLimitBlock(data.elements, elementCountLimit, symbolType);
+    if (blocked) { setElementLimitToast(blocked); return; }
     addElement(symbolType, position, taskType, eventType, id, initial);
   };
 

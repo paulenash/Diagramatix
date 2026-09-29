@@ -24,6 +24,10 @@ export function MobileDiagramView({
   pickMode = false,
   onPick,
   onTapView,
+  keepView = false,
+  focusBox = null,
+  focusKey = 0,
+  bottomInset = 0,
 }: {
   data: DiagramData;
   colorConfig?: SymbolColorConfig;
@@ -33,6 +37,17 @@ export function MobileDiagramView({
   /** A clean single tap while NOT in pickMode — used to open an element's
    *  details / follow a linked diagram. Not fired after a pan/pinch/double-tap. */
   onTapView?: (svgX: number, svgY: number) => void;
+  /**
+   * An EDITING view (Voice Assist, 2026-09-29): as the diagram grows the view
+   * stays where the person put it — it does not re-fit — and follows the last
+   * edit: when `focusKey` changes, `focusBox` (diagram coordinates) is brought
+   * into view if it is not. Fitted once, when the first thing appears.
+   */
+  keepView?: boolean;
+  focusBox?: { x: number; y: number; width: number; height: number } | null;
+  focusKey?: number;
+  /** Pixels at the bottom covered by something else (the sheet): the view fits and follows above it. */
+  bottomInset?: number;
 }) {
   // Render with the diagram's REAL colours + full labels (zoom in to read them).
   const svg = useMemo(
@@ -40,11 +55,12 @@ export function MobileDiagramView({
     [data, colorConfig],
   );
   // Same transform the SVG uses internally, so the overlay lines up exactly.
-  const dims = useMemo(() => {
+  const frame = useMemo(
     // The frame the picture is drawn in (connector routes and labels included).
-    const { w, h } = thumbnailFrameFor(data as never, { trueColors: true, fullLabels: true });
-    return { w, h };
-  }, [data]);
+    () => thumbnailFrameFor(data as never, { trueColors: true, fullLabels: true }),
+    [data],
+  );
+  const dims = useMemo(() => ({ w: frame.w, h: frame.h }), [frame.w, frame.h]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [t, setT] = useState<Transform>({ s: 1, x: 0, y: 0 });
@@ -68,8 +84,8 @@ export function MobileDiagramView({
   function fit() {
     const el = containerRef.current;
     if (!el) return;
-    const cw = el.clientWidth, ch = el.clientHeight;
-    if (!cw || !ch) return;
+    const cw = el.clientWidth, ch = el.clientHeight - bottomInset;
+    if (!cw || ch <= 0) return;
     const s = Math.min(cw / dims.w, ch / dims.h) * 0.96;
     setT({ s, x: (cw - dims.w * s) / 2, y: (ch - dims.h * s) / 2 });
     fittedRef.current = true;
@@ -79,7 +95,35 @@ export function MobileDiagramView({
   // A ResizeObserver drives fitting: it fires once the flex layout has actually
   // sized the container (the old "fit on mount" ran while clientHeight was still 0,
   // leaving an uncentred view), and again on a rotation (aspect flip) / big resize.
-  useEffect(() => { fittedRef.current = false; }, [dims.w, dims.h]);
+  // (An editing view fits once — when the first thing appears — and then keeps the person's view.)
+  const wasEmptyRef = useRef(true);
+  useEffect(() => {
+    if (!keepView || wasEmptyRef.current) fittedRef.current = false;
+    wasEmptyRef.current = (data.elements?.length ?? 0) === 0;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dims.w, dims.h]);
+  // The frame's origin moves when the diagram grows up or to the left: shift the
+  // view to match, so nothing on screen jumps — and follow the last edit.
+  const prevOrigin = useRef({ tx: frame.tx, ty: frame.ty });
+  useEffect(() => {
+    const dx = frame.tx - prevOrigin.current.tx, dy = frame.ty - prevOrigin.current.ty;
+    prevOrigin.current = { tx: frame.tx, ty: frame.ty };
+    if (!keepView || !fittedRef.current) return;
+    const el = containerRef.current;
+    setT((cur) => {
+      let x = cur.x - cur.s * dx, y = cur.y - cur.s * dy;
+      if (focusBox && el) {
+        const cw = el.clientWidth, ch = el.clientHeight - bottomInset;
+        const left = x + (focusBox.x + frame.tx) * cur.s, top = y + (focusBox.y + frame.ty) * cur.s;
+        const w = focusBox.width * cur.s, h = focusBox.height * cur.s;
+        const M = 24;
+        if (w <= cw - 2 * M) { if (left < M) x += M - left; else if (left + w > cw - M) x -= left + w - (cw - M); }
+        if (h <= ch - 2 * M) { if (top < M) y += M - top; else if (top + h > ch - M) y -= top + h - (ch - M); }
+      }
+      return { ...cur, x, y };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [frame.tx, frame.ty, focusKey]);
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -87,6 +131,7 @@ export function MobileDiagramView({
       const cw = el.clientWidth, ch = el.clientHeight;
       if (!cw || !ch) return;
       if (!fittedRef.current) { fit(); return; }
+      if (keepView) return;                          // an editing view is never re-fitted by a resize
       const { w: lw, h: lh } = lastFit.current;
       const flipped = cw > ch !== lw > lh;                                   // portrait ↔ landscape
       const big = Math.abs(cw - lw) > lw * 0.3 || Math.abs(ch - lh) > lh * 0.3;

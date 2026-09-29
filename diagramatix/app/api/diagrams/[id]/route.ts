@@ -4,7 +4,8 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { classifyDiagramWrite } from "@/app/lib/diagram/saveConcurrency";
 import { prisma } from "@/app/lib/db";
-import { isReadOnlyImpersonation } from "@/app/lib/superuser";
+import { getEffectiveUserId, isReadOnlyImpersonation } from "@/app/lib/superuser";
+import { elementCountLimitFor } from "@/app/lib/diagram/elementLimitServer";
 import { isAssignedReviewer } from "@/app/lib/reviewProjects";
 import {
   requireDiagramAccess,
@@ -86,11 +87,14 @@ export async function GET(_req: Request, { params }: Params) {
   } catch {
     canReview = await isAssignedReviewer(session.user.id, id);
   }
+  // The subscription's element cap, for the phone's Voice Assist (elementLimit.ts).
+  const elementCountLimit = canEdit ? await elementCountLimitFor(getEffectiveUserId(session, cookieStore) ?? session.user.id, diagram.type) : null;
   return NextResponse.json({
     ...diagram,
     projectColorConfig: project?.colorConfig ?? null,
     canReview,
     canEdit,
+    elementCountLimit,
     viewer: { id: session.user.id, name: session.user.name ?? session.user.email ?? "" },
   });
 }

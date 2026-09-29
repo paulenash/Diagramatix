@@ -7,10 +7,11 @@ import type { DiagramData, DiagramType } from "@/app/lib/diagram/types";
 import { EMPTY_DIAGRAM } from "@/app/lib/diagram/types";
 import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
 import type { DisplayMode } from "@/app/lib/diagram/displayMode";
-import { getEffectiveUserId, isImpersonating, getImpersonationMode, SUPERUSER_EMAILS } from "@/app/lib/superuser";
+import { getEffectiveUserId, isImpersonating, getImpersonationMode } from "@/app/lib/superuser";
 import { tryGetCurrentOrgId, getDiagramAccess } from "@/app/lib/auth/orgContext";
 import { isAssignedReviewer } from "@/app/lib/reviewProjects";
 import { safeInternalPath } from "@/app/lib/safeRedirect";
+import { elementCountLimitFor } from "@/app/lib/diagram/elementLimitServer";
 
 type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ review?: string; from?: string; feedback?: string }> };
 
@@ -129,28 +130,9 @@ export default async function DiagramPage({ params, searchParams }: Props) {
 
   const impersonationMode = viewing ? getImpersonationMode(cookieStore) : undefined;
 
-  // Per-diagram element-count cap for the effective user. Admins
-  // (SUPERUSER_EMAILS) bypass entirely so we pass `null` to disable
-  // the client-side gate for them. The check picks the BPMN or non-
-  // BPMN limit based on the diagram's type.
-  const effectiveUser = await prisma.user.findUnique({
-    where: { id: effectiveUserId },
-    select: {
-      email: true,
-      subscriptionLevel: {
-        select: {
-          maxBpmnElementsPerDiagram: true,
-          maxNonBpmnElementsPerDiagram: true,
-        },
-      },
-    },
-  });
-  const effectiveIsAdmin = effectiveUser ? SUPERUSER_EMAILS.has(effectiveUser.email) : false;
-  const elementCountLimit = (effectiveIsAdmin || reviewerAccess)
-    ? null
-    : diagram.type === "bpmn"
-    ? effectiveUser?.subscriptionLevel?.maxBpmnElementsPerDiagram ?? null
-    : effectiveUser?.subscriptionLevel?.maxNonBpmnElementsPerDiagram ?? null;
+  // Per-diagram element-count cap for the effective user (admins and reviewers
+  // are not capped) — app/lib/diagram/elementLimitServer.ts.
+  const elementCountLimit = await elementCountLimitFor(effectiveUserId, diagram.type, reviewerAccess);
 
   // Diagram Owner sub-section data. Three pieces:
   //

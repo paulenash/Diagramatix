@@ -1,0 +1,78 @@
+/**
+ * Voice Assist on the phone (mobile voice stage 5, 2026-09-29): the small pure
+ * rules the phone's editing screen needs around the shared session hook
+ * (app/hooks/useVoiceSession.ts) — tested without a phone.
+ */
+import { isHiddenOnCanvas } from "@/app/lib/diagram/diagramThumbnail";
+import type { DiagramData, DiagramElement } from "@/app/lib/diagram/types";
+
+/** The words the session uses for "no pointer yet" — written for a mouse. */
+const MOUSE_LINE = "move the mouse over the canvas first";
+
+/**
+ * A session line in the phone's words. The shared session says "move the mouse
+ * over the canvas first" (applyAssistOps.ts) — on a phone the pointer is the
+ * last tap.
+ */
+export function phoneWording(summary: string): string {
+  return summary.split(MOUSE_LINE).join("tap the canvas where you mean, then say it again");
+}
+
+/** What the microphone is asking for right now: the last line, when it is a question the person must answer. */
+export function currentQuestion(lines: readonly { summary: string }[]): string | null {
+  const last = lines[lines.length - 1];
+  if (!last) return null;
+  const s = last.summary;
+  return /\?\s*(?:—|-|$)|say a number|pick a |say “yes”|“yes” to confirm|which one/i.test(s) ? phoneWording(s) : null;
+}
+
+const same = (a: DiagramElement, b: DiagramElement) =>
+  a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
+
+/**
+ * The element the last edit touched: the last one, in drawing order, that is new
+ * or moved/resized since `prev` — the view follows it. Null when nothing was
+ * added or moved (a rename, a delete).
+ */
+export function lastEditedBox(prev: DiagramData | null, next: DiagramData): { x: number; y: number; width: number; height: number } | null {
+  const before = new Map((prev?.elements ?? []).map((e) => [e.id, e] as const));
+  let hit: DiagramElement | null = null;
+  for (const e of next.elements) {
+    const p = before.get(e.id);
+    if (!p || !same(p, e)) hit = e;
+  }
+  return hit ? { x: hit.x, y: hit.y, width: hit.width, height: hit.height } : null;
+}
+
+/** The topmost element the picture shows under a point (diagram coordinates), or null. */
+export function elementAt(data: DiagramData, x: number, y: number): DiagramElement | null {
+  const hit = [...data.elements].reverse().find(
+    (e) => e.type !== "review-comment" && e.type !== "text-annotation" && !isHiddenOnCanvas(e, data)
+      && x >= e.x && x <= e.x + e.width && y >= e.y && y <= e.y + e.height,
+  );
+  return hit ?? null;
+}
+
+/**
+ * A tap: selects the element under it (adding to the selection when
+ * `multi`), or clears the selection on empty canvas. Returns the new selection.
+ */
+export function selectionAfterTap(current: readonly string[], hit: DiagramElement | null, multi: boolean): string[] {
+  if (!hit) return multi ? [...current] : [];
+  if (!multi) return current.length === 1 && current[0] === hit.id ? [] : [hit.id];
+  return current.includes(hit.id) ? current.filter((id) => id !== hit.id) : [...current, hit.id];
+}
+
+/** A few things worth saying, for the sheet's "What can I say?". */
+export const VOICE_EXAMPLES: readonly string[] = [
+  "add task Check invoice after Receive order",
+  "add a pool called Customer",
+  "rename Check invoice to Verify invoice",
+  "delete Pay supplier",
+  "connect Receive order to Check invoice",
+  "undo that",
+  "again",
+  "rename tasks — then say a number, then the new name",
+  "clear the diagram",
+  "stop",
+];

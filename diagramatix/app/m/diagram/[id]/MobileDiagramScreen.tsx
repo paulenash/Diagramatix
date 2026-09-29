@@ -44,6 +44,14 @@ import { draftStorageKey, photoFromFile } from "@/app/lib/mobile/pickPhoto";
 import { sourceImageUrl, uploadSourceImageBlob } from "@/app/lib/ai/sourceImage";
 import { MobilePhotoViewer } from "@/app/components/mobile/MobilePhotoViewer";
 import { MobileRenameSheet } from "@/app/components/mobile/MobileRenameSheet";
+import dynamic from "next/dynamic";
+import { useFeatureState } from "@/app/components/FeatureGate";
+
+// Voice Assist on the phone (stage 5) carries the whole editing reducer: loaded only when asked for.
+const MobileVoiceEditor = dynamic(
+  () => import("@/app/components/mobile/MobileVoiceEditor").then((m) => m.MobileVoiceEditor),
+  { ssr: false, loading: () => <div className="fixed inset-0 z-40 bg-white flex items-center justify-center text-sm text-gray-500">Opening Voice Assist…</div> },
+);
 import { renameFailureText } from "@/app/lib/mobile/rename";
 import type { SavedPromptPick } from "@/app/lib/mobile/generateDraft";
 import type { GenerateJobView } from "@/app/lib/ai/generateJob";
@@ -54,6 +62,8 @@ interface Loaded {
   /** May change the CONTENT (owners/editors; never a reviewer) — the Generate gate. */
   canEdit: boolean;
   colorConfig?: SymbolColorConfig;
+  /** The subscription's element cap for this diagram (null: none) — Voice Assist's add gate. */
+  elementCountLimit: number | null;
 }
 
 /** Where a phone Generate run stands (the run itself is a server job). */
@@ -138,6 +148,7 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
         version: j.version ?? 0,
         canReview: !!j.canReview,
         canEdit: !!j.canEdit,
+        elementCountLimit: typeof j.elementCountLimit === "number" ? j.elementCountLimit : null,
         viewer: j.viewer ?? { id: "", name: "" },
         // The colours the editor paints with: the project's scheme under the
         // diagram's own, or black and white in hand-drawn mode.
@@ -166,6 +177,10 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
   const [startErr, setStartErr] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const canGenerate = !!d && d.canEdit && d.type === "bpmn" && aiAllowed;
+  // Voice Assist on the phone (stage 5): owners and editors of a BPMN diagram whose plan has it (Expert+, the desktop's gate).
+  const voiceFeature = useFeatureState("voice-assist");
+  const [voiceOn, setVoiceOn] = useState(false);
+  const canVoice = !!d && d.canEdit && d.type === "bpmn" && voiceFeature === "available";
   // ✎ Correct (stage 3): the words, kept until a re-generate succeeds.
   const [correcting, setCorrecting] = useState(false);
   const [correction, setCorrection] = useState("");
@@ -658,6 +673,9 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
         {d && !empty && !unsupported && (
           <button onClick={toggleFullscreen} className="text-gray-600 text-lg leading-none px-1" title={fullscreen ? "Exit full screen" : "Full screen (landscape)"}>{fullscreen ? "⤢" : "⛶"}</button>
         )}
+        {canVoice && !voiceOn && gen.phase !== "running" && gen.phase !== "starting" && (
+          <button onClick={() => setVoiceOn(true)} className="text-lg leading-none px-1" title="Voice Assist — edit by voice" aria-label="Voice Assist">🎤</button>
+        )}
         {d?.canReview && !empty && !unsupported ? (
           <button onClick={saveDiagram} disabled={saving || !dirty || busy}
             className="text-sm font-medium text-blue-600 disabled:text-gray-300">{saving ? "Saving…" : "Save"}</button>
@@ -780,6 +798,12 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
           comments={reviewCommentCount(d.data)} unsaved={dirty}
           starting={gen.phase === "starting"} error={correctErr}
           onSubmit={(finished) => void startCorrect(finished)} onClose={() => setCorrecting(false)} />
+      )}
+      {voiceOn && d && (
+        <MobileVoiceEditor
+          diagramId={diagramId} diagramName={d.name} initialData={d.data} version={d.version}
+          colorConfig={d.colorConfig} elementCountLimit={d.elementCountLimit}
+          onClose={() => { setVoiceOn(false); setDirty(false); setSaveMsg(null); void load(); }} />
       )}
       {renamingDiagram && d && (
         <MobileRenameSheet title="Rename diagram" label="Diagram name" initial={d.name}
