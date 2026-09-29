@@ -40,11 +40,11 @@ afterEach(async () => {
   failOnActWarnings();
 });
 
-async function mount(opts: { limit?: number | null } = {}) {
+async function mount(opts: { limit?: number | null; initial?: import("@/app/lib/diagram/types").DiagramData } = {}) {
   let closed = 0;
   await act(async () => {
     root = create(createElement(MobileVoiceEditor, {
-      diagramId: "d1", diagramName: "Claims", initialData: threeTasks(), version: 7,
+      diagramId: "d1", diagramName: "Claims", initialData: opts.initial ?? threeTasks(), version: 7,
       elementCountLimit: opts.limit ?? null, onClose: () => { closed++; },
     }));
   });
@@ -56,7 +56,7 @@ async function mount(opts: { limit?: number | null } = {}) {
     return out.join(" ");
   };
   const type = async (t: string) => {
-    const input = root!.root.findByType("input");
+    const input = root!.root.findAllByType("input").find((i) => i.props.type !== "checkbox")!;
     await act(async () => { input.props.onChange({ target: { value: t } }); });
     await act(async () => { root!.root.findByType("form").props.onSubmit({ preventDefault() {} }); });
     await settle();
@@ -131,5 +131,72 @@ describe("T5086 — Voice Assist on the phone, end to end", () => {
     expect(fakeDictation.current.stopped).toBe(true);
     expect(puts.length).toBeGreaterThanOrEqual(1);
     expect(h.closed()).toBe(1);
+  });
+
+  it("'rename tasks' puts the green numbers on the diagram AND as chips to tap; tapping a chip answers, then the name renames", async () => {
+    const h = await mount();
+    await h.type("rename tasks");
+    const chips = root!.root.findAll((n) => n.props?.["aria-label"] === "Numbers you can say or tap");
+    expect(chips).toHaveLength(1);
+    const chipButtons = chips[0].findAllByType("button");
+    expect(chipButtons.length, "one chip per task").toBe(3);
+    // the badges are drawn in the diagram's overlay too: green rounded rects with the number
+    const greens = root!.root.findAll((n) => n.type === "rect" && n.props.fill === "#16a34a");
+    expect(greens.length, "one badge per task").toBe(3);
+    await act(async () => { chipButtons[1].props.onClick(); });
+    await h.settle();
+    await h.type("Verify invoice");
+    expect(h.texts()).toContain("Verify invoice");
+  });
+
+  it("a question that needs yes or no gets Yes / No buttons, and Yes confirms", async () => {
+    const h = await mount();
+    await h.type("clear the diagram");
+    await h.press(/^Yes$/);
+    expect(h.texts()).toContain("confirmed");
+  });
+
+  it("Auto-connect: 'add a task' joins the element it follows; switched off, it does not", async () => {
+    const h = await mount();
+    await h.type("add a task called Zed after Pay supplier");
+    await h.type("add a task called Yan");
+    expect(h.texts()).toContain("added Yan after Zed");
+    const box = root!.root.findAll((n) => n.type === "input" && n.props.type === "checkbox")[0];
+    await act(async () => { box.props.onChange({ target: { checked: false } }); });
+    await h.settle();
+    await h.type("add a task called Xi");
+    expect(h.texts()).not.toContain("added Xi after");
+  });
+
+  it("a message from a black-box pool to an event is drawn, and the view frames both ends", async () => {
+    const E = (o: Record<string, unknown>) => o as never;
+    const initial = { elements: [
+      E({ id: "cust", type: "pool", x: 0, y: 0, width: 900, height: 80, label: "Customer", properties: { poolType: "black-box" } }),
+      E({ id: "co", type: "pool", x: 0, y: 220, width: 900, height: 200, label: "Company", properties: { poolType: "white-box" } }),
+      E({ id: "l1", type: "lane", x: 30, y: 220, width: 870, height: 200, label: "Clerk", parentId: "co", properties: {} }),
+      E({ id: "ev", type: "start-event", x: 100, y: 300, width: 36, height: 36, label: "Order received", parentId: "l1", properties: {} }),
+    ], connectors: [], viewport: { x: 0, y: 0, zoom: 1 } } as never;
+    const h = await mount({ initial });
+    await h.type("add message from Customer to Order received");
+    expect(h.texts().replace(/\s+/g, " ")).toContain("added message Customer → Order received");
+  });
+
+  it("when Customer is both a pool and a lane it asks which: the numbers are on the diagram AND chips; a chip answers; a WHITE-box pool cannot send a message, and the sheet says so", async () => {
+    const E = (o: Record<string, unknown>) => o as never;
+    const initial = { elements: [
+      E({ id: "cust", type: "pool", x: 0, y: 0, width: 900, height: 160, label: "Customer", properties: { poolType: "white-box" } }),
+      E({ id: "cl", type: "lane", x: 30, y: 0, width: 870, height: 160, label: "Customer", parentId: "cust", properties: {} }),
+      E({ id: "co", type: "pool", x: 0, y: 220, width: 900, height: 200, label: "Company", properties: { poolType: "white-box" } }),
+      E({ id: "l1", type: "lane", x: 30, y: 220, width: 870, height: 200, label: "Clerk", parentId: "co", properties: {} }),
+      E({ id: "ev", type: "start-event", x: 100, y: 300, width: 36, height: 36, label: "Order received", parentId: "l1", properties: {} }),
+    ], connectors: [], viewport: { x: 0, y: 0, zoom: 1 } } as never;
+    const h = await mount({ initial });
+    await h.type("add message from Customer to Order received");
+    const chips = root!.root.findAll((n) => n.props?.["aria-label"] === "Numbers you can say or tap");
+    expect(chips, "the choices are offered as chips").toHaveLength(1);
+    expect(root!.root.findAll((n) => n.type === "rect" && n.props.fill === "#16a34a").length, "and as green numbers on the diagram").toBeGreaterThanOrEqual(2);
+    await act(async () => { chips[0].findAllByType("button")[0].props.onClick(); });
+    await h.settle();
+    expect(h.texts().replace(/\s+/g, " ")).toContain("white-box pool");
   });
 });

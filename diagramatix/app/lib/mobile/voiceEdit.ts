@@ -26,15 +26,33 @@ export function currentQuestion(lines: readonly { summary: string }[]): string |
   return /\?\s*(?:—|-|$)|say a number|pick a |say “yes”|“yes” to confirm|which one/i.test(s) ? phoneWording(s) : null;
 }
 
+/** The last line asks for a yes or a no ("clear the diagram? — say “yes” to confirm"): the sheet offers the two buttons. */
+export function askedYesNo(lines: readonly { summary: string }[]): boolean {
+  const last = lines[lines.length - 1];
+  return !!last && /say “yes”|“yes” to confirm/i.test(last.summary);
+}
+
 const same = (a: DiagramElement, b: DiagramElement) =>
   a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
 
 /**
- * The element the last edit touched: the last one, in drawing order, that is new
- * or moved/resized since `prev` — the view follows it. Null when nothing was
- * added or moved (a rename, a delete).
+ * What the last edit touched: a NEW CONNECTOR — the box around the two things it
+ * joins, so a message or a flow is seen — else the last element, in drawing
+ * order, that is new or moved/resized since `prev`. The view follows it. Null
+ * when nothing was added or moved (a rename, a delete).
  */
 export function lastEditedBox(prev: DiagramData | null, next: DiagramData): { x: number; y: number; width: number; height: number } | null {
+  const seen = new Set((prev?.connectors ?? []).map((c) => c.id));
+  const fresh = (next.connectors ?? []).filter((c) => !seen.has(c.id));
+  const last = fresh[fresh.length - 1];
+  if (last) {
+    const byId = new Map(next.elements.map((e) => [e.id, e] as const));
+    const ends = [byId.get(last.sourceId), byId.get(last.targetId)].filter((e): e is DiagramElement => !!e);
+    if (ends.length) {
+      const x = Math.min(...ends.map((e) => e.x)), y = Math.min(...ends.map((e) => e.y));
+      return { x, y, width: Math.max(...ends.map((e) => e.x + e.width)) - x, height: Math.max(...ends.map((e) => e.y + e.height)) - y };
+    }
+  }
   const before = new Map((prev?.elements ?? []).map((e) => [e.id, e] as const));
   let hit: DiagramElement | null = null;
   for (const e of next.elements) {
@@ -42,6 +60,14 @@ export function lastEditedBox(prev: DiagramData | null, next: DiagramData): { x:
     if (!p || !same(p, e)) hit = e;
   }
   return hit ? { x: hit.x, y: hit.y, width: hit.width, height: hit.height } : null;
+}
+
+/** What tapping a numbered chip does: say the number, or — a message between two things — build "n to m". */
+export function chipAction(flow: "pick" | "rename" | "divider" | "message-pair" | "message-one", n: number, current: string): { run: string } | { text: string } {
+  if (flow !== "message-pair") return { run: String(n) };
+  const t = current.trim();
+  if (!t || /\bto\s+\d+/.test(t)) return { text: `${n} to ` };
+  return { text: /\bto$/i.test(t) ? `${t} ${n}` : `${n} to ` };
 }
 
 /** The topmost element the picture shows under a point (diagram coordinates), or null. */

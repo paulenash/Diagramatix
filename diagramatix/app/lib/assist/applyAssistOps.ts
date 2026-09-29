@@ -147,6 +147,13 @@ export function assistSettingsOf(d: AssistDiagramSettings): AssistDiagramSetting
 }
 
 export interface AssistApplyContext {
+  /**
+   * Auto-connect (the phone's toggle, 2026-09-29): an add that names no
+   * "after X" and no pointer is joined by a sequence flow from the element it
+   * was placed after (the selection, else the last one added) — when the flow
+   * is legal, and silently unconnected when it is not. Off unless asked for.
+   */
+  autoConnect?: boolean;
   /** The diagram BEFORE the batch. React does not re-render mid-batch, so the
    *  working copy below threads each op's effect forward itself. */
   elements: DiagramElement[];
@@ -573,7 +580,8 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       // contradicted itself ("left it unconnected …; added Fix it after
       // Event 4").
       let leftUnconnected = false;
-      if (anchor && op.afterRef) {
+      const implicitJoin = !op.afterRef && !!ctx.autoConnect && op.at !== "pointer";
+      if (anchor && (op.afterRef || implicitJoin)) {
         // R7 — the explicit `connect` op has always been checked against
         // `canConnect`; this auto-connect never was. So "add a task after
         // Done" drew a sequence flow OUT of an end event and reported it with
@@ -581,8 +589,11 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
         // suggestions use, against the state that WILL exist — the new
         // element is not in `els` yet.
         if (!canConnect(anchor, addedEl, "sequence", withAdded(els, addedEl))) {
-          results.push(`added ${nameOf(addedEl)} but left it unconnected — a sequence flow from ${nameOf(anchor)} isn’t legal`);
-          leftUnconnected = true;
+          // An "after X" that cannot be joined says so; an automatic join just does not happen.
+          if (op.afterRef) {
+            results.push(`added ${nameOf(addedEl)} but left it unconnected — a sequence flow from ${nameOf(anchor)} isn’t legal`);
+            leftUnconnected = true;
+          }
         } else if (srcSide) {
           addConnector(anchor.id, newId, "sequence", "directed", "rectilinear", srcSide, "left");
         } else {
@@ -598,7 +609,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       setSelectedElementIds(new Set([newId]));
       if (!leftUnconnected) {
         const outs = op.afterRef && anchor && FLOWS_THROUGH.has(op.symbolType) ? data.connectors.filter((c) => c.type === "sequence" && c.sourceId === anchor!.id).length : 0;
-        results.push(`added ${op.label ?? op.symbolType}${anchor && op.afterRef ? ` after ${nameOf(anchor)}` : ""}${outs > 1 ? ` — ${nameOf(anchor!)} has ${outs} outgoing flows, so it is on a new one: say “insert a task between ${nameOf(anchor!)} and …” to put it into one` : ""}`);
+        results.push(`added ${op.label ?? op.symbolType}${anchor && (op.afterRef || (implicitJoin && canConnect(anchor, addedEl, "sequence", els))) ? ` after ${nameOf(anchor)}` : ""}${outs > 1 ? ` — ${nameOf(anchor!)} has ${outs} outgoing flows, so it is on a new one: say “insert a task between ${nameOf(anchor!)} and …” to put it into one` : ""}`);
       }
       continue;
     }

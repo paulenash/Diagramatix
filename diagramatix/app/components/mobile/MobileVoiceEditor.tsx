@@ -29,8 +29,10 @@ import { thumbnailFrameFor } from "@/app/lib/diagram/templateThumbnail";
 import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
 import type { DiagramData } from "@/app/lib/diagram/types";
 import {
-  VOICE_EXAMPLES, currentQuestion, elementAt, lastEditedBox, phoneWording, selectionAfterTap,
+  VOICE_EXAMPLES, askedYesNo, chipAction, currentQuestion, elementAt, lastEditedBox, phoneWording, selectionAfterTap,
 } from "@/app/lib/mobile/voiceEdit";
+import { badgePosition } from "@/app/lib/mobile/badgePlace";
+import { GoldFlashOverlay } from "@/app/components/canvas/GoldFlashOverlay";
 import { MobileDiagramView } from "./MobileDiagramView";
 
 /** The useDiagram edit actions the session reads (the same 37 the desktop editor hands it). */
@@ -104,6 +106,11 @@ export function MobileVoiceEditor({
     } catch { /* nothing more to do */ }
   };
 
+  // Auto-connect: "add a task" joins the selected / last element (the desktop's toggle; remembered on this phone).
+  const [autoConnect, setAutoConnect] = useState(true);
+  useEffect(() => { try { if (localStorage.getItem("diagramatix.autoConnect") === "off") setAutoConnect(false); } catch { /* default */ } }, []);
+  const toggleAutoConnect = () => setAutoConnect((v) => { try { localStorage.setItem("diagramatix.autoConnect", v ? "off" : "on"); } catch { /* not kept */ } return !v; });
+
   const actions = Object.fromEntries(SESSION_ACTIONS.map((n) => [n, (d as unknown as Record<string, unknown>)[n]]));
   const session = useVoiceSession({
     ...actions,
@@ -115,6 +122,7 @@ export function MobileVoiceEditor({
     beginLabelEdit: d.beginLabelEdit, cancelLabelEdit: d.cancelLabelEdit,
     beginHistoryGroup: d.beginHistoryGroup, endHistoryGroup: d.endHistoryGroup,
     handleExportJson: exportJson,
+    autoConnect,
   } as never);
   // Voice Assist is on while this screen is (the session turns itself off when a diagram opens).
   const { setVoiceAssistOn } = session;
@@ -161,13 +169,36 @@ export function MobileVoiceEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [frame.tx, frame.ty, data, multi]);
 
-  const overlay = (
+  const badges = session.onScreenBadges ?? [];
+  const rulers = session.onScreenRulers ?? [];
+  const overlay = (zoom: number) => (
     <g>
+      {rulers.length > 0 && rulers.map((r, i) => (
+        <g key={`ruler-${i}`}>
+          {r.ticks.map((y) => (
+            <line key={y} x1={r.x + frame.tx - 9 / zoom} y1={y + frame.ty} x2={r.x + frame.tx + 9 / zoom} y2={y + frame.ty} stroke="#16a34a" strokeWidth={3 / zoom} strokeLinecap="round" />
+          ))}
+        </g>
+      ))}
+      {session.goldFlash.runId > 0 && (
+        <g transform={`translate(${frame.tx}, ${frame.ty})`}><GoldFlashOverlay runId={session.goldFlash.runId} targets={session.goldFlash.targets as never} /></g>
+      )}
       {data.elements.filter((e) => selectedElementIds.has(e.id)).map((e) => (
         <rect key={e.id} x={e.x + frame.tx - 3} y={e.y + frame.ty - 3} width={e.width + 6} height={e.height + 6}
           fill="none" stroke="#2563eb" strokeWidth={3} strokeDasharray="8 5" rx={6} />
       ))}
-      {mark && <circle cx={mark.x + frame.tx} cy={mark.y + frame.ty} r={9} fill="#2563eb" fillOpacity={0.25} stroke="#2563eb" strokeWidth={2} />}
+      {mark && <circle cx={mark.x + frame.tx} cy={mark.y + frame.ty} r={9 / Math.min(1, zoom)} fill="#2563eb" fillOpacity={0.25} stroke="#2563eb" strokeWidth={2} />}
+      {badges.map((b) => {
+        // The green numbers, the desktop's (Canvas.tsx): a constant size on screen, at the item.
+        const pos = badgePosition(b, data, zoom);
+        const rw = 24 + String(b.n).length * 12;
+        return (
+          <g key={`badge-${b.n}`} transform={`translate(${pos.x + frame.tx}, ${pos.y + frame.ty}) scale(${1 / zoom})`}>
+            <rect x={-rw / 2} y={-15} width={rw} height={30} rx={15} fill="#16a34a" stroke="#ffffff" strokeWidth={2} />
+            <text x={0} y={1} fontSize={19} fontWeight={800} fill="#ffffff" textAnchor="middle" dominantBaseline="middle" fontFamily="sans-serif">{b.n}</text>
+          </g>
+        );
+      })}
     </g>
   );
 
@@ -177,6 +208,13 @@ export function MobileVoiceEditor({
   const lines = session.voiceLog;
   const recent = lines.slice(-3);
   const question = currentQuestion(lines);
+  // The same numbers as large chips to tap (the badges can be small or off-screen).
+  const flowKind = session.renameFlow ? "rename" : session.messageFlow ? ((session.messageFlow as { mode?: string }).mode === "one" ? "message-one" : "message-pair") : session.pickFlow ? "pick" : "divider";
+  async function tapChip(n: number) {
+    const a = chipAction(flowKind, n, text);
+    if ("text" in a) { setText(a.text); return; }
+    await session.runVoiceCommand(a.run);
+  }
   const listening = session.voiceListening;
   async function send() {
     const t = text.trim();
@@ -217,6 +255,22 @@ export function MobileVoiceEditor({
       <div className="shrink-0 border-t border-gray-200 bg-white px-3 pt-2 pb-3 max-h-[46dvh] overflow-y-auto">
         {limitMsg && <p className="text-[12px] text-amber-800 bg-amber-50 rounded-md px-2 py-1.5 mb-2">{limitMsg}</p>}
         {question && <p className="text-sm font-medium text-blue-800 bg-blue-50 rounded-md px-2.5 py-2 mb-2">{question}</p>}
+        {askedYesNo(lines) && (
+          <div className="flex gap-2 mb-2">
+            <button onClick={() => void session.runVoiceCommand("yes")} className="flex-1 h-11 rounded-lg bg-blue-600 text-white text-sm font-medium active:bg-blue-700">Yes</button>
+            <button onClick={() => void session.runVoiceCommand("no")} className="flex-1 h-11 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium active:bg-gray-50">No</button>
+          </div>
+        )}
+        {badges.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-2" aria-label="Numbers you can say or tap">
+            {badges.map((b) => (
+              <button key={b.n} onClick={() => void tapChip(b.n)}
+                className="h-10 min-w-[2.5rem] px-2.5 rounded-full bg-green-600 text-white text-sm font-bold active:bg-green-700 max-w-[11rem] truncate">
+                {b.n}{b.label ? <span className="font-normal"> · {b.label}</span> : null}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="space-y-0.5 mb-2 min-h-[2.5rem]">
           {recent.map((e) => (
             <p key={e.id} className={`text-[13px] leading-snug ${e.ok ? "text-gray-800" : "text-amber-700"}`}>
@@ -246,9 +300,15 @@ export function MobileVoiceEditor({
             </button>
           </form>
         </div>
-        <button onClick={() => setShowExamples((v) => !v)} className="mt-2 text-[12px] text-blue-600 underline">
-          {showExamples ? "Hide examples" : "What can I say?"}
-        </button>
+        <div className="mt-2 flex items-center gap-4">
+          <button onClick={() => setShowExamples((v) => !v)} className="text-[12px] text-blue-600 underline">
+            {showExamples ? "Hide examples" : "What can I say?"}
+          </button>
+          <label className="flex items-center gap-1.5 text-[12px] text-gray-700">
+            <input type="checkbox" checked={autoConnect} onChange={toggleAutoConnect} className="h-4 w-4" />
+            Auto-connect
+          </label>
+        </div>
         {showExamples && (
           <ul className="mt-1 space-y-0.5">
             {VOICE_EXAMPLES.map((x) => (

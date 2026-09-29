@@ -77,12 +77,15 @@ export interface VoiceSessionHost extends Pick<AssistDiagramActions, "addConnect
   selectedIdsRef: MutableRefObject<string[]>;
   setSelectedConnectorId: Dispatch<SetStateAction<string | null>>;
   setSelectedElementIds: Dispatch<SetStateAction<Set<string>>>;
+  /** Auto-connect (the phone's toggle): an add with no "after X" joins the selection / last element. Off by default. */
+  autoConnect?: boolean;
 }
 
 export function useVoiceSession(host: VoiceSessionHost) {
   const {
     addConnector, addElementGated, addLaneAt, addPool, alignElements, beginHistoryGroup, beginLabelEdit, cancelLabelEdit, clearDiagram, compressLane, compressPool, connectorsRef, convertTaskSubprocess, data, deleteConnector, deleteElement, diagramColorConfig, diagramId, diagramName, diagramType, displayMode, elementsMoveEnd, elementsRef, endHistoryGroup, expandLane, extendPools, handleExportJson, insertSpace, laneBoundaryMoveEnd, moveElements, moveLane, moveLaneBoundary, movePoolTo, nextStepRef, openTemplateWindowRef, removeSpace, resizeElement, resizeElementEnd, riskCatalog, selectedConnectorIdRef, selectedIdsRef, setEventBoundary, setSelectedConnectorId, setSelectedElementIds, splitLaneEven, splitPoolEven, swapLane, swapPools, undo, unwrapSubprocess, updateConnectorEndpoint, updateConnectorLabel, updateLabel, updateProperties, wrapInContainer, wrapInPool, wrapInSubprocess,
   } = host;
+  const autoConnect = host.autoConnect === true;
 
   // ── Voice Assist: live voice/typed command editing ──
   const [voiceAssistOn, setVoiceAssistOn] = useState(false);
@@ -385,7 +388,7 @@ export function useVoiceSession(host: VoiceSessionHost) {
     appliedOpsRef.current = ops;
     queueMicrotask(() => { if (appliedOpsRef.current === ops) appliedOpsRef.current = null; });
     return applyAssistOpsTo(ops, {
-      elements: data.elements, connectors: data.connectors, settings: assistSettingsOf(data), riskCatalog,
+      elements: data.elements, connectors: data.connectors, settings: assistSettingsOf(data), riskCatalog, autoConnect,
       actions: {
         addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, updateConnectorLabel,
         deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool,

@@ -31,7 +31,8 @@ export function MobileDiagramView({
 }: {
   data: DiagramData;
   colorConfig?: SymbolColorConfig;
-  overlay?: React.ReactNode;
+  /** Drawn in the diagram's coordinates; a function is given the current zoom (badges keep their size at any zoom). */
+  overlay?: React.ReactNode | ((zoom: number) => React.ReactNode);
   pickMode?: boolean;
   onPick?: (svgX: number, svgY: number) => void;
   /** A clean single tap while NOT in pickMode — used to open an element's
@@ -243,7 +244,7 @@ export function MobileDiagramView({
           style={{ position: "absolute", left: 0, top: 0, width: dims.w, height: dims.h, transformOrigin: "0 0", transform: `translate(${t.x}px, ${t.y}px) scale(${t.s})`, pointerEvents: "none" }}
         >
           <svg width={dims.w} height={dims.h} viewBox={`0 0 ${dims.w} ${dims.h}`} style={{ position: "absolute", left: 0, top: 0, overflow: "visible" }}>
-            {overlay}
+            {typeof overlay === "function" ? overlay(t.s) : overlay}
           </svg>
         </div>
       )}
