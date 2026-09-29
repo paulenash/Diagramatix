@@ -13,6 +13,7 @@ import { prisma } from "@/app/lib/db";
 import { getEffectiveSubscriptionLevelId } from "@/app/lib/subscription";
 import { SUPERUSER_EMAILS } from "@/app/lib/superuser";
 import { FEATURE_KEYS } from "./registry";
+import { applyDependencies } from "./dependencies";
 
 export type FeatureState = "available" | "disabled" | "hidden";
 export type FeatureStateMap = Record<string, FeatureState>;
@@ -27,11 +28,18 @@ function isAdminEmail(email: string | null | undefined): boolean {
   return [...SUPERUSER_EMAILS].some((s) => s.toLowerCase() === e);
 }
 
+// Level sort orders, kept for a minute: a level added or re-ordered in the SuperAdmin editor is
+// picked up without a restart (it used to be cached for the life of the process).
+const ORDERS_TTL_MS = 60_000;
 let _orders: Map<string, number> | null = null;
+let _ordersAt = 0;
+/** Forget the cached level orders (the subscriptions editor calls this after a save; tests). */
+export function clearLevelOrders(): void { _orders = null; }
 async function levelOrders(): Promise<Map<string, number>> {
-  if (!_orders) {
+  if (!_orders || Date.now() - _ordersAt > ORDERS_TTL_MS) {
     const ls = await prisma.subscriptionLevel.findMany({ select: { id: true, sortOrder: true } });
     _orders = new Map(ls.map((l) => [l.id, l.sortOrder]));
+    _ordersAt = Date.now();
   }
   return _orders;
 }
@@ -104,7 +112,9 @@ export async function getFeatureStates(userId: string): Promise<FeatureStateMap>
   const map = await getLevelMatrix(levelId);
   const overrides = (u.featureOverrides ?? {}) as Record<string, unknown>;
   for (const [k, v] of Object.entries(overrides)) if (FEATURE_KEYS.includes(k)) map[k] = coerceState(v);
-  return map;
+  // A feature that requires others is only as available as the weakest of them (dependencies.ts) —
+  // applied after the overrides, so an override on a prerequisite flows through to what needs it.
+  return applyDependencies(map);
 }
 
 export function stateOf(map: FeatureStateMap | null | undefined, key: string): FeatureState {

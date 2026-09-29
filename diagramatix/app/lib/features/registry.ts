@@ -26,6 +26,11 @@ export interface FeatureDef {
   key: string;
   label: string;
   category: FeatureCategory;
+  /**
+   * Prerequisites: this feature is only as available as the weakest of these
+   * (dependencies.ts). "Mobile Access" needs Process Review and Voice Assist.
+   */
+  requires?: readonly string[];
 }
 
 export const FEATURES: FeatureDef[] = [
@@ -69,7 +74,7 @@ export const FEATURES: FeatureDef[] = [
   { key: "sop-generation",         label: "SOP Generation",              category: "Documents" },
   // Platform
   { key: "process-portal",         label: "Process Portal",              category: "Platform" },
-  { key: "mobile",                 label: "Mobile Diagramatix",          category: "Platform" },
+  { key: "mobile",                 label: "Mobile Diagramatix",          category: "Platform", requires: ["process-review", "voice-assist"] },
   // AI Models
   { key: "choice-of-llms",         label: "Choice of LLMs",              category: "AI Models" },
   { key: "local-llm",              label: "Local LLM Support",           category: "AI Models" },

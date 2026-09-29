@@ -413,7 +413,10 @@ async function loadUserWithTier(userId: string): Promise<UserWithTier | null> {
 }
 
 function isAdminEmail(email: string): boolean {
-  return SUPERUSER_EMAILS.has(email);
+  // Case-insensitive, like availability.ts: a mixed-case admin address used to bypass the
+  // feature gates but not the limits.
+  const e = (email ?? "").toLowerCase();
+  return [...SUPERUSER_EMAILS].some((s) => s.toLowerCase() === e);
 }
 
 /** Resolve a user's four legacy feature booleans — now DERIVED from the unified
