@@ -401,7 +401,7 @@ describe("T5067 — the router: the AI fallback (request, canonical, ops, failur
     await h.unmount();
   });
 
-  it("a typed “stop” while an AI call runs with commands queued: it does not queue, it empties the queue, stops the mic, logs “stopped listening” — and the queued commands never run (no further fetch)", async () => {
+  it("a typed “stop” while an AI call runs with commands queued: it does not queue, it empties the queue, stops the mic, logs “stopped listening” — the queued commands never run (no further fetch), and the call in flight is ignored when it lands", async () => {
     const ai = heldAi();
     const h = await mountSession({ initial: threeTasks() });
     await h.act(() => h.session.setVoiceAssistOn(true));
@@ -430,26 +430,37 @@ describe("T5067 — the router: the AI fallback (request, canonical, ops, failur
       ["delete Receive order", "waiting for the previous command…", true, null],
       ["I want a fresh start", "waiting for the previous command…", true, null],
       ["stop", "stopped listening", true, null],
-      ["make it pretty", "didn’t understand that", false, true],
+      ["make it pretty", "ignored — you said stop", false, true],
     ]);
     await h.unmount();
   });
 
-  it("CURRENT: “stop” does not cancel the AI call already in flight — its reply still applies, logged after “stopped listening” (a quirk kept deliberately by the move)", async () => {
-    // QUIRK, kept deliberately by the move: "stop" empties the queue and ends the
-    // mic, but runVoiceCommand has no way to abandon a fetch already awaited —
-    // the reply lands, applies, and logs as if nothing had been said.
-    const ai = heldAi();
+  it("a typed “stop” drops the AI call already in flight: its reply, when it lands, is NOT applied — logged “ignored — you said stop” (viaAi, not ok), and nothing to undo", async () => {
+    // Paul's ruling, 2026-09-29: "stop" means stop. The fetch cannot be
+    // abandoned, but the stop moves voiceStopSeq on, and a reply that lands
+    // after it is dropped rather than applied.
+    const ai = heldAi({ ops: [{ op: "add", symbolType: "task", label: "Audit trail" }] });
     const h = await mountSession({ initial: threeTasks() });
     const first = await startCommand(h, "make it pretty");
     await h.typed("stop");
-    expect(h.session.voiceBusyRef.current, "stop leaves the call running").toBe(true);
+    expect(h.session.voiceBusyRef.current, "the call is still out — it cannot be recalled, only ignored").toBe(true);
     await h.act(async () => { ai.release({ ops: [{ op: "add", symbolType: "task", label: "Audit trail" }] }); await first.done; });
-    expect(labels(h)).toContain("Audit trail");
+    expect(labels(h)).not.toContain("Audit trail");
+    expect(labels(h)).toEqual(["Company", "Clerk", "Receive order", "Check invoice", "Pay supplier"]);
     expect(brief(h)).toEqual([
       ["stop", "stopped listening", true, null],
-      ["make it pretty", "added Audit trail", true, true],
+      ["make it pretty", "ignored — you said stop", false, true],
     ]);
+    expect(h.lastLine?.ops).toBeUndefined();
+    expect(canUndo(h)).toBe(false);
+    expect(h.session.voiceBusyRef.current).toBe(false);
+    expect(h.session.voiceBusy).toBe(false);
+    // The NEXT command's call is its own: the same reply, answered at once, applies as usual.
+    ai.holding = false;
+    await h.typed("make it pretty");
+    expect(ai.calls).toHaveLength(2);
+    expect(h.lastLine).toMatchObject({ heard: "make it pretty", summary: "added Audit trail", ok: true, viaAi: true });
+    expect(labels(h)).toContain("Audit trail");
     await h.unmount();
   });
 
@@ -596,22 +607,26 @@ describe("T5068 — the router's questions: “clear the diagram” asks and the
     await h.unmount();
   });
 
-  it("CURRENT: a typed “stop” does NOT close an open “which one?” pick — the numbers stay up and the next number still answers it (a quirk kept deliberately by the move)", async () => {
-    // QUIRK, kept deliberately by the move: stopAbraListening clears the
-    // rename, message and divider flows and a parked confirmation — not the
-    // picker (nor the template window, flows.test.ts). A spoken "stop" takes
-    // the same stopAbraListening path.
+  it("a typed “stop” closes an open “which one?” pick — the numbers go, and a number after it is no answer: it goes to the AI and deletes nothing", async () => {
+    // Paul's ruling, 2026-09-29: a stop ends every QUESTION — a waiting
+    // "clear the diagram?" and a "which one?" pick alike. (Not the template
+    // window, flows.test.ts.) A spoken "stop" takes the same stopAbraListening path.
     const calls = stubFetch(() => ({ ops: [] }));
     const h = await mountSession({ initial: threeTasks() });
     await h.typed("delete the task");
+    expect(h.session.pickFlow).not.toBeNull();
     await h.typed("stop");
     expect(h.lastLine).toMatchObject({ heard: "stop", summary: "stopped listening", ok: true });
-    expect(h.session.pickFlow).toMatchObject({ ref: "task", ops: [{ op: "delete", ref: "task" }] });
+    expect(h.session.pickFlow).toBeNull();
     await h.typed("2");
     expect(h.session.pickFlow).toBeNull();
-    expect(labels(h)).toEqual(["Company", "Clerk", "Receive order", "Pay supplier"]);
-    expect(brief(h)[2]).toEqual(["2", "2 → deleted Check invoice", true, null]);
-    expect(calls).toHaveLength(0);
+    expect(labels(h)).toEqual(["Company", "Clerk", "Receive order", "Check invoice", "Pay supplier"]);
+    expect(brief(h)).toEqual([
+      ["delete the task", "which “task”? say a number (1–3), or “cancel”", true, false],
+      ["stop", "stopped listening", true, null],
+      ["2", "didn’t understand that", false, true],
+    ]);
+    expect(instructions(calls)).toEqual(["2"]);
     await h.unmount();
   });
 

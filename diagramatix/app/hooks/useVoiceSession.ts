@@ -123,6 +123,13 @@ export function useVoiceSession(host: VoiceSessionHost) {
    */
   const voiceBusyRef = useRef(false);
   const voiceQueueRef = useRef<string[]>([]);
+  // Moves on at every stop (and diagram switch). An AI call remembers it when
+  // it starts; a reply that arrives after a stop is dropped, not applied
+  // (Paul's ruling, 2026-09-29: "stop" means stop).
+  const voiceStopSeq = useRef(0);
+  // Moves on at every diagram switch: a reply for the old diagram is dropped
+  // SILENTLY — nobody said stop, and the old diagram's log is gone.
+  const voiceSwitchSeq = useRef(0);
   // Wakes the drain effect (after the command runner): the queue drains one
   // command per render, never inside the call that just finished.
   const [voiceDrainTick, setVoiceDrainTick] = useState(0);
@@ -237,15 +244,34 @@ export function useVoiceSession(host: VoiceSessionHost) {
   const exportJsonRef = useRef<(() => void) | null>(null);
   // Voice Assist is always OFF when you open (or switch) a diagram — a live mic
   // should never be silently on when you arrive. Reset + stop on diagram change.
+  //
+  // Everything of the old diagram ends with it (Paul's ruling, 2026-09-29): the
+  // questions, the numbered flows, the queue, anything buffered — and the log,
+  // which was about the old diagram. The questions and the buffer go FIRST:
+  // stopping the recogniser runs whatever is buffered, and a buffered "yes"
+  // must never answer "clear the diagram?" on the way out.
   useEffect(() => {
     setVoiceAssistOn(false);
-    voiceDictRef.current?.stop();
-    voiceDictRef.current = null;
-    setVoiceListening(false);
     pendingConfirmRef.current = null; // a parked "clear the diagram?" never outlives the diagram it was asked on
     pickFlowRef.current = null;       // nor a parked "which one?" — its candidates are on the old diagram
     boundaryLastRef.current = null;   // nor a boundary's follow-up
     setPickFlowState(null);
+    setRenameFlow(null);
+    setMessageFlow(null);
+    setDividerFlow(null);
+    setTemplateFlow(null);
+    voiceQueueRef.current = [];
+    voiceBuffer.current = "";
+    voiceWaits.current = 0;
+    if (voiceFlushTimer.current) { clearTimeout(voiceFlushTimer.current); voiceFlushTimer.current = null; }
+    setVoiceInterim("");
+    voiceSwitchSeq.current += 1;      // an AI reply for the old diagram is dropped, silently, when it arrives
+    if (voiceIdleTimer.current) { clearTimeout(voiceIdleTimer.current); voiceIdleTimer.current = null; } // nor does its idle clock run on
+    voiceDictRef.current?.stop();
+    voiceDictRef.current = null;
+    setVoiceListening(false);
+    setAbraConnecting(false);
+    setVoiceLog([]);
   }, [diagramId]);
 
   // The numbered badges on the canvas — drawn by the Canvas, and saved by the
@@ -712,6 +738,14 @@ export function useVoiceSession(host: VoiceSessionHost) {
       log({ heard, summary: "waiting for the previous command…", ok: true });
       return;
     }
+    // A flow word ("done", "cancel", "stop rename") with nothing open to close
+    // is what the spoken path already says it is — nothing to do — rather than
+    // a metered AI call to accomplish nothing (2026-09-29).
+    if (isFlowEndWord(heard) && !(renameFlowRef.current || messageFlowRef.current || dividerFlowRef.current
+      || templateFlowRef.current || pickFlowRef.current || pendingConfirmRef.current)) {
+      log({ heard, summary: "cleared — listening for the next command", ok: true });
+      return;
+    }
     // While a guided pick is active, every utterance feeds it (a number, a
     // name, or "done") — never the general command parser.
     //
@@ -850,14 +884,22 @@ export function useVoiceSession(host: VoiceSessionHost) {
     // Deterministic parser didn't recognise it → AI fallback (metered).
     voiceBusyRef.current = true;
     setVoiceBusy(true);
+    const stopSeqAtStart = voiceStopSeq.current;
+    const switchSeqAtStart = voiceSwitchSeq.current;
+    const stoppedSince = () => voiceStopSeq.current !== stopSeqAtStart;
+    const switchedSince = () => voiceSwitchSeq.current !== switchSeqAtStart;
     try {
       const res = await fetch("/api/ai/command", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ instruction: heard, state: { elements: data.elements, connectors: data.connectors }, selectedIds: selectedIdsRef.current }),
       });
+      if (switchedSince()) return;
+      if (stoppedSince()) { log({ heard, summary: "ignored — you said stop", ok: false, viaAi: true }); return; }
       if (!res.ok) { log({ heard, summary: "didn’t understand that", ok: false, viaAi: true }); return; }
       const j = await res.json();
+      if (switchedSince()) return;
+      if (stoppedSince()) { log({ heard, summary: "ignored — you said stop", ok: false, viaAi: true }); return; }
       // Prefer the AI's CANONICAL rewrite re-parsed deterministically (fixes
       // mis-hears + guarantees a valid, documented command); fall back to ops.
       const canonical = typeof j.canonical === "string" ? j.canonical.trim() : "";
@@ -944,18 +986,34 @@ export function useVoiceSession(host: VoiceSessionHost) {
 
   const stopAbraListening = useCallback(() => {
     voiceStopRequested.current = true;
+    voiceStopSeq.current += 1;       // an AI reply still on its way is dropped when it arrives
+    voiceQueueRef.current = [];      // nothing waiting runs after a stop, however it was stopped
     if (voiceIdleTimer.current) { clearTimeout(voiceIdleTimer.current); voiceIdleTimer.current = null; }
+    // A stop ends every QUESTION first (Paul's ruling, 2026-09-29): a waiting
+    // "clear the diagram?" or "which one?" — and whatever was buffered as its
+    // answer — before the recogniser stops, because stopping it runs what is
+    // buffered, and a buffered "yes" must never confirm on the way out.
+    // (The template window's "keep it?" counts too — the window itself stays
+    // open for the mouse, but a buffered "yes" must not keep a template.)
+    const answering = !!(pendingConfirmRef.current || pickFlowRef.current || templateFlowRef.current);
+    pendingConfirmRef.current = null;
+    setPickFlow(null);
+    if (answering) {
+      voiceBuffer.current = "";
+      voiceWaits.current = 0;
+      if (voiceFlushTimer.current) { clearTimeout(voiceFlushTimer.current); voiceFlushTimer.current = null; }
+      setVoiceInterim("");
+    }
     voiceDictRef.current?.stop();
     voiceDictRef.current = null;
     setVoiceListening(false);
     setAbraConnecting(false);
-    // "stop" ends everything: a numbered pick or a parked confirmation dies with the mic.
+    // The numbered flows end with the mic too (a name still buffered for an open rename is read first).
     setRenameFlow(null);
     setMessageFlow(null);
     setDividerFlow(null);
-    pendingConfirmRef.current = null;
     flushVoiceBuffer(true); // apply anything still buffered (force — no more is coming)
-  }, [flushVoiceBuffer, setRenameFlow, setMessageFlow, setDividerFlow]);
+  }, [flushVoiceBuffer, setRenameFlow, setMessageFlow, setDividerFlow, setPickFlow]);
   stopAbraListeningRef.current = stopAbraListening;
 
   // (Re)arm the 2-minute idle auto-close; called on every voice fragment.
@@ -1047,9 +1105,10 @@ export function useVoiceSession(host: VoiceSessionHost) {
         voiceFlushTimer.current = setTimeout(() => flushVoiceBuffer(), ABRA_SILENCE_MS);
       },
       onError: (msg) => appendLog({ heard: "", summary: msg, ok: false }),
-      onEnd: () => { voiceDictRef.current = null; setVoiceListening(false); flushVoiceBuffer(true); },
+      onEnd: () => { voiceDictRef.current = null; setVoiceListening(false); setAbraConnecting(false); flushVoiceBuffer(true); },
     });
-    if (!handle || voiceStopRequested.current) { handle?.stop(); voiceDictRef.current = null; setVoiceListening(false); return; }
+    // A start that failed (or was stopped while connecting) never leaves "connecting…" up.
+    if (!handle || voiceStopRequested.current) { handle?.stop(); voiceDictRef.current = null; setVoiceListening(false); setAbraConnecting(false); return; }
     voiceDictRef.current = handle;
     bumpAbraIdle(); // start the idle clock even if no voice ever arrives
   }, [voiceListening, stopAbraListening, flushVoiceBuffer, bumpAbraIdle, appendLog]);

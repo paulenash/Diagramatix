@@ -4886,11 +4886,7 @@ export function DiagramEditor({
         {!readOnly && diagramType === "bpmn" && voiceAssistAllowed && (
           <button
             onClick={() => {
-              setVoiceAssistOn((prev) => {
-                const nv = !prev;
-                try { localStorage.setItem(`voice-assist-${diagramId}`, String(nv)); } catch { /* ignore */ }
-                return nv;
-              });
+              setVoiceAssistOn((prev) => !prev);
             }}
             className={`px-2 py-0.5 text-[11px] rounded border ${
               voiceAssistOn
@@ -5365,7 +5361,7 @@ export function DiagramEditor({
             onSubmitText={(t) => { void runVoiceCommand(t); }}
             onToggleListen={() => { void toggleAbraListening(); }}
             onClear={clearVoiceLog}
-            onClose={() => { stopAbraListening(); setVoiceAssistOn(false); try { localStorage.setItem(`voice-assist-${diagramId}`, "false"); } catch {} }}
+            onClose={() => { stopAbraListening(); setVoiceAssistOn(false); }}
             onCost={fetchAbraCost}
             isSuperAdmin={isActingAdmin}
             debugOn={voiceDebugRecording}

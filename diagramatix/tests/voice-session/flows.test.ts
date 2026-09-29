@@ -592,10 +592,11 @@ describe("T5071 — the template window's answers (the session's side) and Escap
     expect(h.lastLine).toMatchObject({ summary: "already at the top — say a number, or “scroll down”", ok: true });
   });
 
-  it("CURRENT: a typed “stop” does not close the template window (it closes rename, message and dividers only)", async () => {
+  it("CURRENT: a typed “stop” does not close the template window (it closes rename, message, dividers, a waiting confirmation and the “which one?” pick)", async () => {
     // A quirk kept deliberately by the move: stopAbraListening clears the
-    // rename, message and divider flows and a parked confirmation — not the
-    // template window (nor the picker).
+    // rename, message and divider flows, a parked confirmation and (since
+    // Paul's ruling of 2026-09-29) the "which one?" pick — not the template
+    // window, which his rulings did not name.
     const h = await mount(threeTasks());
     const rec = await openTemplateWindow(h);
     await h.typed("stop");

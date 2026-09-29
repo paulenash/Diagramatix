@@ -84,6 +84,14 @@ describe("3 — 'stop' means one thing", () => {
     expect(isFlowEndWord("stop")).toBe(false);
     expect(isMicStopWord("done")).toBe(false);
     expect(isMicStopWord("add a task called Stop Press")).toBe(false);
+    // Paul's ruling, 2026-09-29: "stop rename" and "stop numbering" begin with
+    // "stop" but are FLOW words only — they close the numbers and the mic
+    // stays on. A bare "stop" is still the mic's.
+    for (const w of ["stop rename", "stop numbering", "Stop rename.", "stop numbering!"]) {
+      expect(isFlowEndWord(w), w).toBe(true);
+      expect(isMicStopWord(w), w).toBe(false);
+    }
+    for (const w of ["stop", "Stop.", "stop listening", "stop it"]) expect(isMicStopWord(w), w).toBe(true);
 
     const ed = editor();
     // Spoken: no rename-flow guard in front of the mic stop any more.
@@ -103,8 +111,23 @@ describe("3 — 'stop' means one thing", () => {
     // The rename loop ends on flow words only, and its prompts say "done".
     expect(ed).toContain("if (isFlowEndWord(low)) { cancelRenameFlow(\"rename finished\"); return; }");
     expect(ed).toContain("pick another or say “done”");
-    // Stopping the mic drops whatever was parked.
-    expect(ed).toMatch(/setAbraConnecting\(false\);\s*\/\/[^\n]*\n\s*setRenameFlow\(null\);\s*setMessageFlow\(null\);\s*setDividerFlow\(null\);\s*pendingConfirmRef\.current = null;/);   // + "move dividers", 2026-09-27
+    // Stopping the mic drops whatever was parked — in this order (Paul's
+    // ruling, 2026-09-29): the QUESTIONS first — a waiting "clear the
+    // diagram?" and a "which one?" pick, with whatever was buffered as their
+    // answer — BEFORE the recogniser stops (its stop fires onEnd, which runs
+    // the buffer, so a buffered "yes" can never confirm on the way out); the
+    // numbered flows after it (+ "move dividers", 2026-09-27); then the flush.
+    const stopBody = ed.slice(ed.indexOf("const stopAbraListening = useCallback(() => {"));
+    expect(stopBody.length, "stopAbraListening is defined").toBeLessThan(ed.length);
+    expect(stopBody).toMatch(/const answering = !!\(pendingConfirmRef\.current \|\| pickFlowRef\.current \|\| templateFlowRef\.current\);\s*pendingConfirmRef\.current = null;\s*setPickFlow\(null\);\s*if \(answering\) \{\s*voiceBuffer\.current = "";[\s\S]*?\}\s*voiceDictRef\.current\?\.stop\(\);\s*voiceDictRef\.current = null;\s*setVoiceListening\(false\);\s*setAbraConnecting\(false\);\s*\/\/[^\n]*\n\s*setRenameFlow\(null\);\s*setMessageFlow\(null\);\s*setDividerFlow\(null\);\s*flushVoiceBuffer\(true\);/);
+    const body = stopBody.slice(0, stopBody.indexOf("}, [flushVoiceBuffer"));
+    expect(body.indexOf("pendingConfirmRef.current = null;"), "the question is dropped before the recogniser stops")
+      .toBeLessThan(body.indexOf("voiceDictRef.current?.stop();"));
+    expect(body.split("pendingConfirmRef.current = null;"), "and only there — never again after the stop").toHaveLength(2);
+    // A stop moves the stop sequence on (an AI reply still on its way is
+    // dropped) and empties the queue, however the stop was given.
+    expect(body).toContain("voiceStopSeq.current += 1;");
+    expect(body).toContain("voiceQueueRef.current = [];");
   });
 });
 

@@ -56,7 +56,11 @@ export interface Final {
  * `endMs` is when the audio stopped: the last buffer is always flushed, because
  * `stopAbraListening` and the socket's `onEnd` both force a flush.
  */
-export function stitchFinals(finals: readonly Final[], endMs?: number): string[] {
+export function stitchFinals(allFinals: readonly Final[], endMs?: number): string[] {
+  // A blank final (the recogniser sometimes sends one) is not speech: the live
+  // loop ignores it, so the pause is measured to the next REAL fragment
+  // (Paul's ruling, 2026-09-29 — it used to cut the pause short).
+  const finals = allFinals.filter((f) => f.text.trim());
   const out: string[] = [];
   let buffer = "";
   let waits = 0;

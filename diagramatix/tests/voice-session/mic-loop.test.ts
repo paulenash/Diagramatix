@@ -8,6 +8,11 @@
  * Tests named "CURRENT:" pin a known quirk ON PURPOSE: the move is a move, not
  * a fix, so today's behaviour is what the moved hook must reproduce. Change one
  * only when the quirk itself is fixed.
+ *
+ * Fixed by Paul's rulings of 2026-09-29 (their tests renamed as the rules they
+ * now are): a failed start clears "connecting"; "stop rename" / "stop
+ * numbering" close the numbers and leave the mic on; a stop drops a waiting
+ * "clear the diagram?" before a buffered "yes" can answer it.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
@@ -104,15 +109,15 @@ describe(`T5072 — the microphone starts, connects, idles out and ends (${runni
     expect(fakeDictation.sessions).toHaveLength(1);
   });
 
-  it("CURRENT: a start that returns no handle clears listening but leaves 'connecting' on, and arms no idle clock (quirk kept deliberately by the move)", async () => {
-    // Quirk kept deliberately by the move: the failed-start path never clears abraConnecting nor starts bumpAbraIdle.
+  it("a start that returns no handle clears listening AND 'connecting' — a failed start never leaves “connecting…” up — and arms no idle clock", async () => {
+    // Paul's ruling, 2026-09-29 (b): the failed-start path clears abraConnecting too.
     const h = await mount();
     fakeDictation.holdStarts = true;
     await h.act(() => { void h.session.toggleAbraListening(); });
+    expect(h.session.abraConnecting).toBe(true);
     await h.act(() => { fakeDictation.current.resolve(null); });
     expect(h.session.voiceListening).toBe(false);
-    // Quirk: only onReady or stopAbraListening clears it — a failed start does neither.
-    expect(h.session.abraConnecting).toBe(true);
+    expect(h.session.abraConnecting).toBe(false);
     await advance(h, ABRA_IDLE_MS + 1000);
     expect(h.log).toHaveLength(0);
     // The button starts afresh.
@@ -345,46 +350,64 @@ describe(`T5074 — stopping the mic, and the start/stop race (${runningAgainst(
     expect(h.lastLine).toMatchObject({ heard: "stop", summary: "stopped listening", ok: true });
   });
 
-  it("CURRENT: 'stop rename' stops the MIC — the mic stop word wins over the flow-end word — and the pick closes with no line (quirk kept deliberately by the move)", async () => {
-    // Quirk kept deliberately by the move: isMicStopWord is checked before isFlowEndWord, and "stop rename" starts with the mic word "stop".
+  it("'stop rename' is a FLOW word only: spoken while the rename pick is open, it closes the pick with “rename finished” and the MIC STAYS ON; a bare 'stop' still stops the mic", async () => {
+    // Paul's ruling, 2026-09-29: isMicStopWord excludes the flow words, so
+    // "stop rename" no longer turns the microphone off.
     const h = await mount();
     await startMic(h);
     await hear(h, "rename tasks");
     expect(renameFlow(h)?.phase).toBe("pick");
-    await hear(h, "stop rename");
+    await hear(h, "stop rename");                 // no timer advanced: a flow word runs at once
+    expect(renameFlow(h)).toBe(null);
+    expect(h.log.map((l) => [l.heard, l.summary, l.ok])).toEqual([
+      ["rename tasks", PICK_TASK_LINE, true],
+      ["", "rename finished", true],
+    ]);
+    expect(h.session.voiceListening).toBe(true);
+    expect(fakeDictation.current.stopped).toBe(false);
+    expect(fakeDictation.sessions).toHaveLength(1);
+    expect(aiCalls()).toHaveLength(0);
+    // The bare word is still the mic's.
+    await hear(h, "stop");
     expect(h.session.voiceListening).toBe(false);
     expect(fakeDictation.current.stopped).toBe(true);
-    expect(renameFlow(h)).toBe(null);
-    expect(h.log).toHaveLength(1);                // only "rename tasks" — no "rename finished"
-    expect(h.lastLine?.heard).toBe("rename tasks");
+    expect(h.log).toHaveLength(2);                // a spoken stop writes no line
   });
 
-  it("CURRENT: 'stop numbering' stops the MIC too — spoken or typed, the mic stop word wins over the flow-end word, as with 'stop rename' (quirk kept deliberately by the move)", async () => {
-    // Quirk kept deliberately by the move: "stop numbering" is in the flow-end
-    // list, but it starts with the mic word "stop", and isMicStopWord is checked first.
+  it("'stop numbering' is a FLOW word too — spoken or typed, it closes the open pick with “rename finished” and the mic stays on; a typed bare “stop” still stops it", async () => {
+    // Paul's ruling, 2026-09-29: as "stop rename".
     const h = await mount();
     await startMic(h);
     await hear(h, "rename tasks");
     expect(renameFlow(h)?.phase).toBe("pick");
     await hear(h, "stop numbering");
-    expect(h.session.voiceListening).toBe(false);
-    expect(fakeDictation.current.stopped).toBe(true);
     expect(renameFlow(h)).toBe(null);
-    expect(h.log).toHaveLength(1);                // spoken: no line of its own
-    // Typed, it is the typed stop: the flow closes and the line says "stopped listening".
+    expect(h.lastLine).toMatchObject({ heard: "", summary: "rename finished", ok: true });
+    expect(h.log).toHaveLength(2);
+    expect(h.session.voiceListening).toBe(true);
+    expect(fakeDictation.current.stopped).toBe(false);
+    // Typed, the same: the flow closes, the mic stays on, no "stopped listening".
     await h.typed("rename tasks");
+    expect(renameFlow(h)?.phase).toBe("pick");
     await h.typed("stop numbering");
     expect(renameFlow(h)).toBe(null);
-    expect(h.lastLine).toMatchObject({ heard: "stop numbering", summary: "stopped listening", ok: true });
+    expect(h.lastLine).toMatchObject({ heard: "", summary: "rename finished", ok: true });
+    expect(h.log.some((l) => l.summary === "stopped listening")).toBe(false);
+    expect(h.session.voiceListening).toBe(true);
+    expect(fakeDictation.current.stopped).toBe(false);
     expect(aiCalls()).toHaveLength(0);
+    await h.typed("stop");
+    expect(h.lastLine).toMatchObject({ heard: "stop", summary: "stopped listening", ok: true });
+    expect(h.session.voiceListening).toBe(false);
+    expect(fakeDictation.current.stopped).toBe(true);
   });
 
-  // HAZARD FOR PAUL TO RULE ON (the two tests below): stopAbraListening means
-  // "a parked confirmation dies with the mic", but the recogniser's stop()
-  // fires onEnd synchronously and onEnd force-flushes the buffer BEFORE
-  // pendingConfirmRef is cleared — so a "yes" still in the buffer confirms the
-  // destructive command the stop was meant to drop. Pinned as today's order only.
-  it("CURRENT: the mic button's stop with a spoken “yes” still buffered and “clear the diagram?” parked — the stop's own flush runs the “yes” BEFORE it drops the question, so the diagram is cleared", async () => {
+  // Paul's ruling, 2026-09-29 (the two tests below): a stop drops a waiting
+  // "clear the diagram?" — and discards whatever was buffered as its answer —
+  // BEFORE the recogniser stops. The recogniser's stop() fires onEnd
+  // synchronously and onEnd force-flushes the buffer, so the order is what
+  // keeps a buffered "yes" from confirming on the way out.
+  it("the mic button's stop drops a waiting “clear the diagram?” before anything buffered can answer it — the spoken “yes” still buffered is discarded, and the diagram is NOT cleared", async () => {
     const h = await mount();
     await startMic(h);
     await h.typed("clear the diagram");
@@ -396,13 +419,20 @@ describe(`T5074 — stopping the mic, and the start/stop race (${runningAgainst(
 
     await h.act(() => h.session.stopAbraListening());
     expect(fakeDictation.current.stopped).toBe(true);
-    expect(h.lastLine).toMatchObject({ heard: "yes", summary: "confirmed → cleared the diagram", ok: true, ops: [{ op: "clear" }] });
-    expect(h.data.elements).toHaveLength(0);
+    expect(h.session.voiceListening).toBe(false);
     expect(h.session.pendingConfirmRef.current).toBeNull();
+    expect(h.session.voiceInterim).toBe("");
+    expect(h.data.elements).toHaveLength(5);
+    expect(h.log.map((l) => [l.heard, l.summary])).toEqual([
+      ["clear the diagram", "clear the whole diagram (5 elements)? — say “yes” to confirm"],
+    ]);
+    await advance(h, FULL_HOLD_MS * 2);           // the buffer's silence timer went with it
+    expect(h.log).toHaveLength(1);
+    expect(h.data.elements).toHaveLength(5);
     expect(aiCalls()).toHaveLength(0);
   });
 
-  it("CURRENT: a typed “stop” with a spoken “yes” still buffered and “clear the diagram?” parked — the “yes” confirms first, then the line says “stopped listening”", async () => {
+  it("a typed “stop” drops a waiting “clear the diagram?” before anything buffered can answer it — the spoken “yes” is discarded, the only new line is “stopped listening”, and the diagram is NOT cleared", async () => {
     const h = await mount();
     await startMic(h);
     await h.typed("clear the diagram");
@@ -412,11 +442,14 @@ describe(`T5074 — stopping the mic, and the start/stop race (${runningAgainst(
     expect(fakeDictation.current.stopped).toBe(true);
     expect(h.log.map((l) => [l.heard, l.summary])).toEqual([
       ["clear the diagram", "clear the whole diagram (5 elements)? — say “yes” to confirm"],
-      ["yes", "confirmed → cleared the diagram"],
       ["stop", "stopped listening"],
     ]);
-    expect(h.data.elements).toHaveLength(0);
+    expect(h.data.elements).toHaveLength(5);
     expect(h.session.pendingConfirmRef.current).toBeNull();
+    expect(h.session.voiceInterim).toBe("");
+    await advance(h, FULL_HOLD_MS * 2);
+    expect(h.log).toHaveLength(2);
+    expect(h.data.elements).toHaveLength(5);
     expect(aiCalls()).toHaveLength(0);
   });
 
@@ -436,9 +469,12 @@ describe(`T5074 — stopping the mic, and the start/stop race (${runningAgainst(
     expect(h.log).toHaveLength(1);
   });
 
-  it("CURRENT: stopping with a command buffered runs it while the flows are STILL OPEN (the recogniser's synchronous onEnd flushes first), then the flows clear", async () => {
-    // Order kept deliberately by the move: stop() → onEnd → flush → the runner
-    // sees the rename flow still open → only then does stopAbraListening clear it.
+  it("stopping with a name buffered for an open rename reads it as the NAME while the flow is still open (the recogniser's synchronous onEnd flushes first), then the flows clear", async () => {
+    // The order stopAbraListening keeps (restated by Paul's ruling, 2026-09-29):
+    // only a QUESTION's buffered answer ("clear the diagram?", "which one?") is
+    // discarded before the recogniser stops. A numbered flow is not a question:
+    // stop() → onEnd → flush → the runner sees the rename flow still open →
+    // only then does stopAbraListening clear the flows.
     const h = await mount();
     await startMic(h);
     await hear(h, "rename tasks");
@@ -481,16 +517,16 @@ describe(`T5074 — stopping the mic, and the start/stop race (${runningAgainst(
     expect(s3.stopped).toBe(true);
   });
 
-  it("CURRENT: a diagram switch stops the recogniser but not the idle clock — 2 minutes later the idle-close line appears (quirk kept deliberately by the move)", async () => {
-    // Quirk kept deliberately by the move: the diagramId effect stops the handle directly, not through stopAbraListening.
+  it("a diagram switch stops the recogniser AND its idle clock — no idle-close line appears on the new diagram later (Paul's ruling (a), 2026-09-29)", async () => {
+    // Changed 2026-09-29: the old diagram's idle clock used to run on and write
+    // "Voice Assist closed — 2 minutes idle" into the new diagram's log.
     const h = await mount();
     await startMic(h);
     await h.rerender({ diagramId: "diagram-2" });
     expect(fakeDictation.current.stopped).toBe(true);
     expect(h.log).toHaveLength(0);
-    await advance(h, ABRA_IDLE_MS);
-    expect(h.log).toHaveLength(1);
-    expect(h.lastLine).toMatchObject({ heard: "", summary: "Voice Assist closed — 2 minutes idle", ok: true });
+    await advance(h, ABRA_IDLE_MS + 1000);
+    expect(h.log).toHaveLength(0);
   });
 
   it("CURRENT: start → stop → start while the first start is still connecting — the first handle, arriving late, is kept and then orphaned: never stopped, still heard (the known desktop race, kept deliberately by the move)", async () => {

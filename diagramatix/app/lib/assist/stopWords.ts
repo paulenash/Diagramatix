@@ -14,7 +14,15 @@ const FLOW = /^(?:done|finished|that'?s all|all done|enough|cancel|never ?mind|s
 
 const clean = (s: string) => s.trim().toLowerCase().replace(/[.,!?;:]+$/g, "");
 
-/** "stop" / "stop listening" / "that's enough" / "voice-assist off" — end the session. */
-export const isMicStopWord = (utterance: string): boolean => MIC.test(clean(utterance));
+/**
+ * "stop" / "stop listening" / "that's enough" / "voice-assist off" — end the
+ * session. Never a flow word: "stop rename" and "stop numbering" begin with
+ * "stop", and used to turn the microphone off when they only meant to close
+ * the numbers (Paul's ruling, 2026-09-29).
+ */
+export const isMicStopWord = (utterance: string): boolean => {
+  const c = clean(utterance);
+  return MIC.test(c) && !FLOW.test(c);
+};
 /** "done" / "cancel" / "never mind" / "stop rename" — end the numbered pick, keep listening. */
 export const isFlowEndWord = (utterance: string): boolean => FLOW.test(clean(utterance));

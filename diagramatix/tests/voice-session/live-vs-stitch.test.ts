@@ -16,7 +16,9 @@
  *   • on Paul's recorded boundary session, with his own pauses;
  * and give each KNOWN difference its own test (T5078): the mic stop word,
  * the flow-end words, the early flushes (renameByType, a number in a rename
- * pick), the 2-minute idle close, and a whitespace-only final.
+ * pick) and the 2-minute idle close. A whitespace-only final was one too,
+ * until Paul's ruling of 2026-09-29 made stitchFinals skip blank finals; its
+ * test now pins that the two agree.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
@@ -433,17 +435,16 @@ describe("T5078 — the known differences between the live loop and stitchFinals
     await h.unmount();
   });
 
-  it("CURRENT: a whitespace-only final inside the silence window — the live loop ignores it and runs the first command at 2200 ms (Replay's stitchFinals does not; a Replay follow-up)", async () => {
-    // Only the LIVE half is pinned here — it is the session's behaviour.
-    // FOLLOW-UP FOR PAUL (Replay, not the session): today stitchFinals
-    // (app/lib/assist/fragmentBuffer.ts) measures the gap to the blank final
-    // (1000 ms, under the silence) and so joins these two into one command,
-    // where the live loop — whose onText returns on a blank before touching the
-    // buffer or its timer — runs two. The fix belongs in stitchFinals: skip
-    // blank finals before measuring gaps. Left unpinned so that fix does not
-    // break the Stage 4 suite.
+  it("a whitespace-only final inside the silence window — the live loop ignores it and runs the first command at 2200 ms, and Replay's stitchFinals now agrees (no longer a difference)", async () => {
+    // Paul's ruling, 2026-09-29: stitchFinals (app/lib/assist/fragmentBuffer.ts)
+    // skips blank finals before measuring the pause. It used to measure the gap
+    // to the blank (1000 ms, under the silence) and so join these two into one
+    // command, where the live loop — whose onText returns on a blank before
+    // touching the buffer or its timer — runs two.
     const finals: Final[] = [{ text: "add a task called Alpha", atMs: 0 }, { text: " ", atMs: 1000 }, { text: "add a task called Beta", atMs: 3000 }];
     const r = await live(finals, 3500, "button");
     expect(r.ran).toEqual(["add a task called Alpha", "add a task called Beta"]);
+    expect(stitchFinals(finals, 3500)).toEqual(r.ran);
+    expect(stitchFinals(finals, 3500), "the blank changes nothing").toEqual(stitchFinals(finals.filter((f) => f.text.trim()), 3500));
   });
 });

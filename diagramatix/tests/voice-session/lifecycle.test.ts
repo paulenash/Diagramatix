@@ -4,10 +4,12 @@
  * out of DiagramEditor.tsx into app/hooks/useVoiceSession.ts (and checked,
  * unchanged, after — the harness runs whichever text exists).
  *
- * T5075 — what a new diagram id resets (the confirmation, the "which one?",
- * the boundary follow-up) and what it does NOT (the rename, message and
- * divider flows, the log, the buffer — which the stop flushes), Voice Assist
- * switched off, and unmount.
+ * T5075 — what a new diagram id resets: since Paul's ruling of 2026-09-29,
+ * EVERYTHING of the old diagram (the confirmation, the "which one?", the
+ * boundary follow-up, the rename, message, divider and template flows, the
+ * queue, the buffer — discarded, not run — an AI reply still on its way, the
+ * mic, "connecting", and the command log, cleared); Voice Assist switched
+ * off, and unmount.
  *
  * T5076 — one apply, one log line carrying its ops; the debug recording's
  * snapshot + "touched" on every command, a queued one included (the settle
@@ -147,65 +149,64 @@ describe("T5075 — the session's lifecycle: a new diagram, Voice Assist off, un
     expect(el(h, "pool1")!.width).toBe(980);
   });
 
-  // CURRENT (quirk kept deliberately by the move): the diagram-change reset
-  // clears only the confirmation, the pick and the boundary memory — not the
-  // guided flows' state. What this pins is only that the flow state SURVIVES
-  // the id change: the harness keeps the old diagram's data across the
-  // rerender, so the "1" below still names the same task. On a real switch
-  // the numbers would be read against a diagram they were not taken from.
-  it("CURRENT: the guided rename's flow state survives a diagram-id change — the flow stays open and still reads the next answer", async () => {
+  // Paul's ruling, 2026-09-29 (a): a diagram switch ends every numbered flow
+  // of the old diagram — its numbers were taken from a diagram that is gone.
+  // (The harness keeps the old diagram's data across the rerender, so "1"
+  // below WOULD still name the same task had the flow survived.)
+  it("a new diagram closes the guided rename — the next answer is no answer: it goes to the AI and renames nothing", async () => {
     const h = await mountSession({ initial: threeTasks() });
     await h.typed("rename tasks");
     expect(h.session.renameFlow).toMatchObject({ phase: "pick", itemType: "task" });
 
     await h.rerender({ diagramId: "diagram-2" });
-    expect(h.session.renameFlow).toMatchObject({ phase: "pick", itemType: "task" });
+    expect(h.session.renameFlow).toBeNull();
+    expect(h.session.onScreenBadges ?? null).toBeNull();
 
     await h.typed("1 Book order");
-    expect(el(h, "t1")!.label).toBe("Book order");
-    expect(h.lastLine).toMatchObject({ heard: "Book order", summary: "renamed to “Book order” — pick another or say “done”", ok: true });
-    expect(aiInstructions()).toEqual([]);
+    expect(el(h, "t1")!.label).toBe("Receive order");
+    expect(h.data.elements.some((e) => e.label === "Book order")).toBe(false);
+    expect(aiInstructions()).toEqual(["1 Book order"]);
+    expect(h.log.map((l) => [l.heard, l.ok, l.viaAi])).toEqual([["1 Book order", false, true]]);
   });
 
-  it("CURRENT: a new diagram leaves “move dividers” open — its next answer still moves the divider", async () => {
+  it("a new diagram closes “move dividers” — its next answer moves no divider", async () => {
     const h = await mountSession({ initial: twoLanesTwoPools() });
     await h.typed("move dividers");
     expect(h.session.dividerFlow).toMatchObject({ order: ["divider:lane1|lane2"] });
 
     await h.rerender({ diagramId: "diagram-2" });
-    expect(h.session.dividerFlow).toMatchObject({ order: ["divider:lane1|lane2"] });
+    expect(h.session.dividerFlow).toBeNull();
 
     await h.typed("1 down 20 pixels");
-    expect(h.lastLine?.summary).toBe("1 → moved Manager's top boundary down 20px — another, or “done”");
-    expect(el(h, "lane2")!.y).toBe(145);
+    expect(el(h, "lane2")!.y).toBe(125);
+    expect(h.log.some((l) => l.summary.startsWith("1 → moved"))).toBe(false);
+    // With nothing open, "done" is the flow word with nothing to close.
     await h.typed("done");
-    expect(h.lastLine?.summary).toBe("dividers closed");
-    expect(h.session.dividerFlow).toBeNull();
+    expect(h.lastLine).toMatchObject({ heard: "done", summary: "cleared — listening for the next command", ok: true });
   });
 
-  it("CURRENT: a new diagram leaves the numbered message pick open, and the command log whole", async () => {
+  it("a new diagram closes the numbered message pick and clears the command log — the old diagram's lines go with it", async () => {
     const h = await mountSession({ initial: twoLanesTwoPools() });
     await h.typed("delete Approve");
     await h.typed("add a message");
     expect(h.session.messageFlow).toMatchObject({ mode: "pair" });
-    const before = h.log.map((l) => ({ id: l.id, summary: l.summary }));
-    expect(before).toHaveLength(2);
+    expect(h.log).toHaveLength(2);
 
     await h.rerender({ diagramId: "diagram-2" });
-    expect(h.session.messageFlow).toMatchObject({ mode: "pair" });
-    expect(h.log.map((l) => ({ id: l.id, summary: l.summary }))).toEqual(before);
-
-    await h.typed("done");
-    expect(h.lastLine?.summary).toBe("message cancelled");
     expect(h.session.messageFlow).toBeNull();
-    expect(h.log).toHaveLength(3);
+    expect(h.log).toEqual([]);
+
+    // Nothing is open, so "done" closes nothing — and costs no AI call.
+    await h.typed("done");
+    expect(h.log.map((l) => [l.heard, l.summary, l.ok])).toEqual([["done", "cleared — listening for the next command", true]]);
+    expect(h.session.messageFlow).toBeNull();
+    expect(aiInstructions()).toEqual([]);
   });
 
-  // CURRENT (quirk kept deliberately by the move): the reset effect STOPS the
-  // mic, and the recogniser's stop fires onEnd, whose forced flush runs what
-  // was still in the buffer — so a half-heard command is not dropped with the
-  // old diagram, it runs (against whatever the new render's runner sees).
-  it("CURRENT: with the mic on, a new diagram stops it — and the stop's forced flush RUNS the fragment still in the buffer", async () => {
+  // Paul's ruling, 2026-09-29 (a): the buffer is the old diagram's. The reset
+  // empties it BEFORE it stops the recogniser (whose stop fires onEnd and
+  // force-flushes), so a half-heard command is dropped with the old diagram.
+  it("with the mic on, a new diagram stops it and DISCARDS the fragment still in the buffer — it never runs", async () => {
     fakeTimers();
     const h = await mountSession({ initial: threeTasks() });
     await micOn(h);
@@ -216,20 +217,22 @@ describe("T5075 — the session's lifecycle: a new diagram, Voice Assist off, un
     await h.rerender({ diagramId: "diagram-2" });
     expect(fakeDictation.current.stopped).toBe(true);
     expect(h.session.voiceListening).toBe(false);
+    expect(h.session.abraConnecting).toBe(false);
     expect(h.session.voiceAssistOn).toBe(false);
     expect(h.session.voiceInterim).toBe("");
-    expect(h.log).toHaveLength(1);
-    expect(h.lastLine).toMatchObject({ heard: "delete Pay supplier", summary: "deleted Pay supplier", ok: true });
-    expect(el(h, "t3")).toBeUndefined();
+    expect(h.log).toEqual([]);
+    expect(el(h, "t3")!.label).toBe("Pay supplier");
+    // Its silence timer went with it: the fragment does not run later either.
+    await h.act(() => { vi.advanceTimersByTime(20_000); });
+    expect(h.log).toEqual([]);
+    expect(el(h, "t3")!.label).toBe("Pay supplier");
+    expect(aiInstructions()).toEqual([]);
   });
 
-  // CURRENT (quirk kept deliberately by the move — a hazard): the effect stops
-  // the mic BEFORE it clears pendingConfirmRef, so the flushed buffer answers
-  // the confirmation the reset was about to drop.
-  // HAZARD FOR PAUL TO RULE ON: a "yes" still in the buffer when the diagram
-  // changes confirms a destructive command (here, clearing the whole diagram)
-  // that the reset exists to throw away. Pinned as today's behaviour only.
-  it("CURRENT: a buffered “yes” is flushed by that stop BEFORE the reset drops the parked confirmation — so it confirms, and the diagram is cleared", async () => {
+  // Paul's ruling, 2026-09-29 (a) with (1): the parked confirmation and the
+  // buffer are both dropped BEFORE the recogniser stops, so a buffered "yes"
+  // can never answer "clear the diagram?" on the way out.
+  it("a new diagram drops a waiting “clear the diagram?” before a buffered “yes” can answer it — nothing is cleared, and the log starts empty", async () => {
     fakeTimers();
     const h = await mountSession({ initial: threeTasks() });
     await h.typed("clear the diagram");
@@ -238,9 +241,14 @@ describe("T5075 — the session's lifecycle: a new diagram, Voice Assist off, un
     expect(h.data.elements).toHaveLength(5);
 
     await h.rerender({ diagramId: "diagram-2" });
-    expect(h.lastLine).toMatchObject({ heard: "yes", summary: "confirmed → cleared the diagram", ok: true });
-    expect(h.data.elements).toHaveLength(0);
+    expect(fakeDictation.current.stopped).toBe(true);
+    expect(h.data.elements).toHaveLength(5);
     expect(h.session.pendingConfirmRef.current).toBeNull();
+    expect(h.log).toEqual([]);
+    await h.act(() => { vi.advanceTimersByTime(20_000); });
+    expect(h.data.elements).toHaveLength(5);
+    expect(h.log).toEqual([]);
+    expect(applies).not.toHaveBeenCalled();
     expect(aiInstructions()).toEqual([]);
   });
 
@@ -263,12 +271,13 @@ describe("T5075 — the session's lifecycle: a new diagram, Voice Assist off, un
     expect(fakeDictation.sessions).toHaveLength(1);
   });
 
-  // CURRENT (quirk kept deliberately by the move): stopAbraListening means to
-  // close the flows and THEN flush the buffer ("stop ends everything … apply
-  // anything still buffered"). But the recogniser's stop() fires onEnd
-  // synchronously, and onEnd force-flushes — so the buffer runs INSIDE stop(),
-  // while the rename flow is still open, and the flow reads it as its answer.
-  it("CURRENT: turning Voice Assist off with a fragment buffered — the recogniser's own onEnd flushes it BEFORE the flows close, so the open rename flow reads it", async () => {
+  // The order stopAbraListening keeps (restated by Paul's ruling, 2026-09-29:
+  // "a name still buffered for an open rename is read first"): only a
+  // QUESTION's buffered answer is discarded before the recogniser stops. The
+  // recogniser's stop() fires onEnd synchronously, and onEnd force-flushes —
+  // so the buffer runs INSIDE stop(), while the rename flow is still open, and
+  // the flow reads it as its answer; the flows close after.
+  it("turning Voice Assist off with a fragment buffered — the recogniser's own onEnd flushes it BEFORE the flows close, so the open rename flow reads it", async () => {
     fakeTimers();
     const h = await mountSession({ initial: threeTasks() });
     await micOn(h);
