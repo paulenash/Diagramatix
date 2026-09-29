@@ -29,7 +29,7 @@ import { thumbnailFrameFor } from "@/app/lib/diagram/templateThumbnail";
 import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
 import type { DiagramData, DiagramElement } from "@/app/lib/diagram/types";
 import {
-  VOICE_EXAMPLES, askedYesNo, chipAction, connectorAt, currentQuestion, elementAt, lastEditedBox, phoneWording, selectionAfterTap,
+  VOICE_EXAMPLES, askedYesNo, chipAction, connectorVisibleSegments, currentQuestion, tapTarget, lastEditedBox, phoneWording, selectionAfterTap,
 } from "@/app/lib/mobile/voiceEdit";
 import { badgePosition } from "@/app/lib/mobile/badgePlace";
 import { keepAwake } from "@/app/lib/mobile/wakeLock";
@@ -167,15 +167,16 @@ export function MobileVoiceEditor({
     const x = svgX - frame.tx, y = svgY - frame.ty;
     session.pointerWorld.current = { x, y };
     setMark({ x, y });
-    // A connector's line is picked before the element under it (a connector runs across a pool or lane).
-    const line = connectorAt(data, x, y);
-    if (line) {
-      setSelectedConnectorId(selectedConnectorIdRef.current === line.id ? null : line.id);
+    // What is under the finger: a boundary event, then any element the tap is inside, then a
+    // connector between its elements, then a pool or lane (voiceEdit.ts tapTarget).
+    const hit = tapTarget(data, x, y);
+    if (hit?.kind === "connector") {
+      setSelectedConnectorId(selectedConnectorIdRef.current === hit.connector.id ? null : hit.connector.id);
       setSelectedElementIds(new Set());
       return;
     }
     setSelectedConnectorId(null);
-    setSelectedElementIds(new Set(selectionAfterTap(selectedIdsRef.current, elementAt(data, x, y), multi)));
+    setSelectedElementIds(new Set(selectionAfterTap(selectedIdsRef.current, hit?.element ?? null, multi)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [frame.tx, frame.ty, data, multi]);
 
@@ -196,10 +197,10 @@ export function MobileVoiceEditor({
       {session.goldFlash.runId > 0 && (
         <g transform={`translate(${frame.tx}, ${frame.ty})`}><GoldFlashOverlay runId={session.goldFlash.runId} targets={session.goldFlash.targets as never} /></g>
       )}
-      {selectedConnector && selectedConnector.waypoints.length > 1 && (
-        <polyline points={selectedConnector.waypoints.map((p) => `${p.x + frame.tx},${p.y + frame.ty}`).join(" ")}
-          fill="none" stroke="#2563eb" strokeWidth={6 / Math.min(1, zoom)} strokeOpacity={0.45} strokeLinecap="round" strokeLinejoin="round" />
-      )}
+      {selectedConnector && connectorVisibleSegments(selectedConnector, data).map(([p, q], i) => (
+        <line key={`sel-conn-${i}`} x1={p.x + frame.tx} y1={p.y + frame.ty} x2={q.x + frame.tx} y2={q.y + frame.ty}
+          stroke="#2563eb" strokeWidth={6 / Math.min(1, zoom)} strokeOpacity={0.45} strokeLinecap="round" />
+      ))}
       {selectedOrder.map((e, i) => selectedOrder.length > 1 && (
         <g key={`order-${e.id}`} transform={`translate(${e.x + frame.tx}, ${e.y + frame.ty}) scale(${1 / zoom})`}>
           <circle r={13} fill="#2563eb" stroke="#ffffff" strokeWidth={2} />

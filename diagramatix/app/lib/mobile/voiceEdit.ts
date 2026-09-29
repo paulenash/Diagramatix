@@ -4,6 +4,7 @@
  * (app/hooks/useVoiceSession.ts) — tested without a phone.
  */
 import { isHiddenOnCanvas } from "@/app/lib/diagram/diagramThumbnail";
+import { isContainerType } from "@/app/hooks/useDiagram";
 import type { Connector, DiagramData, DiagramElement } from "@/app/lib/diagram/types";
 
 /** The words the session uses for "no pointer yet" — written for a mouse. */
@@ -82,24 +83,90 @@ const distToSegment = (px: number, py: number, a: { x: number; y: number }, b: {
   return Math.hypot(px - (a.x + t * dx), py - (a.y + t * dy));
 };
 
+type Pt = { x: number; y: number };
+type Rect = { x: number; y: number; width: number; height: number };
+
+/** The parts of the segment a→b that lie OUTSIDE a rectangle (0, 1 or 2 pieces). */
+function outsideRect(a: Pt, b: Pt, r: Rect): [Pt, Pt][] {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  let t0 = 0, t1 = 1;
+  const clip = (p: number, q: number) => {   // Liang–Barsky: keep the part INSIDE
+    if (p === 0) return q >= 0;
+    const t = q / p;
+    if (p < 0) { if (t > t1) return false; if (t > t0) t0 = t; } else { if (t < t0) return false; if (t < t1) t1 = t; }
+    return true;
+  };
+  const inside = clip(-dx, a.x - r.x) && clip(dx, r.x + r.width - a.x) && clip(-dy, a.y - r.y) && clip(dy, r.y + r.height - a.y);
+  if (!inside || t1 <= t0) return [[a, b]];
+  const at = (t: number): Pt => ({ x: a.x + t * dx, y: a.y + t * dy });
+  const out: [Pt, Pt][] = [];
+  if (t0 > 0) out.push([a, at(t0)]);
+  if (t1 < 1) out.push([at(t1), b]);
+  return out;
+}
+
 /**
- * The connector whose line passes within `tol` of a point (diagram coordinates)
- * — the nearest, when several do — or null. Any connector type: a sequence
- * flow, a message, an association. A tap checks this BEFORE the element under
- * it, because a connector runs across a pool or lane, and the pool would win.
+ * The stretches of a connector that are BETWEEN its two elements — its line
+ * with the parts inside the source's and the target's boundaries cut away.
+ * Only these can be tapped, and only these are highlighted as selected: a
+ * connector that ran on into an event or a gateway used to take every tap
+ * meant for that event or gateway (Paul, 2026-09-30).
+ */
+export function connectorVisibleSegments(c: Connector, data: DiagramData): [Pt, Pt][] {
+  const pts = c.waypoints ?? [];
+  const ends = [c.sourceId, c.targetId]
+    .map((id) => data.elements.find((e) => e.id === id))
+    .filter((e): e is DiagramElement => !!e);
+  let segs: [Pt, Pt][] = [];
+  for (let i = 0; i + 1 < pts.length; i++) segs.push([pts[i], pts[i + 1]]);
+  for (const e of ends) segs = segs.flatMap(([p, q]) => outsideRect(p, q, e));
+  return segs;
+}
+
+/**
+ * The connector whose visible line (between its two elements) passes within
+ * `tol` of a point (diagram coordinates) — the nearest, when several do — or
+ * null. Any connector type: a sequence flow, a message, an association.
  */
 export function connectorAt(data: DiagramData, x: number, y: number, tol: number = CONNECTOR_TAP_TOLERANCE): Connector | null {
   let best: Connector | null = null;
   let bestD = tol;
   for (const c of data.connectors ?? []) {
     if (c.type === "review-comment-link") continue;
-    const pts = c.waypoints ?? [];
-    for (let i = 0; i + 1 < pts.length; i++) {
-      const d = distToSegment(x, y, pts[i], pts[i + 1]);
+    for (const [p, q] of connectorVisibleSegments(c, data)) {
+      const d = distToSegment(x, y, p, q);
       if (d <= bestD) { bestD = d; best = c; }
     }
   }
   return best;
+}
+
+/** What a tap on the phone's picture picks. */
+export type TapTarget = { kind: "element"; element: DiagramElement } | { kind: "connector"; connector: Connector } | null;
+
+const selectable = (e: DiagramElement, data: DiagramData) =>
+  e.type !== "review-comment" && e.type !== "text-annotation" && !isHiddenOnCanvas(e, data);
+const inBox = (e: DiagramElement, x: number, y: number) => x >= e.x && x <= e.x + e.width && y >= e.y && y <= e.y + e.height;
+
+/**
+ * What a tap at a point selects, in this order (Paul, 2026-09-30):
+ *   1. a BOUNDARY event whose box holds the point — always on top of its host;
+ *   2. any other element that is not a container, when the point is INSIDE its
+ *      boundary (the tap's centre anywhere inside is enough) — topmost first;
+ *   3. a connector, along the stretch between its two elements;
+ *   4. a container (pool, lane, expanded subprocess …) holding the point.
+ * A connector never takes a tap that lands inside an element; a pool or lane
+ * never takes one that lands on a connector.
+ */
+export function tapTarget(data: DiagramData, x: number, y: number): TapTarget {
+  const els = [...data.elements].reverse().filter((e) => selectable(e, data) && inBox(e, x, y));
+  const boundary = els.find((e) => !!e.boundaryHostId);
+  if (boundary) return { kind: "element", element: boundary };
+  const solid = els.find((e) => !isContainerType(e.type));
+  if (solid) return { kind: "element", element: solid };
+  const line = connectorAt(data, x, y);
+  if (line) return { kind: "connector", connector: line };
+  return els[0] ? { kind: "element", element: els[0] } : null;
 }
 
 /** The topmost element the picture shows under a point (diagram coordinates), or null. */

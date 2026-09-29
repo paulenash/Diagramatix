@@ -11,7 +11,7 @@ import { applyAssistOps } from "@/app/lib/assist/applyAssistOps";
 import { headlessDiagram } from "@/app/lib/assist/headlessDiagram";
 import { needsConfirmation } from "@/app/lib/assist/confirm";
 import { connectorsForDelete, namesSelectedConnector, parseConnectorsDelete } from "@/app/lib/assist/connectorCommands";
-import { connectorAt } from "@/app/lib/mobile/voiceEdit";
+import { connectorAt, connectorVisibleSegments, tapTarget } from "@/app/lib/mobile/voiceEdit";
 import { parseNumberList } from "@/app/lib/assist/numberList";
 import type { Connector, DiagramData, DiagramElement } from "@/app/lib/diagram/types";
 
@@ -247,5 +247,56 @@ describe("T5098 — every delete with nothing selected asks which, by number", (
     expect(h.data.elements.some((e) => e.id === "t2")).toBe(true);
     const ask = needsConfirmation(parseCommand("delete tasks")!, diagram().elements, null, ["t2", "t3"]);
     expect(ask?.what).toBe("delete the 2 selected elements");
+  });
+});
+
+describe("T5100 — what a tap on the phone picks: elements first, connectors only between their elements", () => {
+  // Task (100..220) → gateway (320..380, centre 350,110) → event (480..516); the lines run centre to centre
+  const line = (id: string, a: string, b: string, pts: { x: number; y: number }[]) => C(id, a, b, "sequence", { waypoints: pts });
+  const d = {
+    elements: [
+      E({ id: "pool", type: "pool", x: 0, y: 0, width: 700, height: 300, label: "Company", properties: { poolType: "white-box" } }),
+      E({ id: "task", type: "task", x: 100, y: 80, width: 120, height: 60, label: "Check", parentId: "pool" }),
+      E({ id: "gw", type: "gateway", x: 320, y: 80, width: 60, height: 60, label: "OK?", parentId: "pool" }),
+      E({ id: "ev", type: "end-event", x: 480, y: 92, width: 36, height: 36, label: "Done", parentId: "pool" }),
+      E({ id: "host", type: "task", x: 100, y: 200, width: 120, height: 60, label: "Host", parentId: "pool" }),
+      E({ id: "bnd", type: "intermediate-event", x: 202, y: 182, width: 36, height: 36, label: "Late", parentId: "pool", boundaryHostId: "host" }),
+    ],
+    connectors: [
+      line("a", "task", "gw", [{ x: 160, y: 110 }, { x: 350, y: 110 }]),          // centre to centre
+      line("b", "gw", "ev", [{ x: 350, y: 110 }, { x: 498, y: 110 }]),
+    ],
+    viewport: { x: 0, y: 0, zoom: 1 },
+  } as unknown as DiagramData;
+
+  it("the line is only its stretch BETWEEN the two elements' boundaries", () => {
+    const a = d.connectors[0];
+    const segs = connectorVisibleSegments(a, d);
+    expect(segs).toEqual([[{ x: 220, y: 110 }, { x: 320, y: 110 }]]);
+    expect(connectorAt(d, 270, 112)?.id).toBe("a");
+    expect(connectorAt(d, 180, 110), "inside the task").toBeNull();
+    expect(connectorAt(d, 340, 110), "inside the gateway").toBeNull();
+  });
+
+  it("a tap anywhere inside a gateway or an event selects IT, whatever line ends there", () => {
+    for (const [x, y] of [[350, 110], [336, 110], [364, 112], [498, 110], [490, 100]] as const) {
+      const t = tapTarget(d, x, y);
+      expect(t?.kind, `${x},${y}`).toBe("element");
+    }
+    expect((tapTarget(d, 350, 110) as { element: DiagramElement }).element.id).toBe("gw");
+    expect((tapTarget(d, 498, 110) as { element: DiagramElement }).element.id).toBe("ev");
+  });
+
+  it("between the elements the connector is picked — not the pool that holds it", () => {
+    const t = tapTarget(d, 270, 112);
+    expect(t).toMatchObject({ kind: "connector", connector: { id: "a" } });
+    expect(tapTarget(d, 600, 250)).toMatchObject({ kind: "element", element: { id: "pool" } });
+  });
+
+  it("a boundary event is always on top of its host", () => {
+    // (210, 205) is inside both boxes: the host task (100..220 × 200..260) and its boundary event (202..238 × 182..218)
+    const both = tapTarget(d, 210, 205);
+    expect(both).toMatchObject({ kind: "element", element: { id: "bnd" } });
+    expect(tapTarget(d, 150, 230)).toMatchObject({ kind: "element", element: { id: "host" } });
   });
 });
