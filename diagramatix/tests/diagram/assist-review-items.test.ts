@@ -65,10 +65,10 @@ describe("2 — nothing said during the handshake is lost", () => {
     // connected BEFORE onopen, chunks queue while CONNECTING, and onopen drains.
     expect(dict).toMatch(/const micPromise[\s\S]{0,240}?getUserMedia\(\{ audio: true \}\)/);
     const graph = dict.indexOf("source.connect(processor);");
-    const open = dict.indexOf("ws.onopen = () => {");
+    const open = dict.indexOf("sock.onopen = () => {");
     expect(graph, "capture is wired before the socket opens").toBeLessThan(open);
-    expect(dict).toContain("queue.drain((chunk) => ws.send(chunk));");
-    expect(dict).toContain("else if (ws.readyState === WebSocket.CONNECTING) queue.push(pcm.buffer);");
+    expect(dict).toContain("queue.drain((chunk) => sock.send(chunk));");
+    expect(dict).toContain("else if (ws.readyState === WebSocket.CONNECTING || (phone && !stopped)) queue.push(pcm.buffer);");
     expect(dict, "the UI is told when the recogniser is live").toContain("cb.onReady?.();");
     const ed = editor();
     expect(ed).toContain("onReady: () => setAbraConnecting(false),");
