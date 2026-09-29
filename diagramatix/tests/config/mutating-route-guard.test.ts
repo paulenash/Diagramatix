@@ -119,6 +119,7 @@ const KNOWN_UNGUARDED: string[] = [
   "admin/users/[id]/org-role/route.ts",
   "admin/users/[id]/route.ts",
   "admin/users/[id]/subscription/route.ts",
+  "admin/users/[id]/usage/route.ts",
   "admin/value-chain-library/route.ts",
   "ai/audio/refine-transcript/route.ts",
   "ai/audio/transcribe/route.ts",

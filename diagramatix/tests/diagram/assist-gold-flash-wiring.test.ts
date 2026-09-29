@@ -171,9 +171,11 @@ describe("T4489 — Voice Assist is gated on the feature, not on being an admin"
   });
 
   it("still respects a SuperAdmin previewing a lower tier", () => {
-    // The server hands an admin every feature, so the feature map alone would
-    // leave the wand up while pretending to be an Introductory user.
-    expect(editor).toContain('atLeastTier(adminViewMode, "introductory")'); // widened with Mobile Access, 2026-09-30
+    // Used to be a client-side tier check on top of the feature map, because the server handed an admin
+    // every feature. Since 2026-09-30 the server evaluates AS the previewed level (features/actAs.ts),
+    // so the feature state read here already is that level's.
+    expect(editor).toContain('const voiceAssistAllowed = voiceAssistFeature === "available";');
+    expect(editor).not.toContain("atLeastTier(");
   });
 
   it("enforces it on the route, not only in the editor", () => {

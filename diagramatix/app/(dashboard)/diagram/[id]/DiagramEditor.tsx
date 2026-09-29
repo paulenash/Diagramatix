@@ -104,7 +104,6 @@ import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
 import { useDiagramTypeStyles } from "@/app/hooks/useDiagramTypeStyles";
 import { useSuperAdminChrome, viewModeEntitlements } from "@/app/hooks/useSuperAdminChrome";
 import { useFeatureState, useFeatureStates } from "@/app/components/FeatureGate";
-import { atLeastTier } from "@/app/lib/features/tierRank";
 import { lightenHex } from "@/app/lib/diagram/diagramTypeStyles";
 import { AiPanel } from "./AiPanel";
 import { AiComparisonModal, type AiComparison } from "@/app/components/AiComparisonModal";
@@ -1726,14 +1725,10 @@ export function DiagramEditor({
   // enterprise since Phase 1 — nothing had ever read it. This is the first
   // reader; the route gate on /api/ai/command is the half that actually
   // enforces it, since anything here is only a matter of which buttons show.
-  //
-  // The second clause is for a SuperAdmin previewing a customer tier: the
-  // server hands an admin every feature, so without it the wand would stay put
-  // while pretending to be an Introductory user, which defeats the preview.
   const voiceAssistFeature = useFeatureState("voice-assist");
-  const voiceAssistAllowed =
-    voiceAssistFeature === "available" &&
-    (!isAdmin || atLeastTier(adminViewMode, "introductory"));
+  // (A SuperAdmin previewing a customer level: the server now evaluates as that level, so the state
+  // read above already is the previewed level's.)
+  const voiceAssistAllowed = voiceAssistFeature === "available";
   // Generate models the current user may pick (cost-gated; SA-in-mode = all).
   const { models: aiModels, current: currentAiModel } = useAllowedModels(isActingAdmin);
   // "Regenerate" from Diagram Properties: pull the linked prompt's CURRENT text and

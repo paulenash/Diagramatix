@@ -1,13 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { refresh as refreshFeatureStore } from "@/app/lib/features/featureStateStore";
 
 /**
  * SuperAdmin "view mode" — double-clicking the Diagramatix logo (top-left) cycles
  * a SuperAdmin through five views so they can use / demo / screenshot the app as
  * different roles AND at each customer subscription tier:
  *
- *   superadmin → orgadmin → expert → professional → introductory → (back to) superadmin
+ *   superadmin → orgadmin → enterprise → expert → professional → introductory → free → (back to) superadmin
  *
  *   • superadmin   — full SuperAdmin chrome (chips, Org-reassign, SuperAdmin AI
  *     options), tier shows normally, and enterprise Org policy is BYPASSED.
@@ -26,7 +28,7 @@ import { useCallback, useEffect, useState } from "react";
  * consumer that reads `hidden` keeps working (SuperAdmin chrome shows only in the
  * superadmin view). Strictly a no-op for non-SuperAdmins.
  */
-export type AdminViewMode = "superadmin" | "orgadmin" | "enterprise" | "expert" | "professional" | "introductory";
+export type AdminViewMode = "superadmin" | "orgadmin" | "enterprise" | "expert" | "professional" | "introductory" | "free";
 
 /** The subscription tier a given view mode previews as — used to relabel the
  *  tier chip. null = show the real tier (superadmin / orgadmin aren't tier views). */
@@ -37,6 +39,7 @@ export const VIEW_MODE_TIER: Record<AdminViewMode, string | null> = {
   expert: "Expert",
   professional: "Professional",
   introductory: "Introductory",
+  free: "Free",
 };
 
 /** The four allocatable feature flags (mirrors subscription.ts `Entitlements`,
@@ -48,38 +51,27 @@ export interface ViewModeEntitlements {
   apqc: boolean;
 }
 
-/** The feature set each TIER view previews. null for superadmin / orgadmin (they
- *  keep the caller's real entitlements). Per Paul's tier definitions:
- *    • Expert       — everything.
- *    • Professional — APQC only (no Simulator / Mining / Risk & Controls → no Examples).
- *    • Introductory — nothing (also hides APQC-generated projects). */
-const VIEW_MODE_ENTITLEMENTS: Record<AdminViewMode, ViewModeEntitlements | null> = {
-  superadmin:   null,
-  orgadmin:     null,
-  enterprise:   { simulator: true,  processMining: true,  riskControl: true,  apqc: true  },
-  expert:       { simulator: true,  processMining: true,  riskControl: true,  apqc: true  },
-  professional: { simulator: false, processMining: false, riskControl: false, apqc: true  },
-  introductory: { simulator: false, processMining: false, riskControl: false, apqc: false },
-};
-
-/** The tier-view feature override for a mode, or null when the real entitlements
- *  should be used unchanged (superadmin / orgadmin / non-SuperAdmin). */
-export function viewModeEntitlements(mode: AdminViewMode): ViewModeEntitlements | null {
-  return VIEW_MODE_ENTITLEMENTS[mode];
+/**
+ * There used to be a hand-written table here of which features each TIER view showed. It never read
+ * the Feature Availability matrix, so it drifted from it, and it only hid buttons — every API gate
+ * still passed as a SuperAdmin. The SERVER now evaluates as the previewed level (the `dgx_sa_mode`
+ * cookie, app/lib/features/actAs.ts), so the real entitlements and feature states already ARE the
+ * previewed level's, and there is nothing left to overlay. These two remain only so their callers
+ * keep compiling.
+ */
+export function viewModeEntitlements(_mode: AdminViewMode): ViewModeEntitlements | null {
+  return null;
 }
 
-/** Overlay the previewed-tier feature flags onto the caller's real entitlements
- *  while a SuperAdmin cycles a tier view; otherwise return them unchanged. */
-export function effectiveEntitlements<T extends ViewModeEntitlements>(mode: AdminViewMode, base: T): T {
-  const o = VIEW_MODE_ENTITLEMENTS[mode];
-  return o ? { ...base, ...o } : base;
+export function effectiveEntitlements<T extends ViewModeEntitlements>(_mode: AdminViewMode, base: T): T {
+  return base;
 }
 
 const KEY = "dgx.superAdminViewMode";
 const VER_KEY = "dgx.superAdminViewModeBuild";
 const EVENT = "dgx:superadmin-chrome";
 const COOKIE = "dgx_sa_mode";
-const ORDER: AdminViewMode[] = ["superadmin", "orgadmin", "enterprise", "expert", "professional", "introductory"];
+const ORDER: AdminViewMode[] = ["superadmin", "orgadmin", "enterprise", "expert", "professional", "introductory", "free"];
 // Build stamp (commit count, baked in per deploy). A new build resets the view
 // mode to "superadmin" so the demo mode never survives a deployment (local or prod).
 const BUILD = process.env.NEXT_PUBLIC_COMMIT_COUNT ?? "0";
@@ -104,6 +96,7 @@ function writeCookie(mode: AdminViewMode): void {
 
 export function useSuperAdminChrome(isSuperAdmin: boolean): { mode: AdminViewMode; hidden: boolean; toggle: () => void } {
   const [mode, setMode] = useState<AdminViewMode>("superadmin");
+  const router = useRouter();
 
   useEffect(() => {
     if (!isSuperAdmin) { setMode("superadmin"); writeCookie("superadmin"); return; }
@@ -122,7 +115,11 @@ export function useSuperAdminChrome(isSuperAdmin: boolean): { mode: AdminViewMod
     try { localStorage.setItem(KEY, next); } catch { /* ignore */ }
     writeCookie(next);
     window.dispatchEvent(new Event(EVENT));
-  }, [isSuperAdmin]);
+    // The server now evaluates as the previewed level: re-read the feature states and re-render the
+    // server components (router.refresh keeps client state, so an open editor is not lost).
+    void refreshFeatureStore();
+    router.refresh();
+  }, [isSuperAdmin, router]);
 
   const effective: AdminViewMode = isSuperAdmin ? mode : "superadmin";
   return { mode: effective, hidden: isSuperAdmin && effective !== "superadmin", toggle };

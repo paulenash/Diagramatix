@@ -272,6 +272,10 @@ export function UsagePopover({
           )}
         </div>
 
+        {mode.kind === "admin" && snapshot && !snapshot.isAdmin && (
+          <TestTools userId={mode.userId} onDone={(s) => setSnapshot(s)} />
+        )}
+
         {/* Footer */}
         <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
@@ -546,5 +550,53 @@ function ManageSubscriptionButton({
     >
       Manage Subscription
     </button>
+  );
+}
+
+const TEST_METRICS: { id: string; label: string }[] = [
+  { id: "aiAttempts", label: "AI attempts" },
+  { id: "individualExports", label: "Individual exports" },
+  { id: "individualImports", label: "Individual imports" },
+  { id: "bulkExports", label: "Bulk exports" },
+  { id: "bulkImports", label: "Bulk imports" },
+];
+
+/** SuperAdmin test tools: set a counter or the trial clock so a limit can be hit in seconds. */
+function TestTools({ userId, onDone }: { userId: string; onDone: (s: UsageSnapshot) => void }) {
+  const [metric, setMetric] = useState(TEST_METRICS[0].id);
+  const [count, setCount] = useState("0");
+  const [days, setDays] = useState("1");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  async function post(body: Record<string, unknown>) {
+    setBusy(true); setMsg(null);
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/usage`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) { setMsg(j.error ?? `Failed (${res.status})`); return; }
+      onDone(j as UsageSnapshot);
+      setMsg("Done");
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="px-5 py-3 border-t border-gray-100 bg-amber-50/50" aria-label="Test tools">
+      <div className="text-[11px] font-semibold text-amber-800 mb-2">Test tools (SuperAdmin) — set a counter or the trial clock to hit a limit</div>
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <select value={metric} onChange={(e) => setMetric(e.target.value)} className="border border-gray-300 rounded px-1.5 py-1 bg-white">
+          {TEST_METRICS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+        </select>
+        <input value={count} onChange={(e) => setCount(e.target.value)} inputMode="numeric" className="w-14 border border-gray-300 rounded px-1.5 py-1" aria-label="Counter value" />
+        <button disabled={busy} onClick={() => void post({ action: "set-counter", metric, count: Number(count) })} className="px-2 py-1 rounded border border-amber-400 text-amber-800 hover:bg-amber-100 disabled:opacity-50">Set counter</button>
+        <button disabled={busy} onClick={() => void post({ action: "reset-counters" })} className="px-2 py-1 rounded border border-amber-400 text-amber-800 hover:bg-amber-100 disabled:opacity-50">Reset all counters</button>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 text-xs mt-2">
+        <span className="text-gray-600">Trial days left</span>
+        <input value={days} onChange={(e) => setDays(e.target.value)} inputMode="numeric" className="w-12 border border-gray-300 rounded px-1.5 py-1" aria-label="Trial days left" />
+        <button disabled={busy} onClick={() => void post({ action: "set-trial-days-left", days: Number(days) })} className="px-2 py-1 rounded border border-amber-400 text-amber-800 hover:bg-amber-100 disabled:opacity-50" title="Shifts the trial start — which is also the anchor of the monthly counter periods">Set trial</button>
+        {msg && <span className="text-gray-600">{msg}</span>}
+      </div>
+    </div>
   );
 }

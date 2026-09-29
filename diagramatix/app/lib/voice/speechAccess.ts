@@ -24,6 +24,7 @@
 import { prisma } from "@/app/lib/db";
 import { isSuperuser } from "@/app/lib/superuser";
 import { resolveEffectiveLevelId } from "@/app/lib/features/availability";
+import { currentActAsLevel } from "@/app/lib/features/actAs";
 
 export const SPEECH_FEATURE_KEY = "voice-feedback";
 
@@ -32,7 +33,9 @@ type SessionLike = { user?: { id?: string | null; email?: string | null } | null
 export async function speechGranted(session: SessionLike): Promise<boolean> {
   const userId = session?.user?.id;
   if (!userId) return false;
-  if (isSuperuser(session as never)) return true;
+  // A SuperAdmin is granted — unless acting as a customer level, when the level's own row decides.
+  const actAs = isSuperuser(session as never) ? await currentActAsLevel() : null;
+  if (isSuperuser(session as never) && !actAs) return true;
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -40,10 +43,10 @@ export async function speechGranted(session: SessionLike): Promise<boolean> {
   });
   if (!user) return false;
 
-  const override = (user.featureOverrides as Record<string, unknown> | null)?.[SPEECH_FEATURE_KEY];
+  const override = actAs ? undefined : (user.featureOverrides as Record<string, unknown> | null)?.[SPEECH_FEATURE_KEY];
   if (override !== undefined && override !== null) return override === "available";
 
-  const levelId = await resolveEffectiveLevelId(userId);
+  const levelId = actAs ?? (await resolveEffectiveLevelId(userId));
   if (!levelId) return false;
   const row = await prisma.featureAvailability.findUnique({
     where: { levelId_featureKey: { levelId, featureKey: SPEECH_FEATURE_KEY } },

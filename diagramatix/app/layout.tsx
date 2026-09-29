@@ -3,6 +3,7 @@ import { Geist, Caveat } from "next/font/google";
 import { SessionProvider } from "@/app/components/SessionProvider";
 import { GlobalOverlays } from "@/app/components/GlobalOverlays";
 import { ScreenBrightness } from "@/app/components/ScreenBrightness";
+import { ActingAsBanner } from "@/app/components/ActingAsBanner";
 import { displayBootScript } from "@/app/lib/ui/screenDisplay";
 import { auth } from "@/auth";
 import { isSuperuser } from "@/app/lib/superuser";
@@ -62,6 +63,7 @@ export default async function RootLayout({
           <SessionProvider>
             {children}
             <GlobalOverlays superAdmin={superAdmin} />
+            <ActingAsBanner superAdmin={superAdmin} />
             {/* Above everything, so the dimmer covers the whole window. */}
             <ScreenBrightness />
           </SessionProvider>

@@ -14,6 +14,7 @@ import { getEffectiveSubscriptionLevelId, resolveEffectiveLevelId } from "./effe
 import { SUPERUSER_EMAILS } from "@/app/lib/superuser";
 import { FEATURE_KEYS } from "./registry";
 import { applyDependencies } from "./dependencies";
+import { currentActAsLevel } from "./actAs";
 
 export type FeatureState = "available" | "disabled" | "hidden";
 export type FeatureStateMap = Record<string, FeatureState>;
@@ -64,7 +65,12 @@ export async function getFeatureStates(userId: string): Promise<FeatureStateMap>
     },
   });
   if (!u) return {};
-  if (isAdminEmail(u.email)) return allAvailable();
+  if (isAdminEmail(u.email)) {
+    // A SuperAdmin acting as a customer level (features/actAs.ts) gets THAT level's matrix, with
+    // the bypass off; otherwise everything.
+    const actAs = await currentActAsLevel();
+    return actAs ? applyDependencies(await getLevelMatrix(actAs)) : allAvailable();
+  }
 
   const levelId = (await resolveEffectiveLevelId(userId)) ?? getEffectiveSubscriptionLevelId(u);
   const map = await getLevelMatrix(levelId);

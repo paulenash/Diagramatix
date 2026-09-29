@@ -32,6 +32,7 @@ import { prisma } from "./db";
 import { SUPERUSER_EMAILS } from "./superuser";
 import { getEffectiveSubscriptionLevelId, withOrgLevel } from "./features/effectiveLevel";
 import { getFeatureStates } from "./features/availability";
+import { currentActAsLevel } from "./features/actAs";
 
 // The pure comp / grace / stored-level rule lives in features/effectiveLevel.ts (a leaf module, so this
 // file and availability.ts can both import it). Re-exported: it has many callers.
@@ -306,6 +307,9 @@ type UserWithTier = {
    *  and the admin popover can offer a Revoke button. Null when the
    *  effective tier comes from the regular paid/free path. */
   comp: { tierLevelId: string; expiresAt: Date; grantedAt: Date | null } | null;
+  /** Set when this user is a SuperAdmin ACTING AS a customer level (features/actAs.ts): that level's
+   *  row is then `subscriptionLevel`, and the SuperAdmin bypass is off. */
+  actingAsLevelId: string | null;
 };
 
 async function loadUserWithTier(userId: string): Promise<UserWithTier | null> {
@@ -363,6 +367,15 @@ async function loadUserWithTier(userId: string): Promise<UserWithTier | null> {
     u.compTierLevelId !== null &&
     u.compTierExpiresAt !== null &&
     u.compTierExpiresAt > now;
+  // A SuperAdmin acting as a customer level: that level's limits apply and the bypass is off.
+  let actingAsLevelId: string | null = null;
+  if (isAdminEmail(u.email)) {
+    const actAs = await currentActAsLevel();
+    if (actAs) {
+      const row = await prisma.subscriptionLevel.findUnique({ where: { id: actAs } });
+      if (row) { effectiveLevel = row; underlyingLevel = row; actingAsLevelId = actAs; }
+    }
+  }
   return {
     id: u.id,
     email: u.email,
@@ -371,7 +384,8 @@ async function loadUserWithTier(userId: string): Promise<UserWithTier | null> {
     subscriptionEndsAt: u.subscriptionEndsAt,
     subscriptionLevel: effectiveLevel,
     underlyingLevel,
-    comp: compActive
+    actingAsLevelId,
+    comp: compActive && !actingAsLevelId
       ? {
           tierLevelId: u.compTierLevelId!,
           expiresAt: u.compTierExpiresAt!,
@@ -379,6 +393,11 @@ async function loadUserWithTier(userId: string): Promise<UserWithTier | null> {
         }
       : null,
   };
+}
+
+/** The SuperAdmin bypass: an admin is never limited — unless they are acting as a customer level. */
+function bypassesLimits(user: { email: string; actingAsLevelId: string | null }): boolean {
+  return isAdminEmail(user.email) && !user.actingAsLevelId;
 }
 
 function isAdminEmail(email: string): boolean {
@@ -541,8 +560,8 @@ export async function checkLimit(
     return { ok: false, reason: "User not found", metric, current: 0, limit: 0 };
   }
 
-  // Admins bypass everything.
-  if (isAdminEmail(user.email)) return { ok: true };
+  // Admins bypass everything (unless acting as a customer level — then the level's limits bite).
+  if (bypassesLimits(user)) return { ok: true };
 
   const tier = user.subscriptionLevel;
   if (!tier) {
@@ -598,7 +617,7 @@ export async function recordUsage(
 ): Promise<void> {
   const user = await loadUserWithTier(userId);
   if (!user) return;
-  if (isAdminEmail(user.email)) return;
+  if (bypassesLimits(user)) return;      // acting as a level: usage IS counted, so a limit can be hit and tested
   if (!user.subscriptionLevel) return;
 
   const periodKey = periodKeyForEventMetric(user, user.subscriptionLevel, metric, now);
@@ -611,6 +630,47 @@ export async function recordUsage(
     create: { userId, periodKey, metric: dbMetric, count: delta },
     update: { count: { increment: delta } },
   });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SuperAdmin test tools — put a user's counters and trial clock where a limit can be hit in seconds
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** The event metrics a test can set (the ones that live in UsageCounter). */
+export const EVENT_METRICS: readonly EventMetric[] = ["aiAttempts", "individualExports", "individualImports", "bulkExports", "bulkImports"];
+
+/** Set a user's counter for the CURRENT period of `metric` to exactly `count`. False when the user has no tier. */
+export async function setUsageCounter(userId: string, metric: EventMetric, count: number, now: Date = new Date()): Promise<boolean> {
+  const user = await loadUserWithTier(userId);
+  if (!user?.subscriptionLevel) return false;
+  const periodKey = periodKeyForEventMetric(user, user.subscriptionLevel, metric, now);
+  const dbMetric = eventMetricDbKey(metric);
+  const n = Math.max(0, Math.floor(count));
+  await prisma.usageCounter.upsert({
+    where: { userId_periodKey_metric: { userId, periodKey, metric: dbMetric } },
+    create: { userId, periodKey, metric: dbMetric, count: n },
+    update: { count: n },
+  });
+  return true;
+}
+
+/** Zero every counter a user has, in every period. */
+export async function resetUsageCounters(userId: string): Promise<number> {
+  return (await prisma.usageCounter.deleteMany({ where: { userId } })).count;
+}
+
+/**
+ * Move a user's trial clock so `daysLeft` days remain (0 = expired today). The trial runs from
+ * subscriptionAssignedAt, so this shifts that stamp — which is also the anchor of the monthly
+ * counter periods; the caller says so. False when their tier has no trial.
+ */
+export async function setTrialDaysLeft(userId: string, daysLeft: number, now: Date = new Date()): Promise<boolean> {
+  const user = await loadUserWithTier(userId);
+  const trialDays = user?.subscriptionLevel?.trialDays ?? null;
+  if (!user || trialDays === null) return false;
+  const usedDays = trialDays - Math.max(0, Math.floor(daysLeft));
+  await prisma.user.update({ where: { id: userId }, data: { subscriptionAssignedAt: new Date(now.getTime() - usedDays * 24 * 60 * 60 * 1000) } });
+  return true;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -663,6 +723,8 @@ export interface UsageSnapshot {
    *  period (this month for monthly tiers, lifetime for a lifetime counter).
    *  From the AiDiagramGeneration table — distinct from AI attempts. */
   diagramsThisPeriod: number;
+  /** Set when a SuperAdmin is acting as a customer level (features/actAs.ts). */
+  actingAs: { id: string; name: string } | null;
   /** Per-tier feature access for the effective tier (SuperAdmin → all true).
    *  Drives hiding of feature launch buttons / example galleries and greying
    *  of OrgAdmin tiles. */
@@ -690,7 +752,7 @@ export async function getUsageSnapshot(
   const user = await loadUserWithTier(userId);
   if (!user) return null;
 
-  const admin = isAdminEmail(user.email);
+  const admin = bypassesLimits(user);
   const tier = user.subscriptionLevel;
 
   // For SuperAdmins (SUPERUSER_EMAILS), surface a synthetic "SuperAdmin"
@@ -789,6 +851,8 @@ export async function getUsageSnapshot(
       ? { id: user.underlyingLevel!.id, name: user.underlyingLevel!.name }
       : null,
     isAdmin: admin,
+    /** A SuperAdmin acting as a customer level — the banner says so; limits are enforced. */
+    actingAs: user.actingAsLevelId ? { id: user.actingAsLevelId, name: tier?.name ?? user.actingAsLevelId } : null,
     trial,
     comp: user.comp
       ? {
