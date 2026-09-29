@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { getEffectiveUserId, isReadOnlyImpersonation, isSuperuser } from "@/app/lib/superuser";
 import { deleteProjectCascade, authorizeProjectDelete, type ProjectDeleteMode } from "@/app/lib/projects/deleteProject";
+import { folderTreeContentChanged } from "@/app/lib/projects/folderTreeViewState";
 import {
   requireOrgAdminFor,
   requireProjectAccess,
@@ -145,8 +146,12 @@ export async function PUT(req: Request, { params }: Params) {
       );
     }
     if (folderTree !== undefined) {
+      // Expanding or collapsing folders is not modifying the project: a save
+      // that changes only that leaves "last modified" (the Dashboard's order)
+      // where it was (folderTreeViewState.ts).
+      const touch = folderTreeContentChanged(existing.folderTree, folderTree) ? ', "updatedAt" = NOW()' : "";
       await prisma.$executeRawUnsafe(
-        'UPDATE "Project" SET "folderTree" = $1::jsonb, "updatedAt" = NOW() WHERE id = $2',
+        `UPDATE "Project" SET "folderTree" = $1::jsonb${touch} WHERE id = $2`,
         JSON.stringify(folderTree),
         id
       );
