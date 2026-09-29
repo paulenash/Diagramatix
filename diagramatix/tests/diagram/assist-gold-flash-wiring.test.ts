@@ -173,7 +173,7 @@ describe("T4489 — Voice Assist is gated on the feature, not on being an admin"
   it("still respects a SuperAdmin previewing a lower tier", () => {
     // The server hands an admin every feature, so the feature map alone would
     // leave the wand up while pretending to be an Introductory user.
-    expect(editor).toContain('atLeastTier(adminViewMode, "expert")');
+    expect(editor).toContain('atLeastTier(adminViewMode, "introductory")'); // widened with Mobile Access, 2026-09-30
   });
 
   it("enforces it on the route, not only in the editor", () => {

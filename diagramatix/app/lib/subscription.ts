@@ -30,6 +30,12 @@
 
 import { prisma } from "./db";
 import { SUPERUSER_EMAILS } from "./superuser";
+import { getEffectiveSubscriptionLevelId, withOrgLevel } from "./features/effectiveLevel";
+import { getFeatureStates } from "./features/availability";
+
+// The pure comp / grace / stored-level rule lives in features/effectiveLevel.ts (a leaf module, so this
+// file and availability.ts can both import it). Re-exported: it has many callers.
+export { getEffectiveSubscriptionLevelId };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -302,49 +308,6 @@ type UserWithTier = {
   comp: { tierLevelId: string; expiresAt: Date; grantedAt: Date | null } | null;
 };
 
-/**
- * Resolve the EFFECTIVE subscription tier id for a user, accounting for:
- *
- *   1. An active admin-granted comp tier (highest priority — comp wins
- *      over both the paid sub and any grace-period downgrade).
- *   2. A canceled-and-expired Stripe subscription — when
- *      `subscriptionEndsAt` has passed, the user lazy-downgrades to
- *      Free without a cron job.
- *   3. The user's stored `subscriptionLevelId`, defaulting to "free"
- *      when null.
- *
- * Pure function. Doesn't touch the DB; the caller must already have
- * read the relevant columns.
- */
-export function getEffectiveSubscriptionLevelId(
-  user: {
-    subscriptionLevelId: string | null;
-    subscriptionEndsAt: Date | null;
-    compTierLevelId?: string | null;
-    compTierExpiresAt?: Date | null;
-  },
-  now: Date = new Date(),
-): string {
-  // 1. Comp grant wins if still active.
-  if (
-    user.compTierLevelId &&
-    user.compTierExpiresAt &&
-    user.compTierExpiresAt > now
-  ) {
-    return user.compTierLevelId;
-  }
-  // 2. Grace-period downgrade for canceled paid subs.
-  if (
-    user.subscriptionEndsAt &&
-    user.subscriptionEndsAt <= now &&
-    user.subscriptionLevelId !== "free"
-  ) {
-    return "free";
-  }
-  // 3. Whatever the paid path / TierPicker set.
-  return user.subscriptionLevelId ?? "free";
-}
-
 async function loadUserWithTier(userId: string): Promise<UserWithTier | null> {
   const u = await prisma.user.findUnique({
     where: { id: userId },
@@ -383,11 +346,17 @@ async function loadUserWithTier(userId: string): Promise<UserWithTier | null> {
       where: { id: underlyingId },
     });
   }
-  // Effective tier (comp wins when active).
+  // The organisation rule (features/effectiveLevel.ts): with no active comp, an organisation the
+  // person belongs to can lift them above their own level — an Enterprise organisation's members
+  // get Enterprise's LIMITS as well as its features (they used to get the features only).
+  const compGrantActive =
+    u.compTierLevelId !== null && u.compTierExpiresAt !== null && u.compTierExpiresAt > now;
+  const finalId = compGrantActive ? effectiveId : (await withOrgLevel(userId, effectiveId)).id;
+  // Effective tier (comp wins when active; else the higher of own and organisation).
   let effectiveLevel = underlyingLevel;
-  if (effectiveId !== underlyingId) {
+  if (finalId !== underlyingId) {
     effectiveLevel = await prisma.subscriptionLevel.findUnique({
-      where: { id: effectiveId },
+      where: { id: finalId },
     });
   }
   const compActive =
@@ -425,8 +394,11 @@ function isAdminEmail(email: string): boolean {
  *  call sites; new gating should use the state map / isFeatureAvailable directly.
  *  (Dynamic import avoids a static import cycle with availability.ts.) */
 export async function getEntitlements(userId: string): Promise<Entitlements> {
-  const { getFeatureStates } = await import("@/app/lib/features/availability");
-  const s = await getFeatureStates(userId);
+  return entitlementsFromStates(await getFeatureStates(userId));
+}
+
+/** Pure: the four legacy booleans from a resolved feature-state map. */
+export function entitlementsFromStates(s: Record<string, string>): Entitlements {
   return {
     simulator: s["simulator"] === "available",
     processMining: s["processMining"] === "available",
@@ -437,7 +409,6 @@ export async function getEntitlements(userId: string): Promise<Entitlements> {
 
 /** Single-feature availability check for ANY registry key — used by route gates. */
 export async function isFeatureAvailable(userId: string, key: string): Promise<boolean> {
-  const { getFeatureStates } = await import("@/app/lib/features/availability");
   return (await getFeatureStates(userId))[key] === "available";
 }
 
@@ -828,7 +799,9 @@ export async function getUsageSnapshot(
       : null,
     metrics: rows,
     diagramsThisPeriod,
-    entitlements: entitlementsForLevel(tier, admin),
+    // From the feature matrix (the one source of truth), NOT the legacy has* columns on the level
+    // — those still existed and could disagree with what the server actually enforces.
+    entitlements: entitlementsFromStates(await getFeatureStates(userId)),
   };
 }
 

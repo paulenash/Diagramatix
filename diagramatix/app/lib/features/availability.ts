@@ -10,7 +10,7 @@
  * Config UI: dashboard/admin/feature-availability (the grid) + the per-user popover.
  */
 import { prisma } from "@/app/lib/db";
-import { getEffectiveSubscriptionLevelId } from "@/app/lib/subscription";
+import { getEffectiveSubscriptionLevelId, resolveEffectiveLevelId } from "./effectiveLevel";
 import { SUPERUSER_EMAILS } from "@/app/lib/superuser";
 import { FEATURE_KEYS } from "./registry";
 import { applyDependencies } from "./dependencies";
@@ -28,51 +28,9 @@ function isAdminEmail(email: string | null | undefined): boolean {
   return [...SUPERUSER_EMAILS].some((s) => s.toLowerCase() === e);
 }
 
-// Level sort orders, kept for a minute: a level added or re-ordered in the SuperAdmin editor is
-// picked up without a restart (it used to be cached for the life of the process).
-const ORDERS_TTL_MS = 60_000;
-let _orders: Map<string, number> | null = null;
-let _ordersAt = 0;
-/** Forget the cached level orders (the subscriptions editor calls this after a save; tests). */
-export function clearLevelOrders(): void { _orders = null; }
-async function levelOrders(): Promise<Map<string, number>> {
-  if (!_orders || Date.now() - _ordersAt > ORDERS_TTL_MS) {
-    const ls = await prisma.subscriptionLevel.findMany({ select: { id: true, sortOrder: true } });
-    _orders = new Map(ls.map((l) => [l.id, l.sortOrder]));
-    _ordersAt = Date.now();
-  }
-  return _orders;
-}
-
-/**
- * The effective subscription level id for a user, org-aware:
- *   • an active per-user comp grant wins outright (existing behaviour), else
- *   • the HIGHEST of the user's own (grace-adjusted) level and any level assigned
- *     to an org they belong to — so a SuperAdmin can put a whole org (by claimed
- *     email domain) on Enterprise and every member resolves to it.
- */
-export async function resolveEffectiveLevelId(userId: string): Promise<string | null> {
-  const u = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { subscriptionLevelId: true, subscriptionEndsAt: true, compTierLevelId: true, compTierExpiresAt: true },
-  });
-  if (!u) return null;
-  const now = new Date();
-  if (u.compTierLevelId && u.compTierExpiresAt && u.compTierExpiresAt > now) return u.compTierLevelId;
-
-  const individual = getEffectiveSubscriptionLevelId(u, now); // grace-adjusted, no comp
-  const memberships = await prisma.orgMember.findMany({
-    where: { userId },
-    select: { org: { select: { subscriptionLevelId: true } } },
-  });
-  const orgLevelIds = memberships.map((m) => m.org.subscriptionLevelId).filter((x): x is string => !!x);
-  if (!orgLevelIds.length) return individual;
-
-  const orders = await levelOrders();
-  let best = individual;
-  for (const id of orgLevelIds) if ((orders.get(id) ?? -1) > (orders.get(best) ?? -1)) best = id;
-  return best;
-}
+// The effective-level resolution lives in effectiveLevel.ts (one place, shared with the limits);
+// re-exported here because the feature-side callers have always imported it from this module.
+export { resolveEffectiveLevelId, clearLevelOrders } from "./effectiveLevel";
 
 /** Every feature available (SuperAdmin bypass). */
 export function allAvailable(): FeatureStateMap {

@@ -103,7 +103,7 @@ import { InfoDialog } from "@/app/components/InfoDialog";
 import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
 import { useDiagramTypeStyles } from "@/app/hooks/useDiagramTypeStyles";
 import { useSuperAdminChrome, viewModeEntitlements } from "@/app/hooks/useSuperAdminChrome";
-import { useFeatureState } from "@/app/components/FeatureGate";
+import { useFeatureState, useFeatureStates } from "@/app/components/FeatureGate";
 import { atLeastTier } from "@/app/lib/features/tierRank";
 import { lightenHex } from "@/app/lib/diagram/diagramTypeStyles";
 import { AiPanel } from "./AiPanel";
@@ -1704,8 +1704,12 @@ export function DiagramEditor({
   // In a SuperAdmin tier-preview view, hide the tier's excluded features (Simulator
   // / Risk & Controls) from the diagram's menus + panel. null → real access unchanged.
   const viewEnt = viewModeEntitlements(adminViewMode);
-  const rcAllowed = viewEnt ? viewEnt.riskControl : true;
-  const simAllowed = viewEnt ? viewEnt.simulator : true;
+  // A real user's access comes from the feature matrix (the server gates read the same one) — these
+  // used to be `true` for everyone but a SuperAdmin previewing a tier. Until the states have loaded
+  // the buttons stay (no flash of missing menu items); the server enforces either way.
+  const { states: featureStates, ready: featureStatesReady } = useFeatureStates();
+  const rcAllowed = viewEnt ? viewEnt.riskControl : (!featureStatesReady || featureStates["riskControl"] === "available");
+  const simAllowed = viewEnt ? viewEnt.simulator : (!featureStatesReady || featureStates["simulator"] === "available");
   // Enterprise policy binds everyone EXCEPT an active (non-presenting) SuperAdmin.
   // So a SuperAdmin keeps AI; "Hide SuperAdmin" makes the org policy take effect
   // live (updates as the toggle flips — handy for demoing Org Settings).
@@ -1715,8 +1719,9 @@ export function DiagramEditor({
   // the logo down to a lower (OrgAdmin / Normal) view mode. Gate SuperAdmin-only
   // menu options on this so they vanish when a SuperAdmin drops into a lower view.
   const isActingAdmin = isAdmin && !superAdminHidden;
-  // Voice Assist is available to Expert subscriptions and above (Paul,
-  // 2026-09-17), not SuperAdmin-only as it was while it settled down. The
+  // Voice Assist is available by subscription level (Expert and above from Paul, 2026-09-17;
+  // widened to every paid level on 2026-09-30 because Mobile Access needs it — the matrix says
+  // which, this only reads it), not SuperAdmin-only as it was while it settled down. The
   // `voice-assist` key has been in the feature registry and seeded expert +
   // enterprise since Phase 1 — nothing had ever read it. This is the first
   // reader; the route gate on /api/ai/command is the half that actually
@@ -1728,7 +1733,7 @@ export function DiagramEditor({
   const voiceAssistFeature = useFeatureState("voice-assist");
   const voiceAssistAllowed =
     voiceAssistFeature === "available" &&
-    (!isAdmin || atLeastTier(adminViewMode, "expert"));
+    (!isAdmin || atLeastTier(adminViewMode, "introductory"));
   // Generate models the current user may pick (cost-gated; SA-in-mode = all).
   const { models: aiModels, current: currentAiModel } = useAllowedModels(isActingAdmin);
   // "Regenerate" from Diagram Properties: pull the linked prompt's CURRENT text and
