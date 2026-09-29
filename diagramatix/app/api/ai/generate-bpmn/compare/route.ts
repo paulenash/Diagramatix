@@ -5,6 +5,7 @@ import { blockReadOnlyImpersonation } from "@/app/lib/routeGuard";
 import { prisma, pgPool } from "@/app/lib/db";
 import { isSuperuser } from "@/app/lib/superuser";
 import { planBpmn } from "@/app/lib/ai/planBpmn";
+import { freeFormLayout } from "@/app/lib/ai/freeForm";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
 import { groundRulesWithPcf } from "@/app/lib/pcf/promptGrounding";
 import { layoutBpmnDiagram } from "@/app/lib/diagram/bpmnLayout";
@@ -135,8 +136,7 @@ export async function POST(req: Request) {
       if (!res.ok) { results.push({ model: m.id, label: m.label, ok: false, ms, error: res.error }); continue; }
       // Reproduce the imported image's layout when geometry was captured and the
       // model returned per-shape bounds; otherwise the normal auto-stack layout.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const preserve = wantGeometry && res.plan.elements.some((e: any) => e.bounds);
+      const { preservePositions: preserve } = freeFormLayout(wantGeometry, res.plan);
       // Layout diagnostics are collected and logged rather than dropped: a plan whose
       // references dangle produces a diagram that LOOKS fine, which is what made the
       // V06 defects survive three regenerations (Paul, 2026-08-29). Not surfaced in

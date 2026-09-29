@@ -12,9 +12,9 @@
 import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import {
-  autoPromptName, decidePromptLink, mergeGeneratedDiagram, nextAiGeneration,
+  autoPromptName, decidePromptLink, mergeGeneratedDiagram, nextAiGeneration, parsePromptLinkAction,
 } from "@/app/lib/ai/applyGeneration";
-import { markPromptUsedFetch, runPromptLinkFetch } from "@/app/lib/ai/promptLinkFetch";
+import { runPromptLinkFetch } from "@/app/lib/ai/promptLinkFetch";
 import { AI_PROMPT_ANNOTATION_ID } from "@/app/lib/ai/promptAnnotation";
 import type { AiApplyMeta, AiGeneration, DiagramData, DiagramElement, Connector } from "@/app/lib/diagram/types";
 
@@ -122,51 +122,51 @@ describe("T5007 — the generated diagram merged into the current one (mergeGene
   });
 });
 
-describe("T5008 — the desktop's half: the rule carried out through /api/prompts", () => {
+describe("T5008 — the desktop's half: the action handed to the server, which carries it out (changed 2026-09-29)", () => {
+  // Changed 2026-09-29: the desktop used to carry the action out itself through
+  // /api/prompts. It now posts it to /api/diagrams/[id]/prompt-link, which runs
+  // the server's own code (promptLinkDb.ts — tested against the database in
+  // generate-job.test.ts and freeform-rename-gaps.test.ts), so who may write
+  // which prompt is decided in ONE place.
   const res = (status: number, body: unknown = {}) => ({ ok: status < 300, status, json: async () => body }) as Response;
+  const upd = { kind: "update" as const, linked: { id: "p-auto", name: "Orders — AI prompt", autoNamed: true }, text: "t", planJson: plan,
+    orCreate: { name: "Orders — AI prompt", text: "t", diagramType: "bpmn", planJson: plan, source: "dictated" as const } };
 
-  it("a link writes nothing", async () => {
-    const f = vi.fn();
-    const linked = await runPromptLinkFetch({ kind: "link", linked: { id: "s1", name: "Mine", autoNamed: false }, orCreate: { name: "x", text: "y", diagramType: "bpmn" } }, f as unknown as typeof fetch);
-    expect(linked).toEqual({ id: "s1", name: "Mine", autoNamed: false });
-    expect(f).not.toHaveBeenCalled();
-  });
-
-  it("an update PUTs the text and plan; a prompt that has been DELETED (404 gone) is replaced by a new one, with its provenance", async () => {
+  it("posts the action and the model to the diagram's prompt-link route, and links what the server says", async () => {
     const calls: { url: string; init: RequestInit }[] = [];
     const f = vi.fn(async (url: string, init: RequestInit) => {
       calls.push({ url, init });
-      return url.endsWith("/p-auto") ? res(404, { error: "Not found", gone: true }) : res(201, { id: "p-new", name: "Orders — AI prompt" });
+      return res(200, { linked: { id: "p-new", name: "Orders — AI prompt", autoNamed: true } });
     });
-    const linked = await runPromptLinkFetch({
-      kind: "update", linked: { id: "p-auto", name: "Orders — AI prompt", autoNamed: true }, text: "t", planJson: plan,
-      orCreate: { name: "Orders — AI prompt", text: "t", diagramType: "bpmn", planJson: plan, source: "dictated" },
-    }, f as unknown as typeof fetch);
+    const linked = await runPromptLinkFetch(upd, "d1", "claude-opus-5", f as unknown as typeof fetch);
     expect(linked).toEqual({ id: "p-new", name: "Orders — AI prompt", autoNamed: true });
-    expect(calls[0].init.method).toBe("PUT");
-    expect(JSON.parse(String(calls[0].init.body))).toEqual({ text: "t", planJson: plan });
-    expect(calls[1].url).toBe("/api/prompts");
-    expect(JSON.parse(String(calls[1].init.body))).toEqual({ name: "Orders — AI prompt", text: "t", diagramType: "bpmn", planJson: plan, source: "dictated" });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toBe("/api/diagrams/d1/prompt-link");
+    expect(calls[0].init.method).toBe("POST");
+    expect(JSON.parse(String(calls[0].init.body))).toEqual({ action: upd, model: "claude-opus-5" });
   });
 
-  it("another editor's prompt (404, not gone) keeps its link and creates nothing — no copy per regeneration (the 2026-09-28 review)", async () => {
-    const f = vi.fn(async () => res(404, { error: "Not found", gone: false }));
-    const kept = await runPromptLinkFetch({ kind: "update", linked: { id: "p-owner", name: "P", autoNamed: true }, text: "t", orCreate: { name: "P", text: "t", diagramType: "bpmn" } }, f as unknown as typeof fetch);
-    expect(kept?.id).toBe("p-owner");
-    expect(f).toHaveBeenCalledTimes(1);
+  it("the server unreachable or refusing: a link or update keeps its link, a create is null", async () => {
+    const down = (async () => { throw new Error("offline"); }) as unknown as typeof fetch;
+    const refused = (async () => res(403, { error: "No access" })) as unknown as typeof fetch;
+    expect((await runPromptLinkFetch(upd, "d1", "m", down))?.id).toBe("p-auto");
+    expect((await runPromptLinkFetch(upd, "d1", "m", refused))?.id).toBe("p-auto");
+    const link = { kind: "link" as const, linked: { id: "s1", name: "Mine", autoNamed: false }, orCreate: { name: "x", text: "y", diagramType: "bpmn" } };
+    expect(await runPromptLinkFetch(link, "d1", "m", refused)).toEqual(link.linked);
+    const create = { kind: "create" as const, body: { name: "P", text: "t", diagramType: "bpmn" } };
+    expect(await runPromptLinkFetch(create, "d1", "m", refused)).toBeNull();
+    expect(await runPromptLinkFetch(create, "d1", "m", down)).toBeNull();
   });
 
-  it("an update that succeeds (or fails for another reason) keeps its link; a refused create or a network error is null", async () => {
-    const ok = await runPromptLinkFetch({ kind: "update", linked: { id: "p", name: "P", autoNamed: true }, text: "t", orCreate: { name: "P", text: "t", diagramType: "bpmn" } }, (async () => res(500)) as unknown as typeof fetch);
-    expect(ok?.id).toBe("p");
-    expect(await runPromptLinkFetch({ kind: "create", body: { name: "P", text: "t", diagramType: "bpmn" } }, (async () => res(403)) as unknown as typeof fetch)).toBeNull();
-    expect(await runPromptLinkFetch({ kind: "create", body: { name: "P", text: "t", diagramType: "bpmn" } }, (async () => { throw new Error("offline"); }) as unknown as typeof fetch)).toBeNull();
-  });
-
-  it("a generation is counted against its prompt with the model, fire-and-forget", async () => {
-    const f = vi.fn(async () => res(200));
-    markPromptUsedFetch("p1", "claude-opus-5", f as unknown as typeof fetch);
-    expect(f).toHaveBeenCalledWith("/api/prompts/p1/used", expect.objectContaining({ method: "POST", body: JSON.stringify({ model: "claude-opus-5" }) }));
+  it("the server re-checks the action's shape: bad kinds and empty text refused; unknown provenance and a malformed plan dropped", () => {
+    expect(parsePromptLinkAction(upd)).toEqual(upd);
+    expect(parsePromptLinkAction({ ...upd, kind: "delete" })).toBeNull();
+    expect(parsePromptLinkAction({ ...upd, text: "  " })).toBeNull();
+    expect(parsePromptLinkAction({ ...upd, linked: { name: "no id" } })).toBeNull();
+    expect(parsePromptLinkAction({ kind: "create", body: { name: "", text: "t", diagramType: "bpmn" } })).toBeNull();
+    expect(parsePromptLinkAction({ kind: "create", body: { name: "P", text: "t", diagramType: "bpmn", source: "hacked", fromImage: "yes", forDiagramId: "x", planJson: { elements: "no" } } }))
+      .toEqual({ kind: "create", body: { name: "P", text: "t", diagramType: "bpmn" } });
+    expect(parsePromptLinkAction(null)).toBeNull();
   });
 });
 
@@ -175,7 +175,8 @@ describe("T5009 — both callers use the one rule set", () => {
   const job = readFileSync("app/lib/ai/generateJob.ts", "utf8");
 
   it("the desktop editor decides, links, records and merges through applyGeneration.ts", () => {
-    expect(ed).toContain("return runPromptLinkFetch(decidePromptLink({ meta, prev: data.aiGeneration, diagramName, diagramType }));");
+    expect(ed).toContain("return runPromptLinkFetch(decidePromptLink({ meta, prev: data.aiGeneration, diagramName, diagramType }), diagramId, meta.model);");
+    expect(ed, "counted by the link — no second, owner-only count").not.toContain("markPromptUsedFetch");
     expect(ed).toContain("aiGeneration = nextAiGeneration({ prev: data.aiGeneration, linked, meta, generatedAt: new Date().toISOString() });");
     expect(ed).toContain("setData(mergeGeneratedDiagram({ current: data, generated: aiData, aiGeneration, meta }));");
     expect(ed, "no second copy of the record-building rule").not.toContain("promptId: linked.id");

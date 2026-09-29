@@ -51,6 +51,61 @@ export type PromptLinkAction =
   | { kind: "update"; linked: LinkedPrompt; text: string; planJson?: PlanJson; orCreate: CreatePromptBody }
   | { kind: "create"; body: CreatePromptBody };
 
+const str = (v: unknown, max = 100_000): string | null =>
+  typeof v === "string" && v.trim() && v.length <= max ? v : null;
+
+function parsePlanJson(v: unknown): PlanJson | undefined {
+  const p = v as { elements?: unknown; connections?: unknown } | null;
+  return p && typeof p === "object" && Array.isArray(p.elements) && Array.isArray(p.connections)
+    ? { elements: p.elements, connections: p.connections } : undefined;
+}
+
+function parseCreateBody(v: unknown): CreatePromptBody | null {
+  const b = (v ?? {}) as Record<string, unknown>;
+  const name = str(b.name, 500), text = str(b.text), diagramType = str(b.diagramType, 64);
+  if (!name || !text || !diagramType) return null;
+  const planJson = parsePlanJson(b.planJson);
+  return {
+    name, text, diagramType,
+    ...(planJson ? { planJson } : {}),
+    // The provenance POST /api/prompts accepts, and nothing else.
+    ...(b.source === "typed" || b.source === "dictated" ? { source: b.source } : {}),
+    ...(b.fromImage === true ? { fromImage: true as const } : {}),
+    ...(b.refined === true ? { refined: true as const } : {}),
+  };
+}
+
+function parseLinked(v: unknown): LinkedPrompt | null {
+  const l = (v ?? {}) as Record<string, unknown>;
+  const id = str(l.id, 200);
+  if (!id) return null;
+  return { id, name: typeof l.name === "string" ? l.name : "", autoNamed: l.autoNamed === true };
+}
+
+/**
+ * A PromptLinkAction as it arrives from a browser (POST
+ * /api/diagrams/[id]/prompt-link), checked field by field — or null. Only the
+ * shape is checked here; WHICH prompt may be written is promptLinkDb's rule.
+ */
+export function parsePromptLinkAction(raw: unknown): PromptLinkAction | null {
+  const a = (raw ?? {}) as Record<string, unknown>;
+  if (a.kind === "create") {
+    const body = parseCreateBody(a.body);
+    return body ? { kind: "create", body } : null;
+  }
+  const linked = parseLinked(a.linked);
+  const orCreate = parseCreateBody(a.orCreate);
+  if (!linked || !orCreate) return null;
+  if (a.kind === "link") return { kind: "link", linked, orCreate };
+  if (a.kind === "update") {
+    const text = str(a.text);
+    if (!text) return null;
+    const planJson = parsePlanJson(a.planJson);
+    return { kind: "update", linked, text, ...(planJson ? { planJson } : {}), orCreate };
+  }
+  return null;
+}
+
 /** "<diagram title> — AI prompt". */
 export function autoPromptName(diagramName: string): string {
   return `${(diagramName || "Untitled").trim()} — AI prompt`;

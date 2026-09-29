@@ -9,6 +9,8 @@
  *          replace: true — stage 3's "✎ Correct": re-generate a diagram that HAS
  *          content, with a correction on the end of its prompt. Needs the version
  *          the phone holds, and saves only if the diagram is still that version.
+ *          freeForm: with an image, reproduce its layout (app/lib/ai/freeForm.ts);
+ *          a re-generate keeps the diagram's own choice unless it says otherwise.
  *   GET  — the caller's latest job on this diagram, so a phone that reloaded
  *          mid-generation picks the run up again → { job | null }
  *
@@ -17,10 +19,11 @@
  * generation takes still gets its diagram. Poll GET …/generate/[jobId].
  *
  * Gates, in the plan route's order: signed in; not viewing someone read-only;
- * EDIT access (owners and editors — never a reviewer); a BPMN diagram; the
- * org's AI policy; a configured model; the AI-attempts cap. The diagram must be
- * EMPTY (unless replace was asked for), and still the version the phone holds.
- * One run at a time per diagram.
+ * EDIT access (owners and editors — never a reviewer); a BPMN diagram; the AI
+ * policy of the caller's org AND of the diagram's own; a configured model; the
+ * AI-attempts cap. The diagram must be EMPTY (unless replace was asked for), and
+ * still the version the phone holds. One run at a time per diagram — held
+ * under a lock, so two taps at the same moment still start one.
  */
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
@@ -33,7 +36,7 @@ import { getEffectiveUserId } from "@/app/lib/superuser";
 import { resolveGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import { modelVision } from "@/app/lib/ai/models";
 import { correctionAdded, isWhiteboardPhotoPrompt } from "@/app/lib/ai/promptPreambles";
-import { correctionRefusalText, correctionSource } from "@/app/lib/mobile/correction";
+import { correctionRefusalText, correctionSource, type CorrectionSource } from "@/app/lib/mobile/correction";
 import type { DiagramData } from "@/app/lib/diagram/types";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { resolveUserAiKey } from "@/app/lib/ai/userAiKey";
@@ -41,8 +44,8 @@ import { resolveAiRouteContext } from "@/app/lib/ai/aiTelemetryRoute";
 import { AI_INVOCATION_POINTS } from "@/app/lib/ai/aiTelemetry";
 import { gateLimit } from "@/app/lib/subscription-route";
 import {
-  MAX_GENERATE_PROMPT_CHARS, hasDiagramContent, reapStaleGenerateJobs, runGenerateJob, viewGenerateJob,
-  type GenerateJobPromptMeta,
+  GENERATE_JOB_SELECT, MAX_GENERATE_PROMPT_CHARS, hasDiagramContent, reapStaleGenerateJobs, resolveJobSelectedPrompt,
+  runGenerateJob, viewGenerateJob, type GenerateJobPromptMeta,
 } from "@/app/lib/ai/generateJob";
 
 export const dynamic = "force-dynamic";
@@ -51,10 +54,15 @@ export const maxDuration = 300;
 
 type Params = { params: Promise<{ id: string }> };
 
-const JOB_SELECT = {
-  id: true, userId: true, status: true, stage: true, promptText: true, version: true,
-  errorCode: true, errorMessage: true, startedAt: true, finishedAt: true, sourceImageId: true,
-} as const;
+type JobRow = Awaited<ReturnType<typeof readActiveJob>>;
+/** The run under way on this diagram, if any. */
+function readActiveJob(db: Pick<typeof prisma, "diagramGenerateJob">, diagramId: string) {
+  return db.diagramGenerateJob.findFirst({
+    where: { diagramId, status: { in: ["queued", "running"] } },
+    orderBy: { createdAt: "desc" },
+    select: GENERATE_JOB_SELECT,
+  });
+}
 
 export async function POST(req: Request, { params }: Params) {
   const session = await auth();
@@ -90,7 +98,10 @@ export async function POST(req: Request, { params }: Params) {
       message: "This diagram already has content. Generating on the phone fills an empty diagram.",
     }, { status: 409 });
   }
-  const pol = await gateOrgPolicy(session, "allowAi");
+  // The AI policy of the caller's org, AND of the org the diagram belongs to —
+  // its content is what goes to the AI, and a shared or elevated caller can be
+  // working in another org's diagram.
+  const pol = (await gateOrgPolicy(session, "allowAi")) ?? (await gateOrgPolicy(session, "allowAi", diagramOrgId));
   if (pol) return pol;
 
   const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
@@ -112,9 +123,11 @@ export async function POST(req: Request, { params }: Params) {
   // the same rule the phone offers it by. Nothing else may replace content:
   // a diagram drawn from a document, an image that was not kept, or a Free
   // Form layout would come back as something else.
+  let src: Extract<CorrectionSource, { ok: true }> | null = null;
   if (replace) {
-    const src = correctionSource((diagram.data ?? {}) as unknown as DiagramData);
-    if (!src.ok) return NextResponse.json({ error: src.reason, message: correctionRefusalText(src.reason) }, { status: 400 });
+    const s = correctionSource((diagram.data ?? {}) as unknown as DiagramData);
+    if (!s.ok) return NextResponse.json({ error: s.reason, message: correctionRefusalText(s.reason) }, { status: 400 });
+    src = s;
     if (correctionAdded(src.basePrompt, prompt) === null) {
       return NextResponse.json({ error: "not_a_correction", message: "This diagram changed since it was opened. Reload it, then try again." }, { status: 400 });
     }
@@ -124,25 +137,26 @@ export async function POST(req: Request, { params }: Params) {
     }
   }
 
+  const promptOwnerIdForPhoto = getEffectiveUserId(session, cookieStore) ?? session.user.id; // whose prompts and photos these are
+  // A second tap, or a reload: hand back the run already under way — its own
+  // caller's, that is; anyone else is told it is busy.
+  const callerId = session.user.id;
+  const answerActive = async (active: NonNullable<JobRow>) => active.userId === callerId
+    ? NextResponse.json({
+      ...viewGenerateJob(active), selectedPrompt: await resolveJobSelectedPrompt(active, promptOwnerIdForPhoto),
+      duplicate: true, pollAfterSeconds: 3,
+    }, { status: 202 })
+    : NextResponse.json({ error: "busy", message: "Someone else is generating this diagram right now." }, { status: 409 });
+
   await reapStaleGenerateJobs();
-  const active = await prisma.diagramGenerateJob.findFirst({
-    where: { diagramId: id, status: { in: ["queued", "running"] } },
-    orderBy: { createdAt: "desc" },
-    select: JOB_SELECT,
-  });
-  if (active) {
-    // A second tap, or a reload: hand back the run already under way.
-    if (active.userId === session.user.id) {
-      return NextResponse.json({ ...viewGenerateJob(active), duplicate: true, pollAfterSeconds: 3 }, { status: 202 });
-    }
-    return NextResponse.json({ error: "busy", message: "Someone else is generating this diagram right now." }, { status: 409 });
-  }
+  // The quick answer; the create below checks again under a lock.
+  const active = await readActiveJob(prisma, id);
+  if (active) return answerActive(active);
 
   // The caller's OWN kept photo, in the diagram's organisation — never a
   // colleague's upload (naming it on this diagram would let everyone here see it).
   // The one exception: the image THIS diagram was generated from, which everyone
   // who can open the diagram can already see — a colleague's re-generate uses it.
-  const promptOwnerIdForPhoto = getEffectiveUserId(session, cookieStore) ?? session.user.id; // whose prompts and photos these are
   const diagramImageId = ((diagram.data ?? {}) as { aiGeneration?: { sourceImage?: { id?: unknown } } }).aiGeneration?.sourceImage?.id;
   let photo: { id: string; name: string; mimeType: string; width: number | null; height: number | null } | null = null;
   if (typeof body.sourceImageId === "string" && body.sourceImageId) {
@@ -184,6 +198,10 @@ export async function POST(req: Request, { params }: Params) {
   const orgId = aiContext.orgId ?? diagramOrgId;
   const promptOwnerId = promptOwnerIdForPhoto;
 
+  // Free Form (an image's layout reproduced) only with an image. A re-generate
+  // keeps the diagram's own choice unless the request says otherwise.
+  const freeForm = !!photo && (typeof body.freeForm === "boolean" ? body.freeForm : (src?.freeForm ?? false));
+
   // Where the words came from. A saved prompt is looked up, not trusted: it
   // links only if it is the caller's own and the text is still unchanged.
   const promptMeta: GenerateJobPromptMeta = {
@@ -191,10 +209,11 @@ export async function POST(req: Request, { params }: Params) {
     // Recorded either way, so a later ✎ Correct knows (no document on the phone).
     promptFromImage: !!photo,
     promptFromDocument: false,
-    // A photo: drawn from an image, laid out normally (Free Form off — recorded,
-    // so a desktop re-generate starts with it off too), and kept with the diagram.
+    // A photo: drawn from an image, laid out normally or — Free Form — as drawn
+    // (recorded, so a later re-generate here or on the desktop starts with the
+    // same choice), and kept with the diagram.
     ...(photo ? {
-      freeForm: false,
+      freeForm,
       sourceImage: {
         name: photo.name, mediaType: photo.mimeType, storedId: photo.id,
         ...(photo.width ? { width: photo.width } : {}),
@@ -203,22 +222,39 @@ export async function POST(req: Request, { params }: Params) {
     } : {}),
   };
   // A photo run is the photo plus the words: it never links a saved prompt.
+  let selected: { id: string; name: string; text: string } | null = null;
   if (!photo && typeof body.selectedPromptId === "string" && body.selectedPromptId) {
-    const sel = await prisma.prompt.findFirst({
+    selected = await prisma.prompt.findFirst({
       where: { id: body.selectedPromptId, userId: promptOwnerId, orgId },
       select: { id: true, name: true, text: true },
     });
-    if (sel) {
-      promptMeta.selectedPromptId = sel.id;
-      promptMeta.selectedPromptName = sel.name;
-      promptMeta.selectedPromptUnchanged = sel.text.trim() === prompt;
+    if (selected) {
+      promptMeta.selectedPromptId = selected.id;
+      promptMeta.selectedPromptName = selected.name;
+      promptMeta.selectedPromptUnchanged = selected.text.trim() === prompt;
     }
   }
 
-  const job = await prisma.diagramGenerateJob.create({
-    data: { diagramId: id, userId: session.user.id, orgId, promptText: prompt, sourceImageId: photo?.id ?? null },
-    select: JOB_SELECT,
+  // One run per diagram: the check and the create hold a lock on this diagram,
+  // so two taps at the same moment start ONE run (the other is handed it, or
+  // told it is busy). Read Committed, so the second sees the first's row.
+  const started = await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${"dgx:generate:" + id}, 0))`;
+    const already = await readActiveJob(tx, id);
+    if (already) return { kind: "busy" as const, already };
+    const job = await tx.diagramGenerateJob.create({
+      data: {
+        diagramId: id, userId: callerId, orgId, promptText: prompt, sourceImageId: photo?.id ?? null,
+        // Kept with the run, so a failed one tried again after a reload is the same run.
+        selectedPromptId: selected?.id ?? null, freeForm,
+      },
+      select: GENERATE_JOB_SELECT,
+    });
+    return { kind: "started" as const, job };
   });
+  if (started.kind === "busy") return answerActive(started.already);
+  const { job } = started;
+  // The worker starts only now, once the row is committed.
   // Deliberately NOT awaited: the phone gets its 202 now. Every path inside
   // ends in succeed or fail, so a rejection cannot escape.
   void runGenerateJob({
@@ -227,7 +263,7 @@ export async function POST(req: Request, { params }: Params) {
     diagramOrgId, ...(photo ? { sourceImageId: photo.id } : {}), ...(replace ? { replace: true } : {}),
   }).catch((e) => console.error(`[generate-job] ${job.id} escaped:`, e));
 
-  return NextResponse.json({ ...viewGenerateJob(job), pollAfterSeconds: 3 }, { status: 202 });
+  return NextResponse.json({ ...viewGenerateJob(job), selectedPrompt: selected, pollAfterSeconds: 3 }, { status: 202 });
 }
 
 export async function GET(_req: Request, { params }: Params) {
@@ -239,7 +275,9 @@ export async function GET(_req: Request, { params }: Params) {
   const job = await prisma.diagramGenerateJob.findFirst({
     where: { diagramId: id, userId: session.user.id },
     orderBy: { createdAt: "desc" },
-    select: JOB_SELECT,
+    select: GENERATE_JOB_SELECT,
   });
-  return NextResponse.json({ job: job ? viewGenerateJob(job) : null });
+  if (!job) return NextResponse.json({ job: null });
+  const ownerId = getEffectiveUserId(session, await cookies()) ?? session.user.id;
+  return NextResponse.json({ job: { ...viewGenerateJob(job), selectedPrompt: await resolveJobSelectedPrompt(job, ownerId) } });
 }

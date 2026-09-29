@@ -366,7 +366,7 @@ describe("T5038 — the phone's upload says why it failed; the sheet and screen 
     expect(screen).toContain("const photoStep = photoToUpload(src);");
     expect(screen).toContain("const body = { ...request, ...(sourceImageId ? { sourceImageId } : {}) };");
     expect(screen).toContain("body: JSON.stringify({ ...body, version: d.version }),");
-    expect(screen).toContain("withRestoredPhoto(draftFromFailedJob(job.promptText), job)");
+    expect(screen).toContain("withRestoredPhoto(draftFromFailedJob(job.promptText, job.selectedPrompt), job)");
     expect(screen).toContain("📷 Photograph a whiteboard");
     expect(screen).toContain("sourceImageUrl(diagramId, d.data.aiGeneration.sourceImage.id)");
   });
@@ -422,7 +422,7 @@ describe("T5039 — the 2026-09-28 review of stage 2", () => {
     const screen = read("app/m/diagram/[id]/MobileDiagramScreen.tsx");
     expect(screen).toContain("cur.photo && cur.photo.blob === sent ? { ...cur, photo: { ...cur.photo, storedId: kept.image.id } } : cur");
     expect(screen).toMatch(/r\.status === 202[\s\S]{0,200}sessionStorage\.removeItem\(draftStorageKey\(diagramId\)\)/);
-    expect(screen, "a failed photo run wins over words kept for the camera").toContain("function restoreFailedRun(cur: GenerateDraft");
+    expect(screen, "a failed photo run wins over words kept for the camera").toContain("function restoreFailedRun(\n  cur: GenerateDraft,");
     expect(read("app/components/mobile/MobilePhotoViewer.tsx").match(/e\.stopPropagation\(\); onClose\(\);/g) ?? []).toHaveLength(2);
     const sheet = read("app/components/mobile/MobileGenerateSheet.tsx");
     expect(sheet).toContain("disabled={photoBusy || tidying || starting}");

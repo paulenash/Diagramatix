@@ -279,8 +279,9 @@ describe("behaviour that was easy to lose in the rewrite", () => {
 
   it("T4321 — preservePositions is derived from the PLAN, not from the attachment", () => {
     const src = screen();
-    expect(src).toMatch(/const planHasBounds = Array\.isArray\(plan\?\.elements\)/);
-    expect(src).toMatch(/const preservePositions = !flatPlan && preserveLayout && planHasBounds;/);
+    // 2026-09-29: the rule lives in app/lib/ai/freeForm.ts (shared with the
+    // phone's job), which reads the plan's bounds — see T5045.
+    expect(src).toMatch(/const \{ preservePositions \} = freeFormLayout\(!flatPlan && preserveLayout, plan\);/);
     // If it were read off `attachment` instead, editing the plan's JSON or
     // removing the image after planning would silently change the layout.
     expect(src).not.toMatch(/preservePositions = [^;]*attachment/);

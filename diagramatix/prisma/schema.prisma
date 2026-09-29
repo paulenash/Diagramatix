@@ -519,6 +519,13 @@ model DiagramGenerateJob {
   /// reloaded run is tried again without sending the photo again. Plain field, no FK
   /// (eraseUser deletes images with raw SQL; a dangling id reads as "photo gone").
   sourceImageId String?
+  /// The saved prompt it was started from, when the server verified it was the
+  /// caller's and unchanged — so a failed run tried again after a reload links it
+  /// again. Plain field, no FK (a deleted prompt reads as "no link").
+  selectedPromptId String?
+  /// Free Form was asked for (a photo's layout reproduced) — so a failed run tried
+  /// again keeps the choice.
+  freeForm     Boolean   @default(false)
   model        String?
   errorCode    String?
   /// Curated for the user — never a raw exception string.
@@ -833,6 +840,14 @@ model Prompt {
   /// whiteboard, a screenshot, somebody else's diagram). The image itself is not
   /// kept, so this records where the words came from, not a file you can open.
   fromImage Boolean   @default(false)
+  /// The diagram this prompt was auto-created FOR (2026-09-29). Set only by the
+  /// server, when it creates the "<diagram> — AI prompt" row for a generation on a
+  /// diagram the caller can edit — never from a request body. Whoever may edit
+  /// that diagram may update this prompt's text (an editor's re-generate keeps the
+  /// owner's prompt current); a user's own saved prompt is always NULL here, so it
+  /// is never written by anyone else. Plain field, no FK: a deleted diagram leaves
+  /// it dangling, which reads as "bound to nothing that exists".
+  forDiagramId String?
 
   // ── What has been done WITH it ──────────────────────────────────────────
   // Recorded at generation rather than scanned out of diagram JSON afterwards:
@@ -848,6 +863,7 @@ model Prompt {
 
   @@index([orgId])
   @@index([userId, diagramType])
+  @@index([forDiagramId])
 }
 
 // ── The Process Repository, internalised ─────────────────────────────────────

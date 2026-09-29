@@ -3,16 +3,24 @@
  * (no React / DOM), so it runs both in the browser at save/update time and in
  * the built-in seed script. SVG = crisp at any size — the NL "suggest a template"
  * popup can blow it up without pixelation. Simplified shapes (recognisable, not
- * pixel-perfect) keyed by element type.
+ * pixel-perfect) keyed by element type — except the state-machine shapes, the
+ * pain point / issue markers and the external names of events, gateways, data
+ * objects and data stores, which are drawn as the desktop draws them
+ * (SymbolRenderer), so the phone viewer and the partner PDF match the website.
  */
 import type { TemplateData, DiagramElement, Connector, Point } from "./types";
 import { isUmlConnType } from "./types";
 import type { SymbolColorConfig } from "./colors";
+import { isSafeColor, safeColorConfig } from "./colors";
 import {
-  CONTAINER_HEADER_H, GROUP_DASH, SHAPE_STROKE, connectorDash, connectorStroke, elementFill,
-  headedContainerPaint, lanePaint, poolPaint, visibleWaypoints,
+  CONTAINER_HEADER_H, FLOWCHART_STROKE, FORK_JOIN_FILL, GROUP_DASH, ISSUE_STROKE, PAIN_POINT_STROKE, SHAPE_STROKE,
+  connectorDash, connectorStroke, elementFill, headedContainerPaint, lanePaint, painPointStarPoints, poolPaint,
+  visibleWaypoints,
 } from "./canvasPaint";
-import { connectorLabelSize, wrapText } from "./textMetrics";
+import {
+  AVG_CHAR_W_FACTOR, EXTERNAL_LABEL_DEFAULT_OY, EXTERNAL_LABEL_DEFAULT_W, EXTERNAL_LABEL_LINE_H,
+  connectorLabelSize, hasExternalLabel, wrapText,
+} from "./textMetrics";
 import { containerHeaderWidth } from "./containerHeader";
 import { laneDepths, sublaneIdsOf } from "./nestingDepth";
 import { compositeRegions } from "./compositeRegions";
@@ -52,8 +60,10 @@ const PAL: Record<string, { fill: string; stroke: string }> = {
   "subprocess-expanded": { fill: "#dbeafe", stroke: "#3b82f6" },
   "process-group": { fill: "#dbeafe", stroke: "#3b82f6" },
   gateway: { fill: "#fef9c3", stroke: "#ca8a04" },
-  "fork-join": { fill: "#fef9c3", stroke: "#ca8a04" },
-  "flowchart-parallel": { fill: "#fef9c3", stroke: "#ca8a04" },
+  // A fork / join (and a flowchart parallel bar) is a solid dark bar in every
+  // mode — never the gateway's yellow.
+  "fork-join": { fill: FORK_JOIN_FILL, stroke: FORK_JOIN_FILL },
+  "flowchart-parallel": { fill: FLOWCHART_STROKE, stroke: FLOWCHART_STROKE },
   "start-event": { fill: "#dcfce7", stroke: "#16a34a" },
   "intermediate-event": { fill: "#fff7ed", stroke: "#ca8a04" },
   "end-event": { fill: "#fee2e2", stroke: "#dc2626" },
@@ -102,18 +112,130 @@ function label(e: DiagramElement, tx: number, ty: number, dy = 4, full = false):
   ).join("");
 }
 
-// Label placed just BELOW a small shape (events / gateways) — BPMN convention,
-// since the glyph fills the diamond/circle. Wrapped like the desktop external label.
-function belowLabel(e: DiagramElement, tx: number, ty: number, full: boolean): string {
+// The compact preview's name just BELOW a small shape (events / gateways),
+// shortened to one line. The full render draws the desktop's external label
+// instead (externalLabel).
+function belowLabel(e: DiagramElement, tx: number, ty: number): string {
   const t = (e.label ?? "").trim();
   if (!t) return "";
-  const fs = 10, lineH = fs * 1.2;
-  const lines = (full ? wrapText(t, Math.max(48, e.width + 30), fs) : [short(t)]).slice(0, 3);
+  const fs = 10;
   const mx = (cx(e) + tx).toFixed(1);
   const startY = e.y + ty + e.height + fs + 1;
-  return lines.map((ln, i) =>
-    `<text x="${mx}" y="${(startY + i * lineH).toFixed(1)}" text-anchor="middle" font-size="${fs}" fill="#0f172a" font-family="sans-serif">${esc(ln)}</text>`,
-  ).join("");
+  return `<text x="${mx}" y="${startY.toFixed(1)}" text-anchor="middle" font-size="${fs}" fill="#0f172a" font-family="sans-serif">${esc(short(t))}</text>`;
+}
+
+const r1 = (v: number) => Math.round(v * 10) / 10;
+const finiteOr = (v: unknown, dflt: number) => (typeof v === "number" && Number.isFinite(v) ? v : dflt);
+const positiveOr = (v: unknown, dflt: number) => (typeof v === "number" && v > 0 ? v : dflt);
+
+/**
+ * The name the desktop draws OUTSIDE the shape — SymbolRenderer's external
+ * label, for events, gateways, data objects, data stores (textMetrics'
+ * `hasExternalLabel`, which also leaves a merge gateway unnamed) and an
+ * icon-only ArchiMate actor. It sits at the element's stored offset
+ * (labelOffsetX ?? 0 from the centre, labelOffsetY ?? 7 below the bottom) —
+ * so a name dragged above or beside its shape is drawn there — wrapped to
+ * labelWidth ?? 80 as measured at 12px, set at 11px × the element font scale,
+ * a line every 14px with the first baseline 11.9 below its top; a data
+ * object's [state] follows on the next line at 10px. A start or end event on
+ * an activity's boundary has no name on the desktop, so none here.
+ * Diagram coordinates; the drawing and the frame both take it from here.
+ */
+interface ExternalLabel { cx: number; top: number; lines: string[]; fs: number; state?: string; stateFs: number }
+function externalLabelOf(e: DiagramElement, fsc: number): ExternalLabel | null {
+  const t = e.type as string | undefined;
+  const p = e.properties ?? {};
+  const archiActorIcon = t === "archimate-shape" && !!p.archimateIconOnly
+    && typeof p.shapeKey === "string" && p.shapeKey.includes("actor");
+  if (!archiActorIcon && !(typeof t === "string" && hasExternalLabel(t, p))) return null;
+  if (e.boundaryHostId && (t === "start-event" || t === "end-event")) return null;
+  const text = typeof e.label === "string" ? e.label : "";
+  const state = t === "data-object" && p.state ? String(p.state) : undefined;
+  if (!text.trim() && !state) return null;
+  return {
+    cx: e.x + e.width / 2 + finiteOr(p.labelOffsetX, 0),
+    top: e.y + e.height + finiteOr(p.labelOffsetY, EXTERNAL_LABEL_DEFAULT_OY),
+    lines: wrapText(text, finiteOr(p.labelWidth, EXTERNAL_LABEL_DEFAULT_W)),
+    fs: r1(11 * fsc),
+    state,
+    stateFs: r1(10 * fsc),
+  };
+}
+
+function externalLabel(e: DiagramElement, tx: number, ty: number, fsc: number): string {
+  const L = externalLabelOf(e, fsc);
+  if (!L) return "";
+  const lh = EXTERNAL_LABEL_LINE_H;
+  const x = (L.cx + tx).toFixed(1);
+  const base = (i: number) => (L.top + ty + i * lh + lh * 0.85).toFixed(1);
+  let out = "";
+  if (L.lines.some((ln) => ln.trim())) {
+    out += `<text text-anchor="middle" font-size="${L.fs}" fill="#111827" font-family="sans-serif">`
+      + L.lines.map((ln, i) => (ln.trim() ? `<tspan x="${x}" y="${base(i)}">${esc(ln)}</tspan>` : "")).join("")
+      + `</text>`;
+  }
+  if (L.state) {
+    out += `<text x="${x}" y="${base(L.lines.length)}" text-anchor="middle" font-size="${L.stateFs}" fill="#374151" font-family="sans-serif">${esc(`[${L.state}]`)}</text>`;
+  }
+  return out;
+}
+
+/** The box an external label takes up — generous (every line measured at no
+ *  less than 12px, never capped at the wrap column) so the frame holds it. */
+function externalLabelBox(L: ExternalLabel): { x: number; y: number; width: number; height: number } {
+  const rows = L.state ? [...L.lines, `[${L.state}]`] : L.lines;
+  const w = Math.max(0, ...rows.map((r) => r.length)) * Math.max(12, L.fs) * AVG_CHAR_W_FACTOR;
+  return { x: L.cx - w / 2, y: L.top, width: w, height: rows.length * EXTERNAL_LABEL_LINE_H };
+}
+
+/** Whether pain-point / issue descriptions are shown under their markers — the
+ *  canvas's toggles (a marker's own switch, then its descriptions'). */
+interface CaptionFlags { pain: boolean; issue: boolean }
+function captionFlagsOf(d: { showPainPoints?: unknown; showIssues?: unknown; showPainPointDescriptions?: unknown; showIssueDescriptions?: unknown }): CaptionFlags {
+  return {
+    pain: d.showPainPoints !== false && !!d.showPainPointDescriptions,
+    issue: d.showIssues !== false && !!d.showIssueDescriptions,
+  };
+}
+
+/**
+ * A pain point's / issue's description under its star, as the desktop sets it
+ * (MarkerShape): every line of `properties.description`, centred, at
+ * 11px × the font scale, a line every 13px × the scale, the first baseline one
+ * line below the star; dark red for a pain point, dark green for an issue.
+ */
+interface MarkerCaption { cx: number; top: number; lines: string[]; fs: number; lineH: number; color: string }
+function markerCaptionOf(e: DiagramElement, fsc: number, show: CaptionFlags | undefined): MarkerCaption | null {
+  const pain = e.type === "uml-pain-point";
+  if (!show || !(pain ? show.pain : e.type === "uml-issue" && show.issue)) return null;
+  const desc = e.properties?.description;
+  const lines = (typeof desc === "string" ? desc : "").split("\n");
+  if (!lines.some((l) => l.trim())) return null;
+  return {
+    cx: e.x + e.width / 2, top: e.y + e.height, lines,
+    fs: r1(11 * fsc), lineH: Math.round(13 * fsc), color: pain ? "#7f1d1d" : "#166534",
+  };
+}
+
+function markerCaption(C: MarkerCaption, tx: number, ty: number): string {
+  const x = (C.cx + tx).toFixed(1);
+  return `<text x="${x}" y="${(C.top + ty + C.lineH).toFixed(1)}" text-anchor="middle" font-size="${C.fs}" fill="${C.color}" font-family="sans-serif">`
+    + C.lines.map((ln, i) => `<tspan x="${x}" dy="${i === 0 ? 0 : C.lineH}">${esc(ln)}</tspan>`).join("")
+    + `</text>`;
+}
+
+function markerCaptionBox(C: MarkerCaption): { x: number; y: number; width: number; height: number } {
+  const w = Math.max(0, ...C.lines.map((l) => l.length)) * Math.max(12, C.fs) * AVG_CHAR_W_FACTOR;
+  return { x: C.cx - w / 2, y: C.top, width: w, height: (C.lines.length + 0.4) * C.lineH };
+}
+
+/** A state's / sub-machine's name, as the desktop sets it: one line (line
+ *  breaks read as spaces), centred in the box, at the element font, #111827. */
+function stateName(e: DiagramElement, tx: number, ty: number, fsc: number): string {
+  const t = (e.label ?? "").replace(/\s+/g, " ").trim();
+  if (!t) return "";
+  const fs = r1(12 * fsc);
+  return `<text x="${(cx(e) + tx).toFixed(1)}" y="${(cy(e) + ty + fs * 0.35).toFixed(1)}" text-anchor="middle" font-size="${fs}" fill="#111827" font-family="sans-serif">${esc(t)}</text>`;
 }
 
 /**
@@ -166,6 +288,8 @@ interface RenderCtx {
   sublanes: Set<string>;
   /** Lane ancestors per lane (each level past a sub-lane lightens). */
   laneDepth: Map<string, number>;
+  /** Whether pain-point / issue descriptions are shown under their markers. */
+  captions?: CaptionFlags;
 }
 
 // A composite state's / system boundary's / group's name, as the desktop sets
@@ -243,6 +367,8 @@ function shapeFor(e: DiagramElement, tx: number, ty: number, opts?: ThumbnailOpt
   const t = e.type as string;
   const fill = fillFor(e, opts), stroke = strokeFor(e, opts);
   const full = !!opts?.fullLabels;
+  /** The element font scale (the desktop's FontScaleCtx: data.fontSize ?? 12, over 12). */
+  const fsc = (ctx?.fonts.element ?? 12) / 12;
 
   if (t === "pool" || t === "lane" || t === "sublane") {
     // A body with its header strip down the left, the strip as wide as the
@@ -278,10 +404,19 @@ function shapeFor(e: DiagramElement, tx: number, ty: number, opts?: ThumbnailOpt
     const call = (e.properties?.subprocessType as string) === "call";
     return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="${fill}" stroke="${stroke}" stroke-width="${call ? 3 : 1.4}"${VE}/>` + label(e, tx, ty, 4, full);
   }
-  if (t === "gateway" || t === "fork-join" || t === "flowchart-parallel") {
+  if (t === "fork-join" || t === "flowchart-parallel") {
+    // A solid bar, as the desktop draws it (ForkJoinShape / FlowchartParallelShape):
+    // the fork/join colour whatever the colour config (a flowchart's near-black),
+    // 2px corners, no outline and no name. It used to be a yellow diamond.
+    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2" ry="2" fill="${t === "fork-join" ? FORK_JOIN_FILL : FLOWCHART_STROKE}"/>`;
+  }
+  if (t === "gateway") {
+    // The desktop's diamond (GatewayShape): corner to corner of the box, 1.5 outline.
     const s = Math.min(w, h) / 2;
     const mx = cx(e) + tx, my = cy(e) + ty;
-    return `<polygon points="${mx},${my - s} ${mx + s},${my} ${mx},${my + s} ${mx - s},${my}" fill="${fill}" stroke="${stroke}" stroke-width="1.2"${VE}/>` + gatewayMarker(e, mx, my, s, stroke) + belowLabel(e, tx, ty, full);
+    return `<polygon points="${mx},${y} ${x + w},${my} ${mx},${y + h} ${x},${my}" fill="${fill}" stroke="${stroke}" stroke-width="1.5"${VE}/>`
+      + gatewayMarker(e, mx, my, s, stroke)
+      + (full ? externalLabel(e, tx, ty, fsc) : belowLabel(e, tx, ty));
   }
   if (t === "start-event" || t === "intermediate-event" || t === "end-event") {
     const r = Math.min(w, h) / 2;
@@ -290,7 +425,7 @@ function shapeFor(e: DiagramElement, tx: number, ty: number, opts?: ThumbnailOpt
     const sw = t === "end-event" ? 2.6 : 1.4;
     let out = `<circle cx="${ecx.toFixed(1)}" cy="${ecy.toFixed(1)}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"${VE}/>`;
     if (dbl) out += `<circle cx="${ecx.toFixed(1)}" cy="${ecy.toFixed(1)}" r="${(r - 3).toFixed(1)}" fill="none" stroke="${stroke}" stroke-width="1"${VE}/>`;
-    return out + eventMarker(e, ecx, ecy, r, stroke) + belowLabel(e, tx, ty, full);
+    return out + eventMarker(e, ecx, ecy, r, stroke) + (full ? externalLabel(e, tx, ty, fsc) : belowLabel(e, tx, ty));
   }
   if (t === "chevron" || t === "chevron-collapsed") {
     // Value-chain "Process" — a right-pointing chevron with a matching left notch
@@ -307,11 +442,68 @@ function shapeFor(e: DiagramElement, tx: number, ty: number, opts?: ThumbnailOpt
     return out;
   }
   if (t === "data-object") {
-    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" stroke="${stroke}" stroke-width="1"${VE}/>`;
+    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" stroke="${stroke}" stroke-width="1"${VE}/>`
+      + (full ? externalLabel(e, tx, ty, fsc) : "");
   }
   if (t === "data-store") {
     return `<ellipse cx="${cx(e) + tx}" cy="${y + 6}" rx="${w / 2}" ry="5" fill="${fill}" stroke="${stroke}" stroke-width="1"${VE}/>`
-      + `<rect x="${x}" y="${y + 6}" width="${w}" height="${h - 6}" fill="${fill}" stroke="${stroke}" stroke-width="1"${VE}/>`;
+      + `<rect x="${x}" y="${y + 6}" width="${w}" height="${h - 6}" fill="${fill}" stroke="${stroke}" stroke-width="1"${VE}/>`
+      + (full ? externalLabel(e, tx, ty, fsc) : "");
+  }
+  if (t === "state" || t === "submachine") {
+    // As the desktop draws it (StateShape / SubmachineShape): a box with 12px
+    // corners in the state's own colour, the #374151 outline at 1.5, and the
+    // name on one line in the middle. A sub-machine adds its marker bottom-right
+    // — two little states joined by a line, blue when it links to its diagram,
+    // grey when it does not.
+    let out = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="12" ry="12" fill="${fill}" stroke="${opts?.trueColors ? SHAPE_STROKE : stroke}" stroke-width="1.5"${VE}/>`;
+    if (t === "submachine") {
+      const ms = e.properties?.linkedDiagramId ? "#2563eb" : "#c0c0c0";
+      const mx = x + w - 25 - 6, my = y + h - 7 - 5;
+      const box = (bx: number) => `<rect x="${bx.toFixed(1)}" y="${my.toFixed(1)}" width="10" height="7" rx="2.5" ry="2.5" fill="#ffffff" stroke="${ms}" stroke-width="1.2"${VE}/>`;
+      out += box(mx)
+        + `<line x1="${(mx + 10).toFixed(1)}" y1="${(my + 3.5).toFixed(1)}" x2="${(mx + 15).toFixed(1)}" y2="${(my + 3.5).toFixed(1)}" stroke="${ms}" stroke-width="1.2"${VE}/>`
+        + box(mx + 15);
+    }
+    return out + (full ? stateName(e, tx, ty, fsc) : label(e, tx, ty, 4, false));
+  }
+  // The pseudo-states, as the desktop draws them — and, as there, never a name
+  // (their stored labels are just "Initial" / "Final" / "History").
+  if (t === "initial-state") {
+    // A filled disc in the state colour (default #374151), no outline.
+    return `<circle cx="${(cx(e) + tx).toFixed(1)}" cy="${(cy(e) + ty).toFixed(1)}" r="${w / 2}" fill="${elementFill(e, opts?.colorConfig)}"/>`;
+  }
+  if (t === "final-state") {
+    // A white ring (#374151 at 2) round a disc in the state colour, 5px in.
+    const [fx, fy] = [(cx(e) + tx).toFixed(1), (cy(e) + ty).toFixed(1)];
+    return `<circle cx="${fx}" cy="${fy}" r="${w / 2}" fill="#ffffff" stroke="${SHAPE_STROKE}" stroke-width="2"${VE}/>`
+      + `<circle cx="${fx}" cy="${fy}" r="${Math.max(0, w / 2 - 5)}" fill="${elementFill(e, opts?.colorConfig)}"/>`;
+  }
+  if (t === "history-state" || t === "deep-history-state") {
+    // A WHITE circle (whatever the colour config — its "colour" is the glyph's),
+    // a #374151 ring at 2 and a bold H; deep history adds a large * upper-right.
+    // The desktop centres the glyphs with dominant-baseline="central"; that
+    // does not survive the PDF, so the baseline is dropped 0.35em instead.
+    const r = w / 2, hx = cx(e) + tx, hy = cy(e) + ty;
+    const glyph = (gx: number, gy: number, size: number, ch: string) =>
+      `<text x="${gx.toFixed(1)}" y="${(gy + size * 0.35).toFixed(1)}" text-anchor="middle" font-size="${r1(size)}" font-weight="700" fill="${SHAPE_STROKE}" font-family="sans-serif">${ch}</text>`;
+    return `<circle cx="${hx.toFixed(1)}" cy="${hy.toFixed(1)}" r="${r}" fill="#ffffff" stroke="${SHAPE_STROKE}" stroke-width="2"${VE}/>`
+      + (t === "deep-history-state"
+        ? glyph(hx - r * 0.28, hy, r, "H") + glyph(hx + r * 0.48, hy + r * 0.13, r * 1.6, "*")
+        : glyph(hx, hy, r, "H"));
+  }
+  if (t === "uml-pain-point" || t === "uml-issue") {
+    // The desktop's starburst (MarkerShape): the marker colour, its red / green
+    // outline, its number in bold in the middle (smaller for two digits), and —
+    // when the diagram shows them — the description underneath.
+    const pain = t === "uml-pain-point";
+    const mcx = cx(e) + tx, mcy = cy(e) + ty, rx = w / 2, ry = h / 2;
+    const num = (e.label ?? "").trim();
+    const nfs = r1(Math.min(rx, ry) * ((e.label ?? "").length >= 2 ? 0.62 : 0.8) * fsc);
+    let out = `<polygon points="${painPointStarPoints(mcx, mcy, rx, ry)}" fill="${elementFill(e, opts?.colorConfig)}" stroke="${pain ? PAIN_POINT_STROKE : ISSUE_STROKE}" stroke-width="1.5" stroke-linejoin="round"${VE}/>`;
+    if (num) out += `<text x="${mcx.toFixed(1)}" y="${(mcy + nfs * 0.35).toFixed(1)}" text-anchor="middle" font-size="${nfs}" font-weight="bold" fill="${pain ? "#7f1d1d" : "#ffffff"}" font-family="sans-serif">${esc(num)}</text>`;
+    const cap = full ? markerCaptionOf(e, fsc, ctx?.captions) : null;
+    return out + (cap ? markerCaption(cap, tx, ty) : "");
   }
   if (t === "composite-state" || t === "system-boundary") {
     // A HEADED container, as the desktop draws it (CompositeStateShape): a
@@ -348,8 +540,10 @@ function shapeFor(e: DiagramElement, tx: number, ty: number, opts?: ThumbnailOpt
     return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="8" fill="#f9fafb" fill-opacity="${opts?.trueColors ? 0.15 : 0}" stroke="${line}" stroke-width="1.5" stroke-dasharray="${GROUP_DASH}"${VE}/>`
       + (full ? containerTitle(e, tx, ty, ctx?.fonts.element ?? 12) : "");
   }
-  // fallback
-  return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="${fill}" stroke="${stroke}" stroke-width="1"${VE}/>` + label(e, tx, ty, 4, full);
+  // fallback — an icon-only ArchiMate actor keeps its name outside, where the
+  // desktop puts it; everything else is named inside the box.
+  return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="${fill}" stroke="${stroke}" stroke-width="1"${VE}/>`
+    + (full && externalLabelOf(e, fsc) ? externalLabel(e, tx, ty, fsc) : label(e, tx, ty, 4, full));
 }
 
 function connFor(c: Connector, els: DiagramElement[], tx: number, ty: number, opts?: ThumbnailOpts): string {
@@ -613,30 +807,75 @@ function connectorLabelFontSize(data: { connectorFontSize?: unknown }): number {
  * drawn at all. Anything that must line up with the picture — the phone's
  * review pins and taps, its pan/zoom size, the PDF page — takes its frame from
  * here, with the options the picture was drawn with.
+ *
+ * With full labels it also takes in every element name drawn OUTSIDE its shape
+ * (an event's, gateway's, data object's… external label at its stored offset —
+ * which can be above or beside the shape) and the pain-point / issue
+ * descriptions under their stars, from the same geometry the drawing uses.
  */
 export function thumbnailFrameFor(
-  data: { elements?: DiagramElement[]; connectors?: Connector[]; connectorFontSize?: unknown },
+  data: {
+    elements?: DiagramElement[]; connectors?: Connector[]; connectorFontSize?: unknown;
+    fontSize?: unknown; showPainPoints?: unknown; showIssues?: unknown;
+    showPainPointDescriptions?: unknown; showIssueDescriptions?: unknown;
+  },
   opts?: ThumbnailOpts,
 ): { tx: number; ty: number; w: number; h: number } {
   const els = data.elements ?? [];
-  if (!opts?.trueColors || els.length === 0) return thumbnailTransform(els);
+  if (els.length === 0 || (!opts?.trueColors && !opts?.fullLabels)) return thumbnailTransform(els);
   const boxes: { x: number; y: number; width: number; height: number }[] = els.map((e) => ({ x: e.x, y: e.y, width: e.width, height: e.height }));
-  const fs = connectorLabelFontSize(data);
-  for (const c of data.connectors ?? []) {
-    if (Array.isArray(c.waypoints)) {
-      for (const p of visibleWaypoints(c)) {
-        if (Number.isFinite(p?.x) && Number.isFinite(p?.y)) boxes.push({ x: p.x, y: p.y, width: 0, height: 0 });
+  if (opts.trueColors) {
+    const fs = connectorLabelFontSize(data);
+    for (const c of data.connectors ?? []) {
+      if (Array.isArray(c.waypoints)) {
+        for (const p of visibleWaypoints(c)) {
+          if (Number.isFinite(p?.x) && Number.isFinite(p?.y)) boxes.push({ x: p.x, y: p.y, width: 0, height: 0 });
+        }
+      }
+      if (opts.fullLabels && connectorShowsLabel(c) && (c.label ?? "").trim()) {
+        const b = connectorLabelBox(c, els, fs);
+        if (b) boxes.push({ x: b.x, y: b.y, width: b.w, height: b.h });
       }
     }
-    if (opts.fullLabels && connectorShowsLabel(c) && (c.label ?? "").trim()) {
-      const b = connectorLabelBox(c, els, fs);
-      if (b) boxes.push({ x: b.x, y: b.y, width: b.w, height: b.h });
+  }
+  if (opts.fullLabels) {
+    const fsc = positiveOr(data.fontSize, 12) / 12;
+    const captions = captionFlagsOf(data);
+    for (const e of els) {
+      const L = externalLabelOf(e, fsc);
+      if (L) boxes.push(externalLabelBox(L));
+      const C = markerCaptionOf(e, fsc, captions);
+      if (C) boxes.push(markerCaptionBox(C));
     }
   }
   return thumbnailTransform(boxes);
 }
 
-export function renderTemplateThumbnailSvg(data: TemplateData, opts?: ThumbnailOpts): string {
+/** A property that holds a colour (fill, fillColor, strokeColor, lineColor, …). */
+const COLOUR_KEY = /(^fill$|^stroke$|colou?r$)/i;
+/** The same object with every colour-holding property that is not a colour removed. */
+function withSafeColourProps<T extends { properties?: Record<string, unknown> }>(x: T): T {
+  const props = x.properties;
+  if (!props) return x;
+  let changed = false;
+  const clean: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(props)) {
+    if (COLOUR_KEY.test(k) && typeof v === "string" && !isSafeColor(v)) { changed = true; continue; }
+    clean[k] = v;
+  }
+  return changed ? { ...x, properties: clean } : x;
+}
+
+export function renderTemplateThumbnailSvg(rawData: TemplateData, rawOpts?: ThumbnailOpts): string {
+  // Everything below writes colours into markup as TEXT (the phone puts it in
+  // the page as HTML): a stored colour that is not a colour is dropped here,
+  // once, and the default drawn instead (the 2026-09-29 review).
+  const opts = rawOpts?.colorConfig ? { ...rawOpts, colorConfig: safeColorConfig(rawOpts.colorConfig) } : rawOpts;
+  const data = {
+    ...rawData,
+    elements: (rawData.elements ?? []).map(withSafeColourProps),
+    ...(rawData.connectors ? { connectors: rawData.connectors.map((c) => withSafeColourProps(c as never) as typeof c) } : {}),
+  } as TemplateData;
   const all = data.elements ?? [];
   if (all.length === 0) return "";
   // Framed on everything it was given (thumbnailFrameFor), so an overlay using
@@ -646,15 +885,15 @@ export function renderTemplateThumbnailSvg(data: TemplateData, opts?: ThumbnailO
   const els = all.filter((e) => !isHiddenOnCanvas(e, flags));
 
   const fontData = data as { poolFontSize?: unknown; laneFontSize?: unknown; fontSize?: unknown; connectorFontSize?: unknown };
-  const num = (v: unknown, dflt: number) => (typeof v === "number" && v > 0 ? v : dflt);
   const ctx: RenderCtx = {
     fonts: {
-      pool: num(fontData.poolFontSize, 16),
-      lane: num(fontData.laneFontSize, 14),
-      element: num(fontData.fontSize, 12),
+      pool: positiveOr(fontData.poolFontSize, 16),
+      lane: positiveOr(fontData.laneFontSize, 14),
+      element: positiveOr(fontData.fontSize, 12),
     },
     sublanes: sublaneIdsOf(els),
     laneDepth: laneDepths(els),
+    captions: captionFlagsOf(data as Parameters<typeof captionFlagsOf>[0]),
   };
   const order = paintOrder(els, ctx);
   const shapes = (from: number, to: number) =>

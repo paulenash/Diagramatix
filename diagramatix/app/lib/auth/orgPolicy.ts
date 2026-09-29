@@ -74,11 +74,12 @@ export async function getOrgPolicy(orgId: string): Promise<OrgPolicy> {
   };
 }
 
-/** Non-throwing check for the caller's active org. No active org → allowed.
- *  A non-presenting SuperAdmin is never bound (returns true). */
-export async function orgPolicyAllows(session: Session, key: OrgPolicyKey): Promise<boolean> {
+/** Non-throwing check for the caller's active org — or `orgId` when given (the
+ *  org a diagram belongs to). No org → allowed. A non-presenting SuperAdmin is
+ *  never bound (returns true). */
+export async function orgPolicyAllows(session: Session, key: OrgPolicyKey, orgId?: string | null): Promise<boolean> {
   if (!(await policyBindsCaller(session))) return true;
-  const orgId = await tryGetCurrentOrgId(session, await cookies());
+  if (orgId === undefined || orgId === null) orgId = await tryGetCurrentOrgId(session, await cookies());
   if (!orgId) return true;
   const policy = await getOrgPolicy(orgId);
   return policy[key];
@@ -100,14 +101,15 @@ export async function orgRedactionEnabled(session: Session): Promise<boolean> {
 }
 
 /**
- * Route guard: returns a 403 NextResponse when the caller's active org disables
- * `key`, else null. Usage:
+ * Route guard: returns a 403 NextResponse when the caller's active org — or
+ * `orgId`, when given (the org a diagram belongs to) — disables `key`, else
+ * null. Usage:
  *   const blocked = await gateOrgPolicy(session, "allowAi");
  *   if (blocked) return blocked;
  * Applies to everyone acting in that org (including SuperAdmins) — the policy is
  * the customer's, so we don't bypass it.
  */
-export async function gateOrgPolicy(session: Session, key: OrgPolicyKey): Promise<NextResponse | null> {
-  const allowed = await orgPolicyAllows(session, key);
+export async function gateOrgPolicy(session: Session, key: OrgPolicyKey, orgId?: string | null): Promise<NextResponse | null> {
+  const allowed = await orgPolicyAllows(session, key, orgId);
   return allowed ? null : NextResponse.json({ error: ORG_POLICY_MESSAGES[key] }, { status: 403 });
 }

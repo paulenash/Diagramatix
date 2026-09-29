@@ -65,7 +65,7 @@ import { adjustOp, collectDividers, dividerOp, dividerReply, dividerRulers, expl
 import { readBoundaryFollowUp, type BoundaryMemory } from "@/app/lib/assist/boundaryFollowUp";
 import { imageNameInPrompt, regenerateFreeForm, storeSourceImage, type StoredSourceImage } from "@/app/lib/ai/sourceImage";
 import { decidePromptLink, mergeGeneratedDiagram, nextAiGeneration, type LinkedPrompt } from "@/app/lib/ai/applyGeneration";
-import { markPromptUsedFetch, runPromptLinkFetch } from "@/app/lib/ai/promptLinkFetch";
+import { runPromptLinkFetch } from "@/app/lib/ai/promptLinkFetch";
 import { isIncompleteCommand } from "@/app/lib/assist/incompleteCommand";
 import { leadingSpokenNumber } from "@/app/lib/assist/spokenNumber";
 import { capitaliseFirstWord, needsCapital } from "@/app/lib/diagram/nameCase";
@@ -1648,14 +1648,16 @@ export function DiagramEditor({
   // Armed by applyAiResult after a generation; the next canvas click dismisses the AI panel.
   const aiJustGeneratedRef = useRef(false);
 
-  // Link/auto-save the Prompt that generated this diagram, returning its id+name.
-  // The rules live in app/lib/ai/applyGeneration.ts (shared with the phone's
-  // server-side generate job); this is only the desktop's fetch half.
+  // Link/auto-save the Prompt that generated this diagram, returning its id+name,
+  // and count the generation against it. The rules live in
+  // app/lib/ai/applyGeneration.ts (shared with the phone's server-side generate
+  // job); the server carries the action out (promptLinkDb.ts) — who may write
+  // which prompt is decided there. This is only the desktop's fetch half.
   const ensureLinkedPrompt = useCallback(async (
     meta: AiApplyMeta,
   ): Promise<LinkedPrompt | null> => {
-    return runPromptLinkFetch(decidePromptLink({ meta, prev: data.aiGeneration, diagramName, diagramType }));
-  }, [data.aiGeneration, diagramName, diagramType]);
+    return runPromptLinkFetch(decidePromptLink({ meta, prev: data.aiGeneration, diagramName, diagramType }), diagramId, meta.model);
+  }, [data.aiGeneration, diagramName, diagramType, diagramId]);
 
   // Apply an AI-generated result — shared by AiPanel + PlanPanel. Replaces the
   // diagram, and (when generation metadata is present) links the Prompt and
@@ -1663,12 +1665,11 @@ export function DiagramEditor({
   const applyAiResult = useCallback(async (aiData: DiagramData, meta?: AiApplyMeta) => {
     let aiGeneration = data.aiGeneration;
     if (meta) {
+      // Every generable type funnels through here, from both the one-shot panel
+      // and the two-phase one — so this is the only place usage is recorded (the
+      // link counts the generation against its prompt).
       const linked = await ensureLinkedPrompt(meta);
       if (linked) {
-        // Every generable type funnels through here, from both the one-shot
-        // panel and the two-phase one — so this is the only place usage has to
-        // be recorded.
-        markPromptUsedFetch(linked.id, meta.model);
         aiGeneration = nextAiGeneration({ prev: data.aiGeneration, linked, meta, generatedAt: new Date().toISOString() });
       }
     }

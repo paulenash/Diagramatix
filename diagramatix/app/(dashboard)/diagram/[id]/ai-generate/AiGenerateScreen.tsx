@@ -1,5 +1,6 @@
 "use client";
 import type { StoredSourceImage } from "@/app/lib/ai/sourceImage";
+import { freeFormLayout } from "@/app/lib/ai/freeForm";
 import { useReattachSourceImage } from "../useReattachSourceImage";
 
 /**
@@ -393,9 +394,7 @@ export function AiGenerateScreen({
         || undefined;
       // Derived from the PLAN, so it survives JSON edits and does not depend on
       // the attachment still being set.
-      const planHasBounds = Array.isArray(plan?.elements)
-        && plan.elements.some((e: { bounds?: unknown }) => e.bounds);
-      const preservePositions = !flatPlan && preserveLayout && planHasBounds;
+      const { preservePositions } = freeFormLayout(!flatPlan && preserveLayout, plan);
       setDiagnostics([]);
       const res = await fetch(`${apiBase}/apply-layout`, {
         method: "POST",

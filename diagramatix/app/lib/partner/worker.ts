@@ -25,6 +25,7 @@ import { gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription
 import { uniqueDiagramName } from "@/app/lib/valueChain/uniqueDiagramName";
 import { runProcessMap, ProcessMapError } from "./runProcessMap";
 import { renderDiagramSvg } from "./renderDiagramSvg";
+import { effectiveSymbolColors } from "@/app/lib/diagram/colors";
 import { svgToPdf } from "@/app/lib/documents/svgToPdf";
 import { applyVolumetrics, type Volumetrics } from "@/app/lib/simulation/volumetrics";
 import { advanceJob, failJob, startJob, succeedJob } from "./jobs";
@@ -134,12 +135,15 @@ export async function runJob(input: WorkerInput): Promise<void> {
     // The destination. A key may pin a project (the harness does, so its runs
     // pile up in one place); otherwise each run gets its own.
     let projectId = input.projectId ?? caller.projectId ?? null;
+    // The project's colour scheme, so the PDF is drawn as the editor draws it (a new project has none).
+    let projectColors: unknown = null;
     if (projectId) {
       const exists = await prisma.project.findFirst({
         where: { id: projectId, orgId: caller.orgId },
-        select: { id: true },
+        select: { id: true, colorConfig: true },
       });
       if (!exists) projectId = null; // never write into another org's project
+      else projectColors = exists.colorConfig;
     }
     if (!projectId) {
       const created = await prisma.project.create({
@@ -203,7 +207,7 @@ export async function runJob(input: WorkerInput): Promise<void> {
     let svg: string | null = null;
     let pdf: Buffer | null = null;
     try {
-      svg = renderDiagramSvg(run.data);
+      svg = renderDiagramSvg(run.data, effectiveSymbolColors(projectColors, {}, "normal"));
       pdf = await svgToPdf(svg);
     } catch (e) {
       console.warn(`[partner] job ${jobId}: no PDF (${e instanceof Error ? e.message : String(e)})`);

@@ -158,6 +158,11 @@ export async function PUT(req: Request, { params }: Params) {
   const reviewerAccess = role === "reviewer";
   const isOwner = role === "owner";
   const name = reviewerAccess ? undefined : body.name;
+  // A name, when one is sent, is a non-empty string, stored trimmed — as a new
+  // diagram's is. An empty one used to be saved as "" (2026-09-29).
+  if (name !== undefined && (typeof name !== "string" || !name.trim())) {
+    return NextResponse.json({ error: "Name is required" }, { status: 400 });
+  }
   const projectId = isOwner ? body.projectId : undefined;
   const diagramOwnerId = isOwner ? body.diagramOwnerId : undefined;
   const colorConfig = reviewerAccess ? undefined : body.colorConfig;
@@ -189,7 +194,7 @@ export async function PUT(req: Request, { params }: Params) {
     ) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const writeFields: any = {
-        ...(name !== undefined && { name }),
+        ...(name !== undefined && { name: name.trim() }),
         ...(hasData && { data: data as unknown }),
         // Keep the Portal's browse/governance columns in step with the
         // diagram's classification + procedure-doc link + entity refs on

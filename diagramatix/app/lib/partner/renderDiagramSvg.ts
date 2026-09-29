@@ -22,6 +22,7 @@
  * they should know that — which is why `diagram.bpmn` ships alongside it.
  */
 import type { DiagramData } from "@/app/lib/diagram/types";
+import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { renderTemplateThumbnailSvg, thumbnailFrameFor, THUMBNAIL_PAD } from "@/app/lib/diagram/templateThumbnail";
 import { healOnLoad } from "@/app/lib/diagram/healOnLoad";
 
@@ -32,14 +33,15 @@ export class NothingToRenderError extends Error {
   constructor() { super("That diagram has no elements to render."); this.name = "NothingToRenderError"; }
 }
 
-export function renderDiagramSvg(stored: DiagramData): string {
+/** `colorConfig`: the colours the editor paints with (the project's scheme — effectiveSymbolColors); type defaults when absent. */
+export function renderDiagramSvg(stored: DiagramData, colorConfig?: SymbolColorConfig): string {
   // As the editor opens it (healOnLoad): a multi-line pool name gets the header
   // width it needs, and a message label that was never placed is placed.
   const data = healOnLoad(stored);
   const els = data.elements ?? [];
   if (els.length === 0) throw new NothingToRenderError();
 
-  const OPTS = { trueColors: true, fullLabels: true } as const;
+  const OPTS = { trueColors: true, fullLabels: true, ...(colorConfig ? { colorConfig } : {}) } as const;
   const body = renderTemplateThumbnailSvg(data, OPTS);
   // The renderer returns "" for an empty diagram; never hand that to soffice.
   if (!body.trim()) throw new NothingToRenderError();

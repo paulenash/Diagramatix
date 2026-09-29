@@ -13,6 +13,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { filterSavedPrompts } from "@/app/lib/ai/savedPromptFilter";
+import { freeFormLayout } from "@/app/lib/ai/freeForm";
 import { SUPERUSER_EMAILS } from "@/app/lib/superuser";
 import { AI_MODELS, type AiModel } from "@/app/lib/ai/models";
 import { useSuperAdminChrome } from "@/app/hooks/useSuperAdminChrome";
@@ -950,10 +951,8 @@ export function PlanPanel({
       // Reproduce original layout when the plan carries drawn geometry (the
       // model returned per-shape bounds). Derived from the plan itself so it
       // survives JSON edits and doesn't depend on the attachment still being set.
-      const planHasBounds = Array.isArray(plan?.elements)
-        && plan.elements.some((e: { bounds?: unknown }) => e.bounds);
       // BPMN-only — flowchart apply-layout must be sent exactly as before.
-      const preservePositions = !flatPlan && preserveLayout && planHasBounds;
+      const { preservePositions } = freeFormLayout(!flatPlan && preserveLayout, plan);
       // Cleared before the call: an apply that fails early returns without
       // reading a response, and a stale list would look like this attempt.
       setDiagnostics([]);

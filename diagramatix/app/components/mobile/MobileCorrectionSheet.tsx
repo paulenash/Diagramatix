@@ -19,7 +19,7 @@ import { withCorrection } from "@/app/lib/ai/promptPreambles";
 import { MicTest } from "./MicTest";
 
 export function MobileCorrectionSheet({
-  words, setWords, basePrompt, imageName, comments, unsaved, onSubmit, onClose, starting, error,
+  words, setWords, basePrompt, imageName, freeForm, setFreeForm, comments, unsaved, onSubmit, onClose, starting, error,
 }: {
   words: string;
   setWords: (update: (w: string) => string) => void;
@@ -27,6 +27,9 @@ export function MobileCorrectionSheet({
   basePrompt: string;
   /** The kept photo or image it is re-generated with, if any. */
   imageName: string | null;
+  /** With an image: lay it out as the image was drawn (Free Form). Starts as the diagram's own choice. */
+  freeForm: boolean;
+  setFreeForm: (on: boolean) => void;
   /** Review comments on the diagram now (unsaved ones included). */
   comments: number;
   /** Some of them are not saved yet. */
@@ -119,6 +122,17 @@ export function MobileCorrectionSheet({
           {showMicTest ? "Hide mic test" : "Mic not working? Test it"}
         </button>
         {showMicTest && <div className="mt-2"><MicTest compact /></div>}
+
+        {imageName && (
+          <label className="mt-3 flex items-start gap-2 text-sm text-gray-800">
+            <input type="checkbox" checked={freeForm} disabled={starting} onChange={(e) => setFreeForm(e.target.checked)}
+              className="mt-0.5 h-5 w-5 shrink-0" />
+            <span>
+              Free Form — keep the layout as it was drawn
+              <span className="block text-[11px] text-gray-500">Off: the AI lays the process out neatly instead.</span>
+            </span>
+          </label>
+        )}
 
         <p className="text-[12px] text-amber-800 bg-amber-50 rounded-md px-2 py-1.5 mt-3">⚠ {replaceWarning(comments, unsaved)}</p>
 

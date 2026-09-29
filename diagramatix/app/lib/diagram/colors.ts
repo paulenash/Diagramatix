@@ -2,6 +2,27 @@ import type { SymbolType } from "./types";
 
 export type SymbolColorConfig = Partial<Record<SymbolType, string>>;
 
+/**
+ * A colour value that is safe to write into SVG markup built as TEXT (the phone
+ * viewer puts it in the page as HTML; the partner PDF and template thumbnails
+ * are files). A hex colour, a colour name, or rgb()/hsl() — nothing that can
+ * close an attribute. Project colour schemes and per-element colours are stored
+ * as whatever a client sent, so anything else is dropped and the default drawn
+ * (the 2026-09-29 review).
+ */
+const SAFE_COLOR = /^(#[0-9a-f]{3,8}|[a-z]{3,24}|(rgb|hsl)a?\([0-9.,%\sdeg/]+\))$/i;
+export function isSafeColor(v: unknown): v is string {
+  return typeof v === "string" && SAFE_COLOR.test(v.trim());
+}
+
+/** The colour scheme with every unsafe value dropped (see isSafeColor). */
+export function safeColorConfig(c: SymbolColorConfig | undefined): SymbolColorConfig | undefined {
+  if (!c) return c;
+  const out: SymbolColorConfig = {};
+  for (const [k, v] of Object.entries(c)) if (isSafeColor(v)) (out as Record<string, string>)[k] = v.trim();
+  return out;
+}
+
 /** Default fill/characteristic colours for every symbol type, matching the hardcoded
  *  values in SymbolRenderer.tsx.  New projects always start with these colours. */
 export const DEFAULT_SYMBOL_COLORS: Record<SymbolType, string> = {

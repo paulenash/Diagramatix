@@ -70,9 +70,12 @@ export async function PUT(req: Request, { params }: Params) {
   }
 
   const { name, text, planJson } = await req.json();
-  const data: Record<string, string> = {};
+  const data: Record<string, string | null> = {};
   if (name !== undefined) data.name = name.trim();
   if (text !== undefined) data.text = text.trim();
+  // Renamed: it is the user's own prompt now, no longer the one a diagram's
+  // editors keep current (Prompt.forDiagramId — the 2026-09-29 review).
+  if (typeof data.name === "string" && data.name !== existing.name) data.forDiagramId = null;
   if (Object.keys(data).length > 0) {
     await prisma.prompt.update({ where: { id }, data });
   }

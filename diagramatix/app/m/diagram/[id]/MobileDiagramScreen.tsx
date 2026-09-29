@@ -31,15 +31,21 @@ import {
  * kept for the camera (they are its own words, from before it started); a
  * draft already holding a photo is left alone.
  */
-function restoreFailedRun(cur: GenerateDraft, job: { promptText: string; sourceImageId: string | null }): GenerateDraft {
+function restoreFailedRun(
+  cur: GenerateDraft,
+  job: { promptText: string; sourceImageId: string | null; freeForm?: boolean; selectedPrompt?: SavedPromptPick | null },
+): GenerateDraft {
   if (cur.photo) return cur;
-  const back = withRestoredPhoto(draftFromFailedJob(job.promptText), job);
+  const back = withRestoredPhoto(draftFromFailedJob(job.promptText, job.selectedPrompt), job);
   if (back.photo) return back;
   return cur.prompt ? cur : back;
 }
 import { draftStorageKey, photoFromFile } from "@/app/lib/mobile/pickPhoto";
 import { sourceImageUrl, uploadSourceImageBlob } from "@/app/lib/ai/sourceImage";
 import { MobilePhotoViewer } from "@/app/components/mobile/MobilePhotoViewer";
+import { MobileRenameSheet } from "@/app/components/mobile/MobileRenameSheet";
+import { renameFailureText } from "@/app/lib/mobile/rename";
+import type { SavedPromptPick } from "@/app/lib/mobile/generateDraft";
 import type { GenerateJobView } from "@/app/lib/ai/generateJob";
 
 interface Loaded {
@@ -163,6 +169,9 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
   // ✎ Correct (stage 3): the words, kept until a re-generate succeeds.
   const [correcting, setCorrecting] = useState(false);
   const [correction, setCorrection] = useState("");
+  // Free Form for a re-generate: the diagram's own choice, which the sheet can
+  // change — kept with the words (a failed run gives both back).
+  const [correctFreeForm, setCorrectFreeForm] = useState(false);
   const setCorrectionWords = useCallback((u: (w: string) => string) => setCorrection(u), []);
   const [correctErr, setCorrectErr] = useState<string | null>(null);
   // The diagram as last loaded, and the words, for the poll (which outlives renders).
@@ -201,6 +210,7 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
           // Only a failed correction OF THIS diagram is news here.
           if (!words) return;
           setCorrection((cur) => cur || words);
+          if (job.sourceImageId) setCorrectFreeForm(job.freeForm === true);
           setSaveMsg({ ok: false, text: correctionFailedText(correctionErrorText(job.error?.code, job.error?.message ?? "The last re-generate failed."), true) });
         }
       })
@@ -225,7 +235,10 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
       }
       setGen({ phase: "idle" });
       const words = job && cur ? correctionFromRun(cur.data, job.promptText) : null;
-      if (words) setCorrection((w) => w || words);
+      if (words) {
+        setCorrection((w) => w || words);
+        if (job?.sourceImageId) setCorrectFreeForm(job.freeForm === true);
+      }
       const kept = !!words || correctionRef.current.trim().length > 0;
       setSaveMsg({ ok: false, text: correctionFailedText(correctionErrorText(job?.error?.code, why), kept) });
     };
@@ -330,6 +343,26 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
   // "View photo": the whiteboard this diagram was generated from.
   const [viewingPhoto, setViewingPhoto] = useState(false);
 
+  // Rename (2026-09-29): a name only — no version, no data — so it never
+  // conflicts with unsaved comments or a run under way (the server does not
+  // move the version for a rename).
+  const [renamingDiagram, setRenamingDiagram] = useState(false);
+  async function saveDiagramName(newName: string): Promise<string | null> {
+    try {
+      const res = await fetch(`/api/diagrams/${diagramId}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: newName }),
+      });
+      const j = await res.json().catch(() => ({})) as { name?: unknown; error?: unknown };
+      if (!res.ok) return renameFailureText(res.status, typeof j.error === "string" ? j.error : null);
+      const saved = typeof j.name === "string" ? j.name : newName;
+      if (saved !== newName) return "You can’t rename this diagram.";
+      setD((cur) => (cur ? { ...cur, name: saved } : cur));
+      return null;
+    } catch {
+      return renameFailureText(0, null);
+    }
+  }
+
   async function startGenerate(finished?: GenerateDraft) {
     if (!d || gen.phase === "starting" || gen.phase === "running") return;
     const src = finished ?? draft;
@@ -406,6 +439,9 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
     }
     setCorrectErr(null);
     setSaveMsg(null);
+    // A fresh correction starts from the diagram's own choice; one being tried
+    // again keeps the choice it was made with.
+    if (correctSrc && !correction.trim()) setCorrectFreeForm(correctSrc.freeForm);
     setCorrecting(true);
   }
 
@@ -414,7 +450,7 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
     if (gen.phase === "running") { setCorrectErr("A re-generate is already under way — wait for it to finish, then try again."); return; }
     const src = correctionSource(d.data);
     if (!src.ok || !words.trim()) return;
-    const request = correctionRequest(src, words, d.version);
+    const request = correctionRequest(src, words, d.version, correctFreeForm);
     setGen({ phase: "starting" });
     setCorrectErr(null);
     try {
@@ -442,8 +478,11 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
         // Changed on another device: take the new copy here — the words stay in
         // the sheet. Comments not saved yet were going with the old diagram anyway.
         const hadUnsaved = dirty;
-        await load();
+        const fresh = await load();
         setDirty(false);
+        // The diagram's own choice, as it now is.
+        const now = fresh ? correctionSource(fresh.data) : null;
+        if (now?.ok) setCorrectFreeForm(now.freeForm);
         setCorrectErr(`This diagram changed on another device. It has been reloaded${hadUnsaved ? " — your unsaved comments could not be kept" : ""}. Look it over, then tap Re-generate again.`);
         return;
       }
@@ -601,7 +640,15 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
       <div className="shrink-0 flex items-center gap-2 px-3 h-11 border-b border-gray-200 bg-white">
         <button onClick={() => router.push(fromParam || (d?.projectId ? `/m/project/${d.projectId}` : "/m"))}
           className="text-blue-600 text-sm">‹ Back</button>
-        <span className="flex-1 text-sm font-medium text-gray-900 truncate text-center">{d?.name ?? "Diagram"}</span>
+        {d?.canEdit ? (
+          <button onClick={() => setRenamingDiagram(true)} aria-label="Rename diagram"
+            className="flex-1 min-w-0 flex items-center justify-center gap-1 text-sm font-medium text-gray-900 active:text-gray-600">
+            <span className="truncate min-w-0">{d.name}</span>
+            <span className="shrink-0 text-gray-400 text-xs">✎</span>
+          </button>
+        ) : (
+          <span className="flex-1 text-sm font-medium text-gray-900 truncate text-center">{d?.name ?? "Diagram"}</span>
+        )}
         {d && !empty && !unsupported && d.data.aiGeneration?.sourceImage && (
           <button onClick={() => setViewingPhoto(true)} className="text-gray-600 text-lg leading-none px-1" title="View the photo this was generated from">📷</button>
         )}
@@ -729,9 +776,14 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
       {correcting && d && correctSrc?.ok && (
         <MobileCorrectionSheet words={correction} setWords={setCorrectionWords}
           basePrompt={correctSrc.basePrompt} imageName={correctSrc.imageName}
+          freeForm={correctFreeForm} setFreeForm={setCorrectFreeForm}
           comments={reviewCommentCount(d.data)} unsaved={dirty}
           starting={gen.phase === "starting"} error={correctErr}
           onSubmit={(finished) => void startCorrect(finished)} onClose={() => setCorrecting(false)} />
+      )}
+      {renamingDiagram && d && (
+        <MobileRenameSheet title="Rename diagram" label="Diagram name" initial={d.name}
+          onSave={saveDiagramName} onClose={() => setRenamingDiagram(false)} />
       )}
       {addTarget && (
         <MobileCommentSheet mode="edit" targetLabel={elementLabel(addTarget)}

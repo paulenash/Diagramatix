@@ -4,9 +4,11 @@
  * is "not found": the prompt text in a run belongs to whoever spoke it.
  */
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
-import { reapStaleGenerateJobs, viewGenerateJob } from "@/app/lib/ai/generateJob";
+import { getEffectiveUserId } from "@/app/lib/superuser";
+import { GENERATE_JOB_SELECT, reapStaleGenerateJobs, resolveJobSelectedPrompt, viewGenerateJob } from "@/app/lib/ai/generateJob";
 
 export const dynamic = "force-dynamic";
 
@@ -20,11 +22,10 @@ export async function GET(_req: Request, { params }: Params) {
   await reapStaleGenerateJobs();
   const job = await prisma.diagramGenerateJob.findFirst({
     where: { id: jobId, diagramId: id, userId: session.user.id },
-    select: {
-      id: true, status: true, stage: true, promptText: true, version: true,
-      errorCode: true, errorMessage: true, startedAt: true, finishedAt: true, sourceImageId: true,
-    },
+    select: GENERATE_JOB_SELECT,
   });
   if (!job) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json(viewGenerateJob(job));
+  // The saved prompt it was started from, if still the caller's — a failed run tried again links it again.
+  const ownerId = getEffectiveUserId(session, await cookies()) ?? session.user.id;
+  return NextResponse.json({ ...viewGenerateJob(job), selectedPrompt: await resolveJobSelectedPrompt(job, ownerId) });
 }

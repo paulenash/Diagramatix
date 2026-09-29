@@ -123,7 +123,12 @@ export function DiagramPropertiesPanel({
         <div className="text-[9px] font-semibold text-gray-600 italic mb-1">Title</div>
         <label className={labelCls}>Name</label>
         <input type="text" className={inputCls} defaultValue={diagram.name} disabled={disabled}
-          onBlur={(e) => saveName(e.target.value.trim())}
+          onBlur={(e) => {
+            const v = e.target.value.trim();
+            // A diagram always has a name: an emptied field goes back to it.
+            if (!v) { e.target.value = diagram.name; return; }
+            void saveName(v);
+          }}
           onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
         <div className="grid grid-cols-2 gap-1 mt-1">
           <div>

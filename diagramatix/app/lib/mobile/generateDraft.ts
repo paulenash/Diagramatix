@@ -31,6 +31,8 @@ export interface GenerateDraft {
   questions: { q: string; a: string }[];
   /** A photo of a whiteboard; the words then CORRECT it. */
   photo: DraftPhoto | null;
+  /** With a photo: reproduce its layout (Free Form) rather than lay the process out afresh. Off unless asked for. */
+  freeForm?: boolean;
 }
 
 export const EMPTY_DRAFT: GenerateDraft = { prompt: "", dictated: false, selected: null, questions: [], photo: null };
@@ -71,6 +73,8 @@ export interface GenerateRequestBody {
   /** Absent for a photo with no words. */
   promptSource?: "dictated" | "typed";
   selectedPromptId?: string;
+  /** Only with a photo, and only when asked for. */
+  freeForm?: true;
 }
 
 /**
@@ -91,6 +95,7 @@ export function draftToRequest(draft: GenerateDraft): GenerateRequestBody {
     return {
       prompt: withPhotoNote(draft.photo.name, words),
       ...(words ? { promptSource: draft.dictated ? "dictated" as const : "typed" as const } : {}),
+      ...(draft.freeForm ? { freeForm: true as const } : {}),
     };
   }
   let text = withAnswers(draft);
@@ -103,16 +108,23 @@ export function draftToRequest(draft: GenerateDraft): GenerateRequestBody {
   };
 }
 
-/** A failed run's prompt, put back in the sheet for another go — without the note. */
-export function draftFromFailedJob(promptText: string): GenerateDraft {
-  return { ...EMPTY_DRAFT, prompt: stripSpokenPreamble(promptText), dictated: hasSpokenPreamble(promptText) };
+/**
+ * A failed run's prompt, put back in the sheet for another go — without the
+ * note, and linked again to the saved prompt it was started from (when that is
+ * still the caller's; the server looks it up).
+ */
+export function draftFromFailedJob(promptText: string, selected?: SavedPromptPick | null): GenerateDraft {
+  // Sent unchanged: back exactly as it was picked (its own words, note and all),
+  // so the sheet does not call it "changed".
+  if (selected && selected.text.trim() === promptText.trim()) return { ...EMPTY_DRAFT, prompt: selected.text, dictated: false, selected };
+  return { ...EMPTY_DRAFT, prompt: stripSpokenPreamble(promptText), dictated: hasSpokenPreamble(promptText), selected: selected ?? null };
 }
 
 /**
  * A failed PHOTO run, put back: the photo (already kept — by its id) and the
  * person's own words, without the photo note. Anything else is left as it is.
  */
-export function withRestoredPhoto(draft: GenerateDraft, job: { promptText: string; sourceImageId: string | null }): GenerateDraft {
+export function withRestoredPhoto(draft: GenerateDraft, job: { promptText: string; sourceImageId: string | null; freeForm?: boolean }): GenerateDraft {
   const parts = job.sourceImageId ? photoNoteParts(job.promptText) : null;
   if (!parts || !job.sourceImageId) return draft;
   return {
@@ -120,6 +132,7 @@ export function withRestoredPhoto(draft: GenerateDraft, job: { promptText: strin
     prompt: parts.words,
     dictated: false,
     photo: { storedId: job.sourceImageId, name: parts.imageName || "Whiteboard photo.jpg", width: 0, height: 0 },
+    ...(job.freeForm ? { freeForm: true } : {}),
   };
 }
 

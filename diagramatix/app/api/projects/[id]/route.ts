@@ -32,8 +32,9 @@ export async function GET(_req: Request, { params }: Params) {
 
   // requireProjectAccess collapses owner-or-shared into a single check.
   // 'view' is the floor — owners and editors satisfy it too.
+  let role: "owner" | "edit" | "view";
   try {
-    await requireProjectAccess(session, await cookies(), id, "view");
+    role = (await requireProjectAccess(session, await cookies(), id, "view")).role;
   } catch (err) {
     if (err instanceof OrgContextError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
@@ -55,7 +56,16 @@ export async function GET(_req: Request, { params }: Params) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  return NextResponse.json(project);
+  // What the caller may do here, by the same rules the writes use — so a client
+  // (the phone) offers only what will work: renaming the project is the
+  // owner's (PUT below); adding and renaming diagrams is an editor's.
+  const readOnly = await checkImpersonating(session);
+  return NextResponse.json({
+    ...project,
+    role,
+    canRename: role === "owner" && !readOnly,
+    canEditDiagrams: role !== "view" && !readOnly,
+  });
 }
 
 export async function PUT(req: Request, { params }: Params) {
@@ -89,7 +99,7 @@ export async function PUT(req: Request, { params }: Params) {
   const body = await req.json();
   const { name, colorConfig, fontConfig, description, ownerName, folderTree, pcf, numberingConfig, diagramSort } = body;
 
-  if (name !== undefined && !name?.trim()) {
+  if (name !== undefined && (typeof name !== "string" || !name.trim())) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
   }
   // Re-homing a project's owning Org is NOT done here — it drives org-wide RCM

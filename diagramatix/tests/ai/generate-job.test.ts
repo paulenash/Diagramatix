@@ -384,8 +384,8 @@ describe("T5019 — Generate fills an EMPTY diagram and never replaces content u
   });
 });
 
-describe("T5020 — another editor's prompt stays linked; only a DELETED one is replaced (the 2026-09-28 review)", () => {
-  it("owner generates, an editor re-generates, the owner again: still one prompt, still the owner's", async () => {
+describe("T5020 — the diagram's own prompt: one prompt, kept current by whoever re-generates; a DELETED one is replaced", () => {
+  it("owner generates, an editor re-generates, the owner again: still one prompt, still the owner's — and the editor's run writes it (2026-09-29)", async () => {
     const w = await world();
     const editor = await createUser();
     await addOrgMember(editor.id, w.org.id, "Viewer");
@@ -400,7 +400,13 @@ describe("T5020 — another editor's prompt stays linked; only a DELETED one is 
     await runGenerateJob(await jobInput(w, (await newJob(w)).id, "Version two, by the editor.", editor));
     expect((await dataOf(w.diagram.id)).aiGeneration?.promptId, "the editor's run keeps the owner's link").toBe(pA);
     expect(await prisma.prompt.count(), "and adds no copy").toBe(1);
-    expect((await prisma.prompt.findUniqueOrThrow({ where: { id: pA } })).text, "nor writes the owner's prompt").toBe("Version one.");
+    // Changed 2026-09-29 (Paul: "correct the known gaps"): the prompt is bound to
+    // this diagram, so an editor of it keeps it current — it was left stale.
+    const bound = await prisma.prompt.findUniqueOrThrow({ where: { id: pA } });
+    expect(bound.forDiagramId, "bound to the diagram it was made for").toBe(w.diagram.id);
+    expect(bound.userId, "still the owner's").toBe(w.owner.id);
+    expect(bound.text, "the editor's words are written").toBe("Version two, by the editor.");
+    expect(bound.useCount, "and the editor's run is counted").toBe(2);
 
     await clear();
     await runGenerateJob(await jobInput(w, (await newJob(w)).id, "Version three."));

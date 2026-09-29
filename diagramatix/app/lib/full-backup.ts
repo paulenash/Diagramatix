@@ -969,6 +969,8 @@ export async function restoreFullBackupAdditive(
           id: shortCuid(),
           userId: userIdMap.get(uId)!,
           orgId: orgIdMap.get(oId)!,
+          // Bound to the diagram it was made for — under that diagram's new id.
+          forDiagramId: p.forDiagramId ? (diagramIdMap.get(String(p.forDiagramId)) ?? null) : null,
         } as any,
       });
       inserted.Prompt = (inserted.Prompt ?? 0) + 1;

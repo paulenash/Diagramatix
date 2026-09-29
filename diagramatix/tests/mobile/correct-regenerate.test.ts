@@ -187,14 +187,14 @@ describe("T5042 — what the phone re-generates from, and what it warns", () => 
   it("a generated diagram: its prompt; one drawn from a kept image: that image too; one whose image was not kept: refused", () => {
     expect(correctionSource(base(undefined))).toEqual({ ok: false, reason: "not_generated" });
     expect(correctionSource(base({ ...gen, promptText: "  " }))).toEqual({ ok: false, reason: "not_generated" });
-    expect(correctionSource(base(gen))).toEqual({ ok: true, basePrompt: "A claim is paid.", sourceImageId: null, imageName: null });
+    expect(correctionSource(base(gen))).toEqual({ ok: true, basePrompt: "A claim is paid.", sourceImageId: null, imageName: null, freeForm: false });
     const photo = { ...gen, promptText: withPhotoNote(NAME, ""), fromImage: true, sourceImage: { id: "img1", name: NAME, mimeType: "image/jpeg" } };
     expect(correctionSource(base(photo))).toMatchObject({ ok: true, sourceImageId: "img1", imageName: NAME });
     expect(correctionSource(base({ ...gen, fromImage: true }))).toEqual({ ok: false, reason: "image_not_kept" });
     expect(correctionSource(base({ ...gen, promptText: withPhotoNote(NAME, "") }))).toEqual({ ok: false, reason: "image_not_kept" });
   });
 
-  it("an older image diagram (no record) or a document one — desktop, or the Partner API's — is refused; so is a Free Form one", () => {
+  it("an older image diagram (no record) or a document one — desktop, or the Partner API's — is refused; a Free Form one is re-generated as Free Form (2026-09-29)", () => {
     expect(correctionSource(base({ ...gen, promptText: "I have attached an image of a process diagram (invoice.png). Reverse-engineer the BPMN from it." })))
       .toEqual({ ok: false, reason: "image_not_kept" });
     expect(correctionSource(base({ ...gen, promptText: "I have attached a document, SOP.pdf" }))).toEqual({ ok: false, reason: "document_not_kept" });
@@ -203,9 +203,10 @@ describe("T5042 — what the phone re-generates from, and what it warns", () => 
     expect(correctionSource(base({ ...gen, fromDocument: true }))).toEqual({ ok: false, reason: "document_not_kept" });
     expect(correctionSource(base({ ...gen, fromImage: false, promptText: "Explain (invoice.png) naming." })), "the record wins over the words").toMatchObject({ ok: true });
     const kept = { id: "img1", name: "d.png", mimeType: "image/png" };
-    expect(correctionSource(base({ ...gen, fromImage: true, freeForm: true, sourceImage: kept }))).toEqual({ ok: false, reason: "free_form" });
-    expect(correctionSource({ ...base({ ...gen, fromImage: true, sourceImage: kept }), relaxedLayout: true } as DiagramData)).toEqual({ ok: false, reason: "free_form" });
-    for (const r of ["not_generated", "image_not_kept", "document_not_kept", "free_form"] as const) expect(correctionRefusalText(r).length).toBeGreaterThan(20);
+    expect(correctionSource(base({ ...gen, fromImage: true, freeForm: true, sourceImage: kept }))).toMatchObject({ ok: true, freeForm: true });
+    expect(correctionSource({ ...base({ ...gen, fromImage: true, sourceImage: kept }), relaxedLayout: true } as DiagramData)).toMatchObject({ ok: true, freeForm: true });
+    expect(correctionSource({ ...base({ ...gen, fromImage: false }), relaxedLayout: true } as DiagramData), "no image: laid out normally").toMatchObject({ ok: true, freeForm: false });
+    for (const r of ["not_generated", "image_not_kept", "document_not_kept"] as const) expect(correctionRefusalText(r).length).toBeGreaterThan(20);
   });
 
   it("the record says what a generation was drawn from — a document too — in every console and the Partner API", () => {
@@ -228,7 +229,9 @@ describe("T5042 — what the phone re-generates from, and what it warns", () => 
     const src = correctionSource(base({ ...gen, sourceImage: { id: "img1", name: "d.png", mimeType: "image/png" } }));
     if (!src.ok) throw new Error("expected ok");
     const req = correctionRequest(src, "Approval first.", 7);
-    expect(req).toEqual({ prompt: withCorrection("A claim is paid.", "Approval first."), version: 7, replace: true, sourceImageId: "img1" });
+    expect(req).toEqual({ prompt: withCorrection("A claim is paid.", "Approval first."), version: 7, replace: true, sourceImageId: "img1", freeForm: false });
+    expect(correctionRequest(src, "Approval first.", 7, true).freeForm, "the sheet's choice").toBe(true);
+    expect("freeForm" in correctionRequest({ ...src, sourceImageId: null }, "x", 7, true), "no image, no Free Form").toBe(false);
     expect(correctionFromRun(base(gen), req.prompt)).toBe("Approval first.");
     expect(correctionFromRun(base({ ...gen, promptText: "Changed since." }), req.prompt), "not a correction of THIS diagram").toBeNull();
   });
@@ -416,11 +419,11 @@ describe("T5044 — a photo diagram is re-generated from the same photo, by its 
 
   it("the phone: Correct above Comment, both away while a run is on; Save still; words back on failure; the warning before sending", () => {
     const screen = read("app/m/diagram/[id]/MobileDiagramScreen.tsx");
-    expect(screen).toContain("const request = correctionRequest(src, words, d.version);");
+    expect(screen).toContain("const request = correctionRequest(src, words, d.version, correctFreeForm);");
     expect(screen).toContain("body: JSON.stringify(request),");
     expect(screen).toContain("{d?.canReview && !empty && !picking && !busy && (");
     expect(screen).toContain("disabled={saving || !dirty || busy}");
-    expect(screen, "a failed correction gives the words back").toContain("if (words) setCorrection((w) => w || words);");
+    expect(screen, "a failed correction gives the words back").toContain("setCorrection((w) => w || words);");
     expect(screen, "a reload mid-run: a re-generate only when the run's prompt is this diagram's plus a correction").toContain(`kind: words !== null ? "correct" : "generate"`);
     expect(screen, "…and anything opened before it was found is closed").toMatch(/setCorrecting\(false\);\s*setPicking\(false\);\s*setAddTarget\(null\);/);
     expect(screen, "a conflict reloads in place, keeping the words").toContain("const hadUnsaved = dirty;");

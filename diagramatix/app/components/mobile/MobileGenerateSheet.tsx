@@ -250,6 +250,17 @@ export function MobileGenerateSheet({
             {photoInput(false, "🖼 Choose photo", "h-11 px-4 text-sm text-gray-700 border border-gray-300 rounded-lg active:bg-gray-50 flex items-center")}
           </div>
         )}
+        {hasPhoto && (
+          <label className="mb-2 flex items-start gap-2 text-sm text-gray-800">
+            <input type="checkbox" checked={draft.freeForm === true} disabled={starting}
+              onChange={(e) => { const on = e.target.checked; setDraft((d) => ({ ...d, freeForm: on })); }}
+              className="mt-0.5 h-5 w-5 shrink-0" />
+            <span>
+              Free Form — keep the layout as drawn on the board
+              <span className="block text-[11px] text-gray-500">Off: the AI lays the process out neatly instead.</span>
+            </span>
+          </label>
+        )}
         {photoBusy && <p className="text-[11px] text-gray-500 mb-2">Preparing photo…</p>}
         {photoMsg && <p className="text-[11px] text-amber-600 mb-2">{photoMsg}</p>}
 

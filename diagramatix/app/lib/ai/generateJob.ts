@@ -21,6 +21,7 @@ import { prisma } from "@/app/lib/db";
 import { planBpmn, type Attachment } from "./planBpmn";
 import { sniff } from "./attachmentFromFile";
 import { layoutBpmnPlan } from "./layoutBpmnPlan";
+import { freeFormLayout } from "./freeForm";
 import { loadAiRulesForType } from "./loadAiRules";
 import { describeAiError } from "./aiErrors";
 import { enterAiContext, recordDiagramGenerated, type AiContext } from "./aiTelemetry";
@@ -154,7 +155,7 @@ async function saveGenerated(
   const { diagramId } = input;
   const owner = { userId: input.promptOwnerId, orgId: input.orgId };
   const meta: AiApplyMeta = { ...input.promptMeta, promptText: input.prompt, model: input.model, planJson: plan };
-  const read = () => prisma.diagram.findUnique({ where: { id: diagramId }, select: { name: true, type: true, data: true, version: true } });
+  const read = () => prisma.diagram.findUnique({ where: { id: diagramId }, select: { name: true, type: true, data: true, version: true, userId: true } });
 
   // A save made elsewhere during the run (the desktop open on the empty
   // diagram) is fine while the diagram is still empty — a moved view, say — but
@@ -176,9 +177,12 @@ async function saveGenerated(
     }
   }
   const first = (cur.data ?? {}) as unknown as DiagramData;
+  // The diagram's own prompt is written by whoever may edit the diagram (its
+  // row is bound to it); anything else only by its owner (promptLinkDb).
   const linked = await runPromptLinkDb(
     decidePromptLink({ meta, prev: first.aiGeneration, diagramName: cur.name, diagramType: cur.type }),
     owner,
+    { diagramId, diagramUserId: cur.userId },
   );
   const generatedAt = new Date().toISOString();
 
@@ -203,7 +207,7 @@ async function saveGenerated(
       // into a "failed" run.
       try { await snapshotDiagramHistory(diagramId, input.userId); }
       catch (e) { console.error(`[generate-job] ${input.jobId} history snapshot failed:`, e instanceof Error ? e.message : e); }
-      if (linked) await markPromptUsedDb(linked.id, input.model, owner);
+      if (linked) await markPromptUsedDb(linked.id, input.model, owner, { diagramId, diagramUserId: cur.userId });
       return { version: cur.version + 1 };
     }
   }
@@ -237,9 +241,10 @@ export async function runGenerateJob(input: GenerateJobInput): Promise<void> {
     const pcfNodeId = ((stored.data ?? {}) as unknown as DiagramData).pcf?.nodeId;
     const rules = await loadAiRulesForType("bpmn", pcfNodeId);
 
-    // A photographed whiteboard: its bytes, as the model takes an image. The
-    // prompt the phone wrote says it is a photo, and that its words correct it
-    // (planBpmn's whiteboard reading). Free Form off: laid out normally.
+    // A photographed whiteboard (or the image a diagram was drawn from): its
+    // bytes, as the model takes an image. The prompt the phone wrote says it is
+    // a photo, and that its words correct it (planBpmn's whiteboard reading).
+    // Laid out normally — unless Free Form was asked for (freeForm.ts).
     let attachment: Attachment | undefined;
     if (input.sourceImageId) {
       const img = await prisma.aiSourceImage.findFirst({
@@ -260,7 +265,12 @@ export async function runGenerateJob(input: GenerateJobInput): Promise<void> {
     // Phase 1 — the plan (POST /api/ai/bpmn/plan's steps).
     let plan: PlanJson;
     try {
-      const res = await planBpmn({ apiKey: input.apiKey, prompt: input.prompt, rules, model: input.model, ...(attachment ? { attachment } : {}) });
+      const res = await planBpmn({
+        apiKey: input.apiKey, prompt: input.prompt, rules, model: input.model,
+        ...(attachment ? { attachment } : {}),
+        // Free Form: the model reports where each shape sits in the image.
+        ...(attachment && input.promptMeta.freeForm === true ? { captureGeometry: true } : {}),
+      });
       if (!res.ok) return fail(jobId, "ai_failed", `AI planning failed: ${describeAiError(res.error)}`);
       plan = res.plan;
     } catch (err) {
@@ -279,7 +289,13 @@ export async function runGenerateJob(input: GenerateJobInput): Promise<void> {
     // Phase 2 — the layout (apply-layout's steps). Labelled as the consoles
     // label it: the saved prompt's name, else the start of the prompt.
     const promptLabel = input.promptMeta.selectedPromptName?.trim() || input.prompt.trim().slice(0, 100) || undefined;
-    const laid = layoutBpmnPlan(plan, { promptLabel });
+    // Free Form keeps the drawn positions when the plan carries them, on a page
+    // shaped like the image (the desktop consoles' rule — freeForm.ts).
+    const si = input.promptMeta.sourceImage;
+    const laid = layoutBpmnPlan(plan, {
+      promptLabel,
+      ...freeFormLayout(!!attachment && input.promptMeta.freeForm === true, plan, si?.width && si?.height ? { w: si.width, h: si.height } : null),
+    });
     if (!laid.ok) {
       return fail(jobId, "plan_invalid", "The AI's answer could not be drawn. Try again — rewording the prompt can help.");
     }
@@ -369,14 +385,46 @@ export interface GenerateJobView {
   version: number | null;
   /** The photo it was generated from, if any — a failed run is tried again with it. */
   sourceImageId: string | null;
+  /** Free Form was asked for — a failed run is tried again with the same choice. */
+  freeForm: boolean;
+  /**
+   * The saved prompt it was started from, when it is still the caller's — a
+   * failed run tried again links it again. Resolved by the routes
+   * (resolveJobSelectedPrompt); absent from viewGenerateJob's own answer.
+   */
+  selectedPrompt?: { id: string; name: string; text: string } | null;
   promptText: string;
   error: { code: string; message: string } | null;
+}
+
+/** What every generate-job read selects — the POST, the latest-run GET and the poll. */
+export const GENERATE_JOB_SELECT = {
+  id: true, userId: true, orgId: true, status: true, stage: true, promptText: true, version: true,
+  errorCode: true, errorMessage: true, startedAt: true, finishedAt: true, sourceImageId: true,
+  selectedPromptId: true, freeForm: true,
+} as const;
+
+/**
+ * The saved prompt a run was started from, if it is still the caller's own —
+ * the POST's own rule (the caller's prompts, in the run's organisation). A
+ * deleted or no-longer-theirs prompt is simply not there.
+ */
+export async function resolveJobSelectedPrompt(
+  job: { selectedPromptId?: string | null; orgId?: string | null },
+  ownerId: string,
+): Promise<{ id: string; name: string; text: string } | null> {
+  if (!job.selectedPromptId || !job.orgId) return null;
+  return prisma.prompt.findFirst({
+    where: { id: job.selectedPromptId, userId: ownerId, orgId: job.orgId },
+    select: { id: true, name: true, text: true },
+  });
 }
 
 export function viewGenerateJob(job: {
   id: string; status: string; stage: string; promptText: string; version: number | null;
   errorCode: string | null; errorMessage: string | null; startedAt: Date | null; finishedAt: Date | null;
   sourceImageId?: string | null;
+  freeForm?: boolean | null;
 }, now: number = Date.now()): GenerateJobView {
   return {
     jobId: job.id,
@@ -385,6 +433,7 @@ export function viewGenerateJob(job: {
     elapsedMs: job.startedAt ? (job.finishedAt?.getTime() ?? now) - job.startedAt.getTime() : null,
     finishedAt: job.finishedAt ? job.finishedAt.toISOString() : null,
     sourceImageId: job.sourceImageId ?? null,
+    freeForm: job.freeForm === true,
     version: job.version,
     promptText: job.promptText,
     error: job.status === "failed"
