@@ -20,7 +20,7 @@ if (!a || !b) { console.error("usage: node scripts/voice/diff-debug-sessions.mjs
 const TIME_KEYS = /^(at|takenAt|savedAt|createdAt|updatedAt|exportedAt|startedAt|generatedAt|ms|elapsedMs|durationMs)$/;
 // png: screenshots; pointer: where the mouse happened to be on the canvas.
 const DROP_KEYS = /^(png|appVersion|productVersion|userAgent|pointer)$/;
-const ID_LIKE = /^[A-Za-z0-9_-]{8,24}$/;
+const ID_LIKE = /^[A-Za-z0-9_-]{8,32}$/;
 
 function normalise(root) {
   const ids = new Map();
