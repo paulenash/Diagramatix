@@ -27,9 +27,9 @@ import { useVoiceSession } from "@/app/hooks/useVoiceSession";
 import { elementLimitBlock } from "@/app/lib/diagram/elementLimit";
 import { thumbnailFrameFor } from "@/app/lib/diagram/templateThumbnail";
 import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
-import type { DiagramData } from "@/app/lib/diagram/types";
+import type { DiagramData, DiagramElement } from "@/app/lib/diagram/types";
 import {
-  VOICE_EXAMPLES, askedYesNo, chipAction, currentQuestion, elementAt, lastEditedBox, phoneWording, selectionAfterTap,
+  VOICE_EXAMPLES, askedYesNo, chipAction, connectorAt, currentQuestion, elementAt, lastEditedBox, phoneWording, selectionAfterTap,
 } from "@/app/lib/mobile/voiceEdit";
 import { badgePosition } from "@/app/lib/mobile/badgePlace";
 import { keepAwake } from "@/app/lib/mobile/wakeLock";
@@ -39,7 +39,7 @@ import { MobileDiagramView } from "./MobileDiagramView";
 /** The useDiagram edit actions the session reads (the same 37 the desktop editor hands it). */
 const SESSION_ACTIONS = [
   "addConnector", "addLaneAt", "addPool", "alignElements", "clearDiagram", "compressLane", "compressPool",
-  "convertTaskSubprocess", "deleteConnector", "deleteElement", "elementsMoveEnd", "expandLane", "extendPools",
+  "convertTaskSubprocess", "deleteConnector", "reverseConnector", "deleteElement", "elementsMoveEnd", "expandLane", "extendPools",
   "insertSpace", "laneBoundaryMoveEnd", "moveElements", "moveLane", "moveLaneBoundary", "movePoolTo", "removeSpace",
   "resizeElement", "resizeElementEnd", "setEventBoundary", "splitLaneEven", "splitPoolEven", "swapLane", "swapPools",
   "undo", "unwrapSubprocess", "updateConnectorEndpoint", "updateConnectorLabel", "updateLabel", "updateProperties",
@@ -167,10 +167,21 @@ export function MobileVoiceEditor({
     const x = svgX - frame.tx, y = svgY - frame.ty;
     session.pointerWorld.current = { x, y };
     setMark({ x, y });
+    // A connector's line is picked before the element under it (a connector runs across a pool or lane).
+    const line = connectorAt(data, x, y);
+    if (line) {
+      setSelectedConnectorId(selectedConnectorIdRef.current === line.id ? null : line.id);
+      setSelectedElementIds(new Set());
+      return;
+    }
+    setSelectedConnectorId(null);
     setSelectedElementIds(new Set(selectionAfterTap(selectedIdsRef.current, elementAt(data, x, y), multi)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [frame.tx, frame.ty, data, multi]);
 
+  const selectedConnector = selectedConnectorId ? data.connectors.find((c) => c.id === selectedConnectorId) ?? null : null;
+  // In the order picked: "connect these" joins the first to the second.
+  const selectedOrder = [...selectedElementIds].map((id) => data.elements.find((e) => e.id === id)).filter((e): e is DiagramElement => !!e);
   const badges = session.onScreenBadges ?? [];
   const rulers = session.onScreenRulers ?? [];
   const overlay = (zoom: number) => (
@@ -185,6 +196,16 @@ export function MobileVoiceEditor({
       {session.goldFlash.runId > 0 && (
         <g transform={`translate(${frame.tx}, ${frame.ty})`}><GoldFlashOverlay runId={session.goldFlash.runId} targets={session.goldFlash.targets as never} /></g>
       )}
+      {selectedConnector && selectedConnector.waypoints.length > 1 && (
+        <polyline points={selectedConnector.waypoints.map((p) => `${p.x + frame.tx},${p.y + frame.ty}`).join(" ")}
+          fill="none" stroke="#2563eb" strokeWidth={6 / Math.min(1, zoom)} strokeOpacity={0.45} strokeLinecap="round" strokeLinejoin="round" />
+      )}
+      {selectedOrder.map((e, i) => selectedOrder.length > 1 && (
+        <g key={`order-${e.id}`} transform={`translate(${e.x + frame.tx}, ${e.y + frame.ty}) scale(${1 / zoom})`}>
+          <circle r={13} fill="#2563eb" stroke="#ffffff" strokeWidth={2} />
+          <text x={0} y={1} fontSize={15} fontWeight={800} fill="#ffffff" textAnchor="middle" dominantBaseline="middle" fontFamily="sans-serif">{i + 1}</text>
+        </g>
+      ))}
       {data.elements.filter((e) => selectedElementIds.has(e.id)).map((e) => (
         <rect key={e.id} x={e.x + frame.tx - 3} y={e.y + frame.ty - 3} width={e.width + 6} height={e.height + 6}
           fill="none" stroke="#2563eb" strokeWidth={3} strokeDasharray="8 5" rx={6} />
@@ -263,6 +284,13 @@ export function MobileVoiceEditor({
       <div className="shrink-0 border-t border-gray-200 bg-white px-3 pt-2 pb-3 max-h-[46dvh] overflow-y-auto">
         {limitMsg && <p className="text-[12px] text-amber-800 bg-amber-50 rounded-md px-2 py-1.5 mb-2">{limitMsg}</p>}
         {question && <p className="text-sm font-medium text-blue-800 bg-blue-50 rounded-md px-2.5 py-2 mb-2">{question}</p>}
+        {(selectedConnector || selectedOrder.length > 1) && (
+          <p className="text-[12px] text-gray-600 mb-2" aria-label="What is selected">
+            {selectedConnector
+              ? `Selected ${selectedConnector.type === "messageBPMN" ? "message" : "connector"}: ${labelOf(data, selectedConnector.sourceId)} → ${labelOf(data, selectedConnector.targetId)} — say “delete this” or “reverse this”`
+              : `Selected in order: ${selectedOrder.map((e) => e.label?.trim() || e.type).join(" → ")} — say “connect these”`}
+          </p>
+        )}
         {askedYesNo(lines) && (
           <div className="flex gap-2 mb-2">
             <button onClick={() => void session.runVoiceCommand("yes")} className="flex-1 h-11 rounded-lg bg-blue-600 text-white text-sm font-medium active:bg-blue-700">Yes</button>
@@ -327,4 +355,10 @@ export function MobileVoiceEditor({
       </div>
     </div>
   );
+}
+
+/** What an element is called on screen, for the sheet's one-line "selected" note. */
+function labelOf(data: DiagramData, id: string): string {
+  const e = data.elements.find((x) => x.id === id);
+  return e?.label?.trim() || e?.type || "?";
 }

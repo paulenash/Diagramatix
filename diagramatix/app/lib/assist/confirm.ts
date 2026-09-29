@@ -11,7 +11,8 @@
  * Pure. The editor parks the ops, logs the question, and feeds the next
  * utterance to `parseConfirmation`.
  */
-import type { DiagramElement } from "../diagram/types";
+import type { Connector, DiagramElement } from "../diagram/types";
+import { connectorsForDelete, deleteConnectorsQuestion } from "./connectorCommands";
 import type { AssistOp } from "./ops";
 import { resolveRef, resolveSelectionRefs } from "./resolveRef";
 
@@ -44,8 +45,14 @@ export function needsConfirmation(
   elements: readonly DiagramElement[],
   lastAddedId?: string | null,
   selectedIds?: readonly string[],
+  connectors?: { all: readonly Connector[]; selectedId: string | null },
 ): Confirmation | null {
   for (const op of ops) {
+    // Removing more than one connector asks first; one goes at once.
+    if (op.op === "deleteConnectors" && connectors) {
+      const pick = connectorsForDelete(op.kind, connectors.all, selectedIds ?? [], connectors.selectedId);
+      if (pick.connectors.length > 1) return { what: deleteConnectorsQuestion(op.kind, pick.connectors.length, pick.scope) };
+    }
     if (op.op === "clear") {
       return elements.length ? { what: `clear the whole diagram (${plural(elements.length, "element")})` } : null;
     }

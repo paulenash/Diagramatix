@@ -200,3 +200,49 @@ describe("T5086 — Voice Assist on the phone, end to end", () => {
     expect(h.texts().replace(/\s+/g, " ")).toContain("white-box pool");
   });
 });
+
+describe("T5096 — on the phone: tap a connector, then 'delete this' / 'reverse this'; tap two elements, 'connect these'", () => {
+  const withLines = () => {
+    const d = threeTasks();
+    d.connectors = d.connectors.map((c, i) => ({ ...c, waypoints: i === 0 ? [{ x: 220, y: 125 }, { x: 320, y: 125 }] : [{ x: 440, y: 125 }, { x: 540, y: 125 }] }));
+    return d;
+  };
+  const tapAt = async (d: import("@/app/lib/diagram/types").DiagramData, x: number, y: number) => {
+    const { thumbnailFrameFor } = await import("@/app/lib/diagram/templateThumbnail");
+    const { MobileDiagramView } = await import("@/app/components/mobile/MobileDiagramView");
+    const frame = thumbnailFrameFor(d as never, { trueColors: true, fullLabels: true });
+    const view = root!.root.findByType(MobileDiagramView);
+    await act(async () => { view.props.onTapView(x + frame.tx, y + frame.ty); });
+  };
+
+  it("tapping a flow's line selects it (the sheet says so); 'delete this' removes it", async () => {
+    const d = withLines();
+    const h = await mount({ initial: d });
+    await tapAt(d, 270, 130);
+    expect(h.texts()).toContain("Selected connector: Receive order → Check invoice");
+    await h.type("delete this");
+    expect(h.texts()).toContain("deleted the connector");
+    await act(async () => { vi.advanceTimersByTime(1600); });
+    await h.settle();
+    expect(puts.at(-1)!.body.data).toMatchObject({ connectors: [{ id: "c2" }] });
+  });
+
+  it("'reverse this' turns the tapped connector round", async () => {
+    const d = withLines();
+    const h = await mount({ initial: d });
+    await tapAt(d, 490, 130);
+    await h.type("reverse this");
+    expect(h.texts()).toContain("reversed the connector: now Pay supplier → Check invoice");
+  });
+
+  it("with 'Select several' on, two taps in order are 'connect these' — first into second", async () => {
+    const d = withLines();
+    const h = await mount({ initial: d });
+    await h.press(/Select several/);
+    await tapAt(d, 600, 100);   // Pay supplier first
+    await tapAt(d, 150, 100);   // then Receive order
+    expect(h.texts()).toContain("Selected in order: Pay supplier → Receive order");
+    await h.type("connect these");
+    expect(h.texts()).toContain("connected Pay supplier → Receive order");
+  });
+});

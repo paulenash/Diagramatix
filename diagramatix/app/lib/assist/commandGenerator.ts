@@ -943,6 +943,8 @@ export const NOT_GENERATED: Record<string, string> = {
   wrapInContainer: "the AI-coerced form of wrapInPool; reached through it, not directly",
   unwrapSubprocess: "needs an expanded subprocess selected",
   labelSelected: "needs a connector selected",
+  reverseConnector: "needs a connector selected",
+  deleteConnectors: "means the selection, or everything — needs a state, not a sentence",
   fillLabels: "needs a selection whose reading order is the answer",
   assignTeam: "needs a simulation team catalogue on the project",
   attachRiskControl: "needs a Risk & Control library on the project",

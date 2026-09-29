@@ -22,6 +22,7 @@ import { parseGhostPick } from "./ghostPick";
 import { isBareTemplateCommand, parseTemplateCommand } from "./templatePhrase";
 import { AFTER_WORDS, HERE_WORDS, TAIL_LEAD_IN, cleanRef } from "./placeWords";
 import type { SymbolType, EventType, GatewayType } from "../diagram/types";
+import { parseConnectorsDelete } from "./connectorCommands";
 
 const clean = cleanRef;
 /** A spoken NAME: cleaned, with "pool three" written "pool 3" (nameCase.ts). */
@@ -168,8 +169,19 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   let m = raw.match(/^(?:disconnect|unlink|remove (?:the )?(?:connection|link|arrow|flow|line))\s+(?:from\s+)?(.+?)\s+(?:to|and|from)\s+(.+)$/i);
   if (m) return [{ op: "disconnect", fromRef: clean(m[1]), toRef: clean(m[2]) }];
 
+  // ── Delete every connector / message (or those on the selection) ──
+  {
+    const dc = parseConnectorsDelete(raw);
+    if (dc) return [{ op: "deleteConnectors", kind: dc.kind }];
+  }
+
+  // ── Reverse the selected connector ("reverse this") ──
+  if (/^(?:reverse|flip|invert)(?:\s+(?:the\s+direction\s+of\s+)?(?:this|that|it|the selected|selected|the))?(?:\s+(?:direction|connector|connection|flow|arrow|line|link|message|sequence flow|message flow|one))?$/i.test(lower.replace(/[.?!]+$/, ""))) {
+    return [{ op: "reverseConnector" }];
+  }
+
   // ── Connect ──
-  if (/^(connect|link|join)\s+(them|these|those|it up)\b/.test(lower) || /^(connect|link|join)\s+the (last two|previous two)\b/.test(lower)) {
+  if (/^(connect|link|join)\s+(them|these|those|it up|(?:the\s+)?(?:two\s+)?selected)\b/.test(lower) || /^(connect|link|join)\s+the (last two|previous two)\b/.test(lower)) {
     return [{ op: "connect", fromRef: "the previous", toRef: "the last" }];
   }
   m = raw.match(/^(?:connect|link|join)\s+(.+?)\s+(?:to|and|with|into)\s+(.+)$/i);

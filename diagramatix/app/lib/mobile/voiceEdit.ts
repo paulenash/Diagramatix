@@ -4,7 +4,7 @@
  * (app/hooks/useVoiceSession.ts) — tested without a phone.
  */
 import { isHiddenOnCanvas } from "@/app/lib/diagram/diagramThumbnail";
-import type { DiagramData, DiagramElement } from "@/app/lib/diagram/types";
+import type { Connector, DiagramData, DiagramElement } from "@/app/lib/diagram/types";
 
 /** The words the session uses for "no pointer yet" — written for a mouse. */
 const MOUSE_LINE = "move the mouse over the canvas first";
@@ -70,6 +70,36 @@ export function chipAction(flow: "pick" | "rename" | "divider" | "message-pair" 
   return { text: /\bto$/i.test(t) ? `${t} ${n}` : `${n} to ` };
 }
 
+/** How near a tap must be to a connector's line to pick it (diagram units; a finger is wider than a mouse). */
+export const CONNECTOR_TAP_TOLERANCE = 18;
+
+const distToSegment = (px: number, py: number, a: { x: number; y: number }, b: { x: number; y: number }) => {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const len2 = dx * dx + dy * dy;
+  const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, ((px - a.x) * dx + (py - a.y) * dy) / len2));
+  return Math.hypot(px - (a.x + t * dx), py - (a.y + t * dy));
+};
+
+/**
+ * The connector whose line passes within `tol` of a point (diagram coordinates)
+ * — the nearest, when several do — or null. Any connector type: a sequence
+ * flow, a message, an association. A tap checks this BEFORE the element under
+ * it, because a connector runs across a pool or lane, and the pool would win.
+ */
+export function connectorAt(data: DiagramData, x: number, y: number, tol: number = CONNECTOR_TAP_TOLERANCE): Connector | null {
+  let best: Connector | null = null;
+  let bestD = tol;
+  for (const c of data.connectors ?? []) {
+    if (c.type === "review-comment-link") continue;
+    const pts = c.waypoints ?? [];
+    for (let i = 0; i + 1 < pts.length; i++) {
+      const d = distToSegment(x, y, pts[i], pts[i + 1]);
+      if (d <= bestD) { bestD = d; best = c; }
+    }
+  }
+  return best;
+}
+
 /** The topmost element the picture shows under a point (diagram coordinates), or null. */
 export function elementAt(data: DiagramData, x: number, y: number): DiagramElement | null {
   const hit = [...data.elements].reverse().find(
@@ -95,6 +125,9 @@ export const VOICE_EXAMPLES: readonly string[] = [
   "add a pool called Customer",
   "rename Check invoice to Verify invoice",
   "delete Pay supplier",
+  "tap a connector, then “delete this” or “reverse this”",
+  "tap two elements in order, then “connect these”",
+  "delete connectors — or “remove messages”",
   "connect Receive order to Check invoice",
   "undo that",
   "again",

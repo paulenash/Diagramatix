@@ -108,7 +108,7 @@ describe("T5085 — the phone screen wires the session as the desktop does", () 
     const iface = hook.slice(hook.indexOf("export interface VoiceSessionHost"), hook.indexOf("export function useVoiceSession"));
     const actions = [...(iface.match(/Pick<AssistDiagramActions, ([^>]+)>/)?.[1].matchAll(/"([A-Za-z]+)"/g) ?? [])].map((m) => m[1]);
     const values = [...iface.matchAll(/^  ([A-Za-z]+): /gm)].map((m) => m[1]);
-    expect(actions.length + values.length, "57 host fields").toBe(57);
+    expect(actions.length + values.length, "58 host fields").toBe(58);
     const ed = editor();
     for (const n of values) expect(new RegExp(`\\b${n}\\b`).test(ed), `host value ${n}`).toBe(true);
     const supplied = ed.slice(ed.indexOf("const SESSION_ACTIONS"), ed.indexOf("] as const;"));

@@ -162,7 +162,7 @@ describe("R1 — destructive commands ask first", () => {
 
     const run = callbackBody(editor(), "runVoiceCommand");
     expect(run).toContain("if (pendingConfirmRef.current) {");
-    expect(run).toContain("needsConfirmation(ops, data.elements, voiceLastId.current, selectedIdsRef.current)");
+    expect(run).toContain("needsConfirmation(ops, data.elements, voiceLastId.current, selectedIdsRef.current, { all: data.connectors, selectedId: selectedConnectorIdRef.current })");
     expect(run, "the parked ops are applied only on a yes").toMatch(/if \(answer === "yes"\) \{\s*const r = applyGrouped\(pending\.ops\);/);
   });
 });

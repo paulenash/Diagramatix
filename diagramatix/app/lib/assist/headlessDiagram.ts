@@ -67,6 +67,7 @@ export function headlessDiagram(initial: DiagramData): HeadlessDiagram {
       sourceSide = "right", targetSide = "left", sourceOffsetAlong, targetOffsetAlong, force, initialLabel) =>
       commit({ type: "ADD_CONNECTOR", payload: { sourceId, targetId, connectorType, directionType, routingType, sourceSide, targetSide, sourceOffsetAlong, targetOffsetAlong, force, initialLabel } }),
     deleteConnector: (id) => commit({ type: "DELETE_CONNECTOR", payload: { id } }),
+    reverseConnector: (id) => commit({ type: "REVERSE_CONNECTOR", payload: { id } }),
     updateConnectorLabel: (id, label) => commit({ type: "UPDATE_CONNECTOR_LABEL", payload: connectorLabelPayload(id, label) }),
     deleteElement: (id) => commit({ type: "DELETE_ELEMENT", payload: { id } }),
     undo: () => {

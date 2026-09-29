@@ -67,6 +67,7 @@ import { BOUNDARY_STEP_PX } from "./poolBoundaryPhrase";
 import { TEMPLATE_BEFORE_REFUSAL } from "./templatePhrase";
 import { refKind, unsaidRef, type RefKind } from "./refKinds";
 import { connectorsOverElement } from "./connectorRef";
+import { connectorsForDelete, connectorWord, namesSelectedConnector } from "./connectorCommands";
 
 /** The guided "rename by number" flow — pick a numbered badge, then say the name. */
 export type RenameFlow =
@@ -83,6 +84,7 @@ export interface AssistDiagramActions {
   updateLabel(id: string, label: string): void;
   addConnector(sourceId: string, targetId: string, connectorType?: ConnectorType, directionType?: DirectionType, routingType?: RoutingType, sourceSide?: Side, targetSide?: Side, sourceOffsetAlong?: number, targetOffsetAlong?: number, force?: boolean, initialLabel?: string): void;
   deleteConnector(id: string): void;
+  reverseConnector(id: string): void;
   updateConnectorLabel(id: string, label?: string): void;
   deleteElement(id: string): void;
   undo(): void;
@@ -206,7 +208,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
   const data = { elements: ctx.elements, connectors: ctx.connectors };
   const { riskCatalog } = ctx;
   const {
-    addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, updateConnectorLabel,
+    addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, reverseConnector, updateConnectorLabel,
     deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool,
     wrapInSubprocess, wrapInContainer, unwrapSubprocess, addPool, addLaneAt, compressPool, compressLane, expandLane, extendPools,
     swapLane, moveLane, moveElements, elementsMoveEnd, removeSpace, insertSpace, convertTaskSubprocess, moveLaneBoundary, laneBoundaryMoveEnd, updateConnectorEndpoint, movePoolTo,
@@ -683,10 +685,14 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
     }
 
     if (op.op === "connect") {
-      const f = resolve1(op.fromRef), t = resolve1(op.toRef);
+      // "connect these": exactly two elements are selected — the FIRST selected
+      // flows into the SECOND, the order they were picked in (Paul, 2026-09-29).
+      const picked = selectedIds.filter((id) => els.some((e) => e.id === id));
+      const theseTwo = op.fromRef === "the previous" && op.toRef === "the last" && picked.length === 2;
+      const f = resolve1(theseTwo ? `${ID_REF_PREFIX}${picked[0]}` : op.fromRef), t = resolve1(theseTwo ? `${ID_REF_PREFIX}${picked[1]}` : op.toRef);
       if ("err" in f) { results.push(f.err); anyFail = true; continue; }
       if ("err" in t) { results.push(t.err); anyFail = true; continue; }
-      if (!canConnect(f, t, op.connectorType ?? "sequence", els, { connectors: data.connectors })) { results.push(`can’t connect ${nameOf(f)} → ${nameOf(t)}`); anyFail = true; continue; }
+      if (!canConnect(f, t, op.connectorType ?? "sequence", els, { connectors: data.connectors })) { results.push(`can’t connect ${nameOf(f)} → ${nameOf(t)}${theseTwo ? " — select them in the order you want them joined" : ""}`); anyFail = true; continue; }
       addConnector(f.id, t.id, op.connectorType ?? "sequence");
       results.push(`connected ${nameOf(f)} → ${nameOf(t)}`);
       continue;
@@ -703,7 +709,46 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       continue;
     }
 
+    if (op.op === "deleteConnectors") {
+      const pick = connectorsForDelete(op.kind, data.connectors, selectedIds, selectedConnectorIdRef.current);
+      const noun = op.kind === "message" ? "message" : "connector";
+      if (pick.connectors.length === 0) {
+        results.push(pick.scope === "selected connector" ? `the selected connector isn’t a ${noun}` : pick.scope === "selected elements" ? `no ${noun}s on the selected elements` : `there are no ${noun}s to delete`);
+        anyFail = true;
+        continue;
+      }
+      for (const c of pick.connectors) deleteConnector(c.id);
+      setSelectedConnectorId(null);
+      results.push(pick.connectors.length === 1
+        ? `deleted the ${noun}${pick.connectors[0].label ? ` “${spokenName(pick.connectors[0].label)}”` : ""}`
+        : `deleted ${pick.connectors.length} ${connectorWord(op.kind, pick.connectors.length)}`);
+      continue;
+    }
+
+    if (op.op === "reverseConnector") {
+      const cid = selectedConnectorIdRef.current;
+      const c = cid ? data.connectors.find((x) => x.id === cid) : undefined;
+      if (!c) { results.push("select a connector first"); anyFail = true; continue; }
+      const from = els.find((e) => e.id === c.sourceId), to = els.find((e) => e.id === c.targetId);
+      if (!from || !to) { results.push("that connector isn’t joined at both ends"); anyFail = true; continue; }
+      const others = data.connectors.filter((x) => x.id !== c.id);
+      if (!canConnect(to, from, c.type, els, { connectors: others })) { results.push(`can’t reverse: ${nameOf(to)} → ${nameOf(from)} isn’t allowed`); anyFail = true; continue; }
+      reverseConnector(c.id);
+      setSelectedConnectorId(null);   // selection protocol
+      results.push(`reversed the ${c.type === "messageBPMN" ? "message" : "connector"}: now ${nameOf(to)} → ${nameOf(from)}`);
+      continue;
+    }
+
     if (op.op === "delete") {
+      // "delete this" with a CONNECTOR selected (and no element): the connector
+      // goes — "delete the selected message" too, whatever else is selected.
+      const sc = selectedConnectorIdRef.current ? data.connectors.find((x) => x.id === selectedConnectorIdRef.current) : undefined;
+      if (sc && namesSelectedConnector(op.ref, selectedIds.length > 0)) {
+        deleteConnector(sc.id);
+        setSelectedConnectorId(null);
+        results.push(`deleted the ${sc.type === "messageBPMN" ? "message" : "connector"}${sc.label ? ` “${spokenName(sc.label)}”` : ""}`);
+        continue;
+      }
       // "delete these" / "delete the selected tasks": every selected element
       // of that kind, in one command (and one undo — the caller groups it).
       const selIds = resolveSelectionRefs(op.ref, els, selectedIds);

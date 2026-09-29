@@ -104,6 +104,8 @@ Op shapes (use element NAMES for refs — they are resolved against the diagram;
   { "op":"addMessage", "fromRef": <name>, "toRef": <name>, "label"?: string }  // message flow between an activity and a pool/participant
   { "op":"addMessageByNumber", "fromSelection"?: true }  // no ends given: number the candidates and let the user pick
   { "op":"labelSelected", "label"?: string }  // the selected connector
+  { "op":"deleteConnectors", "kind": "connector"|"message" }  // "delete connectors" / "remove messages": the selected one, those on the selected elements, or all
+  { "op":"reverseConnector" }  // "reverse this": flip the SELECTED connector's direction
   { "op":"swapGatewayPoints", "a": "top"|"middle"|"bottom"|"left"|"right", "b": same }  // the selected gateways' points
   { "op":"moveGatewayPoint", "from": same, "to": same }  // the selected gateways' OR events' points: move ONE connector to a FREE point; swap needs both taken. An event has no "middle"
   { "op":"wrapInSubprocess", "label"?: string }           // surround the SELECTED elements with an expanded subprocess

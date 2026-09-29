@@ -56,7 +56,7 @@ import { type Dispatch, type MutableRefObject, type SetStateAction, useCallback,
 
 
 /** What the host screen supplies: its useDiagram edit actions and its editor values. */
-export interface VoiceSessionHost extends Pick<AssistDiagramActions, "addConnector" | "addElementGated" | "addLaneAt" | "addPool" | "alignElements" | "clearDiagram" | "compressLane" | "compressPool" | "convertTaskSubprocess" | "deleteConnector" | "deleteElement" | "elementsMoveEnd" | "expandLane" | "extendPools" | "insertSpace" | "laneBoundaryMoveEnd" | "moveElements" | "moveLane" | "moveLaneBoundary" | "movePoolTo" | "removeSpace" | "resizeElement" | "resizeElementEnd" | "setEventBoundary" | "splitLaneEven" | "splitPoolEven" | "swapLane" | "swapPools" | "undo" | "unwrapSubprocess" | "updateConnectorEndpoint" | "updateConnectorLabel" | "updateLabel" | "updateProperties" | "wrapInContainer" | "wrapInPool" | "wrapInSubprocess"> {
+export interface VoiceSessionHost extends Pick<AssistDiagramActions, "addConnector" | "addElementGated" | "addLaneAt" | "addPool" | "alignElements" | "clearDiagram" | "compressLane" | "compressPool" | "convertTaskSubprocess" | "deleteConnector" | "reverseConnector" | "deleteElement" | "elementsMoveEnd" | "expandLane" | "extendPools" | "insertSpace" | "laneBoundaryMoveEnd" | "moveElements" | "moveLane" | "moveLaneBoundary" | "movePoolTo" | "removeSpace" | "resizeElement" | "resizeElementEnd" | "setEventBoundary" | "splitLaneEven" | "splitPoolEven" | "swapLane" | "swapPools" | "undo" | "unwrapSubprocess" | "updateConnectorEndpoint" | "updateConnectorLabel" | "updateLabel" | "updateProperties" | "wrapInContainer" | "wrapInPool" | "wrapInSubprocess"> {
   beginHistoryGroup: () => void;
   beginLabelEdit: (id: string) => void;
   cancelLabelEdit: () => void;
@@ -85,7 +85,7 @@ export interface VoiceSessionHost extends Pick<AssistDiagramActions, "addConnect
 
 export function useVoiceSession(host: VoiceSessionHost) {
   const {
-    addConnector, addElementGated, addLaneAt, addPool, alignElements, beginHistoryGroup, beginLabelEdit, cancelLabelEdit, clearDiagram, compressLane, compressPool, connectorsRef, convertTaskSubprocess, data, deleteConnector, deleteElement, diagramColorConfig, diagramId, diagramName, diagramType, displayMode, elementsMoveEnd, elementsRef, endHistoryGroup, expandLane, extendPools, handleExportJson, insertSpace, laneBoundaryMoveEnd, moveElements, moveLane, moveLaneBoundary, movePoolTo, nextStepRef, openTemplateWindowRef, removeSpace, resizeElement, resizeElementEnd, riskCatalog, selectedConnectorIdRef, selectedIdsRef, setEventBoundary, setSelectedConnectorId, setSelectedElementIds, splitLaneEven, splitPoolEven, swapLane, swapPools, undo, unwrapSubprocess, updateConnectorEndpoint, updateConnectorLabel, updateLabel, updateProperties, wrapInContainer, wrapInPool, wrapInSubprocess,
+    addConnector, addElementGated, addLaneAt, addPool, alignElements, beginHistoryGroup, beginLabelEdit, cancelLabelEdit, clearDiagram, compressLane, compressPool, connectorsRef, convertTaskSubprocess, data, deleteConnector, reverseConnector, deleteElement, diagramColorConfig, diagramId, diagramName, diagramType, displayMode, elementsMoveEnd, elementsRef, endHistoryGroup, expandLane, extendPools, handleExportJson, insertSpace, laneBoundaryMoveEnd, moveElements, moveLane, moveLaneBoundary, movePoolTo, nextStepRef, openTemplateWindowRef, removeSpace, resizeElement, resizeElementEnd, riskCatalog, selectedConnectorIdRef, selectedIdsRef, setEventBoundary, setSelectedConnectorId, setSelectedElementIds, splitLaneEven, splitPoolEven, swapLane, swapPools, undo, unwrapSubprocess, updateConnectorEndpoint, updateConnectorLabel, updateLabel, updateProperties, wrapInContainer, wrapInPool, wrapInSubprocess,
   } = host;
   const autoConnect = host.autoConnect === true;
   const phone = host.phone === true;
@@ -393,7 +393,7 @@ export function useVoiceSession(host: VoiceSessionHost) {
     return applyAssistOpsTo(ops, {
       elements: data.elements, connectors: data.connectors, settings: assistSettingsOf(data), riskCatalog, autoConnect,
       actions: {
-        addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, updateConnectorLabel,
+        addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, reverseConnector, updateConnectorLabel,
         deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool,
         wrapInSubprocess, wrapInContainer, unwrapSubprocess, addPool, addLaneAt, compressPool, compressLane, expandLane, extendPools,
         swapLane, moveLane, moveElements, elementsMoveEnd, removeSpace, insertSpace, convertTaskSubprocess, moveLaneBoundary, laneBoundaryMoveEnd, updateConnectorEndpoint, movePoolTo,
@@ -402,7 +402,7 @@ export function useVoiceSession(host: VoiceSessionHost) {
       ui: { setSelectedElementIds, setSelectedConnectorId, setPickFlow, setRenameFlow, setMessageFlow, setDividerFlow, setGoldFlash },
       refs: { voiceLastId, pointerWorld, selectedIdsRef, selectedConnectorIdRef, nextStepRef, openTemplateWindowRef, exportJsonRef, boundaryLast: boundaryLastRef },
     });
-  }, [data.elements, data.connectors, data.poolFontSize, data.laneFontSize, data.connectorFontSize, data.relaxedLayout, riskCatalog, armDebugBefore, armGoldFlash, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, updateConnectorLabel, deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool, wrapInSubprocess, wrapInContainer, unwrapSubprocess, addPool, addLaneAt, compressPool, compressLane, expandLane, extendPools, swapLane, moveLane, moveElements, elementsMoveEnd, removeSpace, insertSpace, convertTaskSubprocess, moveLaneBoundary, laneBoundaryMoveEnd, updateConnectorEndpoint, movePoolTo, swapPools, resizeElement, resizeElementEnd, alignElements, setRenameFlow, setMessageFlow, setPickFlow, setDividerFlow]);
+  }, [data.elements, data.connectors, data.poolFontSize, data.laneFontSize, data.connectorFontSize, data.relaxedLayout, riskCatalog, armDebugBefore, armGoldFlash, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, reverseConnector, updateConnectorLabel, deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool, wrapInSubprocess, wrapInContainer, unwrapSubprocess, addPool, addLaneAt, compressPool, compressLane, expandLane, extendPools, swapLane, moveLane, moveElements, elementsMoveEnd, removeSpace, insertSpace, convertTaskSubprocess, moveLaneBoundary, laneBoundaryMoveEnd, updateConnectorEndpoint, movePoolTo, swapPools, resizeElement, resizeElementEnd, alignElements, setRenameFlow, setMessageFlow, setPickFlow, setDividerFlow]);
 
   // Gold flashing, part two: the command has run, React has re-rendered, and
   // `data.elements` is now the after picture. Diff it against the snapshot taken
@@ -855,7 +855,7 @@ export function useVoiceSession(host: VoiceSessionHost) {
           ? { op: "wrapInContainer", container: "pool" as const, ...(op.label ? { label: op.label } : {}) } as AssistOp
           : op,
       );
-      const ask = needsConfirmation(ops, data.elements, voiceLastId.current, selectedIdsRef.current);
+      const ask = needsConfirmation(ops, data.elements, voiceLastId.current, selectedIdsRef.current, { all: data.connectors, selectedId: selectedConnectorIdRef.current });
       if (ask) {
         // PIN THE ANSWER TO WHAT WAS ASKED. The question names one element; the
         // "yes" arrives an utterance later, by which time "selected" or "one"

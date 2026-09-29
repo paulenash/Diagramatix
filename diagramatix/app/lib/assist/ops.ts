@@ -26,6 +26,10 @@ export type AssistOp =
   | { op: "connect"; fromRef: Ref; toRef: Ref; connectorType?: ConnectorType }
   | { op: "disconnect"; fromRef: Ref; toRef: Ref }
   | { op: "delete"; ref: Ref; compact?: boolean }
+  /** "delete connectors" / "remove messages" — the selected connector, the connectors on the selected elements, or every one. */
+  | { op: "deleteConnectors"; kind: "connector" | "message" }
+  /** "reverse this" — the selected connector's direction flips. */
+  | { op: "reverseConnector" }
   | { op: "rename"; ref: Ref; label: string }
   | { op: "renameByType"; itemType: string }
   | { op: "move"; ref: Ref; direction: "left" | "right" | "up" | "down"; count?: number }
@@ -329,6 +333,10 @@ export function validateOp(raw: unknown): AssistOp | null {
       return { op: "again" };
     case "addMessageByNumber":
       return { op: "addMessageByNumber", ...(o.fromSelection === true ? { fromSelection: true } : {}) };
+    case "deleteConnectors":
+      return o.kind === "connector" || o.kind === "message" ? { op: "deleteConnectors", kind: o.kind } : null;
+    case "reverseConnector":
+      return { op: "reverseConnector" };
     case "labelSelected":
       return { op: "labelSelected", ...(isRef(o.label) ? { label: (o.label as string).trim() } : {}) };
     case "swapGatewayPoints": {

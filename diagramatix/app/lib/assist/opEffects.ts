@@ -304,10 +304,23 @@ export function checkEffect(op: AssistOp, before: DiagramData, after: DiagramDat
     }
 
     case "connect": {
+      // "connect these": the ends are the two SELECTED elements, which the apply layer reads from the selection.
+      if (op.fromRef === "the previous" && op.toRef === "the last") {
+        return after.connectors.length > before.connectors.length ? pass : fail("nothing was connected");
+      }
       const [a, b] = [refs.fromRef, refs.toRef];
       return a && b && linked(after, a, b, op.connectorType ?? "sequence")
         ? pass : fail(`no ${op.connectorType ?? "sequence"} flow between ${nameOf(byId(after, a))} and ${nameOf(byId(after, b))}`);
     }
+
+    case "deleteConnectors":
+      return after.connectors.length < before.connectors.length ? pass : fail("no connector was removed");
+
+    case "reverseConnector":
+      return before.connectors.some((c) => {
+        const a = after.connectors.find((x) => x.id === c.id);
+        return !!a && a.sourceId === c.targetId && a.targetId === c.sourceId;
+      }) ? pass : fail("no connector was reversed");
 
     case "disconnect": {
       const [a, b] = [refs.fromRef, refs.toRef];

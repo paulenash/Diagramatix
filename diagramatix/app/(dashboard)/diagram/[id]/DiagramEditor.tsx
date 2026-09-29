@@ -2458,7 +2458,7 @@ export function DiagramEditor({
   } = useVoiceSession({
     addConnector, addElementGated, addLaneAt, addPool, alignElements, beginHistoryGroup, beginLabelEdit,
     cancelLabelEdit, clearDiagram, compressLane, compressPool, connectorsRef, convertTaskSubprocess, data,
-    deleteConnector, deleteElement, diagramColorConfig, diagramId, diagramName, diagramType, displayMode,
+    deleteConnector, reverseConnector, deleteElement, diagramColorConfig, diagramId, diagramName, diagramType, displayMode,
     elementsMoveEnd, elementsRef, endHistoryGroup, expandLane, extendPools, handleExportJson, insertSpace,
     laneBoundaryMoveEnd, moveElements, moveLane, moveLaneBoundary, movePoolTo, nextStepRef,
     openTemplateWindowRef, removeSpace, resizeElement, resizeElementEnd, riskCatalog, selectedConnectorIdRef,
