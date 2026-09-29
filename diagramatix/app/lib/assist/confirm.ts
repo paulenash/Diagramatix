@@ -12,7 +12,7 @@
  * utterance to `parseConfirmation`.
  */
 import type { Connector, DiagramElement } from "../diagram/types";
-import { connectorsForDelete, deleteConnectorsQuestion } from "./connectorCommands";
+import { connectorsForDelete, deleteConnectorsQuestion, deleteManyAsSelected } from "./connectorCommands";
 import type { AssistOp } from "./ops";
 import { resolveRef, resolveSelectionRefs } from "./resolveRef";
 
@@ -47,11 +47,13 @@ export function needsConfirmation(
   selectedIds?: readonly string[],
   connectors?: { all: readonly Connector[]; selectedId: string | null },
 ): Confirmation | null {
-  for (const op of ops) {
-    // Removing more than one connector asks first; one goes at once.
+  for (const op0 of ops) {
+    const op = deleteManyAsSelected(op0, selectedIds ?? []);
+    // Removing more than one connector on the selection asks first; one goes at once.
+    // (With nothing selected there is no question here: the numbers are the question.)
     if (op.op === "deleteConnectors" && connectors) {
       const pick = connectorsForDelete(op.kind, connectors.all, selectedIds ?? [], connectors.selectedId);
-      if (pick.connectors.length > 1) return { what: deleteConnectorsQuestion(op.kind, pick.connectors.length, pick.scope) };
+      if (pick.scope === "selected elements" && pick.connectors.length > 1) return { what: deleteConnectorsQuestion(op.kind, pick.connectors.length, pick.scope) };
     }
     if (op.op === "clear") {
       return elements.length ? { what: `clear the whole diagram (${plural(elements.length, "element")})` } : null;

@@ -28,6 +28,7 @@ import { needsConfirmation, parseConfirmation } from "@/app/lib/assist/confirm";
 import { type ArmedCapture, badgesOnScreen, type CaptureLedger, captureState, captureStoppedSummary, newCaptureLedger, projectFlow, settleArm } from "@/app/lib/assist/debugCapture";
 import { buildDebugSessionFile, debugSessionFilename, type DebugSnapshot, serialiseDebugSession, type SnapshotRole } from "@/app/lib/assist/debugSessionFile";
 import { parsePickAnswer, type PickFlow, substituteRef } from "@/app/lib/assist/disambiguate";
+import { parseNumberList } from "@/app/lib/assist/numberList";
 import { adjustOp, collectDividers, type DividerFlow, type DividerMemory, dividerOp, dividerReply, dividerRulers, explainDividerMiss, movedPx, readDividerUtterance } from "@/app/lib/assist/dividerFlow";
 import { FRAGMENT_CONTINUE_MS, FRAGMENT_MAX_WAITS, FRAGMENT_SILENCE_MS } from "@/app/lib/assist/fragmentBuffer";
 import { batchFlashes, type FlashBox, flashTargets, isGoldFlashOn, setGoldFlash } from "@/app/lib/assist/goldFlash";
@@ -801,6 +802,28 @@ export function useVoiceSession(host: VoiceSessionHost) {
       else await pickTemplateCardRef.current(answer.card, report);
       return;
     }
+    // A delete's question ("which tasks to delete?") takes several numbers at once —
+    // "three, seven, eight and nine" — or "all", or one name. Each chosen one is a delete
+    // by #id: reference; "all" asks first (one word from a mis-hear).
+    const answerDeleteMany = (said: string, flow: PickFlow) => {
+      const list = parseNumberList(said, flow.targets.length);
+      if (list?.kind === "out-of-range") { log({ heard: said, summary: `there is no number ${list.numbers.join(", ")} — say numbers from 1 to ${flow.targets.length}`, ok: false }); return; }
+      const byName = list ? null : parsePickAnswer(said, flow);
+      if (!list && !byName) { log({ heard: said, summary: flow.prompt, ok: false }); return; }
+      const picked = byName ? [byName] : list!.kind === "all" ? flow.targets : flow.targets.filter((t) => list!.kind === "numbers" && list!.numbers.includes(t.n));
+      const delOps = picked.map((t) => ({ op: "delete", ref: `${ID_REF_PREFIX}${t.id}` }) as AssistOp);
+      setPickFlow(null);
+      const ask = list?.kind === "all" && picked.length > 1
+        ? { what: `delete all ${picked.length} ${flow.noun ?? "of them"}` }
+        : needsConfirmation(delOps, data.elements, voiceLastId.current, []);
+      if (ask) {
+        pendingConfirmRef.current = { ops: delOps, what: ask.what, viaAi: false };
+        log({ heard: said, summary: `${ask.what}? — say “yes” to confirm`, ok: true });
+        return;
+      }
+      const r = applyGrouped(delOps);
+      log({ heard: said, summary: `${picked.map((t) => t.n).join(", ")} → ${r.summary}`, ok: r.ok });
+    };
     // A whole new command while the numbers are up closes the question and
     // runs (pickInterrupt.ts) — it used to be read as a wrong answer.
     if (pickFlowRef.current && interruptsPick(heard, pickFlowRef.current)) setPickFlow(null);
@@ -811,6 +834,7 @@ export function useVoiceSession(host: VoiceSessionHost) {
         log({ heard, summary: "cancelled", ok: true });
         return;
       }
+      if (flow.many) { answerDeleteMany(heard, flow); return; }
       const chosen = parsePickAnswer(heard, flow);
       if (!chosen) { log({ heard, summary: flow.prompt, ok: false }); return; }
       setPickFlow(null);

@@ -116,7 +116,7 @@ export function collectRenameTargets(
     for (const c of connectors) {
       if (c.type !== wantType) continue;
       const mid = connectorBadgeAt(c);
-      raw.push({ id: c.id, x: mid.x, y: mid.y, height: 0, kind: "connector" });
+      raw.push({ id: c.id, x: mid.x, y: mid.y, height: 0, kind: "connector", label: c.label ?? undefined });
     }
   } else {
     const match = (e: DiagramElement): boolean =>
@@ -129,7 +129,7 @@ export function collectRenameTargets(
       : itemType === "subprocess" ? SUBPROCESS_TYPES.has(e.type)
       : false;
     for (const e of elements) {
-      if (match(e)) raw.push({ id: e.id, x: e.x + e.width / 2, y: e.y + e.height / 2, height: e.height, kind: "element", place: badgePlaceFor(e.type) });
+      if (match(e)) raw.push({ id: e.id, x: e.x + e.width / 2, y: e.y + e.height / 2, height: e.height, kind: "element", place: badgePlaceFor(e.type), label: e.label ?? undefined });
     }
   }
   // Reading order: band the y into Task-height rows, then left-to-right in-row.

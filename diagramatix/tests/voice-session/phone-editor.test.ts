@@ -246,3 +246,44 @@ describe("T5096 — on the phone: tap a connector, then 'delete this' / 'reverse
     expect(h.texts()).toContain("connected Pay supplier → Receive order");
   });
 });
+
+describe("T5099 — on the phone: 'delete connectors' numbers them; several numbers at once delete those", () => {
+  it("chips for every connector; tapping chips fills the box; Send deletes exactly those; 'all' asks first", async () => {
+    const d = threeTasks();
+    d.connectors = d.connectors.map((c, i) => ({ ...c, waypoints: i === 0 ? [{ x: 220, y: 125 }, { x: 320, y: 125 }] : [{ x: 440, y: 125 }, { x: 540, y: 125 }] }));
+    const h = await mount({ initial: d });
+    await h.type("delete connectors");
+    expect(h.texts()).toContain("which connectors to delete?");
+    const chips = root!.root.findAll((n) => n.props?.["aria-label"] === "Numbers you can say or tap");
+    expect(chips).toHaveLength(1);
+    expect(chips[0].findAllByType("button")).toHaveLength(2);
+    await h.type("two");
+    expect(h.texts()).toContain("2 → deleted");
+    await act(async () => { vi.advanceTimersByTime(1600); });
+    await h.settle();
+    expect(puts.at(-1)!.body.data).toMatchObject({ connectors: [{ id: "c1" }] });
+  });
+
+  it("a list with 'and', and 'all' — which asks 'yes' before deleting everything", async () => {
+    const d = threeTasks();
+    d.connectors = d.connectors.map((c, i) => ({ ...c, waypoints: i === 0 ? [{ x: 220, y: 125 }, { x: 320, y: 125 }] : [{ x: 440, y: 125 }, { x: 540, y: 125 }] }));
+    const h = await mount({ initial: d });
+    await h.type("delete connectors");
+    await h.type("all");
+    expect(h.texts()).toContain("delete all 2 connectors? — say “yes” to confirm");
+    await h.type("yes");
+    expect(h.texts()).toContain("confirmed");
+    await act(async () => { vi.advanceTimersByTime(1600); });
+    await h.settle();
+    expect((puts.at(-1)!.body.data as unknown as { connectors: unknown[] }).connectors).toHaveLength(0);
+  });
+
+  it("a number that is not on screen is named and the question stands", async () => {
+    const h = await mount();
+    await h.type("delete connectors");
+    await h.type("one and nine");
+    expect(h.texts()).toContain("there is no number 9");
+    await h.type("cancel");
+    expect(h.texts()).toContain("cancelled");
+  });
+});

@@ -37,6 +37,30 @@ export interface PickFlow {
   targets: RenameTarget[];
   /** Shown in the log: "which task? say a number". */
   prompt: string;
+  /**
+   * A DELETE's question, answered with several numbers ("three, seven and
+   * nine") — each chosen one is deleted. `ops` is empty; the answer builds them.
+   */
+  many?: boolean;
+  /** What is being chosen between, in the plural ("tasks") — for "delete all 5 tasks". */
+  noun?: string;
+}
+
+/**
+ * "delete connectors" / "delete tasks" with nothing selected: number every
+ * candidate and ask which — the answer is a list of numbers (numberList.ts).
+ * Null when there are fewer than two (nothing to choose between).
+ */
+export function buildDeleteManyFlow(targets: RenameTarget[], noun: string): PickFlow | null {
+  if (targets.length < 2) return null;
+  return {
+    ops: [],
+    ref: "",
+    targets,
+    many: true,
+    noun,
+    prompt: `which ${noun} to delete? say the numbers (1–${targets.length}) — like “three, seven and nine” — or “all”, or “cancel”`,
+  };
 }
 
 /**

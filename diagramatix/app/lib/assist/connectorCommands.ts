@@ -13,6 +13,8 @@
  * Paul, 2026-09-29.
  */
 import type { Connector } from "@/app/lib/diagram/types";
+import type { AssistOp } from "./ops";
+import { parseRenameType, type RenameType } from "./renameTargets";
 
 /** What a plural delete is about: any connector, or messages only. */
 export type ConnectorKind = "connector" | "message";
@@ -76,3 +78,38 @@ export function deleteConnectorsQuestion(kind: ConnectorKind, n: number, scope: 
 }
 
 export { word as connectorWord };
+
+// ── "delete tasks" / "delete lanes": every one of a kind, chosen by number ──
+
+/** The plural nouns "delete <these>" takes: one kind of element, named in the plural. */
+// PLURAL only: "delete the task" is a reference to one thing (several of them → the single-pick question,
+// R2), while "delete tasks" names no one in particular.
+const PLURAL_ELEMENT_WORDS = /^(tasks|activities|steps|events|gateways|decisions|sub-?processes|sub-?lanes|lanes|pools)$/i;
+
+/** "task" → "tasks", "activity" → "activities", "subprocess" → "subprocesses"; a plural is left alone. */
+function pluralOf(w: string): string {
+  if (/(?:ies|ses|ches|xes)$/.test(w)) return w;
+  if (/[^aeiou]y$/.test(w)) return w.slice(0, -1) + "ies";
+  if (/ss$/.test(w)) return w + "es";
+  return /s$/.test(w) ? w : w + "s";
+}
+
+/**
+ * "delete tasks", "remove all the events", "delete lanes" — a plural kind of
+ * element, no name: with nothing selected it numbers them and asks which
+ * (applyAssistOps.ts); with some selected it means the selected ones of that
+ * kind. `word` is what was said, so the selected form reads naturally.
+ */
+export function parseElementsDelete(sentence: string): { word: string; itemType: RenameType } | null {
+  const m = sentence.trim().replace(/[.?!]+$/, "").match(
+    /^(?:delete|remove|get rid of|erase|drop)\s+(?:all\s+)?(?:of\s+)?(?:the\s+)?(?:all\s+)?(?:selected\s+)?(\S+)$/i,
+  );
+  if (!m || !PLURAL_ELEMENT_WORDS.test(m[1])) return null;
+  const itemType = parseRenameType(m[1]);
+  return itemType ? { word: pluralOf(m[1].toLowerCase()), itemType } : null;
+}
+
+/** "delete tasks" with some elements SELECTED is the ordinary "delete the selected tasks" — one rule, said two ways. */
+export function deleteManyAsSelected(op: AssistOp, selectedIds: readonly string[]): AssistOp {
+  return op.op === "deleteMany" && selectedIds.length > 0 ? { op: "delete", ref: `selected ${op.word}` } : op;
+}

@@ -232,7 +232,7 @@ export function MobileVoiceEditor({
   const recent = lines.slice(-3);
   const question = currentQuestion(lines);
   // The same numbers as large chips to tap (the badges can be small or off-screen).
-  const flowKind = session.renameFlow ? "rename" : session.messageFlow ? ((session.messageFlow as { mode?: string }).mode === "one" ? "message-one" : "message-pair") : session.pickFlow ? "pick" : "divider";
+  const flowKind = session.renameFlow ? "rename" : session.messageFlow ? ((session.messageFlow as { mode?: string }).mode === "one" ? "message-one" : "message-pair") : session.pickFlow ? (session.pickFlow.many ? "pick-many" : "pick") : "divider";
   async function tapChip(n: number) {
     const a = chipAction(flowKind, n, text);
     if ("text" in a) { setText(a.text); return; }

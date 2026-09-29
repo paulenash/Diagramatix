@@ -12,6 +12,7 @@ import { headlessDiagram } from "@/app/lib/assist/headlessDiagram";
 import { needsConfirmation } from "@/app/lib/assist/confirm";
 import { connectorsForDelete, namesSelectedConnector, parseConnectorsDelete } from "@/app/lib/assist/connectorCommands";
 import { connectorAt } from "@/app/lib/mobile/voiceEdit";
+import { parseNumberList } from "@/app/lib/assist/numberList";
 import type { Connector, DiagramData, DiagramElement } from "@/app/lib/diagram/types";
 
 const E = (o: Record<string, unknown>) => ({ properties: {}, ...o }) as unknown as DiagramElement;
@@ -105,17 +106,18 @@ describe("T5093 — 'delete this' with a connector selected, and the plural dele
     expect(b.h.data.elements.some((e) => e.id === "t3")).toBe(true);
   });
 
-  it("'delete connectors': the selected connector → just it; elements selected → the connectors on them; nothing selected → all", () => {
+  it("'delete connectors': the selected connector → just it; elements selected → the connectors on them; nothing selected → the numbers ask which", () => {
     expect(ids(run("delete connectors", { selectedConnectorId: "f1" }).h)).toEqual(["f2", "m1"]);
     const onT1 = run("delete connectors", { selectedIds: ["t1"] });
     expect(ids(onT1.h), "Start→Check, Check→Pay and the message into Check all touch Check").toEqual([]);
     expect(onT1.r.summary).toBe("deleted 3 connectors");
     const all = run("delete connectors");
-    expect(ids(all.h)).toEqual([]);
-    expect(all.h.data.elements).toHaveLength(diagram().elements.length);
+    expect(ids(all.h), "nothing is removed until a number is said").toEqual(["f1", "f2", "m1"]);
+    expect(all.h.screen).toContain("pick");
+    expect(all.r.summary).toBe("which connectors to delete? say the numbers (1–3) — like “three, seven and nine” — or “all”, or “cancel”");
   });
 
-  it("'delete messages' takes only messages; flows stay", () => {
+  it("'delete messages' takes only messages; flows stay (one message: no question)", () => {
     const a = run("delete messages");
     expect(ids(a.h)).toEqual(["f1", "f2"]);
     expect(a.r.summary).toBe("deleted the message");
@@ -133,7 +135,7 @@ describe("T5093 — 'delete this' with a connector selected, and the plural dele
     const d = diagram();
     const ask = (text: string, sel: string[] = [], conn: string | null = null) =>
       needsConfirmation(parseCommand(text)!, d.elements, null, sel, { all: d.connectors, selectedId: conn });
-    expect(ask("delete connectors")?.what).toBe("delete all 3 connectors");
+    expect(ask("delete connectors"), "nothing selected: the numbers are the question").toBeNull();
     expect(ask("delete connectors", ["t1"])?.what).toBe("delete the 3 connectors attached to the selected elements");
     expect(ask("delete messages"), "one message: no question").toBeNull();
     expect(ask("delete connectors", [], "f1"), "one selected connector: no question").toBeNull();
@@ -195,5 +197,55 @@ describe("T5095 — the phone picks a connector by its line", () => {
   it("a review-comment link is not selectable this way", () => {
     const rc = { ...d, connectors: [C("r1", "t1", "t2", "review-comment-link", { waypoints: [{ x: 270, y: 310 }, { x: 330, y: 310 }] })] } as DiagramData;
     expect(connectorAt(rc, 300, 310)).toBeNull();
+  });
+});
+
+describe("T5097 — a spoken list of numbers", () => {
+  const list = (s: string, max = 12) => parseNumberList(s, max);
+  it("Paul's own: 'three, seven, eight, and nine'", () => {
+    expect(list("three, seven, eight, and nine")).toEqual({ kind: "numbers", numbers: [3, 7, 8, 9] });
+  });
+  it("digits, spaces, 'and', 'then', a lead-in, and a range", () => {
+    expect(list("3 7 8 9")).toEqual({ kind: "numbers", numbers: [3, 7, 8, 9] });
+    expect(list("one and two then five")).toEqual({ kind: "numbers", numbers: [1, 2, 5] });
+    expect(list("delete numbers 2, 4")).toEqual({ kind: "numbers", numbers: [2, 4] });
+    expect(list("three through six")).toEqual({ kind: "numbers", numbers: [3, 4, 5, 6] });
+    expect(list("twenty two and 27", 30)).toEqual({ kind: "numbers", numbers: [22, 27] });
+    expect(list("two, two, three")).toEqual({ kind: "numbers", numbers: [2, 3] });
+  });
+  it("'all' (and its wordings); a number that is not on screen is named; anything else is not a list", () => {
+    for (const s of ["all", "all of them", "everything"]) expect(list(s)).toEqual({ kind: "all" });
+    expect(list("three and fourteen")).toEqual({ kind: "out-of-range", numbers: [14] });
+    expect(list("Customer")).toBeNull();
+    expect(list("three and Customer")).toBeNull();
+    expect(list("")).toBeNull();
+  });
+});
+
+describe("T5098 — every delete with nothing selected asks which, by number", () => {
+  it("'delete tasks' / 'delete lanes' / 'remove events' are their own command", () => {
+    expect(parseCommand("delete tasks")).toEqual([{ op: "deleteMany", itemType: "task", word: "tasks" }]);
+    expect(parseCommand("remove all the events")).toEqual([{ op: "deleteMany", itemType: "event", word: "events" }]);
+    expect(parseCommand("delete lanes")).toEqual([{ op: "deleteMany", itemType: "lane", word: "lanes" }]);
+    expect(parseCommand("delete the task")?.[0].op, "singular is one reference: unchanged").toBe("delete");
+    expect(parseCommand("delete task Check")?.[0].op, "a name is still a plain delete").toBe("delete");
+  });
+  it("nothing selected: two or more tasks are numbered and asked about; nothing is deleted yet", () => {
+    const { h, r } = run("delete tasks");
+    expect(r.summary).toBe("which tasks to delete? say the numbers (1–3) — like “three, seven and nine” — or “all”, or “cancel”");
+    expect(h.screen).toContain("pick");
+    expect(h.data.elements).toHaveLength(diagram().elements.length);
+  });
+  it("just one of the kind goes at once; none says so", () => {
+    expect(run("delete events").h.data.elements.some((e) => e.id === "st")).toBe(false);
+    const noGateways = run("delete gateways");
+    expect(noGateways.r.summary).toBe("there are no gateways to delete");
+  });
+  it("some selected: it is the ordinary 'delete the selected tasks'", () => {
+    const { h } = run("delete tasks", { selectedIds: ["t3"] });
+    expect(h.data.elements.some((e) => e.id === "t3")).toBe(false);
+    expect(h.data.elements.some((e) => e.id === "t2")).toBe(true);
+    const ask = needsConfirmation(parseCommand("delete tasks")!, diagram().elements, null, ["t2", "t3"]);
+    expect(ask?.what).toBe("delete the 2 selected elements");
   });
 });

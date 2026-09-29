@@ -110,7 +110,7 @@ describe("T4991 — “delete event” and “delete events” list EVERY event"
     expect(events).toHaveLength(8);
     for (const said of ["delete event", "delete events", "delete the event"]) {
       const { h, r, flow } = run(d, said);
-      expect(r.summary, said).toMatch(/say a number \(1–8\), or “cancel”$/);
+      expect(r.summary, said).toMatch(said === "delete events" ? /say the numbers \(1–8\) — like “three, seven and nine” — or “all”, or “cancel”$/ : /say a number \(1–8\), or “cancel”$/);
       expect(flow!.targets.map((t) => t.id).sort(), said).toEqual(events);
       expect(parsePickAnswer("send reply", flow!)?.id, said).toBe(SEND_REPLY);
       expect(parsePickAnswer("Send Reply.", flow!)?.id, said).toBe(SEND_REPLY);

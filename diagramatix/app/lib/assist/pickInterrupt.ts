@@ -17,8 +17,11 @@
  */
 import { parseCommand } from "./commandGrammar";
 import { parsePickAnswer, type PickFlow } from "./disambiguate";
+import { parseNumberList } from "./numberList";
 
 export function interruptsPick(heard: string, flow: PickFlow): boolean {
+  // A delete's question is answered with a LIST of numbers; that is the answer, not a new command.
+  if (flow.many && parseNumberList(heard, flow.targets.length)) return false;
   if (parsePickAnswer(heard, flow)) return false;
   return parseCommand(heard) !== null;
 }

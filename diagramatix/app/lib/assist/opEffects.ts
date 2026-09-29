@@ -313,8 +313,10 @@ export function checkEffect(op: AssistOp, before: DiagramData, after: DiagramDat
         ? pass : fail(`no ${op.connectorType ?? "sequence"} flow between ${nameOf(byId(after, a))} and ${nameOf(byId(after, b))}`);
     }
 
+    // Both may only ask which (the numbers are the question), so a screen with nothing removed is not a failure.
     case "deleteConnectors":
-      return after.connectors.length < before.connectors.length ? pass : fail("no connector was removed");
+    case "deleteMany":
+      return null;
 
     case "reverseConnector":
       return before.connectors.some((c) => {

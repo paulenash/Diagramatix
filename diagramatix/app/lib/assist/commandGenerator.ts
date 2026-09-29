@@ -944,6 +944,7 @@ export const NOT_GENERATED: Record<string, string> = {
   unwrapSubprocess: "needs an expanded subprocess selected",
   labelSelected: "needs a connector selected",
   reverseConnector: "needs a connector selected",
+  deleteMany: "with nothing selected it asks which, by number",
   deleteConnectors: "means the selection, or everything — needs a state, not a sentence",
   fillLabels: "needs a selection whose reading order is the answer",
   assignTeam: "needs a simulation team catalogue on the project",

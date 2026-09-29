@@ -22,7 +22,7 @@ import { parseGhostPick } from "./ghostPick";
 import { isBareTemplateCommand, parseTemplateCommand } from "./templatePhrase";
 import { AFTER_WORDS, HERE_WORDS, TAIL_LEAD_IN, cleanRef } from "./placeWords";
 import type { SymbolType, EventType, GatewayType } from "../diagram/types";
-import { parseConnectorsDelete } from "./connectorCommands";
+import { parseConnectorsDelete, parseElementsDelete } from "./connectorCommands";
 
 const clean = cleanRef;
 /** A spoken NAME: cleaned, with "pool three" written "pool 3" (nameCase.ts). */
@@ -173,6 +173,8 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   {
     const dc = parseConnectorsDelete(raw);
     if (dc) return [{ op: "deleteConnectors", kind: dc.kind }];
+    const de = parseElementsDelete(raw);
+    if (de) return [{ op: "deleteMany", itemType: de.itemType, word: de.word }];
   }
 
   // ── Reverse the selected connector ("reverse this") ──

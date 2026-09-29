@@ -50,7 +50,7 @@ import { boundaryRect } from "./poolBoundaryPhrase";
 import { planWrapInPool } from "@/app/lib/diagram/wrapInPoolPlan";
 import { syntheticElement, withAdded, withDeleted, withLabel } from "./workingSet";
 import { collectRenameTargets, type RenameType, type RenameTarget } from "./renameTargets";
-import { buildConnectorPickFlow, buildPickFlow, type PickFlow } from "./disambiguate";
+import { buildConnectorPickFlow, buildDeleteManyFlow, buildPickFlow, type PickFlow } from "./disambiguate";
 import { getRiskControl, riskControlPatch } from "@/app/lib/diagram/riskControl";
 import { simPatch } from "@/app/lib/diagram/simParams";
 import { whyTemplateCantFollow } from "@/app/lib/diagram/templateAttach";
@@ -67,7 +67,8 @@ import { BOUNDARY_STEP_PX } from "./poolBoundaryPhrase";
 import { TEMPLATE_BEFORE_REFUSAL } from "./templatePhrase";
 import { refKind, unsaidRef, type RefKind } from "./refKinds";
 import { connectorsOverElement } from "./connectorRef";
-import { connectorsForDelete, connectorWord, namesSelectedConnector } from "./connectorCommands";
+import { connectorsForDelete, connectorWord, deleteManyAsSelected, namesSelectedConnector } from "./connectorCommands";
+import { numberConnectorTargets, numberTargets } from "./renameTargets";
 
 /** The guided "rename by number" flow — pick a numbered badge, then say the name. */
 export type RenameFlow =
@@ -471,7 +472,12 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
   for (const op0 of ops) {
     opAt += 1;
     if (askWhich()) break;
-    const op = intoFlow(op0);
+    // "delete tasks" with some selected is "delete the selected tasks"; with nothing selected
+    // and just one task it is that task; with several it asks which (below).
+    const op1 = deleteManyAsSelected(intoFlow(op0), selectedIds);
+    const op = op1.op === "deleteMany" && collectRenameTargets(els, data.connectors, op1.itemType).length === 1
+      ? { op: "delete" as const, ref: `${ID_REF_PREFIX}${collectRenameTargets(els, data.connectors, op1.itemType)[0].id}` }
+      : op1;
     if (op.op === "undo") { undo(); results.push("undid the last change"); continue; }
     if (op.op === "clear") { clearDiagram(); voiceLastId.current = null; results.push("cleared the diagram"); continue; }
     if (op.op === "export") { exportJsonRef.current?.(); results.push("exported to JSON"); continue; }
@@ -717,11 +723,25 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
         anyFail = true;
         continue;
       }
+      // Nothing selected and several to choose from: number them and ask which.
+      if (pick.scope === "all" && pick.connectors.length > 1) {
+        const flow = buildDeleteManyFlow(numberConnectorTargets(pick.connectors), connectorWord(op.kind, 2));
+        if (flow) { setPickFlow(flow); results.push(flow.prompt); pickParked = true; break; }
+      }
       for (const c of pick.connectors) deleteConnector(c.id);
       setSelectedConnectorId(null);
       results.push(pick.connectors.length === 1
         ? `deleted the ${noun}${pick.connectors[0].label ? ` “${spokenName(pick.connectors[0].label)}”` : ""}`
         : `deleted ${pick.connectors.length} ${connectorWord(op.kind, pick.connectors.length)}`);
+      continue;
+    }
+
+    if (op.op === "deleteMany") {
+      // Nothing selected (the selected form was turned into a delete above): number them and ask which.
+      const targets = collectRenameTargets(els, data.connectors, op.itemType);
+      if (targets.length === 0) { results.push(`there are no ${op.word} to delete`); anyFail = true; continue; }
+      const flow = buildDeleteManyFlow(targets, op.word);
+      if (flow) { setPickFlow(flow); results.push(flow.prompt); pickParked = true; break; }
       continue;
     }
 
@@ -783,6 +803,12 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
         deleteConnector(conn.id);
         results.push(`deleted ${conn.type === "messageBPMN" ? "message" : "connector"} “${spokenName(conn.label)}”`);
         continue;
+      }
+      // "delete this" with nothing selected: number what can be deleted and ask which.
+      if ("err" in e && e.err === "nothing is selected") {
+        const cands = els.filter((x) => x.type !== "pool" && x.type !== "lane" && x.type !== "review-comment" && x.type !== "text-annotation");
+        const flow = buildDeleteManyFlow(numberTargets(cands), "elements");
+        if (flow) { setPickFlow(flow); results.push(flow.prompt); pickParked = true; break; }
       }
       if ("err" in e && e.ambiguous) {
         // R2: number the candidates and wait for a number, rather than

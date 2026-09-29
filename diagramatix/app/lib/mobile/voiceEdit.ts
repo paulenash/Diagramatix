@@ -63,7 +63,9 @@ export function lastEditedBox(prev: DiagramData | null, next: DiagramData): { x:
 }
 
 /** What tapping a numbered chip does: say the number, or — a message between two things — build "n to m". */
-export function chipAction(flow: "pick" | "rename" | "divider" | "message-pair" | "message-one", n: number, current: string): { run: string } | { text: string } {
+export function chipAction(flow: "pick" | "pick-many" | "rename" | "divider" | "message-pair" | "message-one", n: number, current: string): { run: string } | { text: string } {
+  // A delete's question takes several numbers: each tap adds one to the box, and Send says them all.
+  if (flow === "pick-many") return { text: `${current.trim()} ${n}`.trim() };
   if (flow !== "message-pair") return { run: String(n) };
   const t = current.trim();
   if (!t || /\bto\s+\d+/.test(t)) return { text: `${n} to ` };
