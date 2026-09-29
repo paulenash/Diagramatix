@@ -86,3 +86,5 @@ next-env.d.ts
 
 # Stage 4 voice-session harness: the block cut from the editor, regenerated each test run
 /tests/voice-session/.generated/
+
+!/new features/feature-availability-and-limits-plan-2026-09-30.md
