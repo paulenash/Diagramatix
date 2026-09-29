@@ -47,16 +47,19 @@ export function applyDependencies<M extends Record<string, DepState>>(map: M, de
   return out as M;
 }
 
-/** The first prerequisite that is holding `key` back, or null when nothing is. For "needs Voice Assist" messages. */
+/**
+ * The first prerequisite of `key` that is not itself Available — the ROOT cause when it is a chain
+ * (deepest first) — or null when every prerequisite is Available. For "needs Voice Assist" messages.
+ * Works on a resolved map (dependencies already applied) as well as a raw one.
+ */
 export function blockedBy(map: Record<string, DepState>, key: string, defs: Requires = FEATURE_DEF): string | null {
-  const own = map[key] ?? "hidden";
   const visit = (k: string, seen: Set<string>): string | null => {
     for (const need of defs[k]?.requires ?? []) {
       if (seen.has(need)) continue;
       seen.add(need);
-      if (RANK[map[need] ?? "hidden"] < RANK[own]) return need;
       const deeper = visit(need, seen);
       if (deeper) return deeper;
+      if ((map[need] ?? "hidden") !== "available") return need;
     }
     return null;
   };

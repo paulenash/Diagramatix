@@ -201,8 +201,8 @@
       "key": "voice-assist",
       "states": {
         "free": "hidden",
-        "introductory": "hidden",
-        "professional": "hidden",
+        "introductory": "available",
+        "professional": "available",
         "expert": "available",
         "enterprise": "available"
       }
@@ -291,8 +291,8 @@
       "key": "process-review",
       "states": {
         "free": "hidden",
-        "introductory": "hidden",
-        "professional": "hidden",
+        "introductory": "available",
+        "professional": "available",
         "expert": "available",
         "enterprise": "available"
       }
@@ -311,8 +311,8 @@
       "key": "mobile",
       "states": {
         "free": "hidden",
-        "introductory": "hidden",
-        "professional": "hidden",
+        "introductory": "available",
+        "professional": "available",
         "expert": "available",
         "enterprise": "available"
       }

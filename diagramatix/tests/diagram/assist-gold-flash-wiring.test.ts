@@ -186,7 +186,9 @@ describe("T4489 — Voice Assist is gated on the feature, not on being an admin"
     expect(gate, "the gate must run before any work").toBeLessThan(work);
   });
 
-  it("is seeded available at expert and enterprise, and nowhere below", () => {
+  // Widened 2026-09-30 (Paul): Mobile Access needs Voice Assist, and Mobile is on for every paid level,
+  // so Voice Assist is now available from Introductory up. Free still has none.
+  it("is seeded available at every paid level, and not on free", () => {
     const seed = JSON.parse(read("menus_and_features", "feature-availability.seed.json")) as {
       rows?: Array<{ key: string; states?: Record<string, string> }>;
     };
@@ -197,7 +199,9 @@ describe("T4489 — Voice Assist is gated on the feature, not on being an admin"
     const states = abra!.states ?? {};
     expect(states.expert).toBe("available");
     expect(states.enterprise).toBe("available");
-    for (const below of ["free", "introductory", "professional"]) {
+    expect(states.introductory).toBe("available");
+    expect(states.professional).toBe("available");
+    for (const below of ["free"]) {
       expect(states[below], `${below} should not have it`).not.toBe("available");
     }
   });
