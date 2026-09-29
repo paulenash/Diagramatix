@@ -21,6 +21,7 @@ import {
   serialiseDebugSession, sessionCounts, DEBUG_SESSION_FORMAT,
 } from "@/app/lib/assist/debugSessionFile";
 import type { CommandLogEntry } from "@/app/lib/assist/commandLog";
+import { editorSource } from "./assistApplySource";
 
 describe("T4721 — what the picture is framed around", () => {
   it("wraps every element, with the margin on all four sides", () => {
@@ -140,7 +141,7 @@ describe("T4722 — a session file round-trips", () => {
 describe("T4722b — the bar and the editor are actually wired to all of it", () => {
   // Source-level, because the wiring lives in .tsx and this suite has no jsdom.
   const bar = () => readFileSync("app/components/canvas/VoiceAssistBar.tsx", "utf8");
-  const editor = () => readFileSync("app/(dashboard)/diagram/[id]/DiagramEditor.tsx", "utf8");
+  const editor = () => editorSource();
 
   it("the log entry type lives in the lib, and the bar re-exports it", () => {
     expect(bar()).toContain('export type { CommandLogEntry, CommandVerdict } from "@/app/lib/assist/commandLog"');

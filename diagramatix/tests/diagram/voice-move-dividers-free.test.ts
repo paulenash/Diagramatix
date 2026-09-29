@@ -27,6 +27,7 @@ import { givingBands, wrapLabelInTwo } from "@/app/lib/diagram/laneBoundary";
 import { laneMetrics } from "@/app/lib/diagram/containerMetrics";
 import { containerHeaderWidth } from "@/app/lib/diagram/containerHeader";
 import type { DiagramData, DiagramElement } from "@/app/lib/diagram/types";
+import { editorSource } from "./assistApplySource";
 
 const session1 = (): DiagramData => JSON.parse(readFileSync("tests/fixtures/voice-debug/move-dividers-session-1.json", "utf8")).diagram;
 const session4 = (): DiagramData => JSON.parse(readFileSync("tests/fixtures/voice-debug/boundary-session-4.json", "utf8")).diagram;
@@ -228,7 +229,7 @@ describe("T4978 — the ruler: green ticks every 100px down the lanes' name stri
   });
 
   it("the editor draws it only while “move dividers” is open, and the Canvas draws it in green under the numbers", () => {
-    const ed = readFileSync("app/(dashboard)/diagram/[id]/DiagramEditor.tsx", "utf8");
+    const ed = editorSource();
     expect(ed).toContain("const onScreenRulers = useMemo(() => (dividerFlow ? dividerRulers(data.elements) : null), [dividerFlow, data.elements]);");
     expect(ed).toContain("dividerRulers={onScreenRulers}");
     // The memory is fresh each time the flow opens or closes.

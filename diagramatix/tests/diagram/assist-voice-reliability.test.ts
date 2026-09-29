@@ -18,6 +18,7 @@ import {
 import { phoneticKey, soundsLike, MIN_KEY_FOR_FUZZ } from "@/app/lib/assist/phonetic";
 import { resolveRef } from "@/app/lib/assist/resolveRef";
 import type { DiagramElement } from "@/app/lib/diagram/types";
+import { editorSource } from "./assistApplySource";
 
 const read = (...p: string[]) => readFileSync(join(process.cwd(), ...p), "utf8");
 const el = (id: string, label: string): DiagramElement =>
@@ -115,7 +116,7 @@ describe("T4574 — V1 sends this diagram's names, timidly", () => {
   it("is computed when the mic OPENS, from the live diagram", () => {
     // Deepgram fixes its keyword list when the socket opens, which is also why
     // the number-word elevation cannot live there.
-    const editor = read("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
+    const editor = editorSource();
     expect(editor).toContain("keyterms: diagramKeyterms(elementsRef.current.map((e) => e.label))");
   });
 });

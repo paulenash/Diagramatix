@@ -9,6 +9,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { testDiagramCreateBody, TEST_DIAGRAM_NAME } from "@/app/lib/assist/testDiagram";
 import { fixtureDiagram } from "@/app/lib/assist/commandFixture";
+import { editorSource } from "./assistApplySource";
 
 const read = (p: string) => readFileSync(p, "utf8");
 
@@ -27,14 +28,14 @@ describe("T4936 — the test diagram: shown in a window, and created in the curr
     const bar = read("app/components/canvas/VoiceAssistBar.tsx");
     expect(bar).toContain("onTestDiagram && (");
     expect(bar).toContain(">Test diagram</button>");
-    const editor = read("app/(dashboard)/diagram/[id]/DiagramEditor.tsx");
+    const editor = editorSource();
     expect(editor).toContain("onTestDiagram={() => setTestDiagram({ open: true, creating: false, error: null })}");
     expect(editor).toContain("<TestDiagramWindow");
     expect(editor).toContain("canCreate={!readOnly}");
   });
 
   it("Create saves the current diagram FIRST, then creates the copy in this project, then opens it", () => {
-    const editor = read("app/(dashboard)/diagram/[id]/DiagramEditor.tsx");
+    const editor = editorSource();
     const fn = editor.slice(editor.indexOf("async function createTestDiagram()"), editor.indexOf("async function handleSaveAs()"));
     const saved = fn.indexOf("await saveNowRef.current();");
     const posted = fn.indexOf("body: JSON.stringify(testDiagramCreateBody(projectId)),");

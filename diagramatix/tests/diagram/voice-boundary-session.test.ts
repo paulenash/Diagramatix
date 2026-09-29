@@ -15,6 +15,7 @@ import { parsePoolBoundaryPhrase } from "@/app/lib/assist/poolBoundaryPhrase";
 import { buildPickFlow } from "@/app/lib/assist/disambiguate";
 import { interruptsPick } from "@/app/lib/assist/pickInterrupt";
 import type { DiagramData } from "@/app/lib/diagram/types";
+import { editorSource } from "./assistApplySource";
 
 const session = JSON.parse(readFileSync("tests/fixtures/voice-debug/boundary-session-4.json", "utf8")) as {
   diagram: DiagramData; heard: Array<{ text: string; atMs: number }>;
@@ -74,7 +75,7 @@ describe("T4965 — the boundary session: halves held, the question gives way, n
     expect(interruptsPick("move underwriters team top boundary up by 60", flow)).toBe(true);
     expect(interruptsPick("two", flow)).toBe(false);
     expect(interruptsPick("up one hundred", flow), "a half is not a command").toBe(false);
-    const ed = readFileSync("app/(dashboard)/diagram/[id]/DiagramEditor.tsx", "utf8");
+    const ed = editorSource();
     expect(ed).toContain("if (pickFlowRef.current && interruptsPick(heard, pickFlowRef.current)) setPickFlow(null);");
   });
 });

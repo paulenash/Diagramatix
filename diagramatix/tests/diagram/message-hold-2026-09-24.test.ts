@@ -23,6 +23,7 @@ import { reducer } from "@/app/hooks/useDiagram";
 import { connectorLabelBox } from "@/app/lib/diagram/checks/layoutViolations";
 import { holdMessageLabel, settleMessageLabels } from "@/app/lib/diagram/messageLabel";
 import type { DiagramData, DiagramElement, Connector } from "@/app/lib/diagram/types";
+import { editorSource } from "./assistApplySource";
 
 const E = (o: Record<string, unknown>) => o as unknown as DiagramElement;
 
@@ -187,7 +188,7 @@ describe("T4716 — the template hover preview is clear of the menu", () => {
     // Paul, 2026-09-24: "The hover large template image appears under the drop
     // down template menu. This image must always be clear of the drop-down
     // menu itself. Further to the left is fine."
-    const ed = readFileSync("app/(dashboard)/diagram/[id]/DiagramEditor.tsx", "utf8");
+    const ed = editorSource();
     const panel = ed.slice(ed.indexOf('data-template-preview="large"') - 1200, ed.indexOf('data-template-preview="large"'));
     expect(panel, "measured from the same edge the menu is").toContain('style={{ right: "calc(20rem + 0.75rem)" }}');
     expect(panel, "and never painted under it").toContain("z-[60]");

@@ -17,6 +17,7 @@ import {
 } from "@/app/lib/ai/promptPreambles";
 import { liveStreamParams } from "@/app/lib/dictation/asrParams";
 import { asrFingerprint } from "@/app/lib/dictation/asrParams";
+import { editorSource } from "../diagram/assistApplySource";
 
 const read = (p: string) => readFileSync(p, "utf8");
 const draft = (d: Partial<GenerateDraft>): GenerateDraft => ({ ...EMPTY_DRAFT, ...d });
@@ -94,7 +95,7 @@ describe("T5016 — prompt dictation is punctuated prose; Voice Assist commands 
 
   it("the socket takes prose from the caller; Voice Assist never asks for it; every prompt console and the phone do", () => {
     expect(read("app/lib/dictation/index.ts")).toContain("liveStreamParams({ sampleRate: ctx.sampleRate, keyterms: cb.keyterms, prose: cb.prose })");
-    const ed = read("app/(dashboard)/diagram/[id]/DiagramEditor.tsx");
+    const ed = editorSource();
     // Voice Assist's one call, whole: from its opening to the `});` that closes it.
     const at = ed.indexOf("const handle = await startDictation({");
     expect(at, "Voice Assist's dictation call is where this test looks for it").toBeGreaterThan(0);

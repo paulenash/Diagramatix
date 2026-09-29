@@ -24,6 +24,7 @@ import { repairDeleteWord, repairHeardWords } from "@/app/lib/assist/selectedWor
 import { parseTemplateAnswer, parseTemplateScroll, templateScrollReply, templateScrollTarget, type TemplateCard } from "@/app/lib/assist/templatePick";
 import { checkElementOverlap } from "@/app/lib/diagram/checks/diagramChecks";
 import type { DiagramData } from "@/app/lib/diagram/types";
+import { editorSource } from "./assistApplySource";
 
 const session = (): DiagramData => JSON.parse(readFileSync("tests/fixtures/voice-debug/templates-session-1.json", "utf8")).diagram;
 const SEND_REPLY = "o0nhhwst";
@@ -69,7 +70,7 @@ describe("T4989 — the template window scrolls by voice: “scroll down”, “
   });
 
   it("the editor reads it in the template flow and moves the window's own list; the window says it can", () => {
-    const ed = readFileSync("app/(dashboard)/diagram/[id]/DiagramEditor.tsx", "utf8");
+    const ed = editorSource();
     expect(ed).toContain('if (answer.kind === "scroll") {');
     expect(ed).toContain("const target = templateScrollTarget(answer.to, list);");
     expect(ed).toContain("scrollRef={templateScrollRef}");

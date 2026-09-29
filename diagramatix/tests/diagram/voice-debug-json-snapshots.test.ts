@@ -31,9 +31,10 @@ import type { RenameTarget } from "@/app/lib/assist/renameTargets";
 import { parseCommand } from "@/app/lib/assist/commandGrammar";
 import { applyAssistOps } from "@/app/lib/assist/applyAssistOps";
 import { headlessDiagram } from "@/app/lib/assist/headlessDiagram";
+import { editorSource } from "./assistApplySource";
 
 const src = (...p: string[]) => readFileSync(join(process.cwd(), ...p), "utf8");
-const EDITOR = () => src("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
+const EDITOR = () => editorSource();
 const VIEWER = () => src("app", "(dashboard)", "dashboard", "admin", "voice-debug", "VoiceDebugClient.tsx");
 const DRAWER = () => src("app", "(dashboard)", "dashboard", "admin", "voice-debug", "SnapshotCanvas.tsx");
 

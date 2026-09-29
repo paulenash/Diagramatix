@@ -28,6 +28,7 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { aiTones } from "@/app/(dashboard)/diagram/[id]/ai-generate/AiConsoleChrome";
+import { editorSource } from "../diagram/assistApplySource";
 
 const ROOT = path.resolve(__dirname, "..", "..");
 const AI_GEN = path.join(ROOT, "app", "(dashboard)", "diagram", "[id]", "ai-generate");
@@ -38,7 +39,7 @@ const screen = () => read(AI_GEN, "AiGenerateScreen.tsx");
 const sources = () => read(AI_GEN, "SourcesPanel.tsx");
 const promptPanel = () => read(AI_GEN, "PromptPanel.tsx");
 const saModal = () => read(AI_GEN, "SuperAdminOptionsModal.tsx");
-const editor = () => read(PLAN_DIR, "DiagramEditor.tsx");
+const editor = () => editorSource();
 
 describe("the console is themed by the configured AI colour", () => {
   it("T4312 — every tone is DERIVED from the colour handed in, none is fixed", () => {

@@ -13,6 +13,7 @@
 import { describe, it, expect } from "vitest";
 import { capitaliseFirstWord, wouldCapitalise } from "@/app/lib/diagram/nameCase";
 import { parseCommand } from "@/app/lib/assist/commandGrammar";
+import { editorSource } from "./assistApplySource";
 
 describe("T4475 — the first word is capitalised", () => {
   it("capitalises a dictated lower-case name", () => {
@@ -122,10 +123,7 @@ describe("T4478 — the guided rename keeps the name in the case it was spoken",
     // capitalised properly mid-phrase was flattened too.
     const { readFileSync } = await import("node:fs");
     const { join } = await import("node:path");
-    const src = readFileSync(
-      join(process.cwd(), "app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx"),
-      "utf8",
-    );
+    const src = editorSource();
     expect(src).toContain("leadingSpokenNumber(t)");
     expect(src, "the pick still reads the name off the lower-cased copy").not.toContain(
       "leadingSpokenNumber(low)",

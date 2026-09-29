@@ -32,6 +32,7 @@ import {
 import { buildDiagramThumbnail, THUMB_MIN_STROKE_ZOOM, type ThumbShape } from "@/app/lib/diagram/diagramThumbnail";
 import { getThemeFor } from "@/app/lib/archimate/themes";
 import type { ArchimateCatalogue } from "@/app/lib/archimate/catalogue";
+import { editorSource } from "../diagram/assistApplySource";
 
 const ROOT = path.resolve(__dirname, "..", "..");
 const read = (...p: string[]) => fs.readFileSync(path.join(ROOT, ...p), "utf8");
@@ -306,7 +307,7 @@ describe("T4961 — one rule, one place: the canvas and the tile both call canva
   const canvas = read("app", "components", "canvas", "Canvas.tsx");
   const client = read("app", "(dashboard)", "dashboard", "projects", "[id]", "ProjectDetailClient.tsx");
   const thumb = read("app", "lib", "diagram", "diagramThumbnail.ts");
-  const editor = read("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
+  const editor = editorSource();
   const fn = (src: string, name: string) => {
     const at = src.indexOf(`function ${name}(`);
     expect(at, name).toBeGreaterThan(-1);

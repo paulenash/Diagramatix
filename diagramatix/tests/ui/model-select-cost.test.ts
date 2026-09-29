@@ -13,6 +13,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import fs from "node:fs";
 import path from "node:path";
 import { ModelSelect, type AllowedModel } from "@/app/(dashboard)/diagram/[id]/ModelSelect";
+import { editorSource } from "../diagram/assistApplySource";
 
 const models: AllowedModel[] = [
   { id: "claude-opus-5", label: "Opus 5", costUsd: 0.412 },
@@ -40,7 +41,7 @@ describe("model picker cost is a SuperAdmin detail", () => {
     // The panel is visible to a SuperAdmin in every view mode (canSeeModel =
     // isAdmin); the customer view modes exist to show what a normal user sees,
     // so the price must follow isActingAdmin, which is false there.
-    const editor = src("app/(dashboard)/diagram/[id]/DiagramEditor.tsx");
+    const editor = editorSource();
     expect(editor).toContain("showModelCost={isActingAdmin}");
     expect(editor, "the raw flag must not leak the price into a customer view").not.toContain("showModelCost={isAdmin}");
 

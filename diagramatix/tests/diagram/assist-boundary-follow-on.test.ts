@@ -31,6 +31,7 @@ import { applyAssistOps } from "@/app/lib/assist/applyAssistOps";
 import { headlessDiagram } from "@/app/lib/assist/headlessDiagram";
 import type { DiagramData, DiagramElement, Point, SymbolType } from "@/app/lib/diagram/types";
 import { paulsDiagram } from "../routing/_helpers/block2Test3";
+import { editorCode } from "./assistApplySource";
 
 const el = (id: string, type: SymbolType, x: number, y: number, w: number, h: number, extra: Partial<DiagramElement> = {}): DiagramElement =>
   ({ id, type, x, y, width: w, height: h, label: id, properties: {}, ...extra } as DiagramElement);
@@ -291,7 +292,7 @@ describe("T4799 — wiring: one rule, asked from every place that decides it", (
   });
 
   it("the editor's ghost accept and template attach use the follow-on rules", () => {
-    const src = code("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
+    const src = editorCode();
     const accept = callbackBody(src, "acceptNextStep");
     expect(accept).toMatch(/planBoundaryFollowOn\(src, data\.elements/);
     expect(accept).toMatch(/followOnParentId\(src, data\.elements\)/);

@@ -26,6 +26,7 @@ import { reducer, connectorLabelPayload, healOnLoad } from "@/app/hooks/useDiagr
 import { poolMetrics } from "@/app/lib/diagram/containerMetrics";
 import { DEFAULT_CORPUS_SEED } from "@/app/lib/assist/rng";
 import type { DiagramData } from "@/app/lib/diagram/types";
+import { editorSource } from "./assistApplySource";
 
 const src = (...p: string[]) => readFileSync(join(process.cwd(), ...p), "utf8");
 
@@ -40,7 +41,7 @@ function say(sentence: string, opts: { selected?: string[]; diagram?: DiagramDat
 
 describe("T4748 — the editor delegates; the ops are applied in ONE place", () => {
   it("DiagramEditor calls the module and no longer carries the op branches", () => {
-    const ed = src("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
+    const ed = editorSource();
     expect(ed).toContain(`from "@/app/lib/assist/applyAssistOps"`);
     expect(ed).toContain("return applyAssistOpsTo(ops, {");
     // A branch left behind in the editor would be a second copy, and the
@@ -51,7 +52,7 @@ describe("T4748 — the editor delegates; the ops are applied in ONE place", () 
   });
 
   it("the editor keeps only what is editor memory: \"again\" and the display snapshots", () => {
-    const ed = src("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
+    const ed = editorSource();
     const body = ed.slice(ed.indexOf("const applyAssistOps = useCallback("), ed.indexOf("return applyAssistOpsTo(ops, {"));
     expect(body).toContain("lastAbraOpsRef.current");
     expect(body).toContain("armGoldFlash(data.elements)");

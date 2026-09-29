@@ -73,6 +73,7 @@ vi.mock("@/app/lib/subscription-route", async (orig) => ({
 
 import { POST as startJob } from "@/app/api/diagrams/[id]/generate/route";
 import { buildBpmnRequest, buildSystemPrompt } from "@/app/lib/ai/planBpmn";
+import { editorSource } from "../diagram/assistApplySource";
 
 const NAME = "Whiteboard photo 2026-09-28 14.05.jpg";
 const userText = (req: ReturnType<typeof buildBpmnRequest>) =>
@@ -129,7 +130,7 @@ describe("T5040 — a correction goes on the END of the prompt, and they add up"
     expect(regeneratePromptText("An edited prompt.", snap), "a prompt edited since wins").toBe("An edited prompt.");
     expect(regeneratePromptText(row, row)).toBe(row);
     expect(regeneratePromptText(row, `${row} More words.`), "only corrections, not any longer text").toBe(row);
-    expect(read("app/(dashboard)/diagram/[id]/DiagramEditor.tsx")).toContain("promptText = regeneratePromptText(p.text, gen.promptText);");
+    expect(editorSource()).toContain("promptText = regeneratePromptText(p.text, gen.promptText);");
   });
 
   it("a spoken description keeps its note at the top; the server's trim does not lose the read-back", () => {

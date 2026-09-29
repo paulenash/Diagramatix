@@ -16,6 +16,7 @@ import { shrinkRoom } from "@/app/lib/diagram/laneBands";
 import { laneMetrics } from "@/app/lib/diagram/containerMetrics";
 import { checkElementOverlap } from "@/app/lib/diagram/checks/diagramChecks";
 import type { DiagramData, DiagramElement } from "@/app/lib/diagram/types";
+import { editorSource } from "./assistApplySource";
 
 const load = (f: string): DiagramData => JSON.parse(readFileSync(`tests/fixtures/voice-debug/${f}`, "utf8")).diagram;
 const E = (o: Record<string, unknown>) => ({ properties: {}, ...o }) as unknown as DiagramElement;
@@ -89,7 +90,7 @@ describe("T4983 — the numbers stay put while the flow is open, and the memory 
   });
 
   it("the editor numbers the badges, the answers and the routing by the open flow's order", () => {
-    const ed = readFileSync("app/(dashboard)/diagram/[id]/DiagramEditor.tsx", "utf8");
+    const ed = editorSource();
     expect(ed).toContain("collectDividers(data.elements, dividerFlow.order)");
     expect(ed).toContain("const targets = collectDividers(elementsRef.current, dividerFlowRef.current?.order);");
     expect(ed).toContain("readDividerUtterance(heard, collectDividers(elementsRef.current, dividerFlowRef.current.order), dividerMemRef.current)");

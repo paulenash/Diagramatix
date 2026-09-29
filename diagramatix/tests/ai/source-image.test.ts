@@ -30,6 +30,7 @@ vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined })
 
 import { POST } from "@/app/api/diagrams/[id]/source-image/route";
 import { GET } from "@/app/api/diagrams/[id]/source-image/[imageId]/route";
+import { editorSource } from "../diagram/assistApplySource";
 
 const as = (u: { id: string; email: string } | null) => { sess.current = u ? { user: { id: u.id, email: u.email } } : null; };
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4]);
@@ -194,7 +195,7 @@ describe("T4998 — the client half: keep it, load it back, and what a re-genera
 });
 
 describe("T4999 — wired: kept at apply, shown in Properties, re-attached with Free Form on a re-generate", () => {
-  const ed = readFileSync("app/(dashboard)/diagram/[id]/DiagramEditor.tsx", "utf8");
+  const ed = editorSource();
   const plan = readFileSync("app/(dashboard)/diagram/[id]/PlanPanel.tsx", "utf8");
 
   it("apply shows the diagram at once; the image lands on THAT generation when its upload does; Free Form is never wiped", () => {
@@ -280,7 +281,7 @@ describe("T5000 — the image lands on its own generation, and goes with a user 
 });
 
 describe("T5001 — the NEW AI Generate console too (Paul, 2026-09-28: “Don't forget to check New AI Generate!!”)", () => {
-  const ed = readFileSync("app/(dashboard)/diagram/[id]/DiagramEditor.tsx", "utf8");
+  const ed = editorSource();
   const ag = readFileSync("app/(dashboard)/diagram/[id]/ai-generate/AiGenerateScreen.tsx", "utf8");
   const sp = readFileSync("app/(dashboard)/diagram/[id]/ai-generate/SourcesPanel.tsx", "utf8");
   const props = readFileSync("app/components/canvas/PropertiesPanel.tsx", "utf8");

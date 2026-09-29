@@ -21,6 +21,7 @@ import { substituteRef, type PickFlow } from "@/app/lib/assist/disambiguate";
 import { cardsOf, numberTemplates, parseTemplateAnswer } from "@/app/lib/assist/templatePick";
 import { TEMPLATE_BEFORE_REFUSAL } from "@/app/lib/assist/templatePhrase";
 import type { DiagramData, DiagramElement } from "@/app/lib/diagram/types";
+import { editorSource } from "./assistApplySource";
 
 const E = (o: Record<string, unknown>) => ({ properties: {}, label: "", ...o }) as unknown as DiagramElement;
 
@@ -351,7 +352,7 @@ describe("T4860 — inside the window: a template's whole name beats the place w
   it("the editor resolves “selected” without the preview it selected, falling back to the selection the window opened on", () => {
     // Once a number is picked the preview IS the selection, so "after
     // selected" found only the template itself and said "couldn't find".
-    const editor = src("app/(dashboard)/diagram/[id]/DiagramEditor.tsx");
+    const editor = editorSource();
     const start = editor.indexOf("const reanchorTemplate = useCallback(");
     const re = editor.slice(start, editor.indexOf("}, [", start));
     expect(re).toContain("const live = selectedIdsRef.current.filter((id) => !mine.has(id));");
@@ -393,7 +394,7 @@ describe("T4927 — “add template” with ONE step selected goes after it, as 
 
 describe("T4928 — a pick is final: no Keep it / Cancel step", () => {
   // Paul, 2026-09-27: "remove the 'Keep it/cancel' step as this required mouse input".
-  const editor = readFileSync("app/(dashboard)/diagram/[id]/DiagramEditor.tsx", "utf8");
+  const editor = editorSource();
   const win = readFileSync("app/components/canvas/TemplatePickerWindow.tsx", "utf8");
 
   it("the pick places the template and closes the window in the same step", () => {

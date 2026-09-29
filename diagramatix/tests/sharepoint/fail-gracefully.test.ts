@@ -16,6 +16,7 @@ import {
   MS_NOT_CONNECTED, MS_NOT_CONNECTED_MESSAGE,
   asList, classifySharePointFailure, connectUrl, graphErrorBody, graphErrorStatus, notConnectedBody,
 } from "@/app/lib/microsoft/sharePointOutcome";
+import { editorSource } from "../diagram/assistApplySource";
 
 const src = (p: string) => readFileSync(p, "utf8");
 
@@ -96,7 +97,7 @@ describe("T4684 — the editor is never taken down by the SharePoint windows", (
   });
 
   it("every SharePoint window in the editor sits inside a SafeBoundary", () => {
-    const ed = src("app/(dashboard)/diagram/[id]/DiagramEditor.tsx");
+    const ed = editorSource();
     const opens = ed.match(/<SharePoint(Picker|Preview)\b/g) ?? [];
     expect(opens.length).toBe(3);
     // The boundary's own onClose holds a "=>", so match up to the NEXT tag rather than the first ">".

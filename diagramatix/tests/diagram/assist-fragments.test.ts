@@ -13,6 +13,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { isIncompleteCommand } from "@/app/lib/assist/incompleteCommand";
 import { parseCommand } from "@/app/lib/assist/commandGrammar";
+import { editorSource } from "./assistApplySource";
 
 const read = (...p: string[]) => fs.readFileSync(path.resolve(__dirname, "..", "..", ...p), "utf8");
 
@@ -26,7 +27,7 @@ describe("a command split at a pause waits for the rest", () => {
       "add a message", "send a message", "add a message to the selected", "add a message from this", "add message from Review to Customer labelled Hi",
     ]) expect(isIncompleteCommand(s), s).toBe(false);
     // The editor uses the module, not a private copy.
-    const ed = read("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
+    const ed = editorSource();
     expect(ed).toContain('import { isIncompleteCommand } from "@/app/lib/assist/incompleteCommand";');
     expect(ed).not.toContain("function isIncompleteCommand(");
   });

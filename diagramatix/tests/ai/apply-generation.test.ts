@@ -17,6 +17,7 @@ import {
 import { runPromptLinkFetch } from "@/app/lib/ai/promptLinkFetch";
 import { AI_PROMPT_ANNOTATION_ID } from "@/app/lib/ai/promptAnnotation";
 import type { AiApplyMeta, AiGeneration, DiagramData, DiagramElement, Connector } from "@/app/lib/diagram/types";
+import { editorSource } from "../diagram/assistApplySource";
 
 const plan = { elements: [{ id: "t1" }], connections: [] };
 const meta = (m: Partial<AiApplyMeta> = {}): AiApplyMeta => ({ promptText: "A customer orders a pizza.", model: "claude-opus-5", ...m });
@@ -171,7 +172,7 @@ describe("T5008 — the desktop's half: the action handed to the server, which c
 });
 
 describe("T5009 — both callers use the one rule set", () => {
-  const ed = readFileSync("app/(dashboard)/diagram/[id]/DiagramEditor.tsx", "utf8");
+  const ed = editorSource();
   const job = readFileSync("app/lib/ai/generateJob.ts", "utf8");
 
   it("the desktop editor decides, links, records and merges through applyGeneration.ts", () => {

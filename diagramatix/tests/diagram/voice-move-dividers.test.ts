@@ -15,6 +15,7 @@ import { collectDividers, parseDividerAnswer, dividerOp, dividerReply, explainDi
 import { COMMAND_CATALOG } from "@/app/lib/assist/commandCatalog";
 import { NOT_GENERATED } from "@/app/lib/assist/commandGenerator";
 import type { DiagramData, DiagramElement } from "@/app/lib/diagram/types";
+import { editorSource } from "./assistApplySource";
 
 const paul = (): DiagramData => JSON.parse(readFileSync("tests/fixtures/voice-debug/boundary-session-4.json", "utf8")).diagram;
 const E = (o: Record<string, unknown>) => o as unknown as DiagramElement;
@@ -103,7 +104,7 @@ describe("T4967 — the answer: “<n> up 100 pixels”, “<n> down 2 tasks”,
 });
 
 describe("T4968 — wired into the editor, the card, the AI and the generator", () => {
-  const ed = readFileSync("app/(dashboard)/diagram/[id]/DiagramEditor.tsx", "utf8");
+  const ed = editorSource();
 
   it("the editor shows its numbers, reads its answers first, and closes it on done / Escape / stop / a new command", () => {
     // Changed 2026-09-28: numbered in the order the flow opened with (T4983).

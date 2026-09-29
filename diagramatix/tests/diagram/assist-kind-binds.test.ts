@@ -25,6 +25,7 @@ import { COMPRESS_VERBS } from "@/app/lib/assist/commandVerbs";
 import { fixtureDiagram as fixtureDiagramV1 } from "./_helpers/voiceFixtureV1";
 import { joinSpelledLetters } from "@/app/lib/assist/spelledWord";
 import type { DiagramData, DiagramElement } from "@/app/lib/diagram/types";
+import { editorSource } from "./assistApplySource";
 
 const E = (o: Record<string, unknown>) => o as unknown as DiagramElement;
 const src = (p: string) => readFileSync(p, "utf8");
@@ -250,7 +251,7 @@ describe("T4930 — a name spelled out is the word (“rename Lane 3 to F I N A 
   it("one repair for the grammar and the hold, and the rename-by-number answer too", () => {
     // + convert, 2026-09-27; + "letter" → "delete", 2026-09-28 (T4992).
     expect(readFileSync("app/lib/assist/selectedWord.ts", "utf8")).toContain("repairTurnWord(repairConvertWord(repairMoveWord(repairDeleteWord(joinSpelledLetters(text)).text).text).text)");
-    const editor = readFileSync("app/(dashboard)/diagram/[id]/DiagramEditor.tsx", "utf8");
+    const editor = editorSource();
     const rename = editor.slice(editor.indexOf("const handleRenameUtterance = useCallback("), editor.indexOf("const handleRenameUtterance = useCallback(") + 800);
     expect(rename).toContain("const t = joinSpelledLetters(text.trim());");
   });

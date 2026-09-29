@@ -33,6 +33,7 @@ import { ID_REF_PREFIX } from "@/app/lib/assist/resolveRef";
 import { COMMAND_CATALOG } from "@/app/lib/assist/commandCatalog";
 import { reducer } from "@/app/hooks/useDiagram";
 import type { Connector, DiagramData, DiagramElement } from "@/app/lib/diagram/types";
+import { editorCode } from "./assistApplySource";
 
 const read = (...p: string[]) => readFileSync(join(process.cwd(), ...p), "utf8");
 /** Source with comments removed — the wiring is in the code, not the prose about it. */
@@ -518,7 +519,7 @@ describe("T4813 — wiring: every path asks the one rule", () => {
     const gate = body.indexOf("const whyNot = messageFlowRefusal(f, t, els, { connectors: data.connectors });");
     expect(gate).toBeGreaterThan(-1);
     expect(gate).toBeLessThan(body.indexOf("addConnector("));
-    const ed = code("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
+    const ed = editorCode();
     const h = ed.slice(ed.indexOf("const handleMessageUtterance"), ed.indexOf("const handleMessageUtteranceRef"));
     expect(h).toContain("resolveMessageAnswer(flow, a, elementsRef.current, connectorsRef.current)");
     const refuse = h.indexOf('if ("error" in ends) { log(ends.error, false); return; }');

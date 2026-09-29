@@ -8,6 +8,7 @@ import path from "node:path";
 import { computeEntityDrift } from "@/app/lib/entityLists/entityDrift";
 import type { ProjectEntityStructure } from "@/app/lib/entityLists/types";
 import type { DiagramElement } from "@/app/lib/diagram/types";
+import { editorSource } from "../diagram/assistApplySource";
 
 const sug = (name: string) => ({ id: name, name, level: "Participant" as const, parentId: null, depth: 0 });
 const structure: ProjectEntityStructure = {
@@ -55,7 +56,7 @@ describe("the Entity Drift button is offered on BPMN only", () => {
     // rings pool/lane, participant, IT-system, document and data-store names —
     // a BPMN vocabulary. On any other type the check can only ever answer
     // "no drift", which reads as a pass. The gate used to exclude EPC alone.
-    const src = fs.readFileSync(path.resolve(__dirname, "..", "..", "app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx"), "utf8");
+    const src = editorSource();
     const i = src.indexOf("Entity Drift{entityDriftEnabled");
     expect(i, "the Entity Drift button").toBeGreaterThan(-1);
     const gate = src.slice(Math.max(0, i - 1200), i);

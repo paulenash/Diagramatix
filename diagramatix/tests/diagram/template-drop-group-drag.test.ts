@@ -41,6 +41,7 @@ import { applyAssistOps } from "@/app/lib/assist/applyAssistOps";
 import { builtinTemplates, builtinTemplate } from "./_helpers/builtinTemplates";
 import { auditInsert, endsOff, existingFlowsThrough, outsideParent } from "./_helpers/settleAudit";
 import type { Connector, DiagramData, DiagramElement, TemplateData } from "@/app/lib/diagram/types";
+import { editorSource } from "./assistApplySource";
 
 const E = (o: Record<string, unknown>) => ({ properties: {}, label: "", ...o }) as unknown as DiagramElement;
 const src = (p: string) => readFileSync(p, "utf8");
@@ -385,7 +386,7 @@ describe("T4878 — which band, and where in it", () => {
 });
 
 describe("T4879 — wiring: the window and the toolbar list both drop through planTemplateDrop; the attach and the drop share one placement", () => {
-  const editor = src("app/(dashboard)/diagram/[id]/DiagramEditor.tsx");
+  const editor = editorSource();
   const attach = src("app/lib/diagram/templateAttach.ts");
   const fnBody = (text: string, start: string) => {
     const i = text.indexOf(start);

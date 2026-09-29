@@ -14,11 +14,12 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { mergeRefinement } from "@/app/lib/ai/refineFlowchartBpmn";
 import type { AiElement, AiConnection } from "@/app/lib/diagram/bpmnLayout";
+import { editorSource } from "../diagram/assistApplySource";
 
 const read = (p: string) => readFileSync(p, "utf8");
 
 describe("a person can actually get to it", () => {
-  const editor = () => read("app/(dashboard)/diagram/[id]/DiagramEditor.tsx");
+  const editor = () => editorSource();
 
   it("T4099 - the editor offers Convert to BPMN on an EPC, and mounts the dialog", () => {
     const src = editor();

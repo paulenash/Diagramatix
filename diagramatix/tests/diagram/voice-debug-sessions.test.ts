@@ -19,6 +19,7 @@ import {
 } from "@/app/lib/assist/debugSessionFile";
 import type { CommandLogEntry } from "@/app/lib/assist/commandLog";
 import { captureState, newCaptureLedger } from "@/app/lib/assist/debugCapture";
+import { editorSource } from "./assistApplySource";
 
 const read = (p: string) => readFileSync(p, "utf8");
 const LIST_ROUTE = "app/api/admin/voice-debug/sessions/route.ts";
@@ -218,7 +219,7 @@ describe("T4722c — the POST accepts exactly what the Download writes", () => {
   });
 
   it("the editor builds ONE session and sends it to both destinations", () => {
-    const editor = read("app/(dashboard)/diagram/[id]/DiagramEditor.tsx");
+    const editor = editorSource();
     expect(editor).toContain("const buildDebugSession = useCallback");
     // Both callers go through it — not two builders that can drift.
     expect(editor).toContain("JSON.stringify(buildDebugSession(Date.now()))");

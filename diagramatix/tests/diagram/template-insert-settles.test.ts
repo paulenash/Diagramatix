@@ -35,6 +35,7 @@ import {
 } from "./_helpers/settleAudit";
 import type { Action } from "@/app/hooks/useDiagram";
 import type { Connector, DiagramData, DiagramElement, TemplateData } from "@/app/lib/diagram/types";
+import { editorSource } from "./assistApplySource";
 
 const E = (o: Record<string, unknown>) => ({ properties: {}, label: "", ...o }) as unknown as DiagramElement;
 const src = (p: string) => readFileSync(p, "utf8");
@@ -629,7 +630,7 @@ describe("T4868 — one host, by OVERLAP; never a black-box pool", () => {
     // …and the other place a parent is chosen, ADD_ELEMENT's container filter.
     expect(hook).toContain("if (isBlackBoxPool(b)) return false;");
     expect(hook).not.toMatch(/b\.type === "pool" && \(b\.properties\?\.poolType as string \| undefined\) === "black-box"/);
-    expect(src("app/(dashboard)/diagram/[id]/DiagramEditor.tsx")).toContain("diagramHasWhiteBoxPool(elementsRef.current)");
+    expect(editorSource()).toContain("diagramHasWhiteBoxPool(elementsRef.current)");
   });
 });
 

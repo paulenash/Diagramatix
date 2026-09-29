@@ -13,11 +13,9 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { editorSource } from "./assistApplySource";
 
-const EDITOR = readFileSync(
-  join(process.cwd(), "app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx"),
-  "utf8",
-);
+const EDITOR = editorSource();
 
 /** The Diagram ▾ dropdown's body, from its open state to the end of the panel. */
 const menu = (() => {

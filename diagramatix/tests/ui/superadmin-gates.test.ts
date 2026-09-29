@@ -13,6 +13,7 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { tileVisibleTo, FUN_TILE_OWNERS } from "@/app/lib/admin/tileVisibility";
+import { editorSource } from "../diagram/assistApplySource";
 
 const ROOT = path.resolve(__dirname, "..", "..");
 const read = (...p: string[]) => fs.readFileSync(path.join(ROOT, ...p), "utf8");
@@ -53,7 +54,7 @@ describe("tileVisibleTo — an exact-email gate, narrower than SuperAdmin", () =
 
 describe("NEW AI Generate is SuperAdmin-only while it is judged", () => {
   it("T4380 — the button is behind isActingAdmin, not merely isAdmin", () => {
-    const src = read("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
+    const src = editorSource();
     const block = src.slice(src.indexOf("NEW AI Generate — the full-screen console"));
     const gate = block.slice(0, block.indexOf("<button"));
     expect(gate).toMatch(/\{!readOnly && diagramType === "bpmn" && aiAllowedHere && isActingAdmin && \(/);

@@ -21,6 +21,7 @@ import { importAml, epcModelToPlan } from "@/app/lib/diagram/aris/importAml";
 import { layoutEpcDiagram } from "@/app/lib/diagram/layoutEpc";
 import { translateEpcToBpmn } from "@/app/lib/diagram/translate/epcToBpmn";
 import type { LayoutDiagnostic } from "@/app/lib/diagram/bpmnLayout";
+import { editorSource } from "../diagram/assistApplySource";
 
 const SAMPLE = "public/ARIS Order to Cash eEPC.aml";
 const xml = () => readFileSync(SAMPLE, "utf8");
@@ -129,7 +130,7 @@ describe("a person can actually get to the import", () => {
   const read = (f: string) => readFileSync(f, "utf8");
 
   it("T4122 - the editor offers ARIS (AML) on an EPC and calls the handler", () => {
-    const src = read("app/(dashboard)/diagram/[id]/DiagramEditor.tsx");
+    const src = editorSource();
     expect(src, "no menu entry").toContain("ARIS (AML)");
     expect(src).toContain("importAmlInputRef");
     expect(src).toContain("handleImportAmlFile");
@@ -138,7 +139,7 @@ describe("a person can actually get to the import", () => {
   });
 
   it("T4123 - it posts to a route that exists, and that route shows the warnings", () => {
-    const src = read("app/(dashboard)/diagram/[id]/DiagramEditor.tsx");
+    const src = editorSource();
     expect(src).toContain("\"/api/import/aml\"");
     expect(read("app/api/import/aml/route.ts")).toMatch(/export async function POST/);
     // The warnings are the half that makes a real migration trustworthy, so

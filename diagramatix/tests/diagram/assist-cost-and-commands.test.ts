@@ -8,6 +8,7 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { summariseCommandUsage, formatCostReport, type UsageRow } from "@/app/lib/assist/usageCost";
+import { editorSource } from "./assistApplySource";
 
 const read = (...p: string[]) => fs.readFileSync(path.resolve(__dirname, "..", "..", ...p), "utf8");
 
@@ -61,7 +62,7 @@ describe("cost so far", () => {
     expect(bar).toContain("formatCostReport(cost.report)");
     expect(bar, "the cost is labelled as an estimate").toContain(">estimate</span>");
 
-    const editor = read("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
+    const editor = editorSource();
     expect(editor).toContain("onCost={fetchAbraCost}");
     expect(editor, "the open mic session is added live").toMatch(/voiceMicOpenedAt\.current = Date\.now\(\);/);
     expect(editor).toMatch(/\/api\/ai\/command\/usage\?\$\{q\}/);

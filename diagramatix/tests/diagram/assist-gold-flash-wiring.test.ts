@@ -15,6 +15,7 @@ import { COMMAND_CATALOG, SUPERADMIN_COMMAND_CATALOG } from "@/app/lib/assist/co
 import { parseCommand } from "@/app/lib/assist/commandGrammar";
 import { flashTargets, GOLD_FLASH_MAX_TARGETS, type FlashBox } from "@/app/lib/assist/goldFlash";
 import { atLeastTier, tierRank, TIER_ORDER } from "@/app/lib/features/tierRank";
+import { editorSource } from "./assistApplySource";
 
 const read = (...p: string[]) => readFileSync(join(process.cwd(), ...p), "utf8");
 const phrases = (cat: typeof COMMAND_CATALOG) => cat.flatMap((f) => f.items.flatMap((i) => i.say));
@@ -155,7 +156,7 @@ describe("T4488 — one ordering of the tiers", () => {
 });
 
 describe("T4489 — Voice Assist is gated on the feature, not on being an admin", () => {
-  const editor = read("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
+  const editor = editorSource();
 
   it("reads the registry key that has been seeded since Phase 1", () => {
     expect(editor).toContain('useFeatureState("voice-assist")');

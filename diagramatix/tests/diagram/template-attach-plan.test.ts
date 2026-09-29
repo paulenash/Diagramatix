@@ -30,6 +30,7 @@ import { canAttachInline, templatesToOffer, hiddenTemplatesNote, templateWindowS
 import { builtinTemplate, builtinTemplates } from "./_helpers/builtinTemplates";
 import { paulsDiagram as boundaryDiagram } from "../routing/_helpers/block2Test3";
 import type { Connector, DiagramData, DiagramElement, TemplateData } from "@/app/lib/diagram/types";
+import { editorSource } from "./assistApplySource";
 
 const E = (o: Record<string, unknown>) => ({ properties: {}, label: "", ...o }) as unknown as DiagramElement;
 const src = (p: string) => readFileSync(p, "utf8");
@@ -547,7 +548,7 @@ describe("T4854 — what the anchored window offers", () => {
 
   it("the mouse's attach picker asks the same question", () => {
     expect(rows.filter(canAttachInline).map((r) => r.id)).toEqual(["a", "b"]);
-    expect(src("app/(dashboard)/diagram/[id]/DiagramEditor.tsx")).toContain(".filter(canAttachInline)");
+    expect(editorSource()).toContain(".filter(canAttachInline)");
   });
 
   it("what the log and the footer say", () => {
@@ -562,7 +563,7 @@ describe("T4854 — what the anchored window offers", () => {
 });
 
 describe("T4855 — wiring: one placement, one join, one close", () => {
-  const editor = src("app/(dashboard)/diagram/[id]/DiagramEditor.tsx");
+  const editor = editorSource();
   const hook = src("app/hooks/useDiagram.ts");
   const body = (text: string, name: string) => {
     const start = text.indexOf(`const ${name} = useCallback(`);
@@ -809,7 +810,7 @@ describe("T4861 — the swap's order is ONE function (`runTemplateApply`), run b
 
 describe("T4862 — the Template ghosts are offered only where a template can follow", () => {
   it("both template ghosts ask the attach's own rule, whyTemplateCantFollow, before they are offered", () => {
-    const editor = src("app/(dashboard)/diagram/[id]/DiagramEditor.tsx");
+    const editor = editorSource();
     const start = editor.indexOf("const nextStepCandidates = useMemo(");
     const cands = editor.slice(start, editor.indexOf("const attachTemplate = useCallback(", start));
     expect(cands).toContain("if (inlineTemplates.length > 0 && !whyTemplateCantFollow(selectedElement, data.elements)) {");

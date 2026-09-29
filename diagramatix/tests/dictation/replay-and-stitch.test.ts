@@ -17,6 +17,7 @@ import {
   stitchFinals, FRAGMENT_SILENCE_MS, FRAGMENT_CONTINUE_MS, FRAGMENT_MAX_WAITS,
 } from "@/app/lib/assist/fragmentBuffer";
 import { isIncompleteCommand } from "@/app/lib/assist/incompleteCommand";
+import { editorSource } from "../diagram/assistApplySource";
 
 const read = (p: string) => readFileSync(p, "utf8");
 
@@ -77,7 +78,7 @@ describe("T4735 — the live path and the replay share the numbers", () => {
     // rewriting the live timer state machine, which is the riskiest code in
     // this feature and currently works. That trade is written down in
     // fragmentBuffer.ts rather than left for somebody to discover.
-    const editor = read("app/(dashboard)/diagram/[id]/DiagramEditor.tsx");
+    const editor = editorSource();
     expect(editor).toContain("const ABRA_SILENCE_MS = FRAGMENT_SILENCE_MS;");
     expect(editor).toContain("const ABRA_CONTINUE_MS = FRAGMENT_CONTINUE_MS;");
     expect(editor).toContain("const ABRA_MAX_WAITS = FRAGMENT_MAX_WAITS;");
@@ -89,7 +90,7 @@ describe("T4735 — the live path and the replay share the numbers", () => {
   });
 
   it("both sides use the same unfinished-sentence predicate", () => {
-    const editor = read("app/(dashboard)/diagram/[id]/DiagramEditor.tsx");
+    const editor = editorSource();
     expect(editor).toContain("isIncompleteCommand(cmd)");
     expect(read("app/lib/assist/fragmentBuffer.ts")).toContain("isIncompleteCommand(buffer.trim())");
   });

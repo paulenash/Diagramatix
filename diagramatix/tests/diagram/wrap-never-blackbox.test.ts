@@ -21,6 +21,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseCommand } from "@/app/lib/assist/commandGrammar";
 import type { DiagramElement } from "@/app/lib/diagram/types";
+import { editorSource } from "./assistApplySource";
 
 const el = (id: string, type: string, extra: Partial<DiagramElement> = {}): DiagramElement =>
   ({ id, type: type as DiagramElement["type"], label: id, x: 100, y: 0, width: 400, height: 100, properties: {}, ...extra } as DiagramElement);
@@ -97,10 +98,7 @@ describe("T4518 — a white-box pool is still grown, as it was", () => {
 });
 
 describe("T4519 — a surround always makes a new pool, whatever the AI returns", () => {
-  const EDITOR = readFileSync(
-    join(process.cwd(), "app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx"),
-    "utf8",
-  );
+  const EDITOR = editorSource();
 
   it("rewrites the whole-diagram wrap when the user named the selection", () => {
     expect(EDITOR).toMatch(/op\.op === "wrapInPool" && \/\\b\(\?:selected\|selection\|these\|those\|highlighted\)\\b\//);

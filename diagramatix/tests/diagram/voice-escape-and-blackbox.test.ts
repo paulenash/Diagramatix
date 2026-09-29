@@ -18,9 +18,10 @@ import { reducer } from "@/app/hooks/useDiagram";
 import { isFlowEndWord, isMicStopWord } from "@/app/lib/assist/stopWords";
 import { isIncompleteCommand } from "@/app/lib/assist/incompleteCommand";
 import type { DiagramData, DiagramElement } from "@/app/lib/diagram/types";
+import { editorSource } from "./assistApplySource";
 
 const E = (o: Record<string, unknown>) => o as unknown as DiagramElement;
-const editor = () => readFileSync("app/(dashboard)/diagram/[id]/DiagramEditor.tsx", "utf8");
+const editor = () => editorSource();
 
 describe("T4740 — an escape word is never swallowed by a half-finished command", () => {
   it("the mechanism that trapped it", () => {

@@ -26,6 +26,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { leadingSpokenNumber } from "@/app/lib/assist/spokenNumber";
+import { editorSource } from "./assistApplySource";
 
 describe("reading the number off a spoken pick", () => {
   it("T4447 — digits, number words, and a filler prefix all resolve, with the rest kept as the name", () => {
@@ -61,7 +62,7 @@ describe("reading the number off a spoken pick", () => {
   });
 
   it("T4450 — both halves are wired: the pick handler uses it, and the number words are boosted", () => {
-    const editor = readFileSync(join(process.cwd(), "app/(dashboard)/diagram/[id]/DiagramEditor.tsx"), "utf8");
+    const editor = editorSource();
     // Reads the utterance as spoken, not the lower-cased copy: the number word
     // is folded inside the reader, and lower-casing here threw away the
     // capitalisation of the name that follows it (T4478).

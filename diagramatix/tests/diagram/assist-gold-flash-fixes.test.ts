@@ -27,10 +27,11 @@ import { join } from "node:path";
 import { flashTargets, opFlashes, type FlashBox } from "@/app/lib/assist/goldFlash";
 import { repairTurnWord, TURN_MISHEARD_WORDS } from "@/app/lib/assist/selectedWord";
 import { parseCommand } from "@/app/lib/assist/commandGrammar";
+import { editorSource } from "./assistApplySource";
 
 const read = (...p: string[]) => readFileSync(join(process.cwd(), ...p), "utf8");
 const OVERLAY = read("app", "components", "canvas", "GoldFlashOverlay.tsx");
-const EDITOR = read("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
+const EDITOR = editorSource();
 
 const box = (id: string, over: Partial<FlashBox> = {}): FlashBox =>
   ({ id, x: 100, y: 100, width: 102, height: 65, label: id, ...over });

@@ -12,6 +12,7 @@ import { mergeRefinement } from "@/app/lib/ai/refineFlowchartBpmn";
 import { findDrillBackAnchor } from "@/app/lib/diagram/drillBackAnchor";
 import type { AiElement, AiConnection } from "@/app/lib/diagram/bpmnLayout";
 import type { DiagramElement, Connector } from "@/app/lib/diagram/types";
+import { editorSource } from "../diagram/assistApplySource";
 
 const read = (p: string) => readFileSync(p, "utf8");
 
@@ -84,7 +85,7 @@ describe("item 2 — Entity Drift does not apply to an EPC", () => {
     // It rings pool / lane, participant, IT system, document and data-store
     // names against the project's Entity Structure. An EPC has none of those,
     // so the check would answer "no drift" every time — which reads as a pass.
-    const editor = read("app/(dashboard)/diagram/[id]/DiagramEditor.tsx");
+    const editor = editorSource();
     // 2026-09-14: the gate became BPMN-only ("Only show Entity Drift on BPMN
     // Diagram Screen") — the same reasoning as this item, applied to every
     // type that lacks the vocabulary. An EPC is still hidden, by a stricter rule.

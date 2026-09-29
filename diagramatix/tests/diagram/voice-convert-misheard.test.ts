@@ -15,6 +15,7 @@ import { fixtureDiagram } from "@/app/lib/assist/commandFixture";
 import { aiInventedRename, INVENTED_RENAME_REFUSAL } from "@/app/lib/assist/aiGuards";
 import { diagramKeyterms, VERB_SHADOWS } from "@/app/lib/dictation/diagramKeyterms";
 import type { AssistOp } from "@/app/lib/assist/ops";
+import { editorSource } from "./assistApplySource";
 
 describe("T4947 — “Coverage …” is “convert …” in the convert shape; “Processing” is a subprocess", () => {
   it("Paul's heard lines now parse as the convert he said", () => {
@@ -65,7 +66,7 @@ describe("T4948 — the AI never invents a rename", () => {
   });
 
   it("the editor checks it on BOTH AI paths — the canonical sentence and the raw ops — and the prompt says it too", () => {
-    const ed = readFileSync("app/(dashboard)/diagram/[id]/DiagramEditor.tsx", "utf8");
+    const ed = editorSource();
     expect(ed).toContain("if (canonicalOps && aiInventedRename(heard, canonicalOps)) { log({ heard, summary: INVENTED_RENAME_REFUSAL");
     expect(ed).toContain("if (aiInventedRename(heard, aiOps)) { log({ heard, summary: INVENTED_RENAME_REFUSAL");
     expect(INVENTED_RENAME_REFUSAL).toMatch(/^didn’t understand that — nothing was renamed/);

@@ -26,6 +26,7 @@ import { contentCrossedBy, cutByLine, dividerRoom } from "@/app/lib/diagram/lane
 import { COMMAND_CATALOG } from "@/app/lib/assist/commandCatalog";
 import { diagramKeyterms } from "@/app/lib/dictation/diagramKeyterms";
 import type { DiagramData } from "@/app/lib/diagram/types";
+import { editorSource } from "./assistApplySource";
 
 const session2 = (): DiagramData => JSON.parse(readFileSync("tests/fixtures/voice-debug/move-dividers-session-2.json", "utf8")).diagram;
 const session4 = (): DiagramData => JSON.parse(readFileSync("tests/fixtures/voice-debug/boundary-session-4.json", "utf8")).diagram;
@@ -159,7 +160,7 @@ describe("T4980 — a boundary command's follow-up: “sixty pixels”, “up by
   });
 
   it("the editor: the grammar first, then the follow-up, then the AI; any other command ends it", () => {
-    const ed = readFileSync("app/(dashboard)/diagram/[id]/DiagramEditor.tsx", "utf8");
+    const ed = editorSource();
     const parse = ed.indexOf("    const ops = parseCommand(heard);\n    if (ops) { applyOrAsk(ops, false); return; }");
     const follow = ed.indexOf("const f = readBoundaryFollowUp(heard, boundaryLastRef.current);");
     const ai = ed.indexOf("await fetch(\"/api/ai/command\"");

@@ -17,6 +17,7 @@ import { describe, it, expect } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { FEATURES } from "@/app/lib/features/registry";
+import { editorSource } from "../diagram/assistApplySource";
 
 const ROOT = process.cwd();
 const read = (...p: string[]) => readFileSync(join(ROOT, ...p), "utf8");
@@ -85,7 +86,7 @@ describe("T4553 — nothing still says Abracadabra", () => {
     expect(FEATURES.find((f) => f.key === "voice-assist")?.label).toBe("Voice Assist");
 
     expect(read("app", "api", "ai", "command", "route.ts")).toContain('gateFeature(session.user.id, "voice-assist")');
-    expect(read("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx")).toContain('useFeatureState("voice-assist")');
+    expect(editorSource()).toContain('useFeatureState("voice-assist")');
     // The bar moved file as well as name.
     expect(() => read("app", "components", "canvas", "VoiceAssistBar.tsx")).not.toThrow();
   });
