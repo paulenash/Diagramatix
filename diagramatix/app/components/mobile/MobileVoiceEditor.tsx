@@ -32,6 +32,7 @@ import {
   VOICE_EXAMPLES, askedYesNo, chipAction, currentQuestion, elementAt, lastEditedBox, phoneWording, selectionAfterTap,
 } from "@/app/lib/mobile/voiceEdit";
 import { badgePosition } from "@/app/lib/mobile/badgePlace";
+import { keepAwake } from "@/app/lib/mobile/wakeLock";
 import { GoldFlashOverlay } from "@/app/components/canvas/GoldFlashOverlay";
 import { MobileDiagramView } from "./MobileDiagramView";
 
@@ -123,6 +124,7 @@ export function MobileVoiceEditor({
     beginHistoryGroup: d.beginHistoryGroup, endHistoryGroup: d.endHistoryGroup,
     handleExportJson: exportJson,
     autoConnect,
+    phone: true,
   } as never);
   // Voice Assist is on while this screen is (the session turns itself off when a diagram opens).
   const { setVoiceAssistOn } = session;
@@ -216,6 +218,12 @@ export function MobileVoiceEditor({
     await session.runVoiceCommand(a.run);
   }
   const listening = session.voiceListening;
+  // The screen stays on while the mic is open: a phone that sleeps mid-sentence loses the microphone.
+  useEffect(() => {
+    if (!listening) return;
+    const lock = keepAwake();
+    return () => lock.release();
+  }, [listening]);
   async function send() {
     const t = text.trim();
     if (!t) return;

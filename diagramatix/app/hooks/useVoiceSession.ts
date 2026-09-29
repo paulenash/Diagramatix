@@ -79,6 +79,8 @@ export interface VoiceSessionHost extends Pick<AssistDiagramActions, "addConnect
   setSelectedElementIds: Dispatch<SetStateAction<Set<string>>>;
   /** Auto-connect (the phone's toggle): an add with no "after X" joins the selection / last element. Off by default. */
   autoConnect?: boolean;
+  /** The phone: 16 kHz capture and an automatic reconnect when the connection drops (mobile voice stage 7). */
+  phone?: boolean;
 }
 
 export function useVoiceSession(host: VoiceSessionHost) {
@@ -86,6 +88,7 @@ export function useVoiceSession(host: VoiceSessionHost) {
     addConnector, addElementGated, addLaneAt, addPool, alignElements, beginHistoryGroup, beginLabelEdit, cancelLabelEdit, clearDiagram, compressLane, compressPool, connectorsRef, convertTaskSubprocess, data, deleteConnector, deleteElement, diagramColorConfig, diagramId, diagramName, diagramType, displayMode, elementsMoveEnd, elementsRef, endHistoryGroup, expandLane, extendPools, handleExportJson, insertSpace, laneBoundaryMoveEnd, moveElements, moveLane, moveLaneBoundary, movePoolTo, nextStepRef, openTemplateWindowRef, removeSpace, resizeElement, resizeElementEnd, riskCatalog, selectedConnectorIdRef, selectedIdsRef, setEventBoundary, setSelectedConnectorId, setSelectedElementIds, splitLaneEven, splitPoolEven, swapLane, swapPools, undo, unwrapSubprocess, updateConnectorEndpoint, updateConnectorLabel, updateLabel, updateProperties, wrapInContainer, wrapInPool, wrapInSubprocess,
   } = host;
   const autoConnect = host.autoConnect === true;
+  const phone = host.phone === true;
 
   // ── Voice Assist: live voice/typed command editing ──
   const [voiceAssistOn, setVoiceAssistOn] = useState(false);
@@ -1041,6 +1044,7 @@ export function useVoiceSession(host: VoiceSessionHost) {
       // which is also why the number-word elevation cannot live here and sits
       // in the pick handler instead.
       keyterms: diagramKeyterms(elementsRef.current.map((e) => e.label)),
+      phone,
       onEngine: (e) => setAbraEngine(e),
       onReady: () => setAbraConnecting(false),
       // Show the command building: buffered fragments + the in-progress words.

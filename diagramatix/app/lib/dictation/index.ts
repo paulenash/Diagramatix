@@ -31,10 +31,19 @@ export interface DictationCallbacks {
    * command. Deepgram only: the browser engine has no such setting.
    */
   prose?: boolean;
+  /**
+   * Phone use (mobile voice stage 7). Asks for a capture rate (16 kHz — a third of
+   * the data of the usual 48 kHz; falls back to the device's own rate if refused)
+   * and makes the session RECONNECT by itself when the socket drops, instead of
+   * ending. Deepgram only. Off on the desktop, whose recogniser settings were
+   * measured at the device rate.
+   */
+  phone?: boolean;
 }
 import { createPcmQueue, PCM_QUEUE_MAX_CHUNKS } from "./pcmQueue";
 import { liveStreamParams, ASR_LANGUAGE } from "./asrParams";
 import { tokenOutcome, type TokenOutcome } from "./tokenOutcome";
+import { PHONE_SAMPLE_RATE, reconnectDelayMs } from "./reconnectPolicy";
 
 export interface DictationHandle {
   stop(): void;
@@ -184,7 +193,9 @@ async function startDeepgram(token: string, scheme: string, cb: DictationCallbac
   const stream: MediaStream = early;
 
   const AC: typeof AudioContext = (window as any).AudioContext || (window as any).webkitAudioContext;
-  const ctx = new AC();
+  const phone = cb.phone === true;
+  let ctx: AudioContext;
+  try { ctx = phone ? new AC({ sampleRate: PHONE_SAMPLE_RATE }) : new AC(); } catch { ctx = new AC(); }
   // iOS Safari can start an AudioContext in "suspended" state; resume it (we're
   // inside a user gesture) so the mic actually captures on a phone.
   if (ctx.state === "suspended") { try { await ctx.resume(); } catch { /* best-effort */ } }
@@ -192,8 +203,6 @@ async function startDeepgram(token: string, scheme: string, cb: DictationCallbac
   // boosts with their long-won reasoning — lives in `asrParams.ts`, so the live
   // microphone and a replayed clip cannot drift apart. (2026-09-24.)
   const params = liveStreamParams({ sampleRate: ctx.sampleRate, keyterms: cb.keyterms, prose: cb.prose });
-  const ws = new WebSocket(`wss://api.deepgram.com/v1/listen?${params.toString()}`, [scheme, token]);
-  ws.binaryType = "arraybuffer";
 
   const source = ctx.createMediaStreamSource(stream);
   const processor = ctx.createScriptProcessor(4096, 1, 1);
@@ -201,9 +210,14 @@ async function startDeepgram(token: string, scheme: string, cb: DictationCallbac
   mute.gain.value = 0; // keep the graph alive WITHOUT echoing the mic to speakers
 
   let stopped = false;
+  let ws: WebSocket;
+  let attempts = 0;
+  let retryTimer: ReturnType<typeof setTimeout> | null = null;
   function cleanup() {
     if (stopped) return;
     stopped = true;
+    if (retryTimer) clearTimeout(retryTimer);
+    if (phone && typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisible);
     try { processor.disconnect(); } catch { /* */ }
     try { source.disconnect(); } catch { /* */ }
     try { mute.disconnect(); } catch { /* */ }
@@ -217,15 +231,11 @@ async function startDeepgram(token: string, scheme: string, cb: DictationCallbac
   }
 
   // Capture from the first moment; queue until the socket is open, then drain
-  // in order so nothing said during the handshake is lost.
+  // in order so nothing said during the handshake (or a reconnect) is lost.
   const queue = createPcmQueue(PCM_QUEUE_MAX_CHUNKS);
   source.connect(processor);
   processor.connect(mute);
   mute.connect(ctx.destination);
-  ws.onopen = () => {
-    queue.drain((chunk) => ws.send(chunk));
-    cb.onReady?.();
-  };
   processor.onaudioprocess = (e) => {
     const input = e.inputBuffer.getChannelData(0);
     const pcm = new Int16Array(input.length);
@@ -234,21 +244,72 @@ async function startDeepgram(token: string, scheme: string, cb: DictationCallbac
       pcm[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
     }
     if (ws.readyState === WebSocket.OPEN) ws.send(pcm.buffer);
-    else if (ws.readyState === WebSocket.CONNECTING) queue.push(pcm.buffer);
+    else if (ws.readyState === WebSocket.CONNECTING || (phone && !stopped)) queue.push(pcm.buffer);
   };
-  ws.onmessage = (ev) => {
-    try {
-      const msg = JSON.parse(ev.data as string);
-      const transcript = msg?.channel?.alternatives?.[0]?.transcript;
-      if (transcript) {
-        if (msg.is_final) cb.onText(transcript);
-        else cb.onInterim?.(transcript);
-      }
-    } catch { /* non-JSON keep-alive etc. */ }
-  };
-  ws.onerror = () => { cb.onError?.("Dictation connection error."); };
-  ws.onclose = () => { cleanup(); };
 
+  function open(tok: string) {
+    const sock = new WebSocket(`wss://api.deepgram.com/v1/listen?${params.toString()}`, [scheme, tok]);
+    ws = sock;
+    sock.binaryType = "arraybuffer";
+    sock.onopen = () => {
+      queue.drain((chunk) => sock.send(chunk));
+      cb.onReady?.();
+    };
+    sock.onmessage = (ev) => {
+      try {
+        const msg = JSON.parse(ev.data as string);
+        const transcript = msg?.channel?.alternatives?.[0]?.transcript;
+        if (transcript) {
+          attempts = 0;   // it heard something: the connection is good again
+          if (msg.is_final) cb.onText(transcript);
+          else cb.onInterim?.(transcript);
+        }
+      } catch { /* non-JSON keep-alive etc. */ }
+    };
+    sock.onerror = () => { if (!phone) cb.onError?.("Dictation connection error."); };
+    sock.onclose = () => {
+      if (sock !== ws) return;             // a superseded socket
+      if (phone && !stopped) { reconnect(); return; }
+      cleanup();
+    };
+  }
+
+  /** Phone: the socket dropped — get a fresh token and reopen, keeping the microphone running. */
+  function reconnect() {
+    if (stopped || retryTimer) return;
+    attempts += 1;
+    const delay = reconnectDelayMs(attempts);
+    if (delay === null) { cb.onError?.("Lost the connection and could not get it back. Tap the mic to start again."); cleanup(); return; }
+    cb.onError?.("Connection dropped — reconnecting…");
+    retryTimer = setTimeout(async () => {
+      retryTimer = null;
+      if (stopped) return;
+      try {
+        const r = await fetch("/api/ai/dictation/token", { method: "POST" });
+        const body = await r.json().catch(() => null);
+        const out = tokenOutcome(r.status, body);
+        if (out.kind !== "cloud") throw new Error("no token");
+        if (!stopped) open(out.token);
+      } catch {
+        if (!stopped) reconnect();
+      }
+    }, delay);
+  }
+
+  // Phone: the OS suspends a page that is switched away from. When the person
+  // comes back, wake the audio graph and, if the socket died meanwhile, reopen it now.
+  function onVisible() {
+    if (typeof document === "undefined" || document.visibilityState !== "visible" || stopped) return;
+    if (ctx.state === "suspended" || (ctx.state as string) === "interrupted") { try { void ctx.resume(); } catch { /* best-effort */ } }
+    if (ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) { attempts = 0; reconnect(); }
+  }
+  if (phone) {
+    if (typeof document !== "undefined") document.addEventListener("visibilitychange", onVisible);
+    // Another app (a phone call) taking the microphone ends its track: say so, and stop cleanly.
+    stream.getAudioTracks().forEach((t) => { t.onended = () => { if (!stopped) { cb.onError?.("The microphone was taken by another app."); cleanup(); } }; });
+  }
+
+  open(token);
   return { stop: cleanup };
 }
 
