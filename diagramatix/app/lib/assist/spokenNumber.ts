@@ -23,6 +23,8 @@ const NUMBER_WORDS = [
   "seventeen", "eighteen", "nineteen", "twenty",
 ] as const;
 
+const TENS: Record<string, number> = { twenty: 20, thirty: 30, forty: 40, fourty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 };
+
 /**
  * What the recogniser returns instead of each number word. Kept deliberately
  * tight: every entry is a real substitution seen in use or a near-homophone in
@@ -71,6 +73,23 @@ export function leadingSpokenNumber(text: string): LeadingNumber | null {
 
   // A digit, as spoken by someone reading the badge.
   if (/^\d+$/.test(head)) return { n: parseInt(head, 10), rest, corrected: false };
+
+  // A number above twenty: "twenty two", "twenty-seven", "ninety nine" — the
+  // template window has dozens of cards, and "twenty two" used to be read as
+  // 20 with "two" left over (Paul, 2026-09-29: "I say 22 or 27, I get template 20").
+  const hy = head.split("-");
+  const tens = TENS[hy[0]];
+  if (tens !== undefined) {
+    if (hy.length === 2) {
+      const u = NUMBER_WORDS.indexOf(hy[1] as (typeof NUMBER_WORDS)[number]);
+      if (u >= 1 && u <= 9) return { n: tens + u, rest, corrected: false };
+    } else if (hy.length === 1) {
+      const nx = rest.match(/^(\S+)\s*([\s\S]*)$/);
+      const u = nx ? NUMBER_WORDS.indexOf(nx[1].toLowerCase().replace(/[.,!?;:]+$/g, "") as (typeof NUMBER_WORDS)[number]) : -1;
+      if (nx && u >= 1 && u <= 9) return { n: tens + u, rest: nx[2].trim(), corrected: false };
+      if (tens >= 30) return { n: tens, rest, corrected: false };
+    }
+  }
 
   const asWord = NUMBER_WORDS.indexOf(head as (typeof NUMBER_WORDS)[number]);
   if (asWord >= 0) return { n: asWord, rest, corrected: false };

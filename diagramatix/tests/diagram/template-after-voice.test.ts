@@ -404,7 +404,7 @@ describe("T4928 — a pick is final: no Keep it / Cancel step", () => {
     expect(applied).toBeGreaterThan(-1);
     expect(closed, "the window closes after the template is applied").toBeGreaterThan(applied);
     expect(show).not.toContain("provisional: {");
-    expect(show).toContain("summary: `added template “${card.name}”");
+    expect(show).toContain("summary: `added template ${card.n} “${card.name}”");
     expect(show, "no “yes to keep” is asked for").not.toMatch(/to keep it/);
   });
 

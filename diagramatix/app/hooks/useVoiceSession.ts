@@ -1099,7 +1099,7 @@ export function useVoiceSession(host: VoiceSessionHost) {
         // #5 Instant: show badges the moment a "rename <type>" is heard, and pick
         // a number the moment it's spoken — skip the silence wait entirely.
         const flow = renameFlowRef.current;
-        if (flow?.phase === "pick" && /(?:^|\s)(?:\d{1,3}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty)(?:\s|$)/i.test(buf)) { flushVoiceBuffer(true); return; }
+        if (flow?.phase === "pick" && /(?:^|\s)(?:\d{1,3}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|(?:twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)(?:[- ](?:one|two|three|four|five|six|seven|eight|nine))?)(?:\s|$)/i.test(buf)) { flushVoiceBuffer(true); return; }
         if (!flow) { const p = parseCommand(buf); if (p && p.length === 1 && p[0].op === "renameByType") { flushVoiceBuffer(true); return; } }
         if (voiceFlushTimer.current) clearTimeout(voiceFlushTimer.current);
         voiceFlushTimer.current = setTimeout(() => flushVoiceBuffer(), ABRA_SILENCE_MS);

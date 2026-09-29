@@ -3318,7 +3318,7 @@ export function DiagramEditor({
     // "undo that" takes it off — one undo, as the whole attach is one action.
     templatePickSeqRef.current++;
     setTemplateFlow(null);
-    return { ok: true, summary: `added template “${card.name}”${flow.anchorName ? ` after “${flow.anchorName}”` : ""}` };
+    return { ok: true, summary: `added template ${card.n} “${card.name}”${flow.anchorName ? ` after “${flow.anchorName}”` : ""}` };
   }, [data, templateStillShowing, setTemplateFlow, armGoldFlash, armDebugBefore, applyTemplate]);
   const showTemplateRef = useRef(showTemplate);
   showTemplateRef.current = showTemplate;
@@ -3348,7 +3348,7 @@ export function DiagramEditor({
     templatePickSeqRef.current++;
     setTemplateFlow(null);
     const prov = flow?.provisional;
-    if (keep && prov) return `added template “${prov.card.name}”${flow?.anchorName ? ` after “${flow.anchorName}”` : ""}`;
+    if (keep && prov) return `added template ${prov.card.n} “${prov.card.name}”${flow?.anchorName ? ` after “${flow.anchorName}”` : ""}`;
     if (prov) {
       // Taking the preview off changes the diagram; every caller logs the
       // returned line in this same tick, so the recording's "after" lands on it.
@@ -5853,6 +5853,7 @@ export function DiagramEditor({
             hiddenNote={hiddenTemplatesNote(templateFlow.hiddenInitial, templateFlow.hiddenContainer)}
             anchorName={templateFlow.anchorName}
             notice={templateFlow.notice}
+            heard={voiceInterim || (voiceLog.length ? `“${voiceLog[voiceLog.length - 1].heard}” — ${voiceLog[voiceLog.length - 1].summary}` : "")}
             scrollRef={templateScrollRef}
             onPick={(card) => {
               void pickTemplateCardRef.current(card, (r) => appendLog({ heard: "", summary: r.summary, ok: r.ok }));

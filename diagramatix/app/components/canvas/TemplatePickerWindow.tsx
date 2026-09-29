@@ -37,12 +37,14 @@ interface Props {
   anchorName?: string;
   /** Why the last pick was refused — the window stays open for another number. */
   notice?: string | null;
+  /** What the microphone is hearing, then what the last answer did — this window covers the command log. */
+  heard?: string;
   /** The scrolling list, so "scroll down" can move it (templatePick.ts templateScrollTarget). */
   scrollRef?: Ref<HTMLDivElement>;
 }
 
 export function TemplatePickerWindow({
-  sections, onPick, onCancel, hiddenNote = "", anchorName, notice, scrollRef,
+  sections, onPick, onCancel, hiddenNote = "", anchorName, notice, heard, scrollRef,
 }: Props) {
   const total = sections.reduce((n, s) => n + s.cards.length, 0);
   const bySource = (source: "builtin" | "user") => sections.filter((s) => s.source === source && s.cards.length);
@@ -119,6 +121,7 @@ export function TemplatePickerWindow({
           <span className="text-[11px] text-gray-500">
             Say a number · “scroll down” / “scroll up” / “scroll to the top” · “cancel” to stop
           </span>
+          {heard && <span className="text-[12px] font-medium text-gray-800 truncate max-w-[45%]" title={heard}>Heard: {heard}</span>}
           {notice
             ? <span className="text-[11px] text-red-600">{notice}</span>
             : hiddenNote && <span className="text-[11px] text-gray-400">{hiddenNote}</span>}
