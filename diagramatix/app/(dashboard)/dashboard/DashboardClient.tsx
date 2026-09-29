@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { showGateNotice } from "@/app/lib/subscription/gateNotice";
+import { SubscriptionBanner } from "@/app/components/SubscriptionBanner";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signOut } from "next-auth/react";
@@ -1006,6 +1008,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
         body: JSON.stringify({ name: ddlProjectName.trim() }),
       });
       if (!projRes.ok) {
+        await showGateNotice(projRes);
         log(`\u2718 Failed to create project: ${projRes.status}`);
         setDdlResult("failed");
         return;
@@ -1029,6 +1032,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
         }),
       });
       if (!diagRes.ok) {
+        await showGateNotice(diagRes);
         log(`\u2718 Failed to create diagram: ${diagRes.status}`);
         setDdlResult("failed");
         return;
@@ -1159,6 +1163,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
         }),
       });
       if (!projRes.ok) {
+        await showGateNotice(projRes);
         log("\u2718 Failed to create project");
         setImportResult("failed"); return;
       }
@@ -1280,7 +1285,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
       body: JSON.stringify({ name: newProjectName.trim() }),
     });
     setCreatingProject(false);
-    if (!res.ok) return;
+    if (!res.ok) { await showGateNotice(res); return; }
     const project = await res.json();
     setProjects((prev) => [{ ...project, _count: { diagrams: 0 } }, ...prev]);
     setNewProjectName("");
@@ -1433,7 +1438,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
       body: JSON.stringify({ name: newName.trim(), type: newType }),
     });
     setCreating(false);
-    if (!res.ok) { setError("Failed to create diagram"); return; }
+    if (!res.ok) { if (!(await showGateNotice(res))) setError("Failed to create diagram"); return; }
     const diagram = await res.json();
     router.push(`/diagram/${diagram.id}`);
   }
@@ -1906,6 +1911,18 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           </button>
         </div>
       </header>
+      {usageSnapshot && (
+        <SubscriptionBanner
+          input={{
+            tierName: usageSnapshot.tier.name,
+            isAdmin: usageSnapshot.isAdmin,
+            trial: usageSnapshot.trial,
+            comp: usageSnapshot.comp ? { expiresAt: usageSnapshot.comp.expiresAt } : null,
+            billing: usageSnapshot.billing,
+            metrics: usageSnapshot.metrics.map((m) => ({ metric: m.metric, label: m.label, current: m.current, limit: m.limit, periodEndsAt: m.periodEndsAt })),
+          }}
+        />
+      )}
 
       <main className="flex-1 overflow-y-auto min-h-0">
        <div className="max-w-5xl mx-auto px-6 py-6 space-y-6">

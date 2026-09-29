@@ -19,6 +19,9 @@ import {
   type LimitMetric,
 } from "./subscription";
 import { FEATURE_DEF } from "./features/registry";
+import { blockedBy } from "./features/dependencies";
+import { getFeatureStates, requiredLevelNameFor } from "./features/availability";
+import { featureNotice, limitNotice, trialNotice } from "./subscription/messages";
 
 /**
  * Feature entitlement gate. Returns null when the user's tier includes the
@@ -34,11 +37,24 @@ export async function gateFeature(
   userId: string,
   feature: string,
 ): Promise<NextResponse | null> {
-  if (await isFeatureAvailable(userId, feature)) return null;
+  const states = await getFeatureStates(userId);
+  if (states[feature] === "available") return null;
   const label = FEATURE_DEF[feature]?.label ?? feature;
+  // The notice says WHY and what to do: not in the plan / switched off / held back by a prerequisite,
+  // and the lowest plan that has it (subscription/messages.ts).
+  const need = blockedBy(states, feature);
+  const notice = featureNotice({
+    feature,
+    featureLabel: label,
+    state: states[feature] === "disabled" ? "disabled" : "hidden",
+    blockedByLabel: need ? (FEATURE_DEF[need]?.label ?? need) : null,
+    requiredTierName: await requiredLevelNameFor(feature).catch(() => null),
+  });
   return NextResponse.json(
     {
       error: `${label} is not available on your subscription.`,
+      message: notice.detail,
+      notice,
       metric: "feature",
       feature,
     },
@@ -63,9 +79,17 @@ export async function gateLimit(
 ): Promise<NextResponse | null> {
   const result = await checkLimit(userId, metric, ctx);
   if (result.ok) return null;
+  const notice = result.metric === "trial"
+    ? trialNotice(result.tierName ?? "trial")
+    : limitNotice({
+        metric: result.metric, label: result.label ?? result.metric, tierName: result.tierName ?? "current",
+        current: result.current, limit: result.limit, resetKind: result.resetKind ?? "count", resetsOn: result.resetsOn ?? null,
+      });
   return NextResponse.json(
     {
       error: result.reason,
+      message: notice.detail,
+      notice,
       metric: result.metric,
       current: result.current,
       limit: result.limit,

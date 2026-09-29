@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { GateNoticeHost } from "@/app/components/GateNoticeHost";
 import { Geist, Caveat } from "next/font/google";
 import { SessionProvider } from "@/app/components/SessionProvider";
 import { GlobalOverlays } from "@/app/components/GlobalOverlays";
@@ -64,6 +65,7 @@ export default async function RootLayout({
             {children}
             <GlobalOverlays superAdmin={superAdmin} />
             <ActingAsBanner superAdmin={superAdmin} />
+            <GateNoticeHost />
             {/* Above everything, so the dimmer covers the whole window. */}
             <ScreenBrightness />
           </SessionProvider>

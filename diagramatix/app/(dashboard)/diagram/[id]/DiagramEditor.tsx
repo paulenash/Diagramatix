@@ -1,6 +1,7 @@
 "use client";
 
 import { regeneratePromptText } from "@/app/lib/ai/promptPreambles";
+import { showGateNotice, downloadWithNotice } from "@/app/lib/subscription/gateNotice";
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { flushSync } from "react-dom";
 import { filterAnnotations, NO_ANNOTATIONS, hasAnnotations, type AnnotationInclude } from "@/app/lib/diagram/annotationFilter";
@@ -2909,7 +2910,7 @@ export function DiagramEditor({
         saved = `${safe}.pdf`;
       } else if (format === "visio") {
         const vr = await fetch(`/api/export/visio-v3?diagramId=${diagramId}&profile=v1.6`);
-        if (!vr.ok) throw new Error("Visio export failed");
+        if (!vr.ok) { await showGateNotice(vr); throw new Error("Visio export failed"); }
         await uploadOne(`${safe}.vsdx`, "application/vnd.ms-visio.drawing", await vr.blob());
         saved = `${safe}.vsdx`;
       }
@@ -3005,6 +3006,7 @@ export function DiagramEditor({
       if (overwrite) form.append("overwriteDiagramId", diagramId);
       const resp = await fetch("/api/import/visio-v3", { method: "POST", body: form });
       if (!resp.ok) {
+        if (await showGateNotice(resp)) return;
         const txt = await resp.text();
         alert(`Visio import failed: ${txt || resp.statusText}`);
         return;
@@ -4731,7 +4733,7 @@ export function DiagramEditor({
                                   <>
                                     <ExportLeaf label="Visio (for stencil v1.6)" title="Export using the Diagramatix v1.6 stencil — recipient needs the v1.6 stencil installed in Visio."
                                       onPreview={() => void handlePreview("visio")}
-                                      onDownload={() => { closeFm(); const a = document.createElement("a"); a.href = `/api/export/visio-v3?diagramId=${diagramId}&profile=v1.6`; a.rel = "noopener"; a.click(); }} />
+                                      onDownload={() => { closeFm(); void downloadWithNotice(`/api/export/visio-v3?diagramId=${diagramId}&profile=v1.6`, `${diagramName || "diagram"}.vsdx`.replace(/[\\/:*?"<>|]/g, "_")); }} />
                                     {isActingAdmin && (
                                       <button onClick={() => { closeFm(); const a = document.createElement("a"); a.href = `/api/export/visio-v3?diagramId=${diagramId}&profile=bpmn-m`; a.rel = "noopener"; a.click(); }} className="block w-full text-left px-3 py-2 text-xs text-red-700 hover:bg-red-50" title="SuperAdmin only — BPMN_M export needs further work before general release.">Visio (for stencil BPMN_M)</button>
                                     )}

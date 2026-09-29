@@ -120,6 +120,12 @@ export type EnforcementBlocked = {
   metric: LimitMetric | "trial";
   current: number;
   limit: number;
+  /** For the message (subscription/messages.ts): the metric's label, the plan's name, and whether the
+   *  allowance is lifetime, monthly (with the date it resets) or a standing count. */
+  label?: string;
+  tierName?: string;
+  resetKind?: "lifetime" | "monthly" | "count";
+  resetsOn?: string | null;
 };
 export type EnforcementResult = EnforcementOk | EnforcementBlocked;
 
@@ -293,6 +299,8 @@ type UserWithTier = {
   createdAt: Date;
   subscriptionAssignedAt: Date | null;
   subscriptionEndsAt: Date | null;
+  /** Stripe's status for the paid subscription ("active", "past_due", "canceled" …), for the warnings. */
+  stripeSubscriptionStatus: string | null;
   /** The EFFECTIVE tier — comp wins when active, otherwise the
    *  underlying. Null only if neither is set (shouldn't happen in
    *  practice since registration assigns Free). */
@@ -382,6 +390,7 @@ async function loadUserWithTier(userId: string): Promise<UserWithTier | null> {
     createdAt: u.createdAt,
     subscriptionAssignedAt: u.subscriptionAssignedAt,
     subscriptionEndsAt: u.subscriptionEndsAt,
+    stripeSubscriptionStatus: u.stripeSubscriptionStatus ?? null,
     subscriptionLevel: effectiveLevel,
     underlyingLevel,
     actingAsLevelId,
@@ -584,6 +593,7 @@ export async function checkLimit(
       metric: "trial",
       current: 0,
       limit: 0,
+      tierName: tier.name,
     };
   }
 
@@ -598,10 +608,31 @@ export async function checkLimit(
       metric,
       current,
       limit,
+      label: METRIC_LABELS[metric],
+      tierName: tier.name,
+      ...resetInfoFor(user, tier, metric, now),
     };
   }
 
   return { ok: true };
+}
+
+/**
+ * Whether a metric's allowance resets, and when: lifetime (never), monthly (on the day the current
+ * period ends + 1) or a standing count (projects, element caps …) that only a removal or an upgrade lifts.
+ * For the "limit reached" message.
+ */
+function resetInfoFor(
+  user: { subscriptionAssignedAt: Date | null; createdAt: Date },
+  tier: SubscriptionLevelRow,
+  metric: LimitMetric,
+  now: Date,
+): { resetKind: "lifetime" | "monthly" | "count"; resetsOn: string | null } {
+  if (!isEventMetric(metric)) return { resetKind: "count", resetsOn: null };
+  const key = periodKeyForEventMetric(user, tier, metric, now);
+  if (key === "all-time") return { resetKind: "lifetime", resetsOn: null };
+  const start = new Date(key + "T00:00:00.000Z");
+  return { resetKind: "monthly", resetsOn: isoDateUTC(nextMonthlyPeriodStart(user.subscriptionAssignedAt ?? user.createdAt, start)) };
 }
 
 /** Increment a user's event counter for `metric` by `delta` (default 1).
@@ -725,6 +756,8 @@ export interface UsageSnapshot {
   diagramsThisPeriod: number;
   /** Set when a SuperAdmin is acting as a customer level (features/actAs.ts). */
   actingAs: { id: string; name: string } | null;
+  /** The paid subscription's billing state, for the payment-failed and ending-soon warnings. */
+  billing: { status: string | null; endsAt: string | null };
   /** Per-tier feature access for the effective tier (SuperAdmin → all true).
    *  Drives hiding of feature launch buttons / example galleries and greying
    *  of OrgAdmin tiles. */
@@ -853,6 +886,7 @@ export async function getUsageSnapshot(
     isAdmin: admin,
     /** A SuperAdmin acting as a customer level — the banner says so; limits are enforced. */
     actingAs: user.actingAsLevelId ? { id: user.actingAsLevelId, name: tier?.name ?? user.actingAsLevelId } : null,
+    billing: { status: user.stripeSubscriptionStatus, endsAt: user.subscriptionEndsAt ? user.subscriptionEndsAt.toISOString() : null },
     trial,
     comp: user.comp
       ? {

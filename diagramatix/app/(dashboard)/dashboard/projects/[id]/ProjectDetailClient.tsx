@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { showGateNotice, downloadWithNotice } from "@/app/lib/subscription/gateNotice";
 import { useRouter } from "next/navigation";
 import { UserGuideLink } from "@/app/components/UserGuideLink";
 import type { DiagramType, DiagramData } from "@/app/lib/diagram/types";
@@ -1286,7 +1287,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
     try {
       log("Generating Visio (.vsdx)…");
       const vr = await fetch(`/api/export/visio-v3/bulk?projectId=${encodeURIComponent(project.id)}&profile=v1.6`);
-      if (!vr.ok) throw new Error("Visio export failed");
+      if (!vr.ok) { await showGateNotice(vr); throw new Error("Visio export failed"); }
       const blob = await vr.blob();
       const fileName = `${projectName}.diagramatix.vsdx`.replace(/[\\/:*?"<>|]/g, "_");
       log(`Uploading to SharePoint folder "${sel.name}"…`);
@@ -1499,6 +1500,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
       form.append("folderName", "Imported BPMN Diagrams");
       const resp = await fetch("/api/import/bpmn", { method: "POST", body: form });
       if (!resp.ok) {
+        if (await showGateNotice(resp)) return;
         const txt = await resp.text();
         alert(`BPMN import failed: ${txt || resp.statusText}`);
         return;
@@ -1612,6 +1614,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
       }
       const resp = await fetch("/api/import/visio-v3/bulk", { method: "POST", body: form });
       if (!resp.ok) {
+        if (await showGateNotice(resp)) return;
         const txt = await resp.text();
         setImportVisioError(`Import failed: ${txt || resp.statusText}`);
         return;
@@ -2032,7 +2035,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
       body: JSON.stringify({ name: newName.trim(), type: newType, projectId: project.id }),
     });
     setCreating(false);
-    if (!res.ok) { setError("Failed to create diagram"); return; }
+    if (!res.ok) { if (!(await showGateNotice(res))) setError("Failed to create diagram"); return; }
     const diagram = await res.json();
     // Place new diagram in selected folder
     if (selectedFolderId !== ROOT_ID) {
@@ -2210,7 +2213,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
           displayMode: src.displayMode ?? undefined,
         }),
       });
-      if (!res.ok) return;
+      if (!res.ok) { await showGateNotice(res); return; }
       const created = await res.json();
 
       // Add the clone to the diagram list in the same folder as the original
@@ -2964,7 +2967,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
                                         <button
                                           className={`${itemCls} disabled:opacity-50 disabled:cursor-not-allowed`}
                                           disabled={!hasBpmn}
-                                          onClick={() => { close(); window.location.href = `/api/export/visio-v3/bulk?projectId=${encodeURIComponent(project.id)}&profile=v1.6`; }}
+                                          onClick={() => { close(); void downloadWithNotice(`/api/export/visio-v3/bulk?projectId=${encodeURIComponent(project.id)}&profile=v1.6`, `${projectName}.diagramatix.vsdx`.replace(/[\\/:*?"<>|]/g, "_")); }}
                                           title={hasBpmn ? "Export all BPMN diagrams as one multi-page Visio (.vsdx)" : "No BPMN diagrams in this project"}
                                         >
                                           Visio (.vsdx) — all BPMN

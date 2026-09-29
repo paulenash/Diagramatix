@@ -81,6 +81,19 @@ export async function getFeatureStates(userId: string): Promise<FeatureStateMap>
   return applyDependencies(map);
 }
 
+/**
+ * The lowest subscription level (by sortOrder) at which `key` is Available in the matrix — the plan
+ * to tell a person to upgrade to — or null when no level has it. Ignores prerequisites and overrides.
+ */
+export async function requiredLevelNameFor(key: string): Promise<string | null> {
+  const rows = await prisma.featureAvailability.findMany({
+    where: { featureKey: key, state: "available" },
+    select: { level: { select: { name: true, sortOrder: true } } },
+  });
+  const best = rows.map((r) => r.level).sort((a, b) => a.sortOrder - b.sortOrder)[0];
+  return best?.name ?? null;
+}
+
 export function stateOf(map: FeatureStateMap | null | undefined, key: string): FeatureState {
   return (map?.[key] as FeatureState) ?? "hidden";
 }
