@@ -91,9 +91,10 @@ describe("Miner routes are gated on the subscription", () => {
     expect(ocel).toContain('"process-mining-ocel"');
     const gallery = readFileSync(join(API, "mining-examples", "route.ts"), "utf8");
     expect(gallery).toContain('"process-mining-examples"');
-    // Calibration spans both products, so it must satisfy both.
+    // Calibration spans both products, so it must satisfy both. Its Mining half is the "twin" feature,
+    // which REQUIRES process mining (registry `requires`), so it can never be looser than the module.
     const calibrate = readFileSync(join(API, "projects", "[id]", "mining", "runs", "[runId]", "calibrate", "route.ts"), "utf8");
-    expect(calibrate).toContain('"processMining"');
+    expect(calibrate).toContain('"process-mining-twin"');
     expect(calibrate).toContain('"simulator"');
   });
 });

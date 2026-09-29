@@ -10,6 +10,7 @@
  * separate, explicit POST to the scenarios route.
  */
 import { NextResponse } from "next/server";
+import { gateFeature, gateLimit, recordUsage } from "@/app/lib/subscription-route";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
@@ -36,6 +37,8 @@ export async function POST(_req: Request, { params }: Params) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
+  const fg = await gateFeature(session?.user?.id ?? "", "simulator-analysis");
+  if (fg) return fg;
 
   const study = await prisma.simulationStudy.findFirst({ where: { id: studyId, projectId: id }, select: { id: true, name: true } });
   if (!study) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -51,7 +54,10 @@ export async function POST(_req: Request, { params }: Params) {
 
   const model = await getAiGenerateModel();
   const apiKey = aiApiKey(model);
-  const aiOn = (await orgPolicyAllows(session, "allowAi")) && !!apiKey;
+  // The narration is an AI call, so it counts against the AI attempts limit. At the limit it falls back to
+  // the deterministic summary (a 200, like AI-off) rather than failing the whole request.
+  const aiOn = (await orgPolicyAllows(session, "allowAi")) && !!apiKey
+    && (await gateLimit(session?.user?.id ?? "", "aiAttempts")) === null;
   if (!aiOn) {
     return NextResponse.json({ report, facts, narrative: summariseNextSteps(facts), deterministic: true });
   }
@@ -64,6 +70,7 @@ export async function POST(_req: Request, { params }: Params) {
 
   enterAiContext({ userId: session?.user?.id ?? null, orgId, invocationPoint: AI_INVOCATION_POINTS.SimulationNextSteps });
   const result = await generateNextStepsNarrative({ apiKey: apiKey!, facts }, redactor);
+  if (result.ok && session?.user?.id) await recordUsage(session.user.id, "aiAttempts");
   if (!result.ok) {
     // A failed narration must not lose the findings — fall back rather than 500.
     return NextResponse.json({ report, facts, narrative: summariseNextSteps(facts), deterministic: true, aiError: result.error });

@@ -94,8 +94,8 @@ export const FEATURE_GATES: Record<string, FeatureGateInfo> = {
   // ── Analytics & Mining ─────────────────────────────────────────────────────
   "diff-processes": { description: "Compare two versions of a process.", status: "unwired", ui: [], server: [], alsoLimitedBy: AI_ALSO },
   "simulator": {
-    description: "Simulation: studies, scenarios and results.",
-    status: "partial",
+    description: "Simulation: studies, scenarios and results. The module — the advanced parts are separate features that need it.",
+    status: "wired",
     ui: [
       { file: "app/(dashboard)/dashboard/DashboardClient.tsx", needle: "ent.simulator", what: "Dashboard: examples menu" },
       { file: "app/(dashboard)/dashboard/projects/[id]/ProjectDetailClient.tsx", needle: "ent.simulator", what: "Project page: Simulator button" },
@@ -103,12 +103,67 @@ export const FEATURE_GATES: Record<string, FeatureGateInfo> = {
     ],
     server: [
       { file: "app/api/projects/[id]/simulation/studies/route.ts", needle: '"simulator"', what: "POST create a study" },
-      { file: "app/api/simulation-examples/[id]/adopt/route.ts", needle: '"simulator"', what: "POST adopt an example" },
+      { file: "app/api/projects/[id]/simulation/adopt/route.ts", needle: '"simulator"', what: "POST adopt a package" },
+      { file: "app/api/projects/[id]/simulation/studies/[studyId]/route.ts", needle: '"simulator"', what: "PUT / DELETE a study" },
+      { file: "app/api/projects/[id]/simulation/studies/[studyId]/scenarios/route.ts", needle: '"simulator"', what: "POST a scenario" },
+      { file: "app/api/projects/[id]/simulation/studies/[studyId]/scenarios/[scenarioId]/run/route.ts", needle: '"simulator"', what: "POST run a scenario" },
+      { file: "app/api/projects/[id]/simulation/studies/[studyId]/scenarios/[scenarioId]/runs/[runId]/route.ts", needle: '"simulator"', what: "PATCH / DELETE a run" },
       { file: "app/api/projects/[id]/mining/runs/[runId]/calibrate/route.ts", needle: '"simulator"', what: "POST calibrate (needs Mining too)" },
     ],
-    note: "Entry points only: an existing study can still be run, swept and AI-assessed without the feature.",
+    note: "Every route that changes or computes is gated (tests/simulation/route-gating.test.ts). Reading what you already have stays open, so a downgraded user can still see their studies.",
   },
-  "simulator-examples": { description: "The ready-made simulation examples.", status: "unwired", ui: [], server: [], note: "Adopting an example is gated by `simulator`, not by this key." },
+  "simulator-examples": {
+    description: "The ready-made simulation examples.",
+    status: "wired",
+    ui: [],
+    server: [
+      { file: "app/api/simulation-examples/route.ts", needle: '"simulator-examples"', what: "GET the examples" },
+      { file: "app/api/simulation-examples/[id]/adopt/route.ts", needle: '"simulator-examples"', what: "POST adopt an example" },
+    ],
+  },
+  "simulator-analysis": {
+    description: "Sensitivity (tornado), parameter sweep, business case, next steps and the AI assessment.",
+    status: "wired",
+    ui: [],
+    server: [
+      { file: "app/api/projects/[id]/simulation/studies/[studyId]/scenarios/[scenarioId]/sensitivity/route.ts", needle: '"simulator-analysis"', what: "POST sensitivity" },
+      { file: "app/api/projects/[id]/simulation/studies/[studyId]/scenarios/[scenarioId]/sweep/route.ts", needle: '"simulator-analysis"', what: "POST sweep" },
+      { file: "app/api/projects/[id]/simulation/studies/[studyId]/business-case/route.ts", needle: '"simulator-analysis"', what: "Business case" },
+      { file: "app/api/projects/[id]/simulation/studies/[studyId]/next-steps/route.ts", needle: '"simulator-analysis"', what: "POST next steps" },
+      { file: "app/api/projects/[id]/simulation/studies/[studyId]/assess/route.ts", needle: '"simulator-analysis"', what: "POST AI assessment" },
+    ],
+    alsoLimitedBy: ["AI attempts limit (the AI narration; at the limit it falls back to the deterministic summary)", "Organisation policy: allowAi"],
+  },
+  "simulator-bpsim": {
+    description: "BPSim (and bundle) import and export.",
+    status: "wired",
+    ui: [],
+    server: [
+      { file: "app/api/simulation/import/route.ts", needle: '"simulator-bpsim"', what: "POST import a file as a new project" },
+      { file: "app/api/projects/[id]/simulation/export/route.ts", needle: '"simulator-bpsim"', what: "GET export" },
+    ],
+  },
+  "simulator-calendars": {
+    description: "Simulation calendars (working hours, holidays).",
+    status: "wired",
+    ui: [],
+    server: [
+      { file: "app/api/projects/[id]/simulation-calendars/route.ts", needle: '"simulator-calendars"', what: "POST a calendar" },
+      { file: "app/api/projects/[id]/simulation-calendars/[calendarId]/route.ts", needle: '"simulator-calendars"', what: "PUT / DELETE a calendar" },
+    ],
+  },
+  "simulator-teams": {
+    description: "Simulation teams and skills, in a project and in the organisation's master library.",
+    status: "wired",
+    ui: [],
+    server: [
+      { file: "app/api/projects/[id]/simulation-teams/route.ts", needle: '"simulator-teams"', what: "POST a team" },
+      { file: "app/api/projects/[id]/simulation-teams/[teamId]/route.ts", needle: '"simulator-teams"', what: "PUT / DELETE a team" },
+      { file: "app/api/projects/[id]/simulation-teams/fill-skills/route.ts", needle: '"simulator-teams"', what: "POST fill skills" },
+      { file: "app/api/projects/[id]/simulation-teams/match-lanes/route.ts", needle: '"simulator-teams"', what: "POST match lanes" },
+      { file: "app/api/orgs/[id]/simulation-teams/route.ts", needle: '"simulator-teams"', what: "Organisation master teams" },
+    ],
+  },
   "processMining": {
     description: "Process mining: import logs, discover, conformance, sources.",
     status: "wired",
@@ -121,6 +176,49 @@ export const FEATURE_GATES: Record<string, FeatureGateInfo> = {
       { file: "app/api/projects/[id]/mining/import/route.ts", needle: '"processMining"', what: "Import a log" },
     ],
     note: "Every project mining route is gated (guarded by tests/mining/route-gating.test.ts); ingest and poll are machine callers.",
+  },
+  "process-mining-conformance": {
+    description: "Conformance checking against a reference model.",
+    status: "wired", ui: [],
+    server: [{ file: "app/api/projects/[id]/mining/runs/[runId]/conformance/route.ts", needle: '"process-mining-conformance"', what: "Conformance" }],
+  },
+  "process-mining-sources": {
+    description: "Live sources and connectors (webhook, Azure Blob, SharePoint) with refresh.",
+    status: "wired", ui: [],
+    server: [
+      { file: "app/api/projects/[id]/mining/sources/route.ts", needle: '"process-mining-sources"', what: "Sources" },
+      { file: "app/api/projects/[id]/mining/sources/[sourceId]/refresh/route.ts", needle: '"process-mining-sources"', what: "Refresh a source" },
+    ],
+  },
+  "process-mining-alerts": {
+    description: "Series over time and alerting.",
+    status: "wired", ui: [],
+    server: [{ file: "app/api/projects/[id]/mining/runs/[runId]/series/route.ts", needle: '"process-mining-alerts"', what: "Series" }],
+  },
+  "process-mining-twin": {
+    description: "Validate the simulation against the mined process, and calibrate it.",
+    status: "wired", ui: [],
+    server: [
+      { file: "app/api/projects/[id]/mining/runs/[runId]/validate/route.ts", needle: '"process-mining-twin"', what: "Validate" },
+      { file: "app/api/projects/[id]/mining/runs/[runId]/calibrate/route.ts", needle: '"process-mining-twin"', what: "Calibrate (also needs the Simulator)" },
+    ],
+  },
+  "process-mining-ai": {
+    description: "AI explanation of mining results and next steps.",
+    status: "wired", ui: [],
+    server: [
+      { file: "app/api/projects/[id]/mining/runs/[runId]/explain/route.ts", needle: '"process-mining-ai"', what: "Explain" },
+      { file: "app/api/projects/[id]/mining/runs/[runId]/next-steps/route.ts", needle: '"process-mining-ai"', what: "Next steps" },
+    ],
+    alsoLimitedBy: AI_ALSO,
+  },
+  "process-mining-export": {
+    description: "Export mining results and the analysis workbook.",
+    status: "wired", ui: [],
+    server: [
+      { file: "app/api/projects/[id]/mining/runs/[runId]/export/route.ts", needle: '"process-mining-export"', what: "Export" },
+      { file: "app/api/projects/[id]/mining/runs/[runId]/analysis-export/route.ts", needle: '"process-mining-export"', what: "Analysis export" },
+    ],
   },
   "process-mining-examples": {
     description: "The ready-made process mining examples.",

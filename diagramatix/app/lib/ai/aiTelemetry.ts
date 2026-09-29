@@ -89,6 +89,10 @@ export const AI_USER_METERED_POINTS: ReadonlySet<string> = new Set<string>([
   AI_INVOCATION_POINTS.MiningDiscover,
   AI_INVOCATION_POINTS.MiningDiscoverSm,
   AI_INVOCATION_POINTS.MiningExplain,
+  // Slice 4 of the availability plan (2026-09-30): the three simulation narrations count too.
+  AI_INVOCATION_POINTS.SimulationAssess,
+  AI_INVOCATION_POINTS.SimulationBusinessCase,
+  AI_INVOCATION_POINTS.SimulationNextSteps,
 ]);
 
 /** Friendly display names for the report, keyed by the stored value. */

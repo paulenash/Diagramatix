@@ -9,6 +9,7 @@
  * project's diagrams — the two together, so nothing breaks.
  */
 import { NextResponse } from "next/server";
+import { gateFeature } from "@/app/lib/subscription-route";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma, pgPool } from "@/app/lib/db";
@@ -32,6 +33,8 @@ export async function POST(_req: Request, { params }: Params) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
+  const fg = await gateFeature(session?.user?.id ?? "", "simulator-teams");
+  if (fg) return fg;
 
   const diagrams = await prisma.diagram.findMany({ where: { projectId: id, type: "bpmn" }, select: { id: true, data: true } });
 

@@ -9,6 +9,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
+import { gateFeature } from "@/app/lib/subscription-route";
 import { requireRole, WRITE_ROLES, OrgContextError } from "@/app/lib/auth/orgContext";
 import { validateExamplePackage, type ExamplePackage } from "@/app/lib/simulation/examplePackage";
 import { adoptPackage } from "@/app/lib/simulation/adoptPackage";
@@ -16,6 +17,8 @@ import { adoptPackage } from "@/app/lib/simulation/adoptPackage";
 export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const fg = await gateFeature(session.user.id, "simulator-bpsim");
+  if (fg) return fg;
   try {
     if (isReadOnlyImpersonation(session, await cookies())) {
       return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });

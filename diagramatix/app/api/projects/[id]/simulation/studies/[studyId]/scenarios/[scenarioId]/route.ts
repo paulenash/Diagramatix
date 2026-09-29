@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { gateFeature } from "@/app/lib/subscription-route";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
@@ -32,6 +33,8 @@ export async function PUT(req: Request, { params }: Params) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
+  const fg = await gateFeature(session?.user?.id ?? "", "simulator");
+  if (fg) return fg;
   if (!(await scenarioInProject(scenarioId, studyId, id))) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
@@ -79,6 +82,8 @@ export async function DELETE(_req: Request, { params }: Params) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
+  const fg = await gateFeature(session?.user?.id ?? "", "simulator");
+  if (fg) return fg;
   if (!(await scenarioInProject(scenarioId, studyId, id))) return NextResponse.json({ error: "Not found" }, { status: 404 });
   await prisma.simulationScenario.delete({ where: { id: scenarioId } });
   return NextResponse.json({ ok: true });

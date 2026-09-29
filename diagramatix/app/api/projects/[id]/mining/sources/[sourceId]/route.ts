@@ -33,7 +33,7 @@ async function gate(id: string): Promise<NextResponse | null> {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
-  return gateFeature(session?.user?.id ?? "", "processMining");
+  return gateFeature(session?.user?.id ?? "", "process-mining-sources");
 }
 
 export async function PATCH(req: Request, { params }: Params) {

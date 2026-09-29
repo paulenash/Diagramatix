@@ -5,6 +5,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { gateFeature } from "@/app/lib/subscription-route";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { summarizePackage, type ExamplePackage } from "@/app/lib/simulation/examplePackage";
@@ -12,6 +13,8 @@ import { summarizePackage, type ExamplePackage } from "@/app/lib/simulation/exam
 export async function GET() {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const fg = await gateFeature(session.user.id ?? "", "simulator-examples");
+  if (fg) return fg;
 
   const rows = await prisma.simulationExample.findMany({
     where: { published: true },

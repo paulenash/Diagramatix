@@ -5,6 +5,7 @@
  * from ONLY those figures. Read-access is enough (it doesn't mutate anything).
  */
 import { NextResponse } from "next/server";
+import { gateFeature, gateLimit, recordUsage } from "@/app/lib/subscription-route";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
@@ -60,6 +61,8 @@ export async function POST(req: Request, { params }: Params) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
+  const fg = await gateFeature(session?.user?.id ?? "", "simulator-analysis");
+  if (fg) return fg;
   const body = await req.json().catch(() => ({}));
   // Two modes: compare two SAVED runs (baselineRunId/compareRunId), or two
   // scenarios' latest runs (baselineScenarioId/compareScenarioId).
@@ -85,7 +88,10 @@ export async function POST(req: Request, { params }: Params) {
   // not a 403 — so strict/AI-off tenants still get a Comparison summary.
   const model = await getAiGenerateModel();
   const apiKey = aiApiKey(model);
-  const aiOn = (await orgPolicyAllows(session, "allowAi")) && !!apiKey;
+  // The narration is an AI call, so it counts against the AI attempts limit. At the limit it falls back to
+  // the deterministic summary (a 200, like AI-off) rather than failing the whole request.
+  const aiOn = (await orgPolicyAllows(session, "allowAi")) && !!apiKey
+    && (await gateLimit(session?.user?.id ?? "", "aiAttempts")) === null;
   if (!aiOn) {
     return NextResponse.json({ assessment: summariseComparison(facts), facts, deterministic: true });
   }
@@ -98,6 +104,7 @@ export async function POST(req: Request, { params }: Params) {
 
   enterAiContext({ userId: session?.user?.id ?? null, orgId, invocationPoint: AI_INVOCATION_POINTS.SimulationAssess });
   const result = await generateSimAssessment({ apiKey: apiKey!, facts }, redactor);
+  if (result.ok && session?.user?.id) await recordUsage(session.user.id, "aiAttempts");
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
   return NextResponse.json({ assessment: result.assessment, model: result.model, truncated: result.truncated ?? false, facts });
 }

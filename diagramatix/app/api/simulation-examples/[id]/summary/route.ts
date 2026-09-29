@@ -6,6 +6,7 @@
  * promises and only an opened summary costs anything.
  */
 import { NextResponse } from "next/server";
+import { gateFeature } from "@/app/lib/subscription-route";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { simulatorExampleFeatures } from "@/app/lib/simulation/exampleFeatures";
@@ -18,6 +19,8 @@ type Params = { params: Promise<{ id: string }> };
 export async function GET(_req: Request, { params }: Params) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const fg = await gateFeature(session.user.id ?? "", "simulator-examples");
+  if (fg) return fg;
 
   const { id } = await params;
   const row = await prisma.simulationExample.findFirst({ where: { id, published: true } });

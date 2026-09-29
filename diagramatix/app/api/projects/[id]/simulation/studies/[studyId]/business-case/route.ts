@@ -12,6 +12,7 @@
  * document formats.
  */
 import { NextResponse } from "next/server";
+import { gateFeature, gateLimit, recordUsage } from "@/app/lib/subscription-route";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma, pgPool } from "@/app/lib/db";
@@ -88,6 +89,8 @@ export async function POST(req: Request, { params }: Params) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
+  const fg = await gateFeature(session?.user?.id ?? "", "simulator-analysis");
+  if (fg) return fg;
 
   const s = await study(studyId, id);
   if (!s) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -103,7 +106,10 @@ export async function POST(req: Request, { params }: Params) {
 
   const model = await getAiGenerateModel();
   const apiKey = aiApiKey(model);
-  const aiOn = (await orgPolicyAllows(session, "allowAi")) && !!apiKey;
+  // The narration is an AI call, so it counts against the AI attempts limit. At the limit it falls back to
+  // the deterministic summary (a 200, like AI-off) rather than failing the whole request.
+  const aiOn = (await orgPolicyAllows(session, "allowAi")) && !!apiKey
+    && (await gateLimit(session?.user?.id ?? "", "aiAttempts")) === null;
   if (!aiOn) return NextResponse.json({ facts, narrative: summariseBusinessCase(facts), deterministic: true });
 
   const redactor = (await orgRedactionEnabled(session))
@@ -111,6 +117,7 @@ export async function POST(req: Request, { params }: Params) {
     : undefined;
   enterAiContext({ userId: session?.user?.id ?? null, orgId, invocationPoint: AI_INVOCATION_POINTS.SimulationBusinessCase });
   const result = await generateBusinessCaseNarrative({ apiKey: apiKey!, facts }, redactor);
+  if (result.ok && session?.user?.id) await recordUsage(session.user.id, "aiAttempts");
   if (!result.ok) {
     // Losing the narration must not lose the case.
     return NextResponse.json({ facts, narrative: summariseBusinessCase(facts), deterministic: true, aiError: result.error });
@@ -128,6 +135,8 @@ export async function GET(req: Request, { params }: Params) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
+  const fg = await gateFeature(session?.user?.id ?? "", "simulator-analysis");
+  if (fg) return fg;
 
   const s = await study(studyId, id);
   if (!s) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -193,6 +202,8 @@ export async function PUT(req: Request, { params }: Params) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
+  const fg = await gateFeature(session?.user?.id ?? "", "simulator-analysis");
+  if (fg) return fg;
   if (!(await study(studyId, id))) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));

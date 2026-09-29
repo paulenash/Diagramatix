@@ -356,6 +356,106 @@
         "expert": "hidden",
         "enterprise": "available"
       }
+    },
+    {
+      "key": "simulator-analysis",
+      "states": {
+        "free": "hidden",
+        "introductory": "hidden",
+        "professional": "hidden",
+        "expert": "available",
+        "enterprise": "available"
+      }
+    },
+    {
+      "key": "simulator-bpsim",
+      "states": {
+        "free": "hidden",
+        "introductory": "hidden",
+        "professional": "hidden",
+        "expert": "available",
+        "enterprise": "available"
+      }
+    },
+    {
+      "key": "simulator-calendars",
+      "states": {
+        "free": "hidden",
+        "introductory": "hidden",
+        "professional": "hidden",
+        "expert": "available",
+        "enterprise": "available"
+      }
+    },
+    {
+      "key": "simulator-teams",
+      "states": {
+        "free": "hidden",
+        "introductory": "hidden",
+        "professional": "hidden",
+        "expert": "available",
+        "enterprise": "available"
+      }
+    },
+    {
+      "key": "process-mining-conformance",
+      "states": {
+        "free": "hidden",
+        "introductory": "hidden",
+        "professional": "hidden",
+        "expert": "available",
+        "enterprise": "available"
+      }
+    },
+    {
+      "key": "process-mining-sources",
+      "states": {
+        "free": "hidden",
+        "introductory": "hidden",
+        "professional": "hidden",
+        "expert": "available",
+        "enterprise": "available"
+      }
+    },
+    {
+      "key": "process-mining-alerts",
+      "states": {
+        "free": "hidden",
+        "introductory": "hidden",
+        "professional": "hidden",
+        "expert": "available",
+        "enterprise": "available"
+      }
+    },
+    {
+      "key": "process-mining-twin",
+      "states": {
+        "free": "hidden",
+        "introductory": "hidden",
+        "professional": "hidden",
+        "expert": "available",
+        "enterprise": "available"
+      }
+    },
+    {
+      "key": "process-mining-ai",
+      "states": {
+        "free": "hidden",
+        "introductory": "hidden",
+        "professional": "hidden",
+        "expert": "available",
+        "enterprise": "available"
+      }
+    },
+    {
+      "key": "process-mining-export",
+      "states": {
+        "free": "hidden",
+        "introductory": "hidden",
+        "professional": "hidden",
+        "expert": "available",
+        "enterprise": "available"
+      }
     }
   ]
 }

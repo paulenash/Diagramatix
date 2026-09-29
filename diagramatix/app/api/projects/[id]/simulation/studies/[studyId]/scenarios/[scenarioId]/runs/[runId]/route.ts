@@ -11,6 +11,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
+import { gateFeature } from "@/app/lib/subscription-route";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 
 type Params = { params: Promise<{ id: string; studyId: string; scenarioId: string; runId: string }> };
@@ -36,6 +37,8 @@ async function guard(projectId: string) {
     if (err instanceof OrgContextError) return { error: NextResponse.json({ error: err.message }, { status: err.status }) };
     throw err;
   }
+  const fg = await gateFeature(session?.user?.id ?? "", "simulator");
+  if (fg) return { error: fg };
   return {};
 }
 

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { gateFeature } from "@/app/lib/subscription-route";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
@@ -33,6 +34,8 @@ export async function PUT(req: Request, { params }: Params) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
+  const fg = await gateFeature(session?.user?.id ?? "", "simulator-teams");
+  if (fg) return fg;
   const missing = await requireMaster(id, teamId);
   if (missing) return missing;
 
@@ -79,6 +82,8 @@ export async function DELETE(_req: Request, { params }: Params) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
+  const fg = await gateFeature(session?.user?.id ?? "", "simulator-teams");
+  if (fg) return fg;
   const missing = await requireMaster(id, teamId);
   if (missing) return missing;
 

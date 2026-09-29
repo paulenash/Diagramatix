@@ -8,6 +8,7 @@
  * Body: { packages: ExamplePackage[]; keyMap: Record<string, string> }
  */
 import { NextResponse } from "next/server";
+import { gateFeature } from "@/app/lib/subscription-route";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
@@ -31,6 +32,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
+  const fg = await gateFeature(session?.user?.id ?? "", "simulator");
+  if (fg) return fg;
 
   const body = await req.json().catch(() => ({}));
   const packages: ExamplePackage[] = Array.isArray(body.packages) ? body.packages : [];

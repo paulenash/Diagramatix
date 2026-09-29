@@ -28,7 +28,7 @@ export async function POST(req: Request, { params }: Params) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
-  const fg = await gateFeature(session?.user?.id ?? "", "processMining");
+  const fg = await gateFeature(session?.user?.id ?? "", "process-mining-sources");
   if (fg) return fg;
 
   const source = await prisma.miningSource.findFirst({ where: { id: sourceId, projectId: id } });

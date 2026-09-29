@@ -5,6 +5,7 @@
  * POST /api/simulation/import to recreate the whole thing in a fresh project.
  */
 import { NextResponse } from "next/server";
+import { gateFeature } from "@/app/lib/subscription-route";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
@@ -23,6 +24,8 @@ export async function GET(req: Request, { params }: Params) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
+  const fg = await gateFeature(session?.user?.id ?? "", "simulator-bpsim");
+  if (fg) return fg;
   const studyId = new URL(req.url).searchParams.get("studyId");
   if (!studyId) return NextResponse.json({ error: "studyId required" }, { status: 400 });
 

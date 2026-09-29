@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { gateFeature } from "@/app/lib/subscription-route";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma, pgPool } from "@/app/lib/db";
@@ -21,6 +22,8 @@ export async function PUT(req: Request, { params }: Params) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
+  const fg = await gateFeature(session?.user?.id ?? "", "simulator-calendars");
+  if (fg) return fg;
   const existing = await prisma.simulationCalendar.findFirst({ where: { id: calendarId, projectId: id } });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -51,6 +54,8 @@ export async function DELETE(_req: Request, { params }: Params) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
+  const fg = await gateFeature(session?.user?.id ?? "", "simulator-calendars");
+  if (fg) return fg;
   const existing = await prisma.simulationCalendar.findFirst({ where: { id: calendarId, projectId: id } });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
   await prisma.simulationCalendar.delete({ where: { id: calendarId } });

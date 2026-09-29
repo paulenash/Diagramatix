@@ -114,7 +114,7 @@ describe("aiTelemetry", () => {
     expect(created[0].userId).toBeNull();
   });
 
-  it("T1094 — AI_USER_METERED_POINTS = the 16 quota-metered points; AI Tidy/Vectorize/Compare excluded", () => {
+  it("T1094 — AI_USER_METERED_POINTS = the 19 quota-metered points; AI Tidy/Vectorize/Compare excluded", () => {
     // These MUST match the routes that call recordUsage(userId, "aiAttempts").
     const expected = new Set([
       AI_INVOCATION_POINTS.BpmnPlan, AI_INVOCATION_POINTS.BpmnGenerate, AI_INVOCATION_POINTS.BpmnRefine,
@@ -128,6 +128,8 @@ describe("aiTelemetry", () => {
       AI_INVOCATION_POINTS.PartnerProcessMap,
       // Changed 2026-09-28: the phone's Generate job, metered like the plan route.
       AI_INVOCATION_POINTS.MobileGenerate,
+      // Changed 2026-09-30: the simulation narrations (assess, business case, next steps) are metered.
+      AI_INVOCATION_POINTS.SimulationAssess, AI_INVOCATION_POINTS.SimulationBusinessCase, AI_INVOCATION_POINTS.SimulationNextSteps,
     ]);
     expect(new Set(AI_USER_METERED_POINTS)).toEqual(expected);
     // Raw-only points must NOT count as a User Attempt.

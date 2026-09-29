@@ -86,17 +86,17 @@ describe("T5113 — every feature says what enforces it", () => {
     expect(bad).toEqual([]);
   });
 
-  it("the not-enforced list is a RATCHET: 23 today, and it can only shrink (edit this down when you wire one)", () => {
+  it("the not-enforced list is a RATCHET: 22 today, and it can only shrink (edit this down when you wire one)", () => {
     const unwired = FEATURES.filter((f) => FEATURE_GATES[f.key].status === "unwired").map((f) => f.key).sort();
     expect(unwired).toEqual([
       "ai-generate-audio", "ai-generate-dictated", "ai-generate-image", "ai-generate-record", "ai-generate-refine", "ai-generate-typed",
       "bpmn-templates", "choice-of-llms", "co-authoring", "collaboration-groups", "diff-processes", "local-llm", "nl-assist",
-      "process-portal", "risk-control-examples", "sharepoint", "sharing", "simulator-examples", "sop-generation",
+      "process-portal", "risk-control-examples", "sharepoint", "sharing", "sop-generation",
       "visio-export-bulk", "visio-export-individual", "visio-import-bulk", "visio-import-individual",
     ].sort());
     const count = (s: string) => FEATURES.filter((f) => FEATURE_GATES[f.key].status === s).length;
     expect({ wired: count("wired"), partial: count("partial"), unwired: count("unwired"), informational: count("informational") })
-      .toEqual({ wired: 4, partial: 7, unwired: 23, informational: 1 });
+      .toEqual({ wired: 16, partial: 6, unwired: 22, informational: 1 });
   });
 });
 

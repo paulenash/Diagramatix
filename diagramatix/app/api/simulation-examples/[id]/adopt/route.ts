@@ -26,7 +26,7 @@ type Params = { params: Promise<{ id: string }> };
 export async function POST(_req: Request, { params }: Params) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const featureGate = await gateFeature(session.user.id, "simulator");
+  const featureGate = await gateFeature(session.user.id, "simulator-examples");
   if (featureGate) return featureGate;
   try {
     if (isReadOnlyImpersonation(session, await cookies())) {
