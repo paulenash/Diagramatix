@@ -18,18 +18,24 @@ const [, , a, b] = process.argv;
 if (!a || !b) { console.error("usage: node scripts/voice/diff-debug-sessions.mjs before.json after.json"); process.exit(2); }
 
 const TIME_KEYS = /^(at|takenAt|savedAt|createdAt|updatedAt|exportedAt|startedAt|generatedAt|ms|elapsedMs|durationMs)$/;
-const DROP_KEYS = /^(png|appVersion|productVersion|userAgent)$/;
+// png: screenshots; pointer: where the mouse happened to be on the canvas.
+const DROP_KEYS = /^(png|appVersion|productVersion|userAgent|pointer)$/;
 const ID_LIKE = /^[A-Za-z0-9_-]{8,24}$/;
 
 function normalise(root) {
   const ids = new Map();
   const idFor = (v) => { if (!ids.has(v)) ids.set(v, `id${ids.size + 1}`); return ids.get(v); };
-  // first pass: collect every value used as an id, in order of appearance
-  (function collect(v, key) {
-    if (Array.isArray(v)) { v.forEach((x) => collect(x, key)); return; }
-    if (v && typeof v === "object") { for (const [k, x] of Object.entries(v)) collect(x, k); return; }
-    if (typeof v === "string" && key && /(^id$|Id$|Ids$|^ids$)/.test(key) && ID_LIKE.test(v)) idFor(v);
+  // Ids are numbered where they are DEFINED (an object's own "id"), in order —
+  // so a reference to one elsewhere (voiceLastId, selectedIds …) cannot shift
+  // the numbering of everything after it. Then any id-like reference left.
+  const collect = (defsOnly) => (function walk(v, key) {
+    if (Array.isArray(v)) { v.forEach((x) => walk(x, key)); return; }
+    if (v && typeof v === "object") { for (const [k, x] of Object.entries(v)) walk(x, k); return; }
+    if (typeof v !== "string" || !ID_LIKE.test(v)) return;
+    if (defsOnly ? key === "id" : /(Id$|Ids$|^ids$)/.test(key)) idFor(v);
   })(root, "");
+  collect(true);
+  collect(false);
   const swap = (s) => { let out = s; for (const [id, n] of ids) if (out.includes(id)) out = out.split(id).join(n); return out; };
   return (function walk(v, key) {
     if (Array.isArray(v)) return v.map((x) => walk(x, key));
