@@ -27,13 +27,29 @@ export const TEMPLATE_TYPES_PATH = join("app", "hooks", "voiceTemplateTypes.ts")
 
 const readIfThere = (p: string): string => { try { return read(p); } catch { return ""; } };
 
+export const VOICE_SESSION_PATH = join("app", "hooks", "useVoiceSession.ts");
+/** The line in DiagramEditor.tsx where the voice session hook is called — the block's old place. */
+export const VOICE_SESSION_MARKER = "  // ── Voice Assist: session hook (app/hooks/useVoiceSession.ts) ──";
+
 /**
- * The editor's source as every guard reads it (see above): the editor, then the
- * code moved out of it that it still owns in spirit — autosave and the
- * template-window types (appended, so nothing earlier moves).
+ * The editor's source as every guard reads it (see above): the editor with the
+ * voice session hook spliced back in at its call site — so every slice, order
+ * and count reads the code in the order it always had — then the code moved
+ * out of it that it still owns in spirit: autosave and the template-window
+ * types (appended, so nothing earlier moves).
  */
-export const editorSource = (): string =>
-  [read(EDITOR_PATH), readIfThere(AUTO_SAVE_PATH), readIfThere(TEMPLATE_TYPES_PATH)].filter(Boolean).join("\n");
+export const editorSource = (): string => {
+  const editor = read(EDITOR_PATH);
+  let text = editor;
+  if (editor.includes(VOICE_SESSION_MARKER)) {
+    if (editor.split(VOICE_SESSION_MARKER).length !== 2) throw new Error("the voice session marker must appear exactly once in DiagramEditor.tsx");
+    const hook = readIfThere(VOICE_SESSION_PATH);
+    if (!hook) throw new Error("DiagramEditor.tsx calls the voice session hook, but app/hooks/useVoiceSession.ts is missing");
+    const at = editor.indexOf(VOICE_SESSION_MARKER);
+    text = editor.slice(0, at) + hook + "\n" + editor.slice(at);
+  }
+  return [text, readIfThere(AUTO_SAVE_PATH), readIfThere(TEMPLATE_TYPES_PATH)].filter(Boolean).join("\n");
+};
 
 /** The same with comments removed — for guards that pin the wiring, not the prose about it. */
 export const editorCode = (): string =>
