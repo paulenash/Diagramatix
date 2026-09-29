@@ -12,6 +12,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { isSuperuser } from "@/app/lib/superuser";
+import { blockReadOnlyImpersonation } from "@/app/lib/routeGuard";
 import { EVENT_METRICS, getUsageSnapshot, resetUsageCounters, setTrialDaysLeft, setUsageCounter } from "@/app/lib/subscription";
 
 export async function GET(
@@ -47,6 +48,9 @@ export async function POST(
   if (!isSuperuser(session)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  // Read-only impersonation ("view as") must not change data.
+  const blocked = await blockReadOnlyImpersonation(session);
+  if (blocked) return blocked;
   const { id } = await params;
   const body = (await req.json().catch(() => null)) as { action?: string; metric?: string; count?: unknown; days?: unknown } | null;
   switch (body?.action) {
