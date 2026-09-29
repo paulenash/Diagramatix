@@ -9,6 +9,7 @@ import { auth } from "@/auth";
 import { isSuperuser } from "@/app/lib/superuser";
 import { prisma } from "@/app/lib/db";
 import { FEATURES, FEATURE_KEYS } from "@/app/lib/features/registry";
+import { FEATURE_GATES } from "@/app/lib/features/gateMap";
 import { coerceState, type FeatureState } from "@/app/lib/features/availability";
 
 export const runtime = "nodejs";
@@ -30,7 +31,10 @@ export async function GET() {
     for (const k of FEATURE_KEYS) matrix[l.id][k] = "available"; // fail-open default until a row exists
   }
   for (const r of rows) if (matrix[r.levelId] && FEATURE_KEYS.includes(r.featureKey)) matrix[r.levelId][r.featureKey] = coerceState(r.state);
-  return NextResponse.json({ levels, features: FEATURES, matrix });
+  // Each feature travels with what actually enforces it (features/gateMap.ts), so the grid can say
+  // which cells do something and which do not yet.
+  const features = FEATURES.map((f) => ({ ...f, gate: FEATURE_GATES[f.key] ?? null }));
+  return NextResponse.json({ levels, features, matrix });
 }
 
 export async function PUT(req: Request) {
