@@ -22,8 +22,18 @@ const read = (...p: string[]) => readFileSync(join(process.cwd(), ...p), "utf8")
 export const EDITOR_PATH = join("app", "(dashboard)", "diagram", "[id]", "DiagramEditor.tsx");
 export const APPLY_LAYER_PATH = join("app", "lib", "assist", "applyAssistOps.ts");
 
-/** The editor's source as every guard reads it (see above). */
-export const editorSource = (): string => read(EDITOR_PATH);
+export const AUTO_SAVE_PATH = join("app", "hooks", "useAutoSave.ts");
+export const TEMPLATE_TYPES_PATH = join("app", "hooks", "voiceTemplateTypes.ts");
+
+const readIfThere = (p: string): string => { try { return read(p); } catch { return ""; } };
+
+/**
+ * The editor's source as every guard reads it (see above): the editor, then the
+ * code moved out of it that it still owns in spirit — autosave and the
+ * template-window types (appended, so nothing earlier moves).
+ */
+export const editorSource = (): string =>
+  [read(EDITOR_PATH), readIfThere(AUTO_SAVE_PATH), readIfThere(TEMPLATE_TYPES_PATH)].filter(Boolean).join("\n");
 
 /** The same with comments removed — for guards that pin the wiring, not the prose about it. */
 export const editorCode = (): string =>
