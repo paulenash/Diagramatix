@@ -148,3 +148,25 @@ describe("T5129 — the matrix keeps today's access; the xlsx intent is kept bes
     for (const r of intent.rows) for (const l of LEVELS) expect(sql, `${r.key} @ ${l}`).toContain(`('${l}', '${r.key}', '${r.states[l]}')`);
   });
 });
+
+describe("T5143 — the release 2.13 content SQL is safe to run and to re-run", () => {
+  const sql = read("scripts/sql/publish-release-2-13-content.sql");
+
+  it("is non-destructive: sections are added only when missing, the version line is a targeted replace, and nothing is deleted", () => {
+    expect(sql).not.toMatch(/^\s*DELETE\s/m);
+    expect(sql.split("NOT EXISTS (SELECT 1 FROM \"HelpSection\" x").length - 1).toBeGreaterThanOrEqual(3);
+    expect(sql).toContain("regexp_replace(\"bodyMarkdown\", 'This guide covers version");
+    expect(sql).toContain("AND \"publishedAt\" IS NULL;");
+  });
+
+  it("carries the three guide chapters, the connector-commands section, the three catalog features and the technical note", () => {
+    for (const slug of ["mobile-access", "plans-limits-notices", "plans-features-customise", "feature-availability-limits"]) expect(sql, slug).toContain(`'${slug}'`);
+    expect(sql).toContain("'Connectors, messages and deleting by number'");
+    for (const f of ["Mobile Access", "Plans That Show Their Working", "Voice Assist — Connectors"]) expect(sql, f).toContain(`'${f}'`);
+  });
+
+  it("says loudly that the build number must be checked against the live badge", () => {
+    expect(sql).toContain("BEFORE RUNNING: check the BUILD NUMBER");
+    expect(sql).toContain("2.13.2821");
+  });
+});
