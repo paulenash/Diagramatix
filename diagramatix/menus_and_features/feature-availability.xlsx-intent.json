@@ -1,0 +1,232 @@
+{
+  "note": "The Feature by Subscription Level xlsx (v1.4) INTENT for the 22 features that were not enforced until 2026-09-30. Their seeded cells are now Available at every level so that wiring the gates changes nothing for anyone; restrict them deliberately in Feature Availability, or run scripts/sql/apply-xlsx-restrictions.sql to apply this intent all at once.",
+  "levels": [
+    "free",
+    "introductory",
+    "professional",
+    "expert",
+    "enterprise"
+  ],
+  "rows": [
+    {
+      "key": "ai-generate-typed",
+      "states": {
+        "free": "available",
+        "introductory": "available",
+        "professional": "available",
+        "expert": "available",
+        "enterprise": "available"
+      }
+    },
+    {
+      "key": "ai-generate-image",
+      "states": {
+        "free": "hidden",
+        "introductory": "available",
+        "professional": "available",
+        "expert": "available",
+        "enterprise": "available"
+      }
+    },
+    {
+      "key": "ai-generate-dictated",
+      "states": {
+        "free": "hidden",
+        "introductory": "available",
+        "professional": "available",
+        "expert": "available",
+        "enterprise": "available"
+      }
+    },
+    {
+      "key": "ai-generate-audio",
+      "states": {
+        "free": "hidden",
+        "introductory": "hidden",
+        "professional": "available",
+        "expert": "available",
+        "enterprise": "available"
+      }
+    },
+    {
+      "key": "ai-generate-refine",
+      "states": {
+        "free": "hidden",
+        "introductory": "hidden",
+        "professional": "available",
+        "expert": "available",
+        "enterprise": "available"
+      }
+    },
+    {
+      "key": "ai-generate-record",
+      "states": {
+        "free": "hidden",
+        "introductory": "hidden",
+        "professional": "available",
+        "expert": "available",
+        "enterprise": "available"
+      }
+    },
+    {
+      "key": "bpmn-templates",
+      "states": {
+        "free": "available",
+        "introductory": "available",
+        "professional": "available",
+        "expert": "available",
+        "enterprise": "available"
+      }
+    },
+    {
+      "key": "nl-assist",
+      "states": {
+        "free": "available",
+        "introductory": "available",
+        "professional": "available",
+        "expert": "available",
+        "enterprise": "available"
+      }
+    },
+    {
+      "key": "collaboration-groups",
+      "states": {
+        "free": "hidden",
+        "introductory": "available",
+        "professional": "available",
+        "expert": "available",
+        "enterprise": "available"
+      }
+    },
+    {
+      "key": "sharing",
+      "states": {
+        "free": "hidden",
+        "introductory": "hidden",
+        "professional": "available",
+        "expert": "available",
+        "enterprise": "available"
+      }
+    },
+    {
+      "key": "co-authoring",
+      "states": {
+        "free": "hidden",
+        "introductory": "hidden",
+        "professional": "available",
+        "expert": "available",
+        "enterprise": "available"
+      }
+    },
+    {
+      "key": "diff-processes",
+      "states": {
+        "free": "hidden",
+        "introductory": "available",
+        "professional": "available",
+        "expert": "available",
+        "enterprise": "available"
+      }
+    },
+    {
+      "key": "visio-import-individual",
+      "states": {
+        "free": "hidden",
+        "introductory": "hidden",
+        "professional": "available",
+        "expert": "available",
+        "enterprise": "available"
+      }
+    },
+    {
+      "key": "visio-export-individual",
+      "states": {
+        "free": "hidden",
+        "introductory": "hidden",
+        "professional": "hidden",
+        "expert": "available",
+        "enterprise": "available"
+      }
+    },
+    {
+      "key": "visio-import-bulk",
+      "states": {
+        "free": "hidden",
+        "introductory": "hidden",
+        "professional": "hidden",
+        "expert": "available",
+        "enterprise": "available"
+      }
+    },
+    {
+      "key": "visio-export-bulk",
+      "states": {
+        "free": "hidden",
+        "introductory": "hidden",
+        "professional": "hidden",
+        "expert": "available",
+        "enterprise": "available"
+      }
+    },
+    {
+      "key": "sharepoint",
+      "states": {
+        "free": "hidden",
+        "introductory": "hidden",
+        "professional": "hidden",
+        "expert": "available",
+        "enterprise": "available"
+      }
+    },
+    {
+      "key": "sop-generation",
+      "states": {
+        "free": "hidden",
+        "introductory": "hidden",
+        "professional": "hidden",
+        "expert": "available",
+        "enterprise": "available"
+      }
+    },
+    {
+      "key": "process-portal",
+      "states": {
+        "free": "hidden",
+        "introductory": "hidden",
+        "professional": "available",
+        "expert": "available",
+        "enterprise": "available"
+      }
+    },
+    {
+      "key": "choice-of-llms",
+      "states": {
+        "free": "hidden",
+        "introductory": "hidden",
+        "professional": "hidden",
+        "expert": "hidden",
+        "enterprise": "available"
+      }
+    },
+    {
+      "key": "local-llm",
+      "states": {
+        "free": "hidden",
+        "introductory": "hidden",
+        "professional": "hidden",
+        "expert": "hidden",
+        "enterprise": "available"
+      }
+    },
+    {
+      "key": "risk-control-examples",
+      "states": {
+        "free": "hidden",
+        "introductory": "hidden",
+        "professional": "hidden",
+        "expert": "available",
+        "enterprise": "available"
+      }
+    }
+  ]
+}

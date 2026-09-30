@@ -14,7 +14,7 @@ import {
 } from "@/app/lib/diagram/colors";
 import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { getCurrentOrgId, OrgContextError } from "@/app/lib/auth/orgContext";
-import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
+import { gateFeature, gateLimit, recordUsage } from "@/app/lib/subscription-route";
 
 /**
  * GET /api/export/visio-v3/bulk?projectId=<id>[&profile=v1.6]
@@ -80,6 +80,8 @@ export async function GET(request: Request) {
 
   // Subscription cap: bulk exports. Always monthly for tiers that allow
   // them (Free has bulkExports=0 so this always blocks for Free users).
+  const featBlock = await gateFeature(session.user.id, "visio-export-bulk");
+  if (featBlock) return featBlock;
   const limitBlock = await gateLimit(session.user.id, "bulkExports");
   if (limitBlock) return limitBlock;
 

@@ -19,7 +19,7 @@ import { enterUserAiKey } from "@/app/lib/ai/aiKeyContext";
 import { resolveAiRouteContext } from "@/app/lib/ai/aiTelemetryRoute";
 import { AI_INVOCATION_POINTS, enterAiContext } from "@/app/lib/ai/aiTelemetry";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
-import { gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription-route";
+import { gateFeature, gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription-route";
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -38,6 +38,10 @@ export async function POST(req: Request) {
   // Image input uses the Vision-model override when set; else the main model. A
   // caller may override with a cost-gated model (SuperAdmin → any); disallowed → default.
   const defaultModel = await resolveGenerateModel(attachment?.type === "image");
+  if (requestedModel && requestedModel !== defaultModel) {
+    const modelBlock = await gateFeature(session.user.id, "choice-of-llms");
+    if (modelBlock) return modelBlock;
+  }
   // Models the caller's OWN key unlocks count as available to them. The
   // picker offers those, so rejecting one here would swap it for the
   // default and generate something nobody asked for, without saying so.
@@ -60,6 +64,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "AI is not configured for the selected model. An administrator can add a key for this provider, or you can add your own under Account Settings → Your own AI keys." }, { status: 503 });
   }
 
+  const featBlock = await gateFeature(session.user.id, attachment?.type === "image" ? "ai-generate-image" : "ai-generate-typed");
+  if (featBlock) return featBlock;
   const aiBlock = await gateLimit(session.user.id, "aiAttempts");
   if (aiBlock) return aiBlock;
 

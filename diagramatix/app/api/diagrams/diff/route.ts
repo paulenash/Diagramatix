@@ -18,7 +18,7 @@ import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import { makeAiClient, aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { resolveAiRouteContext } from "@/app/lib/ai/aiTelemetryRoute";
 import { AI_INVOCATION_POINTS, enterAiContext } from "@/app/lib/ai/aiTelemetry";
-import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
+import { gateFeature, gateLimit, recordUsage } from "@/app/lib/subscription-route";
 import { buildDocx } from "@/app/lib/documents/exportDocx";
 import { docxToPdf } from "@/app/lib/documents/docxToPdf";
 import { isSuperuser } from "@/app/lib/superuser";
@@ -157,6 +157,8 @@ export async function POST(req: Request) {
   const model = await getAiGenerateModel();
   const apiKey = aiApiKey(model);
   if (!apiKey) return NextResponse.json({ error: "AI not configured for the selected model." }, { status: 503 });
+  const featBlock = await gateFeature(session.user.id, "diff-processes");
+  if (featBlock) return featBlock;
   const block = await gateLimit(session.user.id, "aiAttempts");
   if (block) return block;
 

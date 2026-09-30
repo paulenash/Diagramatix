@@ -13,6 +13,7 @@
  * Liveblocks error must never surface as a client error on unload.
  */
 import { NextResponse } from "next/server";
+import { gateFeature } from "@/app/lib/subscription-route";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { requireDiagramAccess } from "@/app/lib/auth/orgContext";
@@ -24,6 +25,8 @@ export async function POST(req: Request) {
   try {
     const session = await auth();
     if (!session?.user?.id) return new NextResponse(null, { status: 204 });
+  const fg = await gateFeature(session.user.id, "co-authoring");
+  if (fg) return fg;
 
     // sendBeacon delivers a text/plain-ish body; parse leniently.
     const raw = await req.text().catch(() => "");

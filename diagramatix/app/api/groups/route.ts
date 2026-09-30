@@ -15,6 +15,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { gateFeature } from "@/app/lib/subscription-route";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 
@@ -106,6 +107,8 @@ export async function POST(req: Request) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const fg = await gateFeature(session.user.id, "collaboration-groups");
+  if (fg) return fg;
   const userId = session.user.id;
 
   let body: { name?: string };

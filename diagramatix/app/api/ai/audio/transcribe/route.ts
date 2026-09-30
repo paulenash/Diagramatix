@@ -9,6 +9,7 @@
  *   already contain the text + speaker names, so they never hit this route.)
  */
 import { NextResponse } from "next/server";
+import { gateFeature } from "@/app/lib/subscription-route";
 import { auth } from "@/auth";
 import { batchParams } from "@/app/lib/dictation/asrParams";
 import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
@@ -23,6 +24,10 @@ export async function POST(req: Request) {
   }
   const _pol = await gateOrgPolicy(session, "allowVoiceAi");
   if (_pol) return _pol;
+  // Uploading a file and recording in the browser are two features (the client says which).
+  const audioFeature = req.headers.get("x-audio-source") === "record" ? "ai-generate-record" : "ai-generate-audio";
+  const fg = await gateFeature(session.user.id, audioFeature);
+  if (fg) return fg;
   const key = process.env.DEEPGRAM_API_KEY;
   if (!key) {
     return NextResponse.json({ error: "Audio transcription not configured" }, { status: 503 });

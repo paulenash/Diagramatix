@@ -16,7 +16,7 @@ import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { resolveAiRouteContext } from "@/app/lib/ai/aiTelemetryRoute";
 import { AI_INVOCATION_POINTS, enterAiContext } from "@/app/lib/ai/aiTelemetry";
-import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
+import { gateFeature, gateLimit, recordUsage } from "@/app/lib/subscription-route";
 import type { SopScope } from "@/app/lib/sop/skeleton";
 import { runSopGenerate, runSopSuite } from "@/app/lib/sop/runGenerate";
 import { mergeSopSections, type MergedSopSection } from "@/app/lib/sop/mergeSections";
@@ -49,6 +49,8 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   const model = await getAiGenerateModel();
   const apiKey = aiApiKey(model);
   if (!apiKey) return NextResponse.json({ error: "AI not configured for the selected model." }, { status: 503 });
+  const featBlock = await gateFeature(session.user.id, "sop-generation");
+  if (featBlock) return featBlock;
   const aiBlock = await gateLimit(session.user.id, "aiAttempts");
   if (aiBlock) return aiBlock;
 

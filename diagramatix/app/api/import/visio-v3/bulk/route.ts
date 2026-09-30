@@ -6,7 +6,7 @@ import { uploadSizeError } from "@/app/lib/uploadLimit";
 import { importVisioV3 } from "@/app/lib/diagram/v3/importVisioV3";
 import { listVisioPages } from "@/app/lib/diagram/v3/visioPages";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
-import { gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription-route";
+import { gateFeature, gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription-route";
 import {
   requireRole,
   WRITE_ROLES,
@@ -158,6 +158,8 @@ export async function POST(request: Request) {
   }
 
   // Subscription cap: bulk imports.
+  const featBlock = await gateFeature(session.user.id, "visio-import-bulk");
+  if (featBlock) return featBlock;
   const limitBlock = await gateLimit(session.user.id, "bulkImports");
   if (limitBlock) return limitBlock;
 

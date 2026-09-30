@@ -42,7 +42,7 @@ import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { resolveUserAiKey } from "@/app/lib/ai/userAiKey";
 import { resolveAiRouteContext } from "@/app/lib/ai/aiTelemetryRoute";
 import { AI_INVOCATION_POINTS } from "@/app/lib/ai/aiTelemetry";
-import { gateLimit } from "@/app/lib/subscription-route";
+import { gateFeature, gateLimit } from "@/app/lib/subscription-route";
 import {
   GENERATE_JOB_SELECT, MAX_GENERATE_PROMPT_CHARS, hasDiagramContent, reapStaleGenerateJobs, resolveJobSelectedPrompt,
   runGenerateJob, viewGenerateJob, type GenerateJobPromptMeta,
@@ -190,6 +190,8 @@ export async function POST(req: Request, { params }: Params) {
   }
   // Checked BEFORE the model call, as the plan route does; counted by the job
   // only once a plan has come back.
+  const featBlock = await gateFeature(session.user.id, photo ? "ai-generate-image" : "ai-generate-typed");
+  if (featBlock) return featBlock;
   const aiBlock = await gateLimit(session.user.id, "aiAttempts");
   if (aiBlock) return aiBlock;
 

@@ -9,6 +9,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { gateFeature } from "@/app/lib/subscription-route";
 import { auth } from "@/auth";
 import { inviteGroupMembers } from "@/app/lib/groups/membership";
 
@@ -20,6 +21,8 @@ export async function POST(
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const fg = await gateFeature(session.user.id, "collaboration-groups");
+  if (fg) return fg;
   const callerId = session.user.id;
   const { id: groupId } = await context.params;
 

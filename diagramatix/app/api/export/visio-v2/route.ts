@@ -9,7 +9,7 @@ import { exportVisioV2 } from "@/app/lib/diagram/v2/exportVisioV2";
 import { DEFAULT_SYMBOL_COLORS, BW_SYMBOL_COLORS } from "@/app/lib/diagram/colors";
 import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { requireDiagramAccess, OrgContextError } from "@/app/lib/auth/orgContext";
-import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
+import { gateFeature, gateLimit, recordUsage } from "@/app/lib/subscription-route";
 
 /**
  * GET /api/export/visio-v2?diagramId=<id>
@@ -40,6 +40,8 @@ export async function GET(request: Request) {
   if (!diagram) return NextResponse.json({ error: "Diagram not found" }, { status: 404 });
 
   // Subscription cap: individual exports (V2 and V3 share the counter).
+  const featBlock = await gateFeature(session.user.id, "visio-export-individual");
+  if (featBlock) return featBlock;
   const limitBlock = await gateLimit(session.user.id, "individualExports");
   if (limitBlock) return limitBlock;
 

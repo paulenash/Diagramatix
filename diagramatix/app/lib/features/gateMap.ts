@@ -50,16 +50,66 @@ const AI_ALSO = ["AI attempts limit (per level)", "Organisation policy: allowAi"
 
 export const FEATURE_GATES: Record<string, FeatureGateInfo> = {
   // ── AI Generation ──────────────────────────────────────────────────────────
-  "ai-generate-typed":    { description: "Generate a diagram from a typed prompt.", status: "unwired", ui: [], server: [], alsoLimitedBy: AI_ALSO },
-  "ai-generate-image":    { description: "Generate a diagram from a picture of one.", status: "unwired", ui: [], server: [], alsoLimitedBy: AI_ALSO },
-  "ai-generate-dictated": { description: "Dictate the prompt by voice.", status: "unwired", ui: [], server: [], alsoLimitedBy: [...AI_ALSO, "Organisation policy: allowVoiceAi"] },
-  "ai-generate-audio":    { description: "Turn an audio recording or transcript into a prompt.", status: "unwired", ui: [], server: [], alsoLimitedBy: [...AI_ALSO, "Organisation policy: allowVoiceAi"] },
-  "ai-generate-refine":   { description: "Refine a prompt with the AI's questions before generating.", status: "unwired", ui: [], server: [], alsoLimitedBy: AI_ALSO },
-  "ai-generate-record":   { description: "Record a conversation and turn it into a prompt.", status: "unwired", ui: [], server: [], alsoLimitedBy: [...AI_ALSO, "Organisation policy: allowVoiceAi"] },
+  "ai-generate-typed": {
+    description: "Generate a diagram from a typed prompt.", status: "wired", ui: [],
+    server: [
+      { file: "app/api/ai/bpmn/plan/route.ts", needle: '"ai-generate-typed"', what: "BPMN plan" },
+      { file: "app/api/ai/generate-bpmn/route.ts", needle: '"ai-generate-typed"', what: "BPMN generate" },
+      { file: "app/api/ai/generate-diagram/route.ts", needle: '"ai-generate-typed"', what: "Diagram generate" },
+      { file: "app/api/ai/epc/plan/route.ts", needle: '"ai-generate-typed"', what: "EPC plan" },
+      { file: "app/api/ai/flowchart/plan/route.ts", needle: '"ai-generate-typed"', what: "Flowchart plan" },
+      { file: "app/api/diagrams/[id]/generate/route.ts", needle: '"ai-generate-typed"', what: "Phone generate" },
+    ],
+    alsoLimitedBy: AI_ALSO,
+    note: "A request that carries an image attachment needs Image to Diagram instead.",
+  },
+  "ai-generate-image": {
+    description: "Generate a diagram from a picture of one.", status: "wired", ui: [],
+    server: [
+      { file: "app/api/ai/bpmn/plan/route.ts", needle: '"ai-generate-image"', what: "BPMN plan" },
+      { file: "app/api/ai/generate-bpmn/route.ts", needle: '"ai-generate-image"', what: "BPMN generate" },
+      { file: "app/api/ai/generate-diagram/route.ts", needle: '"ai-generate-image"', what: "Diagram generate" },
+      { file: "app/api/ai/epc/plan/route.ts", needle: '"ai-generate-image"', what: "EPC plan" },
+      { file: "app/api/ai/flowchart/plan/route.ts", needle: '"ai-generate-image"', what: "Flowchart plan" },
+      { file: "app/api/diagrams/[id]/generate/route.ts", needle: '"ai-generate-image"', what: "Phone generate" },
+    ],
+    alsoLimitedBy: AI_ALSO,
+  },
+  "ai-generate-dictated": {
+    description: "Dictate the prompt by voice.", status: "partial",
+    ui: [{ file: "app/lib/dictation/index.ts", needle: 'purpose: "prompt"', what: "A spoken prompt says so when it asks for a token" }],
+    server: [{ file: "app/api/ai/dictation/token/route.ts", needle: '"ai-generate-dictated"', what: "POST dictation token (purpose: prompt)" }],
+    alsoLimitedBy: [...AI_ALSO, "Organisation policy: allowVoiceAi"],
+    note: "The token also serves Voice Assist and review comments, which this feature does not gate; only a caller that says it is dictating a prompt is checked.",
+  },
+  "ai-generate-audio": {
+    description: "Turn an uploaded audio file into a prompt.", status: "wired", ui: [],
+    server: [{ file: "app/api/ai/audio/transcribe/route.ts", needle: '"ai-generate-audio"', what: "POST transcribe (upload)" }],
+    alsoLimitedBy: [...AI_ALSO, "Organisation policy: allowVoiceAi"],
+    note: "A Teams .vtt transcript is read in the browser (no server call), so it is not gated by this feature.",
+  },
+  "ai-generate-refine": {
+    description: "Refine a prompt with the AI's questions before generating.", status: "wired", ui: [],
+    server: [{ file: "app/api/ai/bpmn/refine-questions/route.ts", needle: '"ai-generate-refine"', what: "POST refine questions" }],
+    alsoLimitedBy: AI_ALSO,
+  },
+  "ai-generate-record": {
+    description: "Record a conversation in the browser and turn it into a prompt.", status: "wired",
+    ui: [{ file: "app/components/AudioToProcessButton.tsx", needle: 'transcribeAudioBlob(blob, "record")', what: "The record button says it is a recording" }],
+    server: [{ file: "app/api/ai/audio/transcribe/route.ts", needle: '"ai-generate-record"', what: "POST transcribe (recording)" }],
+    alsoLimitedBy: [...AI_ALSO, "Organisation policy: allowVoiceAi"],
+  },
 
   // ── Authoring ──────────────────────────────────────────────────────────────
-  "bpmn-templates": { description: "The BPMN template window (insert a ready-made flow).", status: "unwired", ui: [], server: [] },
-  "nl-assist":      { description: "Typed natural-language editing commands.", status: "unwired", ui: [], server: [], note: "Voice Assist (the voice-assist key) is what /api/ai/command actually enforces; this key is read by nothing." },
+  "bpmn-templates": {
+    description: "The BPMN template window (insert a ready-made flow).", status: "wired", ui: [],
+    server: [{ file: "app/api/templates/route.ts", needle: '"bpmn-templates"', what: "GET / POST the template library" }],
+  },
+  "nl-assist": {
+    description: "Typed natural-language editing commands (Assist).", status: "partial", ui: [],
+    server: [{ file: "app/api/ai/command/route.ts", needle: '"nl-assist"', what: "POST /api/ai/command (Voice Assist OR Assist opens it)" }],
+    note: "The route accepts either; the editor still draws the Assist bar only when Voice Assist is available, so Assist on its own is not reachable from the screen yet.",
+  },
   "voice-assist": {
     description: "Edit a diagram by voice (desktop and phone).",
     status: "wired",
@@ -80,9 +130,31 @@ export const FEATURE_GATES: Record<string, FeatureGateInfo> = {
   },
 
   // ── Collaboration ──────────────────────────────────────────────────────────
-  "collaboration-groups": { description: "Groups of collaborators that projects and diagrams are shared with.", status: "unwired", ui: [], server: [] },
-  "sharing":              { description: "Share projects and diagrams with other people.", status: "unwired", ui: [], server: [], alsoLimitedBy: ["Organisation policy: allowCrossOrgSharing"] },
-  "co-authoring":         { description: "Edit a diagram together with others, live.", status: "unwired", ui: [], server: [], note: "SubscriptionLevel.hasCollaboration and Org.allowCollaboration exist but nothing reads them." },
+  "collaboration-groups": {
+    description: "Groups of collaborators that projects and diagrams are shared with.", status: "wired", ui: [],
+    server: [
+      { file: "app/api/groups/route.ts", needle: '"collaboration-groups"', what: "POST create a group" },
+      { file: "app/api/groups/[id]/members/route.ts", needle: '"collaboration-groups"', what: "POST add a member" },
+    ],
+    note: "Creating and changing groups; reading the groups you belong to stays open.",
+  },
+  "sharing": {
+    description: "Share projects and diagrams with other people.", status: "wired", ui: [],
+    server: [
+      { file: "app/api/projects/[id]/shares/route.ts", needle: '"sharing"', what: "POST share a project" },
+      { file: "app/api/projects/[id]/share-candidates/route.ts", needle: '"sharing"', what: "GET who can be shared with" },
+    ],
+    alsoLimitedBy: ["Organisation policy: allowCrossOrgSharing"],
+    note: "Sharing something new; existing shares stay visible and can be removed.",
+  },
+  "co-authoring": {
+    description: "Edit a diagram together with others, live.", status: "wired", ui: [],
+    server: [
+      { file: "app/api/collab/token/route.ts", needle: '"co-authoring"', what: "POST collaboration token" },
+      { file: "app/api/collab/flush/route.ts", needle: '"co-authoring"', what: "POST flush the shared document" },
+    ],
+    note: "SubscriptionLevel.hasCollaboration and Org.allowCollaboration still exist and are read by nothing.",
+  },
   "process-review": {
     description: "Reviewers comment on a diagram (desktop and phone).",
     status: "partial",
@@ -92,7 +164,11 @@ export const FEATURE_GATES: Record<string, FeatureGateInfo> = {
   },
 
   // ── Analytics & Mining ─────────────────────────────────────────────────────
-  "diff-processes": { description: "Compare two versions of a process.", status: "unwired", ui: [], server: [], alsoLimitedBy: AI_ALSO },
+  "diff-processes": {
+    description: "Compare two versions of a process.", status: "wired", ui: [],
+    server: [{ file: "app/api/diagrams/diff/route.ts", needle: '"diff-processes"', what: "POST compare" }],
+    alsoLimitedBy: AI_ALSO,
+  },
   "simulator": {
     description: "Simulation: studies, scenarios and results. The module — the advanced parts are separate features that need it.",
     status: "wired",
@@ -265,20 +341,62 @@ export const FEATURE_GATES: Record<string, FeatureGateInfo> = {
     server: [{ file: "app/lib/riskControls/routeAuth.ts", needle: 'feature: "riskControl"', what: "Every mutating risk-control route" }],
     note: "Mutations only, by design: reads stay open so a downgraded user can still see what they built.",
   },
-  "risk-control-examples": { description: "The ready-made Risk & Control examples.", status: "unwired", ui: [], server: [], note: "Adopting an example is gated by `riskControl`, not by this key." },
+  "risk-control-examples": {
+    description: "The ready-made Risk & Control examples.", status: "wired", ui: [],
+    server: [{ file: "app/api/risk-control-examples/route.ts", needle: '"risk-control-examples"', what: "GET the examples" }],
+    note: "Adopting an example is gated by riskControl.",
+  },
 
   // ── Import & Export ────────────────────────────────────────────────────────
-  "visio-import-individual": { description: "Import one Visio file.", status: "unwired", ui: [], server: [], alsoLimitedBy: ["Individual imports limit (per level)"] },
-  "visio-export-individual": { description: "Export one diagram to Visio.", status: "unwired", ui: [], server: [], alsoLimitedBy: ["Individual exports limit (per level)"] },
-  "visio-import-bulk":       { description: "Import many Visio files at once.", status: "unwired", ui: [], server: [], alsoLimitedBy: ["Bulk imports limit (per level)"] },
-  "visio-export-bulk":       { description: "Export a whole project to Visio.", status: "unwired", ui: [], server: [], alsoLimitedBy: ["Bulk exports limit (per level)"] },
+  "visio-import-individual": {
+    description: "Import one Visio file.", status: "wired", ui: [],
+    server: [{ file: "app/api/import/visio-v3/route.ts", needle: '"visio-import-individual"', what: "POST import a Visio file" }],
+    alsoLimitedBy: ["Individual imports limit (per level)"],
+  },
+  "visio-export-individual": {
+    description: "Export one diagram to Visio.", status: "wired", ui: [],
+    server: [
+      { file: "app/api/export/visio-v3/route.ts", needle: '"visio-export-individual"', what: "GET export to Visio" },
+      { file: "app/api/export/visio-v2/route.ts", needle: '"visio-export-individual"', what: "GET export (v2)" },
+    ],
+    alsoLimitedBy: ["Individual exports limit (per level)"],
+  },
+  "visio-import-bulk": {
+    description: "Import many Visio files at once.", status: "wired", ui: [],
+    server: [{ file: "app/api/import/visio-v3/bulk/route.ts", needle: '"visio-import-bulk"', what: "POST bulk import" }],
+    alsoLimitedBy: ["Bulk imports limit (per level)"],
+  },
+  "visio-export-bulk": {
+    description: "Export a whole project to Visio.", status: "wired", ui: [],
+    server: [{ file: "app/api/export/visio-v3/bulk/route.ts", needle: '"visio-export-bulk"', what: "GET bulk export" }],
+    alsoLimitedBy: ["Bulk exports limit (per level)"],
+  },
 
   // ── Integration / Documents ────────────────────────────────────────────────
-  "sharepoint":     { description: "Export to and import from SharePoint.", status: "unwired", ui: [], server: [], alsoLimitedBy: ["Organisation policy: allowSharePoint", "Needs the person's Microsoft connection"] },
-  "sop-generation": { description: "Generate a Standard Operating Procedure from a diagram.", status: "unwired", ui: [], server: [], alsoLimitedBy: AI_ALSO },
+  "sharepoint": {
+    description: "Export to and import from SharePoint.", status: "wired", ui: [],
+    server: [
+      { file: "app/api/sharepoint/route.ts", needle: '"sharepoint"', what: "GET browse" },
+      { file: "app/api/sharepoint/upload/route.ts", needle: '"sharepoint"', what: "POST upload" },
+      { file: "app/api/sharepoint/download/route.ts", needle: '"sharepoint"', what: "GET download" },
+    ],
+    alsoLimitedBy: ["Organisation policy: allowSharePoint", "Needs the person's Microsoft connection"],
+  },
+  "sop-generation": {
+    description: "Generate a Standard Operating Procedure from a diagram.", status: "wired", ui: [],
+    server: [
+      { file: "app/api/projects/[id]/sop/route.ts", needle: '"sop-generation"', what: "POST generate a SOP" },
+      { file: "app/api/sop/[id]/regenerate/route.ts", needle: '"sop-generation"', what: "POST regenerate" },
+    ],
+    alsoLimitedBy: AI_ALSO,
+  },
 
   // ── Platform ───────────────────────────────────────────────────────────────
-  "process-portal": { description: "The published process portal.", status: "unwired", ui: [], server: [] },
+  "process-portal": {
+    description: "The published process portal.", status: "wired", ui: [],
+    server: [{ file: "app/api/diagrams/[id]/publish/route.ts", needle: '"process-portal"', what: "POST publish a diagram" }],
+    note: "Publishing; what is already published stays readable.",
+  },
   "mobile": {
     description: "Mobile Access: the phone app (view, review, edit by voice). Needs Process Review and Voice Assist.",
     status: "wired",
@@ -288,8 +406,18 @@ export const FEATURE_GATES: Record<string, FeatureGateInfo> = {
   },
 
   // ── AI Models ──────────────────────────────────────────────────────────────
-  "choice-of-llms": { description: "Choose which AI model generates.", status: "unwired", ui: [], server: [], note: "The model picker is limited by cost, not by this key." },
-  "local-llm":      { description: "Use a local model (on-premise).", status: "unwired", ui: [], server: [] },
+  "choice-of-llms": {
+    description: "Choose which AI model generates.", status: "partial", ui: [],
+    server: [
+      { file: "app/api/ai/bpmn/plan/route.ts", needle: '"choice-of-llms"', what: "BPMN plan" },
+      { file: "app/api/ai/generate-bpmn/route.ts", needle: '"choice-of-llms"', what: "BPMN generate" },
+      { file: "app/api/ai/generate-diagram/route.ts", needle: '"choice-of-llms"', what: "Diagram generate" },
+      { file: "app/api/ai/epc/plan/route.ts", needle: '"choice-of-llms"', what: "EPC plan" },
+      { file: "app/api/ai/flowchart/plan/route.ts", needle: '"choice-of-llms"', what: "Flowchart plan" },
+    ],
+    note: "Enforced when a request names a model other than the default; the model picker is also limited by cost.",
+  },
+  "local-llm": { description: "Use a local model (on-premise).", status: "informational", ui: [], server: [], note: "A deployment edition (the on-premise product), not something a subscription level switches." },
 
   // ── Enterprise ─────────────────────────────────────────────────────────────
   "soc2": { description: "SOC 2 Type II audit report available.", status: "informational", ui: [], server: [], note: "A statement about the product, not a switch." },

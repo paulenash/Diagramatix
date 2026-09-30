@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { gateFeature } from "@/app/lib/subscription-route";
 import { serverError } from "@/app/lib/apiError";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -22,6 +23,8 @@ export async function GET(req: Request) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const fg = await gateFeature(session.user.id, "bpmn-templates");
+  if (fg) return fg;
 
   const { searchParams } = new URL(req.url);
   const type = searchParams.get("type") || "user";
@@ -79,6 +82,8 @@ export async function POST(req: Request) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const fg = await gateFeature(session.user.id, "bpmn-templates");
+  if (fg) return fg;
 
   try {
     const cookieStore = await cookies();

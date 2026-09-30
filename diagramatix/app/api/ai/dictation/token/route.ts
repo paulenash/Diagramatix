@@ -8,19 +8,27 @@
  *   route returns 503 and the client falls back to the browser speech engine.
  */
 import { NextResponse } from "next/server";
+import { gateFeature } from "@/app/lib/subscription-route";
 import { auth } from "@/auth";
 import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
 
 const DG = "https://api.deepgram.com/v1";
 const TTL_SECONDS = 600;
 
-export async function POST() {
+export async function POST(req?: Request) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const _pol = await gateOrgPolicy(session, "allowVoiceAi");
   if (_pol) return _pol;
+  // Dictating a PROMPT (the AI panel) is the "Dictated Prompt" feature; the same token serves Voice Assist
+  // and review comments, which are not gated by it — so the caller says what it is for.
+  const purpose = req ? ((await req.json().catch(() => ({}))) as { purpose?: string }).purpose : undefined;
+  if (purpose === "prompt") {
+    const fg = await gateFeature(session.user.id, "ai-generate-dictated");
+    if (fg) return fg;
+  }
 
   const masterKey = process.env.DEEPGRAM_API_KEY;
   if (!masterKey) {

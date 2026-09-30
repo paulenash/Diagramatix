@@ -20,7 +20,7 @@ import { resolveAiRouteContext } from "@/app/lib/ai/aiTelemetryRoute";
 import { AI_INVOCATION_POINTS, enterAiContext } from "@/app/lib/ai/aiTelemetry";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
 import { groundRulesWithPcf } from "@/app/lib/pcf/promptGrounding";
-import { gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription-route";
+import { gateFeature, gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription-route";
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -39,6 +39,10 @@ export async function POST(req: Request) {
   // Image input uses the Vision-model override when set; else the main model. A
   // caller may override with a cost-gated model (SuperAdmin → any); disallowed → default.
   const defaultModel = await resolveGenerateModel(attachment?.type === "image");
+  if (requestedModel && requestedModel !== defaultModel) {
+    const modelBlock = await gateFeature(session.user.id, "choice-of-llms");
+    if (modelBlock) return modelBlock;
+  }
   // Models the caller's OWN key unlocks count as available to them. The
   // picker offers those, so rejecting one here would swap it for the
   // default and generate something nobody asked for, without saying so.
@@ -64,6 +68,8 @@ export async function POST(req: Request) {
   // Subscription cap: AI attempts. Free is lifetime (5 total); paid
   // tiers are monthly. Check BEFORE the model call so we don't burn an
   // API request that's about to be rejected anyway.
+  const featBlock = await gateFeature(session.user.id, attachment?.type === "image" ? "ai-generate-image" : "ai-generate-typed");
+  if (featBlock) return featBlock;
   const aiBlock = await gateLimit(session.user.id, "aiAttempts");
   if (aiBlock) return aiBlock;
 

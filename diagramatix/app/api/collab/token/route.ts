@@ -8,6 +8,7 @@
  * Phase 1 (polled presence) with no crash.
  */
 import { NextResponse } from "next/server";
+import { gateFeature } from "@/app/lib/subscription-route";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { requireDiagramAccess, OrgContextError, getCurrentOrgId } from "@/app/lib/auth/orgContext";
@@ -31,6 +32,8 @@ export async function POST(req: Request) {
 
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const fg = await gateFeature(session.user.id, "co-authoring");
+  if (fg) return fg;
 
   const body = await req.json().catch(() => ({} as { room?: string }));
   const room = typeof body.room === "string" ? body.room : "";

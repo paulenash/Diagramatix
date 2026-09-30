@@ -17,7 +17,7 @@ import { resolveAiRouteContext } from "@/app/lib/ai/aiTelemetryRoute";
 import { AI_INVOCATION_POINTS, enterAiContext } from "@/app/lib/ai/aiTelemetry";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
 import { groundRulesWithPcf } from "@/app/lib/pcf/promptGrounding";
-import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
+import { gateFeature, gateLimit, recordUsage } from "@/app/lib/subscription-route";
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -40,6 +40,8 @@ export async function POST(req: Request) {
   }
 
   // Metered like generation: check the AI-attempts cap BEFORE the model call.
+  const featBlock = await gateFeature(session.user.id, "ai-generate-refine");
+  if (featBlock) return featBlock;
   const aiBlock = await gateLimit(session.user.id, "aiAttempts");
   if (aiBlock) return aiBlock;
 

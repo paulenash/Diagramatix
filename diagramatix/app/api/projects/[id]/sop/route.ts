@@ -18,7 +18,7 @@ import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { resolveAiRouteContext } from "@/app/lib/ai/aiTelemetryRoute";
 import { AI_INVOCATION_POINTS, enterAiContext } from "@/app/lib/ai/aiTelemetry";
-import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
+import { gateFeature, gateLimit, recordUsage } from "@/app/lib/subscription-route";
 import type { SopScope } from "@/app/lib/sop/skeleton";
 import { runSopGenerate, runSopSuite } from "@/app/lib/sop/runGenerate";
 import { sopBodyHash } from "@/app/lib/sop/sopHash";
@@ -109,6 +109,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "Diagram not found in this project" }, { status: 404 });
   }
 
+  const featBlock = await gateFeature(session.user.id, "sop-generation");
+  if (featBlock) return featBlock;
   const aiBlock = await gateLimit(session.user.id, "aiAttempts");
   if (aiBlock) return aiBlock;
 

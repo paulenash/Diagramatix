@@ -40,7 +40,7 @@
     {
       "key": "ai-generate-image",
       "states": {
-        "free": "hidden",
+        "free": "available",
         "introductory": "available",
         "professional": "available",
         "expert": "available",
@@ -50,7 +50,7 @@
     {
       "key": "ai-generate-dictated",
       "states": {
-        "free": "hidden",
+        "free": "available",
         "introductory": "available",
         "professional": "available",
         "expert": "available",
@@ -60,7 +60,7 @@
     {
       "key": "collaboration-groups",
       "states": {
-        "free": "hidden",
+        "free": "available",
         "introductory": "available",
         "professional": "available",
         "expert": "available",
@@ -70,7 +70,7 @@
     {
       "key": "diff-processes",
       "states": {
-        "free": "hidden",
+        "free": "available",
         "introductory": "available",
         "professional": "available",
         "expert": "available",
@@ -80,8 +80,8 @@
     {
       "key": "ai-generate-audio",
       "states": {
-        "free": "hidden",
-        "introductory": "hidden",
+        "free": "available",
+        "introductory": "available",
         "professional": "available",
         "expert": "available",
         "enterprise": "available"
@@ -90,8 +90,8 @@
     {
       "key": "visio-import-individual",
       "states": {
-        "free": "hidden",
-        "introductory": "hidden",
+        "free": "available",
+        "introductory": "available",
         "professional": "available",
         "expert": "available",
         "enterprise": "available"
@@ -100,8 +100,8 @@
     {
       "key": "ai-generate-refine",
       "states": {
-        "free": "hidden",
-        "introductory": "hidden",
+        "free": "available",
+        "introductory": "available",
         "professional": "available",
         "expert": "available",
         "enterprise": "available"
@@ -110,8 +110,8 @@
     {
       "key": "sharing",
       "states": {
-        "free": "hidden",
-        "introductory": "hidden",
+        "free": "available",
+        "introductory": "available",
         "professional": "available",
         "expert": "available",
         "enterprise": "available"
@@ -120,8 +120,8 @@
     {
       "key": "co-authoring",
       "states": {
-        "free": "hidden",
-        "introductory": "hidden",
+        "free": "available",
+        "introductory": "available",
         "professional": "available",
         "expert": "available",
         "enterprise": "available"
@@ -140,8 +140,8 @@
     {
       "key": "ai-generate-record",
       "states": {
-        "free": "hidden",
-        "introductory": "hidden",
+        "free": "available",
+        "introductory": "available",
         "professional": "available",
         "expert": "available",
         "enterprise": "available"
@@ -150,8 +150,8 @@
     {
       "key": "process-portal",
       "states": {
-        "free": "hidden",
-        "introductory": "hidden",
+        "free": "available",
+        "introductory": "available",
         "professional": "available",
         "expert": "available",
         "enterprise": "available"
@@ -220,9 +220,9 @@
     {
       "key": "visio-import-bulk",
       "states": {
-        "free": "hidden",
-        "introductory": "hidden",
-        "professional": "hidden",
+        "free": "available",
+        "introductory": "available",
+        "professional": "available",
         "expert": "available",
         "enterprise": "available"
       }
@@ -230,9 +230,9 @@
     {
       "key": "visio-export-bulk",
       "states": {
-        "free": "hidden",
-        "introductory": "hidden",
-        "professional": "hidden",
+        "free": "available",
+        "introductory": "available",
+        "professional": "available",
         "expert": "available",
         "enterprise": "available"
       }
@@ -240,9 +240,9 @@
     {
       "key": "visio-export-individual",
       "states": {
-        "free": "hidden",
-        "introductory": "hidden",
-        "professional": "hidden",
+        "free": "available",
+        "introductory": "available",
+        "professional": "available",
         "expert": "available",
         "enterprise": "available"
       }
@@ -250,9 +250,9 @@
     {
       "key": "sharepoint",
       "states": {
-        "free": "hidden",
-        "introductory": "hidden",
-        "professional": "hidden",
+        "free": "available",
+        "introductory": "available",
+        "professional": "available",
         "expert": "available",
         "enterprise": "available"
       }
@@ -280,9 +280,9 @@
     {
       "key": "risk-control-examples",
       "states": {
-        "free": "hidden",
-        "introductory": "hidden",
-        "professional": "hidden",
+        "free": "available",
+        "introductory": "available",
+        "professional": "available",
         "expert": "available",
         "enterprise": "available"
       }
@@ -300,9 +300,9 @@
     {
       "key": "sop-generation",
       "states": {
-        "free": "hidden",
-        "introductory": "hidden",
-        "professional": "hidden",
+        "free": "available",
+        "introductory": "available",
+        "professional": "available",
         "expert": "available",
         "enterprise": "available"
       }
@@ -320,20 +320,20 @@
     {
       "key": "choice-of-llms",
       "states": {
-        "free": "hidden",
-        "introductory": "hidden",
-        "professional": "hidden",
-        "expert": "hidden",
+        "free": "available",
+        "introductory": "available",
+        "professional": "available",
+        "expert": "available",
         "enterprise": "available"
       }
     },
     {
       "key": "local-llm",
       "states": {
-        "free": "hidden",
-        "introductory": "hidden",
-        "professional": "hidden",
-        "expert": "hidden",
+        "free": "available",
+        "introductory": "available",
+        "professional": "available",
+        "expert": "available",
         "enterprise": "available"
       }
     },

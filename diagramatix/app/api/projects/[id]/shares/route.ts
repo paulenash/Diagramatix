@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { gateFeature } from "@/app/lib/subscription-route";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
@@ -92,6 +93,8 @@ export async function DELETE(_req: Request, { params }: Params) {
 export async function POST(req: Request, { params }: Params) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const fg = await gateFeature(session.user.id, "sharing");
+  if (fg) return fg;
 
   // Impersonation guard — a superuser viewing another user cannot
   // restructure that user's sharing graph.

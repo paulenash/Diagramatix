@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { gateFeature } from "@/app/lib/subscription-route";
 import { auth } from "@/auth";
 import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
 import { uploadToFolder } from "@/app/lib/sharepoint";
@@ -19,6 +20,8 @@ export async function POST(request: Request) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const fg = await gateFeature(session.user.id, "sharepoint");
+  if (fg) return fg;
   // Uploading an export to SharePoint pushes data OUT of the platform.
   const _pol = (await gateOrgPolicy(session, "allowSharePoint"))
     ?? (await gateOrgPolicy(session, "allowExternalExport"));

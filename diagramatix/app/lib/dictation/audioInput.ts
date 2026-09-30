@@ -6,10 +6,11 @@
  */
 
 /** Send recorded/uploaded audio to the server for transcription. */
-export async function transcribeAudioBlob(blob: Blob): Promise<string> {
+export async function transcribeAudioBlob(blob: Blob, source: "record" | "upload" = "upload"): Promise<string> {
   const res = await fetch("/api/ai/audio/transcribe", {
     method: "POST",
-    headers: { "Content-Type": blob.type || "audio/webm" },
+    // The server tells "Record to Prompt" from "Audio/VTT" upload by this (they are separate features).
+    headers: { "Content-Type": blob.type || "audio/webm", "X-Audio-Source": source },
     body: blob,
   });
   if (!res.ok) {

@@ -11,7 +11,7 @@ import { profileByName, domainProfile } from "@/app/lib/diagram/v3/stencilProfil
 import { DEFAULT_SYMBOL_COLORS, BW_SYMBOL_COLORS } from "@/app/lib/diagram/colors";
 import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { requireDiagramAccess, OrgContextError } from "@/app/lib/auth/orgContext";
-import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
+import { gateFeature, gateLimit, recordUsage } from "@/app/lib/subscription-route";
 import { SUPERUSER_EMAILS } from "@/app/lib/superuser";
 
 /**
@@ -48,6 +48,8 @@ export async function GET(request: Request) {
   // Subscription cap: individual exports. Free is lifetime; paid tiers are
   // monthly. Bulk exports go through /api/export/visio-v3/bulk and use the
   // separate bulkExports metric.
+  const featBlock = await gateFeature(session.user.id, "visio-export-individual");
+  if (featBlock) return featBlock;
   const limitBlock = await gateLimit(session.user.id, "individualExports");
   if (limitBlock) return limitBlock;
 

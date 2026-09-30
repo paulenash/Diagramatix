@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { gateFeature } from "@/app/lib/subscription-route";
 import { auth } from "@/auth";
 import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
 import { listSites, searchSites, listDrives, listDriveRoot, listFolder, getItem, getMyDrive, listMyDriveRoot, listMyDriveFolder, getPreviewUrl } from "@/app/lib/sharepoint";
@@ -21,6 +22,8 @@ export async function GET(request: Request) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const fg = await gateFeature(session.user.id, "sharepoint");
+  if (fg) return fg;
   const _pol = await gateOrgPolicy(session, "allowSharePoint");
   if (_pol) return _pol;
 

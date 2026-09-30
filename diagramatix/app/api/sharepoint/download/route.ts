@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { gateFeature } from "@/app/lib/subscription-route";
 import { auth } from "@/auth";
 import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
 import { downloadFileBytes, getItem } from "@/app/lib/sharepoint";
@@ -17,6 +18,8 @@ export async function GET(request: Request) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const fg = await gateFeature(session.user.id, "sharepoint");
+  if (fg) return fg;
   const _pol = await gateOrgPolicy(session, "allowSharePoint");
   if (_pol) return _pol;
   // A token lookup that fails is the same, to the user, as having none.

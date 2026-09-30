@@ -93,7 +93,7 @@ export function AudioToProcessButton({ onTranscript, onError, onNote, onFeedback
     rec.onstop = () => {
       stream.getTracks().forEach((t) => t.stop());
       const blob = new Blob(chunksRef.current, { type: rec.mimeType || "audio/webm" });
-      void process(() => transcribeAudioBlob(blob), "transcribing");
+      void process(() => transcribeAudioBlob(blob, "record"), "transcribing");
     };
     rec.start();
     recorderRef.current = rec;

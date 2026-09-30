@@ -35,9 +35,12 @@ describe("feature availability registry + seed", () => {
   it("T2266 — the xlsx 1/80 mapping landed (sharepoint Expert+, soc2 Enterprise-only, typed-prompt all)", () => {
     const row = (k: string) => seed.rows.find((r) => r.key === k)!;
     expect(row("ai-generate-typed").states).toMatchObject({ free: "available", enterprise: "available" });
-    const sp = row("sharepoint").states;
+    // SharePoint's xlsx intent (Expert+) now lives in the intent file: its gate is live and the seed keeps today's access.
+    const intent = JSON.parse(readFileSync("menus_and_features/feature-availability.xlsx-intent.json", "utf8")) as { rows: { key: string; states: Record<string, string> }[] };
+    const sp = intent.rows.find((r) => r.key === "sharepoint")!.states;
     expect(sp.free).toBe("hidden"); expect(sp.professional).toBe("hidden");
     expect(sp.expert).toBe("available"); expect(sp.enterprise).toBe("available");
+    expect(row("sharepoint").states.free, "the seed keeps today's access").toBe("available");
     const soc2 = row("soc2").states;
     expect(soc2.expert).toBe("hidden"); expect(soc2.enterprise).toBe("available");
   });

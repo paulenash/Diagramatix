@@ -155,8 +155,9 @@ export async function POST(req: Request) {
   // only decides which buttons to draw; this is the half that means anything,
   // since the route is reachable directly. SuperAdmins bypass via the admin-email
   // check inside the availability map.
+  // Voice Assist, or plain typed Assist ("nl-assist", available to every level): either opens the route.
   const feat = await gateFeature(session.user.id, "voice-assist");
-  if (feat) return feat;
+  if (feat && (await gateFeature(session.user.id, "nl-assist"))) return feat;
   enterAiContext(await resolveAiRouteContext(session, AI_INVOCATION_POINTS.LiveCommand));
 
   const body = await req.json().catch(() => null) as { instruction?: string; state?: DiagramData; selectedIds?: string[] } | null;

@@ -4,6 +4,7 @@
  * The full package loads only at adopt time, keeping this list light.
  */
 import { NextResponse } from "next/server";
+import { gateFeature } from "@/app/lib/subscription-route";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { summarizeRiskControlPackage, type RiskControlExamplePackage } from "@/app/lib/riskControls/examplePackage";
@@ -11,6 +12,8 @@ import { summarizeRiskControlPackage, type RiskControlExamplePackage } from "@/a
 export async function GET() {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const fg = await gateFeature(session.user.id ?? "", "risk-control-examples");
+  if (fg) return fg;
 
   const rows = await prisma.riskControlExample.findMany({ where: { published: true }, orderBy: { sortOrder: "asc" } });
   const examples = rows.map((e) => ({

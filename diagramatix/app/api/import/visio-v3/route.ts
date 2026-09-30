@@ -7,7 +7,7 @@ import { importVisioV3 } from "@/app/lib/diagram/v3/importVisioV3";
 import { validateDiagramData } from "@/app/lib/diagram/validateDiagram";
 import { importVisioDomainV3, isDomainVisio } from "@/app/lib/diagram/v3/importVisioDomainV3";
 import { isReadOnlyImpersonation, SUPERUSER_EMAILS } from "@/app/lib/superuser";
-import { gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription-route";
+import { gateFeature, gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription-route";
 import {
   requireRole,
   WRITE_ROLES,
@@ -107,6 +107,8 @@ export async function POST(request: Request) {
   }
 
   // Subscription cap: individual imports.
+  const featBlock = await gateFeature(session.user.id, "visio-import-individual");
+  if (featBlock) return featBlock;
   const limitBlock = await gateLimit(session.user.id, "individualImports");
   if (limitBlock) return limitBlock;
 

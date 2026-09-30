@@ -134,7 +134,11 @@ export async function startDictation(cb: DictationCallbacks): Promise<DictationH
   // holds that distinction, and is pure so it can be tested without a network.
   let outcome: TokenOutcome;
   try {
-    const r = await fetch("/api/ai/dictation/token", { method: "POST" });
+    // A spoken PROMPT (cb.prose) is the "Dictated Prompt" feature; commands and comments are not.
+    const r = await fetch("/api/ai/dictation/token", {
+      method: "POST",
+      ...(cb.prose ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ purpose: "prompt" }) } : {}),
+    });
     const body = await r.json().catch(() => null);
     outcome = tokenOutcome(r.status, body);
   } catch {

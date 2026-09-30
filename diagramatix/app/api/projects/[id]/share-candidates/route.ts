@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { gateFeature } from "@/app/lib/subscription-route";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
@@ -28,6 +29,8 @@ type Params = { params: Promise<{ id: string }> };
 export async function GET(req: Request, { params }: Params) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const fg = await gateFeature(session.user.id, "sharing");
+  if (fg) return fg;
 
   const { id } = await params;
   let access;

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { gateFeature } from "@/app/lib/subscription-route";
 import { serverError } from "@/app/lib/apiError";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -42,6 +43,8 @@ export async function POST(req: Request, { params }: Params) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const fg = await gateFeature(session.user.id, "process-portal");
+  if (fg) return fg;
   if (await checkImpersonating(session)) {
     return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
   }
