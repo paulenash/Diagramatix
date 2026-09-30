@@ -76,12 +76,12 @@ describe("aiClientConfig / aiApiKey — provider routing", () => {
     process.env.GOOGLE_API_KEY = "sk-goog";
     process.env.GOOGLE_BASE_URL = "http://litellm.internal:4000";
     process.env.ANTHROPIC_API_KEY = "sk-ant"; // must NOT be used for a Gemini model
-    expect(aiApiKey("gemini-2.5-pro")).toBe("sk-goog");
-    expect(aiClientConfig("gemini-2.5-pro")).toEqual({ apiKey: "sk-goog", baseURL: "http://litellm.internal:4000" });
+    expect(aiApiKey("gemini-3.8-flash")).toBe("sk-goog");
+    expect(aiClientConfig("gemini-3.8-flash")).toEqual({ apiKey: "sk-goog", baseURL: "http://litellm.internal:4000" });
     // A caller-passed anthropic key is ignored for a Gemini model.
-    expect(aiClientConfig("gemini-2.5-pro", "sk-ant").apiKey).toBe("sk-goog");
+    expect(aiClientConfig("gemini-3.8-flash", "sk-ant").apiKey).toBe("sk-goog");
     // Bearer auth (like Moonshot), not x-api-key.
-    const g = makeAiClient("gemini-2.5-pro");
+    const g = makeAiClient("gemini-3.8-flash");
     expect(g.authToken).toBe("sk-goog");
     expect(g.apiKey).toBeNull();
   });

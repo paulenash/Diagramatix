@@ -7,6 +7,15 @@
 # MICROSOFT_MODELS), so keep them in sync. Add a line per model you want.
 model_list:
   # ── Google Gemini (set GEMINI_API_KEY in the gateway) ──────────────────────
+  # 3.8 Flash + 3.1 Pro (preview): listed by Google models API 2026-09-30.
+  - model_name: gemini-3.8-flash
+    litellm_params:
+      model: gemini/gemini-3.8-flash
+      api_key: os.environ/GEMINI_API_KEY
+  - model_name: gemini-3.1-pro-preview
+    litellm_params:
+      model: gemini/gemini-3.1-pro-preview
+      api_key: os.environ/GEMINI_API_KEY
   - model_name: gemini-2.5-pro
     litellm_params:
       model: gemini/gemini-2.5-pro

@@ -203,11 +203,11 @@ export function deepseekModels(unlocked?: ReadonlySet<string>): AiModel[] {
  * Server-only (env is stripped client-side → [] there; the client gets the list
  * as a prop). */
 const DEFAULT_GOOGLE_MODELS: AiModel[] = [
-  // 3.8 Flash + 3.1 Pro Preview: listed by Google's own models API 2026-09-30 (the gateway's key).
+  // Proven through the gateway 2026-09-30. Gemini 2.5 Pro/Flash are RETIRED for this key (Google: 404
+  // "no longer available to new users"), so they are gone. gemini-3.1-pro-preview is served by the
+  // gateway but Google answers 429 (free-tier quota 0) until billing is enabled on the Google project —
+  // add it back here and to GOOGLE_MODELS once that is done (rate is already in pricing.ts).
   { id: "gemini-3.8-flash", label: "Gemini 3.8 Flash", provider: "google", vision: true },
-  { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro (preview)", provider: "google", vision: true },
-  { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro", provider: "google", vision: true },
-  { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", provider: "google", vision: true },
 ];
 
 export function googleModels(): AiModel[] {

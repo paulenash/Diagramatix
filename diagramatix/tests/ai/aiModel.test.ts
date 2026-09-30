@@ -175,7 +175,7 @@ describe("Google (Gemini) provider registry", () => {
     delete process.env.GOOGLE_API_KEY;
     process.env.GOOGLE_BASE_URL = "http://gw";
     expect(googleModels()).toEqual([]);
-    expect(isKnownAiModel("gemini-2.5-pro")).toBe(false);
+    expect(isKnownAiModel("gemini-3.8-flash")).toBe(false);
   });
 
   it("T1030 — an unresolved Key Vault reference is treated as no key (not offered)", () => {
@@ -193,8 +193,8 @@ describe("Google (Gemini) provider registry", () => {
     const def = googleModels();
     expect(def.length).toBeGreaterThan(0);
     expect(def.every((m) => m.provider === "google")).toBe(true);
-    expect(def.some((m) => m.id === "gemini-2.5-pro")).toBe(true);
-    expect(providerForModel("gemini-2.5-pro")).toBe("google");
+    expect(def.some((m) => m.id === "gemini-3.8-flash")).toBe(true);
+    expect(providerForModel("gemini-3.8-flash")).toBe("google");
     // GOOGLE_MODELS override (id|Label); gemini ids default to vision, "-text" opts out.
     process.env.GOOGLE_MODELS = "gemini-3-pro|Gemini 3 Pro, my-gemini-text|Text only";
     const g = googleModels();
