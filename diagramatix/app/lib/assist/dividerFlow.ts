@@ -149,13 +149,30 @@ const misheardNoun = (t: string, lead: LeadingNumber) =>
   lead.corrected && (NOUN_LEAD.test(t) || leadingSpokenNumber(lead.rest)?.corrected === false);
 
 /**
+ * The recogniser hears a spoken "one" as "the" (Paul, 2026-09-30, 12 utterances: every
+ * "one down …" came back "the down …", while "two" was always heard correctly). "the"
+ * is also a FILLER the number reader strips ("the 3"), so the answer arrived as "down
+ * one hundred pixels" — no number at all — and was refused every time.
+ *
+ * Read only here, where a divider number is what the flow is waiting for, and only
+ * when the "the"/"a" comes straight before the way word: "the down thirty pixels" is
+ * "1 down thirty pixels". Never boosted at the recogniser — a boost is a bet against
+ * every other word (the day "ten" beat "turn"); this costs nothing anywhere else.
+ * The reply names the divider, so a wrong guess is visible and undoable.
+ */
+const LOST_ONE = /^(?:the|a|uh|um)\s+(?=(?:up|upwards?|higher|raise|down|downwards?|lower)\b)/i;
+/** ...and in the amount: "the hundred pixels" is "one hundred pixels" — "the hundred" is never an amount. */
+const LOST_ONE_HUNDRED = /\bthe\s+(?=hundred\b)/gi;
+export const restoreLostOne = (t: string): string => t.replace(LOST_ONE, "1 ").replace(LOST_ONE_HUNDRED, "one ");
+
+/**
  * "2 up 100 pixels", "two down 2 tasks", "number 3 up by forty", "move 1 down
  * a bit", "3 up" (one step), "one a hundred and fifty pixels down". The number
  * first, then the way and how far in either order — read by the boundary
  * command's own distance reader — and nothing else.
  */
 export function parseDividerAnswer(text: string, targets: readonly DividerTarget[]): DividerAnswer | null {
-  const t = String(text ?? "").trim().replace(/[.,!?]+$/g, "").replace(/^(?:move|shift|nudge|put)\s+/i, "").replace(/^divider\s+/i, "");
+  const t = restoreLostOne(String(text ?? "").trim().replace(/[.,!?]+$/g, "").replace(/^(?:move|shift|nudge|put)\s+/i, "").replace(/^divider\s+/i, ""));
   const lead = leadingSpokenNumber(t);
   if (!lead || misheardNoun(t, lead)) return null;
   const target = targets.find((d) => d.n === lead.n);
@@ -238,7 +255,7 @@ export type DividerUtterance =
 const WAY_FIRST = /^(?:up|upwards?|higher|raise|down|downwards?|lower)\b/i;
 
 export function readDividerUtterance(text: string, targets: readonly DividerTarget[], mem: DividerMemory): DividerUtterance | null {
-  const t = String(text ?? "").trim().replace(/[.,!?]+$/g, "");
+  const t = restoreLostOne(String(text ?? "").trim().replace(/[.,!?]+$/g, ""));
   const answer = parseDividerAnswer(t, targets);
   if (answer) return { kind: "move", answer };
   const bareT = t.replace(/^(?:move|shift|nudge|put)\s+/i, "").replace(/^(?:divider|number)\s+/i, "");
