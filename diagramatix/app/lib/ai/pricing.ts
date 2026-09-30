@@ -100,6 +100,11 @@ export const PRICING: Record<string, ModelPrice> = {
   // directly, so these only drive the cost-gate/bars — editable in the rate catalog.
   // gpt-5-mini / gpt-5.4-mini are the deployed models (dgx-openai); estimates —
   // verify against your Azure region pricing.
+  // Paul's figures, 2026-09-30 (Azure had not published them). Cached input is not modelled — the
+  // table has no cached column — so the plain input rate is used: the conservative figure.
+  "gpt-6.1-sol": { in: 2, out: 10, note: "cached input 0.10" },
+  "gpt-6-luna": { in: 0.1, out: 0.5, note: "cached input 0.01" },
+  "gpt-5.6-terra": { in: 2, out: 12, note: "cached input 0.20" },
   "gpt-5-mini": { in: 0.25, out: 2 },
   "gpt-5.4-mini": { in: 0.25, out: 2 },
   "gpt-4o": { in: 2.5, out: 10 },

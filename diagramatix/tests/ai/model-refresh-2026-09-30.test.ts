@@ -69,3 +69,11 @@ describe("T5146 — the Microsoft defaults are the models actually deployed and 
     expect(ids).toEqual(["gpt-6.1-sol", "gpt-6-luna", "gpt-5.6-terra", "gpt-5-mini", "gpt-5.4-mini", "phi-4"]);
   });
 });
+
+describe("T5147 — the three new GPT models are priced, so regular users are offered them", () => {
+  it("has rates for gpt-6.1-sol, gpt-6-luna and gpt-5.6-terra", () => {
+    expect(PRICING["gpt-6.1-sol"]).toMatchObject({ in: 2, out: 10 });
+    expect(PRICING["gpt-6-luna"]).toMatchObject({ in: 0.1, out: 0.5 });
+    expect(PRICING["gpt-5.6-terra"]).toMatchObject({ in: 2, out: 12 });
+  });
+});
