@@ -225,3 +225,29 @@ Every slice: typecheck + full suite, `TESTS_SUMMARY.md` rows, prod SQL only as i
 ## 6. Where this file goes
 
 On approval I will save this plan as `diagramatix/new features/feature-availability-and-limits-plan-2026-09-30.md` (add the `.gitignore` allow-list lines used for the other new-features documents), commit and push it — documentation only, no code changes.
+
+## 7. Addendum (Paul, 2026-09-30) — per-user settings, limits and features, with revert (slice 10)
+
+**The requirement.** A SuperAdmin must be able to change the **settings, limits and feature availability of any individual user** *without changing the subscription level that user is on* (so nobody else on that plan is affected), and to **revert** that user to exactly what their level gives.
+
+### What exists today
+- **Features:** `User.featureOverrides` (a map of feature → Available / Disabled / Not Available) with a per-user panel (Registered Users ▸ Features) and `PUT /api/admin/users/[id]/features` that replaces the whole map. It is applied by the resolver after the level's row and before prerequisites, so this half is built — but it has no "plan value" shown beside the override and no per-row revert.
+- **Limits and settings:** nothing per user. Limits come only from the `SubscriptionLevel` row. A comp grant swaps the whole level for a while; it cannot change one number.
+
+### What to build
+1. **Storage.** `User.limitOverrides` (`Json`, default `{}` — written through raw `pgPool` SQL per the Prisma 7 rule), keyed by the `SubscriptionLevel` field names: every numeric limit (`maxProjects`, `maxDiagramsPerTypePerProject`, `maxArchimateDiagramsTotal`, the two element caps, `maxAiAttempts`, the four export/import caps, the two bulk caps), the reset settings (`aiAttemptsResetMonthly`, `individualExportsResetMonthly`, `individualImportsResetMonthly`) and `trialDays`. **A key present is an override; `null` means unlimited; an absent key means "use the plan".** Plus `overrideNote` (why — required when saving) and an optional `overridesExpireAt` (lazy auto-revert, like a comp).
+2. **One merge, one place.** A pure `effectiveLimits(levelRow, overrides)` in `features/effectiveLevel.ts`'s neighbourhood, applied where `loadUserWithTier` builds the user's effective level — so `checkLimit`, `getUsageSnapshot`, `elementCountLimitFor` (the editor's cap), the warnings strip and the limit messages all see the customised numbers with no other change. Overrides sit **on top of whichever level applies** (own, organisation or comp), so a comp or an organisation upgrade does not silently discard them.
+3. **Acting as a level ignores overrides** (the SuperAdmin previewing "Free" sees Free as Free, not their own customisation) — pinned by a test.
+4. **API.** `GET /api/admin/users/[id]/overrides` → `{ level: <plan values>, features: { plan, override, effective }, limits: { plan, override, effective }, note, expiresAt }`; `PUT` sets/changes selected keys (features and limits together, one audit line); `PUT { revert: [ "maxProjects", "sharing", … ] }` reverts named keys; `DELETE` **reverts everything** (features, limits, trial, note) to the level. SuperAdmin only, `blockReadOnlyImpersonation`, each change written to the audit log with who / what / old → new / note.
+5. **UI (Registered Users ▸ a "Customise" panel that replaces the Features button).** Three sections — **Limits & settings**, **Features**, **Trial** — each row showing *Plan value · Override (input) · In effect* with a **Revert** button per row, a **Revert all to plan** button at the bottom (confirm dialog, not a browser one), the note field, and the optional expiry date. A row that differs from its plan is marked "custom"; the user's row in the Registered Users table gets a small "custom" badge so support can see who has been customised.
+6. **What the customer sees.** The usage popover and the limit message use the effective number; the popover adds "Some allowances on your account were set by support" when any override is active. Public pages are unaffected (they show plans, not people).
+7. **Backups.** `limitOverrides`, `overrideNote` and `overridesExpireAt` are added to the user backup / restore (the backup-coverage test will demand it).
+8. **Tests.** Merge (absent / value / `null`); `checkLimit` with an override above and below the plan; the editor cap; the snapshot showing plan vs effective; revert-one and revert-all restore plan values exactly; override survives a comp or an organisation upgrade; acting-as ignores it; expiry reverts; the API is SuperAdmin-only, guarded against read-only impersonation and audited; the panel shows plan / override / effective and the revert controls.
+
+### Decisions for Paul
+- **Note required on every change?** (recommended — it is the audit trail for "why does this user have 200 projects".)
+- **Expiry date:** offer it (recommended, defaults to none) or keep overrides until reverted?
+- **Should an override survive a plan change** (upgrade / downgrade via Stripe), or reset when the person changes level? (recommended: survive — support set it deliberately; the panel shows it.)
+
+### Order and size
+Slice 10, after slice 9: **M–L**, low risk — the resolver and the merge point already exist, and the feature half is built. It needs a small schema addition (`db push` applies it on deploy) and no prod SQL.
