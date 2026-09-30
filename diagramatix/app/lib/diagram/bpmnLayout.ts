@@ -5955,6 +5955,76 @@ export function layoutBpmnDiagram(
     }
   }
 
+  // ── R8.39: the Start event is never on a pool or lane boundary ──
+  //
+  // Paul, 2026-09-30, on "AI Generation - Event Gateway Test - GPT 6 Luna": "The
+  // Start event is shown on the pool boundary. This is quite common. It should be
+  // placed in the lane of the next element in the generated process diagram and
+  // never on a pool boundary."
+  //
+  // The plan put both the Start and the event-based gateway in "Front Office". The
+  // gateway is then centred on its branches (R8.01) and ends up in the Sales band,
+  // and the Start — first aligned to the gateway, then left behind when the final
+  // lane hug and pool restack shrank Front Office — finished 19px ABOVE the pool's
+  // top edge, straddling the gap between two pools.
+  //
+  // The engine's recurring failure is a correct answer computed before later passes
+  // move the things it was about, so the relationship is re-asserted once, here,
+  // after every vertical pass and before the connectors are routed. The Start takes
+  // the leaf lane whose band holds its next element's centre (the pool itself when
+  // it has no lanes), is parented to it, and is levelled with that element, then
+  // clamped so the whole symbol is inside the band — never on a lane or pool edge.
+  // Left where it is when moving it would land it on another shape.
+  //
+  // A REPAIR, not a placement rule: it fires only when the Start is NOT wholly inside
+  // the lane (or pool) it is parented to. A Start that is inside its lane is where the
+  // earlier rules put it on purpose — R3.08 puts a process Start in the pool's topmost
+  // lane, R8.14/R8.15 place it in X — and is left alone even if its next element is in a
+  // lower lane.
+  {
+    const poolOf = (id: string): string | undefined => {
+      let cur = elMap.get(id);
+      for (let d = 0; cur && d < 16; d++) {
+        if (cur.type === "pool") return cur.id;
+        cur = cur.parentId ? elMap.get(cur.parentId) : undefined;
+      }
+      return undefined;
+    };
+    const START_INSET = 4;
+    for (const s of elements) {
+      if (s.type !== "start-event" || s.boundaryHostId) continue;
+      const parent = s.parentId ? elMap.get(s.parentId) : undefined;
+      if (!parent || (parent.type !== "pool" && parent.type !== "lane")) continue;   // an EP's own start is another rule's
+      const out = connectors.find(c => c.type === "sequence" && c.sourceId === s.id);
+      const t = out ? elMap.get(out.targetId) : undefined;
+      if (!t || t.type === "pool" || t.type === "lane") continue;
+      const poolId = poolOf(s.id);
+      if (!poolId || poolOf(t.id) !== poolId) continue;                              // leads out of its pool — no lane to follow
+      const tcy = t.y + t.height / 2;
+      const pool = elMap.get(poolId)!;
+      const lanes = elements.filter(l => l.type === "lane" && poolOf(l.id) === poolId && l.y <= tcy && tcy < l.y + l.height);
+      // The DEEPEST lane holding the centre: the smallest band.
+      const target = lanes.sort((a, b) => a.height - b.height)[0] ?? pool;
+      const lo = target.y + START_INSET;
+      const hi = target.y + target.height - s.height - START_INSET;
+      if (hi < lo) continue;                                                         // a band too short to hold it — nothing sane to do
+      const wantY = Math.min(Math.max(tcy - s.height / 2, lo), hi);
+      if (s.y >= parent.y - 0.5 && s.y + s.height <= parent.y + parent.height + 0.5) continue;   // wholly inside its own lane — not broken
+      const hits = elements.some(o =>
+        o.id !== s.id && o.type !== "pool" && o.type !== "lane" && !o.boundaryHostId
+        && o.type !== "data-object" && o.type !== "data-store" && o.type !== "text-annotation"
+        && s.x < o.x + o.width && s.x + s.width > o.x && wantY < o.y + o.height && wantY + s.height > o.y);
+      if (hits) continue;
+      const was = `${Math.round(s.y)} in ${parent.label ?? parent.id}`;
+      s.y = wantY;
+      s.parentId = target.id;
+      diagnose({
+        kind: "recovered-reference", elementId: s.id, label: s.label ?? "", field: "position",
+        detail: `Start was at y=${was} — put in "${target.label ?? target.id}", the lane of "${t.label ?? t.id}", which it leads to`,
+      });
+    }
+  }
+
   phase(`connectors built (${connectors.length})`);
 
   // Compute waypoints for all connectors
