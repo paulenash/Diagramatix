@@ -256,6 +256,14 @@ model User {
   // subscription-level matrix for the listed keys only; absent keys inherit.
   // Set from the admin Registered-Users popover. See app/lib/features/availability.ts.
   featureOverrides              Json?
+  // Per-user LIMIT / setting overrides (a SuperAdmin customises ONE person without touching their plan):
+  // `{ <SubscriptionLevel field>: { v, base } }` — v the override (null = unlimited), base what the plan
+  // gave when it was set. Always Json (never Json?): written through raw SQL. See
+  // app/lib/features/userOverrides.ts for the rule ("survives a plan change if the upgrade doesn't cover it").
+  limitOverrides                Json                        @default("{}")
+  // Why the overrides exist (required when set) and when they stop applying (lazy revert, like a comp).
+  overrideNote                  String?
+  overridesExpireAt             DateTime?
   createdAt                     DateTime                    @default(now())
   // Updated (throttled) from the Auth.js jwt callback to power the
   // admin "online / last seen" indicator. Nullable for legacy rows.

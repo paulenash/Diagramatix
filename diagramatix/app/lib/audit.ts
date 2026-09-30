@@ -18,6 +18,8 @@ export const AUDIT = {
   ProjectRehome: "project.rehome",
   ShareCreate: "share.create",
   ShareRevoke: "share.revoke",
+  UserOverridesUpdate: "user.overrides.update",
+  UserOverridesRevert: "user.overrides.revert",
 } as const;
 
 interface SessionLike { user?: { id?: string; email?: string | null } }

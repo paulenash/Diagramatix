@@ -7,7 +7,7 @@ import { PromptDialog } from "@/app/components/PromptDialog";
 import { AlertDialog } from "@/app/components/AlertDialog";
 import { FilePreviewDialog, type PreviewPayload } from "@/app/components/preview/FilePreviewDialog";
 import { UsagePopover } from "@/app/components/UsagePopover";
-import { FeatureOverridePanel } from "@/app/components/FeatureOverridePanel";
+import { UserOverridesPanel } from "@/app/components/UserOverridesPanel";
 import { displayOrgRole } from "@/app/lib/auth/orgRoleLabels";
 import { PRODUCT_VERSION } from "@/app/lib/diagram/types";
 import { safeInternalPath } from "@/app/lib/safeRedirect";
@@ -42,6 +42,8 @@ interface UserRow {
    *  tier label. */
   trialDaysLeft: number | null;
   isAdmin: boolean;
+  /** Some limit / setting / feature was set for THIS person (a "custom" badge on the Customise button). */
+  customised: boolean;
   /** Primary OrgMember row (oldest membership) — the row the OrgRole
    *  column edits. Null only if the user has no Org membership at all
    *  (impossible after Phase 0 backfill but tolerated by the UI). */
@@ -512,9 +514,9 @@ export function AdminClient({ users: initialUsers, currentUserId, currentUserEma
                           <button
                             onClick={() => setFeatureOverrideFor({ userId: u.id, name: u.email })}
                             className="text-xs text-blue-700 hover:text-blue-800 font-medium border border-blue-300 rounded px-2 py-1 hover:bg-blue-50"
-                            title="Per-user feature availability overrides"
+                            title="Customise this person's limits, settings and features without changing their plan — and revert them"
                           >
-                            Features
+                            Customise{u.customised && <span className="ml-1 text-[9px] uppercase px-1 py-0.5 rounded bg-amber-200 text-amber-900">custom</span>}
                           </button>
                         )}
                         {/* Delete is SuperAdmin only (a platform-level action);
@@ -584,8 +586,8 @@ export function AdminClient({ users: initialUsers, currentUserId, currentUserEma
       )}
 
       {featureOverrideFor && (
-        <FeatureOverridePanel userId={featureOverrideFor.userId} userName={featureOverrideFor.name}
-          onClose={() => setFeatureOverrideFor(null)} />
+        <UserOverridesPanel userId={featureOverrideFor.userId} userName={featureOverrideFor.name}
+          onClose={() => setFeatureOverrideFor(null)} onChanged={() => router.refresh()} />
       )}
 
       {/* Delete user — stage 1: count summary + warning, click-to-continue */}

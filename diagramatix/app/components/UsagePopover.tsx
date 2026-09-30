@@ -272,6 +272,11 @@ export function UsagePopover({
           )}
         </div>
 
+        {mode.kind === "self" && snapshot?.customised && (
+          <p className="px-5 py-2 text-[11px] text-gray-500 border-t border-gray-100" aria-label="Custom allowances">
+            Some allowances on your account were set by support and differ from the standard {snapshot.tier.name} plan.
+          </p>
+        )}
         {mode.kind === "admin" && snapshot && !snapshot.isAdmin && (
           <TestTools userId={mode.userId} onDone={(s) => setSnapshot(s)} />
         )}

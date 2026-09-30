@@ -15,6 +15,7 @@ import { SUPERUSER_EMAILS } from "@/app/lib/superuser";
 import { FEATURE_KEYS } from "./registry";
 import { applyDependencies } from "./dependencies";
 import { currentActAsLevel } from "./actAs";
+import { applyFeatureOverrides } from "./userOverrides";
 
 export type FeatureState = "available" | "disabled" | "hidden";
 export type FeatureStateMap = Record<string, FeatureState>;
@@ -61,7 +62,7 @@ export async function getFeatureStates(userId: string): Promise<FeatureStateMap>
     where: { id: userId },
     select: {
       email: true, subscriptionLevelId: true, subscriptionEndsAt: true,
-      compTierLevelId: true, compTierExpiresAt: true, featureOverrides: true,
+      compTierLevelId: true, compTierExpiresAt: true, featureOverrides: true, overridesExpireAt: true,
     },
   });
   if (!u) return {};
@@ -74,8 +75,10 @@ export async function getFeatureStates(userId: string): Promise<FeatureStateMap>
 
   const levelId = (await resolveEffectiveLevelId(userId)) ?? getEffectiveSubscriptionLevelId(u);
   const map = await getLevelMatrix(levelId);
-  const overrides = (u.featureOverrides ?? {}) as Record<string, unknown>;
-  for (const [k, v] of Object.entries(overrides)) if (FEATURE_KEYS.includes(k)) map[k] = coerceState(v);
+  // The person's own overrides (userOverrides.ts): a grant the plan now covers steps aside, a restriction
+  // stays, and all of it stops at the expiry. Unknown keys are ignored.
+  const withOverrides = applyFeatureOverrides(map, u.featureOverrides, u.overridesExpireAt);
+  for (const k of Object.keys(withOverrides)) map[k] = coerceState(withOverrides[k]);
   // A feature that requires others is only as available as the weakest of them (dependencies.ts) —
   // applied after the overrides, so an override on a prerequisite flows through to what needs it.
   return applyDependencies(map);

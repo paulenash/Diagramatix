@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { hasAnyOverride } from "@/app/lib/features/userOverrides";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
@@ -59,6 +60,8 @@ export default async function AdminPage() {
         subscriptionEndsAt: true,
         compTierLevelId: true,
         compTierExpiresAt: true,
+        limitOverrides: true,
+        featureOverrides: true,
         // Surface the user's primary OrgMember row (oldest membership
         // wins, mirroring getCurrentOrgId's fallback) so the SuperAdmin
         // table can show + edit the OrgRole inline.
@@ -157,6 +160,7 @@ export default async function AdminPage() {
        *  Rendered as a purple pill next to the tier name. Null when
        *  the tier has no trial or the trial has already expired. */
       trialDaysLeft: !isAdmin ? freeDaysLeft : null,
+      customised: hasAnyOverride(u.limitOverrides, u.featureOverrides),
       isAdmin,
       // Primary OrgMember (oldest membership). Null only when the user
       // somehow has no OrgMember row — should be impossible after the

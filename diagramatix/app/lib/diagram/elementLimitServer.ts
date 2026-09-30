@@ -8,6 +8,7 @@ import { prisma } from "@/app/lib/db";
 import { SUPERUSER_EMAILS } from "@/app/lib/superuser";
 import { resolveEffectiveLevelId } from "@/app/lib/features/effectiveLevel";
 import { currentActAsLevel } from "@/app/lib/features/actAs";
+import { applyLimitOverrides } from "@/app/lib/features/userOverrides";
 
 export async function elementCountLimitFor(
   effectiveUserId: string,
@@ -17,7 +18,7 @@ export async function elementCountLimitFor(
   if (reviewerAccess) return null;
   const user = await prisma.user.findUnique({
     where: { id: effectiveUserId },
-    select: { email: true, subscriptionLevelId: true, subscriptionLevel: { select: { maxBpmnElementsPerDiagram: true, maxNonBpmnElementsPerDiagram: true } } },
+    select: { email: true, subscriptionLevelId: true, limitOverrides: true, overridesExpireAt: true, subscriptionLevel: { select: { maxBpmnElementsPerDiagram: true, maxNonBpmnElementsPerDiagram: true } } },
   });
   if (!user) return null;
   const isAdmin = [...SUPERUSER_EMAILS].some((s) => s.toLowerCase() === user.email.toLowerCase());
@@ -31,5 +32,7 @@ export async function elementCountLimitFor(
   const level = levelId && levelId !== user.subscriptionLevelId
     ? await prisma.subscriptionLevel.findUnique({ where: { id: levelId }, select: { maxBpmnElementsPerDiagram: true, maxNonBpmnElementsPerDiagram: true } })
     : user.subscriptionLevel;
-  return (diagramType === "bpmn" ? level?.maxBpmnElementsPerDiagram : level?.maxNonBpmnElementsPerDiagram) ?? null;
+  // This person's own overrides on top of the level (not while a SuperAdmin previews a level as itself).
+  const merged = level && !actAs ? applyLimitOverrides(level as never, user.limitOverrides, user.overridesExpireAt) as typeof level : level;
+  return (diagramType === "bpmn" ? merged?.maxBpmnElementsPerDiagram : merged?.maxNonBpmnElementsPerDiagram) ?? null;
 }

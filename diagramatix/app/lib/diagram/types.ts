@@ -1429,8 +1429,20 @@ export const SCHEMA_VERSION = "49";
  *   SCHEMA_VERSION also moves this release, to 49, for the connector's
  *   `labelTether` — the two numbers happen to move together here, for
  *   unrelated reasons, which is exactly why they are two numbers.
+ *
+ * 2.13 — DB: User.limitOverrides + .overrideNote + .overridesExpireAt (a SuperAdmin
+ *   customises ONE person's limits, settings and features without touching the
+ *   plan they are on, and can revert them — in addition to the comp grant);
+ *   AiSourceImage (the photo an AI generation was drawn from, kept so it can be
+ *   viewed and re-generated from); DiagramGenerateJob (the phone's background
+ *   generation, with the photo it corrects); the columns that bind an AI
+ *   prompt to the diagram it made (forDiagramId, freeForm) and the diagram’s selected prompt;
+ *   VoiceClip + VoiceTestRun (+ boostProfile) for the Voice Assist test harness.
+ *   All OPERATIONAL: the curated diagram-model DDL in ddlGenerate.ts covers the
+ *   diagram domain only and is unaffected. The XSD export shape is unchanged, so
+ *   SCHEMA_VERSION stays at 49.
  */
-export const PRODUCT_VERSION = "2.12";
+export const PRODUCT_VERSION = "2.13";
 
 /**
  * The structural (XSD) schema version of an export, as a single integer, tolerant of BOTH the

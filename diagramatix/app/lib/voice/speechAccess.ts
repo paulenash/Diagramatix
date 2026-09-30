@@ -25,6 +25,7 @@ import { prisma } from "@/app/lib/db";
 import { isSuperuser } from "@/app/lib/superuser";
 import { resolveEffectiveLevelId } from "@/app/lib/features/availability";
 import { currentActAsLevel } from "@/app/lib/features/actAs";
+import { overrideValue, overridesExpired } from "@/app/lib/features/userOverrides";
 
 export const SPEECH_FEATURE_KEY = "voice-feedback";
 
@@ -39,12 +40,15 @@ export async function speechGranted(session: SessionLike): Promise<boolean> {
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { featureOverrides: true },
+    select: { featureOverrides: true, overridesExpireAt: true },
   });
   if (!user) return false;
 
-  const override = actAs ? undefined : (user.featureOverrides as Record<string, unknown> | null)?.[SPEECH_FEATURE_KEY];
-  if (override !== undefined && override !== null) return override === "available";
+  // A personal override (bare string, or { s, base } from the customise panel); none once it has expired.
+  const override = actAs || overridesExpired(user.overridesExpireAt)
+    ? undefined
+    : overrideValue((user.featureOverrides as Record<string, unknown> | null)?.[SPEECH_FEATURE_KEY]);
+  if (override !== undefined) return override === "available";
 
   const levelId = actAs ?? (await resolveEffectiveLevelId(userId));
   if (!levelId) return false;

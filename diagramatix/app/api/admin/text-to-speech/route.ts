@@ -47,7 +47,7 @@ export async function GET(req: Request) {
   if (search) {
     if (search.length < 2) return NextResponse.json({ results: [] });
     const { rows } = await pgPool.query<UserRow & { granted: boolean }>(
-      `SELECT id, email, name, ("featureOverrides"->>$2) = 'available' AS granted
+      `SELECT id, email, name, COALESCE("featureOverrides"->$2::text->>'s', "featureOverrides"->>$2) = 'available' AS granted
          FROM "User"
         WHERE email ILIKE $1 OR name ILIKE $1
         ORDER BY lower(email)
@@ -69,7 +69,7 @@ export async function GET(req: Request) {
       [superEmails],
     ),
     pgPool.query<UserRow>(
-      `SELECT id, email, name FROM "User" WHERE ("featureOverrides"->>$1) = 'available' ORDER BY lower(email)`,
+      `SELECT id, email, name FROM "User" WHERE COALESCE("featureOverrides"->$1::text->>'s', "featureOverrides"->>$1) = 'available' ORDER BY lower(email)`,
       [SPEECH_FEATURE_KEY],
     ),
     prisma.featureAvailability.findMany({

@@ -33,6 +33,7 @@ import { SUPERUSER_EMAILS } from "./superuser";
 import { getEffectiveSubscriptionLevelId, withOrgLevel } from "./features/effectiveLevel";
 import { getFeatureStates } from "./features/availability";
 import { currentActAsLevel } from "./features/actAs";
+import { applyLimitOverrides, hasAnyOverride } from "./features/userOverrides";
 
 // The pure comp / grace / stored-level rule lives in features/effectiveLevel.ts (a leaf module, so this
 // file and availability.ts can both import it). Re-exported: it has many callers.
@@ -318,6 +319,8 @@ type UserWithTier = {
   /** Set when this user is a SuperAdmin ACTING AS a customer level (features/actAs.ts): that level's
    *  row is then `subscriptionLevel`, and the SuperAdmin bypass is off. */
   actingAsLevelId: string | null;
+  /** Some allowance or feature on this account was set for THIS person (userOverrides.ts). */
+  customised: boolean;
 };
 
 async function loadUserWithTier(userId: string): Promise<UserWithTier | null> {
@@ -375,6 +378,14 @@ async function loadUserWithTier(userId: string): Promise<UserWithTier | null> {
     u.compTierLevelId !== null &&
     u.compTierExpiresAt !== null &&
     u.compTierExpiresAt > now;
+  // THIS PERSON's own limit overrides (a SuperAdmin customised them without touching the plan): applied on
+  // top of whichever level applies — own, organisation or comp — so an upgrade doesn't silently discard
+  // them, and a grant the new plan already covers steps aside (userOverrides.ts).
+  const limitOverrides = (u as { limitOverrides?: unknown }).limitOverrides;
+  const overridesExpireAt = (u as { overridesExpireAt?: Date | null }).overridesExpireAt ?? null;
+  const customised = hasAnyOverride(limitOverrides, (u as { featureOverrides?: unknown }).featureOverrides);
+  if (effectiveLevel) effectiveLevel = applyLimitOverrides(effectiveLevel as never, limitOverrides, overridesExpireAt, now) as never;
+
   // A SuperAdmin acting as a customer level: that level's limits apply and the bypass is off.
   let actingAsLevelId: string | null = null;
   if (isAdminEmail(u.email)) {
@@ -394,6 +405,7 @@ async function loadUserWithTier(userId: string): Promise<UserWithTier | null> {
     subscriptionLevel: effectiveLevel,
     underlyingLevel,
     actingAsLevelId,
+    customised: customised && !actingAsLevelId,
     comp: compActive && !actingAsLevelId
       ? {
           tierLevelId: u.compTierLevelId!,
@@ -767,6 +779,8 @@ export interface UsageSnapshot {
   diagramsThisPeriod: number;
   /** Set when a SuperAdmin is acting as a customer level (features/actAs.ts). */
   actingAs: { id: string; name: string } | null;
+  /** Some allowance or feature was set for this person by support (userOverrides.ts) — the popover says so. */
+  customised: boolean;
   /** The paid subscription's billing state, for the payment-failed and ending-soon warnings. */
   billing: { status: string | null; endsAt: string | null };
   /** Per-tier feature access for the effective tier (SuperAdmin → all true).
@@ -897,6 +911,7 @@ export async function getUsageSnapshot(
     isAdmin: admin,
     /** A SuperAdmin acting as a customer level — the banner says so; limits are enforced. */
     actingAs: user.actingAsLevelId ? { id: user.actingAsLevelId, name: tier?.name ?? user.actingAsLevelId } : null,
+    customised: user.customised,
     billing: { status: user.stripeSubscriptionStatus, endsAt: user.subscriptionEndsAt ? user.subscriptionEndsAt.toISOString() : null },
     trial,
     comp: user.comp
