@@ -306,7 +306,7 @@ describe("T5037 — whose photo, which model, and a photo that has gone", () => 
   it("a model that cannot read images is refused up front with what to do", async () => {
     const w = await world();
     const img = await w.keep(w.owner.id);
-    ai.model = "deepseek-v4-flash"; // text-only (models.ts: vision false)
+    ai.model = "deepseek-flash"; // text-only (models.ts: vision false)
     // The DeepSeek models are listed only where DeepSeek is configured, as it is when one is chosen.
     const was = process.env.DEEPSEEK_API_KEY;
     process.env.DEEPSEEK_API_KEY = "test-deepseek-key";

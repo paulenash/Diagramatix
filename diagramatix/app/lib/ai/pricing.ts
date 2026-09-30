@@ -74,6 +74,8 @@ export const PRICING: Record<string, ModelPrice> = {
   // price, so the number here was not merely stale, it was wrong — the AI Usage
   // report was billing Sonnet 5 at 1.5x its real cost.
   "claude-sonnet-5": { in: 2, out: 10 },
+  // Sonnet 5.5: $2 / $10 — platform.claude.com/docs/en/about-claude/pricing, read 2026-09-30.
+  "claude-sonnet-5-5": { in: 2, out: 10 },
   "claude-haiku-4-5-20251001": { in: 1, out: 5 },
   // Kimi / Moonshot — international USD (platform.kimi.ai). These three are the
   // current default lineup; the rest are priced for reference if registered via
@@ -81,6 +83,8 @@ export const PRICING: Record<string, ModelPrice> = {
   "kimi-k3": { in: 3, out: 15 },
   "kimi-k2.6": { in: 0.95, out: 4 },
   "kimi-k2.7-code": { in: 0.95, out: 4 },
+  // platform.kimi.ai pricing, read 2026-09-30.
+  "kimi-k2.7-code-highspeed": { in: 1.9, out: 8 },
   "kimi-k2.5": { in: 0.6, out: 3 },
   "kimi-k2-0711-preview": { in: 0.6, out: 2.5 },
   "moonshot-v1-128k": { in: 2, out: 5 },
@@ -97,10 +101,14 @@ export const PRICING: Record<string, ModelPrice> = {
   "gpt-4o": { in: 2.5, out: 10 },
   "gpt-4o-mini": { in: 0.15, out: 0.6 },
   "phi-4": { in: 0.125, out: 0.5 },
-  // DeepSeek — the account's live models (GET /models): v4-flash + v4-pro.
-  // Estimates; verify against your account tier + adjust in the rate catalog.
-  "deepseek-v4-flash": { in: 0.28, out: 0.42, note: "cache-miss input; cache hits far cheaper" },
-  "deepseek-v4-pro": { in: 0.55, out: 2.19 },
+  // DeepSeek — the account's live models (GET /models, 2026-09-30): deepseek-flash + deepseek-v4-pro.
+  // api-docs.deepseek.com/quick_start/pricing has PEAK and OFF-PEAK prices (peak 01:00-04:00 and
+  // 06:00-10:00 UTC, Mon-Fri) — roughly Australian working hours — so the PEAK cache-miss rates are
+  // used here: the conservative figure for the cost gate. Cache hits are far cheaper.
+  "deepseek-flash": { in: 0.3, out: 1.2, note: "peak cache-miss; off-peak 0.15 / 0.6; cache hits far cheaper" },
+  "deepseek-v4-pro": { in: 1.32, out: 3.96, note: "peak cache-miss; off-peak 0.66 / 1.98; cache hits far cheaper" },
+  // The retired name is still accepted and served by V4.1-Flash at the Flash price — kept so old usage rows still price.
+  "deepseek-v4-flash": { in: 0.3, out: 1.2, note: "retired name — served by deepseek-flash" },
   // Generic aliases (both currently resolve to v4-flash) — priced so a direct use
   // isn't "varies".
   "deepseek-chat": { in: 0.28, out: 0.42 },

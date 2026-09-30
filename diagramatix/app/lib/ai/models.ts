@@ -56,6 +56,9 @@ export const AI_MODELS: AiModel[] = [
   { id: "claude-opus-5-5", label: "Opus 5.5", vision: true },
   { id: "claude-opus-5", label: "Opus 5", vision: true },
   { id: "claude-opus-4-8", label: "Opus 4.8", vision: true },
+  // Sonnet 5.5 — added 2026-09-30 after GET /v1/models listed `claude-sonnet-5-5`
+  // against the account's own key. $2 / $10, the same as Sonnet 5.
+  { id: "claude-sonnet-5-5", label: "Sonnet 5.5", vision: true },
   { id: "claude-sonnet-5", label: "Sonnet 5", vision: true },
   { id: "claude-haiku-4-5-20251001", label: "Haiku 4.5", vision: true },
 ];
@@ -132,6 +135,8 @@ const DEFAULT_MOONSHOT_MODELS: AiModel[] = [
   { id: "kimi-k3", label: "Kimi K3", provider: "moonshot" },
   { id: "kimi-k2.6", label: "Kimi K2.6", provider: "moonshot" },
   { id: "kimi-k2.7-code", label: "Kimi K2.7 Code", provider: "moonshot" },
+  // Listed by GET /v1/models 2026-09-30 (with the three above): the faster K2.7 Code.
+  { id: "kimi-k2.7-code-highspeed", label: "Kimi K2.7 Code (fast)", provider: "moonshot" },
 ];
 
 export function moonshotModels(unlocked?: ReadonlySet<string>): AiModel[] {
@@ -162,8 +167,11 @@ export function moonshotModels(unlocked?: ReadonlySet<string>): AiModel[] {
  * used here — we register the two distinct models directly.) No vision on this
  * endpoint. Override with `DEEPSEEK_MODELS` (`id|Label`, comma-separated).
  */
+// GET /models on the account (2026-09-30) lists `deepseek-flash` and `deepseek-v4-pro`. The old
+// `deepseek-v4-flash` (and `-vision-exp`) are RETIRED: the name is still accepted, but the request
+// is served by DeepSeek-V4.1-Flash and billed at the Flash price — so the id below is the real one.
 const DEFAULT_DEEPSEEK_MODELS: AiModel[] = [
-  { id: "deepseek-v4-flash", label: "DeepSeek V4 Flash", provider: "deepseek", vision: false },
+  { id: "deepseek-flash", label: "DeepSeek Flash (V4.1)", provider: "deepseek", vision: false },
   { id: "deepseek-v4-pro", label: "DeepSeek V4 Pro", provider: "deepseek", vision: false },
 ];
 
