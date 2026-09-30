@@ -44,3 +44,17 @@ describe("T5144 — the model list follows what the vendors' own APIs list", () 
     expect(PRICING["deepseek-flash"]).toMatchObject({ in: 0.3, out: 1.2 });
   });
 });
+
+describe("T5145 — Gemini 3.8 Flash and 3.1 Pro (preview) are offered and priced", () => {
+  it("the default Google list has both beside no removals, with vision, and each has a rate", async () => {
+    vi.stubEnv("GOOGLE_API_KEY", "k");
+    vi.stubEnv("GOOGLE_BASE_URL", "https://gw.example");
+    vi.stubEnv("GOOGLE_MODELS", "");
+    const { googleModels } = await import("@/app/lib/ai/models");
+    const ms = googleModels();
+    expect(ms.map((m) => m.id)).toEqual(["gemini-3.8-flash", "gemini-3.1-pro-preview", "gemini-2.5-pro", "gemini-2.5-flash"]);
+    expect(ms.every((m) => m.vision)).toBe(true);
+    expect(PRICING["gemini-3.8-flash"]).toMatchObject({ in: 1.5, out: 7.5 });
+    expect(PRICING["gemini-3.1-pro-preview"]).toMatchObject({ in: 2, out: 12 });
+  });
+});

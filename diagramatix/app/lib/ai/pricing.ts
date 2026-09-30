@@ -92,6 +92,10 @@ export const PRICING: Record<string, ModelPrice> = {
   // a gateway (e.g. LiteLLM in front of Vertex) may rate these differently.
   "gemini-2.5-pro": { in: 1.25, out: 10, note: "≤200k context; higher above" },
   "gemini-2.5-flash": { in: 0.3, out: 2.5 },
+  // ai.google.dev/gemini-api/docs/pricing, read 2026-09-30. 3.8 Flash is discounted to 0.75 / 3.75
+  // until 31 Dec 2026; the 1 Jan 2027 price is used so the cost gate does not go stale.
+  "gemini-3.8-flash": { in: 1.5, out: 7.5, note: "0.75 / 3.75 until 2026-12-31" },
+  "gemini-3.1-pro-preview": { in: 2, out: 12, note: "≤200k prompt; 4 / 18 above" },
   // Microsoft — Azure OpenAI (GPT / o-series) + Microsoft's Phi. Azure bills you
   // directly, so these only drive the cost-gate/bars — editable in the rate catalog.
   // gpt-5-mini / gpt-5.4-mini are the deployed models (dgx-openai); estimates —
