@@ -6025,6 +6025,50 @@ export function layoutBpmnDiagram(
     }
   }
 
+  // ── R8.40: a gateway is a child of the lane it is DRAWN in ──
+  //
+  // Paul, 2026-09-30: gateways are placed flexibly — by aesthetic balance, on the
+  // horizontal middle of what follows the decision (R8.01) or precedes the merge
+  // (R8.32) — so they are not owned by a lane in the strict sense a task is. They are
+  // still allocated to the lane they are shown in, exactly as dropping one on a lane
+  // in the editor makes that lane adopt it. (The task that decides the outcome is the
+  // one the lane's participant owns; the gateway symbol just follows the picture.)
+  //
+  // The plan names a lane, and the passes above then move the gateway, so its parent
+  // and its picture disagree: on the Luna event-gateway diagram the gateway was drawn
+  // in Sales but still belonged to Front Office. Re-assert once, at the end, from the
+  // FINAL position: the deepest lane whose band holds the gateway's centre. A centre
+  // exactly on a divider goes to the lane BELOW (bands are half-open), so the answer
+  // is always the same. The symbol is not moved — straddling a divider is allowed for
+  // a gateway (unlike a Start, R8.39). Decision and merge are judged separately, so a
+  // pair can end up in different lanes.
+  {
+    const poolIdOf = (id: string): string | undefined => {
+      let cur = elMap.get(id);
+      for (let d = 0; cur && d < 16; d++) {
+        if (cur.type === "pool") return cur.id;
+        cur = cur.parentId ? elMap.get(cur.parentId) : undefined;
+      }
+      return undefined;
+    };
+    for (const g of elements) {
+      if (g.type !== "gateway" || g.boundaryHostId) continue;
+      const parent = g.parentId ? elMap.get(g.parentId) : undefined;
+      if (!parent || (parent.type !== "lane" && parent.type !== "pool")) continue;   // inside a subprocess — not a lane's business
+      const poolId = poolIdOf(g.id);
+      if (!poolId) continue;
+      const cy = g.y + g.height / 2;
+      const cx = g.x + g.width / 2;
+      const lane = elements
+        .filter(l => l.type === "lane" && poolIdOf(l.id) === poolId && l.y <= cy && cy < l.y + l.height && l.x <= cx && cx < l.x + l.width)
+        .sort((a, b) => a.height - b.height)[0];
+      if (!lane || lane.id === g.parentId) continue;
+      // No diagnostic: this is ordinary adoption (what the editor does on a drop), not a
+      // recovery from a bad plan reference — a clean plan must still report nothing.
+      g.parentId = lane.id;
+    }
+  }
+
   phase(`connectors built (${connectors.length})`);
 
   // Compute waypoints for all connectors

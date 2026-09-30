@@ -87,3 +87,30 @@ describe("R8.39 — Start event in the lane of its next element", () => {
     expect(readFileSync("scripts/sql/patch-rule-r8-39-start-in-next-lane.sql", "utf8")).toContain("R8.39:");
   });
 });
+
+describe("R8.40 — a gateway is a child of the lane it is drawn in", () => {
+  const out = run(plan.elements, plan.connections);
+  const laneAt = (id: string) => {
+    const g = get(out, id);
+    const cy = g.y + g.height / 2;
+    return out.elements.filter((l) => l.type === "lane" && l.y <= cy && cy < l.y + l.height).sort((a, b) => a.height - b.height)[0];
+  };
+
+  it("T5153 — the Luna event-based gateway, drawn in Sales, is parented to Sales (the plan said Front Office)", () => {
+    const plannedLane = plan.elements.find((e) => e.id === "g_await")!.lane;
+    expect(plannedLane).toBe("l_front");
+    const drawnIn = laneAt("g_await");
+    expect(drawnIn.id).toBe("l_sales");
+    expect(get(out, "g_await").parentId).toBe("l_sales");
+  });
+
+  it("T5154 — every gateway in the plan is a child of the lane its centre is in", () => {
+    for (const e of out.elements.filter((x) => x.type === "gateway" && x.parentId && out.elements.find((p) => p.id === x.parentId)?.type === "lane")) {
+      expect(e.parentId, e.label ?? e.id).toBe(laneAt(e.id).id);
+    }
+  });
+
+  it("T5155 — the rule is stated in the layout pass", () => {
+    expect(readFileSync("app/lib/diagram/bpmnLayout.ts", "utf8")).toContain("R8.40: a gateway is a child of the lane it is DRAWN in");
+  });
+});
