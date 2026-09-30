@@ -43,6 +43,26 @@ model_list:
       api_key: os.environ/AZURE_OPENAI_API_KEY
       api_version: "2025-04-01-preview"
 
+  # Deployed 2026-09-30 in dgx-openai (DataZoneStandard, capacity 50).
+  - model_name: gpt-6.1-sol
+    litellm_params:
+      model: azure/gpt-6.1-sol
+      api_base: os.environ/AZURE_OPENAI_API_BASE
+      api_key: os.environ/AZURE_OPENAI_API_KEY
+      api_version: "2025-04-01-preview"
+  - model_name: gpt-6-luna
+    litellm_params:
+      model: azure/gpt-6-luna
+      api_base: os.environ/AZURE_OPENAI_API_BASE
+      api_key: os.environ/AZURE_OPENAI_API_KEY
+      api_version: "2025-04-01-preview"
+  - model_name: gpt-5.6-terra
+    litellm_params:
+      model: azure/gpt-5.6-terra
+      api_base: os.environ/AZURE_OPENAI_API_BASE
+      api_key: os.environ/AZURE_OPENAI_API_KEY
+      api_version: "2025-04-01-preview"
+
   # ── Microsoft — Phi (Azure AI Services: dgx-aiservices) ────────────────────
   # Phi is an AIServices-kind model (can't live in the OpenAI-kind dgx-openai), so
   # it's served from the dgx-aiservices resource via the azure_ai provider.

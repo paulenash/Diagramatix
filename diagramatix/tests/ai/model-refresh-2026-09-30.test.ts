@@ -58,3 +58,14 @@ describe("T5145 — Gemini 3.8 Flash and 3.1 Pro (preview) are offered and price
     expect(PRICING["gemini-3.1-pro-preview"]).toMatchObject({ in: 2, out: 12 });
   });
 });
+
+describe("T5146 — the Microsoft defaults are the models actually deployed and served by the gateway", () => {
+  it("offers GPT-6.1 Sol, GPT-6 Luna, GPT-5.6 Terra, GPT-5 mini, GPT-5.4 mini and Phi-4 (no undeployed gpt-4o)", async () => {
+    vi.stubEnv("MICROSOFT_API_KEY", "k");
+    vi.stubEnv("MICROSOFT_BASE_URL", "https://gw.example");
+    vi.stubEnv("MICROSOFT_MODELS", "");
+    const { microsoftModels } = await import("@/app/lib/ai/models");
+    const ids = microsoftModels().map((m) => m.id);
+    expect(ids).toEqual(["gpt-6.1-sol", "gpt-6-luna", "gpt-5.6-terra", "gpt-5-mini", "gpt-5.4-mini", "phi-4"]);
+  });
+});

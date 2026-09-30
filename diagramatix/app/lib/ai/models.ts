@@ -240,8 +240,13 @@ export function googleModels(): AiModel[] {
  * id opts back in). Kept distinct from the SharePoint/Entra `AZURE_*` vars on
  * purpose. Server-only. */
 const DEFAULT_MICROSOFT_MODELS: AiModel[] = [
-  { id: "gpt-4o", label: "GPT-4o", provider: "microsoft", vision: true },
-  { id: "gpt-4o-mini", label: "GPT-4o mini", provider: "microsoft", vision: true },
+  // The models deployed in dgx-openai and served by the gateway, each proven with a real request
+  // 2026-09-30. (gpt-4o / gpt-4o-mini were never deployed there, so they are no longer offered.)
+  { id: "gpt-6.1-sol", label: "GPT-6.1 Sol", provider: "microsoft", vision: true },
+  { id: "gpt-6-luna", label: "GPT-6 Luna", provider: "microsoft", vision: true },
+  { id: "gpt-5.6-terra", label: "GPT-5.6 Terra", provider: "microsoft", vision: true },
+  { id: "gpt-5-mini", label: "GPT-5 mini", provider: "microsoft", vision: true },
+  { id: "gpt-5.4-mini", label: "GPT-5.4 mini", provider: "microsoft", vision: true },
   { id: "phi-4", label: "Phi-4", provider: "microsoft", vision: false },
 ];
 

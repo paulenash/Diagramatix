@@ -90,11 +90,11 @@ describe("aiClientConfig / aiApiKey — provider routing", () => {
     process.env.MICROSOFT_API_KEY = "sk-msft";
     process.env.MICROSOFT_BASE_URL = "http://litellm.internal:4000";
     process.env.ANTHROPIC_API_KEY = "sk-ant"; // must NOT be used for a GPT/Phi model
-    expect(aiApiKey("gpt-4o")).toBe("sk-msft");
-    expect(aiClientConfig("gpt-4o")).toEqual({ apiKey: "sk-msft", baseURL: "http://litellm.internal:4000" });
+    expect(aiApiKey("gpt-6.1-sol")).toBe("sk-msft");
+    expect(aiClientConfig("gpt-6.1-sol")).toEqual({ apiKey: "sk-msft", baseURL: "http://litellm.internal:4000" });
     expect(aiApiKey("phi-4")).toBe("sk-msft");
     expect(aiClientConfig("phi-4", "sk-ant").apiKey).toBe("sk-msft"); // caller anthropic key ignored
-    const g = makeAiClient("gpt-4o");
+    const g = makeAiClient("gpt-6.1-sol");
     expect(g.authToken).toBe("sk-msft");
     expect(g.apiKey).toBeNull();
   });

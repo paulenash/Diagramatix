@@ -220,7 +220,7 @@ describe("Microsoft (Azure OpenAI + Phi) provider registry", () => {
     delete process.env.MICROSOFT_API_KEY;
     process.env.MICROSOFT_BASE_URL = "http://gw";
     expect(microsoftModels()).toEqual([]);
-    expect(isKnownAiModel("gpt-4o")).toBe(false);
+    expect(isKnownAiModel("gpt-6.1-sol")).toBe(false);
   });
 
   it("T1038 — configured: default lineup or MICROSOFT_MODELS, tagged provider=microsoft; GPT vision, Phi text", () => {
@@ -230,9 +230,9 @@ describe("Microsoft (Azure OpenAI + Phi) provider registry", () => {
     const def = microsoftModels();
     expect(def.length).toBeGreaterThan(0);
     expect(def.every((m) => m.provider === "microsoft")).toBe(true);
-    expect(def.find((m) => m.id === "gpt-4o")?.vision).toBe(true);   // GPT is multimodal
+    expect(def.find((m) => m.id === "gpt-6.1-sol")?.vision).toBe(true);   // GPT is multimodal
     expect(def.find((m) => m.id === "phi-4")?.vision).toBe(false);   // base Phi is text
-    expect(providerForModel("gpt-4o")).toBe("microsoft");
+    expect(providerForModel("gpt-6.1-sol")).toBe("microsoft");
     // Override: GPT/o default to vision, base Phi opts out, a "…-vision" Phi opts in.
     process.env.MICROSOFT_MODELS = "o3-mini|o3-mini, phi-4|Phi-4, phi-4-multimodal|Phi-4 MM";
     const m = microsoftModels();
