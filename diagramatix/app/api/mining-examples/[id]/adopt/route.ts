@@ -11,7 +11,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireRole, WRITE_ROLES, OrgContextError } from "@/app/lib/auth/orgContext";
-import { gateFeature } from "@/app/lib/subscription-route";
+import { gateFeature, gateLimit } from "@/app/lib/subscription-route";
 import { validateMiningExamplePackage, type MiningExamplePackage } from "@/app/lib/mining/examplePackage";
 import { adoptMiningPackage } from "@/app/lib/mining/adoptMiningPackage";
 import { purgePriorExampleCopies } from "@/app/lib/examples/singleCopy";
@@ -48,6 +48,9 @@ export async function POST(_req: Request, { params }: Params) {
   // One copy per user — overwrite any prior copy of this example.
   await purgePriorExampleCopies(example.id, { id: session.user.id, email: session.user.email ?? "" });
 
+  // A project created any way at all counts against the plan's project cap (this path used to skip it).
+  const projectBlock = await gateLimit(session.user.id, "projects");
+  if (projectBlock) return projectBlock;
   const result = await adoptMiningPackage(pkg, {
     userId: session.user.id,
     orgId,

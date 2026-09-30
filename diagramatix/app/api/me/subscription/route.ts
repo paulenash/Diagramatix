@@ -69,11 +69,30 @@ export async function PATCH(req: Request) {
     );
   }
 
+  // This is the sign-up "Stay on Free" choice, not a plan-change tool. It used to restamp
+  // subscriptionAssignedAt on EVERY call — which restarts the 30-day trial and moves the monthly counter
+  // anniversary — so anyone could reset their trial by posting {"tierId":"free"}. Now:
+  //   • already on Free: nothing changes (idempotent);
+  //   • on a paid tier: refused — plan changes go through Stripe (Manage subscription);
+  //   • first choice: recorded, and the clock is stamped only if it has never been.
+  const current = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { subscriptionLevelId: true, subscriptionAssignedAt: true, hasChosenTier: true },
+  });
+  if (current?.hasChosenTier && current.subscriptionLevelId && current.subscriptionLevelId !== "free") {
+    return NextResponse.json(
+      { error: "Your plan is managed through Stripe. Use Manage subscription to change or cancel it." },
+      { status: 409 },
+    );
+  }
+  if (current?.hasChosenTier && current.subscriptionLevelId === "free") {
+    return NextResponse.json({ user: { id: session.user.id, subscriptionLevelId: "free", subscriptionAssignedAt: current.subscriptionAssignedAt, hasChosenTier: true } });
+  }
   const updated = await prisma.user.update({
     where: { id: session.user.id },
     data: {
       subscriptionLevelId: tierId,
-      subscriptionAssignedAt: new Date(),
+      ...(current?.subscriptionAssignedAt ? {} : { subscriptionAssignedAt: new Date() }),
       hasChosenTier: true,
     },
     select: {

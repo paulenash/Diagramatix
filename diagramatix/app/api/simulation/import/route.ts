@@ -9,7 +9,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
-import { gateFeature } from "@/app/lib/subscription-route";
+import { gateFeature, gateLimit } from "@/app/lib/subscription-route";
 import { requireRole, WRITE_ROLES, OrgContextError } from "@/app/lib/auth/orgContext";
 import { validateExamplePackage, type ExamplePackage } from "@/app/lib/simulation/examplePackage";
 import { adoptPackage } from "@/app/lib/simulation/adoptPackage";
@@ -43,6 +43,9 @@ export async function POST(req: Request) {
     ? body.name.trim()
     : `${pkg.study?.name ?? "Imported"} (imported)`;
 
+  // A project created any way at all counts against the plan's project cap (this path used to skip it).
+  const projectBlock = await gateLimit(session.user.id, "projects");
+  if (projectBlock) return projectBlock;
   const result = await adoptPackage(pkg, {
     userId: session.user.id,
     orgId,

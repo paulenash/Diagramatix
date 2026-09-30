@@ -135,6 +135,9 @@ export async function POST(request: Request) {
   let project: { id: string; folderTree: unknown } | null = null;
   let createdNewProject = false;
   if (newProjectNameRaw) {
+    // A new project counts against the plan’s project cap.
+    const projectBlock = await gateLimit(session.user.id, "projects");
+    if (projectBlock) return projectBlock;
     const created = await prisma.project.create({
       data: {
         name: newProjectNameRaw,

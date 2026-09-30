@@ -601,7 +601,7 @@ export async function checkLimit(
   if (limit === null) return { ok: true }; // Unlimited.
 
   const current = await currentUsageFor(user, metric, ctx, now);
-  if (current >= limit) {
+  if (isOverLimit(metric, current, limit)) {
     return {
       ok: false,
       reason: `${METRIC_LABELS[metric]} limit reached on the ${tier.name} tier (${current} of ${limit}).`,
@@ -615,6 +615,16 @@ export async function checkLimit(
   }
 
   return { ok: true };
+}
+
+/**
+ * Is `current` past the limit? A COUNT (projects, exports …) is blocked AT the limit — the next one
+ * would be over. An ELEMENT count is the size the diagram WOULD have, so a diagram of exactly the limit
+ * is fine and only more is over. (The server used `>=` for both and rejected a diagram of exactly N — "20
+ * of 20" — that the editor let you build.)
+ */
+export function isOverLimit(metric: LimitMetric, current: number, limit: number): boolean {
+  return metric === "bpmnElementsPerDiagram" || metric === "nonBpmnElementsPerDiagram" ? current > limit : current >= limit;
 }
 
 /**
@@ -858,7 +868,7 @@ export async function getUsageSnapshot(
       limit,
       periodLabel,
       periodEndsAt,
-      overLimit: limit !== null && current >= limit,
+      overLimit: limit !== null && isOverLimit(metric, current, limit),
     });
   }
 

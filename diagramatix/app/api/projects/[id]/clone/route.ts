@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { gateLimit } from "@/app/lib/subscription-route";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
@@ -63,6 +64,9 @@ export async function POST(_req: Request, { params }: Params) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  // A project created any way at all counts against the plan's project cap (this path used to skip it).
+  const projectBlock = await gateLimit(session.user.id, "projects");
+  if (projectBlock) return projectBlock;
   const newProject = await prisma.project.create({
     data: {
       name: `${source.name} (Clone)`,
