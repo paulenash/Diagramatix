@@ -114,7 +114,7 @@ export type EnforcementOk = { ok: true };
 export type EnforcementBlocked = {
   ok: false;
   /** Free-form, user-facing message. The route layer can pass it straight
-   *  through in the 402/403 response body. */
+   *  through in the 403 response body (with a structured `notice` — subscription/messages.ts). */
   reason: string;
   /** Either a LimitMetric or "trial" when the block is due to trial expiry. */
   metric: LimitMetric | "trial";
@@ -552,9 +552,10 @@ async function currentUsageFor(
 /** Check whether the given user is permitted to perform an action covered
  *  by `metric`. Admins (SUPERUSER_EMAILS) always pass. Returns
  *  `{ ok: true }` on success; `{ ok: false, reason, … }` when the action
- *  should be blocked. The route layer is expected to translate a blocked
- *  result into a 402 (Payment Required) for event/limit metrics or a 403
- *  for trial expiry, and surface `reason` to the user.
+ *  should be blocked. The route layer (subscription-route.ts) turns a blocked
+ *  result into a 403 — for limits and for trial expiry alike; the body's
+ *  `metric` says which — carrying `reason` and a structured `notice` the
+ *  browser shows (subscription/gateNotice.ts).
  *
  *  This function is read-only — it does NOT consume any counter. The
  *  caller must invoke `recordUsage` separately after the action succeeds. */

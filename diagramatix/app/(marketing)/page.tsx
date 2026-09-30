@@ -3,6 +3,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
+import { getStartingTrialDays } from "@/app/lib/features/publicMatrix";
+import { trialPhrase } from "@/app/lib/subscription/publicCopy";
 
 export const metadata: Metadata = {
   title: {
@@ -74,6 +76,8 @@ export default async function MarketingHome() {
     orderBy: { priceMonthly: "asc" },
     select: { priceMonthly: true },
   });
+  const trial = trialPhrase(await getStartingTrialDays());
+  const Trial = trial.charAt(0).toUpperCase() + trial.slice(1);
   const fromPrice = cheapestPaid
     ? `AU$${Math.round(cheapestPaid.priceMonthly / 100)}`
     : null;
@@ -107,7 +111,7 @@ export default async function MarketingHome() {
           </Link>
         </div>
         <p className="mt-6 text-xs text-gray-400">
-          30-day free trial · No credit card required to get started
+          {Trial} · No credit card required to get started
         </p>
       </section>
 
@@ -159,7 +163,7 @@ export default async function MarketingHome() {
           Simple, transparent pricing
         </h2>
         <p className="mt-3 text-sm text-gray-600">
-          30-day free trial.
+          {Trial}.
           {fromPrice && ` Paid plans from ${fromPrice} per user per month.`}
           {" "}Enterprise on request.
         </p>

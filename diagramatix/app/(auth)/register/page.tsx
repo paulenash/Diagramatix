@@ -1,27 +1,25 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
-// Display-only pricing for the ?plan= banner. Source of truth for tier
-// pricing is scripts/seed-subscriptions.ts — keep these in sync.
-const PAID_PLANS: Record<string, { name: string; price: number }> = {
-  introductory: { name: "Introductory", price: 50 },
-  professional: { name: "Professional", price: 150 },
-  expert: { name: "Expert", price: 270 },
-};
+// Names, prices and the trial length for the ?plan= banner come from /api/plans (the plans
+// themselves) — they used to be typed here with a "keep these in sync" note.
+type PublicPlans = { plans: { id: string; name: string; priceMonthly: number }[]; trialDays: number | null };
 
 function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const planParam = searchParams.get("plan");
-  const plan =
-    planParam === "free" || (planParam && PAID_PLANS[planParam])
-      ? planParam
-      : null;
-  const paidPlan = plan ? PAID_PLANS[plan] : undefined;
+  const [publicPlans, setPublicPlans] = useState<PublicPlans | null>(null);
+  useEffect(() => {
+    fetch("/api/plans").then((r) => (r.ok ? r.json() : null)).then((j) => setPublicPlans(j)).catch(() => {});
+  }, []);
+  const found = publicPlans?.plans.find((p) => p.id === planParam);
+  const plan = planParam === "free" || (found && found.priceMonthly > 0) ? planParam : null;
+  const paidPlan = found && found.priceMonthly > 0 ? { name: found.name, price: Math.round(found.priceMonthly / 100) } : undefined;
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -63,7 +61,7 @@ function RegisterForm() {
               /month.
             </>
           ) : (
-            <>You&apos;re starting the 30-day free trial.</>
+            <>You&apos;re starting the {publicPlans?.trialDays ? `${publicPlans.trialDays}-day ` : ""}free trial.</>
           )}{" "}
           <Link href="/pricing" className="text-blue-600 hover:underline font-medium">
             change plan

@@ -1,5 +1,8 @@
 import Link from "next/link";
 import { prisma } from "@/app/lib/db";
+import { getPublicMatrix, getStartingTrialDays } from "@/app/lib/features/publicMatrix";
+import { trialPhrase } from "@/app/lib/subscription/publicCopy";
+import { PlanMatrix } from "../PlanMatrix";
 
 export const metadata = {
   title: "Features",
@@ -26,6 +29,9 @@ export default async function FeaturesPage() {
       publishedDetails: true,
     },
   });
+
+  const matrix = await getPublicMatrix();
+  const trial = trialPhrase(await getStartingTrialDays());
 
   return (
     <div className="bg-white">
@@ -55,12 +61,20 @@ export default async function FeaturesPage() {
           </div>
         )}
 
+        <div className="mt-16">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 text-center">Every feature, by plan</h2>
+          <p className="mt-2 mb-6 text-sm text-gray-600 text-center">
+            What each plan includes, read live from the plans themselves.
+          </p>
+          <PlanMatrix matrix={matrix} caption="Every feature, by plan" />
+        </div>
+
         <div className="mt-12 text-center">
           <Link
             href="/register"
             className="inline-block px-6 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
           >
-            Start your 30-day free trial
+            Start your {trial}
           </Link>
           <p className="mt-3 text-xs text-gray-500">
             Or see <Link href="/pricing" className="text-blue-600 hover:underline">pricing</Link>.

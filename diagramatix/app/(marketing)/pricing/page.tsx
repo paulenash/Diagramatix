@@ -2,24 +2,29 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
+import { getPublicMatrix, getStartingTrialDays } from "@/app/lib/features/publicMatrix";
+import { limitLines, trialPhrase } from "@/app/lib/subscription/publicCopy";
+import { PlanMatrix } from "../PlanMatrix";
 
-export const metadata: Metadata = {
-  title: "Pricing",
-  description:
-    "Diagramatix pricing in Australian dollars. 30-day free trial, then paid plans for BPMN diagramming with Visio import/export and AI generation. Built in Australia.",
-};
+// The trial length is data (the Free plan's trialDays), not a number typed here.
+export async function generateMetadata(): Promise<Metadata> {
+  const trial = trialPhrase(await getStartingTrialDays());
+  return {
+    title: "Pricing",
+    description: `Diagramatix pricing in Australian dollars. ${trial.charAt(0).toUpperCase()}${trial.slice(1)}, then paid plans for BPMN diagramming with Visio import/export and AI generation. Built in Australia.`,
+  };
+}
 
 const CONTACT_EMAIL = "info@diagramatix.com.au";
 
 /**
  * Marketing pricing page.
  *
- * Renders dynamically from the SubscriptionLevel table so name + price
- * stay in sync with what the app actually charges. The feature list
- * (marketing copy) stays as a small static dictionary keyed by tier id
- * — tier ids are stable ("free" / "introductory" / "professional" /
- * "expert"), so this lookup is robust against price / limit edits in
- * the admin editor.
+ * Renders dynamically from the SubscriptionLevel table (name, price AND every
+ * limit — the bullet lines are generated from the plan's own numbers, so an edit
+ * in the SuperAdmin editor shows here on the next request) and from the Feature
+ * Availability matrix (the "every feature, by plan" table). Only a one-line
+ * blurb and a few non-numeric highlights are typed copy, keyed by tier id.
  *
  * CTAs:
  *   • Signed out → /register (TierPicker on first dashboard visit
@@ -28,54 +33,32 @@ const CONTACT_EMAIL = "info@diagramatix.com.au";
  *     them Upgrade / Manage Subscription buttons).
  */
 
-const TIER_COPY: Record<
+/** Typed copy: a blurb and a few highlights with NO numbers in them — every number (and every feature tick)
+ *  comes from the plan's row and the availability matrix, so it cannot go stale. */
+export const TIER_COPY: Record<
   string,
-  { blurb: string; features: string[]; highlight?: boolean }
+  { blurb: string; extras: string[]; highlight?: boolean }
 > = {
   free: {
-    blurb: "For individuals exploring Diagramatix. 30-day free trial.",
-    features: [
-      "Try every diagram type for 30 days",
-      "Visio + BPMN 2.0 import",
-      "5 AI Generate attempts during your trial",
-      "2 individual exports + 2 imports",
-    ],
+    blurb: "For individuals exploring Diagramatix.",
+    extras: [],
   },
   introductory: {
     blurb: "For solo users who want unlimited diagram building.",
-    features: [
-      "BPMN, Process Context, State Machine, Domain diagrams",
-      "5 projects",
-      "Generous monthly AI Generate quota",
-      "Monthly individual exports + imports",
-    ],
+    extras: ["BPMN, Process Context, State Machine and Domain diagrams"],
     highlight: true,
   },
   professional: {
     blurb: "For consultants and small teams.",
-    features: [
-      "Unlimited projects",
-      "Higher monthly AI Generate quota",
-      "Bulk Visio export + import",
-      "Priority email support",
-    ],
+    extras: ["Priority email support"],
   },
   expert: {
     blurb: "For power users and larger teams.",
-    features: [
-      "Everything in Professional",
-      "Highest monthly AI Generate quota",
-      "Higher bulk export + import caps",
-      "Earliest access to new diagram types",
-    ],
+    extras: ["Earliest access to new diagram types"],
   },
   enterprise: {
     blurb: "For organisations that need tailored limits, procurement, and support.",
-    features: [
-      "Everything in Expert",
-      "Unlimited usage",
-      "Tailored onboarding & support",
-    ],
+    extras: ["Tailored onboarding & support"],
   },
 };
 
@@ -96,7 +79,7 @@ const FAQ: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: "Do I need a data team for process mining? Does it connect to my systems?",
-    a: "No data team — a three-column CSV (Case, Activity, Timestamp) is enough, and worked examples are included. And by design, no live connectors: proper data management and proper process management are two different jobs. If you unify data in a platform like Microsoft Fabric, shape the event log there and drop it in — we meet your data platform at open standards: CSV, IEEE XES, OCEL.",
+    a: "No data team — a three-column CSV (Case, Activity, Timestamp) is enough, and worked examples are included. Where you want it to keep up with your systems there are live sources — a webhook, Azure Blob storage or SharePoint — on the plans that include them (see the table above), but a file is always enough: proper data management and proper process management are two different jobs. If you unify data in a platform like Microsoft Fabric, shape the event log there and drop it in — we meet your data platform at open standards: CSV, IEEE XES, OCEL.",
   },
   {
     q: "Will auditors accept this?",
@@ -133,6 +116,7 @@ export default async function PricingPage() {
   const tiers = await prisma.subscriptionLevel.findMany({
     orderBy: { sortOrder: "asc" },
   });
+  const matrix = await getPublicMatrix();
 
   return (
     <div className="bg-white">
@@ -149,8 +133,10 @@ export default async function PricingPage() {
           {tiers.map((t) => {
             const copy = TIER_COPY[t.id] ?? {
               blurb: t.name,
-              features: [],
+              extras: [],
             };
+            // Every number on the card comes from the plan's own row (null = unlimited).
+            const lines = [...limitLines(t), ...copy.extras];
             // Enterprise is a "Contact us" tier: no self-serve price or
             // register flow. Special-cased here (not in formatPrice) because
             // Free legitimately renders $0 as the trial.
@@ -189,7 +175,7 @@ export default async function PricingPage() {
                   {cadence && <span className="text-xs text-gray-500">{cadence}</span>}
                 </div>
                 <ul className="mt-5 space-y-2 text-sm text-gray-700 flex-1">
-                  {copy.features.map((f) => (
+                  {lines.map((f) => (
                     <li key={f} className="flex items-start gap-2">
                       <svg
                         width={14}
@@ -234,6 +220,14 @@ export default async function PricingPage() {
               </div>
             );
           })}
+        </div>
+
+        <div className="mt-16" id="compare">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 text-center">Every feature, by plan</h2>
+          <p className="mt-2 mb-6 text-sm text-gray-600 text-center">
+            Read live from what each plan includes — it is always what you would actually get.
+          </p>
+          <PlanMatrix matrix={matrix} caption="Every feature, by plan" />
         </div>
 
         <p className="mt-10 text-xs text-center text-gray-500">

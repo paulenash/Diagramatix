@@ -37,6 +37,7 @@ export function FeatureAvailabilityEditor() {
   const [msg, setMsg] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<"group" | "availability">("group");
   const [onlyUnenforced, setOnlyUnenforced] = useState(false);
+  const [previewLevel, setPreviewLevel] = useState<string>("");
 
   useEffect(() => {
     fetch("/api/admin/feature-availability")
@@ -141,6 +142,41 @@ export function FeatureAvailabilityEditor() {
             {saving ? "Saving…" : "Save changes"}
           </button>
         </div>
+      </div>
+
+      <details className="mb-3 text-xs text-gray-600" aria-label="How Feature Availability works">
+        <summary className="cursor-pointer font-medium text-gray-700">How this works</summary>
+        <div className="mt-1.5 space-y-1 max-w-3xl">
+          <p><b>Order of precedence</b> for what a person gets: a SuperAdmin gets everything (unless <i>acting as</i> a level — double-click the logo — when that level&apos;s row is used and its limits bite) → an active comp grant → the higher of their own plan and their organisation&apos;s plan → that plan&apos;s cell here → their personal override (Registered Users ▸ Features) → then prerequisites: a feature is only as available as the weakest thing it needs.</p>
+          <p><b>Available</b> works. <b>Disabled</b> is shown but can&apos;t be used. <b>Not Available</b> is hidden and refused by the server. A level with no row for a feature is treated as Available, so a new feature is never locked out by accident.</p>
+          <p>The public Pricing and Features pages read these cells live. Use <b>Preview a plan</b> below, or act as a level, to see exactly what a plan gets before you save.</p>
+        </div>
+      </details>
+
+      <div className="mb-3 text-xs" aria-label="Preview a plan">
+        <label className="mr-2 text-gray-600">Preview a plan:</label>
+        <select value={previewLevel} onChange={(e) => setPreviewLevel(e.target.value)} className="border border-gray-300 rounded px-1.5 py-1 bg-white">
+          <option value="">— choose —</option>
+          {levels.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+        </select>
+        {previewLevel && effective[previewLevel] && (
+          <div className="mt-2 border border-gray-200 rounded-lg p-3 bg-gray-50 max-w-3xl">
+            <div className="font-medium text-gray-700 mb-1">
+              {levels.find((l) => l.id === previewLevel)?.name} gets ({shown.filter((f) => effective[previewLevel][f.key] === "available").length} of {shown.length} shown features, prerequisites applied — unsaved edits included):
+            </div>
+            <ul className="columns-2 gap-4 text-[11px]">
+              {shown.map((f) => {
+                const st = effective[previewLevel][f.key];
+                return (
+                  <li key={f.key} className={st === "available" ? "text-green-800" : st === "disabled" ? "text-amber-700" : "text-gray-400"}>
+                    {st === "available" ? "✓" : st === "disabled" ? "◐" : "—"} {f.label}
+                    {f.gate?.status === "unwired" ? " (not enforced yet)" : ""}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
       </div>
 
       <p className="text-[11px] text-gray-500 mb-2" aria-label="Enforcement summary">
