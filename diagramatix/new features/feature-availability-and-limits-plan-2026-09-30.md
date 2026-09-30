@@ -232,6 +232,7 @@ On approval I will save this plan as `diagramatix/new features/feature-availabil
 
 ### What exists today
 - **Features:** `User.featureOverrides` (a map of feature → Available / Disabled / Not Available) with a per-user panel (Registered Users ▸ Features) and `PUT /api/admin/users/[id]/features` that replaces the whole map. It is applied by the resolver after the level's row and before prerequisites, so this half is built — but it has no "plan value" shown beside the override and no per-row revert.
+- **The free subscription upgrade (comp grant) — stays exactly as it is.** A SuperAdmin can already grant a user a higher tier for a set number of days (Registered Users ▸ usage popover ▸ Grant comp / Revoke comp). **This addendum is IN ADDITION to that, not a replacement:** a comp swaps a person onto another whole plan for a while; the per-user overrides below change individual features, limits and settings on whatever plan applies. The two combine (an override is kept on top of a comp), and Revoke comp and Revert-to-plan are separate buttons that each do only their own job.
 - **Limits and settings:** nothing per user. Limits come only from the `SubscriptionLevel` row. A comp grant swaps the whole level for a while; it cannot change one number.
 
 ### What to build
