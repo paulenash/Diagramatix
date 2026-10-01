@@ -75,6 +75,7 @@ export const DEFAULT_PATTERNS = `# Voice Assist command tree — what can be sai
 # ── Renaming and labelling
 (rename|relabel) [all|the] {type_words}
 (rename|relabel) [the] (<existing_element_name>|<target>) (to|as) <new_element_name>
+(rename|relabel) (to|as) <new_element_name>
 (rename|relabel) [connector|message|gateway|event] <existing_label_name> (to|as) <new_label_name>
 label <selection> [connector|flow|arrow] <new_label_name>
 call <existing_element_name> <new_element_name>

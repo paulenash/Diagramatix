@@ -404,6 +404,11 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   }
 
   // ── Rename ──
+  // "rename to Pay Claim" — no target said, so it is THIS one (the selection, else what is under the
+  // cursor, else the last one added — the same "this" every other command uses). Paul, 2026-10-01: he
+  // said "rename", pointed at a task, and went straight on to "to pay the claim" — and was refused.
+  m = raw.match(/^(?:rename|relabel)\s+(?:to|as)\s+(.+)$/i);
+  if (m) return [{ op: "rename", ref: "this", label: capitaliseFirstWord(spokenLabel(m[1])) }];
   m = raw.match(/^(?:rename|relabel)\s+(.+?)\s+(?:to|as)\s+(.+)$/i);
   if (m) return [{ op: "rename", ref: clean(m[1]), label: capitaliseFirstWord(spokenLabel(m[2])) }];
   m = raw.match(/^(?:change|set)\s+(?:the )?(?:name|label)(?: of)?\s+(.+?)\s+(?:to|as)\s+(.+)$/i);

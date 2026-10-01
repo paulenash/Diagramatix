@@ -125,7 +125,7 @@ describe("T5172 — how the help writes the next words", () => {
   it("required words first, then [optional] ones; variables in <>; an open variable ends with …", () => {
     const t = defaultCommandTree();
     const after = formatNext(t.next(["rename"]).next);
-    expect(after.slice(0, 3)).toEqual(["activities", "connectors", "decisions"]); // A–Z
+    expect(after.slice(0, 4)).toEqual(["activities", "as", "connectors", "decisions"]); // A–Z ("as" and "to" now start “rename to <name>”)
     expect(after).toEqual(expect.arrayContaining(["<existing_element_name>", "<existing_label_name>", "<target>"]));
     expect(after.indexOf("[all]")).toBeGreaterThan(after.indexOf("<target>"));
     const open = formatNext(t.next(["rename", "review", "claim"]).next);
