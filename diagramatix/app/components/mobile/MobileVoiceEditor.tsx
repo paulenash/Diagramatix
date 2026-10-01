@@ -283,6 +283,22 @@ export function MobileVoiceEditor({
       </div>
 
       <div className="shrink-0 border-t border-gray-200 bg-white px-3 pt-2 pb-3 max-h-[46dvh] overflow-y-auto">
+        {/* What was heard — ALWAYS in view: sticky at the top of the sheet, so a long list of green numbers below can never scroll it away (Paul, 2026-10-01: “it's like flying blind”). */}
+        <div className="sticky -top-2 z-10 bg-white -mx-3 px-3 pt-2 pb-1 border-b border-gray-100 mb-2" aria-label="What was heard" aria-live="polite">
+          <div className="space-y-0.5 mb-2 min-h-[2.5rem]">
+            {recent.map((e) => (
+              <p key={e.id} className={`text-[13px] leading-snug ${e.ok ? "text-gray-800" : "text-amber-700"}`}>
+                {e.heard && <span className="text-gray-400">“{e.heard}” </span>}{phoneWording(e.summary)}
+              </p>
+            ))}
+            {recent.length === 0 && !session.voiceInterim && <p className="text-[13px] text-gray-400">Tap the mic and say what to change.</p>}
+          </div>
+          {(listening || session.abraConnecting) && (
+            <p className="text-[13px] text-gray-500 italic mb-2 min-h-[1.25rem]">
+              {session.abraConnecting ? "connecting…" : session.voiceInterim || "listening…"}
+            </p>
+          )}
+        </div>
         {limitMsg && <p className="text-[12px] text-amber-800 bg-amber-50 rounded-md px-2 py-1.5 mb-2">{limitMsg}</p>}
         {question && <p className="text-sm font-medium text-blue-800 bg-blue-50 rounded-md px-2.5 py-2 mb-2">{question}</p>}
         {(selectedConnector || selectedOrder.length > 1) && (
@@ -307,19 +323,6 @@ export function MobileVoiceEditor({
               </button>
             ))}
           </div>
-        )}
-        <div className="space-y-0.5 mb-2 min-h-[2.5rem]">
-          {recent.map((e) => (
-            <p key={e.id} className={`text-[13px] leading-snug ${e.ok ? "text-gray-800" : "text-amber-700"}`}>
-              {e.heard && <span className="text-gray-400">“{e.heard}” </span>}{phoneWording(e.summary)}
-            </p>
-          ))}
-          {recent.length === 0 && !session.voiceInterim && <p className="text-[13px] text-gray-400">Tap the mic and say what to change.</p>}
-        </div>
-        {(listening || session.abraConnecting) && (
-          <p className="text-[13px] text-gray-500 italic mb-2 min-h-[1.25rem]">
-            {session.abraConnecting ? "connecting…" : session.voiceInterim || "listening…"}
-          </p>
         )}
         <div className="flex items-center gap-2">
           <button onClick={() => void session.toggleAbraListening()}
