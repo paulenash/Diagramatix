@@ -112,7 +112,7 @@ describe("T4749 — the headless diagram dispatches what useDiagram dispatches",
     const hook = src("app", "hooks", "useDiagram.ts");
     const helper = hook.slice(hook.indexOf("const updateConnectorLabel = useCallback("), hook.indexOf("const elementMoveEnd = useCallback("));
     expect(helper).toContain("payload: connectorLabelPayload(id, label, labelOffsetX, labelOffsetY, labelWidth)");
-    expect(src("app", "lib", "assist", "headlessDiagram.ts")).toContain("payload: connectorLabelPayload(id, label)");
+    expect(src("app", "lib", "assist", "headlessDiagram.ts")).toContain("payload: connectorLabelPayload(id, label, labelOffsetX, labelOffsetY)");
     // What the editor's two-argument call sends is exactly what the harness sends.
     expect(connectorLabelPayload("c", "Request", undefined, undefined, undefined)).toEqual(connectorLabelPayload("c", "Request"));
     expect(Object.keys(connectorLabelPayload("c", "Request", undefined, undefined, undefined))).toEqual(["id", "label"]);

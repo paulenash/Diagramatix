@@ -74,6 +74,20 @@ export type AssistOp =
       overContent?: boolean }
   /** "label selected <text>" — the selected connector; no text → wait for it. */
   | { op: "labelSelected"; label?: string }
+  /**
+   * "move label up 20 pixels" / "nudge the label left" — the label of the SELECTED gateway, event, data
+   * object, data store, connector or message, 20 px unless a distance is said (Paul, 2026-10-01).
+   */
+  | { op: "moveLabel"; direction: "up" | "down" | "left" | "right"; distance?: number }
+  /** "remove the label" / "clear the label" — the SELECTED item's label is emptied (Paul, 2026-10-01). */
+  | { op: "clearLabel" }
+  /**
+   * "select end event Claim closed" — select any element, connector or message by NAME (Paul, 2026-10-01).
+   * It stays selected, so "move label up" can follow.
+   */
+  | { op: "select"; ref: Ref }
+  /** "select events" — numbers every one of that type; say a number to select it. */
+  | { op: "selectByType"; itemType: "pool" | "lane" | "message" | "task" | "activity" | "subprocess" | "gateway" | "event" | "connector" }
   /** "swap top and bottom" on the SELECTED gateway — outgoing points of a decision, incoming of a merge. */
   | { op: "swapGatewayPoints"; a: GatewayPoint; b: GatewayPoint }
   /**
@@ -344,6 +358,19 @@ export function validateOp(raw: unknown): AssistOp | null {
       return { op: "reverseConnector" };
     case "labelSelected":
       return { op: "labelSelected", ...(isRef(o.label) ? { label: (o.label as string).trim() } : {}) };
+    case "moveLabel": {
+      const d = o.direction;
+      if (d !== "up" && d !== "down" && d !== "left" && d !== "right") return null;
+      const dist = typeof o.distance === "number" && Number.isFinite(o.distance) && o.distance > 0 && o.distance <= 2000 ? Math.round(o.distance) : undefined;
+      return { op: "moveLabel", direction: d, ...(dist ? { distance: dist } : {}) };
+    }
+    case "clearLabel":
+      return { op: "clearLabel" };
+    case "select":
+      return isRef(o.ref) ? { op: "select", ref: (o.ref as string).trim() } : null;
+    case "selectByType":
+      return typeof o.itemType === "string" && ["pool", "lane", "message", "task", "activity", "subprocess", "gateway", "event", "connector"].includes(o.itemType)
+        ? { op: "selectByType", itemType: o.itemType as never } : null;
     case "swapGatewayPoints": {
       const pts = new Set<string>(GATEWAY_POINTS);
       if (!pts.has(o.a as string) || !pts.has(o.b as string) || o.a === o.b) return null;

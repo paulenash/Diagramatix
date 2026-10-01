@@ -95,6 +95,10 @@ export interface Mounted {
   /** Unmount (once — a second call does nothing). unmountAll() does it for any test that did not. */
   unmount(): Promise<void>;
   select(ids: string[]): Promise<void>;
+  /** What is selected right now: the elements, and the one connector (or null). */
+  selection(): { ids: string[]; connector: string | null };
+  /** Select one connector, as the mouse would. */
+  selectConnector(id: string | null): Promise<void>;
 }
 
 export async function mountSession(opts: {
@@ -104,7 +108,10 @@ export async function mountSession(opts: {
 } = {}): Promise<Mounted> {
   const { useVoiceSession } = await loadVoiceSession();
   const initial: DiagramData = opts.initial ?? { elements: [], connectors: [], viewport: { x: 0, y: 0, zoom: 1 } } as DiagramData;
-  const seen: { d?: ReturnType<typeof useDiagram>; session?: VoiceSession; select?: (ids: Set<string>) => void } = {};
+  const seen: {
+    d?: ReturnType<typeof useDiagram>; session?: VoiceSession; select?: (ids: Set<string>) => void;
+    selectConnector?: (id: string | null) => void; selection?: () => { ids: string[]; connector: string | null };
+  } = {};
   const rec = { templateWindowOpens: [] as Mounted["templateWindowOpens"], exports: 0, labelEdits: [] as string[] };
 
   function Harness(props: { diagramId: string }) {
@@ -146,6 +153,8 @@ export async function mountSession(opts: {
     seen.d = d;
     seen.session = session;
     seen.select = setSelectedElementIds;
+    seen.selectConnector = setSelectedConnectorId;
+    seen.selection = () => ({ ids: [...selectedIdsRef.current], connector: selectedConnectorIdRef.current });
     return null;
   }
 
@@ -180,6 +189,8 @@ export async function mountSession(opts: {
       await act(async () => { root.unmount(); });
     },
     async select(ids) { await m.act(() => seen.select!(new Set(ids))); },
+    selection() { return seen.selection!(); },
+    async selectConnector(id) { await m.act(() => seen.selectConnector!(id)); },
   };
   live.push(m);
   await settle();

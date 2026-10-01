@@ -40,7 +40,7 @@ import { humaniseIds, notUnderstoodMessage } from "@/app/lib/assist/refMentions"
 import { collectRenameTargets, isClearLabelWord, type RenameType } from "@/app/lib/assist/renameTargets";
 import { ID_REF_PREFIX } from "@/app/lib/assist/resolveRef";
 import { joinSpelledLetters } from "@/app/lib/assist/spelledWord";
-import { leadingSpokenNumber } from "@/app/lib/assist/spokenNumber";
+import { leadingSpokenNumber, restoreLostOneNumber } from "@/app/lib/assist/spokenNumber";
 import { isFlowEndWord, isMicStopWord } from "@/app/lib/assist/stopWords";
 import { TEMPLATE_BEFORE_REFUSAL } from "@/app/lib/assist/templatePhrase";
 import { parseTemplateAnswer, type TemplateCard, templateScrollReply, templateScrollTarget } from "@/app/lib/assist/templatePick";
@@ -48,7 +48,7 @@ import { isVoiceDebugOn } from "@/app/lib/assist/voiceDebug";
 import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
 import type { DisplayMode } from "@/app/lib/diagram/displayMode";
 import { subtypeFingerprint } from "@/app/lib/diagram/elementSubtypes";
-import { capitaliseFirstWord } from "@/app/lib/diagram/nameCase";
+import { capitaliseFirstWord, isFullyCapitalised, titleCaseName } from "@/app/lib/diagram/nameCase";
 import { type Connector, type DiagramData, type DiagramElement, type DiagramType, PRODUCT_VERSION } from "@/app/lib/diagram/types";
 import { type DictationHandle, startDictation } from "@/app/lib/dictation";
 import { diagramKeyterms } from "@/app/lib/dictation/diagramKeyterms";
@@ -578,7 +578,10 @@ export function useVoiceSession(host: VoiceSessionHost) {
       appendLog({ heard: name.trim(), summary: "a name can’t be cleared here — say the new name", ok: false });
       return;
     }
-    const clean = clearing ? "" : capitaliseFirstWord(name.trim().replace(/[.,!?;:]+$/g, ""));
+    // A pool, lane or sub-lane takes EVERY word capitalised (Paul, 2026-10-01); everything else, the first word only.
+    const targetType = target.kind === "element" ? data.elements.find((e) => e.id === target.id)?.type : undefined;
+    const spoken = name.trim().replace(/[.,!?;:]+$/g, "");
+    const clean = clearing ? "" : targetType && isFullyCapitalised(targetType) ? titleCaseName(spoken) : capitaliseFirstWord(spoken);
     if (!clean && !clearing) { cancelRenameFlow("rename cancelled (empty name)"); return; }
     // The guided flow writes the label itself, so it has to arm the flash
     // itself too — applyAssistOps is never involved. The debug recording
@@ -595,10 +598,20 @@ export function useVoiceSession(host: VoiceSessionHost) {
     if (single) {
       // "label selected": one item, no pick loop afterwards.
       setRenameFlow(null);
-      appendLog({ heard: clearing ? name.trim() : clean, summary: clearing ? "cleared the connector’s label" : `labelled the connector “${clean}”`, ok: true });
+      appendLog({
+        heard: clearing ? name.trim() : clean,
+        summary: clearing ? "cleared the connector’s label" : target.kind === "connector" ? `labelled the connector “${clean}”` : `labelled “${clean}”`,
+        ok: true,
+      });
       return;
     }
-    const targets = collectRenameTargets(data.elements, data.connectors, itemType);
+    // The edit above has only been DISPATCHED: `data` in this closure is still the diagram from before
+    // it, so a list built from `data` keeps the OLD name — and the phone's numbered list prints each
+    // name, so the renamed task still showed its old one (Paul, 2026-10-01). Build the list from the
+    // diagram as it is about to be.
+    const els = target.kind === "element" ? data.elements.map((e) => (e.id === target.id ? { ...e, label: clean } : e)) : data.elements;
+    const conns = target.kind === "connector" ? data.connectors.map((c) => (c.id === target.id ? { ...c, label: clean } : c)) : data.connectors;
+    const targets = collectRenameTargets(els, conns, itemType);
     if (targets.length > 0) setRenameFlow({ phase: "pick", itemType, targets });
     else setRenameFlow(null);
     appendLog({ heard: clearing ? name.trim() : clean, summary: clearing ? "cleared the label — pick another or say “done”" : `renamed to “${clean}” — pick another or say “done”`, ok: true });
@@ -633,11 +646,22 @@ export function useVoiceSession(host: VoiceSessionHost) {
       // selects a badge; trailing text is the name. `leadingSpokenNumber`
       // absorbs the recogniser substituting "lane" for "one" — a bias we
       // create ourselves by boosting `lane` (spokenNumber.ts).
-      const picked = leadingSpokenNumber(t);
+      // A number is due here, so a leading "the" that is not followed by a number can only have been
+      // "one" (the recogniser's habit — spokenNumber.ts restoreLostOneNumber).
+      const picked = leadingSpokenNumber(restoreLostOneNumber(t));
       if (!picked) { appendLog({ heard: t, summary: "say the number of the item to rename", ok: false }); return; }
       const n = picked.n;
       const target = flow.targets.find((x) => x.n === n);
       if (!target) { appendLog({ heard: t, summary: `there’s no number ${n}`, ok: false }); return; }
+      // "select <type>" (Paul, 2026-10-01): the pick SELECTS the item and the flow ends — nothing is renamed, no
+      // edit box opens. The item stays selected, so "move label up" or "rename this to …" can follow.
+      if (flow.purpose === "select") {
+        if (target.kind === "element") { setSelectedConnectorId(null); setSelectedElementIds(new Set([target.id])); voiceLastId.current = target.id; }
+        else { setSelectedElementIds(new Set()); setSelectedConnectorId(target.id); }
+        setRenameFlow(null);
+        appendLog({ heard: t, summary: `selected ${target.label ? `“${target.label}”` : `number ${n}`}`, ok: true });
+        return;
+      }
       // Select + enter edit mode (+ zoom for elements) so the change is visible.
       if (target.kind === "element") { setSelectedConnectorId(null); setSelectedElementIds(new Set([target.id])); beginLabelEdit(target.id); }
       else { setSelectedElementIds(new Set()); setSelectedConnectorId(target.id); }
@@ -1140,7 +1164,14 @@ export function useVoiceSession(host: VoiceSessionHost) {
         // #5 Instant: show badges the moment a "rename <type>" is heard, and pick
         // a number the moment it's spoken — skip the silence wait entirely.
         const flow = renameFlowRef.current;
-        if (flow?.phase === "pick" && /(?:^|\s)(?:\d{1,3}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|(?:twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)(?:[- ](?:one|two|three|four|five|six|seven|eight|nine))?)(?:\s|$)/i.test(buf)) { flushVoiceBuffer(true); return; }
+        // A number on its own is picked AT ONCE (the quick path) — the flow moves on to "say the new name". But a number
+        // FOLLOWED BY WORDS has begun a name, and the rest may still be coming ("thirteen Approve" … a pause … "Order"):
+        // running it now would rename the item "Approve" and then reject "Order" as an answer with no number. Those wait for
+        // the normal quiet window like every other fragment (Paul, 2026-10-01: "you have to speak very quickly").
+        if (flow?.phase === "pick") {
+          const lead = leadingSpokenNumber(restoreLostOneNumber(buf));
+          if (lead && !lead.rest) { flushVoiceBuffer(true); return; }
+        }
         if (!flow) { const p = parseCommand(buf); if (p && p.length === 1 && p[0].op === "renameByType") { flushVoiceBuffer(true); return; } }
         if (voiceFlushTimer.current) clearTimeout(voiceFlushTimer.current);
         voiceFlushTimer.current = setTimeout(() => flushVoiceBuffer(), ABRA_SILENCE_MS);

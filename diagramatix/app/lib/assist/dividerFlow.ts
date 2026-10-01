@@ -163,7 +163,13 @@ const misheardNoun = (t: string, lead: LeadingNumber) =>
 const LOST_ONE = /^(?:the|a|uh|um)\s+(?=(?:up|upwards?|higher|raise|down|downwards?|lower)\b)/i;
 /** ...and in the amount: "the hundred pixels" is "one hundred pixels" — "the hundred" is never an amount. */
 const LOST_ONE_HUNDRED = /\bthe\s+(?=hundred\b)/gi;
-export const restoreLostOne = (t: string): string => t.replace(LOST_ONE, "1 ").replace(LOST_ONE_HUNDRED, "one ");
+/**
+ * A LONE "the" is the same mistake (Paul, 2026-10-01: "'one' consistently heard as 'the' is back"): in
+ * "move dividers" an answer starts with a number or is "done", so a bare "the" can only be "one".
+ */
+const BARE_THE = /^the[\s.,!?]*$/i;
+export const restoreLostOne = (t: string): string =>
+  BARE_THE.test(t) ? "1" : t.replace(LOST_ONE, "1 ").replace(LOST_ONE_HUNDRED, "one ");
 
 /**
  * "2 up 100 pixels", "two down 2 tasks", "number 3 up by forty", "move 1 down

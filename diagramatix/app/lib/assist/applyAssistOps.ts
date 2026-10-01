@@ -41,7 +41,7 @@ import { planLabelFill } from "./fillSelection";
 import { findRiskCatalogItem } from "./riskCatalogRef";
 import { parseGhostPick, resolveGhostPick } from "./ghostPick";
 import { looksLikeElementId } from "./refMentions";
-import { capitaliseFirstWord, needsCapital, spokenName } from "@/app/lib/diagram/nameCase";
+import { capitaliseFirstWord, isFullyCapitalised, needsCapital, spokenName, titleCaseName } from "@/app/lib/diagram/nameCase";
 import { goldFlashSummary } from "./goldFlash";
 import { planMovePool, planSwapPools, selectedPools, poolsInOrder } from "@/app/lib/diagram/poolOrder";
 import { collectMessageTargets, type MessagePick } from "./messageTargets";
@@ -72,10 +72,23 @@ import { numberConnectorTargets, numberTargets } from "./renameTargets";
 
 /** The guided "rename by number" flow — pick a numbered badge, then say the name. */
 export type RenameFlow =
-  | { phase: "pick"; itemType: RenameType; targets: RenameTarget[] }
+  | { phase: "pick"; itemType: RenameType; targets: RenameTarget[]; /** "select <type>" — a pick SELECTS the item; nothing is renamed (Paul, 2026-10-01) */ purpose?: "select" }
   | { phase: "name"; itemType: RenameType; targetId: string; kind: "element" | "connector"; /** "label selected" — one item, no pick loop after */ single?: boolean };
 
 export type AlignMode = "center" | "top" | "bottom" | "vcenter" | "left" | "right" | "smart";
+
+/**
+ * Elements whose label is drawn OUTSIDE the symbol, at an offset the user can change — gateways (but not a merge,
+ * which is never labelled), events, data objects and data stores — the same set SymbolRenderer draws externally.
+ * A task / subprocess / pool / lane has its NAME inside it, and needs one.
+ */
+const OUTSIDE_LABEL_TYPE = (e: { type: string; properties?: Record<string, unknown> }): boolean =>
+  /-event$/.test(e.type) || e.type === "data-object" || e.type === "data-store"
+  || (e.type === "gateway" && (e.properties?.gatewayRole as string | undefined) !== "merge");
+/** "move label up" with no distance: the same 20 px as "nudge". */
+const LABEL_STEP_PX = 20;
+/** Where an outside label sits when it has never been moved: 7 px below the symbol (SymbolRenderer's default). */
+const LABEL_DEFAULT_OFFSET_Y = 7;
 
 /** The diagram edits — useDiagram's helpers, by the same names and signatures. */
 export interface AssistDiagramActions {
@@ -86,7 +99,8 @@ export interface AssistDiagramActions {
   addConnector(sourceId: string, targetId: string, connectorType?: ConnectorType, directionType?: DirectionType, routingType?: RoutingType, sourceSide?: Side, targetSide?: Side, sourceOffsetAlong?: number, targetOffsetAlong?: number, force?: boolean, initialLabel?: string): void;
   deleteConnector(id: string): void;
   reverseConnector(id: string): void;
-  updateConnectorLabel(id: string, label?: string): void;
+  /** `label` undefined = leave the text. The offsets move the label from where it sits (relative to the connector's midpoint). */
+  updateConnectorLabel(id: string, label?: string, labelOffsetX?: number, labelOffsetY?: number): void;
   deleteElement(id: string): void;
   undo(): void;
   clearDiagram(): void;
@@ -205,7 +219,26 @@ const ALIGN_LABEL: Record<string, string> = {
 };
 
 /** Apply interpreted ops via the granular (undoable) reducer helpers. */
+/**
+ * Pools, lanes and sub-lanes are named with EVERY word capitalised (Paul, 2026-10-01). Ops that CREATE one with a
+ * name are fixed here, once, whoever produced them (the grammar, the AI, a guided flow); a RENAME of an existing
+ * element, and "name these …", only know what they are naming once it is resolved, so they do it where they resolve.
+ */
+function containerNamed(op: AssistOp): AssistOp {
+  switch (op.op) {
+    case "addPool": case "addLaneAt": case "wrapInPool":
+      return op.label ? { ...op, label: titleCaseName(op.label) } : op;
+    case "wrapInContainer":
+      return op.label ? { ...op, label: titleCaseName(op.label) } : op;
+    case "addLanes": case "addSublanes":
+      return { ...op, labels: op.labels.map(titleCaseName) };
+    default:
+      return op;
+  }
+}
+
 export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: boolean; summary: string } {
+  ops = ops.map(containerNamed);
   const data = { elements: ctx.elements, connectors: ctx.connectors };
   const { riskCatalog } = ctx;
   const {
@@ -1433,11 +1466,106 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       continue;
     }
 
+    // ── The label of the SELECTED item (Paul, 2026-10-01): move it, empty it, select by name ──
+    if (op.op === "moveLabel" || op.op === "clearLabel") {
+      const cid = selectedConnectorIdRef.current;
+      const conn = cid ? data.connectors.find((c) => c.id === cid) : undefined;
+      const picked = selectedIds.map((id) => els.find((x) => x.id === id)).filter((e): e is DiagramElement => !!e);
+      if (!conn && !picked.length) {
+        results.push("select a gateway, event, data object, data store, connector or message first — “select end event Claim closed” does it by name");
+        anyFail = true; continue;
+      }
+      // What can have its label moved / emptied: the label drawn OUTSIDE the symbol. A task's, pool's or lane's name
+      // sits inside it (and is required), so those are refused with the reason.
+      const labelled = picked.filter((e) => OUTSIDE_LABEL_TYPE(e) && (e.label ?? "").trim());
+      const unlabelled = picked.filter((e) => OUTSIDE_LABEL_TYPE(e) && !(e.label ?? "").trim());
+      const inside = picked.filter((e) => !OUTSIDE_LABEL_TYPE(e));
+      const connHasLabel = !!conn && !!(conn.label ?? "").trim();
+      if (!labelled.length && !connHasLabel) {
+        results.push(inside.length && !unlabelled.length && !conn
+          ? `${nameOf(inside[0])}’s name sits inside it — only a gateway, event, data object, data store, connector or message has a label of its own`
+          : "it has no label to " + (op.op === "moveLabel" ? "move" : "remove"));
+        anyFail = true; continue;
+      }
+      if (op.op === "moveLabel") {
+        const dist = op.distance ?? LABEL_STEP_PX;
+        const dx = op.direction === "left" ? -dist : op.direction === "right" ? dist : 0;
+        const dy = op.direction === "up" ? -dist : op.direction === "down" ? dist : 0;
+        for (const e of labelled) {
+          updateProperties(e.id, {
+            labelOffsetX: ((e.properties?.labelOffsetX as number | undefined) ?? 0) + dx,
+            labelOffsetY: ((e.properties?.labelOffsetY as number | undefined) ?? LABEL_DEFAULT_OFFSET_Y) + dy,
+          });
+        }
+        if (conn && connHasLabel) updateConnectorLabel(conn.id, undefined, (conn.labelOffsetX ?? 0) + dx, (conn.labelOffsetY ?? 0) + dy);
+        const n = labelled.length + (connHasLabel ? 1 : 0);
+        // The selection STAYS: the item was chosen on purpose (by mouse or "select …"), so the next nudge needs nothing said.
+        results.push(`moved ${n === 1 ? "the label" : `${n} labels`} ${op.direction} ${dist}px`);
+        continue;
+      }
+      for (const e of labelled) updateLabel(e.id, "");
+      if (conn && connHasLabel) updateConnectorLabel(conn.id, "");
+      setSelectedElementIds(new Set());   // the standing selection protocol
+      setSelectedConnectorId(null);
+      const n = labelled.length + (connHasLabel ? 1 : 0);
+      results.push(`removed ${n === 1 ? "the label" : `${n} labels`}`);
+      continue;
+    }
+
+    if (op.op === "select") {
+      // Any element — or a connector / message by its label — selected by NAME. It stays selected.
+      const e = resolve1(op.ref);
+      const conns = connectorsOverElement(data.connectors, op.ref, "err" in e ? null : e);
+      if (conns.length > 1) { results.push(`${conns.length} connectors are called “${op.ref}” — say “select connectors” and pick one by number`); anyFail = true; continue; }
+      if (conns.length === 1) {
+        setSelectedElementIds(new Set());
+        setSelectedConnectorId(conns[0].id);
+        results.push(`selected the ${conns[0].type === "messageBPMN" ? "message" : "connector"} “${conns[0].label ?? ""}”`);
+        continue;
+      }
+      if ("err" in e) { results.push(e.err); anyFail = true; continue; }
+      setSelectedConnectorId(null);
+      setSelectedElementIds(new Set([e.id]));
+      voiceLastId.current = e.id;
+      results.push(`selected ${nameOf(e)}`);
+      continue;
+    }
+
+    if (op.op === "selectByType") {
+      const itemType = op.itemType as RenameType;
+      const targets = collectRenameTargets(els, data.connectors, itemType);
+      if (targets.length === 0) { results.push(`there are no ${itemType}s to select`); anyFail = true; continue; }
+      setMessageFlow(null);
+      setRenameFlow({ phase: "pick", itemType, targets, purpose: "select" });
+      results.push(`say the number of the ${itemType} to select — “cancel” to stop`);
+      continue;
+    }
+
     if (op.op === "labelSelected") {
       // The selected CONNECTOR gets the label; with no text, wait for it
-      // (a single-item name phase — no pick loop afterwards).
-      const cid = selectedConnectorIdRef.current;
-      if (!cid || !data.connectors.some((c) => c.id === cid)) { results.push("select a connector first"); anyFail = true; continue; }
+      // (a single-item name phase — no pick loop afterwards). With no connector selected, ONE selected
+      // element takes it instead ("label this Approved", "add a label Approved" — Paul, 2026-10-01).
+      const cid0 = selectedConnectorIdRef.current;
+      if (!cid0 || !data.connectors.some((c) => c.id === cid0)) {
+        const one = selectedIds.map((id) => els.find((x) => x.id === id)).filter((e): e is DiagramElement => !!e);
+        if (one.length === 1) {
+          const e = one[0];
+          if (op.label) {
+            const named = isFullyCapitalised(e.type) ? titleCaseName(op.label) : op.label;
+            updateLabel(e.id, named);
+            setSelectedElementIds(new Set()); // selection protocol
+            results.push(`labelled ${nameOf(e)} “${named}”`);
+            continue;
+          }
+          setMessageFlow(null);
+          setRenameFlow({ phase: "name", itemType: e.type === "gateway" ? "gateway" : /-event$/.test(e.type) ? "event" : "task", targetId: e.id, kind: "element", single: true });
+          results.push(`say the label for the selected ${String(e.type).replace(/-/g, " ")} (or “done”)`);
+          continue;
+        }
+        results.push(one.length > 1 ? "select just one item to label — or say “name these A, B and C”" : "select a connector or an element first");
+        anyFail = true; continue;
+      }
+      const cid = cid0;
       if (op.label) {
         updateConnectorLabel(cid, op.label);
         setSelectedConnectorId(null); // selection protocol
@@ -1606,7 +1734,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
         }
         const conn = conns.length === 1 ? conns[0] : undefined;
         if (conn) { updateConnectorLabel(conn.id, newLabel); results.push(`renamed connector “${conn.label}” → ${newLabel}`); done = true; break; }
-        if (!("err" in e)) { updateLabel(e.id, newLabel); els = withLabel(els, e.id, newLabel); setSelectedElementIds(new Set()); results.push(`renamed ${nameOf(e)} → ${newLabel}`); done = true; break; }
+        if (!("err" in e)) { const named = isFullyCapitalised(e.type) ? titleCaseName(newLabel) : newLabel; updateLabel(e.id, named); els = withLabel(els, e.id, named); setSelectedElementIds(new Set()); results.push(`renamed ${nameOf(e)} → ${named}`); done = true; break; }
       }
       if (pickParked) break;
       if (!done) {
@@ -1657,9 +1785,13 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       const chosen = selectedIds.map((id) => els.find((e) => e.id === id)).filter((e): e is DiagramElement => !!e);
       const plan = planLabelFill(chosen, op.labels);
       if (!plan.ok) { results.push(plan.reason); anyFail = true; continue; }
-      for (const a of plan.assign) { updateLabel(a.id, a.label); els = withLabel(els, a.id, a.label); }
+      const assigned = plan.assign.map((a) => {
+        const el = els.find((x) => x.id === a.id);
+        return el && isFullyCapitalised(el.type) ? { ...a, label: titleCaseName(a.label) } : a;
+      });
+      for (const a of assigned) { updateLabel(a.id, a.label); els = withLabel(els, a.id, a.label); }
       setSelectedElementIds(new Set());   // the standing selection protocol
-      results.push(`named ${plan.assign.length} in reading order: ${plan.assign.map((a) => a.label).join(", ")}`);
+      results.push(`named ${assigned.length} in reading order: ${assigned.map((a) => a.label).join(", ")}`);
       continue;
     }
 

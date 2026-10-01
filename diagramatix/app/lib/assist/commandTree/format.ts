@@ -6,6 +6,10 @@
  *   optional    →  [word]
  *   <variable>  →  <existing_element_name>
  *   one that is already open and may go on  →  <new_element_name> …
+ *
+ * ORDER (Paul, 2026-10-01: "What can I say words should be in alphabetic order"): the words A–Z,
+ * then the <variables> A–Z — as in his own example, "pools, lanes, tasks, … <existing_element_name>" —
+ * then the [optional] ones, words then variables, each A–Z.
  */
 import type { NextItem } from "./tree";
 
@@ -15,9 +19,10 @@ export function formatItem(i: NextItem): string {
   return i.more ? `${shown} …` : shown;
 }
 
-/** "pools, lanes, tasks, <existing_element_name>, [the]" — required first, optional after. */
+const byText = (a: NextItem, b: NextItem) => a.text.localeCompare(b.text, "en", { sensitivity: "base" });
+
 export function formatNext(items: readonly NextItem[]): string[] {
-  const required = items.filter((i) => !i.optional).map(formatItem);
-  const optional = items.filter((i) => i.optional).map(formatItem);
-  return [...required, ...optional];
+  const group = (optional: boolean, kind: NextItem["kind"]) =>
+    items.filter((i) => i.optional === optional && i.kind === kind).sort(byText).map(formatItem);
+  return [...group(false, "word"), ...group(false, "slot"), ...group(true, "word"), ...group(true, "slot")];
 }

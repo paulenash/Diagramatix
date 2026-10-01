@@ -325,7 +325,8 @@ export class CommandTree {
   summary(ctx: WalkContext = {}): { word: string; next: NextItem[] }[] {
     return this.firstWords(ctx)
       .filter((i) => i.kind === "word")
-      .map((i) => ({ word: i.text, next: this.next([i.text], ctx).next }));
+      .map((i) => ({ word: i.text, next: this.next([i.text], ctx).next }))
+      .sort((a, b) => a.word.localeCompare(b.word, "en", { sensitivity: "base" })); // A–Z, as the lists are
   }
 
   /**

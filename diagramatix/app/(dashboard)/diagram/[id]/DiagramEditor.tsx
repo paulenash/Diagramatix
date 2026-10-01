@@ -2482,7 +2482,7 @@ export function DiagramEditor({
     elements: elementsRef.current, selected: selectedIdsRef.current, last: voiceLastId.current, pointer: pointerWorld.current,
   }));
   const bubbleOpenFlow: OpenFlow | null =
-    renameFlow ? { kind: "rename", phase: renameFlow.phase }
+    renameFlow ? { kind: "rename", phase: renameFlow.phase, ...(renameFlow.phase === "pick" && renameFlow.purpose ? { purpose: renameFlow.purpose } : {}) }
     // The divider flow remembers what has happened (a held number, the last move); the panel
     // reads that so it lists only what can really be said next. Read at render time — the log
     // entry that follows every utterance re-renders this component after the memory has changed.

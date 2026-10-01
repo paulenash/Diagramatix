@@ -43,6 +43,10 @@ export const COMMAND_CATALOG: CatalogFamily[] = [
   ] },
   { family: "The selection (mouse says which, voice says what)", items: [
     { does: "Refer to what is selected", say: ["rename the selected pool to Finance", "delete these", "connect this to Pay Claim", "move the selected task right", "add a boundary event called Timeout to this"] },
+    { does: "Select anything by name — an element, a connector or a message — and it stays selected for what comes next. “Select events” (or tasks, gateways, connectors …) numbers them so you can pick one by number", say: ["select end event Claim closed", "select Review Claim", "select events"] },
+    { does: "Move the label of the selected gateway, event, data object, data store, connector or message — 20 px unless you say how far. The item stays selected, so you can nudge again", say: ["move label up 20 pixels", "move the label left", "nudge the label down by 10"] },
+    { does: "Give the selected item a label, or take it off (a task, pool or lane needs its name, so only gateways, events, data objects, data stores, connectors and messages can have none)", say: ["label this Approved", "remove the label"] },
+    { does: "Take the loop marker off the selected subprocess — the same as “make this a plain subprocess”", say: ["remove the loop marker", "make this a plain subprocess"] },
     { does: "Name several at once, in reading order — rows top to bottom, each row left to right (the counts must match)", say: ["name these Receive, Check and Ship", "label the selected tasks Draft and Review"] },
     { does: "Put the selected tasks in a simulation team", say: ["assign these to the Finance team", "put the selected tasks in the Sales team"] },
     { does: "Attach a Risk or Control from the project's library", say: ["attach risk R-012 to these", "attach control C-3 to the selected task"] },

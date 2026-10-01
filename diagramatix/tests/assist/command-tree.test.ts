@@ -183,7 +183,8 @@ describe("T5164 — the shipped tree", () => {
 
   it("the summary table has one row per first word, each with its own next words", () => {
     const rows = t.summary();
-    expect(rows.map((r) => r.word)).toEqual(t.firstWords().filter((i) => i.kind === "word").map((i) => i.text));
+    // one row per first word, A–Z (Paul, 2026-10-01)
+    expect(rows.map((r) => r.word)).toEqual(t.firstWords().filter((i) => i.kind === "word").map((i) => i.text).sort((a, b) => a.localeCompare(b, "en", { sensitivity: "base" })));
     // A word with nothing after it is a whole command on its own ("again", "repeat").
     expect(rows.filter((r) => r.next.length === 0).every((r) => t.next([r.word]).complete)).toBe(true);
     expect(rows.find((r) => r.word === "rename")!.next.length).toBeGreaterThan(10);

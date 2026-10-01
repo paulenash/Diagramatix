@@ -7,7 +7,7 @@ import type { AssistOp } from "./ops";
 import { SYMBOL_SYNONYMS, SYMBOL_PHRASES } from "./ops";
 import { namesNonContainerKind, laneWordIsAttached, looksPositionalNotAName, namesAContainer, namesOnlyTemplate } from "./greedyGuards";
 import { parseRenameType } from "./renameTargets";
-import { parsePoolBoundaryPhrase, mentionsPoolBoundary, readAmount } from "./poolBoundaryPhrase";
+import { parsePoolBoundaryPhrase, mentionsPoolBoundary, readAmount, readDistance } from "./poolBoundaryPhrase";
 import { DIVIDER_COMMAND_RE } from "./dividerFlow";
 import { repairHeardWords } from "./selectedWord";
 import { hasCommandAfterName, COMPRESS_VERB_SOURCE, EXPAND_VERBS } from "./commandVerbs";
@@ -163,6 +163,57 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   if (/^(export|download|save)\b.*\b(json)\b/.test(lower)
       || /^(export|download)\s+(the\s+)?diagram\b/.test(lower)) {
     return [{ op: "export", format: "json" }];
+  }
+
+  // ── Labels, the loop marker, and selecting (Paul, 2026-10-01) ──
+  // Ahead of every move / delete / convert rule: "move label up 20 pixels" must not be read as moving an
+  // element NAMED "label" (it was, and failed), "remove the label" as deleting one, "remove the loop" as
+  // deleting one called "loop", or "make this not a loop" as converting something called "this not".
+  {
+    const KIND = "(?:gateway|decision|event|connector|message|flow|arrow|data\\s*object|data\\s*store|start\\s+event|end\\s+event|intermediate\\s+event)";
+    const OF_SELECTED = "(?:(?:of|from|on|off)\\s+(?:this|that|(?:the\\s+)?selected(?:\\s+[a-z -]+?)?))";
+
+    // move / nudge the label of the SELECTED item — 20 px unless a distance is said.
+    const ml = raw.match(new RegExp(`^(?:move|nudge|bump|shift|slide|push|inch)\\s+(?:(?:the|this|that|its|selected)\\s+)*(?:${KIND}\\s+)?labels?\\s+(?:to\\s+the\\s+)?(up|down|left|right)\\b(.*)$`, "i"));
+    if (ml) {
+      const words = ml[2].trim().split(/\s+/).filter(Boolean);
+      if (!words.length) return [{ op: "moveLabel", direction: ml[1].toLowerCase() as "up" | "down" | "left" | "right" }];
+      const amt = readDistance(words, true);
+      // Anything left over means it is some other sentence — leave it to the rules below.
+      if (amt && words.every((w, i) => amt.used.has(i) || /^(?:by|please|now|more|again)$/i.test(w))) {
+        return [{ op: "moveLabel", direction: ml[1].toLowerCase() as "up" | "down" | "left" | "right", ...(amt.px > 0 ? { distance: amt.px } : {}) }];
+      }
+    }
+
+    // remove / clear the label of the SELECTED item.
+    if (new RegExp(`^(?:remove|clear|delete|erase|take\\s+off|get\\s+rid\\s+of)\\s+(?:(?:the|this|that|its|selected)\\s+)*(?:${KIND}\\s+)?labels?(?:\\s+${OF_SELECTED})?$`, "i").test(raw)) {
+      return [{ op: "clearLabel" }];
+    }
+
+    // "add a label Approved [to this]" — the same as "label this Approved": the selected connector, or the one
+    // selected element, takes it. "add a label to this" with no text waits for the text.
+    const al = raw.match(/^(?:add|set|give)\s+(?:(?:a|the)\s+)?label\s+(?:(?:of|called|as|to|saying)\s+)?(.+?)(?:\s+to\s+(?:this|that|(?:the\s+)?selected(?:\s+[a-z -]+?)?))?$/i);
+    if (al) {
+      const txt = al[1].trim();
+      if (/^(?:this|that|(?:the\s+)?selected\b.*)$/i.test(txt)) return [{ op: "labelSelected" }];
+      return [{ op: "labelSelected", label: capitaliseFirstWord(spokenLabel(txt)) }];
+    }
+
+    // take the loop / repeat marker off the selected subprocess — the same as "make this a plain subprocess".
+    const MARK = "(?:loop|repeat|multi-?\\s?instance|mi)(?:\\s+marker)?";
+    const SEL = "(?:this|that|(?:the\\s+)?selected(?:\\s+(?:sub-?\\s?process|ep|expanded\\s+sub-?\\s?process))?)";
+    if (new RegExp(`^(?:(?:remove|clear|delete|take\\s+off|drop)\\s+(?:the\\s+)?${MARK}(?:\\s+(?:from|on|off)\\s+${SEL})?|(?:make\\s+)?${SEL}\\s+(?:not\\s+a|no)\\s+(?:loop|repeat)|no\\s+${MARK})$`, "i").test(raw)) {
+      return [{ op: "convert", ref: "this", subtype: "plain subprocess" }];
+    }
+
+    // select anything by name — "select end event Claim closed" — or by number: "select events" numbers them.
+    const sel = raw.match(/^(?:select|highlight)\s+(.+)$/i);
+    if (sel) {
+      const what = sel[1].trim().replace(/^(?:all\s+(?:the\s+)?|the\s+)/i, "");
+      const type = parseRenameType(what);
+      if (type) return [{ op: "selectByType", itemType: type as "pool" | "lane" | "message" | "task" | "activity" | "subprocess" | "gateway" | "event" | "connector" }];
+      return [{ op: "select", ref: spokenLabel(what) }];
+    }
   }
 
   // ── Disconnect (before delete, so "remove the link from X to Y" isn't a delete) ──

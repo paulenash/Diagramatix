@@ -23,7 +23,7 @@ export const DEFAULT_LISTS: Lists = {
   ],
   // What "make … a X" / "turn … into a X" can turn something into (the parser's subtype table).
   convert_kinds: [
-    "task", "subprocess", "decision", "parallel gateway", "exclusive gateway", "inclusive gateway",
+    "task", "subprocess", "plain subprocess", "decision", "parallel gateway", "exclusive gateway", "inclusive gateway",
     "user task", "service task", "script task", "send task", "receive task", "manual task",
     "timer event", "message event", "event",
   ],
@@ -32,6 +32,8 @@ export const DEFAULT_LISTS: Lists = {
     "connector", "connectors", "element", "elements", "subprocess", "subprocesses", "message", "messages",
   ],
   directions: ["up", "down", "left", "right"],
+  // The items whose label is drawn outside the symbol, so it can be moved or removed (a task's name sits inside it).
+  label_kinds: ["gateway", "decision", "event", "start event", "end event", "intermediate event", "connector", "message", "flow", "arrow", "data object", "data store"],
   step_words: ["elements", "steps", "places", "spaces", "cells"],
   edge_words: ["top", "bottom", "left", "right"],
   points: ["top", "middle", "bottom", "left", "right", "centre", "center"],
@@ -80,6 +82,18 @@ call <existing_element_name> <new_element_name>
 label [the] selected [connector]
 label selected <new_label_name>
 (label|relabel) (connectors|messages|flows)
+label <target> <new_label_name>
+(add|set|give) [a|the] label [(called|as|saying)] <new_label_name> [to (<target>|selected)]
+(remove|clear|delete|erase) [the|this|that|its] [{label_kinds}] label [(from|on|of) (<target>|selected)]
+
+# ── Selecting, and moving a label
+(select|highlight) [all|the] {type_words}
+(select|highlight) [the] (<existing_element_name>|<existing_label_name>)
+(move|nudge|bump|shift|slide|push|inch) [the|this|that|its|selected] [{label_kinds}] label [to the] {directions} [[by] <distance>]
+
+# ── Taking a loop marker off
+(remove|clear|delete|drop) [the] (loop|repeat) [marker] [(from|on|off) (this|that|[the] selected [subprocess|ep])]
+no loop [marker]
 
 # ── Moving and nudging
 move (<existing_element_name>|<existing_label_name>|<target>) [<number> {step_words}] [to the] {directions}
@@ -169,6 +183,13 @@ yes|no
 # "rename tasks" opened the green numbers: a number (and then the name), or done.
 # cancel and undo also get out, but are secondary — shown dimmed in [ ].
 <number> [<new_label_name>]
+done
+[cancel|undo]
+
+## flow select-pick
+# "select events" opened the green numbers: a number selects that one — nothing is renamed.
+# done gets out; cancel and undo are secondary.
+<number>
 done
 [cancel|undo]
 

@@ -102,3 +102,28 @@ export function leadingSpokenNumber(text: string): LeadingNumber | null {
 
 /** The number words, for the recogniser's keyword-boost list. */
 export const SPOKEN_NUMBER_WORDS: readonly string[] = NUMBER_WORDS;
+
+/**
+ * The recogniser hears a spoken "one" as "the" (Paul, 2026-10-01: "one consistently heard as the"),
+ * and "the" is also a filler `leadingSpokenNumber` strips ("the 3") — so a lone "the" arrived as no
+ * number at all. Where a number is DUE and nothing else can start the answer, a leading "the" that is
+ * not followed by a number can only have been "one":
+ *
+ *   "the"                    → "one"
+ *   "the Approve Order"      → "one Approve Order"
+ *   "the 3" / "the lane up"  → unchanged (a number, or a mis-heard number, follows — so "the" is filler)
+ *
+ * NOT part of `leadingSpokenNumber` itself: the "which one did you mean?" pick uses that too, and
+ * there "the Finance one" is a real answer by name. Call this only where an answer must start with a
+ * number — "move dividers" and the rename-by-number pick.
+ */
+export function restoreLostOneNumber(text: string): string {
+  const t = String(text ?? "").trim();
+  const m = t.match(/^the\b[\s,.]*([\s\S]*)$/i);
+  if (!m) return t;
+  const rest = m[1].trim();
+  if (!rest) return "one";
+  const next = rest.split(/\s+/)[0].toLowerCase().replace(/[.,!?;:]+$/g, "");
+  const numberLike = /^\d+$/.test(next) || NUMBER_WORDS.includes(next as (typeof NUMBER_WORDS)[number]) || TENS[next] !== undefined || MISHEARD[next] !== undefined;
+  return numberLike ? t : `one ${rest}`;
+}

@@ -124,12 +124,14 @@ describe("T4478 — the guided rename keeps the name in the case it was spoken",
     const { readFileSync } = await import("node:fs");
     const { join } = await import("node:path");
     const src = editorSource();
-    expect(src).toContain("leadingSpokenNumber(t)");
+    expect(src).toContain("leadingSpokenNumber(restoreLostOneNumber(t))");
     expect(src, "the pick still reads the name off the lower-cased copy").not.toContain(
       "leadingSpokenNumber(low)",
     );
     // And the single choke point for the guided flow applies the rule.
-    expect(src).toContain("capitaliseFirstWord(name.trim()");
+    // (A pool, lane or sub-lane takes every word capitalised instead — titleCaseName; everything else this.)
+    expect(src).toContain("capitaliseFirstWord(spoken)");
+    expect(src).toContain("titleCaseName(spoken)");
   });
 
   it("the number word itself is still matched case-insensitively", () => {

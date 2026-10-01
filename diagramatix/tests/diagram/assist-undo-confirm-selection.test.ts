@@ -115,7 +115,7 @@ describe("B1 — a batch sees what it has already done", () => {
     expect(body).toMatch(/const addedEl = syntheticElement\(newId/);
     expect(body).toMatch(/voiceLastId\.current = newId;\s*els = withAdded\(els, addedEl\);/);
     expect(body).toMatch(/deleteElement\(e\.id\);\s*els = withDeleted\(els, e\.id\);/);
-    expect(body).toContain("els = withLabel(els, e.id, newLabel);");
+    expect(body).toContain("els = withLabel(els, e.id, named);");
     // The resolver reads the working copy AND the selection. (It gained a
     // fifth argument on 2026-09-20 — R3's `strict`, which stops a DESTRUCTIVE
     // command guessing between candidates. The claim here is unchanged: the

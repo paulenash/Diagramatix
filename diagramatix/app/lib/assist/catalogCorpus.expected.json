@@ -341,6 +341,69 @@
       "label": "Timeout"
     }
   ],
+  "select end event Claim closed": [
+    {
+      "op": "select",
+      "ref": "end event Claim closed"
+    }
+  ],
+  "select Review Claim": [
+    {
+      "op": "select",
+      "ref": "Review Claim"
+    }
+  ],
+  "select events": [
+    {
+      "op": "selectByType",
+      "itemType": "event"
+    }
+  ],
+  "move label up 20 pixels": [
+    {
+      "op": "moveLabel",
+      "direction": "up",
+      "distance": 20
+    }
+  ],
+  "move the label left": [
+    {
+      "op": "moveLabel",
+      "direction": "left"
+    }
+  ],
+  "nudge the label down by 10": [
+    {
+      "op": "moveLabel",
+      "direction": "down",
+      "distance": 10
+    }
+  ],
+  "label this Approved": [
+    {
+      "op": "labelSelected",
+      "label": "Approved"
+    }
+  ],
+  "remove the label": [
+    {
+      "op": "clearLabel"
+    }
+  ],
+  "remove the loop marker": [
+    {
+      "op": "convert",
+      "ref": "this",
+      "subtype": "plain subprocess"
+    }
+  ],
+  "make this a plain subprocess": [
+    {
+      "op": "convert",
+      "ref": "this",
+      "subtype": "plain subprocess"
+    }
+  ],
   "name these Receive, Check and Ship": [
     {
       "op": "fillLabels",

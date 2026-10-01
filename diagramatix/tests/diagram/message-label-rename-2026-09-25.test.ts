@@ -419,7 +419,7 @@ describe("T4831 — wiring: one placement rule, one measure, one payload", () =>
 
   it("the headless diagram builds the editor's payload, not its own", () => {
     const h = src("app", "lib", "assist", "headlessDiagram.ts");
-    expect(h).toContain(`updateConnectorLabel: (id, label) => commit({ type: "UPDATE_CONNECTOR_LABEL", payload: connectorLabelPayload(id, label) })`);
+    expect(h).toContain(`updateConnectorLabel: (id, label, labelOffsetX, labelOffsetY) => commit({ type: "UPDATE_CONNECTOR_LABEL", payload: connectorLabelPayload(id, label, labelOffsetX, labelOffsetY) })`);
   });
 
   it("the rule's own sanity: placing an already-placed label again changes nothing", () => {

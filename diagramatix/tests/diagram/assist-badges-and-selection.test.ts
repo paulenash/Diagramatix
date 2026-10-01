@@ -63,7 +63,7 @@ describe("the selection protocol", () => {
     // Rename by number: after the name is applied, selection and connector selection are cleared.
     expect(ed).toMatch(/cancelLabelEdit\(\);\s*\/\/[^\n]*\n[^\n]*\n\s*setSelectedElementIds\(new Set\(\)\);\s*setSelectedConnectorId\(null\);/);
     // Plain rename, move, nudge and lane move all end with nothing selected.
-    expect(ed).toMatch(/updateLabel\(e\.id, newLabel\); els = withLabel\(els, e\.id, newLabel\); setSelectedElementIds\(new Set\(\)\);/);
+    expect(ed).toMatch(/updateLabel\(e\.id, named\); els = withLabel\(els, e\.id, named\); setSelectedElementIds\(new Set\(\)\);/);
     expect(ed).toMatch(/elementsMoveEnd\(\);[^\n]*\n\s*setSelectedElementIds\(new Set\(\)\); \/\/ selection protocol: a voice move leaves nothing selected/);
     expect(ed).toMatch(/elementsMoveEnd\(\); \/\/ commit the nudge as its own undo entry\s*setSelectedElementIds\(new Set\(\)\);/);
     // Changed 2026-09-28: the lane move is one helper (moveLaneInStack) for

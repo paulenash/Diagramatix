@@ -542,6 +542,15 @@ export function checkEffect(op: AssistOp, before: DiagramData, after: DiagramDat
     case "alignSelection":
       return null;   // needs the selection the case carries; checked by the caller that has it
 
+    // "move label up 20 pixels": some label's stored offset changed — an element's, or a connector's. Which one is the
+    // selection's business (the case carries it); what the SENTENCE promises is that a label moved.
+    case "moveLabel": {
+      const off = (e: DiagramElement) => `${(e.properties?.labelOffsetX as number | undefined) ?? 0},${(e.properties?.labelOffsetY as number | undefined) ?? 0}`;
+      const moved = after.elements.some((a) => { const b = byId(before, a.id); return !!b && off(a) !== off(b); })
+        || after.connectors.some((a) => { const b = before.connectors.find((x) => x.id === a.id); return !!b && ((a.labelOffsetX ?? 0) !== (b.labelOffsetX ?? 0) || (a.labelOffsetY ?? 0) !== (b.labelOffsetY ?? 0)); });
+      return moved ? pass : fail("no label moved");
+    }
+
     case "wrapInPool": {
       // Written from Paul's four cases (2026-09-25), not from the planner the
       // product uses. Refusals (cases 1 and 3) never reach here — the apply

@@ -66,7 +66,7 @@ describe("reading the number off a spoken pick", () => {
     // Reads the utterance as spoken, not the lower-cased copy: the number word
     // is folded inside the reader, and lower-casing here threw away the
     // capitalisation of the name that follows it (T4478).
-    expect(editor, "the pick handler must go through the shared reader").toMatch(/const picked = leadingSpokenNumber\(t\);/);
+    expect(editor, "the pick handler must go through the shared reader").toMatch(/const picked = leadingSpokenNumber\(restoreLostOneNumber\(t\)\);/);
     expect(editor, "and take the name from the same result").toMatch(/const trailing = picked\.rest;/);
 
     // The keyword list lives in `asrParams.ts` since 2026-09-24 (one rule, one

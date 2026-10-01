@@ -73,6 +73,33 @@ export function wouldCapitalise(name: string): boolean {
 }
 
 /**
+ * Pools, lanes and sub-lanes are named with EVERY word capitalised (Paul, 2026-10-01: "Pool, Lanes and
+ * Sublanes should always be named with full capitalisation … I mean capitalise each word in the name"):
+ * "claims processing" → "Claims Processing", "the finance team" → "The Finance Team".
+ *
+ * Activities, events and gateways are phrases and keep `capitaliseFirstWord` ("Send invoice to customer").
+ * A word that already has a capital anywhere in it is a deliberate choice and is left alone — "IT Support"
+ * stays "IT Support", "eCommerce" stays "eCommerce". Only the first LETTER of each space-separated word is
+ * touched; the rest of the word, digits and punctuation are as they were.
+ */
+export function titleCaseName(name: string): string {
+  const trimmed = String(name ?? "").trim().replace(/\s+/g, " ");
+  if (!trimmed) return trimmed;
+  return trimmed
+    .split(" ")
+    .map((w) => {
+      if (/[A-Z]/.test(w)) return w;
+      const at = w.search(/[a-z]/);
+      return at < 0 ? w : w.slice(0, at) + w[at].toUpperCase() + w.slice(at + 1);
+    })
+    .join(" ");
+}
+
+/** The container types whose names take full capitalisation. */
+export const FULLY_CAPITALISED_TYPES: ReadonlySet<string> = new Set(["pool", "lane", "sublane"]);
+export const isFullyCapitalised = (type: string): boolean => FULLY_CAPITALISED_TYPES.has(type);
+
+/**
  * A DECISION gateway's label is a question, so it ends in one.
  *
  * Paul, 2026-09-21: "Names of Decision Gateways (their labels) should always

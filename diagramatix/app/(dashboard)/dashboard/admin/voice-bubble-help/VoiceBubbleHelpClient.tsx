@@ -48,6 +48,7 @@ const KINDS: SlotKind[] = ["free", "names", "number", "distance", "pattern"];
 /** The guided flows, in the words the tile uses for them. */
 const FLOWS = [
   { id: "rename-pick", label: "After “rename tasks” — pick one by number" },
+  { id: "select-pick", label: "After “select events” — pick one by number" },
   { id: "rename-name", label: "After picking a number — say the new name" },
   { id: "dividers", label: "“Move dividers” — just opened" },
   { id: "dividers-held", label: "“Move dividers” — after saying a number" },

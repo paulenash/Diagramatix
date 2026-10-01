@@ -73,7 +73,7 @@ describe("T5177 — guided flows show their own words", () => {
   });
 
   it("move dividers, just opened: ONLY a number or done — not up, down or an amount (Paul, 2026-10-01)", () => {
-    expect(view("", { flow: { kind: "dividers" } }).lines).toEqual(["<number>", "done"]);
+    expect(view("", { flow: { kind: "dividers" } }).lines).toEqual(["done", "<number>"]); // words A–Z, then variables
     expect(view("", { flow: { kind: "dividers" } }).note).toMatch(/say a divider’s number/);
   });
 
@@ -82,7 +82,7 @@ describe("T5177 — guided flows show their own words", () => {
     expect(held.lines).toEqual(expect.arrayContaining(["up", "down", "<distance>"]));
     expect(held.note).toMatch(/waiting — say up or down/);
     const moved = view("", { flow: { kind: "dividers", moved: true } });
-    expect(moved.lines).toEqual(["<number>", "<distance>", "done"]);
+    expect(moved.lines).toEqual(["done", "<distance>", "<number>"]);
     // a number that has just been said wins over an earlier move
     expect(view("", { flow: { kind: "dividers", held: true, moved: true } }).lines).toContain("up");
   });
@@ -196,5 +196,17 @@ describe("T5179 — the panel is wired in: separate from the canvas Bubble Help,
     const panel = read("app/components/canvas/VoiceBubbleHelpPanel.tsx");
     expect(panel).toContain("FloatingPanel");
     expect(panel).not.toMatch(/window\.(confirm|alert|prompt)/);
+  });
+});
+
+describe("T5197 — “select events” and then a number: the panel offers only the number (nothing is renamed)", () => {
+  it("select-pick lists the number, done, and the secondary exits dimmed — not “number then a name”", () => {
+    const v = view("", { flow: { kind: "rename", phase: "pick", purpose: "select" } });
+    expect(v.mode).toBe("flow");
+    expect(v.lines).toEqual(["done", "<number>", "[cancel]", "[undo]"]);
+    expect(v.note).toBe("Say a number to select that one.");
+    expect(v.lines).not.toContain("<new_label_name>");
+    // …whereas a rename pick still allows a name after the number
+    expect(view("2", { flow: { kind: "rename", phase: "pick" } }).lines).toContain("[<new_label_name>]");   // optional after the number
   });
 });

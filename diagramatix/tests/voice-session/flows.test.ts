@@ -280,8 +280,11 @@ describe("T5069 — rename by number: the numbers, the name, spelled letters, an
     expect(label(h, "t2")).toBe("Approve invoice");
     expect(h.lastLine?.summary).toBe("renamed to “Approve invoice” — pick another or say “done”");
 
-    // "3 pay the supplier" — a number in the pick phase flushes at once too.
+    // "3 pay the supplier" — a number FOLLOWED BY WORDS has begun a name, so it waits for the quiet window like any other
+    // fragment (Paul, 2026-10-01: "you have to speak very quickly"); only a number on its own acts at once.
     await h.act(() => mic.cb.onText?.("3 pay the supplier"));
+    expect(label(h, "t3")).toBe("Pay supplier");
+    await h.act(() => { vi.advanceTimersByTime(FRAGMENT_SILENCE_MS); });
     expect(label(h, "t3")).toBe("Pay the supplier");
   });
 

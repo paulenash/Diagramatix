@@ -14,7 +14,8 @@ import type { DiagramNames } from "./names";
 import { tokenise, type CommandTree } from "./tree";
 
 export type OpenFlow =
-  | { kind: "rename"; phase: "pick" | "name" }
+  /** `purpose: "select"` — "select events": a number SELECTS the item, nothing is renamed (no name follows). */
+  | { kind: "rename"; phase: "pick" | "name"; purpose?: "select" }
   /**
    * "move dividers". What can be said depends on what has happened: `held` — a number was said and
    * is waiting for its way ("two" … "down"); `moved` — a divider has been moved, so an amount on its
@@ -61,7 +62,7 @@ export interface PanelView {
 }
 
 const FLOW_ID = (f: Extract<OpenFlow, { kind: "rename" | "dividers" }>): string =>
-  f.kind === "dividers" ? (f.held ? "dividers-held" : f.moved ? "dividers-moved" : "dividers") : f.phase === "pick" ? "rename-pick" : "rename-name";
+  f.kind === "dividers" ? (f.held ? "dividers-held" : f.moved ? "dividers-moved" : "dividers") : f.phase === "pick" ? (f.purpose === "select" ? "select-pick" : "rename-pick") : "rename-name";
 
 export function computePanel(tree: CommandTree, input: PanelInput): PanelView {
   const tokens = tokenise(input.interim);
@@ -76,7 +77,7 @@ export function computePanel(tree: CommandTree, input: PanelInput): PanelView {
         mode: "flow", heard, lines, complete: r.ok && r.complete, openSlot: r.openSlot,
         note: f.kind === "dividers"
           ? (f.held ? "Move dividers: that number is waiting — say up or down." : f.moved ? "Move dividers: another divider, or an amount to adjust that move." : "Move dividers is open — say a divider’s number.")
-          : f.phase === "pick" ? "Pick one by its number." : "Say the new name.",
+          : f.phase === "pick" ? (f.purpose === "select" ? "Say a number to select that one." : "Pick one by its number.") : "Say the new name.",
       };
     }
     const label = input.flow.kind === "other" ? input.flow.label : "guided pick";

@@ -103,7 +103,11 @@ Op shapes (use element NAMES for refs — they are resolved against the diagram;
   { "op":"again" }                                                  // repeat the last command (e.g. another nudge)
   { "op":"addMessage", "fromRef": <name>, "toRef": <name>, "label"?: string }  // message flow between an activity and a pool/participant
   { "op":"addMessageByNumber", "fromSelection"?: true }  // no ends given: number the candidates and let the user pick
-  { "op":"labelSelected", "label"?: string }  // the selected connector
+  { "op":"labelSelected", "label"?: string }  // the selected connector, or the ONE selected element
+  { "op":"moveLabel", "direction": "up"|"down"|"left"|"right", "distance"?: number }  // move the LABEL of the SELECTED gateway / event / data object / data store / connector / message (default 20px)
+  { "op":"clearLabel" }  // "remove the label": empty the SELECTED item's label (not a task, pool or lane — they need a name)
+  { "op":"select", "ref": <name> }  // "select end event Claim closed": select any element, connector or message by name
+  { "op":"selectByType", "itemType": "pool"|"lane"|"message"|"task"|"activity"|"subprocess"|"gateway"|"event"|"connector" }  // "select events": numbers them, then say a number
   { "op":"deleteConnectors", "kind": "connector"|"message" }  // "delete connectors" / "remove messages": the selected one, those on the selected elements, or all
   { "op":"reverseConnector" }  // "reverse this": flip the SELECTED connector's direction
   { "op":"swapGatewayPoints", "a": "top"|"middle"|"bottom"|"left"|"right", "b": same }  // the selected gateways' points
