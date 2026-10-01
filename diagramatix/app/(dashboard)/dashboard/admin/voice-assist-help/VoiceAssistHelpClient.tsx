@@ -26,6 +26,7 @@ import { COMMAND_CATALOG, SUPERADMIN_COMMAND_CATALOG } from "@/app/lib/assist/co
 import { generateCases } from "@/app/lib/assist/commandGenerator";
 import frozenKey from "@/app/lib/assist/catalogCorpus.expected.json";
 import { startDictation, type DictationHandle } from "@/app/lib/dictation";
+import { describeResult, type DescribedResult } from "@/app/lib/assist/describeResult";
 import { EMPTY_UTTERANCE, heardForHelp, onFinal, onQuiet, type Utterance } from "@/app/lib/assist/commandTree/heard";
 import { diagramKeyterms } from "@/app/lib/dictation/diagramKeyterms";
 import {
@@ -374,6 +375,9 @@ function TryIt({ tree }: { tree: ReturnType<typeof compileTree> }) {
     const e = fx.elements.find((x) => x.id === id);
     return e ? { x: e.x + e.width / 2, y: e.y + e.height / 2 } : null;
   };
+  // The speech callbacks outlive a render, so they read the stand-in selection and cursor through refs.
+  const standIn = useRef({ selId: "", cursorId: "" });
+  standIn.current = { selId, cursorId };
   const target = useMemo(
     () => targetNow(fx.elements, selId ? [selId] : [], null, cursorId ? pointerAt(cursorId) : null),
     [fx, selId, cursorId], // eslint-disable-line react-hooks/exhaustive-deps
@@ -391,7 +395,7 @@ function TryIt({ tree }: { tree: ReturnType<typeof compileTree> }) {
   // back to the first words and what it made of the command is shown under "Last command".
   const utt = useRef<Utterance>(EMPTY_UTTERANCE);
   const quietTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [lastCmd, setLastCmd] = useState<{ heard: string; repaired: string; ops: ReturnType<typeof parseCommand> } | null>(null);
+  const [lastCmd, setLastCmd] = useState<{ heard: string; repaired: string; ops: ReturnType<typeof parseCommand>; result: DescribedResult | null } | null>(null);
   const clearQuiet = () => { if (quietTimer.current) { clearTimeout(quietTimer.current); quietTimer.current = null; } };
   const stopMic = useCallback(() => {
     handleRef.current?.stop(); handleRef.current = null; setMic("off");
@@ -407,7 +411,18 @@ function TryIt({ tree }: { tree: ReturnType<typeof compileTree> }) {
     setText("");
     if (r.command) {
       const repaired = heardForHelp(r.command);
-      setLastCmd({ heard: r.command, repaired, ops: parseCommand(repaired) });
+      const ops = parseCommand(repaired);
+      // What it DID, with the before and after: the command is applied to a copy of the test diagram,
+      // with the element chosen above standing in for the selection and the cursor.
+      let result: DescribedResult | null = null;
+      if (ops && ops.length) {
+        const { selId: sId, cursorId: cId } = standIn.current;
+        const at = cId ? fx.elements.find((x) => x.id === cId) : undefined;
+        try {
+          result = describeResult(ops, fx, sId ? [sId] : [], at ? { x: at.x + at.width / 2, y: at.y + at.height / 2 } : null, cId || null);
+        } catch { result = null; }
+      }
+      setLastCmd({ heard: r.command, repaired, ops, result });
     }
   };
   const startMic = async () => {
@@ -474,7 +489,14 @@ function TryIt({ tree }: { tree: ReturnType<typeof compileTree> }) {
       {lastCmd && (
         <p className="mb-3 text-xs text-gray-700">
           Last command: “{lastCmd.heard}”{lastCmd.repaired !== lastCmd.heard && <> → “{lastCmd.repaired}”</>} —{" "}
-          {lastCmd.ops && lastCmd.ops.length ? <span className="text-green-700">the parser makes it {lastCmd.ops.map((o) => o.op).join(" + ")}</span> : <span className="text-red-700">the parser does not understand it</span>}
+          {!lastCmd.ops || !lastCmd.ops.length ? <span className="text-red-700">the parser does not understand it</span>
+            : !lastCmd.result ? <span className="text-green-700">the parser makes it {lastCmd.ops.map((o) => o.op).join(" + ")}</span>
+            : !lastCmd.result.ok ? <span className="text-amber-700">the parser makes it {lastCmd.ops.map((o) => o.op).join(" + ")}, but {lastCmd.result.changes[0] ?? `it would not run: ${lastCmd.result.summary}`}</span>
+            : lastCmd.result.changes.length === 0 ? <span className="text-amber-700">the parser makes it {lastCmd.ops.map((o) => o.op).join(" + ")} — which changed nothing on the test diagram ({lastCmd.result.summary})</span>
+            : <span className="text-green-700">the parser {lastCmd.result.changes.length === 1 ? lastCmd.result.changes[0] : <>made {lastCmd.result.changes.length} changes:</>}</span>}
+          {lastCmd.result?.ok && lastCmd.result.changes.length > 1 && (
+            <ul className="list-disc ml-5 mt-1 text-green-700">{lastCmd.result.changes.map((c, i) => <li key={i}>{c}</li>)}</ul>
+          )}
         </p>
       )}
       <div className="flex flex-wrap gap-x-4 gap-y-2 items-end mb-3">
