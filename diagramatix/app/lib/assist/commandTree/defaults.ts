@@ -39,7 +39,7 @@ export const DEFAULT_LISTS: Lists = {
   event_triggers: ["timer", "message", "error", "signal", "escalation", "conditional", "cancel", "compensation"],
   place_after: ["after", "following", "behind", "next to", "onto"],
   place_before: ["before", "ahead of"],
-  compress_verbs: ["compress", "collapse", "shrink", "reduce", "shorten", "compact", "tighten", "condense"],
+  compress_verbs: ["compress", "compressed", "collapse", "shrink", "reduce", "shorten", "compact", "tighten", "condense"],
 };
 
 export const DEFAULT_PATTERNS = `# Voice Assist command tree — what can be said, word by word.
@@ -57,43 +57,49 @@ export const DEFAULT_PATTERNS = `# Voice Assist command tree — what can be sai
 ## commands
 
 # ── Elements and flow
-(add|insert|create|put|place) [a|an|the] [new] {element_kinds} [called <new_element_name>] [{place_after} (<existing_element_name>|<target>)] [here|there]
-(add|insert|create) [a|an] {element_kinds} [called <new_element_name>] between (<existing_element_name>|<target>) and (<existing_element_name>|<target>)
-(connect|link|join) (<existing_element_name>|<target>) (to|with|into) (<existing_element_name>|<target>)
+(add|insert|create|put|place) [a|an|the] [new] {element_kinds} [called <new_element_name>] [{place_after} (<existing_element_name>|<existing_label_name>|<target>)] [here|there]
+(add|insert|create) [a|an] {element_kinds} [called <new_element_name>] between (<existing_element_name>|<existing_label_name>|<target>) and (<existing_element_name>|<existing_label_name>|<target>) [called <new_element_name>]
+(connect|link|join) (<existing_element_name>|<existing_label_name>|<target>) (to|with|into) (<existing_element_name>|<existing_label_name>|<target>)
 (connect|link|join) (them|these|those) [up]
-(disconnect|unlink) (<existing_element_name>|<target>) (from|to|and) (<existing_element_name>|<target>)
+(disconnect|unlink) (<existing_element_name>|<existing_label_name>|<target>) (from|to|and) (<existing_element_name>|<existing_label_name>|<target>)
 (reverse|flip) [this|that|it|selected|the connector]
 
 # ── Deleting
-(delete|remove|erase|drop) [the] (<existing_element_name>|<existing_label_name>|<target>) [and (compact|compress|tidy up)]
+(delete|remove|erase|drop) [the] (<existing_element_name>|<existing_label_name>|<target>) [and (compact|compress|tidy up|close the gap)]
 (delete|remove) [all|the] {type_words}
-(delete|remove) (connector|message|sublane) <existing_label_name>
+(delete|remove) (connector|message) <existing_label_name>
+(delete|remove) [the] sublane <existing_element_name>
 
 # ── Renaming and labelling
 (rename|relabel) [all|the] {type_words}
 (rename|relabel) [the] (<existing_element_name>|<target>) (to|as) <new_element_name>
 (rename|relabel) [connector|message|gateway|event] <existing_label_name> (to|as) <new_label_name>
 label <selection> [connector|flow|arrow] <new_label_name>
+call <existing_element_name> <new_element_name>
 (name|call) (these|those) <new_label_name>
 label [the] selected [connector]
 label selected <new_label_name>
 (label|relabel) (connectors|messages|flows)
 
 # ── Moving and nudging
-move (<existing_element_name>|<target>) [<number> {step_words}] [to the] {directions}
-(nudge|bump|inch) [the] (<existing_element_name>|<target>|pool) {directions} [by <distance>]
-move everything (in|of|within) <existing_element_name> <distance> [to the] (left|right)
-move everything (from|after) (<existing_element_name>|<target>) [in <existing_element_name>] <distance> [to the] (left|right)
+move (<existing_element_name>|<existing_label_name>|<target>) [<number> {step_words}] [to the] {directions}
+move (<existing_element_name>|<existing_label_name>|<target>) and everything after it <distance> [to the] (left|right)
+(nudge|bump|inch) [the] (<existing_element_name>|<existing_label_name>|<target>|pool) {directions} [by <distance>]
+move (everything|all the elements) (in|of|within) <existing_element_name> <distance> [to the] (left|right)
+move (everything|all the elements) (in|of|within) <existing_element_name> [to the] (left|right) [by] <distance>
+move everything (from|after) (<existing_element_name>|<existing_label_name>|<target>) [in <existing_element_name>] <distance> [to the] (left|right)
 (move|nudge|shift) [the] [pool|lane] <existing_element_name> (top|bottom) (boundary|edge|divider|border) (up|down) [[by] <distance>]
 (move|nudge|shift) [the] [pool|lane] <existing_element_name> (left|right) (boundary|edge|divider|border) (left|right) [[by] <distance>]
 (move|nudge|shift) [the] (top|bottom|left|right) (edge|boundary|divider) of [the] <existing_element_name> [pool|lane] {directions} [[by] <distance>]
+(nudge|bump|move|shift) [the] <existing_element_name> (pool's|lane's) (top|bottom) (boundary|edge|divider|border) (up|down) [[by] <distance>]
+(nudge|bump|move|shift) [the] <existing_element_name> (pool's|lane's) (left|right) (boundary|edge|divider|border) (left|right) [[by] <distance>]
 (move|put|place) <existing_element_name> (above|below|over|under) <existing_element_name>
 move (divider|dividers)
 move lane (divider|dividers)
 
 # ── Converting
-make (<existing_element_name>|<target>) (a|an) {convert_kinds}
-(turn|change|convert|set) (<existing_element_name>|<target>) (to|into) (a|an) {convert_kinds}
+make (<existing_element_name>|<existing_label_name>|<target>) (a|an) {convert_kinds}
+(turn|change|convert|set) (<existing_element_name>|<existing_label_name>|<target>) (to|into) (a|an) {convert_kinds}
 
 # ── Boundary events
 (add|insert|put|attach|create) [a|an] [non-interrupting] [{event_triggers}] boundary event [called <new_label_name>] [(to|on|onto) (<existing_element_name>|<target>)] [called <new_label_name>]
@@ -108,8 +114,8 @@ make (<existing_element_name>|<target>) (a|an) {convert_kinds}
 (add|insert|use|pick|choose|show|open) template [(after|before) <existing_element_name>|here]
 
 # ── Teams, risks and controls
-assign <selection> to [the] <existing_element_name> team
-put <selection> in [the] <existing_element_name> team
+assign <selection> to [the] <new_element_name> team
+put <selection> in [the] <new_element_name> team
 (attach|link) (risk|control) <new_label_name> to <selection>
 
 # ── Aligning
@@ -144,7 +150,7 @@ move [[the] selected (gateway|event)] {points} to {points}
 
 # ── Diagram
 undo [that]
-(again|repeat)
+(again|repeat [that]|once more|same again|one more|keep going|do it again|do that again)
 turn (on|off) (gold flashing|flashing gold)
 (clear|empty|wipe|reset|blank) (the diagram|all)
 (start over|start again|new diagram)

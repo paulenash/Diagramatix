@@ -18,13 +18,18 @@
  *
  * Plan: new features/voice-assist-bubble-help-plan-2026-10-01.md
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { parseCommand } from "@/app/lib/assist/commandGrammar";
 import { fixtureDiagram } from "@/app/lib/assist/commandFixture";
+import { COMMAND_CATALOG, SUPERADMIN_COMMAND_CATALOG } from "@/app/lib/assist/commandCatalog";
+import { generateCases } from "@/app/lib/assist/commandGenerator";
+import frozenKey from "@/app/lib/assist/catalogCorpus.expected.json";
+import { startDictation, type DictationHandle } from "@/app/lib/dictation";
+import { diagramKeyterms } from "@/app/lib/dictation/diagramKeyterms";
 import {
-  compileTree, formatNext, namesOf, targetNow, tokenise, validateConventions,
-  type Conventions, type Lists, type SlotDef, type SlotKind,
+  compileTree, consistencyReport, DEFAULT_SAMPLE_FILL, formatNext, namesOf, targetNow, tokenise, validateConventions,
+  type ConsistencyReport, type Conventions, type Lists, type SlotDef, type SlotKind,
 } from "@/app/lib/assist/commandTree";
 
 interface TileData {
@@ -263,6 +268,7 @@ function Editor({ data, busy, onSwitch, onSave, onReset }: {
 
       <Summary tree={tree} />
       <TryIt tree={tree} />
+      <CheckAgainstParser tree={tree} />
     </div>
   );
 }
@@ -371,6 +377,35 @@ function TryIt({ tree }: { tree: ReturnType<typeof compileTree> }) {
     [fx, selId, cursorId], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
+  // Speaking a command. The words arrive as the recogniser hears them and walk the tree exactly as they
+  // do in the editor, and the test diagram's names go to the recogniser as hints, as the editor does.
+  // Finished phrases are kept (so a command said in two breaths still reads as one) until Clear.
+  const [mic, setMic] = useState<"off" | "connecting" | "listening">("off");
+  const [micError, setMicError] = useState<string | null>(null);
+  const handleRef = useRef<DictationHandle | null>(null);
+  const finals = useRef("");
+  const stopMic = useCallback(() => { handleRef.current?.stop(); handleRef.current = null; setMic("off"); }, []);
+  useEffect(() => () => { handleRef.current?.stop(); }, []);
+  const startMic = async () => {
+    setMicError(null);
+    setMic("connecting");
+    try {
+      const h = await startDictation({
+        onText: (t) => { finals.current = `${finals.current} ${t}`.trim(); setText(finals.current); },
+        onInterim: (t) => setText(`${finals.current ? finals.current + " " : ""}${t}`.trim()),
+        onError: (m) => setMicError(m),
+        onReady: () => setMic("listening"),
+        onEnd: () => { handleRef.current = null; setMic("off"); },
+        keyterms: diagramKeyterms(fx.elements.map((e) => e.label)),
+      });
+      if (!h) { setMic("off"); setMicError((e) => e ?? "The microphone could not be started."); return; }
+      handleRef.current = h;
+    } catch (e) {
+      setMic("off");
+      setMicError(e instanceof Error ? e.message : "The microphone could not be started.");
+    }
+  };
+
   const flows = useMemo(() => FLOWS.filter((f) => tree.sections[`flow ${f.id}`]), [tree]);
   const tokens = tokenise(text);
   const ctx = { ghost, flow: flow || null, ...(useNames ? { names } : {}) };
@@ -382,10 +417,20 @@ function TryIt({ tree }: { tree: ReturnType<typeof compileTree> }) {
     <Section title="6. Try it — type the words of a command">
       <div className="flex flex-wrap gap-3 items-center mb-3">
         <input
-          value={text} onChange={(e) => setText(e.target.value)} placeholder="rename …" autoFocus
+          value={text} onChange={(e) => { finals.current = e.target.value; setText(e.target.value); }} placeholder="rename …  — type, or press Speak" autoFocus
           className="flex-1 min-w-[16rem] border border-gray-300 rounded px-3 py-1.5 text-sm"
         />
+        <button
+          onClick={() => (mic === "off" ? void startMic() : stopMic())}
+          className={`px-3 py-1.5 text-xs rounded font-medium ${mic === "listening" ? "bg-red-600 text-white hover:bg-red-700" : mic === "connecting" ? "bg-amber-500 text-white" : "bg-purple-600 text-white hover:bg-purple-700"}`}
+          title="Speak a command: the words appear as they are heard and the list follows each word"
+        >{mic === "off" ? "🎤 Speak" : mic === "connecting" ? "Connecting… (stop)" : "● Listening — stop"}</button>
+        <button
+          onClick={() => { finals.current = ""; setText(""); }} disabled={!text}
+          className="px-3 py-1.5 text-xs rounded bg-gray-200 hover:bg-gray-300 text-gray-800 disabled:opacity-40"
+        >Clear</button>
       </div>
+      {micError && <p className="mb-3 text-xs text-red-700">{micError}</p>}
       <div className="flex flex-wrap gap-x-4 gap-y-2 items-end mb-3">
         <label className="text-[11px] text-gray-600 flex flex-col gap-0.5">Guided flow open?
           <select value={flow} onChange={(e) => setFlow(e.target.value)} className={sel}>
@@ -437,7 +482,77 @@ function TryIt({ tree }: { tree: ReturnType<typeof compileTree> }) {
           {!treeSays && ops && <span className="text-amber-800"> The parser takes it but the tree does not describe it{useNames ? " (with this diagram’s names)" : ""}.</span>}
         </p>
       )}
-      <p className="mt-2 text-[11px] text-gray-500">Speaking a command here arrives with a later slice.</p>
+      <p className="mt-2 text-[11px] text-gray-500">
+        Speak: the words appear as they are heard, and the list follows each one. Press Clear between commands. The microphone uses the same
+        recogniser as the editor (and costs the same per minute), so it is for testing the wording, not for leaving on.
+      </p>
+    </Section>
+  );
+}
+
+function CheckAgainstParser({ tree }: { tree: ReturnType<typeof compileTree> }) {
+  const [seed, setSeed] = useState("dgx-voice-1");
+  const [count, setCount] = useState(600);
+  const [report, setReport] = useState<ConsistencyReport | null>(null);
+  const [ran, setRan] = useState<{ seed: string; count: number } | null>(null);
+
+  const run = () => {
+    const fx = fixtureDiagram();
+    const card: string[] = [];
+    for (const fam of [...COMMAND_CATALOG, ...SUPERADMIN_COMMAND_CATALOG]) for (const it of fam.items) if (!it.voice) card.push(...it.say);
+    const generated = generateCases({ seed: seed.trim() || "dgx-voice-1", count: Math.max(1, Math.min(5000, Math.round(count) || 600)), world: fx.elements }).map((c) => c.utterance);
+    setReport(consistencyReport(tree, {
+      fill: DEFAULT_SAMPLE_FILL, card, frozen: Object.keys(frozenKey), generated, parses: (s) => !!parseCommand(s),
+    }));
+    setRan({ seed: seed.trim() || "dgx-voice-1", count });
+  };
+
+  const List = ({ title, lines, hint }: { title: string; lines: ConsistencyReport["treeNotParser"]; hint: string }) => (
+    <div className="mb-3">
+      <h3 className="text-xs font-semibold text-gray-800">{title} <span className="font-normal text-gray-500">({lines.length})</span></h3>
+      <p className="text-[11px] text-gray-500 mb-1">{hint}</p>
+      {lines.length === 0
+        ? <p className="text-xs text-green-800">None.</p>
+        : (
+          <ul className="text-xs font-mono text-gray-800 max-h-56 overflow-y-auto border border-gray-200 rounded p-2 space-y-0.5">
+            {lines.slice(0, 100).map((l, i) => <li key={i}><span className="text-gray-400">[{l.source}]</span> {l.sentence}</li>)}
+            {lines.length > 100 && <li className="text-gray-400">… and {lines.length - 100} more</li>}
+          </ul>
+        )}
+    </div>
+  );
+
+  return (
+    <Section title="7. Check against the parser">
+      <p className="text-xs text-gray-600 mb-3 max-w-3xl">
+        The tree is only a guide; the parser is what acts on a command. This asks both ways, against your draft above, so a change that makes them
+        disagree is seen before it is saved: every sentence the patterns describe is given to the parser, and every sentence the parser is known to take
+        (the Commands card, the frozen answer key, a set of generated sentences) is given to the tree. Names are ignored here — it is about the wording.
+      </p>
+      <div className="flex flex-wrap items-end gap-3 mb-3">
+        <label className="text-[11px] text-gray-600 flex flex-col gap-0.5">Generated set (seed)
+          <input value={seed} onChange={(e) => setSeed(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-xs w-44 font-mono" />
+        </label>
+        <label className="text-[11px] text-gray-600 flex flex-col gap-0.5">How many
+          <input type="number" min={1} max={5000} value={count} onChange={(e) => setCount(Number(e.target.value))} className="border border-gray-300 rounded px-2 py-1.5 text-xs w-24" />
+        </label>
+        <button onClick={run} className="px-3 py-1.5 text-xs rounded bg-blue-600 text-white hover:bg-blue-700">Run the check</button>
+      </div>
+      {report && (
+        <div>
+          <p className="text-xs text-gray-700 mb-3">
+            Checked {report.checked.fromTree.toLocaleString()} sentences from the patterns, {report.checked.card} from the Commands card, {report.checked.frozen} from the frozen
+            answer key and {report.checked.generated.toLocaleString()} generated{ran ? ` (seed ${ran.seed})` : ""}.{" "}
+            {report.treeNotParser.length + report.parserNotTree.length === 0
+              ? <span className="text-green-800 font-medium">No disagreements.</span>
+              : <span className="text-amber-800 font-medium">{report.treeNotParser.length + report.parserNotTree.length} disagreement{report.treeNotParser.length + report.parserNotTree.length === 1 ? "" : "s"}.</span>}
+          </p>
+          <List title="The patterns describe it, the parser does not take it" lines={report.treeNotParser}
+            hint="The bubble would offer words that do not work. Tighten or remove the pattern line shown." />
+          <List title="The parser takes it, the patterns do not describe it" lines={report.parserNotTree}
+            hint="A way of saying a command that the bubble never offers. Add the wording to a pattern if it should be taught." />
+        </div>
+      )}
     </Section>
   );
 }
