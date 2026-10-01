@@ -16,6 +16,7 @@ import { buildTestConnectors } from "./bpmnTestConnectors";
 import { tetherModeOnCreate } from "./labelTether";
 import { placeMessageLabels } from "./messageLabel";
 import { POOL_GAP } from "./poolLaneBounds";
+import { titleCaseName } from "./nameCase";
 
 /**
  * Connector ids carry the INDEX of the connector within its own array.
@@ -590,6 +591,22 @@ export interface LayoutDiagnostic {
   detail: string;
 }
 
+/**
+ * Pools, lanes and sub-lanes are named with EVERY word capitalised (Paul, 2026-10-01: "AI generated names should be
+ * fully capitalised … they normally are at the moment"). "Normally" was the model's habit, not a rule: nothing
+ * enforced it. The Green rule R4.08 now asks the model to; this makes it so whatever it (or an image read) returns.
+ * References between elements match case-insensitively (normRef), so renaming the case cannot break one.
+ * Activities, events and gateways are phrases and keep their own style.
+ */
+function containerNamed(e: AiElement): AiElement {
+  if (e.type !== "pool" && e.type !== "lane" && e.type !== "sublane") return e;
+  return {
+    ...e,
+    label: e.label ? titleCaseName(e.label) : e.label,
+    ...(e.lanes ? { lanes: e.lanes.map((l) => ({ ...l, name: titleCaseName(l.name) })) } : {}),
+  };
+}
+
 export function layoutBpmnDiagram(
   aiElements: AiElement[],
   aiConnections: AiConnection[],
@@ -611,6 +628,7 @@ export function layoutBpmnDiagram(
     mode?: "normal" | "test";
   },
 ): DiagramData {
+  aiElements = aiElements.map(containerNamed);
   // Image import with usable geometry → reproduce the drawn layout. Returns
   // null when the geometry is missing/degenerate so we drop through to the
   // normal auto-stack engine below (always a valid, validated fallback).
