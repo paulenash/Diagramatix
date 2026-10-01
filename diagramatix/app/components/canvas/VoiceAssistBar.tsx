@@ -44,6 +44,7 @@ export function VoiceAssistBar({
   saveState = "idle",
   snapshotCount = 0,
   onTestDiagram,
+  bubbleHelp,
 }: {
   listening: boolean;
   /** Mic pressed but the recogniser not yet live — shown as "connecting…" so
@@ -74,6 +75,11 @@ export function VoiceAssistBar({
   snapshotCount?: number;
   /** Show the test diagram the Commands card is written for (the editor owns the window). */
   onTestDiagram?: () => void;
+  /**
+   * Voice Assist Bubble Help (the next-words panel): present only when the SuperAdmin has
+   * switched it on. This person's own on/off lives in the editor; the bar just shows the button.
+   */
+  bubbleHelp?: { on: boolean; onToggle: () => void };
 }) {
   const [text, setText] = useState("");
   const [showCommands, setShowCommands] = useState(false);
@@ -169,6 +175,11 @@ export function VoiceAssistBar({
             <button onClick={() => setShowCommands((v) => !v)}
               className={`text-[10px] px-1.5 py-0.5 rounded border ${showCommands ? "bg-purple-600 text-white border-purple-600" : "text-purple-700 border-purple-300 hover:bg-purple-50"}`}
               title="What you can say — a movable reminder card">Commands</button>
+            {bubbleHelp && (
+              <button onClick={bubbleHelp.onToggle}
+                className={`text-[10px] px-1.5 py-0.5 rounded border ${bubbleHelp.on ? "bg-purple-600 text-white border-purple-600" : "text-purple-700 border-purple-300 hover:bg-purple-50"}`}
+                title="Show or hide the panel that lists what you can say NEXT, word by word">Next words</button>
+            )}
             {onTestDiagram && (
               <button onClick={onTestDiagram}
                 className="text-[10px] px-1.5 py-0.5 rounded border text-purple-700 border-purple-300 hover:bg-purple-50"

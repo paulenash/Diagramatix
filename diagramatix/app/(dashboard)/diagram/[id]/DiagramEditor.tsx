@@ -78,6 +78,9 @@ import { cardsOf, numberTemplates, templatesToOffer, canAttachInline, diagramHas
 import { planTemplateAttach, checkTemplateAttach, planTemplateShow, planTemplateDrop, whyTemplateCantFollow, anchorNameOf } from "@/app/lib/diagram/templateAttach";
 import { TemplatePickerWindow } from "@/app/components/canvas/TemplatePickerWindow";
 import { VoiceAssistBar } from "@/app/components/canvas/VoiceAssistBar";
+import { VoiceBubbleHelpPanel } from "@/app/components/canvas/VoiceBubbleHelpPanel";
+import { useVoiceBubbleHelp, useTargetNow } from "@/app/hooks/useVoiceBubbleHelp";
+import { computePanel, type OpenFlow } from "@/app/lib/assist/commandTree";
 import { TestDiagramWindow } from "@/app/components/canvas/TestDiagramWindow";
 import { testDiagramCreateBody } from "@/app/lib/assist/testDiagram";
 import { PropertiesPanel } from "@/app/components/canvas/PropertiesPanel";
@@ -2455,7 +2458,7 @@ export function DiagramEditor({
     saveDebugSession, setTemplateFlow, setVoiceAssistOn, setVoiceDebugRecording, stopAbraListening,
     takeDebugSnapshot, templateFlow, templateFlowRef, templatePickSeqRef, templateScrollRef,
     toggleAbraListening, voiceAssistOn, voiceBusy, voiceDebugRecording, voiceInterim, voiceLastId,
-    voiceListening, voiceLog,
+    voiceListening, voiceLog, renameFlow, dividerFlow, pickFlow, messageFlow,
   } = useVoiceSession({
     addConnector, addElementGated, addLaneAt, addPool, alignElements, beginHistoryGroup, beginLabelEdit,
     cancelLabelEdit, clearDiagram, compressLane, compressPool, connectorsRef, convertTaskSubprocess, data,
@@ -2468,7 +2471,33 @@ export function DiagramEditor({
     updateConnectorLabel, updateLabel, updateProperties, wrapInContainer, wrapInPool, wrapInSubprocess,
   });
 
-  const isContext = diagramType === "context" || diagramType === "basic";
+  // ── Voice Assist Bubble Help: the next-words panel (plan slice 3) ──
+  // Separate from the canvas Bubble Help. The SuperAdmin tile switches it on for everyone;
+  // each person can then hide it from the bar's "Next words" button. What it shows is decided
+  // by pure, tested code (app/lib/assist/commandTree/panelState.ts, targetNow.ts).
+  const bubbleActive = voiceAssistOn && !readOnly && diagramType === "bpmn" && voiceAssistAllowed;
+  const bubbleHelp = useVoiceBubbleHelp(bubbleActive);
+  const bubbleShown = bubbleActive && !!bubbleHelp.tree && bubbleHelp.on;
+  const bubbleTarget = useTargetNow(bubbleShown, () => ({
+    elements: elementsRef.current, selected: selectedIdsRef.current, last: voiceLastId.current, pointer: pointerWorld.current,
+  }));
+  const bubbleOpenFlow: OpenFlow | null =
+    renameFlow ? { kind: "rename", phase: renameFlow.phase }
+    : dividerFlow ? { kind: "dividers" }
+    : pickFlow ? { kind: "other", label: "numbered pick" }
+    : messageFlow ? { kind: "other", label: "message pick" }
+    : templateFlow ? { kind: "other", label: "template pick" }
+    : null;
+  const bubbleView = bubbleShown && bubbleHelp.tree
+    ? computePanel(bubbleHelp.tree, { interim: voiceInterim, ghost: assistEnabled && nextStepCandidates.length > 0, flow: bubbleOpenFlow })
+    : null;
+  const bubbleOutline = useMemo(() => {
+    if (!bubbleShown || !bubbleTarget.id) return null;
+    const e = data.elements.find((x) => x.id === bubbleTarget.id);
+    return e ? { x: e.x, y: e.y, width: e.width, height: e.height } : null;
+  }, [bubbleShown, bubbleTarget.id, data.elements]);
+
+  const isContext =diagramType === "context" || diagramType === "basic";
   const defaultDirectionType: DirectionType =
     isContext                            ? "open-directed" :
     diagramType === "process-context" ? "non-directed" :
@@ -5243,6 +5272,7 @@ export function DiagramEditor({
           data={displayData}
           diagramType={diagramType}
           renameBadges={onScreenBadges}
+          voiceTargetOutline={bubbleOutline}
           dividerRulers={onScreenRulers}
           goldFlash={goldFlash}
           liftedIds={dragTravellingIds}
@@ -5369,7 +5399,12 @@ export function DiagramEditor({
             saveState={debugSaveState}
             snapshotCount={debugSnapshots.length}
             onTestDiagram={() => setTestDiagram({ open: true, creating: false, error: null })}
+            bubbleHelp={bubbleHelp.tree ? { on: bubbleHelp.on, onToggle: () => bubbleHelp.setOn(!bubbleHelp.on) } : undefined}
           />
+        )}
+
+        {bubbleShown && bubbleView && (
+          <VoiceBubbleHelpPanel view={bubbleView} target={bubbleTarget} onClose={() => bubbleHelp.setOn(false)} />
         )}
 
         {testDiagram.open && (

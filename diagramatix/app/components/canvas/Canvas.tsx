@@ -429,6 +429,9 @@ interface Props {
   /** Gold flashing: outline what the last Voice Assist command touched. `runId`
    *  is bumped per command so the overlay can tell a new run from a re-render. */
   goldFlash?: { runId: number; targets: readonly GoldFlashTarget[] };
+  /** Voice Assist Bubble Help: a dashed outline on the element "this" would act on right now
+   *  (world coordinates). Decorative and pointer-transparent; null draws nothing. */
+  voiceTargetOutline?: { x: number; y: number; width: number; height: number } | null;
   /** Ids travelling with the current drag — drawn above everything they cross. */
   liftedIds?: readonly string[] | null;
 }
@@ -655,6 +658,7 @@ export function Canvas({
   renameBadges,
   dividerRulers,
   goldFlash,
+  voiceTargetOutline,
   liftedIds,
 }: Props) {
   const displayMode = displayModeProp ?? "normal";
@@ -6384,6 +6388,19 @@ export function Canvas({
               pointer-transparent throughout; it can never eat a click. */}
           {goldFlash && goldFlash.runId > 0 && (
             <GoldFlashOverlay runId={goldFlash.runId} targets={goldFlash.targets} />
+          )}
+
+          {/* Voice Assist Bubble Help: what "this" would act on right now. Same rules as the
+              gold flash — inside the world group, so it follows pan and zoom, and it can
+              never eat a click. */}
+          {voiceTargetOutline && (
+            <rect
+              x={voiceTargetOutline.x - 4} y={voiceTargetOutline.y - 4}
+              width={voiceTargetOutline.width + 8} height={voiceTargetOutline.height + 8}
+              rx={6} fill="none" stroke="#7c3aed" strokeWidth={2} strokeDasharray="6 4"
+              vectorEffect="non-scaling-stroke" opacity={0.85}
+              style={{ pointerEvents: "none" }} aria-hidden="true" data-voice-target-outline
+            />
           )}
 
           {/* Association connectors — rendered above all elements.

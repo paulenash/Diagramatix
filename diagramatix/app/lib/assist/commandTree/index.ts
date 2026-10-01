@@ -24,3 +24,8 @@ let shipped: CommandTree | null = null;
 export function defaultCommandTree(): CommandTree {
   return (shipped ??= compileTree(DEFAULT_PATTERNS, DEFAULT_CONVENTIONS, DEFAULT_LISTS));
 }
+
+export { computePanel } from "./panelState";
+export type { OpenFlow, PanelInput, PanelMode, PanelView } from "./panelState";
+export { targetNow } from "./targetNow";
+export type { TargetKind, TargetNow } from "./targetNow";
