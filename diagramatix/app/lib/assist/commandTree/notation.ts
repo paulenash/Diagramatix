@@ -1,7 +1,7 @@
 /**
- * The command-tree notation — what Voice Assist Bubble Help is built from.
+ * The command-tree notation — what Voice Assist Help is built from.
  *
- * Plan: new features/voice-assist-bubble-help-plan-2026-10-01.md (slice 1).
+ * Plan: new features/voice-assist-help-plan-2026-10-01.md (slice 1).
  *
  * A pattern is one line of words that says what may be spoken, word by word:
  *
@@ -12,7 +12,7 @@
  *   a|b|c           ONE of these (single items, no spaces round the bars)
  *   ( x y | z )     a group: inside parentheses a bar ALWAYS separates branches,
  *                   and a branch may be several items
- *   [ x y ]         optional — shown in [ ] by the bubble
+ *   [ x y ]         optional — shown in [ ] by the help
  *   <slot>          a variable (<existing_element_name>, <number>, <target> …);
  *                   what it means is defined in the conventions, not here
  *   {list}          a named list of words or phrases ({directions}, {type_words})

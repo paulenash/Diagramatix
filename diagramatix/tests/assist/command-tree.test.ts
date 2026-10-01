@@ -1,6 +1,6 @@
 /**
- * Voice Assist Bubble Help — slice 1: the command tree engine.
- * Plan: new features/voice-assist-bubble-help-plan-2026-10-01.md
+ * Voice Assist Help — slice 1: the command tree engine.
+ * Plan: new features/voice-assist-help-plan-2026-10-01.md
  */
 import { describe, it, expect } from "vitest";
 import {

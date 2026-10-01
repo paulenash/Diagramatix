@@ -1,6 +1,6 @@
 "use client";
 /**
- * Voice Assist Bubble Help — the floating panel (plan slice 3).
+ * Voice Assist Help — the floating panel (plan slice 3).
  *
  * Lists what can be said NEXT, word by word, while Voice Assist is on. Presentational:
  * what to show is decided by `computePanel` (app/lib/assist/commandTree/panelState.ts) and
@@ -24,7 +24,7 @@ function Chip({ text }: { text: string }) {
   return <span className={`inline-block text-xs px-1.5 py-0.5 rounded border mr-1.5 mb-1.5 ${cls}`}>{text}</span>;
 }
 
-export function VoiceBubbleHelpPanel({ view, target, onClose }: { view: PanelView; target: TargetNow; onClose: () => void }) {
+export function VoiceAssistHelpPanel({ view, target, onClose }: { view: PanelView; target: TargetNow; onClose: () => void }) {
   // Opens just left of the bottom-centre command bar (440 px wide); draggable from there.
   const [initial] = useState(() => {
     if (typeof window === "undefined") return { x: 24, y: 88 };

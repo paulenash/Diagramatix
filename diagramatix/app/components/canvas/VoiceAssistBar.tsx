@@ -44,7 +44,7 @@ export function VoiceAssistBar({
   saveState = "idle",
   snapshotCount = 0,
   onTestDiagram,
-  bubbleHelp,
+  assistHelp,
 }: {
   listening: boolean;
   /** Mic pressed but the recogniser not yet live — shown as "connecting…" so
@@ -76,10 +76,10 @@ export function VoiceAssistBar({
   /** Show the test diagram the Commands card is written for (the editor owns the window). */
   onTestDiagram?: () => void;
   /**
-   * Voice Assist Bubble Help (the next-words panel): present only when the SuperAdmin has
+   * Voice Assist Help (the next-words panel): present only when the SuperAdmin has
    * switched it on. This person's own on/off lives in the editor; the bar just shows the button.
    */
-  bubbleHelp?: { on: boolean; onToggle: () => void };
+  assistHelp?: { on: boolean; onToggle: () => void };
 }) {
   const [text, setText] = useState("");
   const [showCommands, setShowCommands] = useState(false);
@@ -175,10 +175,10 @@ export function VoiceAssistBar({
             <button onClick={() => setShowCommands((v) => !v)}
               className={`text-[10px] px-1.5 py-0.5 rounded border ${showCommands ? "bg-purple-600 text-white border-purple-600" : "text-purple-700 border-purple-300 hover:bg-purple-50"}`}
               title="What you can say — a movable reminder card">Commands</button>
-            {bubbleHelp && (
-              <button onClick={bubbleHelp.onToggle}
-                className={`text-[10px] px-1.5 py-0.5 rounded border ${bubbleHelp.on ? "bg-purple-600 text-white border-purple-600" : "text-purple-700 border-purple-300 hover:bg-purple-50"}`}
-                title="Show or hide the panel that lists what you can say NEXT, word by word">Next words</button>
+            {assistHelp && (
+              <button onClick={assistHelp.onToggle}
+                className={`text-[10px] px-1.5 py-0.5 rounded border ${assistHelp.on ? "bg-purple-600 text-white border-purple-600" : "text-purple-700 border-purple-300 hover:bg-purple-50"}`}
+                title={assistHelp.on ? "Voice Assist Help is on — click to hide the panel that lists what you can say next" : "Voice Assist Help is off — click to show the panel that lists what you can say next"}>{assistHelp.on ? "Help: on" : "Help: off"}</button>
             )}
             {onTestDiagram && (
               <button onClick={onTestDiagram}

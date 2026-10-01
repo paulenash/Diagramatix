@@ -1,5 +1,5 @@
 /**
- * Voice Assist Bubble Help — the next words must be correct.
+ * Voice Assist Help — the next words must be correct.
  *
  * Paul, 2026-10-01: typing "move dividers" showed `<existing_element_name> … · up · down · left ·
  * right · top · bottom · above · below · over · under · [<number>] · [to]` and "That is already a

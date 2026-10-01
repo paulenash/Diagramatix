@@ -78,8 +78,8 @@ import { cardsOf, numberTemplates, templatesToOffer, canAttachInline, diagramHas
 import { planTemplateAttach, checkTemplateAttach, planTemplateShow, planTemplateDrop, whyTemplateCantFollow, anchorNameOf } from "@/app/lib/diagram/templateAttach";
 import { TemplatePickerWindow } from "@/app/components/canvas/TemplatePickerWindow";
 import { VoiceAssistBar } from "@/app/components/canvas/VoiceAssistBar";
-import { VoiceBubbleHelpPanel } from "@/app/components/canvas/VoiceBubbleHelpPanel";
-import { useVoiceBubbleHelp, useTargetNow } from "@/app/hooks/useVoiceBubbleHelp";
+import { VoiceAssistHelpPanel } from "@/app/components/canvas/VoiceAssistHelpPanel";
+import { useVoiceAssistHelp, useTargetNow } from "@/app/hooks/useVoiceAssistHelp";
 import { computePanel, namesOf, type OpenFlow } from "@/app/lib/assist/commandTree";
 import { TestDiagramWindow } from "@/app/components/canvas/TestDiagramWindow";
 import { testDiagramCreateBody } from "@/app/lib/assist/testDiagram";
@@ -2471,17 +2471,17 @@ export function DiagramEditor({
     updateConnectorLabel, updateLabel, updateProperties, wrapInContainer, wrapInPool, wrapInSubprocess,
   });
 
-  // ── Voice Assist Bubble Help: the next-words panel (plan slice 3) ──
+  // ── Voice Assist Help: the next-words panel (plan slice 3) ──
   // Separate from the canvas Bubble Help. The SuperAdmin tile switches it on for everyone;
-  // each person can then hide it from the bar's "Next words" button. What it shows is decided
+  // each person can then hide it from the bar's "Help" button. What it shows is decided
   // by pure, tested code (app/lib/assist/commandTree/panelState.ts, targetNow.ts).
-  const bubbleActive = voiceAssistOn && !readOnly && diagramType === "bpmn" && voiceAssistAllowed;
-  const bubbleHelp = useVoiceBubbleHelp(bubbleActive);
-  const bubbleShown = bubbleActive && !!bubbleHelp.tree && bubbleHelp.on;
-  const bubbleTarget = useTargetNow(bubbleShown, () => ({
+  const helpActive = voiceAssistOn && !readOnly && diagramType === "bpmn" && voiceAssistAllowed;
+  const assistHelp = useVoiceAssistHelp(helpActive);
+  const helpShown = helpActive && !!assistHelp.tree && assistHelp.on;
+  const helpTarget = useTargetNow(helpShown, () => ({
     elements: elementsRef.current, selected: selectedIdsRef.current, last: voiceLastId.current, pointer: pointerWorld.current,
   }));
-  const bubbleOpenFlow: OpenFlow | null =
+  const helpOpenFlow: OpenFlow | null =
     renameFlow ? { kind: "rename", phase: renameFlow.phase, ...(renameFlow.phase === "pick" && renameFlow.purpose ? { purpose: renameFlow.purpose } : {}) }
     // The divider flow remembers what has happened (a held number, the last move); the panel
     // reads that so it lists only what can really be said next. Read at render time — the log
@@ -2493,15 +2493,15 @@ export function DiagramEditor({
     : null;
   // The names on the diagram, so a name in a command must be a real one (or a pointing phrase):
   // "move dividers down" no longer reads "dividers" as an element's name.
-  const bubbleNames = useMemo(() => (bubbleShown ? namesOf(data.elements, data.connectors) : undefined), [bubbleShown, data.elements, data.connectors]);
-  const bubbleView = bubbleShown && bubbleHelp.tree
-    ? computePanel(bubbleHelp.tree, { interim: voiceInterim, ghost: assistEnabled && nextStepCandidates.length > 0, flow: bubbleOpenFlow, names: bubbleNames })
+  const helpNames = useMemo(() => (helpShown ? namesOf(data.elements, data.connectors) : undefined), [helpShown, data.elements, data.connectors]);
+  const helpView = helpShown && assistHelp.tree
+    ? computePanel(assistHelp.tree, { interim: voiceInterim, ghost: assistEnabled && nextStepCandidates.length > 0, flow: helpOpenFlow, names: helpNames })
     : null;
-  const bubbleOutline = useMemo(() => {
-    if (!bubbleShown || !bubbleTarget.id) return null;
-    const e = data.elements.find((x) => x.id === bubbleTarget.id);
+  const helpOutline = useMemo(() => {
+    if (!helpShown || !helpTarget.id) return null;
+    const e = data.elements.find((x) => x.id === helpTarget.id);
     return e ? { x: e.x, y: e.y, width: e.width, height: e.height } : null;
-  }, [bubbleShown, bubbleTarget.id, data.elements]);
+  }, [helpShown, helpTarget.id, data.elements]);
 
   const isContext =diagramType === "context" || diagramType === "basic";
   const defaultDirectionType: DirectionType =
@@ -5278,7 +5278,7 @@ export function DiagramEditor({
           data={displayData}
           diagramType={diagramType}
           renameBadges={onScreenBadges}
-          voiceTargetOutline={bubbleOutline}
+          voiceTargetOutline={helpOutline}
           dividerRulers={onScreenRulers}
           goldFlash={goldFlash}
           liftedIds={dragTravellingIds}
@@ -5405,12 +5405,12 @@ export function DiagramEditor({
             saveState={debugSaveState}
             snapshotCount={debugSnapshots.length}
             onTestDiagram={() => setTestDiagram({ open: true, creating: false, error: null })}
-            bubbleHelp={bubbleHelp.tree ? { on: bubbleHelp.on, onToggle: () => bubbleHelp.setOn(!bubbleHelp.on) } : undefined}
+            assistHelp={assistHelp.tree ? { on: assistHelp.on, onToggle: () => assistHelp.setOn(!assistHelp.on) } : undefined}
           />
         )}
 
-        {bubbleShown && bubbleView && (
-          <VoiceBubbleHelpPanel view={bubbleView} target={bubbleTarget} onClose={() => bubbleHelp.setOn(false)} />
+        {helpShown && helpView && (
+          <VoiceAssistHelpPanel view={helpView} target={helpTarget} onClose={() => assistHelp.setOn(false)} />
         )}
 
         {testDiagram.open && (

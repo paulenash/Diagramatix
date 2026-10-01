@@ -1,5 +1,5 @@
 /**
- * The Voice Assist Bubble Help tile's data — SuperAdmin only.
+ * The Voice Assist Help tile's data — SuperAdmin only.
  *
  *   GET                       → everything the tile shows: the switch, the patterns and
  *                               conventions in force, the shipped ones (for Reset and "changed"),
@@ -11,19 +11,19 @@
  *   DELETE ?reset=patterns|conventions|all
  *                             → back to the shipped default
  *
- * The editor reads the result through `app/api/voice-bubble-help/route.ts`.
- * Plan: new features/voice-assist-bubble-help-plan-2026-10-01.md
+ * The editor reads the result through `app/api/voice-assist-help/route.ts`.
+ * Plan: new features/voice-assist-help-plan-2026-10-01.md
  */
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { isSuperuser } from "@/app/lib/superuser";
 import { blockReadOnlyImpersonation } from "@/app/lib/routeGuard";
 import {
-  MAX_PATTERNS_CHARS, readVoiceBubbleHelp, writeVoiceBubbleHelp,
-} from "@/app/lib/voice/voiceBubbleHelpSetting";
+  MAX_PATTERNS_CHARS, readVoiceAssistHelp, writeVoiceAssistHelp,
+} from "@/app/lib/voice/voiceAssistHelpSetting";
 import {
   compileTree, DEFAULT_CONVENTIONS, DEFAULT_LISTS, DEFAULT_PATTERNS, isDefaultConventions, isDefaultPatterns,
-  resolveBubbleHelp, validateConventions, type Conventions,
+  resolveAssistHelp, validateConventions, type Conventions,
 } from "@/app/lib/assist/commandTree";
 
 const forbidden = () => NextResponse.json({ error: "SuperAdmin only" }, { status: 403 });
@@ -33,8 +33,8 @@ export async function GET() {
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!isSuperuser(session)) return forbidden();
 
-  const stored = await readVoiceBubbleHelp();
-  const cfg = resolveBubbleHelp(stored);
+  const stored = await readVoiceAssistHelp();
+  const cfg = resolveAssistHelp(stored);
   return NextResponse.json({
     enabled: stored.enabled,
     patterns: cfg.patterns,
@@ -59,7 +59,7 @@ export async function PUT(req: Request) {
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Send JSON" }, { status: 400 }); }
 
   const patch: { enabled?: boolean; patterns?: string | null; conventions?: Conventions | null } = {};
-  const stored = await readVoiceBubbleHelp();
+  const stored = await readVoiceAssistHelp();
 
   if (body.enabled !== undefined) {
     if (typeof body.enabled !== "boolean") return NextResponse.json({ error: "enabled must be true or false" }, { status: 400 });
@@ -91,7 +91,7 @@ export async function PUT(req: Request) {
     }
   }
 
-  await writeVoiceBubbleHelp(patch);
+  await writeVoiceAssistHelp(patch);
   return NextResponse.json({ ok: true });
 }
 
@@ -106,7 +106,7 @@ export async function DELETE(req: Request) {
   if (what !== "patterns" && what !== "conventions" && what !== "all") {
     return NextResponse.json({ error: "reset must be patterns, conventions or all" }, { status: 400 });
   }
-  await writeVoiceBubbleHelp({
+  await writeVoiceAssistHelp({
     ...(what === "patterns" || what === "all" ? { patterns: null } : {}),
     ...(what === "conventions" || what === "all" ? { conventions: null } : {}),
   });

@@ -1,13 +1,13 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { isActingSuperuser } from "@/app/lib/auth/orgPolicy";
-import { VoiceBubbleHelpClient } from "./VoiceBubbleHelpClient";
+import { VoiceAssistHelpClient } from "./VoiceAssistHelpClient";
 
-export const metadata = { title: "Voice Assist Bubble Help — SuperAdmin" };
+export const metadata = { title: "Voice Assist Help — SuperAdmin" };
 
-export default async function VoiceBubbleHelpPage() {
+export default async function VoiceAssistHelpPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
   if (!(await isActingSuperuser(session))) redirect("/dashboard");
-  return <VoiceBubbleHelpClient />;
+  return <VoiceAssistHelpClient />;
 }

@@ -1,5 +1,5 @@
 /**
- * How the bubble writes a list of next words — one place, shared by the tile's preview and
+ * How the help writes a list of next words — one place, shared by the tile's preview and
  * the editor's panel, so what Paul tests in the tile is what he sees in the editor.
  *
  *   word        →  word

@@ -1,7 +1,7 @@
 /**
- * What the Voice Assist Bubble Help panel shows right now — pure.
+ * What the Voice Assist Help panel shows right now — pure.
  *
- * Plan slice 3 (new features/voice-assist-bubble-help-plan-2026-10-01.md). The component
+ * Plan slice 3 (new features/voice-assist-help-plan-2026-10-01.md). The component
  * is a thin skin over this, because the project's tests are node-only: anything in a .tsx
  * cannot be reached, so everything that decides WHAT to show lives here.
  *
@@ -51,7 +51,7 @@ export interface PanelView {
   mode: PanelMode;
   /** The words heard, tidied (shown after "Heard:"). */
   heard: string;
-  /** The next words, written as the bubble writes them: required first, then [optional]. */
+  /** The next words, written as the help writes them: required first, then [optional]. */
   lines: string[];
   /** What was heard is already a whole command — it could stop here. */
   complete: boolean;

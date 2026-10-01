@@ -1,6 +1,6 @@
 /**
- * Voice Assist Bubble Help — slice 3: what the editor panel shows, and the wiring.
- * Plan: new features/voice-assist-bubble-help-plan-2026-10-01.md
+ * Voice Assist Help — slice 3: what the editor panel shows, and the wiring.
+ * Plan: new features/voice-assist-help-plan-2026-10-01.md
  *
  * The suite is node-only (no component rendering), so what the panel DECIDES lives in pure
  * modules — computePanel and targetNow — and is tested here; the component only draws it.
@@ -160,27 +160,27 @@ describe("T5179 — the panel is wired in: separate from the canvas Bubble Help,
   const editor = read("app/(dashboard)/diagram/[id]/DiagramEditor.tsx");
 
   it("the editor draws it only inside Voice Assist's own gate (BPMN, not read-only, voice-assist available) and when the SuperAdmin switch is on", () => {
-    expect(editor).toContain("const bubbleActive = voiceAssistOn && !readOnly && diagramType === \"bpmn\" && voiceAssistAllowed;");
-    expect(editor).toContain("const bubbleShown = bubbleActive && !!bubbleHelp.tree && bubbleHelp.on;");
-    expect(editor).toContain("{bubbleShown && bubbleView && (");
+    expect(editor).toContain("const helpActive = voiceAssistOn && !readOnly && diagramType === \"bpmn\" && voiceAssistAllowed;");
+    expect(editor).toContain("const helpShown = helpActive && !!assistHelp.tree && assistHelp.on;");
+    expect(editor).toContain("{helpShown && helpView && (");
   });
 
   it("the panel's content comes from the pure modules, not decided in the component", () => {
-    expect(editor).toContain("computePanel(bubbleHelp.tree,");
-    const panel = read("app/components/canvas/VoiceBubbleHelpPanel.tsx");
+    expect(editor).toContain("computePanel(assistHelp.tree,");
+    const panel = read("app/components/canvas/VoiceAssistHelpPanel.tsx");
     expect(panel).not.toMatch(/tokenise|tree\.next|resolveRef/);
   });
 
   it("it reads the editor route and its own localStorage key — nothing shared with the canvas Bubble Help", () => {
-    const hook = read("app/hooks/useVoiceBubbleHelp.ts");
-    expect(hook).toContain('"/api/voice-bubble-help"');
-    expect(hook).toContain('"diagramatix.voiceBubbleHelp"');
-    expect(hook).not.toMatch(/diagramatix\.bubbleHelp"|\/api\/bubble-helps/);
+    const hook = read("app/hooks/useVoiceAssistHelp.ts");
+    expect(hook).toContain('"/api/voice-assist-help"');
+    expect(hook).toContain('"diagramatix.voiceAssistHelp"');
+    expect(hook).not.toMatch(/diagramatix\.assistHelp"|\/api\/bubble-helps/);
   });
 
-  it("the bar shows a Next words button only when there is a tree to show", () => {
-    expect(editor).toContain("bubbleHelp={bubbleHelp.tree ? {");
-    expect(read("app/components/canvas/VoiceAssistBar.tsx")).toContain("Next words");
+  it("the bar shows a Help on/off button only when there is a tree to show", () => {
+    expect(editor).toContain("assistHelp={assistHelp.tree ? {");
+    expect(read("app/components/canvas/VoiceAssistBar.tsx")).toContain("Help: on");
   });
 
   it("the target outline is a dashed, pointer-transparent rect inside the canvas world group", () => {
@@ -189,11 +189,11 @@ describe("T5179 — the panel is wired in: separate from the canvas Bubble Help,
     expect(canvas).toMatch(/data-voice-target-outline/);
     const at = canvas.indexOf("{voiceTargetOutline && (");
     expect(canvas.slice(at, at + 700)).toContain('pointerEvents: "none"');
-    expect(editor).toContain("voiceTargetOutline={bubbleOutline}");
+    expect(editor).toContain("voiceTargetOutline={helpOutline}");
   });
 
   it("the panel is draggable (it reuses FloatingPanel) and has no browser dialogs", () => {
-    const panel = read("app/components/canvas/VoiceBubbleHelpPanel.tsx");
+    const panel = read("app/components/canvas/VoiceAssistHelpPanel.tsx");
     expect(panel).toContain("FloatingPanel");
     expect(panel).not.toMatch(/window\.(confirm|alert|prompt)/);
   });

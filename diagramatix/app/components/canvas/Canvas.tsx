@@ -429,7 +429,7 @@ interface Props {
   /** Gold flashing: outline what the last Voice Assist command touched. `runId`
    *  is bumped per command so the overlay can tell a new run from a re-render. */
   goldFlash?: { runId: number; targets: readonly GoldFlashTarget[] };
-  /** Voice Assist Bubble Help: a dashed outline on the element "this" would act on right now
+  /** Voice Assist Help: a dashed outline on the element "this" would act on right now
    *  (world coordinates). Decorative and pointer-transparent; null draws nothing. */
   voiceTargetOutline?: { x: number; y: number; width: number; height: number } | null;
   /** Ids travelling with the current drag — drawn above everything they cross. */
@@ -6390,7 +6390,7 @@ export function Canvas({
             <GoldFlashOverlay runId={goldFlash.runId} targets={goldFlash.targets} />
           )}
 
-          {/* Voice Assist Bubble Help: what "this" would act on right now. Same rules as the
+          {/* Voice Assist Help: what "this" would act on right now. Same rules as the
               gold flash — inside the world group, so it follows pan and zoom, and it can
               never eat a click. */}
           {voiceTargetOutline && (

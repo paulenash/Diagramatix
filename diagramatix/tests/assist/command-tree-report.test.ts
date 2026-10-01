@@ -1,6 +1,6 @@
 /**
- * Voice Assist Bubble Help — slice 4: the "Check against the parser" report, and the tile's microphone.
- * Plan: new features/voice-assist-bubble-help-plan-2026-10-01.md
+ * Voice Assist Help — slice 4: the "Check against the parser" report, and the tile's microphone.
+ * Plan: new features/voice-assist-help-plan-2026-10-01.md
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
@@ -90,7 +90,7 @@ describe("T5185 — with the diagram's own names the names rule accepts what is 
 
 describe("T5186 — the tile: Speak and the check, wired as described", () => {
   const read = (...p: string[]) => readFileSync(p.join("/"), "utf8").replace(/\r\n/g, "\n");
-  const client = read("app/(dashboard)/dashboard/admin/voice-bubble-help/VoiceBubbleHelpClient.tsx");
+  const client = read("app/(dashboard)/dashboard/admin/voice-assist-help/VoiceAssistHelpClient.tsx");
 
   it("Speak uses the editor's recogniser (startDictation), hints it with the test diagram's names, and keeps finished phrases", () => {
     expect(client).toContain("startDictation({");

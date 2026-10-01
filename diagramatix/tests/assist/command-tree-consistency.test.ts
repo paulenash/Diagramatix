@@ -1,14 +1,14 @@
 /**
- * Voice Assist Bubble Help — the command tree must agree with the parser.
+ * Voice Assist Help — the command tree must agree with the parser.
  *
  * The tree is a LENS (Paul's ruling, 2026-10-01): `parseCommand` still acts on commands.
- * The danger is drift — the bubble offering words the parser will not take, or the parser
- * taking sentences the bubble never offers. These tests catch both, in both directions:
+ * The danger is drift — the help offering words the parser will not take, or the parser
+ * taking sentences the help never offers. These tests catch both, in both directions:
  *
  *   tree → parser   every sentence the shipped patterns describe must parse
  *   parser → tree   every sentence in the Commands card must be accepted by the tree
  *
- * Plan: new features/voice-assist-bubble-help-plan-2026-10-01.md (slice 1).
+ * Plan: new features/voice-assist-help-plan-2026-10-01.md (slice 1).
  */
 import { describe, it, expect } from "vitest";
 import { defaultCommandTree, DEFAULT_LISTS } from "@/app/lib/assist/commandTree";

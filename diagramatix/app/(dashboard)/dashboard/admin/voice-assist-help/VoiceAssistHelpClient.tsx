@@ -1,8 +1,8 @@
 "use client";
 /**
- * Voice Assist Bubble Help — the SuperAdmin tile (plan slice 2).
+ * Voice Assist Help — the SuperAdmin tile (plan slice 2).
  *
- * Shows what the bubble will list as the next words, word by word, and lets the
+ * Shows what the help will list as the next words, word by word, and lets the
  * SuperAdmin change it:
  *   1. the global switch (off until Paul turns it on);
  *   2. the conventions — what <existing_element_name>, <existing_label_name>,
@@ -10,13 +10,13 @@
  *   3. the word lists (read-only: they are the parser's own vocabularies);
  *   4. the command patterns, with the [optional] words defined in them, validated live;
  *   5. the next-word summary, generated from the draft;
- *   6. try it — type the words of a command and see the bubble as the editor would draw it.
+ *   6. try it — type the words of a command and see the help as the editor would draw it.
  *
  * Everything below the switch runs in the browser against the DRAFT, so an edit can be
  * tried before it is saved. The parser comparison is the real `parseCommand`. (Speaking
  * a command here is slice 4.)
  *
- * Plan: new features/voice-assist-bubble-help-plan-2026-10-01.md
+ * Plan: new features/voice-assist-help-plan-2026-10-01.md
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -55,7 +55,7 @@ const FLOWS = [
   { id: "dividers-moved", label: "“Move dividers” — after a move" },
 ];
 
-export function VoiceBubbleHelpClient() {
+export function VoiceAssistHelpClient() {
   const [data, setData] = useState<TileData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -64,7 +64,7 @@ export function VoiceBubbleHelpClient() {
 
   const load = useCallback(async () => {
     try {
-      const r = await fetch("/api/admin/voice-bubble-help", { cache: "no-store" });
+      const r = await fetch("/api/admin/voice-assist-help", { cache: "no-store" });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error ?? `the page could not load (${r.status})`);
       setData(j as TileData);
@@ -99,7 +99,7 @@ export function VoiceBubbleHelpClient() {
     <div className="max-w-5xl mx-auto p-6">
       <div className="flex items-baseline gap-3 mb-1">
         <Link href="/dashboard/admin" className="text-xs text-blue-700 hover:underline">← SuperAdmin</Link>
-        <h1 className="text-lg font-semibold text-gray-900">Voice Assist Bubble Help</h1>
+        <h1 className="text-lg font-semibold text-gray-900">Voice Assist Help</h1>
       </div>
       <p className="text-xs text-gray-600 mb-4 max-w-3xl">
         While Voice Assist is on, a panel lists what can be said next, word by word — the first words of every command, then
@@ -127,9 +127,9 @@ export function VoiceBubbleHelpClient() {
           key={`${data.patterns.length}:${data.conventions.length}:${data.usingPatternsOverride}:${data.usingConventionsOverride}`}
           data={data}
           busy={busy}
-          onSwitch={async (enabled) => { if (await send("PUT", "/api/admin/voice-bubble-help", { enabled })) setNotice(enabled ? "Voice Assist Bubble Help is ON." : "Voice Assist Bubble Help is OFF."); }}
-          onSave={async (patch, label) => { if (await send("PUT", "/api/admin/voice-bubble-help", patch)) setNotice(`${label} saved.`); }}
-          onReset={async (what) => { if (await send("DELETE", `/api/admin/voice-bubble-help?reset=${what}`)) setNotice("Back to the shipped default."); }}
+          onSwitch={async (enabled) => { if (await send("PUT", "/api/admin/voice-assist-help", { enabled })) setNotice(enabled ? "Voice Assist Help is ON." : "Voice Assist Help is OFF."); }}
+          onSave={async (patch, label) => { if (await send("PUT", "/api/admin/voice-assist-help", patch)) setNotice(`${label} saved.`); }}
+          onReset={async (what) => { if (await send("DELETE", `/api/admin/voice-assist-help?reset=${what}`)) setNotice("Back to the shipped default."); }}
         />
       )}
     </div>
@@ -173,7 +173,7 @@ function Editor({ data, busy, onSwitch, onSave, onReset }: {
             onClick={() => onSwitch(!data.enabled)} disabled={busy}
             className={`px-3 py-1.5 text-xs rounded font-medium disabled:opacity-50 ${data.enabled ? "bg-green-600 text-white hover:bg-green-700" : "bg-gray-200 text-gray-800 hover:bg-gray-300"}`}
           >
-            {data.enabled ? "Bubble Help is ON" : "Bubble Help is OFF"}
+            {data.enabled ? "Voice Assist Help is ON" : "Voice Assist Help is OFF"}
           </button>
           <span className="text-xs text-gray-600">
             {data.enabled
@@ -549,9 +549,9 @@ function CheckAgainstParser({ tree }: { tree: ReturnType<typeof compileTree> }) 
               : <span className="text-amber-800 font-medium">{report.treeNotParser.length + report.parserNotTree.length} disagreement{report.treeNotParser.length + report.parserNotTree.length === 1 ? "" : "s"}.</span>}
           </p>
           <List title="The patterns describe it, the parser does not take it" lines={report.treeNotParser}
-            hint="The bubble would offer words that do not work. Tighten or remove the pattern line shown." />
+            hint="The help would offer words that do not work. Tighten or remove the pattern line shown." />
           <List title="The parser takes it, the patterns do not describe it" lines={report.parserNotTree}
-            hint="A way of saying a command that the bubble never offers. Add the wording to a pattern if it should be taught." />
+            hint="A way of saying a command that the help never offers. Add the wording to a pattern if it should be taught." />
         </div>
       )}
     </Section>

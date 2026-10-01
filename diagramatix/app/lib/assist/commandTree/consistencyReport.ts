@@ -1,9 +1,9 @@
 /**
  * "Check against the parser" — where the command tree and `parseCommand` disagree.
  *
- * Plan slice 4 (new features/voice-assist-bubble-help-plan-2026-10-01.md). The tree is a LENS: the
- * parser acts on commands, so the danger is DRIFT — the bubble offering words the parser will not
- * take, or the parser taking sentences the bubble never offers. This runs both directions:
+ * Plan slice 4 (new features/voice-assist-help-plan-2026-10-01.md). The tree is a LENS: the
+ * parser acts on commands, so the danger is DRIFT — the help offering words the parser will not
+ * take, or the parser taking sentences the help never offers. This runs both directions:
  *
  *   tree → parser   every sentence the patterns describe is given to the parser
  *   parser → tree   every sentence the parser is known to take (the Commands card, the frozen answer

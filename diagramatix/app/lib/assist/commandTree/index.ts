@@ -1,6 +1,6 @@
 /**
- * Voice Assist Bubble Help — the command tree (plan slices 1–2).
- * new features/voice-assist-bubble-help-plan-2026-10-01.md
+ * Voice Assist Help — the command tree (plan slices 1–2).
+ * new features/voice-assist-help-plan-2026-10-01.md
  */
 export { parsePattern, parseSections } from "./notation";
 export type { Node, Pattern, NotationError, Sections } from "./notation";
@@ -11,8 +11,8 @@ export { DEFAULT_LISTS, DEFAULT_PATTERNS } from "./defaults";
 export { CommandTree, compileTree, tokenise } from "./tree";
 export type { Lists, NextItem, NextResult, WalkContext } from "./tree";
 export { formatItem, formatNext } from "./format";
-export { resolveBubbleHelp, isDefaultPatterns, isDefaultConventions } from "./resolve";
-export type { BubbleHelpConfig } from "./resolve";
+export { resolveAssistHelp, isDefaultPatterns, isDefaultConventions } from "./resolve";
+export type { AssistHelpConfig } from "./resolve";
 
 import { DEFAULT_CONVENTIONS } from "./conventions";
 import { DEFAULT_LISTS, DEFAULT_PATTERNS } from "./defaults";

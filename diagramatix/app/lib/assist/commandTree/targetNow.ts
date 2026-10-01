@@ -1,5 +1,5 @@
 /**
- * What "this" / "that" would act on RIGHT NOW — for the bubble's live "Target:" line.
+ * What "this" / "that" would act on RIGHT NOW — for the help's live "Target:" line.
  *
  * Paul, 2026-10-01: "Have you included 'this' and the identified targets?" The answer comes
  * from the resolver itself (`resolveRef`), never a second copy of its rule, so what the panel

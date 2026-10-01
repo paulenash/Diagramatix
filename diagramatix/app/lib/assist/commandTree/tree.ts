@@ -1,10 +1,10 @@
 /**
  * The command tree: given the words heard so far, what can come next?
  *
- * Plan: new features/voice-assist-bubble-help-plan-2026-10-01.md (slice 1).
+ * Plan: new features/voice-assist-help-plan-2026-10-01.md (slice 1).
  *
  * A LENS, not the parser (Paul's ruling, 2026-10-01). `parseCommand` is still what
- * acts on a command; this answers "what could be said next" for the bubble, and a
+ * acts on a command; this answers "what could be said next" for the help, and a
  * test keeps the two honest (tests/assist/command-tree-consistency.test.ts).
  *
  * The state is a pure function of the tokens, recomputed from scratch every time, so a
@@ -192,7 +192,7 @@ export class CommandTree {
     }
   }
 
-  /** Could the variable take another word after `tokens`? (For the "…" the bubble shows.) */
+  /** Could the variable take another word after `tokens`? (For the "…" the help shows.) */
   private slotMore(def: SlotDef, tokens: string[], ctx: WalkContext): boolean {
     switch (def.kind) {
       case "free": return tokens.length < (def.maxWords ?? 12);
