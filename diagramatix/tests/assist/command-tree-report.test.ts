@@ -92,15 +92,16 @@ describe("T5186 — the tile: Speak and the check, wired as described", () => {
   const read = (...p: string[]) => readFileSync(p.join("/"), "utf8").replace(/\r\n/g, "\n");
   const client = read("app/(dashboard)/dashboard/admin/voice-assist-help/VoiceAssistHelpClient.tsx");
 
-  it("Speak uses the editor's recogniser (startDictation), hints it with the test diagram's names, and keeps finished phrases", () => {
+  it("Speak uses the editor's recogniser (startDictation), hints it with the test diagram's names, and stitches finished phrases into one command (T5201)", () => {
     expect(client).toContain("startDictation({");
     expect(client).toContain("keyterms: diagramKeyterms(fx.elements.map((e) => e.label))");
     expect(client).toContain("onInterim:");
-    expect(client).toContain('finals.current = `${finals.current} ${t}`.trim()');
+    expect(client).toContain("onFinal(utt.current, t)");
+    expect(client).toContain("finals.current = r.utterance.buffer;");
   });
 
   it("the microphone is stopped when the page goes away, and by the button", () => {
-    expect(client).toContain("useEffect(() => () => { handleRef.current?.stop(); }, []);");
+    expect(client).toContain("useEffect(() => () => { handleRef.current?.stop();");
     expect(client).toContain("stopMic()");
     expect(client).toContain("Clear");
   });

@@ -26,6 +26,7 @@ import { COMMAND_CATALOG, SUPERADMIN_COMMAND_CATALOG } from "@/app/lib/assist/co
 import { generateCases } from "@/app/lib/assist/commandGenerator";
 import frozenKey from "@/app/lib/assist/catalogCorpus.expected.json";
 import { startDictation, type DictationHandle } from "@/app/lib/dictation";
+import { EMPTY_UTTERANCE, heardForHelp, onFinal, onQuiet, type Utterance } from "@/app/lib/assist/commandTree/heard";
 import { diagramKeyterms } from "@/app/lib/dictation/diagramKeyterms";
 import {
   compileTree, consistencyReport, DEFAULT_SAMPLE_FILL, formatNext, namesOf, targetNow, tokenise, validateConventions,
@@ -385,18 +386,51 @@ function TryIt({ tree }: { tree: ReturnType<typeof compileTree> }) {
   const [micError, setMicError] = useState<string | null>(null);
   const handleRef = useRef<DictationHandle | null>(null);
   const finals = useRef("");
-  const stopMic = useCallback(() => { handleRef.current?.stop(); handleRef.current = null; setMic("off"); }, []);
-  useEffect(() => () => { handleRef.current?.stop(); }, []);
+  // Speak works the way the real Voice Assist does: fragments are stitched into one command, an
+  // unfinished one is held for the rest, and when you stop talking the command ENDS — the list goes
+  // back to the first words and what it made of the command is shown under "Last command".
+  const utt = useRef<Utterance>(EMPTY_UTTERANCE);
+  const quietTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [lastCmd, setLastCmd] = useState<{ heard: string; repaired: string; ops: ReturnType<typeof parseCommand> } | null>(null);
+  const clearQuiet = () => { if (quietTimer.current) { clearTimeout(quietTimer.current); quietTimer.current = null; } };
+  const stopMic = useCallback(() => {
+    handleRef.current?.stop(); handleRef.current = null; setMic("off");
+    if (quietTimer.current) { clearTimeout(quietTimer.current); quietTimer.current = null; }
+  }, []);
+  useEffect(() => () => { handleRef.current?.stop(); if (quietTimer.current) clearTimeout(quietTimer.current); }, []);
+  const commit = (force: boolean) => {
+    clearQuiet();
+    const r = onQuiet(utt.current, force);
+    utt.current = r.utterance;
+    if (r.kind === "wait") { quietTimer.current = setTimeout(() => commit(false), r.quietMs); return; }
+    finals.current = "";
+    setText("");
+    if (r.command) {
+      const repaired = heardForHelp(r.command);
+      setLastCmd({ heard: r.command, repaired, ops: parseCommand(repaired) });
+    }
+  };
   const startMic = async () => {
     setMicError(null);
+    utt.current = EMPTY_UTTERANCE;
+    finals.current = "";
     setMic("connecting");
     try {
       const h = await startDictation({
-        onText: (t) => { finals.current = `${finals.current} ${t}`.trim(); setText(finals.current); },
-        onInterim: (t) => setText(`${finals.current ? finals.current + " " : ""}${t}`.trim()),
+        onText: (t) => {
+          clearQuiet();
+          const r = onFinal(utt.current, t);
+          utt.current = r.utterance;
+          if (r.kind === "stop") { finals.current = ""; setText(""); stopMic(); return; }
+          if (r.kind === "clear") { finals.current = ""; setText(""); return; }
+          finals.current = r.utterance.buffer;
+          setText(finals.current);
+          quietTimer.current = setTimeout(() => commit(false), r.quietMs);
+        },
+        onInterim: (t) => { clearQuiet(); setText(`${finals.current ? finals.current + " " : ""}${t}`.trim()); },
         onError: (m) => setMicError(m),
         onReady: () => setMic("listening"),
-        onEnd: () => { handleRef.current = null; setMic("off"); },
+        onEnd: () => { handleRef.current = null; setMic("off"); commit(true); },
         keyterms: diagramKeyterms(fx.elements.map((e) => e.label)),
       });
       if (!h) { setMic("off"); setMicError((e) => e ?? "The microphone could not be started."); return; }
@@ -408,11 +442,13 @@ function TryIt({ tree }: { tree: ReturnType<typeof compileTree> }) {
   };
 
   const flows = useMemo(() => FLOWS.filter((f) => tree.sections[`flow ${f.id}`]), [tree]);
-  const tokens = tokenise(text);
+  // What the recogniser heard goes through the same repairs the parser and the hold use (mood → move …).
+  const heard = useMemo(() => heardForHelp(text, { numberPick: flow === "rename-pick" || flow === "select-pick" || flow.startsWith("dividers") }), [text, flow]);
+  const tokens = tokenise(heard);
   const ctx = { ghost, flow: flow || null, ...(useNames ? { names } : {}) };
-  const result = useMemo(() => tree.next(tokens, ctx), [tree, text, ghost, flow, useNames]); // eslint-disable-line react-hooks/exhaustive-deps
-  const ops = useMemo(() => (text.trim() && !flow ? parseCommand(text.trim()) : null), [text, flow]);
-  const treeSays = tree.accepts(text, ctx);
+  const result = useMemo(() => tree.next(tokens, ctx), [tree, heard, ghost, flow, useNames]); // eslint-disable-line react-hooks/exhaustive-deps
+  const ops = useMemo(() => (text.trim() && !flow ? parseCommand(heard.trim()) : null), [heard, flow]);
+  const treeSays = tree.accepts(heard, ctx);
   const sel = "border border-gray-300 rounded px-2 py-1.5 text-xs max-w-[15rem]";
   return (
     <Section title="6. Try it — type the words of a command">
@@ -432,6 +468,15 @@ function TryIt({ tree }: { tree: ReturnType<typeof compileTree> }) {
         >Clear</button>
       </div>
       {micError && <p className="mb-3 text-xs text-red-700">{micError}</p>}
+      {text.trim() && heard.trim().toLowerCase() !== text.trim().toLowerCase() && (
+        <p className="mb-3 text-xs text-gray-600">Heard “{text.trim()}” — read as <b>“{heard.trim()}”</b> after the parser’s own mis-hear repairs.</p>
+      )}
+      {lastCmd && (
+        <p className="mb-3 text-xs text-gray-700">
+          Last command: “{lastCmd.heard}”{lastCmd.repaired !== lastCmd.heard && <> → “{lastCmd.repaired}”</>} —{" "}
+          {lastCmd.ops && lastCmd.ops.length ? <span className="text-green-700">the parser makes it {lastCmd.ops.map((o) => o.op).join(" + ")}</span> : <span className="text-red-700">the parser does not understand it</span>}
+        </p>
+      )}
       <div className="flex flex-wrap gap-x-4 gap-y-2 items-end mb-3">
         <label className="text-[11px] text-gray-600 flex flex-col gap-0.5">Guided flow open?
           <select value={flow} onChange={(e) => setFlow(e.target.value)} className={sel}>

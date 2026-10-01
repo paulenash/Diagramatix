@@ -258,7 +258,7 @@ describe("T5175 — the tile is on the admin grid and the page is SuperAdmin-onl
   it("the tile client compiles the DRAFT in the browser and uses the real parser to compare", () => {
     const c = read("app/(dashboard)/dashboard/admin/voice-assist-help/VoiceAssistHelpClient.tsx");
     expect(c).toContain("compileTree(patterns, convInForce, data.lists)");
-    expect(c).toContain("parseCommand(text.trim())");
+    expect(c).toContain("parseCommand(heard.trim())");   // the REPAIRED words, as the real session parses them
     expect(c).not.toMatch(/window\.(confirm|alert|prompt)/);
   });
 });

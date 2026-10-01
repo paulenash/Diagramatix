@@ -11,6 +11,7 @@
  */
 import { formatNext } from "./format";
 import type { DiagramNames } from "./names";
+import { heardForHelp } from "./heard";
 import { tokenise, type CommandTree } from "./tree";
 
 export type OpenFlow =
@@ -65,7 +66,7 @@ const FLOW_ID = (f: Extract<OpenFlow, { kind: "rename" | "dividers" }>): string 
   f.kind === "dividers" ? (f.held ? "dividers-held" : f.moved ? "dividers-moved" : "dividers") : f.phase === "pick" ? (f.purpose === "select" ? "select-pick" : "rename-pick") : "rename-name";
 
 export function computePanel(tree: CommandTree, input: PanelInput): PanelView {
-  const tokens = tokenise(input.interim);
+  const tokens = tokenise(heardForHelp(input.interim, { numberPick: input.flow?.kind === "rename" && input.flow.phase === "pick" || input.flow?.kind === "dividers" }));
   const heard = tokens.join(" ");
 
   if (input.flow) {
