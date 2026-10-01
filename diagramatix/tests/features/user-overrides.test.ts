@@ -133,7 +133,7 @@ describe("T5140 — the rule: what an override does", () => {
 
 describe("T5141 — the resolvers honour it (and only for that person)", () => {
   function asUser(o: Record<string, unknown> = {}, level = "free") {
-    db.user = { id: "u1", email: "someone@example.com", createdAt: new Date("2026-01-01"), subscriptionAssignedAt: new Date("2026-09-01"), subscriptionEndsAt: null, subscriptionLevelId: level, compTierLevelId: null, compTierExpiresAt: null, compTierGrantedAt: null, featureOverrides: null, limitOverrides: {}, overrideNote: null, overridesExpireAt: null, stripeSubscriptionStatus: null, ...o };
+    db.user = { id: "u1", email: "someone@example.com", createdAt: new Date("2026-01-01"), subscriptionAssignedAt: new Date(Date.now() - 86_400_000), subscriptionEndsAt: null, subscriptionLevelId: level, compTierLevelId: null, compTierExpiresAt: null, compTierGrantedAt: null, featureOverrides: null, limitOverrides: {}, overrideNote: null, overridesExpireAt: null, stripeSubscriptionStatus: null, ...o };
   }
   beforeEach(() => { db.user = null; db.actAs = null; db.projects = 0; db.matrix = []; clearLevelOrders(); });
 

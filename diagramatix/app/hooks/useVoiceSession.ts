@@ -37,7 +37,7 @@ import { type MessagePick, parseMessageAnswer, resolveMessageAnswer } from "@/ap
 import { type AssistOp, validateOps } from "@/app/lib/assist/ops";
 import { interruptsPick } from "@/app/lib/assist/pickInterrupt";
 import { humaniseIds, notUnderstoodMessage } from "@/app/lib/assist/refMentions";
-import { collectRenameTargets, type RenameType } from "@/app/lib/assist/renameTargets";
+import { collectRenameTargets, isClearLabelWord, type RenameType } from "@/app/lib/assist/renameTargets";
 import { ID_REF_PREFIX } from "@/app/lib/assist/resolveRef";
 import { joinSpelledLetters } from "@/app/lib/assist/spelledWord";
 import { leadingSpokenNumber } from "@/app/lib/assist/spokenNumber";
@@ -568,8 +568,18 @@ export function useVoiceSession(host: VoiceSessionHost) {
     // lower-case sentence fragment, which then sits on the diagram looking like
     // a typo beside every name that was typed. First word only — a process step
     // is a phrase, and title case would give "Send To Customer For Approval".
-    const clean = capitaliseFirstWord(name.trim().replace(/[.,!?;:]+$/g, ""));
-    if (!clean) { cancelRenameFlow("rename cancelled (empty name)"); return; }
+    // "clear" / "no label" / "blank" — a connector or message left with NO label
+    // (Paul, 2026-10-01). An empty name still means cancel; this is the way to ask
+    // for empty on purpose. Elements keep their names: a task with none is not
+    // something to do by accident, so it says so and waits for a name.
+    const clearing = isClearLabelWord(name);
+    if (clearing && target.kind !== "connector") {
+      cancelLabelEdit();
+      appendLog({ heard: name.trim(), summary: "a name can’t be cleared here — say the new name", ok: false });
+      return;
+    }
+    const clean = clearing ? "" : capitaliseFirstWord(name.trim().replace(/[.,!?;:]+$/g, ""));
+    if (!clean && !clearing) { cancelRenameFlow("rename cancelled (empty name)"); return; }
     // The guided flow writes the label itself, so it has to arm the flash
     // itself too — applyAssistOps is never involved. The debug recording
     // likewise: a rename is a command that changed the diagram.
@@ -585,13 +595,13 @@ export function useVoiceSession(host: VoiceSessionHost) {
     if (single) {
       // "label selected": one item, no pick loop afterwards.
       setRenameFlow(null);
-      appendLog({ heard: clean, summary: `labelled the connector “${clean}”`, ok: true });
+      appendLog({ heard: clearing ? name.trim() : clean, summary: clearing ? "cleared the connector’s label" : `labelled the connector “${clean}”`, ok: true });
       return;
     }
     const targets = collectRenameTargets(data.elements, data.connectors, itemType);
     if (targets.length > 0) setRenameFlow({ phase: "pick", itemType, targets });
     else setRenameFlow(null);
-    appendLog({ heard: clean, summary: `renamed to “${clean}” — pick another or say “done”`, ok: true });
+    appendLog({ heard: clearing ? name.trim() : clean, summary: clearing ? "cleared the label — pick another or say “done”" : `renamed to “${clean}” — pick another or say “done”`, ok: true });
   }, [updateLabel, updateConnectorLabel, cancelLabelEdit, setRenameFlow, cancelRenameFlow, armDebugBefore, appendLog, data.elements, data.connectors]);
 
   // Handle one utterance while the guided rename flow is active.

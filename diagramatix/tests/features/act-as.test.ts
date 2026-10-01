@@ -60,7 +60,7 @@ const read = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
 const ADMIN = "paul@nashcc.com.au";
 
 function asUser(email: string, level = "expert") {
-  db.user = { id: "u1", email, createdAt: new Date("2026-01-01"), subscriptionAssignedAt: new Date("2026-09-01"), subscriptionEndsAt: null, subscriptionLevelId: level, compTierLevelId: null, compTierExpiresAt: null, compTierGrantedAt: null, featureOverrides: null };
+  db.user = { id: "u1", email, createdAt: new Date("2026-01-01"), subscriptionAssignedAt: new Date(Date.now() - 86_400_000), subscriptionEndsAt: null, subscriptionLevelId: level, compTierLevelId: null, compTierExpiresAt: null, compTierGrantedAt: null, featureOverrides: null };
 }
 beforeEach(() => {
   db.user = null; db.actAs = null; db.projects = 1; db.upserts = []; db.deletes = []; db.userUpdates = [];

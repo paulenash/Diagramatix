@@ -9,7 +9,17 @@ import { containerWordKind } from "./containerWords";
 import type { DiagramElement, Connector } from "../diagram/types";
 
 export type RenameType =
-  | "pool" | "lane" | "message" | "task" | "subprocess" | "gateway" | "event" | "connector";
+  | "pool" | "lane" | "message" | "task" | "activity" | "subprocess" | "gateway" | "event" | "connector";
+
+/**
+ * What to say, in place of a name, to leave a connector or message with NO label
+ * (Paul, 2026-10-01: "Is there a way to rename a connector to empty? If not invent
+ * one"). Before this an empty name meant "cancel", so there was none. Whole-utterance
+ * only — "clear" alone, "no label", "remove the label" — so a name that merely
+ * contains one of these words is still a name.
+ */
+const CLEAR_LABEL_RE = /^(?:clear(?:\s+(?:it|the\s+(?:label|name|text)|label|name|text))?|blank|empty|nothing|no\s+(?:label|name|text)|(?:remove|delete)(?:\s+the)?\s+(?:label|name|text))$/i;
+export const isClearLabelWord = (s: string): boolean => CLEAR_LABEL_RE.test(s.trim().replace(/[.,!?;:]+$/g, "").trim());
 
 export interface RenameTarget {
   id: string;
@@ -96,7 +106,10 @@ export function parseRenameType(word: string): RenameType | null {
   if (container === "pool") return "pool";
   if (container === "lane" || container === "sublane") return "lane"; // lane includes sub-lanes
   if (/^messages?$/.test(w)) return "message";
-  if (/^(?:tasks?|activit(?:y|ies)|steps?)$/.test(w)) return "task";
+  // "tasks" is tasks only (Paul, 2026-10-01: "rename tasks is correct"); "activities"
+  // is every kind of activity — task, collapsed subprocess and expanded subprocess.
+  if (/^(?:tasks?|steps?)$/.test(w)) return "task";
+  if (/^activit(?:y|ies)$/.test(w)) return "activity";
   if (/^subprocess(?:es)?$/.test(w)) return "subprocess";      // includes expanded/collapsed
   if (/^(?:gateways?|decisions?)$/.test(w)) return "gateway";
   if (/^events?$/.test(w)) return "event";                     // all events incl. boundary
@@ -123,6 +136,7 @@ export function collectRenameTargets(
       itemType === "pool" ? e.type === "pool"
       : itemType === "lane" ? e.type === "lane"                 // sub-lanes are lanes too
       : itemType === "task" ? e.type === "task"
+      : itemType === "activity" ? e.type === "task" || SUBPROCESS_TYPES.has(e.type)
       // A merge gateway is never labelled, so don't number it (#4).
       : itemType === "gateway" ? e.type === "gateway" && (e.properties?.gatewayRole as string | undefined) !== "merge"
       : itemType === "event" ? EVENT_TYPES.has(e.type)

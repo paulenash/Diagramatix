@@ -110,7 +110,7 @@ Op shapes (use element NAMES for refs — they are resolved against the diagram;
   { "op":"moveGatewayPoint", "from": same, "to": same }  // the selected gateways' OR events' points: move ONE connector to a FREE point; swap needs both taken. An event has no "middle"
   { "op":"wrapInSubprocess", "label"?: string }           // surround the SELECTED elements with an expanded subprocess
   { "op":"unwrapSubprocess" }                              // dissolve the SELECTED expanded subprocess back into the flow
-  { "op":"renameByType", "itemType": "pool"|"lane"|"message"|"task"|"subprocess"|"gateway"|"event"|"connector" }  // numbers them for a pick
+  { "op":"renameByType", "itemType": "pool"|"lane"|"message"|"task"|"activity"|"subprocess"|"gateway"|"event"|"connector" }  // numbers them for a pick — "task" is tasks only; "activity" is tasks AND collapsed/expanded subprocesses
   { "op":"pickTemplate", "afterRef"?: <name> }   // open the numbered TEMPLATE window; the user then says a number, and that pick is final.
         // Use for anything that asks to add or see a template WITHOUT naming one. Never invent a template name.
         // "afterRef": the element the chosen template goes AFTER ("add a template after Review"). Never an "add" op

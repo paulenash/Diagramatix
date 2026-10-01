@@ -409,7 +409,19 @@ export function resolveRef(spoken: string, elements: DiagramElement[], lastAdded
 
   // Pronouns / recency. Array order reflects add order (adds append), so the
   // last two entries are "it"/"the last" and "the previous".
-  if (LAST_PRONOUNS.has(s)) {
+  if (LAST_PRONOUNS.has(s) || DEMONSTRATIVE.test(s)) {
+    // "this" / "that" POINT (Paul, 2026-10-01: "Using the cursor to indicate which
+    // element is the target is unreliable. I can rename an element using 'this',
+    // move the cursor elsewhere, say 'this' over another element, and the new name
+    // is applied to the previous element"). With nothing selected, the element the
+    // mouse is resting on is what a demonstrative means — it must beat "the one just
+    // added", which only "it" / "the last" / "the new one" (the anaphors) mean. The
+    // selection still comes first (above), so a click-then-"this" is unchanged; and
+    // with the mouse over nothing, recency is still the fallback.
+    if (DEMONSTRATIVE.test(s)) {
+      const pointed = elementUnderPointer(opts.pointer ?? null, elements);
+      if (pointed) return { id: pointed.id };
+    }
     if (lastAddedId && elements.some((e) => e.id === lastAddedId)) return { id: lastAddedId };
     // M5 — with nothing selected and nothing added this session, what the mouse
     // is resting on is a better answer than the last element in the document.

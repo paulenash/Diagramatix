@@ -29,7 +29,7 @@ export type AssistOp =
   /** "delete connectors" / "remove messages" — the selected connector, the connectors on the selected elements, or every one. */
   | { op: "deleteConnectors"; kind: "connector" | "message" }
   /** "delete tasks" / "delete lanes": with nothing selected, numbers them and asks which; with some selected, the selected ones. */
-  | { op: "deleteMany"; itemType: "pool" | "lane" | "message" | "task" | "subprocess" | "gateway" | "event" | "connector"; word: string }
+  | { op: "deleteMany"; itemType: "pool" | "lane" | "message" | "task" | "activity" | "subprocess" | "gateway" | "event" | "connector"; word: string }
   /** "reverse this" — the selected connector's direction flips. */
   | { op: "reverseConnector" }
   | { op: "rename"; ref: Ref; label: string }
@@ -338,7 +338,7 @@ export function validateOp(raw: unknown): AssistOp | null {
     case "deleteConnectors":
       return o.kind === "connector" || o.kind === "message" ? { op: "deleteConnectors", kind: o.kind } : null;
     case "deleteMany":
-      return typeof o.itemType === "string" && ["pool", "lane", "message", "task", "subprocess", "gateway", "event", "connector"].includes(o.itemType)
+      return typeof o.itemType === "string" && ["pool", "lane", "message", "task", "activity", "subprocess", "gateway", "event", "connector"].includes(o.itemType)
         ? { op: "deleteMany", itemType: o.itemType as never, word: typeof o.word === "string" ? o.word : `${o.itemType}s` } : null;
     case "reverseConnector":
       return { op: "reverseConnector" };

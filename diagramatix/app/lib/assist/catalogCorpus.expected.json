@@ -103,6 +103,18 @@
       "itemType": "task"
     }
   ],
+  "rename activities": [
+    {
+      "op": "renameByType",
+      "itemType": "activity"
+    }
+  ],
+  "rename subprocesses": [
+    {
+      "op": "renameByType",
+      "itemType": "subprocess"
+    }
+  ],
   "rename lanes": [
     {
       "op": "renameByType",
@@ -113,6 +125,12 @@
     {
       "op": "renameByType",
       "itemType": "message"
+    }
+  ],
+  "rename connectors": [
+    {
+      "op": "renameByType",
+      "itemType": "connector"
     }
   ],
   "move the gateway two elements to the right": [
