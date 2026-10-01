@@ -24,8 +24,9 @@ function writePref(on: boolean): void {
   try { window.localStorage.setItem(PREF_KEY, on ? "on" : "off"); } catch { /* private window etc. — the choice just does not persist */ }
 }
 
-export function useVoiceAssistHelp(active: boolean): { tree: CommandTree | null; on: boolean; setOn: (on: boolean) => void } {
+export function useVoiceAssistHelp(active: boolean): { tree: CommandTree | null; repairTree: CommandTree | null; on: boolean; setOn: (on: boolean) => void } {
   const [tree, setTree] = useState<CommandTree | null>(null);
+  const [repairTree, setRepairTree] = useState<CommandTree | null>(null);
   const [on, setOnState] = useState(true);
   const asked = useRef(false);
 
@@ -40,17 +41,19 @@ export function useVoiceAssistHelp(active: boolean): { tree: CommandTree | null;
         const r = await fetch("/api/voice-assist-help", { cache: "no-store" });
         if (!r.ok) return;
         const j = await r.json();
-        if (!alive || !j.enabled) return;
+        if (!alive || (!j.enabled && !j.repair)) return;
         // The server has already chosen what is in force; resolving again only compiles it
         // (and falls back to the shipped tree if what arrived somehow does not compile).
-        setTree(resolveAssistHelp({ patterns: j.patterns, conventions: j.conventions }).tree);
+        const t = resolveAssistHelp({ patterns: j.patterns, conventions: j.conventions }).tree;
+        if (j.enabled) setTree(t);
+        if (j.repair) setRepairTree(t);   // position-aware repair of mis-heard words (plan slice 5)
       } catch { /* no help panel is a fine outcome — nothing else depends on it */ }
     })();
     return () => { alive = false; };
   }, [active]);
 
   const setOn = useCallback((v: boolean) => { setOnState(v); writePref(v); }, []);
-  return { tree, on, setOn };
+  return { tree, repairTree, on, setOn };
 }
 
 export function useTargetNow(

@@ -37,6 +37,7 @@ export async function GET() {
   const cfg = resolveAssistHelp(stored);
   return NextResponse.json({
     enabled: stored.enabled,
+    repair: stored.repair,
     patterns: cfg.patterns,
     conventions: cfg.conventions,
     defaultPatterns: DEFAULT_PATTERNS,
@@ -55,15 +56,19 @@ export async function PUT(req: Request) {
   if (readOnly) return readOnly;
   if (!isSuperuser(session)) return forbidden();
 
-  let body: { enabled?: unknown; patterns?: unknown; conventions?: unknown };
+  let body: { enabled?: unknown; repair?: unknown; patterns?: unknown; conventions?: unknown };
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Send JSON" }, { status: 400 }); }
 
-  const patch: { enabled?: boolean; patterns?: string | null; conventions?: Conventions | null } = {};
+  const patch: { enabled?: boolean; repair?: boolean; patterns?: string | null; conventions?: Conventions | null } = {};
   const stored = await readVoiceAssistHelp();
 
   if (body.enabled !== undefined) {
     if (typeof body.enabled !== "boolean") return NextResponse.json({ error: "enabled must be true or false" }, { status: 400 });
     patch.enabled = body.enabled;
+  }
+  if (body.repair !== undefined) {
+    if (typeof body.repair !== "boolean") return NextResponse.json({ error: "repair must be true or false" }, { status: 400 });
+    patch.repair = body.repair;
   }
 
   let conventions = stored.conventions ?? DEFAULT_CONVENTIONS;

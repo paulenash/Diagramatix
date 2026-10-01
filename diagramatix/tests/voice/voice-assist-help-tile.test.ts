@@ -50,7 +50,7 @@ beforeEach(() => { h.session = SUPER; h.readOnly = false; h.rows = []; h.writes 
 
 describe("T5169 — what is stored: off until switched on; a missing row is the shipped default", () => {
   it("nothing stored: off, no overrides", () => {
-    expect(parseStoredVoiceAssistHelp([])).toEqual({ enabled: false, patterns: null, conventions: null });
+    expect(parseStoredVoiceAssistHelp([])).toEqual({ enabled: false, repair: true, patterns: null, conventions: null });   // repair is ON unless switched off (slice 5)
   });
 
   it("reads the switch, the patterns text and the conventions JSON", () => {
@@ -227,9 +227,18 @@ describe("T5174 — what the editor reads: any signed-in user, nothing while it 
     expect((await publicGet()).status).toBe(401);
   });
 
-  it("off: just {enabled:false} — no command text leaves the server", async () => {
+  it("panel off AND repair off: just {enabled:false, repair:false} — no command text leaves the server", async () => {
     h.session = REGULAR;
-    expect(await body(await publicGet())).toEqual({ enabled: false });
+    h.rows = [{ key: "voiceAssistHelp.repair", value: "false" }];
+    expect(await body(await publicGet())).toEqual({ enabled: false, repair: false });
+  });
+
+  it("panel off, repair on (the default): the patterns are sent for the repair only", async () => {
+    h.session = REGULAR;
+    const j = await body(await publicGet());
+    expect(j.enabled).toBe(false);
+    expect(j.repair).toBe(true);
+    expect(typeof j.patterns).toBe("string");
   });
 
   it("on: the patterns and conventions in force", async () => {
@@ -270,7 +279,7 @@ describe("T5200 — renamed from its first name: a setting saved under the OLD k
       { key: LEGACY_PATTERNS_KEY, value: "undo" },
       { key: LEGACY_CONVENTIONS_KEY, value: JSON.stringify(DEFAULT_CONVENTIONS) },
     ]);
-    expect(s).toEqual({ enabled: true, patterns: "undo", conventions: DEFAULT_CONVENTIONS });
+    expect(s).toEqual({ enabled: true, repair: true, patterns: "undo", conventions: DEFAULT_CONVENTIONS });
   });
 
   it("a NEW row wins over the old one, field by field", () => {

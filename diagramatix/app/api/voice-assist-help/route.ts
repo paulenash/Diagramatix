@@ -1,7 +1,7 @@
 /**
  * What the editor needs to draw the Voice Assist Help — any signed-in user.
  *
- *   GET → { enabled, patterns, conventions }
+ *   GET → { enabled, repair, patterns, conventions }   (the patterns are sent when the panel OR the repair is on)
  *
  * `enabled` is the SuperAdmin's global switch (off until Paul turns it on). The patterns and
  * conventions are the ones in force: the SuperAdmin's saved edit, or — if that edit does not
@@ -20,7 +20,8 @@ export async function GET() {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const stored = await readVoiceAssistHelp();
-  if (!stored.enabled) return NextResponse.json({ enabled: false });
+  // The tree is needed by the panel (enabled) AND by position-aware repair (repair, on by default).
+  if (!stored.enabled && !stored.repair) return NextResponse.json({ enabled: false, repair: false });
   const cfg = resolveAssistHelp(stored);
-  return NextResponse.json({ enabled: true, patterns: cfg.patterns, conventions: cfg.conventions });
+  return NextResponse.json({ enabled: stored.enabled, repair: stored.repair, patterns: cfg.patterns, conventions: cfg.conventions });
 }

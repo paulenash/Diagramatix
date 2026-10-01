@@ -24,6 +24,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDiagram } from "@/app/hooks/useDiagram";
 import { useAutoSave } from "@/app/hooks/useAutoSave";
 import { useVoiceSession } from "@/app/hooks/useVoiceSession";
+import { useVoiceAssistHelp } from "@/app/hooks/useVoiceAssistHelp";
+import { computePanel, namesOf, type OpenFlow } from "@/app/lib/assist/commandTree";
+import { repairForRun } from "@/app/lib/assist/commandTree/positionRepair";
 import { elementLimitBlock } from "@/app/lib/diagram/elementLimit";
 import { thumbnailFrameFor } from "@/app/lib/diagram/templateThumbnail";
 import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
@@ -113,8 +116,13 @@ export function MobileVoiceEditor({
   const toggleAutoConnect = () => setAutoConnect((v) => { try { localStorage.setItem("diagramatix.autoConnect", v ? "off" : "on"); } catch { /* not kept */ } return !v; });
 
   const actions = Object.fromEntries(SESSION_ACTIONS.map((n) => [n, (d as unknown as Record<string, unknown>)[n]]));
+  // Voice Assist Help on the phone (plan slice 6): the same next-words list the desktop shows, and the same
+  // position-aware repair, both driven by the SuperAdmin's tile. The repair is read through a ref because the
+  // session is created before the tree has arrived.
+  const repairCommandRef = useRef<((heard: string) => { text: string; note: string | null }) | null>(null);
   const session = useVoiceSession({
     ...actions,
+    repairCommandRef,
     addElementGated,
     data, diagramId, diagramName, diagramType: "bpmn",
     diagramColorConfig: colorConfig ?? {}, displayMode: "normal", riskCatalog: [],
@@ -126,6 +134,13 @@ export function MobileVoiceEditor({
     autoConnect,
     phone: true,
   } as never);
+  const help = useVoiceAssistHelp(true);
+  repairCommandRef.current = help.repairTree
+    ? (heard) => {
+        const r = repairForRun(help.repairTree!, heard);
+        return { text: r.text, note: r.changes.length ? `heard “${heard}” — read as “${r.text}” (${r.changes.map((c) => `${c.from} → ${c.to}`).join(", ")})` : null };
+      }
+    : null;
   // Voice Assist is on while this screen is (the session turns itself off when a diagram opens).
   const { setVoiceAssistOn } = session;
   useEffect(() => { setVoiceAssistOn(true); }, [setVoiceAssistOn]);
@@ -240,6 +255,17 @@ export function MobileVoiceEditor({
     await session.runVoiceCommand(a.run);
   }
   const listening = session.voiceListening;
+  // What can be said NEXT, from the words heard so far. Shown while the mic is open (and while a numbered pick is up).
+  const helpNames = useMemo(() => (help.tree && help.on ? namesOf(data.elements, data.connectors) : undefined), [help.tree, help.on, data.elements, data.connectors]);
+  const helpFlow: OpenFlow | null =
+    session.renameFlow ? { kind: "rename", phase: session.renameFlow.phase, ...(session.renameFlow.phase === "pick" && session.renameFlow.purpose ? { purpose: session.renameFlow.purpose } : {}) }
+    : session.dividerFlow ? { kind: "dividers", held: session.dividerMemRef.current.pendingN !== undefined, moved: !!session.dividerMemRef.current.last }
+    : session.pickFlow ? { kind: "other", label: "numbered pick" }
+    : session.messageFlow ? { kind: "other", label: "message pick" }
+    : null;
+  const helpView = help.tree && help.on && (listening || helpFlow)
+    ? computePanel(help.tree, { interim: session.voiceInterim, ghost: false, flow: helpFlow, names: helpNames })
+    : null;
   // The screen stays on while the mic is open: a phone that sleeps mid-sentence loses the microphone.
   useEffect(() => {
     if (!listening) return;
@@ -293,6 +319,23 @@ export function MobileVoiceEditor({
             ))}
             {recent.length === 0 && !session.voiceInterim && <p className="text-[13px] text-gray-400">Tap the mic and say what to change.</p>}
           </div>
+          {helpView && (
+            <div className="mt-1 pt-1 border-t border-gray-100" aria-label="What you can say next">
+              <div className="flex items-start gap-1.5">
+                <div className="flex-1 max-h-[4.5rem] overflow-y-auto leading-6">
+                  <span className="text-[11px] text-gray-500 mr-1.5">{helpView.mode === "first" || helpView.mode === "no-match" ? "Say:" : "Next:"}</span>
+                  {helpView.lines.map((l, i) => (
+                    <span key={`${l}-${i}`} className={`inline-block text-[12px] px-1.5 py-0.5 rounded border mr-1 mb-1 ${l.startsWith("[") ? "text-gray-400 border-gray-200" : l.includes("<") ? "text-teal-800 border-teal-300 bg-teal-50 italic" : "text-purple-900 border-purple-300 bg-purple-50 font-medium"}`}>{l}</span>
+                  ))}
+                  {helpView.complete && <span className="text-[11px] text-green-700"> ✓ complete</span>}
+                </div>
+                <button onClick={() => help.setOn(false)} className="text-[11px] text-gray-400 px-1" aria-label="Hide the next-words help">hide</button>
+              </div>
+            </div>
+          )}
+          {help.tree && !help.on && (
+            <button onClick={() => help.setOn(true)} className="text-[11px] text-purple-700 underline mt-1">Show what I can say next</button>
+          )}
           {(listening || session.abraConnecting) && (
             <p className="text-[13px] text-gray-500 italic mb-2 min-h-[1.25rem]">
               {session.abraConnecting ? "connecting…" : session.voiceInterim || "listening…"}

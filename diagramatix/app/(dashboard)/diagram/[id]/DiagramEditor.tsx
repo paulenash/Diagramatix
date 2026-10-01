@@ -81,6 +81,7 @@ import { VoiceAssistBar } from "@/app/components/canvas/VoiceAssistBar";
 import { VoiceAssistHelpPanel } from "@/app/components/canvas/VoiceAssistHelpPanel";
 import { useVoiceAssistHelp, useTargetNow } from "@/app/hooks/useVoiceAssistHelp";
 import { computePanel, namesOf, type OpenFlow } from "@/app/lib/assist/commandTree";
+import { repairForRun } from "@/app/lib/assist/commandTree/positionRepair";
 import { TestDiagramWindow } from "@/app/components/canvas/TestDiagramWindow";
 import { testDiagramCreateBody } from "@/app/lib/assist/testDiagram";
 import { PropertiesPanel } from "@/app/components/canvas/PropertiesPanel";
@@ -2447,6 +2448,7 @@ export function DiagramEditor({
   const openTemplateWindowRef = useRef<(opts?: { anchorId?: string; at?: Point }) => string>(() => "");
 
   // ── Voice Assist: session hook (app/hooks/useVoiceSession.ts) ──
+  const repairCommandRef = useRef<((heard: string) => { text: string; note: string | null }) | null>(null);
   // The Voice Assist session — its state, the command router, the guided
   // flows, the microphone loop — lives in the hook, called exactly where the
   // block was so its effects keep their place among the editor's (Stage 4 of
@@ -2460,6 +2462,7 @@ export function DiagramEditor({
     toggleAbraListening, voiceAssistOn, voiceBusy, voiceDebugRecording, voiceInterim, voiceLastId,
     voiceListening, voiceLog, renameFlow, dividerFlow, dividerMemRef, pickFlow, messageFlow,
   } = useVoiceSession({
+    repairCommandRef,
     addConnector, addElementGated, addLaneAt, addPool, alignElements, beginHistoryGroup, beginLabelEdit,
     cancelLabelEdit, clearDiagram, compressLane, compressPool, connectorsRef, convertTaskSubprocess, data,
     deleteConnector, reverseConnector, deleteElement, diagramColorConfig, diagramId, diagramName, diagramType, displayMode,
@@ -2476,7 +2479,14 @@ export function DiagramEditor({
   // each person can then hide it from the bar's "Help" button. What it shows is decided
   // by pure, tested code (app/lib/assist/commandTree/panelState.ts, targetNow.ts).
   const helpActive = voiceAssistOn && !readOnly && diagramType === "bpmn" && voiceAssistAllowed;
-  const assistHelp = useVoiceAssistHelp(helpActive);
+  const assistHelp = useVoiceAssistHelp(voiceAssistOn);
+  // Position-aware repair of mis-heard words (Voice Assist Help slice 5): on by default, switched in the SuperAdmin tile.
+  repairCommandRef.current = assistHelp.repairTree
+    ? (heard) => {
+        const r = repairForRun(assistHelp.repairTree!, heard);
+        return { text: r.text, note: r.changes.length ? `heard “${heard}” — read as “${r.text}” (${r.changes.map((c) => `${c.from} → ${c.to}`).join(", ")})` : null };
+      }
+    : null;
   const helpShown = helpActive && !!assistHelp.tree && assistHelp.on;
   const helpTarget = useTargetNow(helpShown, () => ({
     elements: elementsRef.current, selected: selectedIdsRef.current, last: voiceLastId.current, pointer: pointerWorld.current,

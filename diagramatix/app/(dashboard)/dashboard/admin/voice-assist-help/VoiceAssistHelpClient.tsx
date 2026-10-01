@@ -36,6 +36,7 @@ import {
 
 interface TileData {
   enabled: boolean;
+  repair: boolean;
   patterns: string;
   conventions: Conventions;
   defaultPatterns: string;
@@ -129,6 +130,7 @@ export function VoiceAssistHelpClient() {
           key={`${data.patterns.length}:${data.conventions.length}:${data.usingPatternsOverride}:${data.usingConventionsOverride}`}
           data={data}
           busy={busy}
+          onRepair={async (repair) => { if (await send("PUT", "/api/admin/voice-assist-help", { repair })) setNotice(repair ? "Position-aware repair is ON." : "Position-aware repair is OFF."); }}
           onSwitch={async (enabled) => { if (await send("PUT", "/api/admin/voice-assist-help", { enabled })) setNotice(enabled ? "Voice Assist Help is ON." : "Voice Assist Help is OFF."); }}
           onSave={async (patch, label) => { if (await send("PUT", "/api/admin/voice-assist-help", patch)) setNotice(`${label} saved.`); }}
           onReset={async (what) => { if (await send("DELETE", `/api/admin/voice-assist-help?reset=${what}`)) setNotice("Back to the shipped default."); }}
@@ -147,10 +149,11 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function Editor({ data, busy, onSwitch, onSave, onReset }: {
+function Editor({ data, busy, onSwitch, onRepair, onSave, onReset }: {
   data: TileData;
   busy: boolean;
   onSwitch: (on: boolean) => void;
+  onRepair: (on: boolean) => void;
   onSave: (patch: { patterns?: string; conventions?: Conventions }, label: string) => void;
   onReset: (what: "patterns" | "conventions") => void;
 }) {
@@ -181,6 +184,22 @@ function Editor({ data, busy, onSwitch, onSave, onReset }: {
             {data.enabled
               ? "Anyone who can use Voice Assist can turn the panel on in the editor."
               : "No one sees the panel. (The canvas Bubble Help is a separate switch.)"}
+          </span>
+        </div>
+      </Section>
+
+      <Section title="1b. Position-aware repair of mis-heard words">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => onRepair(!data.repair)} disabled={busy}
+            className={`px-3 py-1.5 text-xs rounded font-medium disabled:opacity-50 ${data.repair ? "bg-green-600 text-white hover:bg-green-700" : "bg-gray-200 text-gray-800 hover:bg-gray-300"}`}
+          >
+            {data.repair ? "Repair is ON" : "Repair is OFF"}
+          </button>
+          <span className="text-xs text-gray-600">
+            When a spoken command is NOT understood, a heard word that the command tree does not expect — but that sounds like exactly one
+            word it does expect (“mood” for “move”, “to” for “two” where a number is due) — is repaired, and the command is run only if the
+            parser then understands it. A command that already parses is never touched, and the log shows what was read as what.
           </span>
         </div>
       </Section>

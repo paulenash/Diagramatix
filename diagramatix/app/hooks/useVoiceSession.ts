@@ -80,6 +80,13 @@ export interface VoiceSessionHost extends Pick<AssistDiagramActions, "addConnect
   setSelectedElementIds: Dispatch<SetStateAction<Set<string>>>;
   /** Auto-connect (the phone's toggle): an add with no "after X" joins the selection / last element. Off by default. */
   autoConnect?: boolean;
+  /**
+   * Position-aware repair of a heard command (Voice Assist Help slice 5). Set by the editor once the
+   * SuperAdmin's setting is known; null/absent means no repair. It only ever turns a command the parser
+   * does NOT understand into one it does, and the session never calls it while a guided flow or a question
+   * is open — those answers go to the flow, not to the parser.
+   */
+  repairCommandRef?: MutableRefObject<((heard: string) => { text: string; note: string | null }) | null>;
   /** The phone: 16 kHz capture and an automatic reconnect when the connection drops (mobile voice stage 7). */
   phone?: boolean;
 }
@@ -1045,7 +1052,15 @@ export function useVoiceSession(host: VoiceSessionHost) {
     voiceWaits.current = 0;
     voiceBuffer.current = "";
     setVoiceInterim("");
-    if (cmd) void runAbraCommandRef.current(cmd);
+    if (cmd) {
+      const nothingOpen = !(renameFlowRef.current || messageFlowRef.current || dividerFlowRef.current
+        || templateFlowRef.current || pickFlowRef.current || pendingConfirmRef.current);
+      const fixed = nothingOpen ? host.repairCommandRef?.current?.(cmd) : null;
+      if (fixed && fixed.text !== cmd) {
+        appendLog({ heard: cmd, summary: fixed.note ?? `read as “${fixed.text}”`, ok: true });
+        void runAbraCommandRef.current(fixed.text);
+      } else void runAbraCommandRef.current(cmd);
+    }
   }, []);
 
   const stopAbraListening = useCallback(() => {

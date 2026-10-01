@@ -2,6 +2,8 @@
  * Voice Assist Help — what the SuperAdmin tile stores. Server-only.
  *
  *   `voiceAssistHelp.enabled`      the global switch. Missing means OFF (Paul turns it on).
+ *   `voiceAssistHelp.repair`       position-aware repair of mis-heard words (plan slice 5). Missing means ON
+ *                                  (Paul, 2026-10-01: "put it on, configurably, for now"); only "false" turns it off.
  *   `voiceAssistHelp.patterns`     the SuperAdmin's edit of the command patterns (text).
  *   `voiceAssistHelp.conventions`  the SuperAdmin's edit of the conventions (JSON).
  *
@@ -24,6 +26,7 @@ import type { Conventions } from "@/app/lib/assist/commandTree/conventions";
 
 export const VAH_ENABLED_KEY = "voiceAssistHelp.enabled";
 export const VAH_PATTERNS_KEY = "voiceAssistHelp.patterns";
+export const VAH_REPAIR_KEY = "voiceAssistHelp.repair";
 export const VAH_CONVENTIONS_KEY = "voiceAssistHelp.conventions";
 
 /** The keys this feature was first stored under — read as a fallback, removed on the next save. */
@@ -36,6 +39,8 @@ export const MAX_PATTERNS_CHARS = 60_000;
 
 export interface StoredVoiceAssistHelp {
   enabled: boolean;
+  /** Position-aware repair of mis-heard words is on (the default). */
+  repair: boolean;
   /** The stored edit, or null when there is none (the shipped default applies). */
   patterns: string | null;
   conventions: Conventions | null;
@@ -55,6 +60,7 @@ export function parseStoredVoiceAssistHelp(rows: ReadonlyArray<{ key: string; va
   }
   return {
     enabled: get(VAH_ENABLED_KEY, LEGACY_ENABLED_KEY) === "true",
+    repair: rows.find((r) => r.key === VAH_REPAIR_KEY)?.value !== "false",
     patterns: patterns && patterns.trim() ? patterns : null,
     conventions,
   };
@@ -64,7 +70,7 @@ export async function readVoiceAssistHelp(): Promise<StoredVoiceAssistHelp> {
   const rows = await prisma.appSetting.findMany({
     where: {
       key: {
-        in: [VAH_ENABLED_KEY, VAH_PATTERNS_KEY, VAH_CONVENTIONS_KEY, LEGACY_ENABLED_KEY, LEGACY_PATTERNS_KEY, LEGACY_CONVENTIONS_KEY],
+        in: [VAH_ENABLED_KEY, VAH_REPAIR_KEY, VAH_PATTERNS_KEY, VAH_CONVENTIONS_KEY, LEGACY_ENABLED_KEY, LEGACY_PATTERNS_KEY, LEGACY_CONVENTIONS_KEY],
       },
     },
     select: { key: true, value: true },
@@ -73,13 +79,14 @@ export async function readVoiceAssistHelp(): Promise<StoredVoiceAssistHelp> {
 }
 
 /** `null` for patterns / conventions means "no override" — the row is deleted. A field that is written also clears its legacy row. */
-export async function writeVoiceAssistHelp(patch: { enabled?: boolean; patterns?: string | null; conventions?: Conventions | null }): Promise<void> {
+export async function writeVoiceAssistHelp(patch: { enabled?: boolean; repair?: boolean; patterns?: string | null; conventions?: Conventions | null }): Promise<void> {
   const ops = [];
   const put = (key: string, value: string) => prisma.appSetting.upsert({ where: { key }, create: { key, value }, update: { value } });
   const drop = (key: string) => prisma.appSetting.deleteMany({ where: { key } });
   if (patch.enabled !== undefined) {
     ops.push(put(VAH_ENABLED_KEY, patch.enabled ? "true" : "false"), drop(LEGACY_ENABLED_KEY));
   }
+  if (patch.repair !== undefined) ops.push(put(VAH_REPAIR_KEY, patch.repair ? "true" : "false"));
   if (patch.patterns !== undefined) {
     ops.push(patch.patterns === null ? drop(VAH_PATTERNS_KEY) : put(VAH_PATTERNS_KEY, patch.patterns), drop(LEGACY_PATTERNS_KEY));
   }
