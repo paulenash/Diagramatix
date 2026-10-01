@@ -241,6 +241,19 @@ describe("T5196 — pools, lanes and sub-lanes are named with every word capital
     expect(titleCaseName("")).toBe("");
   });
 
+  it("SMALL WORDS stay lower case unless first (Paul: “Department of Health”, “The Defence Department”)", () => {
+    expect(titleCaseName("department of health")).toBe("Department of Health");
+    expect(titleCaseName("the defence department")).toBe("The Defence Department");
+    expect(titleCaseName("bank of new south wales")).toBe("Bank of New South Wales");
+    expect(titleCaseName("accounts payable and receivable")).toBe("Accounts Payable and Receivable");
+    expect(titleCaseName("of counsel")).toBe("Of Counsel");                       // a small word FIRST is capitalised
+    expect(titleCaseName("Department Of Health")).toBe("Department of Health");     // the model's all-capitals style is brought back
+    expect(titleCaseName("IT and support")).toBe("IT and Support");
+    expect(titleCaseName("Plan A")).toBe("Plan A");                               // an all-caps word is left alone
+    expect(titleCaseName("friends of the (the) club")).toBe("Friends of the (the) Club");
+    expect(titleCaseName("in-house team")).toBe("In-house Team");                  // “in-house” is one word, not the small word “in”
+  });
+
   it("renaming a lane or pool by sentence", async () => {
     const h = await mountSession({ initial: diagram() });
     await h.typed("rename Clerk to claims processing team");

@@ -25,7 +25,7 @@ SET rules = regexp_replace(
       E'(\r?\n)(\r?\n)## Group 5:',
       E'\\1R4.'
         || lpad((SELECT COALESCE(MAX((m)[1]::int), 0) + 1 FROM regexp_matches(r.rules, E'R4\\.(\\d+):', 'g') AS m)::text, 2, '0')
-        || $NEW$: Pool, Lane and Sub-lane names are written with EVERY word capitalised (for example "Claims Processing", "Finance Team", "Customer Service"). Activities, events and gateways keep their own style: only the first word capitalised.$NEW$
+        || $NEW$: Pool, Lane and Sub-lane names are written with EVERY word capitalised, except small words (a, an, the, and, but, or, nor, for, of, on, in, at, to, by, as), which stay lower case unless they come first (for example "Claims Processing", "Department of Health", "The Defence Department", "Customer Service"). Activities, events and gateways keep their own style: only the first word capitalised.$NEW$
         || E'\\1\\2## Group 5:'
     ),
     "updatedAt" = NOW()

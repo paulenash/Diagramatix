@@ -64,6 +64,17 @@ describe("T5198 — generated pool and lane names are fully capitalised", () => 
     expect(lanes).toContain("Level Two Engineers");   // the sub-lane, flattened by the layout
   });
 
+  it("small words stay lower case unless first — in generated names too, even when the model capitalised them", () => {
+    const els: AiElement[] = [
+      { id: "p", type: "pool", label: "Department Of Health", poolType: "white-box", lanes: [{ id: "l1", name: "the claims team" }, { id: "l2", name: "Accounts Payable And Receivable" }] },
+      { id: "s", type: "start-event", label: "go", pool: "p", lane: "l1" },
+      { id: "t", type: "task", label: "do it", pool: "p", lane: "l2" },
+    ];
+    const o = run(els, [{ sourceId: "s", targetId: "t" }]);
+    expect(labelOf(o, "p")).toBe("Department of Health");
+    expect(o.elements.filter((e) => e.type === "lane").map((e) => e.label).sort()).toEqual(["Accounts Payable and Receivable", "The Claims Team"]);
+  });
+
   it("the caller's plan is not changed — only the diagram that comes back", () => {
     const input = plan();
     run(input, flow);

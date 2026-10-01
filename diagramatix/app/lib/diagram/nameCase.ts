@@ -77,17 +77,30 @@ export function wouldCapitalise(name: string): boolean {
  * Sublanes should always be named with full capitalisation … I mean capitalise each word in the name"):
  * "claims processing" → "Claims Processing", "the finance team" → "The Finance Team".
  *
+ * SMALL WORDS stay lower case unless they come first (Paul, 2026-10-01: "Department of Health … small words not
+ * capitalised except 'The Defence Department', i.e. small words at the beginning"): "department of health" →
+ * "Department of Health", "bank of new south wales" → "Bank of New South Wales", "the defence department" →
+ * "The Defence Department". A small word the model capitalised mid-name ("Department Of Health") is brought back
+ * to lower case. (An all-caps word such as the "A" in "Plan A" is left alone.)
+ *
  * Activities, events and gateways are phrases and keep `capitaliseFirstWord` ("Send invoice to customer").
- * A word that already has a capital anywhere in it is a deliberate choice and is left alone — "IT Support"
+ * Any OTHER word that already has a capital anywhere in it is a deliberate choice and is left alone — "IT Support"
  * stays "IT Support", "eCommerce" stays "eCommerce". Only the first LETTER of each space-separated word is
  * touched; the rest of the word, digits and punctuation are as they were.
  */
+export const SMALL_WORDS: ReadonlySet<string> = new Set([
+  "a", "an", "the", "and", "but", "or", "nor", "for", "of", "on", "in", "at", "to", "by", "as", "per", "via", "vs",
+]);
+
 export function titleCaseName(name: string): string {
   const trimmed = String(name ?? "").trim().replace(/\s+/g, " ");
   if (!trimmed) return trimmed;
   return trimmed
     .split(" ")
-    .map((w) => {
+    .map((w, i) => {
+      // The word without punctuation round it: "(the)" → "the".
+      const bare = w.replace(/^[^A-Za-z]+|[^A-Za-z]+$/g, "");
+      if (i > 0 && bare && SMALL_WORDS.has(bare.toLowerCase()) && bare !== bare.toUpperCase()) return w.toLowerCase();
       if (/[A-Z]/.test(w)) return w;
       const at = w.search(/[a-z]/);
       return at < 0 ? w : w.slice(0, at) + w[at].toUpperCase() + w.slice(at + 1);
