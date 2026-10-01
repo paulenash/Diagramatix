@@ -1,0 +1,22 @@
+/**
+ * Voice Assist Bubble Help — the command tree (plan slice 1).
+ * new features/voice-assist-bubble-help-plan-2026-10-01.md
+ */
+export { parsePattern, parseSections } from "./notation";
+export type { Node, Pattern, NotationError, Sections } from "./notation";
+export { DEFAULT_CONVENTIONS, slotDefOf } from "./conventions";
+export type { Conventions, SlotDef, SlotKind } from "./conventions";
+export { DEFAULT_LISTS, DEFAULT_PATTERNS } from "./defaults";
+export { CommandTree, compileTree, tokenise } from "./tree";
+export type { Lists, NextItem, NextResult, WalkContext } from "./tree";
+
+import { DEFAULT_CONVENTIONS } from "./conventions";
+import { DEFAULT_LISTS, DEFAULT_PATTERNS } from "./defaults";
+import { compileTree, type CommandTree } from "./tree";
+
+let shipped: CommandTree | null = null;
+
+/** The tree as shipped (code defaults). Cached — it is immutable. */
+export function defaultCommandTree(): CommandTree {
+  return (shipped ??= compileTree(DEFAULT_PATTERNS, DEFAULT_CONVENTIONS, DEFAULT_LISTS));
+}
