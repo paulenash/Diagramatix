@@ -21,12 +21,16 @@
 import type { Node, Pattern, Sections } from "./notation";
 import { parsePattern, parseSections } from "./notation";
 import { DISTANCE_WORDS, isNumberToken, NUMBER_WORD_SET, slotDefOf, type Conventions, type SlotDef } from "./conventions";
+import { nameFits, type DiagramNames } from "./names";
 
 export type Lists = Record<string, readonly string[]>;
 
 export interface WalkContext {
-  /** Names on the diagram, for the variables that take them (reserved: v1 does not narrow by them). */
-  names?: { elements: readonly string[]; labels: readonly string[] };
+  /**
+   * Names on the diagram. When given, <existing_element_name> / <existing_label_name> take only
+   * words that belong to a real name (or a pointing phrase); when absent they take any words.
+   */
+  names?: DiagramNames;
   /** Assist ghost suggestions are on screen — the "assist" section counts. */
   ghost?: boolean;
   /** A guided flow is open: ONLY that flow's patterns apply ("flow rename-pick" → "rename-pick"). */
@@ -56,7 +60,8 @@ export interface NextResult {
 }
 
 interface Open { def: SlotDef; tokens: string[] }
-interface State { seq: Node[]; open?: Open }
+/** `viaSlot`: a <variable> has taken words on the way here. A reading that used only command words is preferred for display. */
+interface State { seq: Node[]; open?: Open; viaSlot?: boolean }
 interface Head { kind: "word" | "slot"; text: string; rest: Node[]; optional: boolean }
 
 const MAX_STATES = 400;
@@ -145,11 +150,13 @@ export class CommandTree {
     switch (def.kind) {
       case "free":
         return tokens.length <= (def.maxWords ?? 12);
-      case "names":
-        // v1 is lenient: an unrecognised name is still a name, so it never stops following
-        // the speaker. (ctx.names is reserved for position-aware repair, slice 5.)
-        void ctx;
-        return tokens.length <= (def.maxWords ?? 8);
+      case "names": {
+        if (tokens.length > (def.maxWords ?? 8)) return false;
+        // With the diagram's names known, a name is a real name (or a pointing phrase). Without
+        // them (no diagram to ask) any words may be a name — the lenient reading.
+        const list = ctx.names ? (def.source === "labels" ? ctx.names.labels : ctx.names.elements) : null;
+        return list ? nameFits(tokens, list).ok : true;
+      }
       case "number":
         return tokens.length <= 2 && tokens.every(isNumberToken);
       case "distance":
@@ -167,8 +174,11 @@ export class CommandTree {
     if (!tokens.length) return false;
     switch (def.kind) {
       case "free":
-      case "names":
         return true;
+      case "names": {
+        const list = ctx.names ? (def.source === "labels" ? ctx.names.labels : ctx.names.elements) : null;
+        return list ? nameFits(tokens, list).complete : true;
+      }
       case "number":
         return tokens.every(isNumberToken);
       case "distance": {
@@ -214,10 +224,10 @@ export class CommandTree {
     const out: State[] = [];
     for (const h of this.expand(st.seq, 0).heads) {
       if (h.kind === "word") {
-        if (h.text === token) out.push({ seq: h.rest });
+        if (h.text === token) out.push({ seq: h.rest, ...(st.viaSlot ? { viaSlot: true } : {}) });
       } else {
         const def = slotDefOf(this.conventions, h.text);
-        if (def && this.slotOk(def, [token], ctx)) out.push({ seq: h.rest, open: { def, tokens: [token] } });
+        if (def && this.slotOk(def, [token], ctx)) out.push({ seq: h.rest, open: { def, tokens: [token] }, viaSlot: true });
       }
     }
     return out;
@@ -228,9 +238,9 @@ export class CommandTree {
     for (const st of states) {
       if (st.open) {
         const toks = [...st.open.tokens, token];
-        if (this.slotOk(st.open.def, toks, ctx)) out.push({ seq: st.seq, open: { def: st.open.def, tokens: toks } });
+        if (this.slotOk(st.open.def, toks, ctx)) out.push({ seq: st.seq, open: { def: st.open.def, tokens: toks }, viaSlot: true });
         // …or the variable ended before this word, and this word is what follows it.
-        if (this.slotComplete(st.open.def, st.open.tokens, ctx)) out.push(...this.stepPlain({ seq: st.seq }, token, ctx));
+        if (this.slotComplete(st.open.def, st.open.tokens, ctx)) out.push(...this.stepPlain({ seq: st.seq, viaSlot: true }, token, ctx));
       } else {
         out.push(...this.stepPlain(st, token, ctx));
       }
@@ -277,15 +287,26 @@ export class CommandTree {
       if (!have) items.set(key, it);
       else { have.optional = have.optional && it.optional; have.more = have.more || it.more; }
     };
+    // A reading that used only command words beats one that took some of the words as a NAME:
+    // "move dividers" is the command, not "move" + an element called dividers (Paul,
+    // 2026-10-01). The name reading is the fallback — it takes over the moment no command
+    // word fits ("move top floor up" with a lane called Top Floor). What counts as COMPLETE
+    // still looks at every reading, so no real command is ever called unfinished.
+    const literal = states.filter((s) => !s.viaSlot);
+    const shown = literal.length ? literal : states;
     for (const st of states) {
+      if (st.open) {
+        if (!this.slotComplete(st.open.def, st.open.tokens, ctx)) continue;
+      }
+      if (this.expand(st.seq, 0).end && toks.length) complete = true;
+    }
+    for (const st of shown) {
       if (st.open) {
         openSlot = st.open.def.name;
         if (this.slotMore(st.open.def, st.open.tokens, ctx)) add({ kind: "slot", text: st.open.def.name, optional: false, more: true });
         if (!this.slotComplete(st.open.def, st.open.tokens, ctx)) continue;
       }
-      const e = this.expand(st.seq, 0);
-      if (e.end && toks.length) complete = true;
-      for (const h of e.heads) add({ kind: h.kind, text: h.text, optional: h.optional });
+      for (const h of this.expand(st.seq, 0).heads) add({ kind: h.kind, text: h.text, optional: h.optional });
     }
     return { ok: states.length > 0, next: [...items.values()], openSlot, complete };
   }

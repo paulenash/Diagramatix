@@ -64,10 +64,27 @@ describe("T5177 — guided flows show their own words", () => {
   it("rename-by-number: the number (and then a name), or done", () => {
     const pick = view("", { flow: { kind: "rename", phase: "pick" } });
     expect(pick.mode).toBe("flow");
-    expect(pick.lines).toEqual(expect.arrayContaining(["<number>", "done", "cancel"]));
+    // done is the way out; cancel and undo are secondary, so dimmed in [ ] and last
+    expect(pick.lines).toEqual(expect.arrayContaining(["<number>", "done", "[cancel]", "[undo]"]));
+    expect(pick.lines.indexOf("done")).toBeLessThan(pick.lines.indexOf("[cancel]"));
     expect(pick.note).toMatch(/Pick one by its number/);
     const name = view("", { flow: { kind: "rename", phase: "name" } });
     expect(name.lines).toEqual(expect.arrayContaining(["<new_label_name>", "clear", "done"]));
+  });
+
+  it("move dividers, just opened: ONLY a number or done — not up, down or an amount (Paul, 2026-10-01)", () => {
+    expect(view("", { flow: { kind: "dividers" } }).lines).toEqual(["<number>", "done"]);
+    expect(view("", { flow: { kind: "dividers" } }).note).toMatch(/say a divider’s number/);
+  });
+
+  it("move dividers: after a number is said it waits for its way; after a move, another number or an amount", () => {
+    const held = view("", { flow: { kind: "dividers", held: true } });
+    expect(held.lines).toEqual(expect.arrayContaining(["up", "down", "<distance>"]));
+    expect(held.note).toMatch(/waiting — say up or down/);
+    const moved = view("", { flow: { kind: "dividers", moved: true } });
+    expect(moved.lines).toEqual(["<number>", "<distance>", "done"]);
+    // a number that has just been said wins over an earlier move
+    expect(view("", { flow: { kind: "dividers", held: true, moved: true } }).lines).toContain("up");
   });
 
   it("move dividers: the number, then up or down, then how far", () => {

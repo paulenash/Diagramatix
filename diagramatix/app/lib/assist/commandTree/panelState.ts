@@ -10,11 +10,17 @@
  * guided flow — if any — is open.
  */
 import { formatNext } from "./format";
+import type { DiagramNames } from "./names";
 import { tokenise, type CommandTree } from "./tree";
 
 export type OpenFlow =
   | { kind: "rename"; phase: "pick" | "name" }
-  | { kind: "dividers" }
+  /**
+   * "move dividers". What can be said depends on what has happened: `held` — a number was said and
+   * is waiting for its way ("two" … "down"); `moved` — a divider has been moved, so an amount on its
+   * own adjusts that move. Neither: it has just opened, and only a number or "done" makes sense.
+   */
+  | { kind: "dividers"; held?: boolean; moved?: boolean }
   /** A guided flow the tree has no sub-grammar for (numbered pick, message pick, template pick). */
   | { kind: "other"; label: string };
 
@@ -24,6 +30,8 @@ export interface PanelInput {
   /** Assist ghost suggestions are showing — the Assist-only words count. */
   ghost: boolean;
   flow: OpenFlow | null;
+  /** The names on the diagram, so a name variable takes only real names (see names.ts). Absent: any words. */
+  names?: DiagramNames;
 }
 
 export type PanelMode =
@@ -53,7 +61,7 @@ export interface PanelView {
 }
 
 const FLOW_ID = (f: Extract<OpenFlow, { kind: "rename" | "dividers" }>): string =>
-  f.kind === "dividers" ? "dividers" : f.phase === "pick" ? "rename-pick" : "rename-name";
+  f.kind === "dividers" ? (f.held ? "dividers-held" : f.moved ? "dividers-moved" : "dividers") : f.phase === "pick" ? "rename-pick" : "rename-name";
 
 export function computePanel(tree: CommandTree, input: PanelInput): PanelView {
   const tokens = tokenise(input.interim);
@@ -63,16 +71,19 @@ export function computePanel(tree: CommandTree, input: PanelInput): PanelView {
     if (input.flow.kind !== "other" && tree.sections[`flow ${FLOW_ID(input.flow)}`]) {
       const r = tree.next(tokens, { flow: FLOW_ID(input.flow) });
       const lines = r.ok ? formatNext(r.next) : formatNext(tree.firstWords({ flow: FLOW_ID(input.flow) }));
+      const f = input.flow;
       return {
         mode: "flow", heard, lines, complete: r.ok && r.complete, openSlot: r.openSlot,
-        note: input.flow.kind === "dividers" ? "Move dividers is open." : input.flow.phase === "pick" ? "Pick one by its number." : "Say the new name.",
+        note: f.kind === "dividers"
+          ? (f.held ? "Move dividers: that number is waiting — say up or down." : f.moved ? "Move dividers: another divider, or an amount to adjust that move." : "Move dividers is open — say a divider’s number.")
+          : f.phase === "pick" ? "Pick one by its number." : "Say the new name.",
       };
     }
     const label = input.flow.kind === "other" ? input.flow.label : "guided pick";
     return { mode: "other-flow", heard, lines: ["<number>", "cancel"], complete: false, openSlot: null, note: `A ${label} is open — say its number, or cancel.` };
   }
 
-  const ctx = { ghost: input.ghost };
+  const ctx = { ghost: input.ghost, ...(input.names ? { names: input.names } : {}) };
   if (!tokens.length) {
     return { mode: "first", heard, lines: formatNext(tree.firstWords(ctx)), complete: false, openSlot: null, note: null };
   }

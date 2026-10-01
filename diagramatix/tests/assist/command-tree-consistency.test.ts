@@ -130,8 +130,24 @@ describe("T5168 — the divider flow's sub-grammar matches what the flow reads",
     }
   });
 
-  it("the first words in the flow are the number, the amount and “done”", () => {
-    const first = tree.firstWords({ flow: "dividers" }).map((i) => (i.kind === "slot" ? `<${i.text}>` : i.text));
-    expect(first).toEqual(expect.arrayContaining(["<number>", "up", "down", "<distance>", "done"]));
+  it("the flow has three states, and each lists only what the flow reads in that state", () => {
+    const first = (flow: string) => tree.firstWords({ flow }).map((i) => (i.kind === "slot" ? `<${i.text}>` : i.text));
+    // Just opened: Paul's reading — only a number, or done.
+    expect(first("dividers")).toEqual(["<number>", "done"]);
+    // A number is waiting for its way.
+    expect(first("dividers-held")).toEqual(expect.arrayContaining(["up", "down", "<distance>", "<number>", "done"]));
+    // After a move: another divider, or an amount to adjust the last move — not a bare up/down.
+    expect(first("dividers-moved")).toEqual(["<number>", "<distance>", "done"]);
+  });
+
+  it("the flow reads exactly what each state offers: a bare way only after a held number, a bare amount only after a move", () => {
+    const targets2 = collectDividers(fixtureDiagram().elements);
+    // after a held number
+    expect(readDividerUtterance("down", targets2, { pendingN: 1 })?.kind).toBe("move");
+    expect(readDividerUtterance("down", targets2, {})).toBeNull();
+    // after a move: an amount alone adjusts it
+    const moved = { last: { id: targets2[0].id, n: 1, direction: "down" as const, moved: 20 } };
+    expect(readDividerUtterance("fifty pixels", targets2, moved)?.kind).toBe("adjust");
+    expect(readDividerUtterance("fifty pixels", targets2, {})).toBeNull();
   });
 });

@@ -160,20 +160,41 @@ stop [listening]
 yes|no
 
 ## flow rename-pick
-# "rename tasks" opened the green numbers.
+# "rename tasks" opened the green numbers: a number (and then the name), or done.
+# cancel and undo also get out, but are secondary — shown dimmed in [ ].
 <number> [<new_label_name>]
-(done|cancel|undo)
+done
+[cancel|undo]
 
 ## flow rename-name
+# A number was picked: say the new name — or clear it (connectors and messages only).
 <new_label_name>
 (clear|blank|nothing|no label|no name)
-(done|cancel)
+done
+[cancel]
+
+# "move dividers" opens green numbers on the lane dividers. What can be said depends on
+# what has happened so far, so there are three states (the editor picks one from the flow's
+# own memory):
+#   dividers        just opened — a number, or done
+#   dividers-held   a number was said and is waiting for its way
+#   dividers-moved  a divider has been moved — another number, or an amount to adjust that move
 
 ## flow dividers
-# "move dividers": green numbers on the lane dividers.
 <number> (up|down) [<distance>]
 <number>
+done
+
+## flow dividers-held
 (up|down) [<distance>]
+<distance>
+<number> (up|down) [<distance>]
+<number>
+done
+
+## flow dividers-moved
+<number> (up|down) [<distance>]
+<number>
 <distance>
 done
 `;

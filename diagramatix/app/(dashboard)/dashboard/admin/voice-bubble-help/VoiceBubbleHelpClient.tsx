@@ -21,8 +21,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { parseCommand } from "@/app/lib/assist/commandGrammar";
+import { fixtureDiagram } from "@/app/lib/assist/commandFixture";
 import {
-  compileTree, formatNext, tokenise, validateConventions,
+  compileTree, formatNext, namesOf, targetNow, tokenise, validateConventions,
   type Conventions, type Lists, type SlotDef, type SlotKind,
 } from "@/app/lib/assist/commandTree";
 
@@ -39,7 +40,14 @@ interface TileData {
 }
 
 const KINDS: SlotKind[] = ["free", "names", "number", "distance", "pattern"];
-const FLOWS = ["rename-pick", "rename-name", "dividers"];
+/** The guided flows, in the words the tile uses for them. */
+const FLOWS = [
+  { id: "rename-pick", label: "After “rename tasks” — pick one by number" },
+  { id: "rename-name", label: "After picking a number — say the new name" },
+  { id: "dividers", label: "“Move dividers” — just opened" },
+  { id: "dividers-held", label: "“Move dividers” — after saying a number" },
+  { id: "dividers-moved", label: "“Move dividers” — after a move" },
+];
 
 export function VoiceBubbleHelpClient() {
   const [data, setData] = useState<TileData | null>(null);
@@ -342,12 +350,34 @@ function TryIt({ tree }: { tree: ReturnType<typeof compileTree> }) {
   const [text, setText] = useState("");
   const [flow, setFlow] = useState("");
   const [ghost, setGhost] = useState(false);
-  const flows = useMemo(() => FLOWS.filter((f) => tree.sections[`flow ${f}`]), [tree]);
+  const [useNames, setUseNames] = useState(true);
+  const [selId, setSelId] = useState("");
+  const [cursorId, setCursorId] = useState("");
+
+  // The test diagram — the same one the Commands card is written for — stands in for a real
+  // diagram, so what is selected / pointed at, and which names exist, can be tried here.
+  const fx = useMemo(() => fixtureDiagram(), []);
+  const names = useMemo(() => namesOf(fx.elements, fx.connectors), [fx]);
+  const choices = useMemo(
+    () => fx.elements.filter((e) => (e.label ?? "").trim()).map((e) => ({ id: e.id, text: `${(e.label ?? "").replace(/\s+/g, " ").trim()} (${String(e.type).replace(/-/g, " ")})` })),
+    [fx],
+  );
+  const pointerAt = (id: string) => {
+    const e = fx.elements.find((x) => x.id === id);
+    return e ? { x: e.x + e.width / 2, y: e.y + e.height / 2 } : null;
+  };
+  const target = useMemo(
+    () => targetNow(fx.elements, selId ? [selId] : [], null, cursorId ? pointerAt(cursorId) : null),
+    [fx, selId, cursorId], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  const flows = useMemo(() => FLOWS.filter((f) => tree.sections[`flow ${f.id}`]), [tree]);
   const tokens = tokenise(text);
-  const ctx = { ghost, flow: flow || null };
-  const result = useMemo(() => tree.next(tokens, ctx), [tree, text, ghost, flow]); // eslint-disable-line react-hooks/exhaustive-deps
+  const ctx = { ghost, flow: flow || null, ...(useNames ? { names } : {}) };
+  const result = useMemo(() => tree.next(tokens, ctx), [tree, text, ghost, flow, useNames]); // eslint-disable-line react-hooks/exhaustive-deps
   const ops = useMemo(() => (text.trim() && !flow ? parseCommand(text.trim()) : null), [text, flow]);
   const treeSays = tree.accepts(text, ctx);
+  const sel = "border border-gray-300 rounded px-2 py-1.5 text-xs max-w-[15rem]";
   return (
     <Section title="6. Try it — type the words of a command">
       <div className="flex flex-wrap gap-3 items-center mb-3">
@@ -355,12 +385,34 @@ function TryIt({ tree }: { tree: ReturnType<typeof compileTree> }) {
           value={text} onChange={(e) => setText(e.target.value)} placeholder="rename …" autoFocus
           className="flex-1 min-w-[16rem] border border-gray-300 rounded px-3 py-1.5 text-sm"
         />
-        <select value={flow} onChange={(e) => setFlow(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-xs">
-          <option value="">No flow open</option>
-          {flows.map((f) => <option key={f} value={f}>Flow: {f}</option>)}
-        </select>
-        <label className="text-xs text-gray-700 flex items-center gap-1"><input type="checkbox" checked={ghost} onChange={(e) => setGhost(e.target.checked)} /> Assist suggestions showing</label>
       </div>
+      <div className="flex flex-wrap gap-x-4 gap-y-2 items-end mb-3">
+        <label className="text-[11px] text-gray-600 flex flex-col gap-0.5">Guided flow open?
+          <select value={flow} onChange={(e) => setFlow(e.target.value)} className={sel}>
+            <option value="">None — ordinary commands</option>
+            {flows.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
+          </select>
+        </label>
+        <label className="text-[11px] text-gray-600 flex flex-col gap-0.5">Element selected
+          <select value={selId} onChange={(e) => setSelId(e.target.value)} className={sel}>
+            <option value="">Nothing selected</option>
+            {choices.map((c) => <option key={c.id} value={c.id}>{c.text}</option>)}
+          </select>
+        </label>
+        <label className="text-[11px] text-gray-600 flex flex-col gap-0.5">Cursor over
+          <select value={cursorId} onChange={(e) => setCursorId(e.target.value)} className={sel}>
+            <option value="">Nothing</option>
+            {choices.map((c) => <option key={c.id} value={c.id}>{c.text}</option>)}
+          </select>
+        </label>
+        <label className="text-xs text-gray-700 flex items-center gap-1 pb-1.5"><input type="checkbox" checked={useNames} onChange={(e) => setUseNames(e.target.checked)} /> Names from the test diagram</label>
+        <label className="text-xs text-gray-700 flex items-center gap-1 pb-1.5"><input type="checkbox" checked={ghost} onChange={(e) => setGhost(e.target.checked)} /> Assist suggestions showing</label>
+      </div>
+      <p className="text-[11px] text-gray-500 mb-3 max-w-2xl">
+        <strong>Guided flow</strong> shows the panel as it looks while a flow is open — for example after “rename tasks” (green numbers on the tasks) or “move dividers”.
+        <strong> Names from the test diagram</strong> makes a name in a command have to be one that is really on that diagram, as it is in the editor;
+        switch it off to see any words accepted as a name. Selected and Cursor over drive the “this / that” line below.
+      </p>
 
       <div className="border border-gray-300 rounded-lg bg-yellow-50 p-3 max-w-xl">
         <div className="text-[11px] text-gray-500 mb-1">
@@ -372,13 +424,17 @@ function TryIt({ tree }: { tree: ReturnType<typeof compileTree> }) {
           <p className="text-sm text-gray-900 leading-6">{formatNext(result.next).join(" · ") || "—"}</p>
         )}
         {result.complete && <p className="mt-1 text-[11px] text-green-800">That is already a whole command — you could stop here.</p>}
+        <div className="mt-2 pt-2 border-t border-yellow-200 text-[11px]">
+          <span className="text-gray-500">“this” / “that” would act on: </span>
+          <span className={target.kind === "none" ? "text-gray-400" : "text-gray-800"}>{target.label}</span>
+        </div>
       </div>
 
       {text.trim() && !flow && (
         <p className="mt-3 text-xs text-gray-700">
           The parser: {ops ? <span className="text-green-800">understands it ({ops.map((o) => o.op).join(", ")})</span> : <span className="text-amber-800">does not understand this as a whole command</span>}.
           {treeSays && !ops && <span className="text-red-700"> The tree describes this sentence but the parser does not take it — a drift to fix.</span>}
-          {!treeSays && ops && <span className="text-amber-800"> The parser takes it but the tree does not describe it.</span>}
+          {!treeSays && ops && <span className="text-amber-800"> The parser takes it but the tree does not describe it{useNames ? " (with this diagram’s names)" : ""}.</span>}
         </p>
       )}
       <p className="mt-2 text-[11px] text-gray-500">Speaking a command here arrives with a later slice.</p>

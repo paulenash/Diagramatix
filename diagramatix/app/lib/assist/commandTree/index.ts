@@ -29,3 +29,5 @@ export { computePanel } from "./panelState";
 export type { OpenFlow, PanelInput, PanelMode, PanelView } from "./panelState";
 export { targetNow } from "./targetNow";
 export type { TargetKind, TargetNow } from "./targetNow";
+export { namesOf, nameFits } from "./names";
+export type { DiagramNames } from "./names";

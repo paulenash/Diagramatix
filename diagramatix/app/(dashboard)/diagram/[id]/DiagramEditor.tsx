@@ -80,7 +80,7 @@ import { TemplatePickerWindow } from "@/app/components/canvas/TemplatePickerWind
 import { VoiceAssistBar } from "@/app/components/canvas/VoiceAssistBar";
 import { VoiceBubbleHelpPanel } from "@/app/components/canvas/VoiceBubbleHelpPanel";
 import { useVoiceBubbleHelp, useTargetNow } from "@/app/hooks/useVoiceBubbleHelp";
-import { computePanel, type OpenFlow } from "@/app/lib/assist/commandTree";
+import { computePanel, namesOf, type OpenFlow } from "@/app/lib/assist/commandTree";
 import { TestDiagramWindow } from "@/app/components/canvas/TestDiagramWindow";
 import { testDiagramCreateBody } from "@/app/lib/assist/testDiagram";
 import { PropertiesPanel } from "@/app/components/canvas/PropertiesPanel";
@@ -2458,7 +2458,7 @@ export function DiagramEditor({
     saveDebugSession, setTemplateFlow, setVoiceAssistOn, setVoiceDebugRecording, stopAbraListening,
     takeDebugSnapshot, templateFlow, templateFlowRef, templatePickSeqRef, templateScrollRef,
     toggleAbraListening, voiceAssistOn, voiceBusy, voiceDebugRecording, voiceInterim, voiceLastId,
-    voiceListening, voiceLog, renameFlow, dividerFlow, pickFlow, messageFlow,
+    voiceListening, voiceLog, renameFlow, dividerFlow, dividerMemRef, pickFlow, messageFlow,
   } = useVoiceSession({
     addConnector, addElementGated, addLaneAt, addPool, alignElements, beginHistoryGroup, beginLabelEdit,
     cancelLabelEdit, clearDiagram, compressLane, compressPool, connectorsRef, convertTaskSubprocess, data,
@@ -2483,13 +2483,19 @@ export function DiagramEditor({
   }));
   const bubbleOpenFlow: OpenFlow | null =
     renameFlow ? { kind: "rename", phase: renameFlow.phase }
-    : dividerFlow ? { kind: "dividers" }
+    // The divider flow remembers what has happened (a held number, the last move); the panel
+    // reads that so it lists only what can really be said next. Read at render time — the log
+    // entry that follows every utterance re-renders this component after the memory has changed.
+    : dividerFlow ? { kind: "dividers", held: dividerMemRef.current.pendingN !== undefined, moved: !!dividerMemRef.current.last }
     : pickFlow ? { kind: "other", label: "numbered pick" }
     : messageFlow ? { kind: "other", label: "message pick" }
     : templateFlow ? { kind: "other", label: "template pick" }
     : null;
+  // The names on the diagram, so a name in a command must be a real one (or a pointing phrase):
+  // "move dividers down" no longer reads "dividers" as an element's name.
+  const bubbleNames = useMemo(() => (bubbleShown ? namesOf(data.elements, data.connectors) : undefined), [bubbleShown, data.elements, data.connectors]);
   const bubbleView = bubbleShown && bubbleHelp.tree
-    ? computePanel(bubbleHelp.tree, { interim: voiceInterim, ghost: assistEnabled && nextStepCandidates.length > 0, flow: bubbleOpenFlow })
+    ? computePanel(bubbleHelp.tree, { interim: voiceInterim, ghost: assistEnabled && nextStepCandidates.length > 0, flow: bubbleOpenFlow, names: bubbleNames })
     : null;
   const bubbleOutline = useMemo(() => {
     if (!bubbleShown || !bubbleTarget.id) return null;
