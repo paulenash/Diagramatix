@@ -467,7 +467,14 @@ export type Action =
   | { type: "CORRECT_ALL_CONNECTORS" }
   | { type: "INSERT_SPACE"; payload: { markerX: number; markerY: number; dx: number; dy: number;
       /** Only this container's contents move (voice "insert between", 2026-09-27); containers the line crosses still grow. */
-      scopeId?: string } }
+      scopeId?: string;
+      /**
+       * Make room FOR this element (voice, add inside an expanded subprocess — 2026-10-03). The element and the containers
+       * above it (its subprocess, lane, pool) grow; going DOWN only what is UNDERNEATH it moves — plus every lane divider,
+       * pool boundary and pool below, with what is in them; an expanded subprocess the line merely passes through is left
+       * exactly as it is, with everything in it (Paul: "growing downwards needs to only affect elements underneath, but lane
+       * dividers, pool boundaries and pools all need to move down"). */
+      underId?: string } }
   | { type: "REMOVE_SPACE"; payload: { zone: { x: number; y: number; width: number; height: number }; preserveIds?: string[]; extraDeleteIds?: string[]; leaveAloneIds?: string[] } }
   | { type: "SET_VIEWPORT"; payload: { x: number; y: number; zoom: number } }
   | { type: "MOVE_END"; payload: { id: string; fromX?: number; fromY?: number;
@@ -8232,7 +8239,36 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       return { ...state, aiGeneration: { ...state.aiGeneration, sourceImage: action.payload.sourceImage } };
 
     case "INSERT_SPACE": {
-      const { markerX, markerY, dx, dy, scopeId } = action.payload;
+      const { markerX, markerY, dx, dy, scopeId, underId } = action.payload;
+      // MAKING ROOM FOR ONE ELEMENT (`underId`). The mouse's Insert Space cuts across the WHOLE diagram and stretches every
+      // expanded subprocess its line passes through — which grew a neighbouring EP beside the target (Paul's debug capture,
+      // 2026-10-02). For one element the line behaves like this instead:
+      //   • the element, and everything above it (its subprocess, lane, pool) grow, as before;
+      //   • an expanded subprocess the line cuts, that does not hold the element, and all it holds, stay put;
+      //   • going DOWN, an element moves only if it is UNDER the target (its columns), or sits in a lane or pool that moves
+      //     (every lane divider, pool boundary and pool below move, with what is in them).
+      const targetEl = underId ? state.elements.find((e) => e.id === underId) : undefined;
+      const ancestorIds = new Set<string>();
+      for (let c: DiagramElement | undefined = targetEl, i = 0; c && i < 24; i++) { ancestorIds.add(c.id); c = c.parentId ? state.elements.find((e) => e.id === c!.parentId) : undefined; }
+      const insideTarget = targetEl ? getAllDescendantIds(state.elements, targetEl.id) : new Set<string>();
+      const frozen = new Set<string>();
+      const movingBelow = new Set<string>();
+      if (targetEl) {
+        for (const e of state.elements) {
+          if (ancestorIds.has(e.id) || insideTarget.has(e.id)) continue;
+          const cutX = dx !== 0 && markerX > e.x && markerX < e.x + e.width;
+          const cutY = dy !== 0 && markerY > e.y && markerY < e.y + e.height;
+          if (e.type === "subprocess-expanded" && (cutX || cutY)) {
+            frozen.add(e.id);
+            for (const d of getAllDescendantIds(state.elements, e.id)) frozen.add(d);
+          }
+          if (dy > 0 && (e.type === "pool" || e.type === "lane") && e.y >= markerY) {
+            movingBelow.add(e.id);
+            for (const d of getAllDescendantIds(state.elements, e.id)) movingBelow.add(d);
+          }
+        }
+      }
+      const underTarget = (e: DiagramElement) => !!targetEl && e.x < targetEl.x + targetEl.width && e.x + e.width > targetEl.x;
       // SCOPED (voice "insert C between A and B", Paul 2026-09-27: "move
       // everything in Task A's Pool … to the right"): only the scope and what
       // it contains move. Outside it nothing moves, but a pool or lane the line
@@ -8245,6 +8281,8 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       const elements = state.elements.map(el => {
         // Skip boundary events here — handled in second pass
         if (el.boundaryHostId) return el;
+        // An expanded subprocess the line only passes through, and all it holds: untouched (see `underId` above).
+        if (frozen.has(el.id)) return el;
 
         const cx = el.x + el.width / 2;
         const cy = el.y + el.height / 2;
@@ -8299,11 +8337,19 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
               if (dy > 0) return { ...el, height: el.height + dy };
               return { ...el, y: el.y + dy, height: el.height - dy };
             }
-            if (dy > 0 && el.y >= markerY) return { ...el, y: el.y + dy };
+            if (dy > 0 && el.y >= markerY) {
+              // Making room for one element: an expanded subprocess wholly below the line moves only if it is UNDER the target
+              // or inside a lane / pool that moves; lanes and pools below always move.
+              if (targetEl && isExpandedSp && !movingBelow.has(el.id) && !underTarget(el)) return el;
+              return { ...el, y: el.y + dy };
+            }
             if (dy < 0 && el.y + el.height <= markerY) return { ...el, y: el.y + dy };
             return el;
           }
-          if (dy > 0 && cy > markerY) return { ...el, y: el.y + dy };
+          if (dy > 0 && cy > markerY) {
+            if (targetEl && !insideTarget.has(el.id) && !movingBelow.has(el.id) && !underTarget(el)) return el;   // beside it, not underneath
+            return { ...el, y: el.y + dy };
+          }
           if (dy < 0 && cy < markerY) return { ...el, y: el.y + dy };
           return el;
         }
@@ -10904,7 +10950,7 @@ export function useDiagram(initialData: DiagramData) {
     dispatch({ type: "CONVERT_TASK_SUBPROCESS", payload: { id } });
   }, []);
 
-  const insertSpace = useCallback((markerX: number, markerY: number, dx: number, dy: number, scopeId?: string) => {
+  const insertSpace = useCallback((markerX: number, markerY: number, dx: number, dy: number, scopeId?: string, underId?: string) => {
     // ENG-11: the shift-drag fires insertSpace every mouse-move frame. Coalesce
     // into ONE undo entry — push the pre-drag snapshot on the first tick of the
     // gesture and skip the rest (same pattern as updateProperties). Otherwise
@@ -10915,7 +10961,7 @@ export function useDiagram(initialData: DiagramData) {
     } else {
       pushHistory(snapshotData());
     }
-    dispatch({ type: "INSERT_SPACE", payload: { markerX, markerY, dx, dy, ...(scopeId ? { scopeId } : {}) } });
+    dispatch({ type: "INSERT_SPACE", payload: { markerX, markerY, dx, dy, ...(scopeId ? { scopeId } : {}), ...(underId ? { underId } : {}) } });
   }, []);
 
   const removeSpace = useCallback((

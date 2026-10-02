@@ -126,7 +126,7 @@ export interface AssistDiagramActions {
   elementsMoveEnd(): void;
   removeSpace(zone: { x: number; y: number; width: number; height: number }): void;
   /** The mouse's Insert Space, scoped to one container's contents ("insert between"). */
-  insertSpace(markerX: number, markerY: number, dx: number, dy: number, scopeId?: string): void;
+  insertSpace(markerX: number, markerY: number, dx: number, dy: number, scopeId?: string, underId?: string): void;
   /** The right-click menu's task ↔ subprocess toggle. */
   convertTaskSubprocess(id: string): void;
   /** The divider drag: the band above grows by dy, the band below gives way. */
@@ -558,13 +558,13 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
         const ev = planAddEventEp(els, epCtx.ep, sizeOf("task"), sizeOf("start-event").w);
         if ("error" in ev) { results.push(ev.error); anyFail = true; continue; }
         if (ev.growX) {
-          const next = preview({ type: "INSERT_SPACE", payload: { markerX: ev.growX.markerX, markerY: 0, dx: ev.growX.dx, dy: 0 } });
-          insertSpace(ev.growX.markerX, 0, ev.growX.dx, 0);
+          const next = preview({ type: "INSERT_SPACE", payload: { markerX: ev.growX.markerX, markerY: 0, dx: ev.growX.dx, dy: 0, underId: epCtx.ep.id } });
+          insertSpace(ev.growX.markerX, 0, ev.growX.dx, 0, undefined, epCtx.ep.id);
           if (next) els = next.elements;
         }
         if (ev.growY) {
-          const next = preview({ type: "INSERT_SPACE", payload: { markerX: 0, markerY: ev.growY.markerY, dx: 0, dy: ev.growY.dy } });
-          insertSpace(0, ev.growY.markerY, 0, ev.growY.dy);
+          const next = preview({ type: "INSERT_SPACE", payload: { markerX: 0, markerY: ev.growY.markerY, dx: 0, dy: ev.growY.dy, underId: epCtx.ep.id } });
+          insertSpace(0, ev.growY.markerY, 0, ev.growY.dy, undefined, epCtx.ep.id);
           if (next) els = next.elements;
         }
         if (ev.moveUp) {
@@ -627,14 +627,14 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
         }
         // Room DOWN first — an expanded subprocess is taller than a task: the EP grows and everything below moves down.
         if (plan.grow) {
-          const next = preview({ type: "INSERT_SPACE", payload: { markerX: 0, markerY: plan.grow.markerY, dx: 0, dy: plan.grow.dy } });
-          insertSpace(0, plan.grow.markerY, 0, plan.grow.dy);
+          const next = preview({ type: "INSERT_SPACE", payload: { markerX: 0, markerY: plan.grow.markerY, dx: 0, dy: plan.grow.dy, underId: epCtx.ep.id } });
+          insertSpace(0, plan.grow.markerY, 0, plan.grow.dy, undefined, epCtx.ep.id);
           if (next) els = next.elements;
         }
         if (plan.shift) {
           const { markerX, dx, scopeId } = plan.shift;
-          const next = preview({ type: "INSERT_SPACE", payload: { markerX, markerY: 0, dx, dy: 0, scopeId } });
-          insertSpace(markerX, 0, dx, 0, scopeId);
+          const next = preview({ type: "INSERT_SPACE", payload: { markerX, markerY: 0, dx, dy: 0, scopeId, underId: epCtx.ep.id } });
+          insertSpace(markerX, 0, dx, 0, scopeId, epCtx.ep.id);
           if (next) els = next.elements;
         }
         for (const item of plan.add) {

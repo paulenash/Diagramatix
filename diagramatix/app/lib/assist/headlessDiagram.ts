@@ -106,8 +106,8 @@ export function headlessDiagram(initial: DiagramData): HeadlessDiagram {
     convertTaskSubprocess: (id) => commit({ type: "CONVERT_TASK_SUBPROCESS", payload: { id } }),
     moveLaneBoundary: (aboveLaneId, belowLaneId, dy) => commit({ type: "MOVE_LANE_BOUNDARY", payload: { aboveLaneId, belowLaneId, dy } }),
     laneBoundaryMoveEnd: () => {},
-    insertSpace: (markerX, markerY, dx, dy, scopeId) =>
-      commit({ type: "INSERT_SPACE", payload: { markerX, markerY, dx, dy, ...(scopeId ? { scopeId } : {}) } }),
+    insertSpace: (markerX, markerY, dx, dy, scopeId, underId) =>
+      commit({ type: "INSERT_SPACE", payload: { markerX, markerY, dx, dy, ...(scopeId ? { scopeId } : {}), ...(underId ? { underId } : {}) } }),
     updateConnectorEndpoint: (connectorId, endpoint, newElementId, newSide, newOffsetAlong) =>
       commit({ type: "UPDATE_CONNECTOR_ENDPOINT", payload: { connectorId, endpoint, newElementId, newSide, newOffsetAlong } }),
     // useDiagram dispatches these two with no history entry of their own; so does this.
