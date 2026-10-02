@@ -13,6 +13,8 @@
 import type { Lists } from "./tree";
 
 export const DEFAULT_LISTS: Lists = {
+  /** A subprocess's Usage — the Properties panel's own list (Paul, 2026-10-02). */
+  usage_words: ["normal", "call", "event", "transaction"],
   type_words: ["pools", "lanes", "sublanes", "tasks", "activities", "steps", "subprocesses", "gateways", "decisions", "events", "messages", "connectors"],
   element_kinds: [
     "task", "activity", "step", "subprocess", "expanded subprocess", "gateway", "decision",
@@ -59,7 +61,8 @@ export const DEFAULT_PATTERNS = `# Voice Assist command tree — what can be sai
 ## commands
 
 # ── Elements and flow
-(add|insert|create|put|place) [a|an|the] [new] {element_kinds} [called <new_element_name>] [{place_after} (<existing_element_name>|<existing_label_name>|<target>)] [here|there]
+(add|insert|create|put|place) [a|an|the] [new] [{usage_words}] {element_kinds} [called <new_element_name>] [{place_after} (<existing_element_name>|<existing_label_name>|<target>)] [here|there]
+(add|insert|create) [a|an] [{usage_words}] {element_kinds} (in|inside|into|within) [the] (<existing_element_name>|<target>) [called <new_element_name>]
 (add|insert|create) [a|an] {element_kinds} [called <new_element_name>] between (<existing_element_name>|<existing_label_name>|<target>) and (<existing_element_name>|<existing_label_name>|<target>) [called <new_element_name>]
 (connect|link|join) (<existing_element_name>|<existing_label_name>|<target>) (to|with|into) (<existing_element_name>|<existing_label_name>|<target>)  @on flownode data
 (connect|link|join) (them|these|those) [up]  @on flownode data
@@ -113,6 +116,7 @@ move (divider|dividers)  @on pool lane
 move lane (divider|dividers)  @on pool lane
 
 # ── Converting
+(set|change|make) [the] [subprocess] usage [(of|for) (<existing_element_name>|<target>)] (to|as) [a|an] {usage_words} [subprocess]  @on subprocess expanded-subprocess
 make (<existing_element_name>|<existing_label_name>|<target>) (a|an) {convert_kinds}  @on flownode
 (turn|change|convert|set) (<existing_element_name>|<existing_label_name>|<target>) (to|into) (a|an) {convert_kinds}  @on flownode
 

@@ -20,7 +20,12 @@ export type AssistOp =
    */
   | { op: "add"; symbolType: SymbolType; label?: string; eventType?: EventType; gatewayType?: GatewayType; afterRef?: Ref; at?: "pointer";
       /** Said with "insert" — it goes INTO the flow: a selected connector, or the anchor's one outgoing flow (Paul, 2026-09-28). */
-      insert?: true }
+      insert?: true;
+      /** A subprocess's Usage, said in the sentence: "add an event expanded subprocess" (Paul, 2026-10-02). */
+      usage?: "normal" | "call" | "event" | "transaction";
+      /** "… inside Settle Claim": which existing subprocess it goes IN, and the word said (kept so a name that merely
+       *  contains "in" can be put back together when nothing by that name is an expanded subprocess). */
+      insideRef?: Ref; insideWord?: string }
   /** "insert a task called C between A and B" — spliced into the flow A → B, room made in A's pool (Paul, 2026-09-27). */
   | { op: "insertBetween"; symbolType: SymbolType; label?: string; eventType?: EventType; gatewayType?: GatewayType; afterRef: Ref; beforeRef: Ref }
   | { op: "connect"; fromRef: Ref; toRef: Ref; connectorType?: ConnectorType }
@@ -233,6 +238,8 @@ export function validateOp(raw: unknown): AssistOp | null {
       if (isRef(o.afterRef)) op.afterRef = (o.afterRef as string).trim();
       if (o.at === "pointer") op.at = "pointer";
       if (o.insert === true) op.insert = true;
+      if (o.usage === "normal" || o.usage === "call" || o.usage === "event" || o.usage === "transaction") op.usage = o.usage;
+      if (isRef(o.insideRef)) { op.insideRef = (o.insideRef as string).trim(); if (isRef(o.insideWord)) op.insideWord = (o.insideWord as string).trim(); }
       return op;
     }
     case "insertBetween": {

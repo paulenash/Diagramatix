@@ -536,6 +536,44 @@
       "pick": "take the second one"
     }
   ],
+  "add an expanded subprocess called Check Stock": [
+    {
+      "op": "add",
+      "symbolType": "subprocess-expanded",
+      "label": "Check Stock"
+    }
+  ],
+  "add an event expanded subprocess called Cancel Order": [
+    {
+      "op": "add",
+      "symbolType": "subprocess-expanded",
+      "label": "Cancel Order",
+      "usage": "event"
+    }
+  ],
+  "add a task called Pack inside Settle Claim": [
+    {
+      "op": "add",
+      "symbolType": "task",
+      "label": "Pack",
+      "insideRef": "Settle Claim",
+      "insideWord": "inside"
+    }
+  ],
+  "set the usage to event": [
+    {
+      "op": "convert",
+      "ref": "this",
+      "subtype": "subprocess event"
+    }
+  ],
+  "change the usage of this to call": [
+    {
+      "op": "convert",
+      "ref": "this",
+      "subtype": "subprocess call"
+    }
+  ],
   "surround selected with an expanded subprocess called Check Stock": [
     {
       "op": "wrapInSubprocess",

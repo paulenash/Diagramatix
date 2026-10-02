@@ -32,7 +32,7 @@ import { canConnect, messageFlowRefusal } from "@/app/lib/diagram/canConnect";
 import { isBoundaryHost } from "@/app/lib/diagram/boundaryHosts";
 import { resolveRef, resolveSelectionRefs, isSelectionRef, nearestRefs, ID_REF_PREFIX, spokenNumbersAsDigits } from "./resolveRef";
 import { isPointerElementRef, elementUnderPointer } from "./pointerRef";
-import { epTarget, planAddInsideEp, EP_ADDABLE } from "@/app/lib/diagram/epAdd";
+import { epTarget, planAddInsideEp, planAddEventEp, nextSubprocessName, EP_ADDABLE } from "@/app/lib/diagram/epAdd";
 import { inferBoundaryTrigger } from "./boundaryEventPhrase";
 import { planCompressEp } from "@/app/lib/diagram/epCompress";
 import { nextContainerLabels } from "@/app/lib/diagram/containerNames";
@@ -537,8 +537,60 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       // and End, later ones after the last step (or after the selected / hovered step), the EP widening and the
       // rest of its lane moving across. Where and what to join is epAdd.ts; this carries it out. "insert", "after
       // X" and "here" are untouched, and so is every add with no EP in play.
-      const epCtx = !op.afterRef && op.at !== "pointer" && !op.insert
-        ? epTarget(els, selectedIds, elementUnderPointer(pointerWorld.current, els)) : null;
+      //
+      // NAMING the subprocess it goes in — "… called X inside Settle Claim" — is the third way to say which (Paul,
+      // 2026-10-02: select, hover OR name one). When what was named is not an expanded subprocess the words were part of
+      // the NAME ("Pay in advance"), so they are put back and this is an ordinary add.
+      let namedEp: DiagramElement | null = null;
+      if (op.insideRef) {
+        const found = resolve1(op.insideRef);
+        if (!("err" in found) && found.type === "subprocess-expanded") namedEp = found;
+        else if (op.label) { op.label = `${op.label} ${op.insideWord ?? "in"} ${op.insideRef}`; delete op.insideRef; delete op.insideWord; }
+        else { results.push(`couldn’t find an expanded subprocess called “${op.insideRef}”`); anyFail = true; continue; }
+      }
+      const epCtx = namedEp ? { ep: namedEp, anchor: null }
+        : !op.afterRef && op.at !== "pointer" && !op.insert
+          ? epTarget(els, selectedIds, elementUnderPointer(pointerWorld.current, els)) : null;
+      // An EVENT expanded subprocess in an expanded subprocess is built, not just added: under the existing flow, in the
+      // middle, with its own Start (Message, interrupting), Task and End; the parent grows, everything below moves down and
+      // everything to the right moves right (epAdd.ts planAddEventEp).
+      if (epCtx && op.symbolType === "subprocess-expanded" && op.usage === "event") {
+        const ev = planAddEventEp(els, epCtx.ep, sizeOf("task"), sizeOf("start-event").w);
+        if ("error" in ev) { results.push(ev.error); anyFail = true; continue; }
+        if (ev.growX) {
+          const next = preview({ type: "INSERT_SPACE", payload: { markerX: ev.growX.markerX, markerY: 0, dx: ev.growX.dx, dy: 0 } });
+          insertSpace(ev.growX.markerX, 0, ev.growX.dx, 0);
+          if (next) els = next.elements;
+        }
+        if (ev.growY) {
+          const next = preview({ type: "INSERT_SPACE", payload: { markerX: 0, markerY: ev.growY.markerY, dx: 0, dy: ev.growY.dy } });
+          insertSpace(0, ev.growY.markerY, 0, ev.growY.dy);
+          if (next) els = next.elements;
+        }
+        if (ev.moveUp) {
+          const moving = new Set(ev.moveUp.ids);
+          moveElements([...moving], 0, -ev.moveUp.dy);
+          elementsMoveEnd();
+          els = els.map((e) => (moving.has(e.id) ? { ...e, y: e.y - ev.moveUp!.dy } : e));
+        }
+        const evIds = { ep: nanoid(), start: nanoid(), task: nanoid(), end: nanoid() };
+        const evLabel = op.label ? capitaliseFirstWord(op.label) : undefined;
+        addElementGated("subprocess-expanded", ev.ep.centre, undefined, undefined, evIds.ep,
+          { parentId: epCtx.ep.id, width: ev.ep.width, height: ev.ep.height, properties: { subprocessType: "event" } });
+        updateLabel(evIds.ep, evLabel ?? nextSubprocessName(els));
+        addElementGated("start-event", ev.start, undefined, "message", evIds.start, { parentId: evIds.ep });
+        updateProperties(evIds.start, { interruptionType: "interrupting" });
+        addElementGated("task", ev.task, undefined, undefined, evIds.task, { parentId: evIds.ep });
+        addElementGated("end-event", ev.end, undefined, undefined, evIds.end, { parentId: evIds.ep });
+        addConnector(evIds.start, evIds.task, "sequence", "directed", "rectilinear", "right", "left");
+        addConnector(evIds.task, evIds.end, "sequence", "directed", "rectilinear", "right", "left");
+        if (els.some((e) => e.type === "pool" && e.x + e.width < ev.ep.centre.x + ev.ep.width / 2 + 40)) extendPools();
+        voiceLastId.current = evIds.ep;
+        setSelectedElementIds(new Set([evIds.ep]));
+        setSelectedConnectorId(null);
+        results.push(`added ${evLabel ?? "an expanded subprocess"} ${ev.summary}`);
+        continue;
+      }
       if (epCtx) {
         if (!EP_ADDABLE.has(op.symbolType)) {
           results.push(`a ${op.symbolType.replace(/-/g, " ")} can't be added inside ${nameOf(epCtx.ep)} that way — its Start and End are made for you when you add the first step`);
@@ -572,6 +624,12 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
           results.push(`can't add a ${op.symbolType.replace(/-/g, " ")} there — a sequence flow from ${f ? nameOf(f) : "it"} to ${t ? nameOf(t) : "it"} isn’t legal`);
           anyFail = true; continue;
         }
+        // Room DOWN first — an expanded subprocess is taller than a task: the EP grows and everything below moves down.
+        if (plan.grow) {
+          const next = preview({ type: "INSERT_SPACE", payload: { markerX: 0, markerY: plan.grow.markerY, dx: 0, dy: plan.grow.dy } });
+          insertSpace(0, plan.grow.markerY, 0, plan.grow.dy);
+          if (next) els = next.elements;
+        }
         if (plan.shift) {
           const { markerX, dx, scopeId } = plan.shift;
           const next = preview({ type: "INSERT_SPACE", payload: { markerX, markerY: 0, dx, dy: 0, scopeId } });
@@ -585,7 +643,9 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
           addElementGated(symbol, item.centre, undefined, item.role === "new" ? op.eventType : undefined, id, { parentId: epCtx.ep.id });
           if (item.role === "new") {
             if (op.gatewayType) updateProperties(id, { gatewayType: op.gatewayType });
+            if (op.usage) updateProperties(id, { subprocessType: op.usage });
             if (addedLabel) updateLabel(id, addedLabel);
+            else if (op.symbolType === "subprocess-expanded") updateLabel(id, nextSubprocessName(els));
           }
           els = withAdded(els, syntheticElement(id, symbol, item.centre, iw, ih, { label: item.role === "new" ? addedLabel : undefined, parentId: epCtx.ep.id, eventType: item.role === "new" ? op.eventType : undefined }));
         }
@@ -687,12 +747,14 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       addElementGated(op.symbolType, center, undefined, op.eventType, newId,
         parentId ? { parentId, ...(followOn?.laneId ? { keepInLane: true } : {}) } : undefined);
       if (op.gatewayType) updateProperties(newId, { gatewayType: op.gatewayType });
+      if (op.usage) updateProperties(newId, { subprocessType: op.usage });   // a subprocess's Usage, said in the sentence
       // The reducer capitalises an activity / gateway / event label, so the
       // WORKING COPY has to carry the same string — otherwise the log line
       // and the next command's reference describe a name the diagram does
       // not have.
       const addedLabel = op.label && needsCapital(op.symbolType) ? capitaliseFirstWord(op.label) : op.label;
       if (addedLabel) updateLabel(newId, addedLabel);
+      else if (op.symbolType === "subprocess-expanded") updateLabel(newId, nextSubprocessName(els));
       const addedEl = syntheticElement(newId, op.symbolType, center, w, h, { label: addedLabel, parentId, eventType: op.eventType });
       // One line per add. A refused auto-connect says so and nothing else:
       // it used to be followed by "added X after Y" as well, so the log

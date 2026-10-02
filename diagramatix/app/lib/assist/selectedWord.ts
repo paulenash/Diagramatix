@@ -240,6 +240,8 @@ const ADD_BARE_RE = new RegExp(
  */
 const ADD_TYPE_ALT = [
   BOUNDARY_EVENT_NOUN,
+  // A subprocess's Usage before the word: "and an event expanded subprocess …" (2026-10-02).
+  "(?:normal|call|event|transaction)\\s+(?:expanded\\s+)?sub-?\\s?process",
   wordAlternation([
     ...SYMBOL_PHRASES, ...POOL_WORDS, ...LANE_WORDS, ...SUBLANE_WORDS,
     ...PARTICIPANT_WORDS, ...BOX_WORDS, ...MESSAGE_WORDS,

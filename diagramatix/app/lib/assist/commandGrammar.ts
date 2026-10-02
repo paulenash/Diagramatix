@@ -369,6 +369,14 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   // marker, so not M3's table below. Only the bare shape words: "a user task"
   // is still M3's marker, and "sub process" is how the recogniser often
   // writes it.
+  // "set the usage to event", "change the usage of this to call" — a subprocess's Usage (Normal / Call / Event /
+  // Transaction), the Properties panel's own drop-down (Paul, 2026-10-02). The same marker conversion as "make this an
+  // event subprocess", so it hands that conversion the phrase it reads.
+  {
+    const usageSet = raw.match(/^(?:set|change|make)\s+(?:the\s+)?(?:sub-?\s?process\s+)?usage(?:\s+(?:of|for)\s+(.+?))?\s+(?:to|as)\s+(?:an?\s+)?(normal|call|event|transaction)(?:\s+sub-?\s?process)?$/i);
+    // "subprocess normal", noun FIRST: "normal subprocess" is also read as "no repeat marker", and the two would be asked about.
+    if (usageSet) return [{ op: "convert", ref: usageSet[1] ? clean(usageSet[1]) : "this", subtype: `subprocess ${usageSet[2].toLowerCase()}` }];
+  }
   // No target said — "convert to a subprocess" — means THIS: the selection, else what is under the cursor (Paul,
   // 2026-10-02: hovering a task and saying it did nothing; it had to be selected).
   {
@@ -987,11 +995,37 @@ export function parseCommand(utterance: string): AssistOp[] | null {
       }
     }
 
+    // "add an expanded subprocess called Check Stock INSIDE Settle Claim" — which existing subprocess it goes in (Paul,
+    // 2026-10-02: select, hover OR NAME one). Read before the name, or "called X inside Y" would all become the name.
+    // Only in / inside / into / within ("to" is too often part of a name), and only when a type word or a "called" is
+    // in front of it. The apply layer puts the words back into the name when nothing by that name is an expanded
+    // subprocess, so "add a task called Pay in advance" is still a task called "Pay in advance".
+    let insideRef: string | undefined;
+    let insideWord: string | undefined;
+    const inside = rest.match(/^(.*\S)\s+(in|inside|into|within)\s+(?:the\s+)?(.+)$/i);
+    if (inside && (/\b(?:called|named|labell?ed|titled)\b/i.test(inside[1]) || matchSymbol(inside[1]))) {
+      insideRef = clean(inside[3]);
+      insideWord = inside[2].toLowerCase();
+      rest = inside[1].trim();
+      // "add a task inside Settle Claim called Pack": the name comes AFTER the subprocess's.
+      const nameAfter = insideRef.match(/^(.+?)\s+(?:called|named|labell?ed|titled)\s+(.+)$/i);
+      if (nameAfter) { insideRef = clean(nameAfter[1]); rest = `${rest} called ${nameAfter[2]}`; }
+    }
+
     let label: string | undefined;
     const named = rest.match(/\s+(?:called|named|labell?ed|titled)\s+(.+)$/i);
     if (named) { label = spokenLabel(named[1]); rest = rest.slice(0, named.index).trim(); }
     const quoted = rest.match(/["'“”‘’](.+?)["'“”‘’]/);
     if (!label && quoted) { label = clean(quoted[1]); rest = rest.replace(quoted[0], "").trim(); }
+
+    // A subprocess's USAGE, said before the word: "an event expanded subprocess", "a call subprocess" (Normal / Call /
+    // Event / Transaction — the Properties panel's own list). The word is taken out so the type phrase reads as before.
+    let usage: "normal" | "call" | "event" | "transaction" | undefined;
+    const usageWord = rest.match(/\b(normal|call|event|transaction)\s+((?:expanded\s+)?sub-?\s?process)\b/i);
+    if (usageWord && usageWord.index !== undefined) {
+      usage = usageWord[1].toLowerCase() as typeof usage;
+      rest = `${rest.slice(0, usageWord.index)}${usageWord[2]}${rest.slice(usageWord.index + usageWord[0].length)}`.replace(/\s+/g, " ").trim();
+    }
 
     const sym = matchSymbol(rest);
     if (sym) {
@@ -1019,6 +1053,8 @@ export function parseCommand(utterance: string): AssistOp[] | null {
       if (afterRef) op.afterRef = afterRef;
       if (atPointer) op.at = "pointer";
       if (inserting) op.insert = true;
+      if (usage) op.usage = usage;
+      if (insideRef) { op.insideRef = insideRef; if (insideWord) op.insideWord = insideWord; }
       return [op];
     }
     // "add Approve after Review" — no type word → a task named by the rest.
