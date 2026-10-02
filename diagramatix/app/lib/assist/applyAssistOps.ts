@@ -578,6 +578,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
         addElementGated("subprocess-expanded", ev.ep.centre, undefined, undefined, evIds.ep,
           { parentId: epCtx.ep.id, width: ev.ep.width, height: ev.ep.height, properties: { subprocessType: "event" } });
         updateLabel(evIds.ep, evLabel ?? nextSubprocessName(els));
+        // The Start of an Event subprocess is NAMED, "Event occurs" by default (the reducer gives it, eventSubprocess.ts).
         addElementGated("start-event", ev.start, undefined, "message", evIds.start, { parentId: evIds.ep });
         updateProperties(evIds.start, { interruptionType: "non-interrupting" });
         addElementGated("task", ev.task, undefined, undefined, evIds.task, { parentId: evIds.ep });

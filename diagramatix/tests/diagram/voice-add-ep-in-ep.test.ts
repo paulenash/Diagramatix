@@ -205,8 +205,8 @@ describe("T5218 5  an EVENT EP in an EP that already has a flow", () => {
     const start = kids.find((k) => k.type === "start-event")! as Els & { eventType?: string };
     expect(start.eventType).toBe("message");
     expect((start.properties as { interruptionType?: string }).interruptionType).toBe("non-interrupting");
-    expect((start.label ?? "").trim(), "Start and End events inside an EP are unnamed").toBe("");
-    expect((kids.find((k) => k.type === "end-event")!.label ?? "").trim()).toBe("");
+    expect(start.label, "the Start of an EVENT subprocess is NAMED, “Event occurs” by default (Paul, 2026-10-03)").toBe("Event occurs");
+    expect((kids.find((k) => k.type === "end-event")!.label ?? "").trim(), "…but its End stays unnamed").toBe("");
     const task = kids.find((k) => k.type === "task")!, end = kids.find((k) => k.type === "end-event")!;
     expect(start.x).toBeLessThan(task.x);
     expect(task.x).toBeLessThan(end.x);

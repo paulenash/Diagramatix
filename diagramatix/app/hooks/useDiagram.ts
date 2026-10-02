@@ -52,6 +52,7 @@ import { autoResizeUmlElement, sizeUmlNote } from "@/app/lib/diagram/umlAutoSize
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { getElementPoolId } from "@/app/lib/diagram/poolUtil";
 import { isLaneUnowned, edgeEventParentId, getAllDescendantIds } from "@/app/lib/diagram/containment";
+import { EVENT_EP_START_LABEL, isEventEp } from "@/app/lib/diagram/eventSubprocess";
 import { setBandHeightAtBottom, fitLaneToContent, bandContentIds, type LaneFonts } from "@/app/lib/diagram/laneFit";
 import { isAnyLane } from "@/app/lib/diagram/laneKind";
 import { isBlackBoxPool } from "@/app/lib/diagram/blackBoxPoolMenu";
@@ -4291,7 +4292,11 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       // is blanked; a caller-supplied initial.label is respected.
       if ((newEl.type === "start-event" || newEl.type === "end-event") && newEl.parentId && initial?.label === undefined) {
         const parent = state.elements.find((e) => e.id === newEl.parentId);
-        if (parent?.type === "subprocess-expanded") newEl = { ...newEl, label: "" };
+        // …EXCEPT the Start of an EVENT subprocess: it names what triggers it, "Event occurs" by default (Paul, 2026-10-03;
+        // Start events only — an End stays unnamed).
+        if (parent?.type === "subprocess-expanded") {
+          newEl = { ...newEl, label: newEl.type === "start-event" && isEventEp(parent) ? EVENT_EP_START_LABEL : "" };
+        }
       }
 
       // EP boundary-aware growth: if the new element's parent is an
@@ -6351,7 +6356,12 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         ? retypeTasksForSystemFlag(state.elements, state.connectors, action.payload.id, nextIsSystem as boolean)
         : [];
 
-      const elements = state.elements.map((el) => {
+      // An expanded subprocess whose Usage becomes EVENT: its (unnamed) Start event is named now — it says what triggers
+      // the subprocess — and can be renamed (Paul, 2026-10-03).
+      const becameEventEp = before?.type === "subprocess-expanded"
+        && action.payload.properties.subprocessType === "event"
+        && (before.properties as { subprocessType?: string } | undefined)?.subprocessType !== "event";
+      const elementsRaw = state.elements.map((el) => {
         if (el.id !== action.payload.id) return el;
         const { taskType, gatewayType, eventType, repeatType, flowType, ...rest } = action.payload.properties;
         let updatedLabel = el.label;
@@ -6383,6 +6393,9 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           properties: { ...el.properties, ...rest },
         };
       });
+      const elements = becameEventEp
+        ? elementsRaw.map((e) => (e.parentId === action.payload.id && e.type === "start-event" && !e.boundaryHostId && !(e.label ?? "").trim() ? { ...e, label: EVENT_EP_START_LABEL } : e))
+        : elementsRaw;
       if (taskRetypes.length > 0) {
         // A task's type drives its marker, which drives its size, so the
         // retyped tasks are re-sized about their centres and their connectors

@@ -6,6 +6,7 @@
 import type { DiagramData, DiagramElement, Connector, Point } from "./types";
 import { getSymbolDefinition } from "./symbols/definitions";
 import { closeFlowVoids } from "./closeFlowVoids";
+import { EVENT_EP_START_LABEL } from "./eventSubprocess";
 import { computeWaypoints, recomputeAllConnectors, pickBoundaryEventSide } from "./routing";
 import { clampExitTargetToBand } from "./assistPlacement";
 import { analysePaths } from "./bpmnPaths";
@@ -765,7 +766,8 @@ export function layoutBpmnDiagram(
       injected.push({
         id: `_ev_start_${ai.id}`,
         type: "start-event",
-        label: "",
+        // The Start of an Event subprocess is named (Paul, 2026-10-03): it says what triggers it.
+        label: EVENT_EP_START_LABEL,
         parentSubprocess: ai.id,
         eventType: "none",
         properties: { interruptionType: "non-interrupting" },

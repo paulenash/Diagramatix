@@ -25,6 +25,7 @@ import type { Connector, DiagramElement } from "./types";
 import { EP_WRAP } from "./subprocessWrap";
 import { SEQUENCE_NODE_TYPES } from "./templates";
 import { getAllDescendantIds } from "./containment";
+import { isEventEp } from "./eventSubprocess";
 
 /** The gap between neighbours inside an EP — the one a wrap leaves around its Start and End. */
 export const EP_GAP = 30;
@@ -44,9 +45,8 @@ export function nextSubprocessName(els: readonly DiagramElement[]): string {
   return `Subprocess ${n}`;
 }
 
-/** An expanded subprocess whose Usage is Event: it hangs under the flow of the EP it is in, not in it. */
-export const isEventEp = (e: DiagramElement): boolean =>
-  e.type === "subprocess-expanded" && (e.properties as { subprocessType?: string } | undefined)?.subprocessType === "event";
+/** An expanded subprocess whose Usage is Event: it hangs under the flow of the EP it is in, not in it. (eventSubprocess.ts) */
+export { isEventEp };
 
 export interface Size { w: number; h: number }
 export interface Centre { x: number; y: number }
