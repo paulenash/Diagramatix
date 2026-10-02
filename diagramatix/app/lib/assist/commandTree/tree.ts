@@ -22,6 +22,7 @@ import type { Node, Pattern, Sections } from "./notation";
 import { parsePattern, parseSections } from "./notation";
 import { DISTANCE_WORDS, isNumberToken, NUMBER_WORD_SET, slotDefOf, type Conventions, type SlotDef } from "./conventions";
 import { nameFits, type DiagramNames } from "./names";
+import { appliesTo } from "./kinds";
 
 export type Lists = Record<string, readonly string[]>;
 
@@ -37,6 +38,11 @@ export interface WalkContext {
   flow?: string | null;
   /** Include the microphone words (stop, yes, no). */
   voice?: boolean;
+  /**
+   * The KINDS of what is selected (kinds.ts). When there are any, a command whose pattern says it is about other
+   * kinds (`@on …`), or never about a selection (`@nosel`), is left out. Absent or empty: nothing is filtered.
+   */
+  selected?: readonly string[];
 }
 
 export interface NextItem {
@@ -76,6 +82,8 @@ export class CommandTree {
     readonly conventions: Conventions,
     readonly lists: Lists,
     errors: { line: number; message: string }[] = [],
+    /** `## aliases` and `## hidden` from the pattern text. */
+    readonly meta: { aliases: Record<string, string[]>; hidden: string[] } = { aliases: {}, hidden: [] },
   ) {
     this.errors.push(...errors);
     for (const def of conventions) {
@@ -265,11 +273,15 @@ export class CommandTree {
   /** The patterns that apply right now. */
   activePatterns(ctx: WalkContext = {}): Pattern[] {
     if (ctx.flow) return this.sections[`flow ${ctx.flow}`] ?? [];
-    return [
+    const all = [
       ...(this.sections.commands ?? []),
       ...(ctx.ghost ? this.sections.assist ?? [] : []),
       ...(ctx.voice ? this.sections.voice ?? [] : []),
     ];
+    const kinds = ctx.selected ?? [];
+    if (!kinds.length) return all;
+    // Something is selected: only what applies to it. A line with no tag applies to anything.
+    return all.filter((p) => !p.noSel && (!p.on || appliesTo(p.on, kinds)));
   }
 
   // ── the public questions ─────────────────────────────────────────────────
@@ -313,6 +325,31 @@ export class CommandTree {
 
   firstWords(ctx: WalkContext = {}): NextItem[] {
     return this.next([], ctx).next;
+  }
+
+  /**
+   * The first words as the list shows them (Paul, 2026-10-02): hidden words dropped, and each word that is an
+   * alias of another shown beside it in grey instead of on its own. A word whose main word is not in the list
+   * (nothing it names applies to the selection) stands alone.
+   */
+  firstWordGroups(ctx: WalkContext = {}): { main: string; aliases: string[] }[] {
+    const hidden = new Set(this.meta.hidden);
+    const words = this.firstWords(ctx).filter((i) => i.kind === "word" && !i.optional && !hidden.has(i.text)).map((i) => i.text);
+    const present = new Set(words);
+    // An alias may belong to more than one main word ("set" is both a way to say convert and a way to say label):
+    // it is shown beside each of them present, and never as a word of its own while any of them is.
+    const claimed = new Set<string>();
+    for (const [main, list] of Object.entries(this.meta.aliases)) {
+      if (!present.has(main)) continue;
+      for (const a of list) if (present.has(a) && a !== main) claimed.add(a);
+    }
+    const byMain = new Map<string, string[]>();
+    for (const w of words) {
+      if (claimed.has(w)) continue;
+      byMain.set(w, (this.meta.aliases[w] ?? []).filter((a) => present.has(a) && a !== w));
+    }
+    const cmp = (a: string, b: string) => a.localeCompare(b, "en", { sensitivity: "base" });
+    return [...byMain.entries()].sort(([a], [b]) => cmp(a, b)).map(([main, aliases]) => ({ main, aliases }));
   }
 
   /** Is this whole sentence a command the tree knows? */
@@ -375,6 +412,6 @@ export { NUMBER_WORD_SET };
 
 /** Compile pattern text. Problems are in `.errors` — the tree still works for the lines that parsed. */
 export function compileTree(text: string, conventions: Conventions, lists: Lists): CommandTree {
-  const { sections, errors } = parseSections(text);
-  return new CommandTree(sections, conventions, lists, errors);
+  const { sections, aliases, hidden, errors } = parseSections(text);
+  return new CommandTree(sections, conventions, lists, errors, { aliases, hidden });
 }

@@ -34,6 +34,12 @@ export interface PanelInput {
   flow: OpenFlow | null;
   /** The names on the diagram, so a name variable takes only real names (see names.ts). Absent: any words. */
   names?: DiagramNames;
+  /**
+   * The KINDS of what is SELECTED (kinds.ts). With any, only the commands that apply to them are listed —
+   * "shrink" does not appear with an expanded subprocess selected. Not the hover target: pointing at something
+   * changes nothing here (Paul, 2026-10-02).
+   */
+  selectedKinds?: readonly string[];
 }
 
 export type PanelMode =
@@ -54,6 +60,11 @@ export interface PanelView {
   heard: string;
   /** The next words, written as the help writes them: required first, then [optional]. */
   lines: string[];
+  /**
+   * Only for the first words: each main word with its aliases (shown in grey beside it). `lines` then holds just
+   * the main words, so a caller that ignores this still shows a clean list.
+   */
+  groups?: { main: string; aliases: string[] }[];
   /** What was heard is already a whole command — it could stop here. */
   complete: boolean;
   /** The variable currently taking words, if one is open. */
@@ -85,13 +96,17 @@ export function computePanel(tree: CommandTree, input: PanelInput): PanelView {
     return { mode: "other-flow", heard, lines: ["<number>", "cancel"], complete: false, openSlot: null, note: `A ${label} is open — say its number, or cancel.` };
   }
 
-  const ctx = { ghost: input.ghost, ...(input.names ? { names: input.names } : {}) };
-  if (!tokens.length) {
-    return { mode: "first", heard, lines: formatNext(tree.firstWords(ctx)), complete: false, openSlot: null, note: null };
-  }
+  const ctx = {
+    ghost: input.ghost,
+    ...(input.names ? { names: input.names } : {}),
+    ...(input.selectedKinds?.length ? { selected: input.selectedKinds } : {}),
+  };
+  const firstView = (mode: "first" | "no-match", note: string | null): PanelView => {
+    const groups = tree.firstWordGroups(ctx);
+    return { mode, heard, lines: groups.map((g) => g.main), groups, complete: false, openSlot: null, note };
+  };
+  if (!tokens.length) return firstView("first", null);
   const r = tree.next(tokens, ctx);
-  if (!r.ok) {
-    return { mode: "no-match", heard, lines: formatNext(tree.firstWords(ctx)), complete: false, openSlot: null, note: "No command starts like that — the first words are:" };
-  }
+  if (!r.ok) return firstView("no-match", "No command starts like that — the first words are:");
   return { mode: "next", heard, lines: formatNext(r.next), complete: r.complete, openSlot: r.openSlot, note: null };
 }

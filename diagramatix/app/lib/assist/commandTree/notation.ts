@@ -25,8 +25,15 @@
  *   ## voice        the microphone words (stop, yes, no) — not parser commands
  *   ## flow <id>    what can be said while a guided flow is open
  *
+ *   ## aliases     word: alias alias — shown in grey beside the word in the first-words list
+ *   ## hidden      first words the list never shows (they still work)
+ *
+ * A pattern line may end with  @on pool lane  (the kinds it is about — see kinds.ts) or  @nosel  (it never
+ * acts on a selection). With something selected the help shows only the commands that apply to it.
+ *
  * Pure. No React, no DOM.
  */
+import { expandKindToken } from "./kinds";
 
 export type Node =
   | { t: "word"; w: string }
@@ -41,6 +48,13 @@ export interface Pattern {
   /** 1-based line number in the text it came from. */
   line: number;
   seq: Node[];
+  /**
+   * `@on pool lane` at the end of the line: the kinds (or kind groups — see kinds.ts) of thing this command is
+   * about. When something is selected, the help shows the command only if the selection is one of them.
+   */
+  on?: string[];
+  /** `@nosel` at the end of the line: the command never acts on a selection — hidden once something is selected. */
+  noSel?: boolean;
 }
 
 export interface NotationError {
@@ -51,6 +65,13 @@ export interface NotationError {
 export interface Sections {
   /** Section id ("commands", "assist", "voice", "flow <id>") → its patterns, in order. */
   sections: Record<string, Pattern[]>;
+  /**
+   * `## aliases` — lines like `add: insert create put`. The first word is the one shown; the rest are shown in
+   * grey beside it in the first-words list instead of as words of their own.
+   */
+  aliases: Record<string, string[]>;
+  /** `## hidden` — first words the list never shows (they still work). */
+  hidden: string[];
   errors: NotationError[];
 }
 
@@ -129,8 +150,21 @@ export function parsePattern(source: string): Node[] {
 }
 
 /** Parse a whole block of text into sections. Never throws: problems come back as `errors`. */
+/** Split a trailing `@on kind kind` / `@nosel` off a pattern line. */
+function splitAnnotation(t: string): { text: string; on?: string[]; noSel?: boolean; error?: string } {
+  const m = t.match(/^(.*?)\s+@(nosel|on\s+[a-z0-9 \-]+?)\s*$/i);
+  if (!m) return { text: t };
+  if (m[2].toLowerCase() === "nosel") return { text: m[1].trim(), noSel: true };
+  const tokens = m[2].replace(/^on\s+/i, "").trim().split(/\s+/).map((x) => x.toLowerCase());
+  const bad = tokens.find((x) => !expandKindToken(x));
+  if (bad) return { text: m[1].trim(), error: `@on: "${bad}" is not a kind or a group of kinds` };
+  return { text: m[1].trim(), on: tokens };
+}
+
 export function parseSections(text: string): Sections {
   const sections: Record<string, Pattern[]> = { commands: [] };
+  const aliases: Record<string, string[]> = {};
+  const hidden: string[] = [];
   const errors: NotationError[] = [];
   let current = "commands";
   const lines = String(text ?? "").replace(/\r\n/g, "\n").split("\n");
@@ -144,8 +178,8 @@ export function parseSections(text: string): Sections {
     if (!t) return;
     if (h) {
       const name = h[1].trim().toLowerCase().replace(/\s+/g, " ");
-      if (!/^(commands|assist|voice|flow [a-z0-9-]+)$/.test(name)) {
-        errors.push({ line, message: `unknown section "${h[1].trim()}" — use commands, assist, voice or flow <id>` });
+      if (!/^(commands|assist|voice|aliases|hidden|flow [a-z0-9-]+)$/.test(name)) {
+        errors.push({ line, message: `unknown section "${h[1].trim()}" — use commands, assist, voice, aliases, hidden or flow <id>` });
         current = "?";
         return;
       }
@@ -154,11 +188,24 @@ export function parseSections(text: string): Sections {
       return;
     }
     if (current === "?") return;
+    if (current === "aliases") {
+      const a = t.match(/^([a-z0-9'’.\-]+)\s*:\s*(.+)$/i);
+      if (!a) { errors.push({ line, message: "an alias line is  word: alias alias" }); return; }
+      const main = a[1].toLowerCase();
+      aliases[main] = [...(aliases[main] ?? []), ...a[2].trim().toLowerCase().split(/\s+/)];
+      return;
+    }
+    if (current === "hidden") {
+      hidden.push(...t.toLowerCase().split(/\s+/).filter(Boolean));
+      return;
+    }
     try {
-      sections[current].push({ source: t, line, seq: parsePattern(t) });
+      const a = splitAnnotation(t);
+      if (a.error) { errors.push({ line, message: a.error }); return; }
+      sections[current].push({ source: t, line, seq: parsePattern(a.text), ...(a.on ? { on: a.on } : {}), ...(a.noSel ? { noSel: true } : {}) });
     } catch (e) {
       errors.push({ line, message: (e as Error).message });
     }
   });
-  return { sections, errors };
+  return { sections, aliases, hidden, errors };
 }

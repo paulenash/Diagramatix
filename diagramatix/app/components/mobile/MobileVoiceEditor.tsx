@@ -27,6 +27,7 @@ import { useVoiceSession } from "@/app/hooks/useVoiceSession";
 import { useVoiceAssistHelp } from "@/app/hooks/useVoiceAssistHelp";
 import { computePanel, namesOf, type OpenFlow } from "@/app/lib/assist/commandTree";
 import { repairForRun } from "@/app/lib/assist/commandTree/positionRepair";
+import { selectedKinds as selectedKindsOf } from "@/app/lib/assist/commandTree/kinds";
 import { elementLimitBlock } from "@/app/lib/diagram/elementLimit";
 import { thumbnailFrameFor } from "@/app/lib/diagram/templateThumbnail";
 import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
@@ -264,7 +265,7 @@ export function MobileVoiceEditor({
     : session.messageFlow ? { kind: "other", label: "message pick" }
     : null;
   const helpView = help.tree && help.on && (listening || helpFlow)
-    ? computePanel(help.tree, { interim: session.voiceInterim, ghost: false, flow: helpFlow, names: helpNames })
+    ? computePanel(help.tree, { interim: session.voiceInterim, ghost: false, flow: helpFlow, names: helpNames, selectedKinds: selectedKindsOf(data.elements, selectedElementIds, selectedConnector) })
     : null;
   // The screen stays on while the mic is open: a phone that sleeps mid-sentence loses the microphone.
   useEffect(() => {
@@ -324,7 +325,13 @@ export function MobileVoiceEditor({
               <div className="flex items-start gap-1.5">
                 <div className="flex-1 max-h-[4.5rem] overflow-y-auto leading-6">
                   <span className="text-[11px] text-gray-500 mr-1.5">{helpView.mode === "first" || helpView.mode === "no-match" ? "Say:" : "Next:"}</span>
-                  {helpView.lines.map((l, i) => (
+                  {helpView.groups && helpView.groups.map((g) => (
+                    <span key={g.main} className="inline-block mr-1.5 mb-1">
+                      <span className="text-[12px] px-1.5 py-0.5 rounded border text-purple-900 border-purple-300 bg-purple-50 font-medium">{g.main}</span>
+                      {g.aliases.length > 0 && <span className="text-[11px] text-gray-400 ml-1">{g.aliases.join(" ")}</span>}
+                    </span>
+                  ))}
+                  {!helpView.groups && helpView.lines.map((l, i) => (
                     <span key={`${l}-${i}`} className={`inline-block text-[12px] px-1.5 py-0.5 rounded border mr-1 mb-1 ${l.startsWith("[") ? "text-gray-400 border-gray-200" : l.includes("<") ? "text-teal-800 border-teal-300 bg-teal-50 italic" : "text-purple-900 border-purple-300 bg-purple-50 font-medium"}`}>{l}</span>
                   ))}
                   {helpView.complete && <span className="text-[11px] text-green-700"> ✓ complete</span>}

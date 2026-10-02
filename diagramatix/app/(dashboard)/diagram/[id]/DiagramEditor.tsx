@@ -82,6 +82,7 @@ import { VoiceAssistHelpPanel } from "@/app/components/canvas/VoiceAssistHelpPan
 import { useVoiceAssistHelp, useTargetNow } from "@/app/hooks/useVoiceAssistHelp";
 import { computePanel, namesOf, type OpenFlow } from "@/app/lib/assist/commandTree";
 import { repairForRun } from "@/app/lib/assist/commandTree/positionRepair";
+import { selectedKinds as selectedKindsOf } from "@/app/lib/assist/commandTree/kinds";
 import { PropertiesPanel } from "@/app/components/canvas/PropertiesPanel";
 import { captureTemplate, instantiateTemplate } from "@/app/lib/diagram/templates";
 import { resolvePackageNameLink } from "@/app/lib/diagram/packageLink";
@@ -2479,7 +2480,11 @@ export function DiagramEditor({
   // "move dividers down" no longer reads "dividers" as an element's name.
   const helpNames = useMemo(() => (helpShown ? namesOf(data.elements, data.connectors) : undefined), [helpShown, data.elements, data.connectors]);
   const helpView = helpShown && assistHelp.tree
-    ? computePanel(assistHelp.tree, { interim: voiceInterim, ghost: assistEnabled && nextStepCandidates.length > 0, flow: helpOpenFlow, names: helpNames })
+    ? computePanel(assistHelp.tree, {
+        interim: voiceInterim, ghost: assistEnabled && nextStepCandidates.length > 0, flow: helpOpenFlow, names: helpNames,
+        // What is SELECTED narrows the commands to those that apply to it. The hover target does not (Paul, 2026-10-02).
+        selectedKinds: selectedKindsOf(data.elements, selectedElementIds, selectedConnector),
+      })
     : null;
   // THE HOVER HIGHLIGHT (Paul, 2026-10-02: "add the hover highlight that exists in the mobile Voice Assist"). With
   // Voice Assist on, the element under the cursor is outlined whenever it is what "this" would act on — nothing

@@ -497,7 +497,9 @@ function TryIt({ tree }: { tree: ReturnType<typeof compileTree> }) {
   // What the recogniser heard goes through the same repairs the parser and the hold use (mood → move …).
   const heard = useMemo(() => heardForHelp(text, { numberPick: flow === "rename-pick" || flow === "select-pick" || flow.startsWith("dividers") }), [text, flow]);
   const tokens = tokenise(heard);
-  const ctx = { ghost, flow: flow || null, ...(useNames ? { names } : {}) };
+  // What is selected narrows the commands to those that apply to it (kinds.ts) — the stand-in kind chosen above.
+  const selectedKindIds = selKind ? [selKind === "step-in-ep" ? "task" : selKind] : [];
+  const ctx = { ghost, flow: flow || null, ...(useNames ? { names } : {}), ...(selectedKindIds.length ? { selected: selectedKindIds } : {}) };
   const result = useMemo(() => tree.next(tokens, ctx), [tree, heard, ghost, flow, useNames]); // eslint-disable-line react-hooks/exhaustive-deps
   const ops = useMemo(() => (text.trim() && !flow ? parseCommand(heard.trim()) : null), [heard, flow]);
   const treeSays = tree.accepts(heard, ctx);

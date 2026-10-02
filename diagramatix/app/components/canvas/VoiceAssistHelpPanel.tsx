@@ -13,6 +13,16 @@ import { useState } from "react";
 import { FloatingPanel } from "./FloatingPanel";
 import type { PanelView, TargetNow } from "@/app/lib/assist/commandTree";
 
+/** A main command word with its aliases in grey beside it (“add  insert create put …”). */
+function WordWithAliases({ main, aliases }: { main: string; aliases: string[] }) {
+  return (
+    <span className="inline-flex items-baseline mr-1.5 mb-1.5">
+      <span className="text-xs px-1.5 py-0.5 rounded border text-purple-900 border-purple-300 bg-purple-50 font-medium">{main}</span>
+      {aliases.length > 0 && <span className="text-[11px] text-gray-400 ml-1" title={`also: ${aliases.join(", ")}`}>{aliases.join(" ")}</span>}
+    </span>
+  );
+}
+
 function Chip({ text }: { text: string }) {
   const optional = text.startsWith("[");
   const variable = text.includes("<");
@@ -40,7 +50,11 @@ export function VoiceAssistHelpPanel({ view, target, onClose }: { view: PanelVie
         </div>
       )}
       {view.note && <p className="text-[11px] text-gray-600 mb-1.5">{view.note}</p>}
-      <div className="leading-6">{view.lines.map((l, i) => <Chip key={`${l}-${i}`} text={l} />)}</div>
+      <div className="leading-6">
+        {view.groups
+          ? view.groups.map((g) => <WordWithAliases key={g.main} main={g.main} aliases={g.aliases} />)
+          : view.lines.map((l, i) => <Chip key={`${l}-${i}`} text={l} />)}
+      </div>
       {view.complete && <p className="text-[11px] text-green-700 mt-0.5">That is already a whole command — you can stop here.</p>}
       <div className="mt-2 pt-2 border-t border-gray-100 text-[11px]">
         <span className="text-gray-500">“this” / “that” would act on: </span>

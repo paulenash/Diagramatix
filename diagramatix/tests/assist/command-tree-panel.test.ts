@@ -19,7 +19,11 @@ describe("T5176 — the panel: first words, then next words, as Paul described",
   it("nothing said: the first words of every command", () => {
     const v = view("");
     expect(v.mode).toBe("first");
-    for (const w of ["add", "align", "assign", "connect", "convert", "delete", "insert", "move", "make", "nudge", "put", "rename"]) expect(v.lines, w).toContain(w);
+    // The main words; “insert”, “nudge”, “put” … are ALIASES now, shown in grey beside them (T5215), not words of their own.
+    for (const w of ["add", "align", "assign", "connect", "convert", "delete", "move", "make", "rename"]) expect(v.lines, w).toContain(w);
+    const g = (m: string) => v.groups?.find((x) => x.main === m)?.aliases ?? [];
+    expect(g("add")).toEqual(expect.arrayContaining(["insert", "put"]));
+    expect(g("move")).toContain("nudge");
     expect(v.heard).toBe("");
     expect(v.complete).toBe(false);
   });
@@ -56,7 +60,10 @@ describe("T5176 — the panel: first words, then next words, as Paul described",
 
   it("the Assist-only words appear only while ghost suggestions are showing", () => {
     expect(view("").lines).not.toContain("accept");
-    expect(view("", { ghost: true }).lines).toEqual(expect.arrayContaining(["accept", "take"]));
+    const on = view("", { ghost: true });
+    expect(on.lines).toContain("accept");
+    expect(on.groups?.find((x) => x.main === "accept")?.aliases).toContain("take");   // “take” is an alias of “accept”
+    expect(view("").groups?.some((x) => x.main === "accept" || x.aliases.includes("take"))).toBe(false);
   });
 });
 
