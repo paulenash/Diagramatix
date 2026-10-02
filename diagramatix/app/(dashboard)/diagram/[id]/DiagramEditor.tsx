@@ -82,8 +82,6 @@ import { VoiceAssistHelpPanel } from "@/app/components/canvas/VoiceAssistHelpPan
 import { useVoiceAssistHelp, useTargetNow } from "@/app/hooks/useVoiceAssistHelp";
 import { computePanel, namesOf, type OpenFlow } from "@/app/lib/assist/commandTree";
 import { repairForRun } from "@/app/lib/assist/commandTree/positionRepair";
-import { TestDiagramWindow } from "@/app/components/canvas/TestDiagramWindow";
-import { testDiagramCreateBody } from "@/app/lib/assist/testDiagram";
 import { PropertiesPanel } from "@/app/components/canvas/PropertiesPanel";
 import { captureTemplate, instantiateTemplate } from "@/app/lib/diagram/templates";
 import { resolvePackageNameLink } from "@/app/lib/diagram/packageLink";
@@ -811,32 +809,6 @@ export function DiagramEditor({
   const [saveAsName, setSaveAsName] = useState("");
   const [saveAsBusy, setSaveAsBusy] = useState(false);
   const [saveAsError, setSaveAsError] = useState<string | null>(null);
-  // The Voice Assist test diagram (Paul, 2026-09-27): shown in a window; "Create
-  // test diagram" saves THIS diagram, makes a copy of the test diagram in the
-  // same project, and opens it — the Save As pattern below.
-  const [testDiagram, setTestDiagram] = useState<{ open: boolean; creating: boolean; error: string | null }>({ open: false, creating: false, error: null });
-  async function createTestDiagram() {
-    if (testDiagram.creating) return;
-    setTestDiagram((t) => ({ ...t, creating: true, error: null }));
-    try {
-      await saveNowRef.current();
-      const res = await fetch("/api/diagrams", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(testDiagramCreateBody(projectId)),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: "Failed" }));
-        setTestDiagram((t) => ({ ...t, creating: false, error: err.error ?? "Could not create the test diagram" }));
-        return;
-      }
-      const created = await res.json();
-      setTestDiagram({ open: false, creating: false, error: null });
-      router.push(`/diagram/${created.id}`);
-    } catch (err) {
-      setTestDiagram((t) => ({ ...t, creating: false, error: err instanceof Error ? err.message : "Network error" }));
-    }
-  }
   async function handleSaveAs() {
     if (!saveAsName.trim() || saveAsBusy) return;
     setSaveAsBusy(true);
@@ -2488,7 +2460,9 @@ export function DiagramEditor({
       }
     : null;
   const helpShown = helpActive && !!assistHelp.tree && assistHelp.on;
-  const helpTarget = useTargetNow(helpShown, () => ({
+  // The target is tracked whenever Voice Assist is on — not only while the help panel is showing — because the
+  // element under the cursor is outlined too (below), as a tapped element is on the phone.
+  const helpTarget = useTargetNow(helpActive, () => ({
     elements: elementsRef.current, selected: selectedIdsRef.current, last: voiceLastId.current, pointer: pointerWorld.current,
   }));
   const helpOpenFlow: OpenFlow | null =
@@ -2507,11 +2481,16 @@ export function DiagramEditor({
   const helpView = helpShown && assistHelp.tree
     ? computePanel(assistHelp.tree, { interim: voiceInterim, ghost: assistEnabled && nextStepCandidates.length > 0, flow: helpOpenFlow, names: helpNames })
     : null;
+  // THE HOVER HIGHLIGHT (Paul, 2026-10-02: "add the hover highlight that exists in the mobile Voice Assist"). With
+  // Voice Assist on, the element under the cursor is outlined whenever it is what "this" would act on — nothing
+  // selected, the cursor over it — exactly as the phone outlines what you tap. With the help panel showing, the
+  // outline follows whatever "this" means (the selection, the cursor, or the last one added), as before.
   const helpOutline = useMemo(() => {
-    if (!helpShown || !helpTarget.id) return null;
+    if (!helpActive || !helpTarget.id) return null;
+    if (!helpShown && helpTarget.kind !== "cursor") return null;
     const e = data.elements.find((x) => x.id === helpTarget.id);
     return e ? { x: e.x, y: e.y, width: e.width, height: e.height } : null;
-  }, [helpShown, helpTarget.id, data.elements]);
+  }, [helpActive, helpShown, helpTarget.id, helpTarget.kind, data.elements]);
 
   const isContext =diagramType === "context" || diagramType === "basic";
   const defaultDirectionType: DirectionType =
@@ -5414,23 +5393,12 @@ export function DiagramEditor({
             onSaveSession={() => { void saveDebugSession(); }}
             saveState={debugSaveState}
             snapshotCount={debugSnapshots.length}
-            onTestDiagram={() => setTestDiagram({ open: true, creating: false, error: null })}
             assistHelp={assistHelp.tree ? { on: assistHelp.on, onToggle: () => assistHelp.setOn(!assistHelp.on) } : undefined}
           />
         )}
 
         {helpShown && helpView && (
           <VoiceAssistHelpPanel view={helpView} target={helpTarget} onClose={() => assistHelp.setOn(false)} />
-        )}
-
-        {testDiagram.open && (
-          <TestDiagramWindow
-            onClose={() => setTestDiagram({ open: false, creating: false, error: null })}
-            onCreate={() => { void createTestDiagram(); }}
-            creating={testDiagram.creating}
-            error={testDiagram.error}
-            canCreate={!readOnly}
-          />
         )}
 
         {/* Template-attach picker (assist "Template" ghost). Category → template

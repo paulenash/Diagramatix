@@ -43,7 +43,6 @@ export function VoiceAssistBar({
   onSaveSession,
   saveState = "idle",
   snapshotCount = 0,
-  onTestDiagram,
   assistHelp,
 }: {
   listening: boolean;
@@ -73,8 +72,6 @@ export function VoiceAssistBar({
   onSaveSession?: () => void;
   saveState?: "idle" | "saving" | "saved" | "error";
   snapshotCount?: number;
-  /** Show the test diagram the Commands card is written for (the editor owns the window). */
-  onTestDiagram?: () => void;
   /**
    * Voice Assist Help (the next-words panel): present only when the SuperAdmin has
    * switched it on. This person's own on/off lives in the editor; the bar just shows the button.
@@ -179,11 +176,6 @@ export function VoiceAssistBar({
               <button onClick={assistHelp.onToggle}
                 className={`text-[10px] px-1.5 py-0.5 rounded border ${assistHelp.on ? "bg-purple-600 text-white border-purple-600" : "text-purple-700 border-purple-300 hover:bg-purple-50"}`}
                 title={assistHelp.on ? "Voice Assist Help is on — click to hide the panel that lists what you can say next" : "Voice Assist Help is off — click to show the panel that lists what you can say next"}>{assistHelp.on ? "Help: on" : "Help: off"}</button>
-            )}
-            {onTestDiagram && (
-              <button onClick={onTestDiagram}
-                className="text-[10px] px-1.5 py-0.5 rounded border text-purple-700 border-purple-300 hover:bg-purple-50"
-                title="The diagram every Commands example is written for — see it, or create a copy in this project">Test diagram</button>
             )}
             {onCost && (
               <button onClick={() => { void askCost(); }} disabled={cost.state === "loading"}

@@ -1,6 +1,8 @@
 /**
- * The diagram every generated command is written against, and scored against —
- * and the one "Show test diagram" puts in front of the user.
+ * The diagram every generated command is written against, and scored against.
+ * (It used to be shown to the user by a "Show test diagram" button on the Voice Assist bar; that button and its
+ * window were removed on 2026-10-02 — Paul no longer needs the diagram in front of him. It remains the fixture the
+ * card, the generated test sets and the Voice Assist Help tile are written against.)
  *
  * PAUL'S OWN DIAGRAM (2026-09-27): "Replace current Voice Assist test diagram
  * with Voice-Assist-testdiagram-2.json in /test. This looks a lot better and

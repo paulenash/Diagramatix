@@ -36,10 +36,11 @@ export function describeResult(
   selectedIds: string[] = [],
   pointer: { x: number; y: number } | null = null,
   cursorId: string | null = null,
+  selectedConnectorId: string | null = null,
 ): DescribedResult {
   const h = headlessDiagram(structuredClone(diagram));
   const before = structuredClone(h.data);                  // after the load heal, so a heal is never reported as an effect
-  const { ok, summary } = applyAssistOps(ops, h.context({ selectedIds, pointer }));
+  const { ok, summary } = applyAssistOps(ops, h.context({ selectedIds, pointer, selectedConnectorId }));
   if (h.screen.includes("pick")) {
     return { ok: false, changes: ["it would ask which one you meant, and wait for your answer"], summary };
   }

@@ -2053,12 +2053,16 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
         // which, the voice says what); otherwise refuse and say what to say.
         // Never a task, never a loose event: the mouse can make neither.
         const sel = selectedIds.map((id) => els.find((e) => e.id === id)).filter((e): e is DiagramElement => !!e);
-        if (sel.length !== 1 || !isBoundaryHost(sel[0].type)) {
+        // …and with nothing selected, the one under the cursor (Paul, 2026-10-02: any activity — a task, a collapsed
+        // subprocess or an expanded subprocess — selected OR pointed at, the same "this" every other command uses).
+        const under = sel.length === 0 ? elementUnderPointer(pointerWorld.current, els) : null;
+        const pick = sel.length === 1 ? sel[0] : under;
+        if (!pick || !isBoundaryHost(pick.type)) {
           const kind = `${op.nonInterrupting ? "non-interrupting " : ""}${op.eventType && op.eventType !== "none" ? `${op.eventType} ` : ""}boundary event`;
-          results.push(`say which task or subprocess it goes on — “add ${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}${op.label ? ` called ${op.label}` : ""} to <name>”`);
+          results.push(`say which task or subprocess it goes on, or select or point at one — “add ${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}${op.label ? ` called ${op.label}` : ""} to <name>”`);
           anyFail = true; continue;
         }
-        host = sel[0];
+        host = pick;
       }
       if (!isBoundaryHost(host.type)) { results.push(`${nameOf(host)} can't host a boundary event`); anyFail = true; continue; }
       const existing = els.filter((e) => e.boundaryHostId === host.id);

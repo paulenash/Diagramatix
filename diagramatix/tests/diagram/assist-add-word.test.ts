@@ -406,7 +406,8 @@ describe("T4786 — a boundary event with no host goes on the selected task", ()
     const r = say("add a boundary event called Timeout");
     expect(r.ok).toBe(false);
     expect(r.added).toEqual([]);
-    expect(r.summary).toBe("say which task or subprocess it goes on — “add a boundary event called Timeout to <name>”");
+    // (wording widened 2026-10-02: the cursor can name the host too — see boundary-event-hosts.test.ts)
+    expect(r.summary).toBe("say which task or subprocess it goes on, or select or point at one — “add a boundary event called Timeout to <name>”");
   });
 
   it("refuses when the selection is not exactly one task or subprocess", () => {
@@ -414,7 +415,7 @@ describe("T4786 — a boundary event with no host goes on the selected task", ()
       const r = say("add a timer boundary event", sel);
       expect(r.ok, sel.join(",")).toBe(false);
       expect(r.added, sel.join(",")).toEqual([]);
-      expect(r.summary).toBe("say which task or subprocess it goes on — “add a timer boundary event to <name>”");
+      expect(r.summary).toBe("say which task or subprocess it goes on, or select or point at one — “add a timer boundary event to <name>”");
     }
   });
 

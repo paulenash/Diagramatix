@@ -27,6 +27,7 @@ import { generateCases } from "@/app/lib/assist/commandGenerator";
 import frozenKey from "@/app/lib/assist/catalogCorpus.expected.json";
 import { startDictation, type DictationHandle } from "@/app/lib/dictation";
 import { summariesByFirstWord } from "@/app/lib/assist/commandTree/summaries";
+import { STAND_IN_KINDS, standInDiagram } from "@/app/lib/assist/commandTree/standIns";
 import { describeResult, type DescribedResult } from "@/app/lib/assist/describeResult";
 import { EMPTY_UTTERANCE, heardForHelp, onFinal, onQuiet, type Utterance } from "@/app/lib/assist/commandTree/heard";
 import { diagramKeyterms } from "@/app/lib/dictation/diagramKeyterms";
@@ -395,28 +396,30 @@ function TryIt({ tree }: { tree: ReturnType<typeof compileTree> }) {
   const [flow, setFlow] = useState("");
   const [ghost, setGhost] = useState(false);
   const [useNames, setUseNames] = useState(true);
-  const [selId, setSelId] = useState("");
-  const [cursorId, setCursorId] = useState("");
+  // What is selected / pointed at is chosen by KIND (a task, a gateway, an expanded subprocess …), not by picking a
+  // particular element: each kind has one stand-in on the test diagram (standIns.ts).
+  const [selKind, setSelKind] = useState("");
+  const [cursorKind, setCursorKind] = useState("");
 
   // The test diagram — the same one the Commands card is written for — stands in for a real
   // diagram, so what is selected / pointed at, and which names exist, can be tried here.
-  const fx = useMemo(() => fixtureDiagram(), []);
+  const stand = useMemo(() => standInDiagram(), []);
+  const fx = stand.diagram;
   const names = useMemo(() => namesOf(fx.elements, fx.connectors), [fx]);
-  const choices = useMemo(
-    () => fx.elements.filter((e) => (e.label ?? "").trim()).map((e) => ({ id: e.id, text: `${(e.label ?? "").replace(/\s+/g, " ").trim()} (${String(e.type).replace(/-/g, " ")})` })),
-    [fx],
-  );
-  const pointerAt = (id: string) => {
-    const e = fx.elements.find((x) => x.id === id);
-    return e ? { x: e.x + e.width / 2, y: e.y + e.height / 2 } : null;
-  };
+  /** The selection / cursor a chosen pair of kinds stands for. */
+  const standFor = (sKind: string, cKind: string) => ({
+    selEl: sKind ? stand.elementOf(sKind) : undefined,
+    selConn: sKind ? stand.connectorOf(sKind) : undefined,
+    cursorEl: cKind ? stand.elementOf(cKind) : undefined,
+    cursorAt: cKind ? stand.pointOf(cKind) : null,
+  });
   // The speech callbacks outlive a render, so they read the stand-in selection and cursor through refs.
-  const standIn = useRef({ selId: "", cursorId: "" });
-  standIn.current = { selId, cursorId };
-  const target = useMemo(
-    () => targetNow(fx.elements, selId ? [selId] : [], null, cursorId ? pointerAt(cursorId) : null),
-    [fx, selId, cursorId], // eslint-disable-line react-hooks/exhaustive-deps
-  );
+  const standIn = useRef({ selKind: "", cursorKind: "" });
+  standIn.current = { selKind, cursorKind };
+  const target = useMemo(() => {
+    const s = standFor(selKind, cursorKind);
+    return targetNow(fx.elements, s.selEl ? [s.selEl.id] : [], null, s.cursorAt, s.selConn);
+  }, [fx, selKind, cursorKind]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Speaking a command. The words arrive as the recogniser hears them and walk the tree exactly as they
   // do in the editor, and the test diagram's names go to the recogniser as hints, as the editor does.
@@ -448,13 +451,12 @@ function TryIt({ tree }: { tree: ReturnType<typeof compileTree> }) {
       const repaired = heardForHelp(r.command);
       const ops = parseCommand(repaired);
       // What it DID, with the before and after: the command is applied to a copy of the test diagram,
-      // with the element chosen above standing in for the selection and the cursor.
+      // with the kinds chosen above standing in for the selection and the cursor.
       let result: DescribedResult | null = null;
       if (ops && ops.length) {
-        const { selId: sId, cursorId: cId } = standIn.current;
-        const at = cId ? fx.elements.find((x) => x.id === cId) : undefined;
+        const s = standFor(standIn.current.selKind, standIn.current.cursorKind);
         try {
-          result = describeResult(ops, fx, sId ? [sId] : [], at ? { x: at.x + at.width / 2, y: at.y + at.height / 2 } : null, cId || null);
+          result = describeResult(ops, fx, s.selEl ? [s.selEl.id] : [], s.cursorAt, s.cursorEl?.id ?? null, s.selConn?.id ?? null);
         } catch { result = null; }
       }
       setLastCmd({ heard: r.command, repaired, ops, result });
@@ -541,16 +543,16 @@ function TryIt({ tree }: { tree: ReturnType<typeof compileTree> }) {
             {flows.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
           </select>
         </label>
-        <label className="text-[11px] text-gray-600 flex flex-col gap-0.5">Element selected
-          <select value={selId} onChange={(e) => setSelId(e.target.value)} className={sel}>
+        <label className="text-[11px] text-gray-600 flex flex-col gap-0.5">Selected
+          <select value={selKind} onChange={(e) => setSelKind(e.target.value)} className={sel}>
             <option value="">Nothing selected</option>
-            {choices.map((c) => <option key={c.id} value={c.id}>{c.text}</option>)}
+            {STAND_IN_KINDS.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}
           </select>
         </label>
         <label className="text-[11px] text-gray-600 flex flex-col gap-0.5">Cursor over
-          <select value={cursorId} onChange={(e) => setCursorId(e.target.value)} className={sel}>
+          <select value={cursorKind} onChange={(e) => setCursorKind(e.target.value)} className={sel}>
             <option value="">Nothing</option>
-            {choices.map((c) => <option key={c.id} value={c.id}>{c.text}</option>)}
+            {STAND_IN_KINDS.filter((k) => k.hover).map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}
           </select>
         </label>
         <label className="text-xs text-gray-700 flex items-center gap-1 pb-1.5"><input type="checkbox" checked={useNames} onChange={(e) => setUseNames(e.target.checked)} /> Names from the test diagram</label>
