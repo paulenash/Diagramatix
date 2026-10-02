@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { STAND_IN_KINDS, standInDiagram } from "@/app/lib/assist/commandTree/standIns";
 import { targetNow } from "@/app/lib/assist/commandTree";
-import { elementUnderPointer } from "@/app/lib/assist/pointerRef";
+import { elementUnderPointer, hoverConnectorAt } from "@/app/lib/assist/pointerRef";
 
 const stand = standInDiagram();
 
@@ -25,16 +25,16 @@ describe("T5213 the kinds", () => {
   it("kinds are unique", () => {
     expect(new Set(STAND_IN_KINDS.map((k) => k.id)).size).toBe(STAND_IN_KINDS.length);
   });
-  it("connectors can be selected but not hovered; everything else can be both", () => {
-    for (const k of STAND_IN_KINDS) expect(k.hover, k.id).toBe(!/connector$|^association$/.test(k.id));
+  it("every kind can be selected AND hovered — connectors and their labels are hover targets too (2026-10-02)", () => {
+    for (const k of STAND_IN_KINDS) expect(k.hover, k.id).toBe(true);
   });
 });
 
 describe("T5213 every kind has a stand-in on the test diagram", () => {
   it("an element kind resolves to an element, a connector kind to a connector", () => {
     for (const k of STAND_IN_KINDS) {
-      if (k.hover) expect(stand.elementOf(k.id), k.id).toBeTruthy();
-      else expect(stand.connectorOf(k.id), k.id).toBeTruthy();
+      if (/connector$|^association$/.test(k.id)) expect(stand.connectorOf(k.id), k.id).toBeTruthy();
+      else expect(stand.elementOf(k.id), k.id).toBeTruthy();
     }
   });
   it("each is the right KIND of thing", () => {
@@ -73,7 +73,7 @@ describe("T5213 every kind has a stand-in on the test diagram", () => {
 });
 
 describe("T5213 pointing at a kind finds exactly that kind — by the editor's own rule", () => {
-  for (const k of STAND_IN_KINDS.filter((x) => x.hover)) {
+  for (const k of STAND_IN_KINDS.filter((x) => x.hover && !/connector$|^association$/.test(x.id))) {
     it(`over ${k.label}`, () => {
       const at = stand.pointOf(k.id)!;
       expect(at, k.id).toBeTruthy();
@@ -81,9 +81,14 @@ describe("T5213 pointing at a kind finds exactly that kind — by the editor's o
       expect(found?.id, `${k.id} → ${found?.type}:${found?.label}`).toBe(stand.elementOf(k.id)!.id);
     });
   }
-  it("a connector kind has no pointer position", () => {
-    expect(stand.pointOf("sequence-connector")).toBeNull();
-  });
+  for (const k of STAND_IN_KINDS.filter((x) => /connector$|^association$/.test(x.id))) {
+    it(`over ${k.label}: no element in front, and the connector is the one found`, () => {
+      const at = stand.pointOf(k.id)!;
+      expect(at, k.id).toBeTruthy();
+      expect(elementUnderPointer(at, stand.diagram.elements), `${k.id}: an element is in front`).toBeNull();
+      expect(hoverConnectorAt(at, stand.diagram.elements, stand.diagram.connectors)?.id).toBe(stand.connectorOf(k.id)!.id);
+    });
+  }
 });
 
 describe("T5213 the target line understands a selected connector", () => {
@@ -107,7 +112,7 @@ describe("T5213 the target line understands a selected connector", () => {
 
 describe("T5213 the tile uses it", () => {
   const tile = readFileSync("app/(dashboard)/dashboard/admin/voice-assist-help/VoiceAssistHelpClient.tsx", "utf8");
-  it("lists kinds, not elements: Selected offers every kind, Cursor over only the hoverable ones", () => {
+  it("lists kinds, not elements: Selected offers every kind, Cursor over every hoverable one (all of them since connectors became hover targets)", () => {
     expect(tile).toContain("{STAND_IN_KINDS.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}");
     expect(tile).toContain("{STAND_IN_KINDS.filter((k) => k.hover).map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}");
     expect(tile).not.toContain("choices.map");

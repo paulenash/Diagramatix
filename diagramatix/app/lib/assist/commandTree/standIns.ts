@@ -12,14 +12,15 @@
  *
  * A kind that can be POINTED at has a point where the pointer really finds it: a pool's name strip, a lane's
  * left margin and an expanded subprocess's empty corner are not covered by what they hold, so the same rule the
- * editor uses (`elementUnderPointer`) resolves them. Connectors can be selected but not hovered — the editor's
- * pointer reference finds elements only.
+ * editor uses (`elementUnderPointer`) resolves them. A connector kind has a point on its line, found by
+ * `hoverConnectorAt` (connectors and their labels are hover targets too since 2026-10-02).
  *
  * Pure.
  */
 import type { Connector, DiagramData, DiagramElement } from "../../diagram/types";
 import { fixtureDiagram } from "../commandFixture";
 import { sizeOf } from "../../diagram/assistPlacement";
+import { elementUnderPointer } from "../pointerRef";
 
 export interface StandInKind {
   id: string;
@@ -46,9 +47,9 @@ export const STAND_IN_KINDS: readonly StandInKind[] = [
   { id: "data-store", label: "Data Store", hover: true },
   { id: "text-annotation", label: "Text Annotation", hover: true },
   { id: "group", label: "Group", hover: true },
-  { id: "sequence-connector", label: "Sequence Connector", hover: false },
-  { id: "message-connector", label: "Message Connector", hover: false },
-  { id: "association", label: "Association", hover: false },
+  { id: "sequence-connector", label: "Sequence Connector", hover: true },
+  { id: "message-connector", label: "Message Connector", hover: true },
+  { id: "association", label: "Association", hover: true },
 ];
 
 export interface StandIns {
@@ -57,14 +58,14 @@ export interface StandIns {
   elementOf(kindId: string): DiagramElement | undefined;
   /** The connector standing for a kind, if it is a connector. */
   connectorOf(kindId: string): Connector | undefined;
-  /** Where the pointer rests to be "over" the kind — null for a connector. */
+  /** Where the pointer rests to be "over" the kind (for a connector: on its longest stretch of line). */
   pointOf(kindId: string): { x: number; y: number } | null;
 }
 
-const flow = (id: string, sourceId: string, targetId: string, type = "sequence"): Connector => ({
+const flow = (id: string, sourceId: string, targetId: string, type = "sequence", waypoints: Array<{ x: number; y: number }> = []): Connector => ({
   id, sourceId, targetId, sourceSide: "right", targetSide: "left",
   type, directionType: type === "associationBPMN" ? "non-directed" : "directed", routingType: "rectilinear",
-  sourceInvisibleLeader: false, targetInvisibleLeader: false, waypoints: [],
+  sourceInvisibleLeader: false, targetInvisibleLeader: false, waypoints,
   sourceOffsetAlong: 0.5, targetOffsetAlong: 0.5,
 }) as unknown as Connector;
 
@@ -91,14 +92,16 @@ export function standInDiagram(): StandIns {
   const host = box("ki-host", "task", px + 110, py + 70, tk.w, tk.h, "Sample Activity", "ki-sub-a");
   const boundary = box("ki-boundary", "intermediate-event", host.x + host.width - 36 - ev.w / 2, host.y + host.height - ev.h / 2, ev.w, ev.h, "Sample Timer", "ki-sub-a",
     { eventType: "timer", boundaryHostId: "ki-host" } as Partial<DiagramElement>);
-  const inline = box("ki-inline", "intermediate-event", px + 300, py + 88, ev.w, ev.h, "Sample Inline Event", "ki-sub-a", { eventType: "message" } as Partial<DiagramElement>);
+  const inline = box("ki-inline", "intermediate-event", px + 300, py + 150, ev.w, ev.h, "Sample Inline Event", "ki-sub-a", { eventType: "message" } as Partial<DiagramElement>);
   const dobj = sizeOf("data-object"), dstore = sizeOf("data-store"), note = sizeOf("text-annotation"), grp = sizeOf("group");
   const dataObject = box("ki-dobj", "data-object", px + 420, py + 60, dobj.w, dobj.h, "Sample Data Object", "ki-sub-a");
   const dataStore = box("ki-dstore", "data-store", px + 540, py + 60, dstore.w, dstore.h, "Sample Data Store", "ki-sub-a");
   const annotation = box("ki-note", "text-annotation", px + 660, py + 60, note.w, note.h, "Sample note", "ki-sub-a");
   const group = box("ki-group", "group", px + 800, py + 30, Math.min(grp.w, 150), Math.min(grp.h, 150), "Sample Group", "ki-sub-a");
   els.push(host, boundary, inline, dataObject, dataStore, annotation, group);
-  cons.push(flow("ki-assoc", "ki-host", "ki-dobj", "associationBPMN"));
+  // A straight run from one shape's right edge to the next one's left (the sample connectors' routes).
+  const run = (a: DiagramElement, b: DiagramElement) => [{ x: a.x + a.width, y: a.y + a.height / 2 }, { x: b.x, y: b.y + b.height / 2 }];
+  cons.push(flow("ki-assoc", "ki-host", "ki-dobj", "associationBPMN", run(host, dataObject)));
 
   // An expanded subprocess in the second sublane, with a Start → task → End inside it (unnamed events).
   const ep = box("ki-ep", "subprocess-expanded", px + 100, py + 230, 380, 190, "Sample Expanded Subprocess", "ki-sub-b");
@@ -108,7 +111,7 @@ export function standInDiagram(): StandIns {
   const epTask = box("ki-ep-task", "task", ep.x + 24 + evs.w + 30, rowY - tk.h / 2, tk.w, tk.h, "Sample Step", "ki-ep");
   const epEnd = box("ki-ep-end", "end-event", epTask.x + epTask.width + 30, rowY - evs.h / 2, evs.w, evs.h, "", "ki-ep");
   els.push(ep, epStart, epTask, epEnd);
-  cons.push(flow("ki-ep-f1", "ki-ep-start", "ki-ep-task"), flow("ki-ep-f2", "ki-ep-task", "ki-ep-end"));
+  cons.push(flow("ki-ep-f1", "ki-ep-start", "ki-ep-task", "sequence", run(epStart, epTask)), flow("ki-ep-f2", "ki-ep-task", "ki-ep-end", "sequence", run(epTask, epEnd)));
 
   const diagram = { ...base, elements: els, connectors: cons } as DiagramData;
 
@@ -134,10 +137,23 @@ export function standInDiagram(): StandIns {
     "text-annotation": first((e) => e.type === "text-annotation" && !e.id.startsWith("ki-")) ?? annotation,
     group: first((e) => e.type === "group" && !e.id.startsWith("ki-")) ?? group,
   };
+  // A spot on a connector's line with NO element in front of it — the pointer finds a connector only there. A
+  // route's stored points run on inside the shapes at its ends, so scan the straight stretches, longest first.
+  const clearPoint = (c: Connector): { x: number; y: number } | null => {
+    const w = c.waypoints ?? [];
+    const stretches = w.slice(1).map((q, i) => ({ a: w[i], b: q, len: Math.hypot(q.x - w[i].x, q.y - w[i].y) })).sort((s, t) => t.len - s.len);
+    for (const s of stretches) {
+      for (const f of [0.5, 0.4, 0.6, 0.3, 0.7, 0.2, 0.8, 0.1, 0.9]) {
+        const p = { x: s.a.x + (s.b.x - s.a.x) * f, y: s.a.y + (s.b.y - s.a.y) * f };
+        if (!elementUnderPointer(p, els)) return p;
+      }
+    }
+    return null;
+  };
   const con: Record<string, Connector | undefined> = {
-    "sequence-connector": cons.find((c) => c.type === "sequence" && !c.id.startsWith("ki-")),
-    "message-connector": cons.find((c) => c.type === "messageBPMN"),
-    association: cons.find((c) => c.type === "associationBPMN"),
+    "sequence-connector": cons.find((c) => c.type === "sequence" && !c.id.startsWith("ki-") && clearPoint(c)),
+    "message-connector": cons.find((c) => c.type === "messageBPMN" && clearPoint(c)),
+    association: cons.find((c) => c.type === "associationBPMN" && clearPoint(c)),
   };
 
   // Where the pointer rests. A container's centre is covered by what it holds, so those use a bare spot.
@@ -154,7 +170,9 @@ export function standInDiagram(): StandIns {
     connectorOf: (k) => con[k],
     pointOf: (k) => {
       const e = el[k];
-      return e ? bare(e, k) : null;
+      if (e) return bare(e, k);
+      const c = con[k];
+      return c ? clearPoint(c) : null;
     },
   };
 }

@@ -27,6 +27,7 @@
  *
  *   ## aliases     word: alias alias — shown in grey beside the word in the first-words list
  *   ## hidden      first words the list never shows (they still work)
+ *   ## assist-words first words listed only while Assist is active
  *
  * A pattern line may end with  @on pool lane  (the kinds it is about — see kinds.ts) or  @nosel  (it never
  * acts on a selection). With something selected the help shows only the commands that apply to it.
@@ -72,6 +73,8 @@ export interface Sections {
   aliases: Record<string, string[]>;
   /** `## hidden` — first words the list never shows (they still work). */
   hidden: string[];
+  /** `## assist-words` — first words listed ONLY while Assist is active (use, pick, choose … are Assist's). */
+  assistWords: string[];
   errors: NotationError[];
 }
 
@@ -165,6 +168,7 @@ export function parseSections(text: string): Sections {
   const sections: Record<string, Pattern[]> = { commands: [] };
   const aliases: Record<string, string[]> = {};
   const hidden: string[] = [];
+  const assistWords: string[] = [];
   const errors: NotationError[] = [];
   let current = "commands";
   const lines = String(text ?? "").replace(/\r\n/g, "\n").split("\n");
@@ -178,8 +182,8 @@ export function parseSections(text: string): Sections {
     if (!t) return;
     if (h) {
       const name = h[1].trim().toLowerCase().replace(/\s+/g, " ");
-      if (!/^(commands|assist|voice|aliases|hidden|flow [a-z0-9-]+)$/.test(name)) {
-        errors.push({ line, message: `unknown section "${h[1].trim()}" — use commands, assist, voice, aliases, hidden or flow <id>` });
+      if (!/^(commands|assist|voice|aliases|hidden|assist-words|flow [a-z0-9-]+)$/.test(name)) {
+        errors.push({ line, message: `unknown section "${h[1].trim()}" — use commands, assist, voice, aliases, hidden, assist-words or flow <id>` });
         current = "?";
         return;
       }
@@ -199,6 +203,10 @@ export function parseSections(text: string): Sections {
       hidden.push(...t.toLowerCase().split(/\s+/).filter(Boolean));
       return;
     }
+    if (current === "assist-words") {
+      assistWords.push(...t.toLowerCase().split(/\s+/).filter(Boolean));
+      return;
+    }
     try {
       const a = splitAnnotation(t);
       if (a.error) { errors.push({ line, message: a.error }); return; }
@@ -207,5 +215,5 @@ export function parseSections(text: string): Sections {
       errors.push({ line, message: (e as Error).message });
     }
   });
-  return { sections, aliases, hidden, errors };
+  return { sections, aliases, hidden, assistWords, errors };
 }

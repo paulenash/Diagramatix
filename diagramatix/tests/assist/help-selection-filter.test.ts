@@ -49,10 +49,10 @@ describe("T5215 kinds", () => {
 });
 
 describe("T5215 1. what is selected narrows the commands", () => {
-  it("an EXPANDED SUBPROCESS selected: no shrink / compress / extend / expand / swap — they apply to pools and lanes", () => {
+  it("an EXPANDED SUBPROCESS selected: compress (it fits the EP's height) but no extend / expand / swap — those are pool and lane commands", () => {
     const all = everything(["expanded-subprocess"]);
-    for (const w of ["shrink", "compress", "extend", "widen", "expand", "grow", "swap"]) expect(all, w).not.toContain(w);
-    for (const w of ["rename", "delete", "move", "add", "unwrap", "surround", "convert"]) expect(mains(["expanded-subprocess"]), w).toContain(w);
+    for (const w of ["extend", "widen", "expand", "grow", "swap"]) expect(all, w).not.toContain(w);
+    for (const w of ["rename", "delete", "move", "add", "unwrap", "surround", "convert", "compress"]) expect(mains(["expanded-subprocess"]), w).toContain(w);
   });
   it("a POOL selected: compress (and its aliases), swap and lanes; not unwrap, surround, convert, connect", () => {
     const m = mains(["white-box-pool"]);
@@ -104,7 +104,7 @@ describe("T5215 2. the hover target does not narrow", () => {
   it("computePanel takes only SELECTED kinds — with none given the list is the full one", () => {
     const base = { interim: "", ghost: false, flow: null };
     expect(computePanel(tree, base).lines).toEqual(computePanel(tree, { ...base, selectedKinds: [] }).lines);
-    expect(computePanel(tree, { ...base, selectedKinds: ["expanded-subprocess"] }).lines).not.toContain("compress");
+    expect(computePanel(tree, { ...base, selectedKinds: ["task"] }).lines).not.toContain("compress");
     expect(computePanel(tree, base).lines).toContain("compress");
   });
   it("the editor feeds it the selection, never the pointer or the target", () => {

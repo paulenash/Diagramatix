@@ -149,7 +149,8 @@ put a pool around everything [called <new_element_name>]  @nosel
 (add|insert|create) [a|an] [new] [(black|white) box] pool [called <new_element_name>] [(above|below|over) <existing_element_name>]  @nosel
 (extend|widen|expand|grow) [the] pools [to include all elements]  @nosel
 include all elements  @nosel
-{compress_verbs} [the] <existing_element_name> [pool|lane|sublane]  @on pool lane
+{compress_verbs} [the] <existing_element_name> [pool|lane|sublane]  @on pool lane expanded-subprocess
+{compress_verbs} [(this|that|it|selected)]  @on pool lane expanded-subprocess
 swap [the] [selected|two] pools  @on pool
 
 # ── Lanes
@@ -194,6 +195,10 @@ surround: wrap enclose
 unwrap: dissolve unpack flatten
 use: pick choose open show
 accept: take
+
+## assist-words
+# Listed as first words only while Assist is active: they are Assist's way of taking a suggestion or a template.
+use pick choose open show
 
 ## hidden
 # Words that start a command but are not worth listing as first words (Paul, 2026-10-02). They still work.

@@ -18,10 +18,10 @@ describe("T5212 the hover outline", () => {
   it("the target is tracked whenever Voice Assist is on, not only while the help panel shows", () => {
     expect(editor).toContain("const helpTarget = useTargetNow(helpActive, () => ({");
   });
-  it("with Voice Assist on, the element under the cursor is outlined even with the help panel off; with it on, the outline follows “this”", () => {
-    expect(editor).toContain("if (!helpActive || !helpTarget.id) return null;");
-    expect(editor).toContain('if (!helpShown && helpTarget.kind !== "cursor") return null;');
+  it("only what the cursor is REALLY over is outlined — never the selection or the last-added fallback (2026-10-02)", () => {
+    expect(editor).toContain('if (!helpActive || helpTarget.kind !== "cursor" || !helpTarget.id) return null;');
     expect(editor).toContain("voiceTargetOutline={helpOutline}");
+    expect(editor).toContain("voiceTargetPath={helpPath}");
   });
   it("“under the cursor” means: nothing selected and the pointer over an element — what targetNow reports as kind 'cursor'", () => {
     const els = [el("a", "task", 100, 100, 100, 60, "Review")];

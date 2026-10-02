@@ -132,6 +132,7 @@ export function MobileVoiceEditor({
     beginLabelEdit: d.beginLabelEdit, cancelLabelEdit: d.cancelLabelEdit,
     beginHistoryGroup: d.beginHistoryGroup, endHistoryGroup: d.endHistoryGroup,
     handleExportJson: exportJson,
+    debugAllowed: false,   // debug recording is a desktop SuperAdmin tool
     autoConnect,
     phone: true,
   } as never);

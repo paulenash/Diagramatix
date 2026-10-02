@@ -369,6 +369,12 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   // marker, so not M3's table below. Only the bare shape words: "a user task"
   // is still M3's marker, and "sub process" is how the recogniser often
   // writes it.
+  // No target said — "convert to a subprocess" — means THIS: the selection, else what is under the cursor (Paul,
+  // 2026-10-02: hovering a task and saying it did nothing; it had to be selected).
+  {
+    const bareShape = raw.match(/^(?:convert|turn|change|make)\s+(?:in)?to\s+(?:an?\s+)?(sub[\s-]?process|process(?:ing)?|task)$/i);
+    if (bareShape) return [{ op: "convertActivity", ref: "this", to: /^task$/i.test(bareShape[1]) ? "task" : "subprocess" }];
+  }
   for (const pat of [
     // "sub process" also comes back as "Processing" or "process" — and a
     // process is the only thing a task becomes here (2026-09-27, session 2).
@@ -390,6 +396,12 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   // ("make a task called Approve"), so a pattern alone would steal it. A
   // convert op is returned only when the tail is a subtype the shared table
   // knows — which is also what keeps this rule from being the next greedy one.
+  // "convert to a subprocess" — no target said, so it is THIS one: the selection, else what is under the cursor
+  // (Paul, 2026-10-02: hovering a task and saying it did nothing; it had to be selected).
+  {
+    const bare = raw.match(/^(?:turn|convert|change|set)\s+(?:in)?to\s+(?:an?\s+)?(.+)$/i);
+    if (bare && convertMatches(clean(bare[1])).length) return [{ op: "convert", ref: "this", subtype: clean(bare[1]) }];
+  }
   for (const pat of [
     /^(?:make|turn|convert|change|set)\s+(.+?)\s+(?:in)?to\s+(?:an?\s+)?(.+)$/i,
     /^(?:make|turn|convert|change|set)\s+(.+?)\s+an?\s+(.+)$/i,
@@ -517,6 +529,9 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     // compressPool, whose apply compresses the LANE when a bare name turns out
     // to be one (compressPhrase.ts). An EP collapse, plural kinds and "the
     // gap" are not this rule's.
+    // A bare "compress" / "shrink" names nothing, so it means THIS — the selection, else what is under the cursor
+    // (an expanded subprocess, a pool or a lane; Paul, 2026-10-02).
+    if (new RegExp(`^${COMPRESS_VERB_SOURCE}[.!? ]*$`, "i").test(raw)) return [{ op: "compressPool", poolRef: "this" }];
     const compress = parseCompressPhrase(raw);
     if (compress) {
       return [compress.kind === "lane" || compress.kind === "sublane"
@@ -817,7 +832,8 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   // editor routes it — so only the explicit verbs need a rule; it sits above
   // the delete catch-all, which would otherwise swallow "unwrap …". ──
   {
-    const u = raw.match(/^(?:unwrap|dissolve|unpack|flatten|explode|open\s+up)\s+(?:the\s+)?(?:selected\s+|this\s+|that\s+)?(?:expanded\s+)?(?:sub-?\s?process|subprocess|ep)(?:\s+(?:selected|shell))?$/i);
+    // A bare "unwrap" / "dissolve" names nothing, so it means THIS — the selected or hovered expanded subprocess.
+    const u = raw.match(/^(?:unwrap|dissolve|unpack|flatten|explode)$/i) ?? raw.match(/^(?:unwrap|dissolve|unpack|flatten|explode|open\s+up)\s+(?:the\s+)?(?:selected\s+|this\s+|that\s+)?(?:expanded\s+)?(?:sub-?\s?process|subprocess|ep)(?:\s+(?:selected|shell))?$/i);
     if (u) return [{ op: "unwrapSubprocess" }];
   }
 

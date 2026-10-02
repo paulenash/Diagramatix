@@ -83,6 +83,7 @@ import { useVoiceAssistHelp, useTargetNow } from "@/app/hooks/useVoiceAssistHelp
 import { computePanel, namesOf, type OpenFlow } from "@/app/lib/assist/commandTree";
 import { repairForRun } from "@/app/lib/assist/commandTree/positionRepair";
 import { selectedKinds as selectedKindsOf } from "@/app/lib/assist/commandTree/kinds";
+import { elementUnderPointer, hoverConnectorAt } from "@/app/lib/assist/pointerRef";
 import { PropertiesPanel } from "@/app/components/canvas/PropertiesPanel";
 import { captureTemplate, instantiateTemplate } from "@/app/lib/diagram/templates";
 import { resolvePackageNameLink } from "@/app/lib/diagram/packageLink";
@@ -2436,6 +2437,7 @@ export function DiagramEditor({
     voiceListening, voiceLog, renameFlow, dividerFlow, dividerMemRef, pickFlow, messageFlow,
   } = useVoiceSession({
     repairCommandRef,
+    debugAllowed: isActingAdmin,
     addConnector, addElementGated, addLaneAt, addPool, alignElements, beginHistoryGroup, beginLabelEdit,
     cancelLabelEdit, clearDiagram, compressLane, compressPool, connectorsRef, convertTaskSubprocess, data,
     deleteConnector, reverseConnector, deleteElement, diagramColorConfig, diagramId, diagramName, diagramType, displayMode,
@@ -2465,6 +2467,9 @@ export function DiagramEditor({
   // element under the cursor is outlined too (below), as a tapped element is on the phone.
   const helpTarget = useTargetNow(helpActive, () => ({
     elements: elementsRef.current, selected: selectedIdsRef.current, last: voiceLastId.current, pointer: pointerWorld.current,
+    // A connector under the cursor (its line, or its label) is a hover target too, once no element is in front of it.
+    hoverConnector: selectedIdsRef.current.length === 0 && !elementUnderPointer(pointerWorld.current, elementsRef.current)
+      ? hoverConnectorAt(pointerWorld.current, elementsRef.current, connectorsRef.current) : null,
   }));
   const helpOpenFlow: OpenFlow | null =
     renameFlow ? { kind: "rename", phase: renameFlow.phase, ...(renameFlow.phase === "pick" && renameFlow.purpose ? { purpose: renameFlow.purpose } : {}) }
@@ -2481,7 +2486,7 @@ export function DiagramEditor({
   const helpNames = useMemo(() => (helpShown ? namesOf(data.elements, data.connectors) : undefined), [helpShown, data.elements, data.connectors]);
   const helpView = helpShown && assistHelp.tree
     ? computePanel(assistHelp.tree, {
-        interim: voiceInterim, ghost: assistEnabled && nextStepCandidates.length > 0, flow: helpOpenFlow, names: helpNames,
+        interim: voiceInterim, ghost: assistEnabled, flow: helpOpenFlow, names: helpNames,   // Assist's own words are listed whenever Assist is ACTIVE, not only when a suggestion is on screen
         // What is SELECTED narrows the commands to those that apply to it. The hover target does not (Paul, 2026-10-02).
         selectedKinds: selectedKindsOf(data.elements, selectedElementIds, selectedConnector),
       })
@@ -2490,12 +2495,19 @@ export function DiagramEditor({
   // Voice Assist on, the element under the cursor is outlined whenever it is what "this" would act on — nothing
   // selected, the cursor over it — exactly as the phone outlines what you tap. With the help panel showing, the
   // outline follows whatever "this" means (the selection, the cursor, or the last one added), as before.
+  // ONLY what the cursor is really over (item 2, 2026-10-02): an element, an event's or gateway's label (its element),
+  // or a connector. The fallbacks "this" falls back on — the selection, the last one added — are NOT outlined: with the
+  // cursor on empty canvas, the previous target used to stay lit.
   const helpOutline = useMemo(() => {
-    if (!helpActive || !helpTarget.id) return null;
-    if (!helpShown && helpTarget.kind !== "cursor") return null;
+    if (!helpActive || helpTarget.kind !== "cursor" || !helpTarget.id) return null;
     const e = data.elements.find((x) => x.id === helpTarget.id);
     return e ? { x: e.x, y: e.y, width: e.width, height: e.height } : null;
-  }, [helpActive, helpShown, helpTarget.id, helpTarget.kind, data.elements]);
+  }, [helpActive, helpTarget.kind, helpTarget.id, data.elements]);
+  const helpPath = useMemo(() => {
+    if (!helpActive || helpTarget.kind !== "cursor" || !helpTarget.connectorId) return null;
+    const c = data.connectors.find((x) => x.id === helpTarget.connectorId);
+    return c && c.waypoints && c.waypoints.length > 1 ? c.waypoints : null;
+  }, [helpActive, helpTarget.kind, helpTarget.connectorId, data.connectors]);
 
   const isContext =diagramType === "context" || diagramType === "basic";
   const defaultDirectionType: DirectionType =
@@ -5273,6 +5285,7 @@ export function DiagramEditor({
           diagramType={diagramType}
           renameBadges={onScreenBadges}
           voiceTargetOutline={helpOutline}
+          voiceTargetPath={helpPath}
           dividerRulers={onScreenRulers}
           goldFlash={goldFlash}
           liftedIds={dragTravellingIds}
@@ -5390,8 +5403,8 @@ export function DiagramEditor({
             onClose={() => { stopAbraListening(); setVoiceAssistOn(false); }}
             onCost={fetchAbraCost}
             isSuperAdmin={isActingAdmin}
-            debugOn={voiceDebugRecording}
-            onToggleDebug={(on) => { setVoiceDebug(on); setVoiceDebugRecording(on); }}
+            debugOn={voiceDebugRecording && isActingAdmin}
+            onToggleDebug={isActingAdmin ? (on) => { setVoiceDebug(on); setVoiceDebugRecording(on); } : undefined}
             onAnnotate={annotateCommand}
             onSnapshot={takeDebugSnapshot}
             onDownloadSession={downloadDebugSession}

@@ -18,6 +18,8 @@ export interface TargetNow {
   kind: TargetKind;
   /** The element "this" means (absent for "many" and "none"). */
   id?: string;
+  /** For a CONNECTOR under the cursor: its id (there is no element id then). */
+  connectorId?: string;
   count?: number;
   /** The panel's sentence: "“Review Claim” (task) — selected". */
   label: string;
@@ -40,6 +42,8 @@ export function targetNow(
   pointer: { x: number; y: number } | null | undefined,
   /** A connector is selected (the editor selects a connector OR elements, never both). It is what "this" means then. */
   selectedConnector?: { type: string; sourceId: string; targetId: string } | null,
+  /** The connector under the cursor (its line or its label) — what "this" means when nothing is selected and no element is under the cursor. */
+  hoverConnector?: { id?: string; type: string; sourceId: string; targetId: string } | null,
 ): TargetNow {
   const els = elements as DiagramElement[];
   const selected = selectedIds.filter((id) => els.some((e) => e.id === id));
@@ -52,6 +56,14 @@ export function targetNow(
   }
   if (selected.length > 1) {
     return { kind: "many", count: selected.length, label: `${selected.length} things selected — say “these”` };
+  }
+  // A connector under the cursor (and no element in front of it) is the cursor target — before the "last one added" fallback.
+  if (hoverConnector && selected.length === 0 && !elementUnderPointer(pointer ?? null, els)) {
+    const end = (id: string) => {
+      const e = els.find((x) => x.id === id);
+      return e ? nameOf(e) : "something";
+    };
+    return { kind: "cursor", ...(hoverConnector.id ? { connectorId: hoverConnector.id } : {}), label: `the ${connectorWord(hoverConnector.type)} ${end(hoverConnector.sourceId)} → ${end(hoverConnector.targetId)} — under the cursor` };
   }
   const r = resolveRef("this", els, lastAddedId ?? null, selected, { pointer: pointer ?? null });
   if (!r || !("id" in r)) {

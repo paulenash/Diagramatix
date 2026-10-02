@@ -57,8 +57,8 @@ describe("surround the selection with an expanded subprocess", () => {
     expect(parseCommand("dissolve the EP")).toEqual([{ op: "unwrapSubprocess" }]);
     expect(parseCommand("delete selected"), "delete stays delete — the editor routes an EP to the unwrap").toEqual([{ op: "delete", ref: "selected" }]);
     expect(validateOps([{ op: "wrapInSubprocess", label: " X " }, { op: "unwrapSubprocess" }])).toEqual([{ op: "wrapInSubprocess", label: "X" }, { op: "unwrapSubprocess" }]);
-    for (const s of ["surround selected", "Surround the selected elements", "surround selected with an expanded subprocess called", "unwrap", "wrap these"]) expect(isIncompleteCommand(s), s).toBe(true);
-    for (const s of ["surround selected with an expanded subprocess called Check Stock", "unwrap the selected subprocess", "wrap everything in a pool", "wrap these in a subprocess"]) expect(isIncompleteCommand(s), s).toBe(false);
+    for (const s of ["surround selected", "Surround the selected elements", "surround selected with an expanded subprocess called", "wrap these"]) expect(isIncompleteCommand(s), s).toBe(true);
+    for (const s of ["surround selected with an expanded subprocess called Check Stock", "unwrap the selected subprocess", "wrap everything in a pool", "wrap these in a subprocess", "unwrap", "dissolve", "compress"]) expect(isIncompleteCommand(s), s).toBe(false);   // a bare unwrap / compress is whole: it means THIS (2026-10-02)
     const els = [el("ep", "subprocess-expanded", "Check", 0, 0, 180, 108), el("sp", "subprocess", "Old", 0, 0, 108, 72), el("t", "task", "T", 0, 0, 102, 65)];
     expect(resolveSelectionRefs("the selected subprocess", els, ["ep", "sp", "t"])).toEqual(["ep", "sp"]);
     expect(resolveSelectionRefs("the selected expanded subprocess", els, ["ep", "sp", "t"])).toEqual(["ep"]);

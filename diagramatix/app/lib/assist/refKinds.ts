@@ -14,12 +14,13 @@ import type { DiagramElement } from "../diagram/types";
 import { isAnyLane } from "../diagram/laneKind";
 
 /** `container` = a pool or a band of any depth; `lane` = a band of any depth. */
-export type RefKind = "pool" | "lane" | "container";
+export type RefKind = "pool" | "lane" | "container" | "compressible";
 
 const TABLE: Readonly<Record<string, Readonly<Record<string, RefKind>>>> = {
   // No kind word said: a pool or a lane, and the apply decides by what it found.
   // A kind word the user DID say ("pool three") narrows it further, in resolveRef.
-  compressPool: { poolRef: "container" },
+  // …and an expanded subprocess, whose height "compress" fits to its content (Paul, 2026-10-02).
+  compressPool: { poolRef: "compressible" },
   // "move everything in Underwriters …" — a pool, lane or sub-lane (2026-09-27).
   moveContents: { ref: "container" },
   // A lane's top or bottom boundary too — a divider (2026-09-27).
@@ -61,5 +62,6 @@ export function unsaidRef(op: string, field: string): string | undefined {
 export function isOfKind(kind: RefKind, e: DiagramElement): boolean {
   if (kind === "pool") return e.type === "pool";
   if (kind === "lane") return isAnyLane(e);
+  if (kind === "compressible") return e.type === "pool" || isAnyLane(e) || e.type === "subprocess-expanded";
   return e.type === "pool" || isAnyLane(e);
 }

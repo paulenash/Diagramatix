@@ -411,6 +411,7 @@ function TryIt({ tree }: { tree: ReturnType<typeof compileTree> }) {
     selEl: sKind ? stand.elementOf(sKind) : undefined,
     selConn: sKind ? stand.connectorOf(sKind) : undefined,
     cursorEl: cKind ? stand.elementOf(cKind) : undefined,
+    cursorConn: cKind ? stand.connectorOf(cKind) : undefined,
     cursorAt: cKind ? stand.pointOf(cKind) : null,
   });
   // The speech callbacks outlive a render, so they read the stand-in selection and cursor through refs.
@@ -418,7 +419,7 @@ function TryIt({ tree }: { tree: ReturnType<typeof compileTree> }) {
   standIn.current = { selKind, cursorKind };
   const target = useMemo(() => {
     const s = standFor(selKind, cursorKind);
-    return targetNow(fx.elements, s.selEl ? [s.selEl.id] : [], null, s.cursorAt, s.selConn);
+    return targetNow(fx.elements, s.selEl ? [s.selEl.id] : [], null, s.cursorAt, s.selConn, s.cursorConn);
   }, [fx, selKind, cursorKind]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Speaking a command. The words arrive as the recogniser hears them and walk the tree exactly as they

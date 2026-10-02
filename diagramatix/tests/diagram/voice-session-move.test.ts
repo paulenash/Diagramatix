@@ -31,7 +31,7 @@ function effectDeps(src: string): string[] {
 
 /** The session's 11 effects, in the order they ran inside the editor (gold flash → touched → settle → drain …). */
 const SESSION_EFFECT_DEPS = [
-  "[]",
+  "[debugAllowed]",   // the debug-recording preference — now gated on the host's debugAllowed (SuperAdmin only, 2026-10-02)
   "[voiceAssistOn]",
   "[diagramId]",
   "[voiceAssistOn, voiceDebugRecording, debugEpoch]",

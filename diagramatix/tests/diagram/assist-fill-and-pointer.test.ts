@@ -195,9 +195,10 @@ describe("T4594 — M5: what the pointer is over", () => {
   it("prefers what is inside a container over the container", () => {
     // A pool covers everything in it, and is almost never what the hand means.
     expect(elementUnderPointer({ x: 150, y: 130 }, [pool, task])?.id).toBe("task");
-    // …but a pointer over the bare part of the pool still finds the pool, or
-    // there would be no way to point at one at all.
-    expect(elementUnderPointer({ x: 700, y: 350 }, [pool, task])?.id).toBe("pool");
+    // …and the bare body of a WHITE-BOX pool is over nothing: only its HEADER (the name strip down its left) is the
+    // hover target (Paul, 2026-10-02). See hover-targets.test.ts for the full rules.
+    expect(elementUnderPointer({ x: 700, y: 350 }, [pool, task])).toBeNull();
+    expect(elementUnderPointer({ x: 10, y: 350 }, [pool, task])?.id).toBe("pool");
   });
 
   it("prefers the element even when the CONTAINER is the smaller of the two", () => {

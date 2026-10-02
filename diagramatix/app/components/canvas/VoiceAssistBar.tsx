@@ -177,7 +177,7 @@ export function VoiceAssistBar({
                 className={`text-[10px] px-1.5 py-0.5 rounded border ${assistHelp.on ? "bg-purple-600 text-white border-purple-600" : "text-purple-700 border-purple-300 hover:bg-purple-50"}`}
                 title={assistHelp.on ? "Voice Assist Help is on — click to hide the panel that lists what you can say next" : "Voice Assist Help is off — click to show the panel that lists what you can say next"}>{assistHelp.on ? "Help: on" : "Help: off"}</button>
             )}
-            {onCost && (
+            {isSuperAdmin && onCost && (
               <button onClick={() => { void askCost(); }} disabled={cost.state === "loading"}
                 className="text-[10px] px-1.5 py-0.5 rounded border text-purple-700 border-purple-300 hover:bg-purple-50 disabled:opacity-50"
                 title="What this session has cost so far (AI calls + microphone minutes, at list rates)">{cost.state === "loading" ? "Cost…" : "Cost"}</button>

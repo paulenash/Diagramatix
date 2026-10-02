@@ -19,6 +19,12 @@ import { wordAlternation } from "./containerWords";
 import { DIVIDER_COMMAND_RE } from "./dividerFlow";
 
 const VERBS = new RegExp(`^(?:${COMMAND_VERBS.join("|")})$`);
+/**
+ * Verbs that are a WHOLE command on their own: with no target said they mean THIS — the selected or hovered thing
+ * (Paul, 2026-10-02: "unwrap" on a hovered expanded subprocess, "compress" on a selected one). Held as "the start of
+ * something" they would wait ~10 seconds before running.
+ */
+const BARE_THIS_VERBS = new RegExp(`^(?:unwrap|dissolve|unpack|flatten|explode|${COMPRESS_COMMAND_VERBS.join("|")})$`);
 /** A strong compress verb and ONE container's kind word, the name not said yet. */
 const BARE_COMPRESS_KIND = new RegExp(`^(?:compress(?:es|ed|ing)?|${COMPRESS_COMMAND_VERBS.filter((v) => v !== "compress").join("|")})(?:\\s+the)?\\s+(?:${wordAlternation(COMPRESS_KIND_WORDS)})$`);
 /** "expand" and ONE lane's kind word, the name not said yet. */
@@ -50,7 +56,7 @@ export function isIncompleteCommand(text: string): boolean {
   // called X" — a whole new element nobody asked for.
   if (/^(?:called|named|labell?ed)\b/.test(t)) return true;
   // A bare verb — "Swap." "Rename." "Move." — is the start of something.
-  if (VERBS.test(t)) return true;
+  if (VERBS.test(t) && !BARE_THIS_VERBS.test(t)) return true;
   // "Swap lanes." / "Swap lines." — the kind is said, the two names are a pause
   // away. Paul's test-diagram session (2026-09-27): "swap lines", "swap lane"
   // and "swap Claims" each went to the AI on their own, which guessed a pair he

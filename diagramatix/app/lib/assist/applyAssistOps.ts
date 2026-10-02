@@ -34,6 +34,7 @@ import { resolveRef, resolveSelectionRefs, isSelectionRef, nearestRefs, ID_REF_P
 import { isPointerElementRef, elementUnderPointer } from "./pointerRef";
 import { epTarget, planAddInsideEp, EP_ADDABLE } from "@/app/lib/diagram/epAdd";
 import { inferBoundaryTrigger } from "./boundaryEventPhrase";
+import { planCompressEp } from "@/app/lib/diagram/epCompress";
 import { nextContainerLabels } from "@/app/lib/diagram/containerNames";
 import { isAnyLane, isSublane, laneKindWord, sameKindAs } from "@/app/lib/diagram/laneKind";
 import { LANE_EXPAND_STEP } from "@/app/lib/diagram/laneFit";
@@ -398,6 +399,15 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
     }
     compressLane(lane.id);
     results.push(`compressed ${nameOf(lane)} to its content`);
+  };
+  // "compress" an EXPANDED SUBPROCESS (Paul, 2026-10-02): fit it to what is inside — the top comes down and the bottom
+  // comes up, the contents stay (epCompress.ts).
+  const compressTheEp = (ep: DiagramElement) => {
+    const plan = planCompressEp(els, ep);
+    if ("error" in plan) { results.push(plan.error); anyFail = true; return; }
+    resizeElement(ep.id, ep.x, plan.y, ep.width, plan.height);
+    resizeElementEnd(ep.id);
+    results.push(`compressed ${nameOf(ep)} to its content — ${plan.saved}px shorter`);
   };
   // "delete selected" on an expanded subprocess DISSOLVES it: the shell and
   // its Start/End go, the contents are spliced back into the flow and the
@@ -1041,17 +1051,23 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       // flow in and one out", "X sits in that area") comes from the same
       // code the reducer applies; the ids are minted here so the working
       // set and the reducer agree on them.
-      const label = op.label?.trim() || "Subprocess";
+      // An expanded subprocess's name starts with a capital, like any activity's (Paul, 2026-10-02: "remember to capitalise
+      // the names of Expanded Subprocesses") — this path used to carry the name exactly as it was spoken.
+      const said = op.label?.trim();
+      const label = said ? capitaliseFirstWord(said) : "Subprocess";
+      // A name that says it REPEATS marks the subprocess with a loop marker: "repeat …", "do until …", "do while …".
+      const loops = !!said && /\brepeat/i.test(said) || !!said && /\bdo\s+(?:until|while)\b/i.test(said);
       const ids = { epId: nanoid(), startId: nanoid(), endId: nanoid(), startConnId: nanoid(), endConnId: nanoid() };
       const plan = planWrapInSubprocess({ elements: els, connectors: data.connectors }, selectedIds, label, ids);
       if ("error" in plan) { results.push(plan.error); anyFail = true; continue; }
       wrapInSubprocess([...selectedIds], label, ids);
+      if (loops) updateProperties(ids.epId, { repeatType: "loop" });
       // The room came out of the lane's right-hand side: widen the pools to fit (they stay one width).
       if (els.some((e) => e.type === "pool" && e.x + e.width < plan.contentRight + 40)) extendPools();
       els = plan.elements;
       voiceLastId.current = ids.epId;
       setSelectedElementIds(new Set()); // selection protocol: nothing stays selected
-      results.push(plan.summary);
+      results.push(loops ? `${plan.summary} — with a loop marker, since its name says it repeats` : plan.summary);
       continue;
     }
     if (op.op === "wrapInContainer") {
@@ -1072,7 +1088,14 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
     }
     if (op.op === "unwrapSubprocess") {
       const eps = selectedIds.map((id) => els.find((x) => x.id === id)).filter((x): x is DiagramElement => !!x && x.type === "subprocess-expanded");
-      if (eps.length !== 1) { results.push(eps.length ? "select just the one expanded subprocess" : "select the expanded subprocess first"); anyFail = true; continue; }
+      // Nothing selected: the one under the cursor — or the one around what is under it (Paul, 2026-10-02: hovering an
+      // EP did not allow "unwrap"; it had to be selected).
+      if (selectedIds.length === 0) {
+        let under: DiagramElement | undefined | null = elementUnderPointer(pointerWorld.current, els);
+        for (let i = 0; under && under.type !== "subprocess-expanded" && i < 8; i++) under = under.parentId ? els.find((x) => x.id === under!.parentId) : null;
+        if (under && under.type === "subprocess-expanded") eps.push(under);
+      }
+      if (eps.length !== 1) { results.push(eps.length ? "select just the one expanded subprocess" : "select or point at the expanded subprocess first"); anyFail = true; continue; }
       if (!unwrapEp(eps[0])) anyFail = true;
       continue;
     }
@@ -1220,6 +1243,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       // a lane is compressed as a lane. This used to dead-end at "isn't a
       // pool", and the AI never saw the sentence.
       if (isAnyLane(p)) { compressTheLane(p); continue; }
+      if (p.type === "subprocess-expanded") { compressTheEp(p); continue; }
       if (p.type !== "pool") { results.push(`${nameOf(p)} isn't a pool`); anyFail = true; continue; }
       compressPool(p.id);
       results.push(`compressed ${nameOf(p)}`);

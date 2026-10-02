@@ -367,7 +367,8 @@ interface Props {
   onGenerateSopForElement?: (scope: "lane" | "pool", elementId: string) => void;
   /** M5 — the mouse position in WORLD coordinates, on every move over the canvas.
    *  The editor stores it in a ref, so this fires often and renders nothing. */
-  onPointerWorld?: (p: { x: number; y: number }) => void;
+  /** Where the pointer is, in world coordinates — or null once it has LEFT the canvas (so a hover target does not linger). */
+  onPointerWorld?: (p: { x: number; y: number } | null) => void;
   onElementMoveEnd?: (id: string) => void;
   onMoveLaneBoundary?: (aboveLaneId: string, belowLaneId: string, dy: number) => void;
   onMoveVSwimlaneBoundary?: (kind: "divider" | "left" | "right" | "bottom", delta: number, leftId?: string, rightId?: string) => void;
@@ -432,6 +433,8 @@ interface Props {
   /** Voice Assist Help: a dashed outline on the element "this" would act on right now
    *  (world coordinates). Decorative and pointer-transparent; null draws nothing. */
   voiceTargetOutline?: { x: number; y: number; width: number; height: number } | null;
+  /** The connector under the cursor, as its line — highlighted like the outline above (Voice Assist, 2026-10-02). */
+  voiceTargetPath?: { x: number; y: number }[] | null;
   /** Ids travelling with the current drag — drawn above everything they cross. */
   liftedIds?: readonly string[] | null;
 }
@@ -659,6 +662,7 @@ export function Canvas({
   dividerRulers,
   goldFlash,
   voiceTargetOutline,
+  voiceTargetPath,
   liftedIds,
 }: Props) {
   const displayMode = displayModeProp ?? "normal";
@@ -5111,6 +5115,7 @@ export function Canvas({
         // editor and triggers no render, which is why tracking every move is
         // affordable.
         onPointerMoveCapture={(e) => { onPointerWorld?.(clientToWorld(e.clientX, e.clientY)); }}
+        onPointerLeave={() => { onPointerWorld?.(null); }}
         onMouseDownCapture={(e) => {
           // Any new pointer interaction retires a pool-alignment guide left
           // over from a previous one. In CAPTURE, so it still runs when a
@@ -6410,6 +6415,14 @@ export function Canvas({
               rx={6} fill="none" stroke="#7c3aed" strokeWidth={2} strokeDasharray="6 4"
               vectorEffect="non-scaling-stroke" opacity={0.85}
               style={{ pointerEvents: "none" }} aria-hidden="true" data-voice-target-outline
+            />
+          )}
+          {voiceTargetPath && voiceTargetPath.length > 1 && (
+            <polyline
+              points={voiceTargetPath.map((p) => `${p.x},${p.y}`).join(" ")}
+              fill="none" stroke="#7c3aed" strokeWidth={6} strokeLinecap="round" strokeLinejoin="round"
+              vectorEffect="non-scaling-stroke" opacity={0.35}
+              style={{ pointerEvents: "none" }} aria-hidden="true" data-voice-target-path
             />
           )}
 

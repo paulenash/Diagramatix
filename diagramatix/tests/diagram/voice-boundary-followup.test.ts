@@ -168,7 +168,7 @@ describe("T4980 — a boundary command's follow-up: “sixty pixels”, “up by
     expect(follow).toBeGreaterThan(parse);
     expect(ai).toBeGreaterThan(follow);
     expect(ed).toContain('if (!(ops.length === 1 && ops[0].op === "movePoolBoundary" && !ops[0].overContent)) boundaryLastRef.current = null;');
-    expect(ed).toContain("refs: { voiceLastId, pointerWorld, selectedIdsRef, selectedConnectorIdRef, nextStepRef, openTemplateWindowRef, exportJsonRef, boundaryLast: boundaryLastRef },");
+    expect(ed).toContain("refs: { voiceLastId, pointerWorld, selectedIdsRef, selectedConnectorIdRef: effectiveConnectorRef, nextStepRef, openTemplateWindowRef, exportJsonRef, boundaryLast: boundaryLastRef },");
     expect(ed).toContain("boundaryLastRef.current = null;   // nor a boundary's follow-up");
   });
 });

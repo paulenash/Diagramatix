@@ -99,7 +99,8 @@ describe("T4900 — a spoken kind word reaches the command, and binds", () => {
     expect(resolveRef("three", world(), null, [], { kind: "pool" })).toEqual({ id: "p3" });
     // Changed 2026-09-27: a lane's top/bottom boundary is a divider (T4945) — pool or lane.
     expect(refKind("movePoolBoundary", "ref")).toBe("container");
-    expect(refKind("compressPool", "poolRef")).toBe("container");
+    // Changed 2026-10-02: "compress" also fits an expanded subprocess, so its field takes a pool, a lane or an EP.
+    expect(refKind("compressPool", "poolRef")).toBe("compressible");
     expect(refKind("delete", "ref")).toBeUndefined();
   });
 

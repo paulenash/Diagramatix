@@ -58,7 +58,7 @@ export function useVoiceAssistHelp(active: boolean): { tree: CommandTree | null;
 
 export function useTargetNow(
   active: boolean,
-  read: () => { elements: readonly DiagramElement[]; selected: readonly string[]; last: string | null; pointer: { x: number; y: number } | null },
+  read: () => { elements: readonly DiagramElement[]; selected: readonly string[]; last: string | null; pointer: { x: number; y: number } | null; hoverConnector?: { id?: string; type: string; sourceId: string; targetId: string } | null },
 ): TargetNow {
   const [now, setNow] = useState<TargetNow>({ kind: "none", label: "nothing — point at an element, or select one" });
   const readRef = useRef(read);
@@ -67,8 +67,8 @@ export function useTargetNow(
     if (!active) return;
     const tick = () => {
       const i = readRef.current();
-      const t = targetNow(i.elements, i.selected, i.last, i.pointer);
-      setNow((prev) => (prev.kind === t.kind && prev.id === t.id && prev.label === t.label && prev.count === t.count ? prev : t));
+      const t = targetNow(i.elements, i.selected, i.last, i.pointer, null, i.hoverConnector ?? null);
+      setNow((prev) => (prev.kind === t.kind && prev.id === t.id && prev.connectorId === t.connectorId && prev.label === t.label && prev.count === t.count ? prev : t));
     };
     tick();
     // The pointer is a ref, not state, so there is nothing to subscribe to: a light poll.

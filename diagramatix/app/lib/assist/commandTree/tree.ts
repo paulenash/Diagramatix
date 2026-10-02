@@ -83,7 +83,7 @@ export class CommandTree {
     readonly lists: Lists,
     errors: { line: number; message: string }[] = [],
     /** `## aliases` and `## hidden` from the pattern text. */
-    readonly meta: { aliases: Record<string, string[]>; hidden: string[] } = { aliases: {}, hidden: [] },
+    readonly meta: { aliases: Record<string, string[]>; hidden: string[]; assistWords: string[] } = { aliases: {}, hidden: [], assistWords: [] },
   ) {
     this.errors.push(...errors);
     for (const def of conventions) {
@@ -333,7 +333,8 @@ export class CommandTree {
    * (nothing it names applies to the selection) stands alone.
    */
   firstWordGroups(ctx: WalkContext = {}): { main: string; aliases: string[] }[] {
-    const hidden = new Set(this.meta.hidden);
+    // Assist's own words (use, pick, choose …) are listed only while Assist is active (Paul, 2026-10-02).
+    const hidden = new Set([...this.meta.hidden, ...(ctx.ghost ? [] : this.meta.assistWords)]);
     const words = this.firstWords(ctx).filter((i) => i.kind === "word" && !i.optional && !hidden.has(i.text)).map((i) => i.text);
     const present = new Set(words);
     // An alias may belong to more than one main word ("set" is both a way to say convert and a way to say label):
@@ -412,6 +413,6 @@ export { NUMBER_WORD_SET };
 
 /** Compile pattern text. Problems are in `.errors` — the tree still works for the lines that parsed. */
 export function compileTree(text: string, conventions: Conventions, lists: Lists): CommandTree {
-  const { sections, aliases, hidden, errors } = parseSections(text);
-  return new CommandTree(sections, conventions, lists, errors, { aliases, hidden });
+  const { sections, aliases, hidden, assistWords, errors } = parseSections(text);
+  return new CommandTree(sections, conventions, lists, errors, { aliases, hidden, assistWords });
 }

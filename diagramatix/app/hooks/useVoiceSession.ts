@@ -33,6 +33,7 @@ import { adjustOp, collectDividers, type DividerFlow, type DividerMemory, divide
 import { FRAGMENT_CONTINUE_MS, FRAGMENT_MAX_WAITS, FRAGMENT_SILENCE_MS } from "@/app/lib/assist/fragmentBuffer";
 import { batchFlashes, type FlashBox, flashTargets, isGoldFlashOn, setGoldFlash } from "@/app/lib/assist/goldFlash";
 import { isIncompleteCommand } from "@/app/lib/assist/incompleteCommand";
+import { elementUnderPointer, hoverConnectorAt } from "@/app/lib/assist/pointerRef";
 import { type MessagePick, parseMessageAnswer, resolveMessageAnswer } from "@/app/lib/assist/messageTargets";
 import { type AssistOp, validateOps } from "@/app/lib/assist/ops";
 import { interruptsPick } from "@/app/lib/assist/pickInterrupt";
@@ -78,6 +79,8 @@ export interface VoiceSessionHost extends Pick<AssistDiagramActions, "addConnect
   selectedIdsRef: MutableRefObject<string[]>;
   setSelectedConnectorId: Dispatch<SetStateAction<string | null>>;
   setSelectedElementIds: Dispatch<SetStateAction<Set<string>>>;
+  /** May this person record debug sessions? False for everyone but a (non-impersonated) SuperAdmin; the editor decides. */
+  debugAllowed?: boolean;
   /** Auto-connect (the phone's toggle): an add with no "after X" joins the selection / last element. Off by default. */
   autoConnect?: boolean;
   /**
@@ -157,6 +160,22 @@ export function useVoiceSession(host: VoiceSessionHost) {
   // render. Null until the pointer has been over the canvas at all, which is
   // what lets "put a task here" refuse with a reason rather than guess (0,0).
   const pointerWorld = useRef<{ x: number; y: number } | null>(null);
+  // THE CONNECTOR "this" MEANS. A connector is selected, or — with nothing selected and no element under the cursor —
+  // the one under the cursor (its line or its label): "delete this", "reverse this", "label this …" then act on it,
+  // as they do on a selected one (Paul, 2026-10-02: connectors and their labels are hover targets). Reads like a ref
+  // so every op that already asks the selected-connector ref gets the hover for free.
+  const effectiveConnectorRef = useMemo<MutableRefObject<string | null>>(() => ({
+    get current(): string | null {
+      const sel = host.selectedConnectorIdRef.current;
+      if (sel) return sel;
+      if (host.selectedIdsRef.current.length > 0) return null;
+      const at = pointerWorld.current;
+      if (!at || elementUnderPointer(at, host.elementsRef.current)) return null;
+      return hoverConnectorAt(at, host.elementsRef.current, host.connectorsRef.current)?.id ?? null;
+    },
+    set current(v: string | null) { host.selectedConnectorIdRef.current = v; },
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [host.selectedConnectorIdRef, host.selectedIdsRef, host.elementsRef, host.connectorsRef]);
   // stopAbraListening is defined after the command runner (it needs the buffer
   // flush); the runner reaches it through this ref.
   const stopAbraListeningRef = useRef<() => void>(() => {});
@@ -175,7 +194,11 @@ export function useVoiceSession(host: VoiceSessionHost) {
   const [voiceDebugRecording, setVoiceDebugRecording] = useState(false);
   const debugBeforeRef = useRef<TouchBox[] | null>(null);
   const [debugSnapshots, setDebugSnapshots] = useState<DebugSnapshot[]>([]);
-  useEffect(() => { setVoiceDebugRecording(isVoiceDebugOn()); }, []);
+  // Debug recording is a SuperAdmin tool, OFF by default (voiceDebug.ts), and never on for anyone else — even if a
+  // stored preference says so (Paul, 2026-10-02: "make sure the Cost and Debug buttons are SuperAdmin only and debug
+  // is turned off by default"). The host says whether this person may; absent means yes (the old behaviour).
+  const debugAllowed = host.debugAllowed !== false;
+  useEffect(() => { setVoiceDebugRecording(debugAllowed ? isVoiceDebugOn() : false); }, [debugAllowed]);
   // Saved states of the diagram, automatic while recording (debugCapture.ts,
   // Paul's Q1 answer 2026-09-26). The reducer's state is immutable, so these
   // hold REFERENCES — a state is turned into text only for the size total and
@@ -408,7 +431,7 @@ export function useVoiceSession(host: VoiceSessionHost) {
         swapPools, resizeElement, resizeElementEnd, alignElements,
       },
       ui: { setSelectedElementIds, setSelectedConnectorId, setPickFlow, setRenameFlow, setMessageFlow, setDividerFlow, setGoldFlash },
-      refs: { voiceLastId, pointerWorld, selectedIdsRef, selectedConnectorIdRef, nextStepRef, openTemplateWindowRef, exportJsonRef, boundaryLast: boundaryLastRef },
+      refs: { voiceLastId, pointerWorld, selectedIdsRef, selectedConnectorIdRef: effectiveConnectorRef, nextStepRef, openTemplateWindowRef, exportJsonRef, boundaryLast: boundaryLastRef },
     });
   }, [data.elements, data.connectors, data.poolFontSize, data.laneFontSize, data.connectorFontSize, data.relaxedLayout, riskCatalog, armDebugBefore, armGoldFlash, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, reverseConnector, updateConnectorLabel, deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool, wrapInSubprocess, wrapInContainer, unwrapSubprocess, addPool, addLaneAt, compressPool, compressLane, expandLane, extendPools, swapLane, moveLane, moveElements, elementsMoveEnd, removeSpace, insertSpace, convertTaskSubprocess, moveLaneBoundary, laneBoundaryMoveEnd, updateConnectorEndpoint, movePoolTo, swapPools, resizeElement, resizeElementEnd, alignElements, setRenameFlow, setMessageFlow, setPickFlow, setDividerFlow]);
 
