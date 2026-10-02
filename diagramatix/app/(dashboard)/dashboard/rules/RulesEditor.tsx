@@ -42,7 +42,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   // "assist" holds the Voice Assist (voice/typed command) rules: GREEN command
   // aliases / phrasing hints that reach the AI command fallback, plus RED
   // code-enforced container naming & sizing invariants (reference only).
-  assist: "Assist / Voice Commands",
+  assist: "NL Assist / Voice Commands",
   // The five "md-prompt-*" categories hold the house conventions layered on top
   // of the built-in master templates that write the diagram prompts inside a
   // Process Repository .md. Editing one changes how every prompt of that type is

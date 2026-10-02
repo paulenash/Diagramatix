@@ -87,7 +87,7 @@ export interface CatalogContext {
   needsSelection?: string[];
   parseOnly?: string;
 }
-const GHOST = "needs an Assist ghost suggestion on screen, which the test diagram cannot show";
+const GHOST = "needs an NL Assist ghost suggestion on screen, which the test diagram cannot show";
 const POINTER = "needs the mouse over the canvas — “here” and “under the cursor” are where it is";
 const LIBRARY = "needs the project's Risk & Control library, which the test diagram does not have";
 const NO_EP = "the test diagram has no expanded subprocess to dissolve — its one subprocess, Subprocess 3, is collapsed";

@@ -1,16 +1,16 @@
--- AI Assist + Abracadabra feature-catalog rows (draft). Idempotent.
+-- NL Assist + Abracadabra feature-catalog rows (draft). Idempotent.
 -- Run in the SuperAdmin Database Manager, then /dashboard/admin/features → Publish All.
 BEGIN;
 
--- AI Assist — Suggest as You Draw
+-- NL Assist — Suggest as You Draw
 INSERT INTO "Feature" (id, name, summary, details, hidden, "sortOrder", "createdAt", "updatedAt")
-  SELECT gen_random_uuid()::text, $FN$AI Assist — Suggest as You Draw$FN$, $FS$Switch on Assist and the editor suggests the next step, the right template, even the data a task needs — every suggestion validated by the rules engine, so it's always legal and tidily placed.$FS$, $FD$- **Ghost next-steps** — select an element and translucent chips suggest what comes next (Task / Decision / End). Press **Tab** or click to accept; it's placed and connected for you, never on top of anything.
+  SELECT gen_random_uuid()::text, $FN$NL Assist — Suggest as You Draw$FN$, $FS$Switch on NL Assist and the editor suggests the next step, the right template, even the data a task needs — every suggestion validated by the rules engine, so it's always legal and tidily placed.$FS$, $FD$- **Ghost next-steps** — select an element and translucent chips suggest what comes next (Task / Decision / End). Press **Tab** or click to accept; it's placed and connected for you, never on top of anything.
 - **Boundary events & template fragments** suggested in context — attach a boundary event, or drop in a saved template inline.
 - **Content-aware** — name a task "Approve invoice" and it suggests the matching **approval template**; imply a document and it offers an **Output** data object; imply a policy and it offers an **Instructions** input.
 - **Always correct** — every suggestion is checked by the same rules engine that governs AI generation, so nothing illegal or badly laid out ever appears.
-- **Tunable** — admins edit a keyword → action catalog (Assist / NL Rules); the geometry rules are shown read-only.
+- **Tunable** — admins edit a keyword → action catalog (NL Assist Rules); the geometry rules are shown read-only.
 - BPMN, opt-in per diagram, and **instant + free** for the common cases (no AI call).$FD$, false, 220, now(), now()
-  WHERE NOT EXISTS (SELECT 1 FROM "Feature" WHERE name = $FN$AI Assist — Suggest as You Draw$FN$);
+  WHERE NOT EXISTS (SELECT 1 FROM "Feature" WHERE name = $FN$NL Assist — Suggest as You Draw$FN$);
 
 -- Abracadabra Mode — Voice-Driven Diagramming
 INSERT INTO "Feature" (id, name, summary, details, hidden, "sortOrder", "createdAt", "updatedAt")

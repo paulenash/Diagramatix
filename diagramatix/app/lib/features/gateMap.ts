@@ -106,7 +106,7 @@ export const FEATURE_GATES: Record<string, FeatureGateInfo> = {
     server: [{ file: "app/api/templates/route.ts", needle: '"bpmn-templates"', what: "GET / POST the template library" }],
   },
   "nl-assist": {
-    description: "Typed natural-language editing commands (Assist).", status: "partial", ui: [],
+    description: "Typed natural-language editing commands (NL Assist).", status: "partial", ui: [],
     server: [{ file: "app/api/ai/command/route.ts", needle: '"nl-assist"', what: "POST /api/ai/command (Voice Assist OR Assist opens it)" }],
     note: "The route accepts either; the editor still draws the Assist bar only when Voice Assist is available, so Assist on its own is not reachable from the screen yet.",
   },

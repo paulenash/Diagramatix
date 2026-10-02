@@ -1,5 +1,5 @@
 /**
- * Add an "AI Assist & Voice Assist" chapter to the in-app User Guide.
+ * Add an "NL Assist & Voice Assist" chapter to the in-app User Guide.
  * Idempotent: upserts the chapter + each section by heading; appended after the
  * current last user-guide chapter.
  *
@@ -13,21 +13,21 @@ import { PrismaPg } from "@prisma/adapter-pg";
 
 const COLLECTION = "user-guide";
 const SLUG = "ai-assist";
-const TITLE = "AI Assist & Voice Assist";
+const TITLE = "NL Assist & Voice Assist";
 
 const SECTIONS: Array<{ heading: string; body: string }> = [
   {
-    heading: "What Assist does",
+    heading: "What NL Assist does",
     body: [
-      "**Assist** helps you build a BPMN diagram faster by suggesting the next thing as you draw, and by letting you **speak or type** what you want. It's optional and off until you turn it on, and most of it is instant and free — the AI is only called for the trickier requests.",
+      "**NL Assist** helps you build a BPMN diagram faster by suggesting the next thing as you draw, and by letting you **speak or type** what you want. It's optional and off until you turn it on, and most of it is instant and free — the AI is only called for the trickier requests.",
       "",
-      "There are two switches in the toolbar (BPMN diagrams only): **👻 Assist** (ghost suggestions) and **🪄 Voice Assist** (voice/typed commands). Each remembers its own on/off state per diagram.",
+      "There are two switches in the toolbar (BPMN diagrams only): **👻 NL Assist** (ghost suggestions) and **🪄 Voice Assist** (voice/typed commands). Each remembers its own on/off state per diagram.",
     ].join("\n"),
   },
   {
-    heading: "👻 Assist — ghost next-step suggestions",
+    heading: "👻 NL Assist — ghost next-step suggestions",
     body: [
-      "Turn on **👻 Assist**, then select a single element. Faint **ghost chips** appear to its right suggesting what usually comes next. **Press Tab** (or click a chip) to accept the top one — the element is placed and connected for you, tidily and never on top of anything.",
+      "Turn on **👻 NL Assist**, then select a single element. Faint **ghost chips** appear to its right suggesting what usually comes next. **Press Tab** (or click a chip) to accept the top one — the element is placed and connected for you, tidily and never on top of anything.",
       "",
       "Depending on what's selected you may see:",
       "- **Task / Decision / End** — the usual next steps.",

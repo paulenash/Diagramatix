@@ -50,10 +50,10 @@ UPDATE "HelpSection" s
  WHERE c.id = s."chapterId" AND s.collection <> c.collection;
 
 -- ════════════════════════════════════════════════════════════════════════════
--- 1. User Guide — "AI Assist & Voice Assist"
+-- 1. User Guide — "NL Assist & Voice Assist"
 -- ════════════════════════════════════════════════════════════════════════════
 INSERT INTO "HelpChapter" (id, slug, collection, title, category, "sortOrder", "adminOnly", "createdAt", "updatedAt")
-SELECT gen_random_uuid()::text, 'ai-assist', 'user-guide', 'AI Assist & Voice Assist', 'Creating & Editing',
+SELECT gen_random_uuid()::text, 'ai-assist', 'user-guide', 'NL Assist & Voice Assist', 'Creating & Editing',
        (SELECT coalesce(max("sortOrder"), 0) + 1 FROM "HelpChapter" WHERE collection = 'user-guide'),
        false, NOW(), NOW()
  WHERE NOT EXISTS (SELECT 1 FROM "HelpChapter" WHERE collection = 'user-guide' AND slug = 'ai-assist');
@@ -61,7 +61,7 @@ SELECT gen_random_uuid()::text, 'ai-assist', 'user-guide', 'AI Assist & Voice As
 -- Title and category are set on every run so a database seeded in August is
 -- brought forward without a second file.
 UPDATE "HelpChapter"
-   SET title = 'AI Assist & Voice Assist', category = 'Creating & Editing', "updatedAt" = NOW()
+   SET title = 'NL Assist & Voice Assist', category = 'Creating & Editing', "updatedAt" = NOW()
  WHERE collection = 'user-guide' AND slug = 'ai-assist';
 
 DELETE FROM "HelpSection"
@@ -72,16 +72,16 @@ SELECT gen_random_uuid()::text, ch.id, 'user-guide', v.heading, v.body, false, v
   FROM (SELECT id FROM "HelpChapter" WHERE collection = 'user-guide' AND slug = 'ai-assist') ch,
   (VALUES
 
-  (0, 'What Assist does', $UG$**Assist** helps you build a BPMN diagram faster: it suggests the next thing as you draw, and it lets you **say or type** what you want instead of clicking for it. It is optional, off until you turn it on, and most of it is instant and free — the AI is only called for wording the built-in rules do not recognise.
+  (0, 'What NL Assist does', $UG$**NL Assist** helps you build a BPMN diagram faster: it suggests the next thing as you draw, and it lets you **say or type** what you want instead of clicking for it. It is optional, off until you turn it on, and most of it is instant and free — the AI is only called for wording the built-in rules do not recognise.
 
 Two switches in the BPMN toolbar, each remembering its own on/off state per diagram:
 
-- **👻 Assist** — ghost suggestions for the next step. Available on **every subscription level**.
+- **👻 NL Assist** — ghost suggestions for the next step. Available on **every subscription level**.
 - **🪄 Voice Assist** — speak or type editing commands. Available on **Expert** and above.
 
 Neither changes anything you have not asked for, and every change either makes is a single undo away.$UG$),
 
-  (1, '👻 Assist — ghost next-step suggestions', $UG$Turn on **👻 Assist**, then select a single element. Faint **ghost chips** appear to its right suggesting what usually comes next. **Press Tab** (or click a chip) to accept the top one — the element is placed and connected for you, tidily, and never on top of anything.
+  (1, '👻 NL Assist — ghost next-step suggestions', $UG$Turn on **👻 NL Assist**, then select a single element. Faint **ghost chips** appear to its right suggesting what usually comes next. **Press Tab** (or click a chip) to accept the top one — the element is placed and connected for you, tidily, and never on top of anything.
 
 Depending on what is selected you may see:
 
@@ -209,16 +209,16 @@ If your organisation has not enabled cloud voice, the microphone tells you so ra
   ) AS v(ord, heading, body);
 
 -- ════════════════════════════════════════════════════════════════════════════
--- 2. Technical Notes — "AI Assist & Voice Assist"
+-- 2. Technical Notes — "NL Assist & Voice Assist"
 -- ════════════════════════════════════════════════════════════════════════════
 INSERT INTO "HelpChapter" (id, slug, collection, title, category, "sortOrder", "adminOnly", "createdAt", "updatedAt")
-SELECT gen_random_uuid()::text, 'ai-assist', 'tech-design', 'AI Assist & Voice Assist', NULL,
+SELECT gen_random_uuid()::text, 'ai-assist', 'tech-design', 'NL Assist & Voice Assist', NULL,
        (SELECT coalesce(max("sortOrder"), 0) + 1 FROM "HelpChapter" WHERE collection = 'tech-design'),
        false, NOW(), NOW()
  WHERE NOT EXISTS (SELECT 1 FROM "HelpChapter" WHERE collection = 'tech-design' AND slug = 'ai-assist');
 
 UPDATE "HelpChapter"
-   SET title = 'AI Assist & Voice Assist', "updatedAt" = NOW()
+   SET title = 'NL Assist & Voice Assist', "updatedAt" = NOW()
  WHERE collection = 'tech-design' AND slug = 'ai-assist';
 
 DELETE FROM "HelpSection"
@@ -229,7 +229,7 @@ SELECT gen_random_uuid()::text, ch.id, 'tech-design', v.heading, v.body, false, 
   FROM (SELECT id FROM "HelpChapter" WHERE collection = 'tech-design' AND slug = 'ai-assist') ch,
   (VALUES
 
-  (0, 'Two tiers: rules propose, rules dispose', $TD$Assist is deliberately **hybrid**: everything cheap and deterministic runs client-side with no LLM, and the AI is a fallback for free phrasing only.
+  (0, 'Two tiers: rules propose, rules dispose', $TD$NL Assist is deliberately **hybrid**: everything cheap and deterministic runs client-side with no LLM, and the AI is a fallback for free phrasing only.
 
 - **Placement geometry** is pure and unit-tested (`app/lib/diagram/assistPlacement.ts`): inline (51px, centres aligned), gateway fan-out, boundary near-edge (18px), `findFreeSlot` (nearest slot ≥51px), and the R7 boundary-follow. The constants live in one file so tuning is a one-liner.
 - **Legality** reuses the pure `canConnect(source, target, type, elements)` that mirrors the `ADD_CONNECTOR` reducer gauntlet; a parity test keeps the two in agreement, so no suggestion is ever illegal.
@@ -280,7 +280,7 @@ Measured before it was built: multi-word mis-hears already resolved on token ove
 
 **Voice metering:** `startDictation` records one `DictationSession` row per session (who, org, engine, seconds) via `sendBeacon` on session end, for both consumers. Deepgram bills the audio; AI Usage surfaces our own minutes-and-sessions-by-engine view under the same filters. The 2-minute idle auto-close exists because an open socket is billed whether or not anyone is speaking.$TD$),
 
-  (7, 'Assist / NL Rules catalog (green)', $TD$The green rules are one editable catalog (`IntentKeywordMap`, generalised): each row is keywords → an action (`suggest-template` | `add-input-data-object` | `add-output-data-object`) plus `diagramType` and `defaultLabel`. Edited at **Admin → Assist / NL Rules**, which also shows the red geometry rules read-only. `matchAssistRules(name, diagramType, catalog, action?)` is the shared, word-boundary matcher.
+  (7, 'NL Assist Rules catalog (green)', $TD$The green rules are one editable catalog (`IntentKeywordMap`, generalised): each row is keywords → an action (`suggest-template` | `add-input-data-object` | `add-output-data-object`) plus `diagramType` and `defaultLabel`. Edited at **Admin → NL Assist Rules**, which also shows the red geometry rules read-only. `matchAssistRules(name, diagramType, catalog, action?)` is the shared, word-boundary matcher.
 
 The command grammar itself stays in code, not in the catalog, because every phrasing it accepts is covered by a test — `app/lib/assist/commandCatalog.ts` is the single list the Commands card, the admin reference page and those tests all read, so a phrasing cannot be advertised without parsing.$TD$)
 
@@ -298,13 +298,13 @@ The command grammar itself stays in code, not in the catalog, because every phra
 -- values already. The publish below is a separate statement and does see them.
 WITH feat(ord, name, summary, details) AS (VALUES
 
-  (220, 'AI Assist — Suggest as You Draw',
-   $FS$Switch on Assist and the editor suggests the next step, the right template, even the data a task needs — every suggestion validated by the rules engine, so it is always legal and tidily placed.$FS$,
+  (220, 'NL Assist — Suggest as You Draw',
+   $FS$Switch on NL Assist and the editor suggests the next step, the right template, even the data a task needs — every suggestion validated by the rules engine, so it is always legal and tidily placed.$FS$,
    $FD$- **Ghost next-steps** — select an element and translucent chips suggest what comes next (Task / Decision / End). Press **Tab** or click to accept; it is placed and connected for you, never on top of anything.
 - **Boundary events & template fragments** suggested in context — attach an edge-mounted event, or drop in a saved template inline.
 - **Content-aware** — name a task "Approve invoice" and it suggests the matching **approval template**; imply a document and it offers an **Output** data object; imply a policy and it offers an **Instructions** input.
 - **Always correct** — every suggestion is checked by the same rules engine that governs AI generation, so nothing illegal or badly laid out ever appears.
-- **Tunable** — admins edit a keyword → action catalog (Assist / NL Rules); the geometry rules are shown read-only.
+- **Tunable** — admins edit a keyword → action catalog (NL Assist Rules); the geometry rules are shown read-only.
 - BPMN, opt-in per diagram, **instant and free** for the common cases (no AI call), and **included at every subscription level**.$FD$),
 
   (230, 'Voice Assist — Voice-Driven Diagramming',
@@ -343,7 +343,7 @@ UPDATE "Feature"
        "publishedSortOrder" = "sortOrder",
        "publishedAt"        = NOW(),
        "updatedAt"          = NOW()
- WHERE name IN ('AI Assist — Suggest as You Draw', 'Voice Assist — Voice-Driven Diagramming');
+ WHERE name IN ('NL Assist — Suggest as You Draw', 'Voice Assist — Voice-Driven Diagramming');
 
 COMMIT;
 
@@ -395,13 +395,13 @@ SELECT * FROM (
   SELECT 6, 'Feature rows (draft)',
          CASE WHEN count(*) < 2 THEN 'PARTIAL — ' || count(*) || ' of 2' ELSE 'present: ' || count(*) END
     FROM "Feature"
-   WHERE name IN ('AI Assist — Suggest as You Draw', 'Voice Assist — Voice-Driven Diagramming')
+   WHERE name IN ('NL Assist — Suggest as You Draw', 'Voice Assist — Voice-Driven Diagramming')
   UNION ALL
   SELECT 7, 'Feature rows (published)',
          CASE WHEN count(*) < 2 THEN 'NOT PUBLISHED — ' || count(*) || ' of 2' ELSE 'published: ' || count(*) END
     FROM "Feature"
    WHERE "publishedAt" IS NOT NULL
-     AND "publishedName" IN ('AI Assist — Suggest as You Draw', 'Voice Assist — Voice-Driven Diagramming')
+     AND "publishedName" IN ('NL Assist — Suggest as You Draw', 'Voice Assist — Voice-Driven Diagramming')
   UNION ALL
   SELECT 8, 'Old name still present',
          CASE WHEN count(*) = 0 THEN 'none — rename complete'

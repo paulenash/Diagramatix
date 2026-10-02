@@ -46,7 +46,7 @@ export function VoiceAssistCommandsClient() {
         <ul className="list-disc pl-5 space-y-0.5">
           <li>The <strong>phrasings</strong> the instant (free) path accepts are regular expressions in <code>app/lib/assist/commandGrammar.ts</code> — code, changed by a release.</li>
           <li>The <strong>AI fallback</strong> also reads the green <em>Command Aliases &amp; Phrasing</em> rules of the <em>assist</em> category in the Diagram Rules editor — editable, but they only steer the AI, never the instant path.</li>
-          <li><Link href="/dashboard/admin/intent-keywords" className="underline">Assist / NL Rules</Link> is the separate, editable catalogue for the 👻 ghost suggestions (element-name keywords → template / data object).</li>
+          <li><Link href="/dashboard/admin/intent-keywords" className="underline">NL Assist Rules</Link> is the separate, editable catalogue for the 👻 ghost suggestions (element-name keywords → template / data object).</li>
           <li>An admin-editable <strong>alias table</strong> consulted before the grammar (spoken phrase → canonical command) is planned; until then, a new phrasing is a code change.</li>
         </ul>
       </div>

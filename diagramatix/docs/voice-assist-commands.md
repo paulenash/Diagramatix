@@ -244,9 +244,9 @@ that was typed.
   - *"Space these evenly"* and *"same size as this"* are **not** built — those
     reducers do not exist yet, and distributing badly is worse than not
     distributing, because it looks finished.
-- **"accept the suggestion"** — takes the 👻 Assist ghost, the same as pressing
+- **"accept the suggestion"** — takes the 👻 NL Assist ghost, the same as pressing
   **Tab**. Also **"take the gateway"** (by what it is), **"take the second
-  one"**, **"accept ghost 2"**. Needs Assist on and one element selected.
+  one"**, **"accept ghost 2"**. Needs NL Assist on and one element selected.
   - **"Yes" is not an accept word.** It already means *go ahead* for a parked
     destructive command, and a word that changes meaning depending on whether a
     ghost happens to be showing is how a diagram gets cleared by accident.

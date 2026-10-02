@@ -1853,7 +1853,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       const cands = nextStepRef.current.candidates;
       if (!cands.length) {
         results.push(selectedIds.length === 0
-          ? "no suggestion showing — select an element with Assist on"
+          ? "no suggestion showing — select an element with NL Assist on"
           : "no suggestion showing for that element");
         anyFail = true; continue;
       }

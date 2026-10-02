@@ -1,5 +1,5 @@
 /**
- * Add an "AI Assist & Voice Assist" chapter to the SuperAdmin **Technical
+ * Add an "NL Assist & Voice Assist" chapter to the SuperAdmin **Technical
  * Design Notes** (`tech-design` collection, /tech-notes). Documents the
  * non-obvious engineering behind the 2026-08-04 assist suite. Idempotent.
  *
@@ -13,13 +13,13 @@ import { PrismaPg } from "@prisma/adapter-pg";
 
 const COLLECTION = "tech-design";
 const SLUG = "ai-assist";
-const TITLE = "AI Assist & Voice Assist";
+const TITLE = "NL Assist & Voice Assist";
 
 const SECTIONS: Array<{ heading: string; body: string }> = [
   {
     heading: "Two tiers: rules propose, rules dispose",
     body: [
-      "Assist is deliberately **hybrid**: everything cheap and deterministic runs client-side with no LLM; the AI is a fallback for free phrasing only.",
+      "NL Assist is deliberately **hybrid**: everything cheap and deterministic runs client-side with no LLM; the AI is a fallback for free phrasing only.",
       "",
       "- **Placement geometry** is pure + unit-tested (`app/lib/diagram/assistPlacement.ts`): inline (51px, centres aligned), gateway fan-out, boundary near-edge (18px), `findFreeSlot` (nearest slot ≥51px), and R7 boundary-follow. Constants live in one file so tuning is a one-liner.",
       "- **Legality** reuses a pure `canConnect(source, target, type, elements)` that mirrors the `ADD_CONNECTOR` reducer gauntlet; a parity test keeps them in agreement so no suggestion is ever illegal.",
@@ -55,9 +55,9 @@ const SECTIONS: Array<{ heading: string; body: string }> = [
     ].join("\n"),
   },
   {
-    heading: "Assist / NL Rules catalog (green) + voice metering",
+    heading: "NL Assist Rules catalog (green) + voice metering",
     body: [
-      "The **green** rules are one editable catalog (`IntentKeywordMap`, generalised): each row = keywords → an action (`suggest-template` | `add-input-data-object` | `add-output-data-object`) + `diagramType` + `defaultLabel`. Edited at **Admin → Assist / NL Rules**, which also shows the **red** geometry rules read-only. `matchAssistRules(name, diagramType, catalog, action?)` is the shared, word-boundary matcher.",
+      "The **green** rules are one editable catalog (`IntentKeywordMap`, generalised): each row = keywords → an action (`suggest-template` | `add-input-data-object` | `add-output-data-object`) + `diagramType` + `defaultLabel`. Edited at **Admin → NL Assist Rules**, which also shows the **red** geometry rules read-only. `matchAssistRules(name, diagramType, catalog, action?)` is the shared, word-boundary matcher.",
       "",
       "**Voice metering:** `startDictation` records one `DictationSession` row per session (who, org, engine, seconds) via `sendBeacon` on session end — for both consumers (Voice Assist + the AI panel). Deepgram audio is billed by Deepgram; the AI Usage page surfaces our lightweight minutes/sessions-by-engine view, scoped by the same filters.",
     ].join("\n"),

@@ -4912,10 +4912,10 @@ export function DiagramEditor({
                 : "text-gray-700 border-gray-300 hover:bg-gray-50"
             }`}
             title={assistEnabled
-              ? "Assist ON — select an element to see ghost next-step suggestions (Tab or click to accept). Click to turn off."
-              : "Assist OFF — turn on ghost next-step suggestions while you draw"}
+              ? "NL Assist ON — select an element to see ghost next-step suggestions (Tab or click to accept). Click to turn off."
+              : "NL Assist OFF — turn on ghost next-step suggestions while you draw"}
           >
-            👻 Assist{assistEnabled ? " ●" : ""}
+            👻 NL Assist{assistEnabled ? " ●" : ""}
           </button>
         )}
         {/* Voice Assist — live voice/typed command editing (BPMN only).

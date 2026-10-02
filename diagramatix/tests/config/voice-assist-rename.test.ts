@@ -119,7 +119,7 @@ describe("T4554 — Assist at every level, Voice Assist where it was", () => {
 
   it("names both features plainly in the matrix", () => {
     const labels = Object.fromEntries(FEATURES.map((f) => [f.key, f.label]));
-    expect(labels["nl-assist"]).toBe("Assist");
+    expect(labels["nl-assist"]).toBe("NL Assist");   // renamed from "Assist" 2026-10-02 (T5217)
     expect(labels["voice-assist"]).toBe("Voice Assist");
   });
 

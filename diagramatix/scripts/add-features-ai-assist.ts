@@ -1,5 +1,5 @@
 /**
- * Append Feature-catalog rows for the AI Assist + Voice Assist suite
+ * Append Feature-catalog rows for the NL Assist + Voice Assist suite
  * (2026-08-04). Idempotent (skipped if a row with the same `name` exists).
  * New rows insert as DRAFT — open /dashboard/admin/features to review, then
  * Publish All to push to /features.
@@ -17,16 +17,16 @@ import { PrismaPg } from "@prisma/adapter-pg";
 
 const FEATURES: Array<{ name: string; summary: string; details: string; sortOrder: number }> = [
   {
-    name: "AI Assist — Suggest as You Draw",
+    name: "NL Assist — Suggest as You Draw",
     sortOrder: 220,
     summary:
-      "Switch on Assist and the editor suggests the next step, the right template, even the data a task needs — every suggestion validated by the rules engine, so it's always legal and tidily placed.",
+      "Switch on NL Assist and the editor suggests the next step, the right template, even the data a task needs — every suggestion validated by the rules engine, so it's always legal and tidily placed.",
     details: [
       "- **Ghost next-steps** — select an element and translucent chips suggest what comes next (Task / Decision / End). Press **Tab** or click to accept; it's placed and connected for you, never on top of anything.",
       "- **Boundary events & template fragments** suggested in context — attach a boundary event, or drop in a saved template inline.",
       "- **Content-aware** — name a task \"Approve invoice\" and it suggests the matching **approval template**; imply a document and it offers an **Output** data object; imply a policy and it offers an **Instructions** input.",
       "- **Always correct** — every suggestion is checked by the same rules engine that governs AI generation, so nothing illegal or badly laid out ever appears.",
-      "- **Tunable** — admins edit a keyword → action catalog (Assist / NL Rules); the geometry rules are shown read-only.",
+      "- **Tunable** — admins edit a keyword → action catalog (NL Assist Rules); the geometry rules are shown read-only.",
       "- BPMN, opt-in per diagram, and **instant + free** for the common cases (no AI call).",
     ].join("\n"),
   },
@@ -50,7 +50,7 @@ const FEATURES: Array<{ name: string; summary: string; details: string; sortOrde
 const dq = (tag: string, s: string) => `$${tag}$${s}$${tag}$`;
 function toSql(): string {
   const out = [
-    "-- AI Assist + Voice Assist feature-catalog rows (draft). Idempotent.",
+    "-- NL Assist + Voice Assist feature-catalog rows (draft). Idempotent.",
     "-- Run in the SuperAdmin Database Manager, then /dashboard/admin/features → Publish All.",
     "BEGIN;",
     "",

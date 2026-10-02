@@ -107,7 +107,7 @@ export function IntentKeywordsClient() {
           <button onClick={() => router.push("/dashboard/admin")} className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1">
             <span style={{ fontSize: "1.5em", lineHeight: 1 }}>←</span><span className="underline">SuperAdmin</span>
           </button>
-          <h1 className="font-semibold text-gray-900">Assist / NL Rules</h1>
+          <h1 className="font-semibold text-gray-900">NL Assist Rules</h1>
         </div>
         <div className="flex items-center gap-2">
           {status && <span className={`text-xs ${status.startsWith("Error") ? "text-red-600" : "text-green-600"}`}>{status}</span>}
@@ -123,7 +123,7 @@ export function IntentKeywordsClient() {
           <h2 className="text-sm font-semibold text-green-700 mb-1">🟢 Green rules — editable</h2>
           <p className="text-xs text-gray-500 mb-3">
             When a just-named element&rsquo;s <strong>name</strong> contains any keyword (whole-word, case-insensitive),
-            the assist ghost does the row&rsquo;s <strong>action</strong>: suggest a template, or ghost an input/output
+            the NL Assist ghost does the row&rsquo;s <strong>action</strong>: suggest a template, or ghost an input/output
             <strong> Data Object</strong> with the default name. These also ground the Voice Assist AI. <strong>Type</strong>
             = <code>all</code> or a notation (bpmn, archimate…).
           </p>

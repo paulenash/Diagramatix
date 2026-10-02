@@ -259,7 +259,7 @@ function Editor({ data, busy, onSwitch, onRepair, onSave, onReset }: {
         <p className="text-xs text-gray-600 mb-2">
           One command per line. <code>word</code> · <code>a|b</code> one of · <code>( x y | z )</code> a group · <code>[optional]</code> shown in [ ] ·
           <code> &lt;variable&gt;</code> · <code>{"{list}"}</code> · <code># comment</code>. Sections: <code>## commands</code>, <code>## assist</code> (only while
-          Assist suggestions show), <code>## voice</code>, <code>## flow &lt;id&gt;</code> (a guided flow).
+          NL Assist suggestions show), <code>## voice</code>, <code>## flow &lt;id&gt;</code> (a guided flow).
         </p>
         <textarea
           value={patterns} onChange={(e) => setPatterns(e.target.value)} spellCheck={false}
@@ -357,7 +357,7 @@ function Summary({ tree, patterns, lists }: { tree: ReturnType<typeof compileTre
     <Section title="5. Next words — generated from the patterns above">
       <label className="flex items-center gap-2 text-xs text-gray-700 mb-3">
         <input type="checkbox" checked={ghost} onChange={(e) => setGhost(e.target.checked)} />
-        Assist suggestions are showing (adds the Assist-only words)
+        NL Assist is active (adds the NL Assist-only words)
       </label>
       <div className="mb-3 text-xs">
         <span className="font-semibold text-gray-800">First words: </span>
@@ -559,7 +559,7 @@ function TryIt({ tree }: { tree: ReturnType<typeof compileTree> }) {
           </select>
         </label>
         <label className="text-xs text-gray-700 flex items-center gap-1 pb-1.5"><input type="checkbox" checked={useNames} onChange={(e) => setUseNames(e.target.checked)} /> Names from the test diagram</label>
-        <label className="text-xs text-gray-700 flex items-center gap-1 pb-1.5"><input type="checkbox" checked={ghost} onChange={(e) => setGhost(e.target.checked)} /> Assist suggestions showing</label>
+        <label className="text-xs text-gray-700 flex items-center gap-1 pb-1.5"><input type="checkbox" checked={ghost} onChange={(e) => setGhost(e.target.checked)} /> NL Assist active</label>
       </div>
       <p className="text-[11px] text-gray-500 mb-3 max-w-2xl">
         <strong>Guided flow</strong> shows the panel as it looks while a flow is open — for example after “rename tasks” (green numbers on the tasks) or “move dividers”.
