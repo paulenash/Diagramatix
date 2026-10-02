@@ -195,7 +195,7 @@ describe("T5218 5  an EVENT EP in an EP that already has a flow", () => {
     expect(ep.height).toBeGreaterThan(150);
   });
 
-  it("inside it: a Start (trigger Message, Interruption → Interrupting), a Task and an End, joined", () => {
+  it("inside it: a Start (trigger Message, Interruption → NON-interrupting), a Task and an End, joined", () => {
     const h = headlessDiagram(world());
     run("add an event expanded subprocess", h, { selected: ["ep"] });
     const ev = eventEps(h)[0];
@@ -204,7 +204,7 @@ describe("T5218 5  an EVENT EP in an EP that already has a flow", () => {
     expect(kids.map((k) => k.type).sort()).toEqual(["end-event", "start-event", "task"]);
     const start = kids.find((k) => k.type === "start-event")! as Els & { eventType?: string };
     expect(start.eventType).toBe("message");
-    expect((start.properties as { interruptionType?: string }).interruptionType).toBe("interrupting");
+    expect((start.properties as { interruptionType?: string }).interruptionType).toBe("non-interrupting");
     expect((start.label ?? "").trim(), "Start and End events inside an EP are unnamed").toBe("");
     expect((kids.find((k) => k.type === "end-event")!.label ?? "").trim()).toBe("");
     const task = kids.find((k) => k.type === "task")!, end = kids.find((k) => k.type === "end-event")!;
@@ -280,7 +280,7 @@ describe("T5218 5  an EVENT EP in an EP that already has a flow", () => {
     const h = headlessDiagram(world());
     const r = run("add an event expanded subprocess called Cancel Order", h, { selected: ["ep"] });
     expect(r.summary).toContain("Event subprocess");
-    expect(r.summary).toContain("Start (Message, interrupting)");
+    expect(r.summary).toContain("Start (Message, non-interrupting)");
     expect(r.summary).toContain("moved the existing flow up");
     expect(r.summary).toContain("taller");
     expect(r.summary).toContain("widened");

@@ -135,6 +135,8 @@ export type AssistOp =
   | { op: "convert"; ref: Ref; subtype: string }
   /** "convert Review Claim to a subprocess" / "convert selected to a task" — the right-click menu's shape change (Paul, 2026-09-27). */
   | { op: "convertActivity"; ref: Ref; to: "task" | "subprocess" }
+  /** "make the selected event non-interrupting" — a start or intermediate (boundary) event's Interruption (Paul, 2026-10-02). */
+  | { op: "setInterruption"; ref: Ref; interrupting: boolean }
   /** "move dividers" — number the lane dividers; the answer ("2 up 100 pixels") is the next utterance (dividerFlow.ts). */
   | { op: "numberDividers" }
   /**
@@ -453,6 +455,9 @@ export function validateOp(raw: unknown): AssistOp | null {
     }
     case "numberDividers":
       return { op: "numberDividers" };
+    case "setInterruption":
+      if (!isRef(o.ref) || typeof o.interrupting !== "boolean") return null;
+      return { op: "setInterruption", ref: (o.ref as string).trim(), interrupting: o.interrupting };
     case "convertActivity":
       if (!isRef(o.ref) || (o.to !== "task" && o.to !== "subprocess")) return null;
       return { op: "convertActivity", ref: (o.ref as string).trim(), to: o.to };

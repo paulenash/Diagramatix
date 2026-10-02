@@ -579,7 +579,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
           { parentId: epCtx.ep.id, width: ev.ep.width, height: ev.ep.height, properties: { subprocessType: "event" } });
         updateLabel(evIds.ep, evLabel ?? nextSubprocessName(els));
         addElementGated("start-event", ev.start, undefined, "message", evIds.start, { parentId: evIds.ep });
-        updateProperties(evIds.start, { interruptionType: "interrupting" });
+        updateProperties(evIds.start, { interruptionType: "non-interrupting" });
         addElementGated("task", ev.task, undefined, undefined, evIds.task, { parentId: evIds.ep });
         addElementGated("end-event", ev.end, undefined, undefined, evIds.end, { parentId: evIds.ep });
         addConnector(evIds.start, evIds.task, "sequence", "directed", "rectilinear", "right", "left");
@@ -2017,6 +2017,34 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
     // on each named or selected element that is the other shape. A task's
     // marker and a subprocess's link to its sub-diagram do not survive the
     // change, as with the menu — the log says so rather than losing them quietly.
+    // "make the selected event non-interrupting" (Paul, 2026-10-02): the Interruption of a START or INTERMEDIATE (boundary)
+    // event — the Properties panel's own drop-down. Selected, hovered or named; several selected events all change.
+    if (op.op === "setInterruption") {
+      const value = op.interrupting ? "interrupting" : "non-interrupting";
+      const sel = resolveSelectionRefs(op.ref, els, selectedIds);
+      let targets: DiagramElement[];
+      if (sel) {
+        if (!sel.length) { results.push("nothing is selected"); anyFail = true; continue; }
+        targets = sel.map((id) => els.find((e) => e.id === id)!).filter(Boolean);
+      } else {
+        const e = resolve1(op.ref);
+        if ("err" in e) { results.push(e.err); anyFail = true; continue; }
+        targets = [e];
+      }
+      const done: string[] = [];
+      for (const e of targets) {
+        if (e.type !== "start-event" && e.type !== "intermediate-event") {
+          results.push(`${nameOf(e)} is ${/^[aeiou]/i.test(e.type) ? "an" : "a"} ${e.type.replace(/-/g, " ")} — only a start or intermediate event can be interrupting or non-interrupting`);
+          anyFail = true; continue;
+        }
+        if (((e.properties?.interruptionType as string | undefined) ?? "interrupting") === value) { results.push(`${nameOf(e)} is already ${value}`); continue; }
+        updateProperties(e.id, { interruptionType: value });
+        done.push(nameOf(e));
+      }
+      if (done.length) results.push(`made ${done.join(", ")} ${value}`);
+      continue;
+    }
+
     if (op.op === "convertActivity") {
       const from = op.to === "subprocess" ? "task" : "subprocess";
       const sel = resolveSelectionRefs(op.ref, els, selectedIds);

@@ -560,6 +560,20 @@
       "insideWord": "inside"
     }
   ],
+  "make the selected event non-interrupting": [
+    {
+      "op": "setInterruption",
+      "ref": "selected event",
+      "interrupting": false
+    }
+  ],
+  "make this interrupting": [
+    {
+      "op": "setInterruption",
+      "ref": "this",
+      "interrupting": true
+    }
+  ],
   "set the usage to event": [
     {
       "op": "convert",

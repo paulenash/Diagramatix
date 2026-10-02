@@ -108,6 +108,8 @@ export const CATALOG_CONTEXT: Readonly<Record<string, CatalogContext>> = {
   "add a gateway called Stock OK": { parseOnly: "needs an expanded subprocess selected or under the cursor — the test diagram has none, so on it this is an ordinary add" },
   "add a subprocess called Inspect": { parseOnly: "needs an expanded subprocess selected or under the cursor — the test diagram has none, so on it this is an ordinary add" },
   "add a task called Pack inside Settle Claim": { parseOnly: "needs an expanded subprocess called Settle Claim — the test diagram has none, so on it the words are part of the name" },
+  "make the selected event non-interrupting": { needsSelection: ["start"] },
+  "make this interrupting": { needsSelection: ["start"] },
   "set the usage to event": { needsSelection: ["sub3"] },
   "change the usage of this to call": { needsSelection: ["sub3"] },
   "reverse this": { parseOnly: "needs a connector selected — the test diagram's selection stand-in holds elements, not connectors" },

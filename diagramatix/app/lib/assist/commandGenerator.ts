@@ -942,6 +942,7 @@ export const NOT_GENERATED: Record<string, string> = {
   wrapInSubprocess: "needs a selection with exactly one flow in and one out",
   wrapInContainer: "the AI-coerced form of wrapInPool; reached through it, not directly",
   unwrapSubprocess: "needs an expanded subprocess selected",
+  setInterruption: "needs a start or intermediate event selected (or under the cursor)",
   labelSelected: "needs a connector or one element selected",
   moveLabel: "needs a selected item with a label",
   clearLabel: "needs a selected item with a label",

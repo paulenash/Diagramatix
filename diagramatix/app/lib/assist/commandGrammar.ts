@@ -369,6 +369,19 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   // marker, so not M3's table below. Only the bare shape words: "a user task"
   // is still M3's marker, and "sub process" is how the recogniser often
   // writes it.
+  // "make the selected event non-interrupting", "make this interrupting", "set the interruption to non-interrupting" — the
+  // Interruption drop-down of a start or intermediate (boundary) event (Paul, 2026-10-02: the command did not exist).
+  {
+    const setWord = (s: string) => /^non/i.test(s);
+    const a = raw.match(/^(?:make|set|turn|change)\s+(?:the\s+)?(.+?)\s+(?:(?:to|as|into)\s+)?(?:(?:be|an?)\s+)?(non[-\s]?interrupting|interrupting)(?:\s+(?:start\s+|boundary\s+|intermediate\s+)?event)?$/i);
+    const b = raw.match(/^(?:set|change|make)\s+(?:the\s+)?interruption(?:\s+(?:of|for)\s+(.+?))?\s+(?:to|as)\s+(?:be\s+)?(non[-\s]?interrupting|interrupting)$/i);
+    if (b) return [{ op: "setInterruption", ref: b[1] ? clean(b[1]) : "this", interrupting: !setWord(b[2]) }];
+    if (a && !/^interruption\b/i.test(a[1])) {
+      // "the boundary event" / "the start event" name a KIND, not a thing: it means the selected or hovered one.
+      const kindOnly = /^(?:(?:start|boundary|intermediate)\s+)?events?$/i.test(clean(a[1]));
+      return [{ op: "setInterruption", ref: kindOnly ? "this" : clean(a[1]), interrupting: !setWord(a[2]) }];
+    }
+  }
   // "set the usage to event", "change the usage of this to call" — a subprocess's Usage (Normal / Call / Event /
   // Transaction), the Properties panel's own drop-down (Paul, 2026-10-02). The same marker conversion as "make this an
   // event subprocess", so it hands that conversion the phrase it reads.

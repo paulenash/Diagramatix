@@ -116,6 +116,8 @@ move (divider|dividers)  @on pool lane
 move lane (divider|dividers)  @on pool lane
 
 # ── Converting
+(make|set|turn|change) [the] (this|that|it|selected|selected event|event|start event|boundary event) [(to|as|into)] [(a|an)] (non-interrupting|interrupting|non interrupting) [event]  @on event
+(set|change|make) [the] interruption [(of|for) (<existing_element_name>|<target>)] (to|as) (non-interrupting|interrupting|non interrupting)  @on event
 (set|change|make) [the] [subprocess] usage [(of|for) (<existing_element_name>|<target>)] (to|as) [a|an] {usage_words} [subprocess]  @on subprocess expanded-subprocess
 make (<existing_element_name>|<existing_label_name>|<target>) (a|an) {convert_kinds}  @on flownode
 (turn|change|convert|set) (<existing_element_name>|<existing_label_name>|<target>) (to|into) (a|an) {convert_kinds}  @on flownode

@@ -207,7 +207,8 @@ export function planAddInsideEp(
 //   "A common scenario is adding an Event Expanded Subprocess to an Expanded Subprocess that already has a Start Event
 //   to End Event flow. The height of the parent EP must increase, the existing flow move to the top of the parent EP and
 //   the new EP appear as an Event EP with its own Start Event, Task and End Event, placed in the middle of the EP under
-//   the existing flow. The Start Event has Trigger Message and Interruption → Interrupting. A further EP goes
+//   the existing flow. The Start Event has Trigger Message and Interruption → NON-interrupting (Paul's second thought,
+//   2026-10-02: it was Interrupting first). A further EP goes
 //   underneath any existing Event EPs, the same construction. The parent EP will in general need to grow in height and
 //   width: everything below it is pushed down and everything to the right of it pushed right, including pool and lane
 //   boundaries and any pool below the white-box pool the EP is in."
@@ -287,6 +288,6 @@ export function planAddEventEp(
     start: { x: startX, y: rowY },
     task: { x: taskX, y: rowY },
     end: { x: endX, y: rowY },
-    summary: `as an Event subprocess in the middle of ${nameOf(parent)}, ${eventEps.length ? "under the existing Event subprocesses" : flowKids.length ? "under the existing flow" : "at the top"}, with its own Start (Message, interrupting), Task and End${said ? ` — ${said}` : ""}`,
+    summary: `as an Event subprocess in the middle of ${nameOf(parent)}, ${eventEps.length ? "under the existing Event subprocesses" : flowKids.length ? "under the existing flow" : "at the top"}, with its own Start (Message, non-interrupting), Task and End${said ? ` — ${said}` : ""}`,
   };
 }
