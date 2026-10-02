@@ -59,6 +59,12 @@ interface Props {
   maskBounds?: { x: number; y: number; width: number; height: number }[];
   sourceBounds?: { x: number; y: number; width: number; height: number };
   targetBounds?: { x: number; y: number; width: number; height: number };
+  /** The expanded-subprocess shapes this connector is attached to (its source and/or target). A click INSIDE one
+   *  selects the subprocess, never this connector: the flow's stored route runs on to the subprocess's centre, and
+   *  an expanded subprocess is click-through inside, so its hidden 12 px hit stroke used to catch the click
+   *  (Paul, 2026-10-02: "connectors are selectable when clicking inside the EP — only outside the boundary of
+   *  their source or target EP"). Cut out of the hit area exactly as an association's endpoints are. */
+  epHitHoles?: { x: number; y: number; width: number; height: number }[];
   /** Height of the pool that contains the source endpoint (pool itself if source is a pool). Debug only. */
   sourcePoolHeight?: number;
   /** Height of the pool that contains the target endpoint (pool itself if target is a pool). Debug only. */
@@ -778,7 +784,7 @@ function ConstraintBox({
   );
 }
 
-function ConnectorRendererInner({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onWaypointsDragEnd, onUpdateLabel, onUpdateCurveHandles, misaligned, otherConnectorWaypoints, debugMode, onUpdateEndOffset, showBottleneck, reviewLinkColor, maskBounds, sourceBounds, targetBounds, sourcePoolHeight, targetPoolHeight, sourceIsPool, sourceType, targetIsPool, onLabelFocusEditStart, onLabelFocusEditEnd, hideLabel, highlight, faded, relaxedLayout }: Props) {
+function ConnectorRendererInner({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onWaypointsDragEnd, onUpdateLabel, onUpdateCurveHandles, misaligned, otherConnectorWaypoints, debugMode, onUpdateEndOffset, showBottleneck, reviewLinkColor, maskBounds, sourceBounds, targetBounds, epHitHoles, sourcePoolHeight, targetPoolHeight, sourceIsPool, sourceType, targetIsPool, onLabelFocusEditStart, onLabelFocusEditEnd, hideLabel, highlight, faded, relaxedLayout }: Props) {
   // Bumped when the connector LINE is double-clicked, which opens the same
   // label editor its label box does — the line is the bigger target, and the
   // one a user aims at (Paul, 2026-09-17).
@@ -1080,7 +1086,7 @@ function ConnectorRendererInner({ connector, selected, onSelect, svgToWorld, onU
           diagram, then each element's box as its own subpath, which evenodd
           turns into a hole. Coordinates are the local (transformed) space, the
           same as the waypoints. */}
-      {(isAssocBPMN || isReviewLink) && (sourceBounds || targetBounds || (maskBounds?.length ?? 0) > 0) && (() => {
+      {(((isAssocBPMN || isReviewLink) && (sourceBounds || targetBounds || (maskBounds?.length ?? 0) > 0)) || (epHitHoles?.length ?? 0) > 0) && (() => {
         const clipId = `assoc-hit-clip-${connector.id}`;
         // DE-DUPLICATED, and that is the whole point. `evenodd` COUNTS
         // crossings rather than unioning them, so a rectangle listed twice is
@@ -1089,10 +1095,12 @@ function ConnectorRendererInner({ connector, selected, onSelect, svgToWorld, onU
         // mask, so the line stayed clickable inside exactly the two shapes it
         // belongs to — invisible until the connector re-routed centre to
         // centre and ran straight under the pointer (Paul, 2026-09-21).
+        const assocLike = isAssocBPMN || isReviewLink;
         const holes = dedupeHoles([
-          ...(sourceBounds ? [sourceBounds] : []),
-          ...(targetBounds ? [targetBounds] : []),
-          ...(maskBounds ?? []),
+          ...(assocLike && sourceBounds ? [sourceBounds] : []),
+          ...(assocLike && targetBounds ? [targetBounds] : []),
+          ...(assocLike ? (maskBounds ?? []) : []),
+          ...(epHitHoles ?? []),
         ]);
         const rect = (x: number, y: number, w: number, h: number) =>
           `M${x},${y} H${x + w} V${y + h} H${x} Z`;
@@ -1124,7 +1132,7 @@ function ConnectorRendererInner({ connector, selected, onSelect, svgToWorld, onU
         stroke="transparent"
         strokeWidth={12}
         style={{ cursor: isMessageBPMN && !isRectilinearMessage ? "ew-resize" : "pointer" }}
-        clipPath={(isAssocBPMN || isReviewLink) && (sourceBounds || targetBounds || (maskBounds?.length ?? 0) > 0) ? `url(#assoc-hit-clip-${connector.id})` : undefined}
+        clipPath={(((isAssocBPMN || isReviewLink) && (sourceBounds || targetBounds || (maskBounds?.length ?? 0) > 0)) || (epHitHoles?.length ?? 0) > 0) ? `url(#assoc-hit-clip-${connector.id})` : undefined}
         onMouseDown={(e) => {
           if (isMessageBPMN && !isRectilinearMessage && selected) {
             handleMessageBPMNBodyMouseDown(e);

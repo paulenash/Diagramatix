@@ -34,7 +34,9 @@ export interface EpPlan {
   shift?: { markerX: number; dx: number; scopeId: string };
   /** The elements to add, in order. `role` names them in `joins`. */
   add: Array<{ role: "start" | "new" | "end"; symbol: "start-event" | "end-event" | "new"; centre: Centre }>;
-  /** Sequence flows to draw, each end an existing element id or a role of something added. */
+  /** Sequence flows to draw, each end an existing element id or a ROLE of something added. A role is written
+   *  "@start", "@new" or "@end" — never a bare word, because a real element id can be "start" or "end" (Paul's test
+   *  diagram has both, and the first version of this confused the new Start with his "Claim Received"). */
   joins: Array<{ from: string; to: string }>;
   /** Flows to remove first (the one being spliced into). */
   remove: string[];
@@ -114,7 +116,7 @@ export function planAddInsideEp(
         { role: "new", symbol: "new", centre: { x: nx, y: rowY } },
         { role: "end", symbol: "end-event", centre: { x: ex, y: rowY } },
       ],
-      joins: [{ from: "start", to: "new" }, { from: "new", to: "end" }],
+      joins: [{ from: "@start", to: "@new" }, { from: "@new", to: "@end" }],
       remove: [],
       summary: `added it inside ${nameOf(ep)}, between a new Start and End${dx > 0 ? ` — widened ${nameOf(ep)} ${dx}px and moved what is right of it in ${nameOf(band)} across` : ""}`,
     };
@@ -156,7 +158,7 @@ export function planAddInsideEp(
   const dx = next
     ? Math.max(0, Math.ceil(needRightOf - next.x))
     : Math.max(0, Math.ceil(slotRight + EP_WRAP.EVENT_INSET - right(ep)));
-  const joins = [{ from: prev.id, to: "new" }, ...(next ? [{ from: "new", to: next.id }] : [])];
+  const joins = [{ from: prev.id, to: "@new" }, ...(next ? [{ from: "@new", to: next.id }] : [])];
   return {
     ...(dx > 0 ? { shift: { markerX: right(prev), dx, scopeId: band.id } } : {}),
     add: [{ role: "new", symbol: "new", centre: { x: nx, y: rowY } }],

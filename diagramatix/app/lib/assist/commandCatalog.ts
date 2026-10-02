@@ -40,7 +40,7 @@ export const COMMAND_CATALOG: CatalogFamily[] = [
     { does: "Change what kind of thing it is — the same choices as the right-click menu", say: ["make this a user task", "turn the selected gateway into a parallel gateway", "make Review Claim a service task", "make the selected event a timer event"] },
     { does: "Task ↔ subprocess — the right-click menu's convert. A task's marker, or a subprocess's link to its sub-diagram, does not survive the change", say: ["convert Review Claim to a subprocess", "convert selected to a task"] },
     { does: "Delete (and close the gap)", say: ["delete Task 2", "remove Task 1 and compact"] },
-    { does: "Boundary event on a task or subprocess", say: ["add a boundary event called Cancel to Subprocess 3", "add a boundary event to Check Coverage called Timeout"] },
+    { does: "Boundary event on a task or subprocess — say its trigger, or let the name decide: error, cancellation, receive and escalate set Error, Cancel, Message and Escalation; a time or date phrase sets Timer", say: ["add a boundary event called Cancel to Subprocess 3", "add a boundary event to Check Coverage called Timeout"] },
     { does: "Templates — the numbered template window; say a number and it goes on the diagram. With a step selected (or “after X”) it goes after that step, in its lane, joined to it — a Start Event at its front is dropped and the lane grows to fit. While it shows: “scroll down”, “scroll up”, “scroll to the top”, “scroll to the bottom”", say: ["add template", "add template after Review Claim"] },
   ] },
   { family: "The selection (mouse says which, voice says what)", items: [

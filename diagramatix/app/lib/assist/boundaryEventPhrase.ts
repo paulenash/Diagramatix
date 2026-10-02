@@ -68,6 +68,58 @@ const HOST_WORD = "(?:to|on|onto)";
 const clean = (s: string) =>
   s.trim().replace(/[.,!?;:]+$/g, "").replace(/^["'“”‘’]+|["'“”‘’]+$/g, "").trim();
 
+/**
+ * The trigger a boundary event's NAME implies — Paul, 2026-10-02: "Use the wording of the proposed boundary
+ * event to set the event trigger. If the words error, cancellation, receive or escalate occur in the event
+ * name, set the trigger to Error, Cancel, Message or Escalation respectively. If any phrase with time or date
+ * is part of the name then set the trigger to Timer."
+ *
+ * Used ONLY when the sentence did not say a trigger itself ("add a timer boundary event …" always wins), and
+ * only for a name that was given. The four words are matched by stem (error → errors; cancel → cancellation,
+ * cancelled; receiv → receive, received; escalat → escalate, escalation). A time or date phrase is a clock
+ * time, a date or weekday or month, a duration ("after 3 days"), a recurrence ("every week", "daily"), or the
+ * words time / timer / timeout / date / deadline / overdue / expire. A name with both reads as the words first:
+ * "Escalate after 3 days" is an escalation, since the words were the first thing he listed.
+ *
+ * Pure.
+ */
+const MONTHS = "january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec";
+const WEEKDAYS = "monday|tuesday|wednesday|thursday|friday|saturday|sunday";
+const COUNT = "\\d+|an?|one|two|three|four|five|six|seven|eight|nine|ten|twelve|several|few";
+const UNITS = "seconds?|secs?|minutes?|mins?|hours?|hrs?|days?|weeks?|fortnights?|months?|quarters?|years?";
+const TIME_OR_DATE = new RegExp(
+  [
+    "\\btime(?:r|rs|out|outs|-out|d out|d-out)?\\b",
+    "\\btime\\s*limit\\b",
+    "\\bdates?\\b",
+    "\\bdeadlines?\\b",
+    "\\boverdue\\b",
+    "\\bexpir(?:e|es|ed|y|ation)\\b",
+    `\\b(?:\\d+\\s*|(?:${COUNT})\\s+)(?:${UNITS})\\b`,
+    "\\b(?:daily|weekly|fortnightly|monthly|quarterly|yearly|annually|hourly|nightly)\\b",
+    "\\bevery\\s+(?:\\w+\\s+)?(?:day|night|week|month|year|hour|minute|morning|afternoon|evening|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\\b",
+    "\\b(?:midnight|noon|midday|today|tomorrow|tonight|end of (?:day|week|month|year))\\b",
+    "\\b\\d{1,2}:\\d{2}\\b",
+    "\\b\\d{1,2}\\s*(?:am|pm)\\b",
+    `\\b(?:${WEEKDAYS})\\b`,
+    `\\b(?:${MONTHS})\\b`,
+    "\\b\\d{1,2}(?:st|nd|rd|th)\\b",
+    "\\b\\d{1,2}[/-]\\d{1,2}(?:[/-]\\d{2,4})?\\b",
+  ].join("|"),
+  "i",
+);
+
+export function inferBoundaryTrigger(name: string | undefined): EventType | undefined {
+  const t = String(name ?? "").trim();
+  if (!t) return undefined;
+  if (/\berror/i.test(t)) return "error";
+  if (/\bcancel/i.test(t)) return "cancel";
+  if (/\breceiv/i.test(t)) return "message";
+  if (/\bescalat/i.test(t)) return "escalation";
+  if (TIME_OR_DATE.test(t)) return "timer";
+  return undefined;
+}
+
 export interface BoundaryEventPhrase {
   /** Absent when no host was named — the apply layer then uses the selection. */
   hostRef?: string;

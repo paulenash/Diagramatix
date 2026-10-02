@@ -4701,6 +4701,15 @@ export function Canvas({
     () => new Map(data.elements.map((e) => [e.id, e.type] as const)),
     [data.elements],
   );
+  // The expanded subprocesses by id — a connector attached to one must not be clickable INSIDE it (ConnectorRenderer `epHitHoles`).
+  const epBoundsById = useMemo(
+    () => new Map(data.elements.filter((e) => e.type === "subprocess-expanded").map((e) => [e.id, { x: e.x, y: e.y, width: e.width, height: e.height }] as const)),
+    [data.elements],
+  );
+  const epHolesOf = useCallback(
+    (conn: Connector) => [conn.sourceId, conn.targetId].flatMap((id) => { const b = epBoundsById.get(id); return b ? [b] : []; }),
+    [epBoundsById],
+  );
   const poolIdOf = useCallback(
     (el: DiagramElement): string | null =>
       poolIdByElement.has(el.id) ? (poolIdByElement.get(el.id) ?? null) : getElementPoolId(el, data.elements),
@@ -5781,6 +5790,7 @@ export function Canvas({
                 key={conn.id}
                 connector={conn}
                 sourceType={elTypeById.get(conn.sourceId)}
+                epHitHoles={epHolesOf(conn)}
                 reviewLinkColor={reviewLinkColorFor(conn)}
                 selected={false}
                 onSelect={() => {
@@ -6519,6 +6529,7 @@ export function Canvas({
               <ConnectorRenderer
                 key={`sel-${conn.id}`}
                 connector={conn}
+                epHitHoles={epHolesOf(conn)}
                 selected={true}
                 onSelect={() => {
                   onSelectConnector(conn.id);

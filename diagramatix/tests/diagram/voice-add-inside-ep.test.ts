@@ -161,3 +161,31 @@ describe("T5208 nothing else changes", () => {
     expect(h.data.elements.length).toBe(before);
   });
 });
+
+describe("T5208 a real element id that looks like a role (Paul's debug capture, 2026-10-02)", () => {
+  // His test diagram has elements whose ids are literally "start" and "end" (Claim Received, Claim Closed). The first
+  // version named the Start/End it was about to add "start" / "end" too, so the legality check looked up HIS
+  // elements and refused: “a sequence flow from Claim Received to New task isn't legal”.
+  it("an empty EP still takes its first task when the diagram has elements with ids 'start' and 'end'", () => {
+    const d = world();
+    d.elements.push(el("start", "start-event", 60, 60, 36, 36, "Claim Received", "laneA"), el("end", "end-event", 640, 60, 36, 36, "Claim Closed", "laneA"));
+    const h = headlessDiagram(d);
+    const r = run("add a task called New Task", h, { selected: ["ep"] });
+    expect(r.ok, r.summary).toBe(true);
+    expect(inside(h).map((k) => k.type).sort()).toEqual(["end-event", "start-event", "task"]);
+    // and the flows joined the NEW Start / End, not the ids that merely share their names
+    const newStart = inside(h).find((k) => k.type === "start-event")!, newEnd = inside(h).find((k) => k.type === "end-event")!;
+    expect(newStart.id).not.toBe("start");
+    expect(newEnd.id).not.toBe("end");
+    expect(flows(h).some((c) => c.sourceId === newStart.id && c.targetId === byLabel(h, "New Task").id)).toBe(true);
+    expect(flows(h).some((c) => c.sourceId === "start" || c.targetId === "end")).toBe(false);
+  });
+
+  it("the plan's roles can never be mistaken for an element id", async () => {
+    const { planAddInsideEp } = await import("@/app/lib/diagram/epAdd");
+    const d = world();
+    const plan = planAddInsideEp(d.elements, d.connectors, d.elements.find((e) => e.id === "ep")!, null, { w: 102, h: 64 });
+    expect("error" in plan).toBe(false);
+    if (!("error" in plan)) for (const j of plan.joins) for (const end of [j.from, j.to]) expect(end.startsWith("@")).toBe(true);
+  });
+});

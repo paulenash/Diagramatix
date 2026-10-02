@@ -33,6 +33,7 @@ import { isBoundaryHost } from "@/app/lib/diagram/boundaryHosts";
 import { resolveRef, resolveSelectionRefs, isSelectionRef, nearestRefs, ID_REF_PREFIX, spokenNumbersAsDigits } from "./resolveRef";
 import { isPointerElementRef, elementUnderPointer } from "./pointerRef";
 import { epTarget, planAddInsideEp, EP_ADDABLE } from "@/app/lib/diagram/epAdd";
+import { inferBoundaryTrigger } from "./boundaryEventPhrase";
 import { nextContainerLabels } from "@/app/lib/diagram/containerNames";
 import { isAnyLane, isSublane, laneKindWord, sameKindAs } from "@/app/lib/diagram/laneKind";
 import { LANE_EXPAND_STEP } from "@/app/lib/diagram/laneFit";
@@ -540,9 +541,18 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
         // Legal before anything moves: a refusal changes nothing.
         const probeAt = plan.add.find((a) => a.role === "new")!.centre;
         const probe = syntheticElement(newId, op.symbolType, probeAt, w, h, { label: addedLabel, parentId: epCtx.ep.id, eventType: op.eventType });
-        const idOf = (role: string) => (role === "new" ? newId : role);
+        // The ids of what is about to be made, by role ("@start" … — see epAdd.ts for why they carry an @), and a
+        // stand-in for each so every flow is checked for legality BEFORE anything moves.
+        const roleIds: Record<string, string> = { "@new": newId, "@start": nanoid(), "@end": nanoid() };
+        const idOf = (role: string) => roleIds[role] ?? role;
         const ends = new Map<string, DiagramElement>(els.map((e) => [e.id, e] as const));
         ends.set(newId, probe);
+        for (const item of plan.add) {
+          if (item.role === "new") continue;
+          const sym = item.symbol === "new" ? op.symbolType : item.symbol;
+          const { w: sw, h: sh } = sizeOf(sym);
+          ends.set(roleIds[`@${item.role}`], syntheticElement(roleIds[`@${item.role}`], sym, item.centre, sw, sh, { parentId: epCtx.ep.id }));
+        }
         const illegal = plan.joins.find((j) => {
           const f = ends.get(idOf(j.from)), t = ends.get(idOf(j.to));
           return !!f && !!t && !canConnect(f, t, "sequence", withAdded(els, probe));
@@ -558,10 +568,8 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
           insertSpace(markerX, 0, dx, 0, scopeId);
           if (next) els = next.elements;
         }
-        const ids: Record<string, string> = { new: newId };
         for (const item of plan.add) {
-          const id = item.role === "new" ? newId : nanoid();
-          ids[item.role] = id;
+          const id = roleIds[`@${item.role}`];
           const symbol = item.symbol === "new" ? op.symbolType : item.symbol;
           const { w: iw, h: ih } = sizeOf(symbol);
           addElementGated(symbol, item.centre, undefined, item.role === "new" ? op.eventType : undefined, id, { parentId: epCtx.ep.id });
@@ -572,7 +580,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
           els = withAdded(els, syntheticElement(id, symbol, item.centre, iw, ih, { label: item.role === "new" ? addedLabel : undefined, parentId: epCtx.ep.id, eventType: item.role === "new" ? op.eventType : undefined }));
         }
         for (const cid of plan.remove) deleteConnector(cid);
-        for (const j of plan.joins) addConnector(ids[j.from] ?? j.from, ids[j.to] ?? j.to, "sequence", "directed", "rectilinear", "right", "left");
+        for (const j of plan.joins) addConnector(idOf(j.from), idOf(j.to), "sequence", "directed", "rectilinear", "right", "left");
         if (els.some((e) => e.type === "pool" && e.x + e.width < probeAt.x + w / 2 + 40)) extendPools();
         voiceLastId.current = newId;
         setSelectedElementIds(new Set([newId]));
@@ -2057,13 +2065,17 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       const spot = placeBoundaryEvent(host, existing);
       if (!spot) { results.push(`no room for another boundary event on ${nameOf(host)}`); anyFail = true; continue; }
       const newId = nanoid();
-      addElementGated("intermediate-event", spot, undefined, op.eventType, newId);
+      // The trigger: the one SAID wins; otherwise the NAME's wording decides (boundaryEventPhrase.ts, Paul 2026-10-02).
+      const said = op.eventType && op.eventType !== "none" ? op.eventType : undefined;
+      const inferred = said ? undefined : inferBoundaryTrigger(op.label);
+      const trigger = said ?? inferred;
+      addElementGated("intermediate-event", spot, undefined, trigger, newId);
       setEventBoundary(newId, host.id);
       if (op.nonInterrupting) updateProperties(newId, { interruptionType: "non-interrupting" });
       if (op.label) updateLabel(newId, op.label);
       voiceLastId.current = newId;
       setSelectedElementIds(new Set([newId]));
-      results.push(`added boundary event${op.label ? ` ${op.label}` : ""} on ${nameOf(host)}`);
+      results.push(`added boundary event${op.label ? ` ${op.label}` : ""} on ${nameOf(host)}${inferred ? ` — ${/^[aeiou]/i.test(inferred) ? "an" : "a"} ${inferred} event, read from its name` : ""}`);
       continue;
     }
 
