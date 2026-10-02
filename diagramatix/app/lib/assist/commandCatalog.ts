@@ -25,7 +25,9 @@ export const COMMAND_CATALOG: CatalogFamily[] = [
   // Underwriters, Lane 2), Customer above it, Claims System below.
   { family: "Elements & flow", items: [
     { does: "Add an element — after another it goes into that one's outgoing flow, when it has just one; otherwise it is joined on", say: ["add a task called Approve Claim after Review Claim", "add a decision", "insert a parallel gateway after Check Coverage", "add an end event called Done after Pay Claim"] },
+    { does: "Add inside an expanded subprocess — with one selected or under the cursor, the first step goes between a new Start and End; later ones follow the last step (or the step you select or point at). The subprocess widens and the rest of its lane moves right", say: ["add a task called Check Stock", "add a gateway called Stock OK", "add a subprocess called Inspect"] },
     { does: "Insert between two steps — spliced into the flow from the first to the second; with no room, everything after the first step in its pool moves right. Not connected? It joins them. With a connector selected, “insert a task” goes into it; “add” or “insert a task after X” goes into X's outgoing flow when it has just one", say: ["insert a task called Assess Risk between Review Claim and Check Claim", "insert a subprocess called Investigate between Subprocess 3 and Check Coverage"] },
+    { does: "Reverse a connector — select it first, and its arrow points the other way", say: ["reverse this"] },
     { does: "Connect / disconnect", say: ["connect Check Coverage to Pay Claim", "connect them", "disconnect Review Claim from Check Claim"] },
     { does: "Rename", say: ["rename the gateway to Approved?", "rename Lane 3 to Claims Support", "rename Task 1 to Review Email"] },
     { does: "Spell a name the recogniser keeps mishearing — letters are never misheard as a word; the capital is added for you", say: ["rename Lane 3 to F I N A N C E"] },
@@ -92,7 +94,7 @@ export const COMMAND_CATALOG: CatalogFamily[] = [
     { does: "Swap two pools", say: ["swap Customer with Claims System", "swap the selected pools"] },
   ] },
   { family: "Diagram", items: [
-    { does: "Undo, repeat, clear, export", say: ["undo that", "again", "clear the diagram", "export the diagram to JSON"] },
+    { does: "Undo, repeat, clear, export", say: ["undo that", "again", "clear the diagram", "start over", "new diagram", "export the diagram to JSON"] },
   ] },
   { family: "Voice", items: [
     { does: "Stop listening — always; a numbered pick or a parked question ends with it", say: ["stop", "stop listening", "that's enough"], voice: true },

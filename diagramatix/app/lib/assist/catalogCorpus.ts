@@ -103,6 +103,11 @@ const GATEWAY_POINTS = "needs a selected gateway with flows on those points — 
  * Notification end event, cust Customer, sys Claims System.
  */
 export const CATALOG_CONTEXT: Readonly<Record<string, CatalogContext>> = {
+  // Add inside an expanded subprocess (Paul, 2026-10-02): with none selected or under the cursor these are ordinary adds.
+  "add a task called Check Stock": { parseOnly: "needs an expanded subprocess selected or under the cursor — the test diagram has none, so on it this is an ordinary add" },
+  "add a gateway called Stock OK": { parseOnly: "needs an expanded subprocess selected or under the cursor — the test diagram has none, so on it this is an ordinary add" },
+  "add a subprocess called Inspect": { parseOnly: "needs an expanded subprocess selected or under the cursor — the test diagram has none, so on it this is an ordinary add" },
+  "reverse this": { parseOnly: "needs a connector selected — the test diagram's selection stand-in holds elements, not connectors" },
   "connect them": { parseOnly: "means the last two elements added this session — the test diagram has no history" },
   "move these right": { needsSelection: ["t4", "t5"] },
   "move the selected task two steps up": { needsSelection: ["t4"] },

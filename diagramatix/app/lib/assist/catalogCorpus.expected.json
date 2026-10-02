@@ -30,6 +30,27 @@
       "afterRef": "Pay Claim"
     }
   ],
+  "add a task called Check Stock": [
+    {
+      "op": "add",
+      "symbolType": "task",
+      "label": "Check Stock"
+    }
+  ],
+  "add a gateway called Stock OK": [
+    {
+      "op": "add",
+      "symbolType": "gateway",
+      "label": "Stock OK"
+    }
+  ],
+  "add a subprocess called Inspect": [
+    {
+      "op": "add",
+      "symbolType": "subprocess",
+      "label": "Inspect"
+    }
+  ],
   "insert a task called Assess Risk between Review Claim and Check Claim": [
     {
       "op": "insertBetween",
@@ -46,6 +67,11 @@
       "afterRef": "Subprocess 3",
       "beforeRef": "Check Coverage",
       "label": "Investigate"
+    }
+  ],
+  "reverse this": [
+    {
+      "op": "reverseConnector"
     }
   ],
   "connect Check Coverage to Pay Claim": [
@@ -1042,6 +1068,16 @@
     }
   ],
   "clear the diagram": [
+    {
+      "op": "clear"
+    }
+  ],
+  "start over": [
+    {
+      "op": "clear"
+    }
+  ],
+  "new diagram": [
     {
       "op": "clear"
     }

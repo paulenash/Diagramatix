@@ -64,7 +64,7 @@ export const DEFAULT_PATTERNS = `# Voice Assist command tree — what can be sai
 (connect|link|join) (<existing_element_name>|<existing_label_name>|<target>) (to|with|into) (<existing_element_name>|<existing_label_name>|<target>)
 (connect|link|join) (them|these|those) [up]
 (disconnect|unlink) (<existing_element_name>|<existing_label_name>|<target>) (from|to|and) (<existing_element_name>|<existing_label_name>|<target>)
-(reverse|flip) [this|that|it|selected|the connector]
+(reverse|flip) [(this|that|it|selected|the connector)]
 
 # ── Deleting
 (delete|remove|erase|drop) [the] (<existing_element_name>|<existing_label_name>|<target>) [and (compact|compress|tidy up|close the gap)]

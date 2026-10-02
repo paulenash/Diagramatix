@@ -26,6 +26,7 @@ import { COMMAND_CATALOG, SUPERADMIN_COMMAND_CATALOG } from "@/app/lib/assist/co
 import { generateCases } from "@/app/lib/assist/commandGenerator";
 import frozenKey from "@/app/lib/assist/catalogCorpus.expected.json";
 import { startDictation, type DictationHandle } from "@/app/lib/dictation";
+import { summariesByFirstWord } from "@/app/lib/assist/commandTree/summaries";
 import { describeResult, type DescribedResult } from "@/app/lib/assist/describeResult";
 import { EMPTY_UTTERANCE, heardForHelp, onFinal, onQuiet, type Utterance } from "@/app/lib/assist/commandTree/heard";
 import { diagramKeyterms } from "@/app/lib/dictation/diagramKeyterms";
@@ -288,7 +289,7 @@ function Editor({ data, busy, onSwitch, onRepair, onSave, onReset }: {
         </div>
       </Section>
 
-      <Summary tree={tree} />
+      <Summary tree={tree} patterns={patterns} lists={data.lists} />
       <TryIt tree={tree} />
       <CheckAgainstParser tree={tree} />
     </div>
@@ -346,9 +347,11 @@ function ConventionRow({ c, onChange, onRemove }: { c: SlotDef; onChange: (c: Sl
   );
 }
 
-function Summary({ tree }: { tree: ReturnType<typeof compileTree> }) {
+function Summary({ tree, patterns, lists }: { tree: ReturnType<typeof compileTree>; patterns: string; lists: Lists }) {
   const [ghost, setGhost] = useState(false);
   const rows = useMemo(() => tree.summary({ ghost }), [tree, ghost]);
+  // What each first word DOES on the diagram — taken from the Commands card, so there is no second list to go stale.
+  const does = useMemo(() => summariesByFirstWord([...COMMAND_CATALOG, ...SUPERADMIN_COMMAND_CATALOG], patterns, lists), [patterns, lists]);
   return (
     <Section title="5. Next words — generated from the patterns above">
       <label className="flex items-center gap-2 text-xs text-gray-700 mb-3">
@@ -360,12 +363,25 @@ function Summary({ tree }: { tree: ReturnType<typeof compileTree> }) {
         <span className="text-gray-700">{formatNext(tree.firstWords({ ghost })).join(", ")}</span>
       </div>
       <table className="w-full text-xs border-collapse">
-        <thead><tr className="text-left text-gray-500"><th className="py-1 pr-3 w-28">Say</th><th className="py-1">Then, next</th></tr></thead>
+        <thead><tr className="text-left text-gray-500"><th className="py-1 pr-3 w-28">Say</th><th className="py-1 pr-3">Then, next</th><th className="py-1 w-[26rem]">What happens on the diagram</th></tr></thead>
         <tbody>
           {rows.map((r) => (
             <tr key={r.word} className="border-t border-gray-100 align-top">
               <td className="py-1 pr-3 font-mono text-gray-900">{r.word}</td>
-              <td className="py-1 text-gray-700">{r.next.length ? formatNext(r.next).join(", ") : <em className="text-gray-400">(a complete command on its own)</em>}</td>
+              <td className="py-1 pr-3 text-gray-700">{r.next.length ? formatNext(r.next).join(", ") : <em className="text-gray-400">(a complete command on its own)</em>}</td>
+              <td className="py-1 text-gray-700">
+                {(() => {
+                  const all = does.get(r.word.toLowerCase()) ?? [];
+                  if (!all.length) return <em className="text-gray-400">—</em>;
+                  const shown = all.slice(0, 3);
+                  return (
+                    <div title={all.join("; ")}>
+                      {shown.map((t, i) => <div key={i}>{t}</div>)}
+                      {all.length > shown.length && <div className="text-gray-400">…and {all.length - shown.length} more (hover)</div>}
+                    </div>
+                  );
+                })()}
+              </td>
             </tr>
           ))}
         </tbody>

@@ -31,7 +31,8 @@ import { planWrapInSubprocess, planUnwrapSubprocess, planWrapInContainer } from 
 import { canConnect, messageFlowRefusal } from "@/app/lib/diagram/canConnect";
 import { isBoundaryHost } from "@/app/lib/diagram/boundaryHosts";
 import { resolveRef, resolveSelectionRefs, isSelectionRef, nearestRefs, ID_REF_PREFIX, spokenNumbersAsDigits } from "./resolveRef";
-import { isPointerElementRef } from "./pointerRef";
+import { isPointerElementRef, elementUnderPointer } from "./pointerRef";
+import { epTarget, planAddInsideEp, EP_ADDABLE } from "@/app/lib/diagram/epAdd";
 import { nextContainerLabels } from "@/app/lib/diagram/containerNames";
 import { isAnyLane, isSublane, laneKindWord, sameKindAs } from "@/app/lib/diagram/laneKind";
 import { LANE_EXPAND_STEP } from "@/app/lib/diagram/laneFit";
@@ -520,6 +521,65 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
 
     if (op.op === "add") {
       const { w, h } = sizeOf(op.symbolType);
+      // ADD INSIDE AN EXPANDED SUBPROCESS (Paul, 2026-10-02). With an EP selected or under the cursor — or an
+      // element inside one — an ordinary "add a task called X" goes INSIDE it: the first one between a new Start
+      // and End, later ones after the last step (or after the selected / hovered step), the EP widening and the
+      // rest of its lane moving across. Where and what to join is epAdd.ts; this carries it out. "insert", "after
+      // X" and "here" are untouched, and so is every add with no EP in play.
+      const epCtx = !op.afterRef && op.at !== "pointer" && !op.insert
+        ? epTarget(els, selectedIds, elementUnderPointer(pointerWorld.current, els)) : null;
+      if (epCtx) {
+        if (!EP_ADDABLE.has(op.symbolType)) {
+          results.push(`a ${op.symbolType.replace(/-/g, " ")} can't be added inside ${nameOf(epCtx.ep)} that way — its Start and End are made for you when you add the first step`);
+          anyFail = true; continue;
+        }
+        const plan = planAddInsideEp(els, data.connectors, epCtx.ep, epCtx.anchor, { w, h }, sizeOf("start-event").w);
+        if ("error" in plan) { results.push(plan.error); anyFail = true; continue; }
+        const newId = nanoid();
+        const addedLabel = op.label && needsCapital(op.symbolType) ? capitaliseFirstWord(op.label) : op.label;
+        // Legal before anything moves: a refusal changes nothing.
+        const probeAt = plan.add.find((a) => a.role === "new")!.centre;
+        const probe = syntheticElement(newId, op.symbolType, probeAt, w, h, { label: addedLabel, parentId: epCtx.ep.id, eventType: op.eventType });
+        const idOf = (role: string) => (role === "new" ? newId : role);
+        const ends = new Map<string, DiagramElement>(els.map((e) => [e.id, e] as const));
+        ends.set(newId, probe);
+        const illegal = plan.joins.find((j) => {
+          const f = ends.get(idOf(j.from)), t = ends.get(idOf(j.to));
+          return !!f && !!t && !canConnect(f, t, "sequence", withAdded(els, probe));
+        });
+        if (illegal) {
+          const f = ends.get(idOf(illegal.from)), t = ends.get(idOf(illegal.to));
+          results.push(`can't add a ${op.symbolType.replace(/-/g, " ")} there — a sequence flow from ${f ? nameOf(f) : "it"} to ${t ? nameOf(t) : "it"} isn’t legal`);
+          anyFail = true; continue;
+        }
+        if (plan.shift) {
+          const { markerX, dx, scopeId } = plan.shift;
+          const next = preview({ type: "INSERT_SPACE", payload: { markerX, markerY: 0, dx, dy: 0, scopeId } });
+          insertSpace(markerX, 0, dx, 0, scopeId);
+          if (next) els = next.elements;
+        }
+        const ids: Record<string, string> = { new: newId };
+        for (const item of plan.add) {
+          const id = item.role === "new" ? newId : nanoid();
+          ids[item.role] = id;
+          const symbol = item.symbol === "new" ? op.symbolType : item.symbol;
+          const { w: iw, h: ih } = sizeOf(symbol);
+          addElementGated(symbol, item.centre, undefined, item.role === "new" ? op.eventType : undefined, id, { parentId: epCtx.ep.id });
+          if (item.role === "new") {
+            if (op.gatewayType) updateProperties(id, { gatewayType: op.gatewayType });
+            if (addedLabel) updateLabel(id, addedLabel);
+          }
+          els = withAdded(els, syntheticElement(id, symbol, item.centre, iw, ih, { label: item.role === "new" ? addedLabel : undefined, parentId: epCtx.ep.id, eventType: item.role === "new" ? op.eventType : undefined }));
+        }
+        for (const cid of plan.remove) deleteConnector(cid);
+        for (const j of plan.joins) addConnector(ids[j.from] ?? j.from, ids[j.to] ?? j.to, "sequence", "directed", "rectilinear", "right", "left");
+        if (els.some((e) => e.type === "pool" && e.x + e.width < probeAt.x + w / 2 + 40)) extendPools();
+        voiceLastId.current = newId;
+        setSelectedElementIds(new Set([newId]));
+        setSelectedConnectorId(null);
+        results.push(`${plan.summary.replace(/^added it /, `added ${addedLabel ?? `a ${op.symbolType.replace(/-/g, " ")}`} `)}`);
+        continue;
+      }
       let anchor: DiagramElement | null = null;
       // A NAMED ANCHOR THAT DOES NOT RESOLVE STOPS THE COMMAND.
       //
