@@ -86,6 +86,7 @@ import { selectedKinds as selectedKindsOf } from "@/app/lib/assist/commandTree/k
 import { elementUnderPointer, hoverConnectorAt } from "@/app/lib/assist/pointerRef";
 import { PropertiesPanel } from "@/app/components/canvas/PropertiesPanel";
 import { captureTemplate, instantiateTemplate } from "@/app/lib/diagram/templates";
+import { buildCollapsedEpDiagram, movedIdsForCollapse } from "@/app/lib/diagram/epToDiagram";
 import { resolvePackageNameLink } from "@/app/lib/diagram/packageLink";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { SimulatorOverlay } from "@/app/components/simulation/SimulatorOverlay";
@@ -2438,6 +2439,7 @@ export function DiagramEditor({
   } = useVoiceSession({
     repairCommandRef,
     debugAllowed: isActingAdmin,
+    collapseEpToDiagram: (epId: string) => doCollapseEpToSubprocess(epId),
     addConnector, addElementGated, addLaneAt, addPool, alignElements, beginHistoryGroup, beginLabelEdit,
     cancelLabelEdit, clearDiagram, compressLane, compressPool, connectorsRef, convertTaskSubprocess, data,
     deleteConnector, reverseConnector, deleteElement, diagramColorConfig, diagramId, diagramName, diagramType, displayMode,
@@ -3528,46 +3530,23 @@ export function DiagramEditor({
     // Mirror the reducer's partition so the sub-diagram payload matches what
     // the canvas removes: everything under the EP EXCEPT boundary
     // Intermediate events (which stay on the collapsed box).
-    const desc = new Set<string>();
-    {
-      const queue = [epId];
-      while (queue.length) {
-        const cur = queue.shift()!;
-        for (const e of data.elements) {
-          if ((e.parentId === cur || e.boundaryHostId === cur) && !desc.has(e.id)) {
-            desc.add(e.id);
-            queue.push(e.id);
-          }
-        }
-      }
-    }
-    const byId = new Map(data.elements.map((e) => [e.id, e]));
-    const moved = new Set<string>(
-      [...desc].filter((d) => {
-        const e = byId.get(d);
-        return !(e && e.boundaryHostId === epId && e.type === "intermediate-event");
-      }),
-    );
+    // What moves, and what the new diagram holds (epToDiagram.ts): one white-box pool with the default name and no
+    // lanes, the Event EPs stacked down its left, everything else to their right (Paul, 2026-10-03).
+    const moved = movedIdsForCollapse(data.elements, epId);
 
     setEpCollapseBusyId(epId);
     try {
       let linkedId: string | null = null;
       if (moved.size > 0) {
-        // Capture the moved interior as a self-contained, origin-normalised
-        // diagram payload (same helper the template feature uses).
-        const captured = captureTemplate(data.elements, data.connectors, moved);
-        const subData = {
-          ...data,
-          elements: captured.elements,
-          connectors: captured.connectors,
-          viewport: { x: 0, y: 0, zoom: 1 },
-        };
+        const subData = buildCollapsedEpDiagram(data, epId)!;
+        // The EP's name, made unique in the project with " (n)" by the server.
         const name = (ep.label && ep.label.trim()) || "Subprocess";
         const res = await fetch("/api/diagrams", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             name,
+            uniqueName: true,
             type: "bpmn",
             projectId: projectId ?? undefined,
             data: subData,

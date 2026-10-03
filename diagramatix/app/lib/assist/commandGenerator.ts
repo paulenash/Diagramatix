@@ -942,6 +942,7 @@ export const NOT_GENERATED: Record<string, string> = {
   wrapInSubprocess: "needs a selection with exactly one flow in and one out",
   wrapInContainer: "the AI-coerced form of wrapInPool; reached through it, not directly",
   unwrapSubprocess: "needs an expanded subprocess selected",
+  collapseToDiagram: "needs an expanded subprocess selected AND the server (it creates a new diagram) — covered by voice-collapse-to-diagram.test.ts",
   setInterruption: "needs a start or intermediate event selected (or under the cursor)",
   labelSelected: "needs a connector or one element selected",
   moveLabel: "needs a selected item with a label",

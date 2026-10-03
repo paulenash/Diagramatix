@@ -626,6 +626,16 @@
       "label": "Sales"
     }
   ],
+  "collapse this subprocess to a new diagram": [
+    {
+      "op": "collapseToDiagram"
+    }
+  ],
+  "move this into a new diagram": [
+    {
+      "op": "collapseToDiagram"
+    }
+  ],
   "unwrap the selected subprocess": [
     {
       "op": "unwrapSubprocess"

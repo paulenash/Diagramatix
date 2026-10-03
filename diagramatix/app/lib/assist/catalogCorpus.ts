@@ -159,6 +159,8 @@ export const CATALOG_CONTEXT: Readonly<Record<string, CatalogContext>> = {
   "put a pool around the selected elements called Sales": { parseOnly: NOTHING_LOOSE },
   "unwrap the selected subprocess": { parseOnly: NO_EP },
   "dissolve the EP": { parseOnly: NO_EP },
+  "collapse this subprocess to a new diagram": { parseOnly: "creates a new diagram on the server — covered by voice-collapse-to-diagram.test.ts" },
+  "move this into a new diagram": { parseOnly: "creates a new diagram on the server — covered by voice-collapse-to-diagram.test.ts" },
   "delete selected": { needsSelection: ["t5"] },
   "put a pool around everything": { parseOnly: NOTHING_LOOSE },
   "wrap everything in a pool": { parseOnly: NOTHING_LOOSE },

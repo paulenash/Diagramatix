@@ -72,6 +72,8 @@ export interface VoiceSessionHost extends Pick<AssistDiagramActions, "addConnect
   elementsRef: MutableRefObject<DiagramElement[]>;
   endHistoryGroup: () => void;
   handleExportJson: () => void | Promise<void>;
+  /** "collapse this subprocess to a new diagram" — creates the linked diagram on the server. Absent on the phone. */
+  collapseEpToDiagram?: (epId: string) => void | Promise<void>;
   nextStepRef: AssistApplyContext["refs"]["nextStepRef"];
   openTemplateWindowRef: AssistApplyContext["refs"]["openTemplateWindowRef"];
   riskCatalog: AssistApplyContext["riskCatalog"];
@@ -279,6 +281,7 @@ export function useVoiceSession(host: VoiceSessionHost) {
   // Stable ref to the JSON export (a plain function redefined each render) so
   // the memoised apply layer can call it without churning its deps.
   const exportJsonRef = useRef<(() => void) | null>(null);
+  const collapseEpRef = useRef<((epId: string) => void) | null>(null);
   // Voice Assist is always OFF when you open (or switch) a diagram — a live mic
   // should never be silently on when you arrive. Reset + stop on diagram change.
   //
@@ -431,7 +434,7 @@ export function useVoiceSession(host: VoiceSessionHost) {
         swapPools, resizeElement, resizeElementEnd, alignElements,
       },
       ui: { setSelectedElementIds, setSelectedConnectorId, setPickFlow, setRenameFlow, setMessageFlow, setDividerFlow, setGoldFlash },
-      refs: { voiceLastId, pointerWorld, selectedIdsRef, selectedConnectorIdRef: effectiveConnectorRef, nextStepRef, openTemplateWindowRef, exportJsonRef, boundaryLast: boundaryLastRef },
+      refs: { voiceLastId, pointerWorld, selectedIdsRef, selectedConnectorIdRef: effectiveConnectorRef, nextStepRef, openTemplateWindowRef, exportJsonRef, boundaryLast: boundaryLastRef, collapseEpRef },
     });
   }, [data.elements, data.connectors, data.poolFontSize, data.laneFontSize, data.connectorFontSize, data.relaxedLayout, riskCatalog, armDebugBefore, armGoldFlash, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, reverseConnector, updateConnectorLabel, deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool, wrapInSubprocess, wrapInContainer, unwrapSubprocess, addPool, addLaneAt, compressPool, compressLane, expandLane, extendPools, swapLane, moveLane, moveElements, elementsMoveEnd, removeSpace, insertSpace, convertTaskSubprocess, moveLaneBoundary, laneBoundaryMoveEnd, updateConnectorEndpoint, movePoolTo, swapPools, resizeElement, resizeElementEnd, alignElements, setRenameFlow, setMessageFlow, setPickFlow, setDividerFlow]);
 
@@ -1045,6 +1048,7 @@ export function useVoiceSession(host: VoiceSessionHost) {
     if (!voiceBusyRef.current && voiceQueueRef.current.length > 0) setVoiceDrainTick((n) => n + 1);
   }, [voiceDrainTick]);
   exportJsonRef.current = () => { void handleExportJson(); };
+  collapseEpRef.current = host.collapseEpToDiagram ? (epId) => { void host.collapseEpToDiagram!(epId); } : null;
 
   // Voice comes in as fragments (Deepgram finalises on every pause), so ONE
   // spoken command arrives as several onText calls. Buffer the fragments and

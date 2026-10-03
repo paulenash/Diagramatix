@@ -193,6 +193,8 @@ export interface AssistApplyContext {
     /** Opens the numbered window; `anchorId` — each pick goes after it, `at` — at that point. Returns the log line. */
     openTemplateWindowRef: MutableRefObject<(opts?: { anchorId?: string; at?: { x: number; y: number } }) => string>;
     exportJsonRef: MutableRefObject<(() => void) | null>;
+    /** Collapses an expanded subprocess into a NEW linked diagram (needs the server; absent where it cannot — the phone, tests). */
+    collapseEpRef?: MutableRefObject<((epId: string) => void) | null>;
     /** The last lane-boundary / pool-edge command and how far it has moved — its follow-up ("sixty pixels") reads it (boundaryFollowUp.ts). Written. */
     boundaryLast?: MutableRefObject<BoundaryMemory | null>;
   };
@@ -1160,6 +1162,26 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       }
       if (eps.length !== 1) { results.push(eps.length ? "select just the one expanded subprocess" : "select or point at the expanded subprocess first"); anyFail = true; continue; }
       if (!unwrapEp(eps[0])) anyFail = true;
+      continue;
+    }
+    // "Collapse this subprocess to a new diagram" (Paul, 2026-10-03): the selected EP, or the one under the cursor (or the
+    // one round what is under it), moves into a NEW linked diagram. The server creates it, so this only starts it; the
+    // question ("…?") was asked and answered before the op ran. Undo restores the EP and drops the link — the new
+    // diagram stays.
+    if (op.op === "collapseToDiagram") {
+      const eps = selectedIds.map((id) => els.find((x) => x.id === id)).filter((x): x is DiagramElement => !!x && x.type === "subprocess-expanded");
+      if (selectedIds.length === 0) {
+        let under: DiagramElement | undefined | null = elementUnderPointer(pointerWorld.current, els);
+        for (let i = 0; under && under.type !== "subprocess-expanded" && i < 8; i++) under = under.parentId ? els.find((x) => x.id === under!.parentId) : null;
+        if (under && under.type === "subprocess-expanded") eps.push(under);
+      }
+      if (eps.length !== 1) { results.push(eps.length ? "select just the one expanded subprocess" : "select or point at the expanded subprocess first"); anyFail = true; continue; }
+      const collapse = ctx.refs.collapseEpRef?.current;
+      if (!collapse) { results.push("collapsing to a new diagram is not available here"); anyFail = true; continue; }
+      if (!els.some((x) => x.parentId === eps[0].id || x.boundaryHostId === eps[0].id)) { results.push(`${nameOf(eps[0])} is empty — there is nothing to move into a new diagram`); anyFail = true; continue; }
+      collapse(eps[0].id);
+      voiceLastId.current = eps[0].id;
+      results.push(`collapsing ${nameOf(eps[0])} into a new linked diagram`);
       continue;
     }
     // Reorder the pool stack (Paul, 2026-09-18). Planned first so a refusal

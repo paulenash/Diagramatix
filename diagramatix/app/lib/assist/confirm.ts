@@ -55,6 +55,13 @@ export function needsConfirmation(
       const pick = connectorsForDelete(op.kind, connectors.all, selectedIds ?? [], connectors.selectedId);
       if (pick.scope === "selected elements" && pick.connectors.length > 1) return { what: deleteConnectorsQuestion(op.kind, pick.connectors.length, pick.scope) };
     }
+    // Collapsing to a new diagram creates a diagram on the server and moves a whole flow into it, so it asks first.
+    // The name is given when the selection says which one; a hovered one is named by the answer's own run.
+    if (op.op === "collapseToDiagram") {
+      const eps = (selectedIds ?? []).map((id) => elements.find((x) => x.id === id)).filter((x): x is DiagramElement => !!x && x.type === "subprocess-expanded");
+      const name = eps.length === 1 ? eps[0].label?.trim() : "";
+      return { what: `collapse ${name ? `“${name}”` : "the expanded subprocess"} into a new linked diagram` };
+    }
     if (op.op === "clear") {
       return elements.length ? { what: `clear the whole diagram (${plural(elements.length, "element")})` } : null;
     }

@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { EMPTY_DIAGRAM } from "@/app/lib/diagram/types";
 import { validateDiagramData } from "@/app/lib/diagram/validateDiagram";
+import { uniqueDiagramName } from "@/app/lib/diagram/epToDiagram";
 import { getEffectiveUserId, isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { gateLimit } from "@/app/lib/subscription-route";
 import {
@@ -166,10 +167,17 @@ export async function POST(req: Request) {
     }
   }
 
+  // `uniqueName`: a name already used in the project becomes "Name (2)", "Name (3)" … (collapse-to-diagram, 2026-10-03).
+  let finalName: string = name.trim();
+  if (body.uniqueName === true && projectId) {
+    const existing = await prisma.diagram.findMany({ where: { projectId }, select: { name: true } });
+    finalName = uniqueDiagramName(finalName, existing.map((d) => d.name));
+  }
+
   void validateDiagramData(seededData, { route: "POST /api/diagrams", mode: "log" });
   const diagram = await prisma.diagram.create({
     data: {
-      name: name.trim(),
+      name: finalName,
       type,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       data: seededData as any,

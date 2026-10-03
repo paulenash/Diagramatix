@@ -858,6 +858,13 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     if (u) return [{ op: "unwrapSubprocess" }];
   }
 
+  // ── Collapse an expanded subprocess into a NEW linked diagram (the right-click "Collapse to Subprocess…", by voice).
+  // Always means THIS one — the selected or hovered expanded subprocess. "collapse" alone is not enough (it is also a
+  // compress word); the diagram has to be named: "… to a new diagram", "… into its own diagram", "move this into a new diagram". ──
+  if (/^(?:collapse|move|convert|turn|put|extract|push|send)\s+(?:the\s+|this\s+|that\s+)?(?:selected\s+)?(?:(?:expanded\s+)?sub-?\s?process|ep|it|this|that)?\s*(?:(?:in)?to|as|in)\s+(?:a\s+)?(?:new|linked|its\s+own|separate|child|sub)[\s-]*(?:diagram|process\s+diagram)$/i.test(raw)) {
+    return [{ op: "collapseToDiagram" }];
+  }
+
   // ── Delete (+ optional compact) ──
   m = raw.match(/^(?:delete|remove|get rid of|drop|erase)\s+(.+)$/i);
   if (m) {
