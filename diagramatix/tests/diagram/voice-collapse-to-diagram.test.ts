@@ -160,6 +160,33 @@ describe("T5224 “called <new diagram name>”, the Help popup, the back-link m
   });
 });
 
+describe("T5224 a collapse command said in pieces is ONE command (Paul's capture, 2026-10-03)", () => {
+  it("the front, the middle and the name-less whole are held; other collapse / compress / move commands are not", async () => {
+    const { isIncompleteCommand } = await import("@/app/lib/assist/incompleteCommand");
+    for (const s of ["collapse this", "Collapse selected.", "collapse the selected subprocess", "collapse this expanded subprocess into a new",
+      "collapse this subprocess to a linked", "move this into its own", "collapse this subprocess to a new diagram"]) expect(isIncompleteCommand(s), s).toBe(true);
+    for (const s of ["compress this", "shrink selected", "move this left", "collapse this subprocess to a new diagram called Seven"]) expect(isIncompleteCommand(s), s).toBe(false);
+  });
+  it("Paul's three fragments stitch into one command that parses to collapseToDiagram with the name", async () => {
+    const { stitchFinals } = await import("@/app/lib/assist/fragmentBuffer");
+    const out = stitchFinals([
+      { text: "collapse this", atMs: 1000 },
+      { text: "expanded subprocess into a new", atMs: 6000 },
+      { text: "diagram called this is new diagram seven", atMs: 9000 },
+    ], 13000);
+    expect(out).toEqual(["collapse this expanded subprocess into a new diagram called this is new diagram seven"]);
+    expect(parseCommand(out[0])).toEqual([{ op: "collapseToDiagram", label: "this is new diagram seven" }]);
+  });
+  it("and the name arriving after a pause on “… a new diagram” joins too", async () => {
+    const { stitchFinals } = await import("@/app/lib/assist/fragmentBuffer");
+    const out = stitchFinals([
+      { text: "collapse this subprocess to a new diagram", atMs: 1000 },
+      { text: "called Seven", atMs: 4200 },
+    ], 8000);
+    expect(out).toHaveLength(1);
+  });
+});
+
 describe("T5224 by voice", () => {
   it("the words parse to collapseToDiagram", () => {
     for (const s of ["collapse this subprocess to a new diagram", "Collapse this expanded subprocess into a new diagram", "move this into a new diagram",

@@ -14,6 +14,7 @@ import { hasCommandAfterName, COMPRESS_VERB_SOURCE, EXPAND_VERBS } from "./comma
 import { parseCompressPhrase, parseExpandPhrase } from "./compressPhrase";
 import { PARTICIPANT_WORDS, BOX_WORDS, MESSAGE_WORDS, wordAlternation } from "./containerWords";
 import { parseBoundaryEventPhrase } from "./boundaryEventPhrase";
+import { COLLAPSE_TO_DIAGRAM_RE } from "./collapsePhrase";
 import { MESSAGE_VERB, MESSAGE_BY_NUMBER, MESSAGE_BY_NUMBER_FROM_SELECTION, ADD_MESSAGE_LEAD } from "./messagePhrase";
 import { capitaliseFirstWord, digitsAfterKindWord } from "../diagram/nameCase";
 import { convertMatches } from "./convertPhrase";
@@ -862,7 +863,7 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   // Always means THIS one — the selected or hovered expanded subprocess. "collapse" alone is not enough (it is also a
   // compress word); the diagram has to be named: "… to a new diagram", "… into its own diagram", "move this into a new diagram". ──
   // Optionally "… called <new diagram name>" (also "named").
-  const collapseDiagram = raw.match(/^(?:collapse|move|convert|turn|put|extract|push|send)\s+(?:the\s+|this\s+|that\s+)?(?:selected\s+)?(?:(?:expanded\s+)?sub-?\s?process|ep|it|this|that)?\s*(?:(?:in)?to|as|in)\s+(?:a\s+)?(?:new|linked|its\s+own|separate|child|sub)[\s-]*(?:diagram|process\s+diagram)(?:\s+(?:called|named)\s+(.+))?$/i);
+  const collapseDiagram = raw.match(COLLAPSE_TO_DIAGRAM_RE);
   if (collapseDiagram) {
     const label = collapseDiagram[1] ? clean(collapseDiagram[1]) : "";
     return [{ op: "collapseToDiagram", ...(label ? { label } : {}) }];

@@ -17,6 +17,7 @@ import { ADD_MESSAGE_LEAD, MESSAGE_BY_NUMBER, MESSAGE_BY_NUMBER_FROM_SELECTION }
 import { COMPRESS_KIND_WORDS, EXPAND_KIND_WORDS } from "./compressPhrase";
 import { wordAlternation } from "./containerWords";
 import { DIVIDER_COMMAND_RE } from "./dividerFlow";
+import { isCollapsePhraseInProgress } from "./collapsePhrase";
 
 const VERBS = new RegExp(`^(?:${COMMAND_VERBS.join("|")})$`);
 /**
@@ -55,6 +56,10 @@ export function isIncompleteCommand(text: string): boolean {
   // On its own it means nothing, and handed to the AI it becomes "add a pool
   // called X" — a whole new element nobody asked for.
   if (/^(?:called|named|labell?ed)\b/.test(t)) return true;
+  // "Collapse this" … "expanded subprocess into a new" … "diagram called Seven" (Paul's capture, 2026-10-03: three
+  // fragments, the first ran as a compress). The front, the middle and the name-less whole of the collapse-to-diagram
+  // phrase wait for the rest — the words live in collapsePhrase.ts, shared with the parser.
+  if (isCollapsePhraseInProgress(t)) return true;
   // A bare verb — "Swap." "Rename." "Move." — is the start of something.
   if (VERBS.test(t) && !BARE_THIS_VERBS.test(t)) return true;
   // "Swap lanes." / "Swap lines." — the kind is said, the two names are a pause
