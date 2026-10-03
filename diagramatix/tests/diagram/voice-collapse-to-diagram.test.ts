@@ -64,18 +64,24 @@ describe("T5224 what goes into the new diagram", () => {
       expect(e.x + e.width).toBeLessThanOrEqual(box.x + box.width); expect(e.y + e.height).toBeLessThanOrEqual(box.y + box.height);
     }
   });
-  it("the Event EPs are stacked down the LEFT, in their original top-to-bottom order, left-justified", () => {
-    expect(get("evA").x).toBe(get("evB").x);
-    expect(get("evA").y).toBeLessThan(get("evB").y);
-    expect(get("evB").y).toBeGreaterThanOrEqual(get("evA").y + get("evA").height);
-    expect(get("evA").x).toBeLessThan(get("t").x);
-  });
-  it("what is in an Event EP moves with it, and the rest keeps its relative position to the right", () => {
-    expect(get("evAs").x - get("evA").x).toBe(670 - 650);
-    expect(get("evAs").y - get("evA").y).toBe(300 - 250);
-    expect(get("s").x).toBeGreaterThanOrEqual(get("evA").x + get("evA").width);
+  it("the main flow is laid out as if the Event EPs were not there — top left of the pool, relative positions kept", () => {
+    const flow = ["s", "t", "e"].map(get);
+    expect(Math.min(...flow.map((e) => e.y))).toBe(30);                 // PAD from the pool's top
     expect(get("t").x - get("s").x).toBe(420 - 340);
     expect(get("e").x - get("t").x).toBe(570 - 420);
+    expect(get("t").y - get("s").y).toBe(150 - 160);
+  });
+  it("the Event EPs are UNDER the main flow, one under another, left-justified, in their original order; the pool grew to hold them", () => {
+    const flowBottom = Math.max(...["s", "t", "e"].map(get).map((e) => e.y + e.height));
+    expect(get("evA").y).toBeGreaterThanOrEqual(flowBottom);
+    expect(get("evB").y).toBeGreaterThanOrEqual(get("evA").y + get("evA").height);
+    expect(get("evA").x).toBe(get("evB").x);
+    expect(get("evA").x).toBe(get("s").x);                             // left-justified with the flow
+    expect(pool.height).toBeGreaterThanOrEqual(get("evB").y + get("evB").height);
+  });
+  it("what is in an Event EP moves with it", () => {
+    expect(get("evAs").x - get("evA").x).toBe(670 - 650);
+    expect(get("evAs").y - get("evA").y).toBe(300 - 250);
   });
   it("the connector between them is kept; nothing else is invented", () => {
     expect(d.connectors).toHaveLength(1);
@@ -109,6 +115,48 @@ describe("T5224 the canvas side, and Undo", () => {
     expect(after.elements.length).toBeLessThan(snapshot.elements.length);
     expect(snapshot.elements.find((e: DiagramElement) => e.id === "EP").type).toBe("subprocess-expanded");
     expect(snapshot.elements.find((e: DiagramElement) => e.id === "EP").properties?.linkedDiagramId).toBeUndefined();
+  });
+});
+
+describe("T5224 “called <new diagram name>”, the Help popup, the back-link marker", () => {
+  it("“… called X” names the new diagram (title-cased), and is optional", () => {
+    expect(parseCommand("collapse this subprocess to a new diagram called handle error process")).toEqual([{ op: "collapseToDiagram", label: "handle error process" }]);
+    expect(parseCommand("move this into a new diagram named Cancel Order")).toEqual([{ op: "collapseToDiagram", label: "Cancel Order" }]);
+    expect(parseCommand("collapse this subprocess to a new diagram")).toEqual([{ op: "collapseToDiagram" }]);
+  });
+  it("the question and the hook carry the name", () => {
+    const ask = needsConfirmation([{ op: "collapseToDiagram", label: "Cancel Order" }], world().elements, null, ["EP"]);
+    expect(ask?.what).toMatch(/called “Cancel Order”/);
+    const h = headlessDiagram(world());
+    const ctx = h.context({ selectedIds: ["EP"] });
+    const seen: Array<[string, string | undefined]> = [];
+    ctx.refs.collapseEpRef = { current: (id: string, name?: string) => { seen.push([id, name]); } };
+    const r = applyAssistOps([{ op: "collapseToDiagram", label: "cancel order" }], ctx);
+    expect(r.ok, r.summary).toBe(true);
+    expect(seen).toEqual([["EP", "Cancel Order"]]);
+  });
+  it("the Help popup lists “collapse” as its own word when an expanded subprocess is selected", async () => {
+    const { resolveAssistHelp } = await import("@/app/lib/assist/commandTree");
+    const { computePanel } = await import("@/app/lib/assist/commandTree");
+    const tree = resolveAssistHelp({ patterns: null, conventions: null }).tree!;
+    const view = computePanel(tree, { interim: "", ghost: false, flow: null, selectedKinds: ["expanded-subprocess"] });
+    expect(view.groups?.map((g) => g.main)).toContain("collapse");
+    const next = computePanel(tree, { interim: "collapse this subprocess to a new diagram", ghost: false, flow: null, selectedKinds: ["expanded-subprocess"] });
+    expect(next.lines.join(" ")).toMatch(/called|named/);
+  });
+  it("the Start of an Event EP never carries the back-link marker", async () => {
+    const { findDrillBackAnchor } = await import("@/app/lib/diagram/drillBackAnchor");
+    const els = [
+      el("evB", "subprocess-expanded", 10, 10, 260, 140, "Cancelled", undefined, { subprocessType: "event" }),
+      el("evBs", "start-event", 30, 30, 36, 36, "Event occurs", "evB"),
+      el("s", "start-event", 400, 400, 36, 36),
+    ];
+    expect(findDrillBackAnchor(els, [], "bpmn")).toBe("s");
+  });
+  it("the back-link chevrons are drawn twice the size", async () => {
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync("app/components/canvas/SymbolRenderer.tsx", "utf8");
+    expect(src).toMatch(/translate\(\$\{element\.x - 2\},\$\{element\.y - 2\}\) scale\(2\)/);
   });
 });
 

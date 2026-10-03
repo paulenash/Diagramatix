@@ -3418,14 +3418,15 @@ function SymbolRendererInner({
           EPC case came to have no way back while BPMN did. */}
       {onDrillBack && !element.boundaryHostId && (
         <g
-          transform={`translate(${element.x - 2},${element.y - 2})`}
+          // TWICE the width and height it was (Paul, 2026-10-03) — scaled, with the line kept at 2 px (was 1.5).
+          transform={`translate(${element.x - 2},${element.y - 2}) scale(2)`}
           style={{ cursor: "pointer", pointerEvents: "all" }}
           onMouseDown={(e) => e.stopPropagation()}
           onDoubleClick={(e) => { e.stopPropagation(); onDrillBack(); }}
         >
           <rect x={-12} y={-4} width={16} height={14} fill="transparent" />
-          <path d="M0 4L-4 0L0 -4" fill="none" stroke="#2563eb" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-          <path d="M-4 4L-8 0L-4 -4" fill="none" stroke="#2563eb" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M0 4L-4 0L0 -4" fill="none" stroke="#2563eb" strokeWidth={1} strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M-4 4L-8 0L-4 -4" fill="none" stroke="#2563eb" strokeWidth={1} strokeLinecap="round" strokeLinejoin="round" />
         </g>
       )}
 

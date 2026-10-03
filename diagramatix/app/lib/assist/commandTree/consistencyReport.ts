@@ -98,6 +98,7 @@ export const DEFAULT_SAMPLE_FILL: Record<string, readonly string[]> = {
   existing_label_name: ["Payment Details"],
   new_element_name: ["Finance Review"],
   new_label_name: ["Approved"],
+  new_diagram_name: ["Handle Error Process"],
   number: ["3"],
   distance: ["100 pixels"],
   target: ["this", "the selected task"],

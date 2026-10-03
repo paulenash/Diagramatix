@@ -160,6 +160,7 @@ export const CATALOG_CONTEXT: Readonly<Record<string, CatalogContext>> = {
   "unwrap the selected subprocess": { parseOnly: NO_EP },
   "dissolve the EP": { parseOnly: NO_EP },
   "collapse this subprocess to a new diagram": { parseOnly: "creates a new diagram on the server — covered by voice-collapse-to-diagram.test.ts" },
+  "collapse this subprocess to a new diagram called Handle Error": { parseOnly: "creates a new diagram on the server — covered by voice-collapse-to-diagram.test.ts" },
   "move this into a new diagram": { parseOnly: "creates a new diagram on the server — covered by voice-collapse-to-diagram.test.ts" },
   "delete selected": { needsSelection: ["t5"] },
   "put a pool around everything": { parseOnly: NOTHING_LOOSE },

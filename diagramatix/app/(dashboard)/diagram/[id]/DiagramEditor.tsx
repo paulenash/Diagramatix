@@ -2439,7 +2439,7 @@ export function DiagramEditor({
   } = useVoiceSession({
     repairCommandRef,
     debugAllowed: isActingAdmin,
-    collapseEpToDiagram: (epId: string) => doCollapseEpToSubprocess(epId),
+    collapseEpToDiagram: (epId: string, diagramName?: string) => doCollapseEpToSubprocess(epId, diagramName),
     addConnector, addElementGated, addLaneAt, addPool, alignElements, beginHistoryGroup, beginLabelEdit,
     cancelLabelEdit, clearDiagram, compressLane, compressPool, connectorsRef, convertTaskSubprocess, data,
     deleteConnector, reverseConnector, deleteElement, diagramColorConfig, diagramId, diagramName, diagramType, displayMode,
@@ -3522,7 +3522,7 @@ export function DiagramEditor({
     setEpCollapseConfirmId(epId);
   }
 
-  async function doCollapseEpToSubprocess(epId: string) {
+  async function doCollapseEpToSubprocess(epId: string, diagramName?: string) {
     if (epCollapseBusyId) return;
     const ep = data.elements.find((e) => e.id === epId);
     if (!ep || ep.type !== "subprocess-expanded") return;
@@ -3540,7 +3540,7 @@ export function DiagramEditor({
       if (moved.size > 0) {
         const subData = buildCollapsedEpDiagram(data, epId)!;
         // The EP's name, made unique in the project with " (n)" by the server.
-        const name = (ep.label && ep.label.trim()) || "Subprocess";
+        const name = (diagramName && diagramName.trim()) || (ep.label && ep.label.trim()) || "Subprocess";
         const res = await fetch("/api/diagrams", {
           method: "POST",
           headers: { "Content-Type": "application/json" },

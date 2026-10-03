@@ -31,8 +31,18 @@ export function findDrillBackAnchor(
 
   // A notation with a dedicated start symbol says so outright. A boundary event
   // is mounted on something else and is never where a process begins.
+  // The Start of an EVENT expanded subprocess is not where the process begins (it begins when the event occurs), so
+  // it never carries the marker — with Event EPs laid out beside or under the flow, the top-left Start could be theirs.
+  const eventEpIds = new Set(els.filter((e) => e.type === "subprocess-expanded" && e.properties?.subprocessType === "event").map((e) => e.id));
+  const insideEventEp = (e: DiagramElement) => {
+    for (let p = e.parentId, i = 0; p && i < 12; i++) {
+      if (eventEpIds.has(p)) return true;
+      p = els.find((x) => x.id === p)?.parentId;
+    }
+    return false;
+  };
   const explicit = els
-    .filter((e) => (e.type === "start-event" || e.type === "initial-state") && !e.boundaryHostId)
+    .filter((e) => (e.type === "start-event" || e.type === "initial-state") && !e.boundaryHostId && !insideEventEp(e))
     .sort(byTopLeft);
   if (explicit.length) return explicit[0].id;
 

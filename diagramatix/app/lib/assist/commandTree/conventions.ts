@@ -64,6 +64,12 @@ export const DEFAULT_CONVENTIONS: Conventions = [
     example: "Finance Review",
   },
   {
+    name: "new_diagram_name",
+    kind: "free",
+    means: "What the user is about to name a NEW diagram (collapse a subprocess into one). Free speech; it ends the command. Left out, the diagram takes the subprocess's name.",
+    example: "Handle Error Process",
+  },
+  {
     name: "new_label_name",
     kind: "free",
     means: "What the user is about to name an event, message, connector, data object, data store or gateway. Free speech; it ends the command.",

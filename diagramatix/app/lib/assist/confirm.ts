@@ -60,7 +60,7 @@ export function needsConfirmation(
     if (op.op === "collapseToDiagram") {
       const eps = (selectedIds ?? []).map((id) => elements.find((x) => x.id === id)).filter((x): x is DiagramElement => !!x && x.type === "subprocess-expanded");
       const name = eps.length === 1 ? eps[0].label?.trim() : "";
-      return { what: `collapse ${name ? `“${name}”` : "the expanded subprocess"} into a new linked diagram` };
+      return { what: `collapse ${name ? `“${name}”` : "the expanded subprocess"} into a new linked diagram${op.label ? ` called “${op.label}”` : ""}` };
     }
     if (op.op === "clear") {
       return elements.length ? { what: `clear the whole diagram (${plural(elements.length, "element")})` } : null;

@@ -48,7 +48,7 @@ export type AssistOp =
   /** "unwrap the selected subprocess" — the reverse; "delete selected" on an EP does the same. */
   | { op: "unwrapSubprocess" }
   /** "collapse this subprocess to a new diagram" — the selected / hovered expanded subprocess moves into a new linked diagram. */
-  | { op: "collapseToDiagram" }
+  | { op: "collapseToDiagram"; label?: string }
   /**
    * `hostRef` is absent only from the grammar, when the speaker named no host:
    * the apply layer then mounts it on the single selected task or subprocess,
@@ -288,7 +288,7 @@ export function validateOp(raw: unknown): AssistOp | null {
     case "unwrapSubprocess":
       return { op: "unwrapSubprocess" };
     case "collapseToDiagram":
-      return { op: "collapseToDiagram" };
+      return { op: "collapseToDiagram", ...(isRef(o.label) ? { label: (o.label as string).trim() } : {}) };
     case "addBoundary": {
       if (!isRef(o.hostRef)) return null;
       const op: AssistOp = { op: "addBoundary", hostRef: (o.hostRef as string).trim() };

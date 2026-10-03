@@ -631,6 +631,12 @@
       "op": "collapseToDiagram"
     }
   ],
+  "collapse this subprocess to a new diagram called Handle Error": [
+    {
+      "op": "collapseToDiagram",
+      "label": "Handle Error"
+    }
+  ],
   "move this into a new diagram": [
     {
       "op": "collapseToDiagram"

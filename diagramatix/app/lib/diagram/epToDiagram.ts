@@ -4,9 +4,10 @@
  * The expanded subprocess's interior is moved to a brand-new BPMN diagram, and the subprocess itself becomes a
  * collapsed one linked to it (the CONVERT_EP_TO_SUBPROCESS reducer does the canvas side). The new diagram holds:
  *   • ONE white-box pool with no lanes and the default name, around everything that moved;
- *   • any Event expanded subprocesses that sat directly in the original EP, stacked one above the other down the LEFT
- *     of the pool (original top-to-bottom order, left-justified), as they would sit in the original EP;
- *   • everything else, keeping its relative position, to the right of them.
+ *   • the main flow — everything else — laid out as if the Event EPs were not there, keeping its relative position, at
+ *     the top left of the pool;
+ *   • any Event expanded subprocesses that sat directly in the original EP, stacked one under another UNDER the main
+ *     flow, left-justified, in their original top-to-bottom order; the pool grows downwards to hold them.
  *
  * Pure. The diagram's NAME is the EP's name, made unique in its project with " (n)" (`uniqueDiagramName`).
  */
@@ -69,21 +70,21 @@ export function buildCollapsedEpDiagram(base: DiagramData, epId: string): Diagra
   const eventEps = top.filter(isEventEp).sort((a, b) => a.y - b.y || a.x - b.x);
   const rest = top.filter((e) => !isEventEp(e));
 
-  // Event EPs: a column down the left, top to bottom, left-justified.
-  let y = PAD, column = 0;
+  // The main flow first, laid out as if the Event EPs were not there: everything else keeps its relative position, at the
+  // top left of the pool.
+  let y = PAD;
+  if (rest.length) {
+    const minX = Math.min(...rest.map((e) => byId().get(e.id)!.x));
+    const minY = Math.min(...rest.map((e) => byId().get(e.id)!.y));
+    for (const e of rest) shift(e.id, left - minX, PAD - minY);
+    y = Math.max(...rest.map((e) => { const c = byId().get(e.id)!; return c.y + c.height; })) + GAP;
+  }
+  // Then the pool grows DOWNWARDS to take the Event EPs UNDER the main flow: one under another, left-justified, in their
+  // original top-to-bottom order (Paul, 2026-10-03: "grow the new pool downwards to accommodate it under the main flow").
   for (const e of eventEps) {
     const cur = byId().get(e.id)!;
     shift(e.id, left - cur.x, y - cur.y);
     y += cur.height + GAP;
-    column = Math.max(column, cur.width);
-  }
-  // Everything else keeps its relative position, to the right of that column (or at the left when there is none).
-  if (rest.length) {
-    const minX = Math.min(...rest.map((e) => byId().get(e.id)!.x));
-    const minY = Math.min(...rest.map((e) => byId().get(e.id)!.y));
-    const dx = (eventEps.length ? left + column + GAP : left) - minX;
-    const dy = PAD - minY;
-    for (const e of rest) shift(e.id, dx, dy);
   }
 
   // The pool round the lot; every top-level element belongs to it (a pool with no lanes).

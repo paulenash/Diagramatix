@@ -150,8 +150,8 @@ wrap everything in a pool [called <new_element_name>]  @nosel
 put (a subprocess|an expanded subprocess|a pool|a lane) around <selection> [called <new_element_name>]  @on flownode
 put a pool around everything [called <new_element_name>]  @nosel
 (unwrap|dissolve|unpack|flatten) [the] (selected (subprocess|ep)|ep|subprocess|expanded subprocess)  @on expanded-subprocess
-collapse [this|the selected] [(expanded subprocess|subprocess|ep)] (to|into) a (new|linked) diagram  @on expanded-subprocess
-(move|convert) (this|it) (to|into) a (new|linked) diagram  @on expanded-subprocess
+collapse [(this|the selected)] [(expanded subprocess|subprocess|ep)] (to|into) a (new|linked) diagram [(called|named) <new_diagram_name>]  @on expanded-subprocess
+(move|convert) (this|it) (to|into) a (new|linked) diagram [(called|named) <new_diagram_name>]  @on expanded-subprocess
 
 # ── Pools
 (add|insert|create) [a|an] [new] [(black|white) box] pool [called <new_element_name>] [(above|below|over) <existing_element_name>]  @nosel
@@ -186,7 +186,7 @@ add: insert create put place draw send
 again: repeat same one keep do
 align: straighten
 clear: blank empty wipe reset start new
-compress: collapse compact compressed condense reduce shorten shrink tighten
+compress: compact compressed condense reduce shorten shrink tighten
 connect: link join
 convert: turn change set
 delete: remove erase drop

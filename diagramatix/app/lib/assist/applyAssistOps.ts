@@ -194,7 +194,7 @@ export interface AssistApplyContext {
     openTemplateWindowRef: MutableRefObject<(opts?: { anchorId?: string; at?: { x: number; y: number } }) => string>;
     exportJsonRef: MutableRefObject<(() => void) | null>;
     /** Collapses an expanded subprocess into a NEW linked diagram (needs the server; absent where it cannot — the phone, tests). */
-    collapseEpRef?: MutableRefObject<((epId: string) => void) | null>;
+    collapseEpRef?: MutableRefObject<((epId: string, diagramName?: string) => void) | null>;
     /** The last lane-boundary / pool-edge command and how far it has moved — its follow-up ("sixty pixels") reads it (boundaryFollowUp.ts). Written. */
     boundaryLast?: MutableRefObject<BoundaryMemory | null>;
   };
@@ -1179,9 +1179,10 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       const collapse = ctx.refs.collapseEpRef?.current;
       if (!collapse) { results.push("collapsing to a new diagram is not available here"); anyFail = true; continue; }
       if (!els.some((x) => x.parentId === eps[0].id || x.boundaryHostId === eps[0].id)) { results.push(`${nameOf(eps[0])} is empty — there is nothing to move into a new diagram`); anyFail = true; continue; }
-      collapse(eps[0].id);
+      const diagramName = op.label ? titleCaseName(op.label) : undefined;
+      collapse(eps[0].id, diagramName);
       voiceLastId.current = eps[0].id;
-      results.push(`collapsing ${nameOf(eps[0])} into a new linked diagram`);
+      results.push(`collapsing ${nameOf(eps[0])} into a new linked diagram${diagramName ? ` called ${diagramName}` : ""}`);
       continue;
     }
     // Reorder the pool stack (Paul, 2026-09-18). Planned first so a refusal
