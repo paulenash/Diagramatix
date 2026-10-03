@@ -2,6 +2,8 @@
 
 Written for: Paul, to review before anything is built. **Nothing has been changed in the code.** This follows a read-only survey of the code base on 2026-10-03. Section references like `useDiagram.ts:7103` are to the code as it stands today.
 
+> **Decisions taken by Paul on 2026-10-03 override this text where they differ — see §12 (gateways out of scope for now, messages stay at 24 px, imports untouched, heal on load).**
+
 ## 1. The rule, as I understand it
 
 BPMN diagrams only. Whenever a connector is created, re-attached, re-routed or has its connection points moved — by hand, by any NL Assist / voice feature, by AI generation in any context, or by a re-route — then:
@@ -221,3 +223,20 @@ Each slice ships on its own with the full suite green; nothing starts until you 
 6. **Imports:** apply the rule to imported BPMN XML / Visio drawings, or leave an imported drawing exactly as drawn?
 7. **Existing diagrams:** should opening an old diagram *repair* shared points (a heal-on-load, as pool headers and message labels already do), or only apply the rule to what is changed from now on?
 8. **Associations:** data and annotation associations are left alone (not "sequence or message"). Agree?
+
+## 12. Decisions (Paul, 2026-10-03) and what they change
+
+| # | Decision | Effect on the plan |
+|---|---|---|
+| 1 | Leave gateways for now | Gateways are **out of scope**: R6.30 (vertex snap), B49 / B54 and the `unavoidable` exemption are untouched, §7.2 is deferred, and the allocator skips any end on a gateway (it neither moves it nor counts it as a clash for the other end's group). Scope is Activities and Events. |
+| 2 | Messages keep 24 px | R5.06 / R05.10 spacing stays; messages are spread by the allocator with a 24 px step (pool ends) and the event ±3 px rule for two messages on one event. |
+| 3 | Keep the gateway refusal | `moveGatewayPoint` / `swapGatewayPoints` and the event-side refusals are unchanged. |
+| 4 | User-placed non-colliding offsets are never touched | As §5.1 step 4. |
+| 5 | Fewest crossings wins over target order | As §5.1 step 3. |
+| 6 | Imported drawings and generations from images stay exactly as drawn | No post-import pass (slice 5 is dropped); `layoutBpmnPreserved` is exempt. |
+| 7 | Heal on load | A heal-on-load pass applies the allocator to saved BPMN diagrams (as pool headers and message labels are healed today). |
+| 8 | Associations left alone | As §7.5. |
+
+**One interaction to settle before slice 3:** decisions 6 and 7 pull against each other. An imported or image-generated diagram is saved, and the next load would heal it. Proposal: mark such a diagram when it is created by import / image generation (a `properties` flag on the diagram, e.g. `exactAsDrawn: true`), and heal-on-load skips marked diagrams. Diagrams already imported before the flag exists cannot be told apart and would be healed. Alternatively heal only when something is edited. Needs Paul's ruling.
+
+**Revised slices:** 1 allocator (Activities and Events, sequence and messages; gateway ends skipped) · 2 generation (replace R8.11/R8.12, R5.06, R05.10 with the module, excluding image-preserved layout) · 3 editor post-pass and carve-outs for A3 / R7.02 / obstacle reset (gateway carve-out not needed) · 4 NL Assist · 5 heal-on-load (with the flag) · 6 rule text, checks (the shared-point check keeps its gateway exemption) and User Guide.
