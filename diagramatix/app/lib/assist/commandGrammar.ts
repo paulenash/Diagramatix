@@ -610,6 +610,9 @@ export function parseCommand(utterance: string): AssistOp[] | null {
       const a = pt(sp[1]), b = pt(sp[2]);
       if (a !== b) return [{ op: "swapGatewayPoints", a, b }];
     }
+    // "swap", "swap lanes", "swap the selected lanes", "swap these two lanes" — no names: the TWO lanes the mouse has selected
+    // (Paul, 2026-10-04). Only adjacent lanes of one pool can swap; the apply says so otherwise.
+    if (/^swap(?:\s+the)?(?:\s+(?:selected|these|those|highlighted|two|2))?(?:\s+two)?(?:\s+(?:sub-?\s?)?(?:lanes?|lines?))?[.!? ]*$/i.test(raw)) return [{ op: "swapLanes" }];
     let mm = raw.match(new RegExp(`^swap\\s+(.+?)\\s+(?:with|and|for|<->|<>)\\s+(.+)$`, "i"));
     // B5: nothing here requires either side to be a lane, so "swap Task A with
     // Task B" became a lane swap and failed. Decline and let the AI have it.

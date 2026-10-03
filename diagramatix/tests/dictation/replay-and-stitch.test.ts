@@ -91,7 +91,9 @@ describe("T4735 — the live path and the replay share the numbers", () => {
 
   it("both sides use the same unfinished-sentence predicate", () => {
     const editor = editorSource();
-    expect(editor).toContain("isIncompleteCommand(cmd)");
+    // (The live path also tells it whether two lanes are selected — `isIncompleteCommand(cmd, { twoLanesSelected })` — so a
+    // bare "swap" runs at once with two lanes selected; a replay has no selection, and holds it as before.)
+    expect(editor).toMatch(/isIncompleteCommand\(cmd[,)]/);
     expect(read("app/lib/assist/fragmentBuffer.ts")).toContain("isIncompleteCommand(buffer.trim())");
   });
 });

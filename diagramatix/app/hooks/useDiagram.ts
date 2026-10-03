@@ -29,6 +29,7 @@ import { isUmlConnType } from "@/app/lib/diagram/types";
 import { capitaliseFirstWord, needsCapital, decisionLabel, isDecisionGateway } from "@/app/lib/diagram/nameCase";
 import { contentBoundsOf, clampRectToContent, clampRectToLimits, poolFollowsLanes, leftGapShortfall, MIN_LEFT_GAP } from "@/app/lib/diagram/poolLaneBounds";
 import { getLaneHeaderWidth, getPoolHeaderWidth, healPoolHeaderWidths, laneMetrics, minHeightForContainer, poolMetrics } from "@/app/lib/diagram/containerMetrics";
+import { shiftNeighbourPools } from "@/app/lib/diagram/poolNeighbours";
 import { carveGeometry, refitStackAtEdge, shiftSublanesBy } from "@/app/lib/diagram/laneStack";
 import { uniqueContainerLabel } from "@/app/lib/diagram/containerNames";
 import { planCarve, planLaneDrop, type CarvePlan } from "@/app/lib/diagram/laneDropPlan";
@@ -5910,6 +5911,12 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
             elements = clampChildrenToLane(elements, e);
           }
         }
+        // The pools above / below follow the edge that moved (poolNeighbours.ts; Paul, 2026-10-04: "moving the bottom
+        // boundary of a pool with pools underneath it does not cause the pools below to move up").
+        {
+          const resized = elements.find((e) => e.id === id);
+          if (resized) elements = shiftNeighbourPools(elements, id, { y: target.y, height: target.height }, { y: resized.y, height: resized.height });
+        }
         // White-box pool L/R lockstep (user rule): when a white-box
         // pool's left or right boundary moves — manually here, or via
         // EP cascade in applyEPBoundaryChange — every other pool's
@@ -9585,19 +9592,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       // The gaps between the pools stay as they were — nothing is left floating, nothing is left overlapped.
       {
         const after = els.find((e) => e.id === poolId);
-        if (after) {
-          const dTop = after.y - pool.y;
-          const dBottom = (after.y + after.height) - (pool.y + pool.height);
-          const shifted = new Map<string, number>();
-          for (const p of els) {
-            if (p.type !== "pool" || p.id === poolId) continue;
-            const d = p.y + p.height <= pool.y + 0.5 ? dTop : p.y >= pool.y + pool.height - 0.5 ? dBottom : 0;
-            if (!d) continue;
-            shifted.set(p.id, d);
-            for (const id of getAllDescendantIds(els, p.id)) shifted.set(id, d);
-          }
-          if (shifted.size) els = els.map((e) => (shifted.has(e.id) ? { ...e, y: e.y + shifted.get(e.id)! } : e));
-        }
+        if (after) els = shiftNeighbourPools(els, poolId, { y: pool.y, height: pool.height }, { y: after.y, height: after.height });
       }
 
       // Black-box pools always take the white-box pool's width.

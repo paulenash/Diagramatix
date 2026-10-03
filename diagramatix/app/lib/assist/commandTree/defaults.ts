@@ -167,6 +167,7 @@ swap [the] [selected|two] pools  @on pool
 (expand|grow|enlarge) [the] <existing_element_name> lane [by <distance>]  @on lane
 (expand|grow|enlarge) [the] lane <existing_element_name> [by <distance>]  @on lane
 swap <existing_element_name> (with|and|for) <existing_element_name>  @on pool lane
+swap [the] [(selected|these|two)] [(lanes|sublanes)]  @on lane
 
 # ── Gateway and event points
 swap [[the] selected (gateway|event)] {points} (and|with) {points}  @on gateway event

@@ -1300,7 +1300,16 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
     }
 
     if (op.op === "swapLanes") {
-      const a = resolveField(op, "laneA"), b = resolveField(op, "laneB");
+      let a: DiagramElement | { err: string }, b: DiagramElement | { err: string };
+      if (!op.laneA && !op.laneB) {
+        // No names: the two the mouse has selected (Paul, 2026-10-04).
+        const sel = selectedIds.map((id) => els.find((e) => e.id === id)).filter((e): e is DiagramElement => !!e);
+        if (sel.length !== 2) { results.push(sel.length ? `select exactly two lanes to swap — ${sel.length} ${sel.length === 1 ? "is" : "are"} selected` : "select the two lanes to swap (next to each other, in the same pool), or say “swap <lane> with <lane>”"); anyFail = true; continue; }
+        [a, b] = sel;
+      } else {
+        a = resolveField(op, "laneA");
+        b = resolveField(op, "laneB");
+      }
       if ("err" in a) { results.push(a.err); anyFail = true; continue; }
       if ("err" in b) { results.push(b.err); anyFail = true; continue; }
       // "swap Customer with Salesforce" names two POOLS without saying so —

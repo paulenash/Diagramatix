@@ -61,7 +61,8 @@ export type AssistOp =
   | { op: "addLanes"; poolRef: Ref; labels: string[] }
   | { op: "addLaneAt"; /** Only when a pool was SAID — the ref lane names its own pool. */ poolRef?: Ref; label?: string; position: "above" | "below"; refLane: Ref }
   | { op: "addSublanes"; laneRef: Ref; labels: string[] }
-  | { op: "swapLanes"; laneA: Ref; laneB: Ref }
+  /** With no names: the two lanes (or pools) the mouse has selected — adjacent lanes in the same pool only. */
+  | { op: "swapLanes"; laneA?: Ref; laneB?: Ref }
   | { op: "compressPool"; poolRef: Ref }
   /**
    * "compress the Underwriters lane" — fit ONE lane (or sub-lane) to its
@@ -316,6 +317,7 @@ export function validateOp(raw: unknown): AssistOp | null {
       return op;
     }
     case "swapLanes":
+      if (!isRef(o.laneA) && !isRef(o.laneB)) return { op: "swapLanes" };
       return isRef(o.laneA) && isRef(o.laneB) ? { op: "swapLanes", laneA: (o.laneA as string).trim(), laneB: (o.laneB as string).trim() } : null;
     case "compressPool":
       return isRef(o.poolRef) ? { op: "compressPool", poolRef: (o.poolRef as string).trim() } : null;

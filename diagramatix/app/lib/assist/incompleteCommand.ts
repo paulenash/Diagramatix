@@ -31,7 +31,7 @@ const BARE_COMPRESS_KIND = new RegExp(`^(?:compress(?:es|ed|ing)?|${COMPRESS_COM
 /** "expand" and ONE lane's kind word, the name not said yet. */
 const BARE_EXPAND_KIND = new RegExp(`^${EXPAND_COMMAND_VERB}(?:s|ed|ing)?(?:\\s+the)?\\s+(?:${wordAlternation(EXPAND_KIND_WORDS)})$`);
 
-export function isIncompleteCommand(text: string): boolean {
+export function isIncompleteCommand(text: string, opts: { twoLanesSelected?: boolean } = {}): boolean {
   // The same repairs the grammar makes, first — so the hold judges the words
   // the parser will read. "and a message from review" must wait for its "to …"
   // exactly as "add a message from review" does, or the two halves run as two
@@ -56,6 +56,9 @@ export function isIncompleteCommand(text: string): boolean {
   // On its own it means nothing, and handed to the AI it becomes "add a pool
   // called X" — a whole new element nobody asked for.
   if (/^(?:called|named|labell?ed)\b/.test(t)) return true;
+  // With TWO LANES selected, "swap" / "swap lanes" / "swap the selected lanes" is a whole command — the two lanes are the
+  // names (Paul, 2026-10-04). Without that selection the same words wait for names, as below.
+  if (opts.twoLanesSelected && /^swap(?:\s+the)?(?:\s+(?:selected|these|those|highlighted|two|2))?(?:\s+two)?(?:\s+(?:sub-?\s?)?(?:lanes?|lines?))?$/.test(t)) return false;
   // "Collapse this" … "expanded subprocess into a new" … "diagram called Seven" (Paul's capture, 2026-10-03: three
   // fragments, the first ran as a compress). The front, the middle and the name-less whole of the collapse-to-diagram
   // phrase wait for the rest — the words live in collapsePhrase.ts, shared with the parser.

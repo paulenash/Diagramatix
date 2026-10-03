@@ -33,6 +33,8 @@ import { adjustOp, collectDividers, type DividerFlow, type DividerMemory, divide
 import { FRAGMENT_CONTINUE_MS, FRAGMENT_MAX_WAITS, FRAGMENT_SILENCE_MS } from "@/app/lib/assist/fragmentBuffer";
 import { batchFlashes, type FlashBox, flashTargets, isGoldFlashOn, setGoldFlash } from "@/app/lib/assist/goldFlash";
 import { isIncompleteCommand } from "@/app/lib/assist/incompleteCommand";
+import { isLonePixelWord } from "@/app/lib/assist/loneUnit";
+import { twoLanesSelected } from "@/app/lib/assist/laneSwapSelection";
 import { elementUnderPointer, hoverConnectorAt } from "@/app/lib/assist/pointerRef";
 import { type MessagePick, parseMessageAnswer, resolveMessageAnswer } from "@/app/lib/assist/messageTargets";
 import { type AssistOp, validateOps } from "@/app/lib/assist/ops";
@@ -963,6 +965,8 @@ export function useVoiceSession(host: VoiceSessionHost) {
       log({ heard, summary: `${prefix}${r.summary}`, ok: r.ok, viaAi });
     };
 
+    // "… up 100" … "pixels": the unit as a fragment of its own, after the command already ran (loneUnit.ts).
+    if (isLonePixelWord(heard)) { log({ heard, summary: "“pixels” is the default unit — already applied", ok: true }); return; }
     const ops = parseCommand(heard);
     if (ops) { applyOrAsk(ops, false); return; }
     // A boundary command's follow-up (Paul, 2026-09-28: refused with "say “up by
@@ -1071,7 +1075,7 @@ export function useVoiceSession(host: VoiceSessionHost) {
     const cmd = voiceBuffer.current.trim();
     // A split command ("rename Task 8 to" … pause … "Approve") — keep the buffer
     // and wait a bit longer for the continuation rather than running the half.
-    if (!force && cmd && isIncompleteCommand(cmd) && voiceWaits.current < ABRA_MAX_WAITS) {
+    if (!force && cmd && isIncompleteCommand(cmd, { twoLanesSelected: twoLanesSelected(host.elementsRef.current, host.selectedIdsRef.current) }) && voiceWaits.current < ABRA_MAX_WAITS) {
       voiceWaits.current += 1;
       voiceFlushTimer.current = setTimeout(() => flushVoiceBuffer(), ABRA_CONTINUE_MS);
       return;
