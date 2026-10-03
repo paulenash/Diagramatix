@@ -76,6 +76,28 @@ export interface PanelView {
 const FLOW_ID = (f: Extract<OpenFlow, { kind: "rename" | "dividers" }>): string =>
   f.kind === "dividers" ? (f.held ? "dividers-held" : f.moved ? "dividers-moved" : "dividers") : f.phase === "pick" ? (f.purpose === "select" ? "select-pick" : "rename-pick") : "rename-name";
 
+/** A pattern line as the help shows it: the `@on …` / `@nosel` tags are for the filter, not the reader. */
+const plainSyntax = (source: string): string => source.replace(/\s+@(?:on|nosel)\b.*$/, "").trim();
+
+/**
+ * The full syntax of the command being completed, for a word the speaker clicked in the panel (Paul, 2026-10-03:
+ * "clicking on a next word should pop up another small window that lists the full syntax of the command the user is in
+ * the middle of completing"). Every pattern that still fits what was heard PLUS the clicked word, written in the help's
+ * notation. Empty for a guided flow (its words are listed already) or a word no command takes.
+ */
+export function syntaxFor(tree: CommandTree, input: PanelInput, word: string): { heard: string; lines: string[] } {
+  const w = word.replace(/^\[|\]$/g, "").trim().toLowerCase();
+  const tokens = tokenise(heardForHelp(input.interim, {}));
+  if (input.flow || !w || w.includes("<")) return { heard: tokens.join(" "), lines: [] };
+  const ctx = {
+    ghost: input.ghost,
+    ...(input.names ? { names: input.names } : {}),
+    ...(input.selectedKinds?.length ? { selected: input.selectedKinds } : {}),
+  };
+  const lines = [...new Set(tree.patternsFitting([...tokens, w], ctx).map((p) => plainSyntax(p.source)))];
+  return { heard: [...tokens, w].join(" "), lines };
+}
+
 export function computePanel(tree: CommandTree, input: PanelInput): PanelView {
   const tokens = tokenise(heardForHelp(input.interim, { numberPick: input.flow?.kind === "rename" && input.flow.phase === "pick" || input.flow?.kind === "dividers" }));
   const heard = tokens.join(" ");

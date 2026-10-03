@@ -11,7 +11,7 @@
  * Pure, so every rule here is tested; the editor only imports it.
  */
 import { COMMAND_VERBS, COMPRESS_COMMAND_VERBS, EXPAND_COMMAND_VERB } from "./commandVerbs";
-import { repairHeardWords } from "./selectedWord";
+import { repairHeardWords, MISHEARD_ADD_LEADING_WORDS } from "./selectedWord";
 import { parseBoundaryEventPhrase } from "./boundaryEventPhrase";
 import { ADD_MESSAGE_LEAD, MESSAGE_BY_NUMBER, MESSAGE_BY_NUMBER_FROM_SELECTION } from "./messagePhrase";
 import { COMPRESS_KIND_WORDS, EXPAND_KIND_WORDS } from "./compressPhrase";
@@ -76,6 +76,12 @@ export function isIncompleteCommand(text: string): boolean {
   // "Expand the lane." the same way. Not "expand the pool": that is already
   // a whole command (widen every pool), and holding it would only delay it.
   if (BARE_EXPAND_KIND.test(t)) return true;
+  // "add an event" … "expanded subprocess called Handle Error" (Paul, 2026-10-03: "I have to speak very quickly — it often
+  // gets truncated to 'add an event'"). A usage word (event / call / transaction / normal) with the subprocess noun still to
+  // come, or a bare "expanded", is the middle of a phrase, never its end. "add an event" on its own is held too: it is
+  // almost always the front of "add an event expanded subprocess …", and costs one grace period if it is not.
+  // The mis-hears of "add" count as "add" (they are folded by the parser the same way — T4784, one rule one place).
+  if (new RegExp(`^(?:add|create|insert|put|make|new|${MISHEARD_ADD_LEADING_WORDS.join("|")})\\s+(?:an?\\s+|the\\s+)?(?:(?:normal|call|event|transaction)(?:\\s+expanded)?|expanded)$`).test(t)) return true;
   // Ends on a dangling connective / preposition → more is coming. "after",
   // "before" and "following" too: "add template after" … "selected", split at
   // the pause, ran as a task called "Template after" (2026-09-25).

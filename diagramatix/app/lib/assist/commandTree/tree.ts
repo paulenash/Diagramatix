@@ -284,6 +284,15 @@ export class CommandTree {
     return all.filter((p) => !p.noSel && (!p.on || appliesTo(p.on, kinds)));
   }
 
+  /**
+   * The patterns that still fit these words — each walked on its own, so the answer is the full syntax of every
+   * command the speaker could be completing ("add" + "an" → every `add …` line). Used by the help's syntax window.
+   */
+  patternsFitting(tokens: readonly string[], ctx: WalkContext = {}): Pattern[] {
+    const toks = tokens.map((t) => t.toLowerCase());
+    return this.activePatterns(ctx).filter((p) => this.walkFrom([{ seq: p.seq }], toks, ctx).length > 0);
+  }
+
   // ── the public questions ─────────────────────────────────────────────────
 
   /** What can come after these words? `[]` gives the first words. */

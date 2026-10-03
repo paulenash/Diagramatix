@@ -80,7 +80,7 @@ import { TemplatePickerWindow } from "@/app/components/canvas/TemplatePickerWind
 import { VoiceAssistBar } from "@/app/components/canvas/VoiceAssistBar";
 import { VoiceAssistHelpPanel } from "@/app/components/canvas/VoiceAssistHelpPanel";
 import { useVoiceAssistHelp, useTargetNow } from "@/app/hooks/useVoiceAssistHelp";
-import { computePanel, namesOf, type OpenFlow } from "@/app/lib/assist/commandTree";
+import { computePanel, namesOf, syntaxFor, type OpenFlow } from "@/app/lib/assist/commandTree";
 import { repairForRun } from "@/app/lib/assist/commandTree/positionRepair";
 import { selectedKinds as selectedKindsOf } from "@/app/lib/assist/commandTree/kinds";
 import { elementUnderPointer, hoverConnectorAt } from "@/app/lib/assist/pointerRef";
@@ -2484,13 +2484,14 @@ export function DiagramEditor({
   // The names on the diagram, so a name in a command must be a real one (or a pointing phrase):
   // "move dividers down" no longer reads "dividers" as an element's name.
   const helpNames = useMemo(() => (helpShown ? namesOf(data.elements, data.connectors) : undefined), [helpShown, data.elements, data.connectors]);
-  const helpView = helpShown && assistHelp.tree
-    ? computePanel(assistHelp.tree, {
-        interim: voiceInterim, ghost: assistEnabled, flow: helpOpenFlow, names: helpNames,   // Assist's own words are listed whenever Assist is ACTIVE, not only when a suggestion is on screen
-        // What is SELECTED narrows the commands to those that apply to it. The hover target does not (Paul, 2026-10-02).
-        selectedKinds: selectedKindsOf(data.elements, selectedElementIds, selectedConnector),
-      })
-    : null;
+  const helpInput = {
+    interim: voiceInterim, ghost: assistEnabled, flow: helpOpenFlow, names: helpNames,   // Assist's own words are listed whenever Assist is ACTIVE, not only when a suggestion is on screen
+    // What is SELECTED narrows the commands to those that apply to it. The hover target does not (Paul, 2026-10-02).
+    selectedKinds: selectedKindsOf(data.elements, selectedElementIds, selectedConnector),
+  };
+  const helpView = helpShown && assistHelp.tree ? computePanel(assistHelp.tree, helpInput) : null;
+  // Clicking a word in the panel opens the full syntax of the command being completed (Paul, 2026-10-03).
+  const helpSyntax = helpShown && assistHelp.tree ? (word: string) => syntaxFor(assistHelp.tree!, helpInput, word) : undefined;
   // THE HOVER HIGHLIGHT (Paul, 2026-10-02: "add the hover highlight that exists in the mobile Voice Assist"). With
   // Voice Assist on, the element under the cursor is outlined whenever it is what "this" would act on — nothing
   // selected, the cursor over it — exactly as the phone outlines what you tap. With the help panel showing, the
@@ -5416,7 +5417,7 @@ export function DiagramEditor({
         )}
 
         {helpShown && helpView && (
-          <VoiceAssistHelpPanel view={helpView} target={helpTarget} onClose={() => assistHelp.setOn(false)} />
+          <VoiceAssistHelpPanel view={helpView} target={helpTarget} syntaxFor={helpSyntax}onClose={() => assistHelp.setOn(false)} />
         )}
 
         {/* Template-attach picker (assist "Template" ghost). Category → template
