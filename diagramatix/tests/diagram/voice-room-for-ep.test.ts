@@ -121,6 +121,32 @@ describe("T5221 an Event EP added to the target: growing down", () => {
   });
 });
 
+describe("T5221 edge events ride the edge of the EP that grows (Paul, 2026-10-03)", () => {
+  it("an Event EP added to an EP: its bottom and right edge events move with the new edges; top and left stay", () => {
+    const d = world();
+    d.elements.push(
+      el("bBot", "intermediate-event", 232, 382, 36, 36, "Error", "L2", { boundaryHostId: "T" }),       // centre on T's bottom edge (400)
+      el("bRight", "intermediate-event", 382, 307, 36, 36, "Cancel", "L2", { boundaryHostId: "T" }),    // centre on T's right edge (400)
+      el("bTop", "intermediate-event", 232, 232, 36, 36, "Timer", "L2", { boundaryHostId: "T" }),       // centre on T's top edge (250)
+      el("bLeft", "intermediate-event", 82, 307, 36, 36, "Msg", "L2", { boundaryHostId: "T" }),         // centre on T's left edge (100)
+      // And an EP the line only passes through, with its own bottom event: it is frozen, so its event stays.
+      el("bN", "intermediate-event", 682, 462, 36, 36, "N err", "L2", { boundaryHostId: "N" }),         // on N's bottom edge (480)
+    );
+    const h = headlessDiagram(d);
+    const r = applyAssistOps(parseCommand("add an event expanded subprocess called Cancel")!, h.context({ selectedIds: ["T"] }));
+    expect(r.ok, r.summary).toBe(true);
+    const T = get(h, "T");
+    const cx = (id: string) => get(h, id).x + 18, cy = (id: string) => get(h, id).y + 18;
+    expect(T.height).toBeGreaterThan(150);
+    expect(T.width).toBeGreaterThan(300);
+    expect(cy("bBot")).toBeCloseTo(T.y + T.height, 0);        // on the new bottom edge
+    expect(cx("bRight")).toBeCloseTo(T.x + T.width, 0);       // on the new right edge
+    expect(cy("bTop")).toBeCloseTo(T.y, 0);                   // top edge unchanged
+    expect(cx("bLeft")).toBeCloseTo(T.x, 0);                  // left edge unchanged
+    expect(cy("bN")).toBeCloseTo(get(h, "N").y + get(h, "N").height, 0);   // the frozen neighbour's event is still on ITS edge
+  });
+});
+
 describe("T5221 an ordinary add that needs the EP taller: the same rules", () => {
   it("an EP added inside a short target: the neighbour beside it does not grow", () => {
     const d = world();

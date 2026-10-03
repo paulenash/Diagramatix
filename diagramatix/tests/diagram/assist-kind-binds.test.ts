@@ -251,7 +251,7 @@ describe("T4930 — a name spelled out is the word (“rename Lane 3 to F I N A 
 
   it("one repair for the grammar and the hold, and the rename-by-number answer too", () => {
     // + convert, 2026-09-27; + "letter" → "delete", 2026-09-28 (T4992).
-    expect(readFileSync("app/lib/assist/selectedWord.ts", "utf8")).toContain("repairTurnWord(repairConvertWord(repairMoveWord(repairDeleteWord(joinSpelledLetters(text)).text).text).text)");
+    expect(readFileSync("app/lib/assist/selectedWord.ts", "utf8")).toContain("repairTurnWord(repairConvertWord(repairMoveWord(repairCompressWord(repairDeleteWord(joinSpelledLetters(text)).text).text).text).text)");
     const editor = editorSource();
     const rename = editor.slice(editor.indexOf("const handleRenameUtterance = useCallback("), editor.indexOf("const handleRenameUtterance = useCallback(") + 800);
     expect(rename).toContain("const t = joinSpelledLetters(text.trim());");

@@ -20,7 +20,10 @@ const nameOf = (e: DiagramElement) => (e.label ?? "").replace(/\s+/g, " ").trim(
 export type EpCompressPlan = { error: string } | { y: number; height: number; saved: number };
 
 export function planCompressEp(els: readonly DiagramElement[], ep: DiagramElement): EpCompressPlan {
-  const kids = els.filter((e) => e.parentId === ep.id);
+  // Boundary events sit ON the rim, not in the content (Paul's capture, 2026-10-03: an EP with ~145 px spare at the top
+  // was "already fitted" because its Cancellation event on the top edge counted as the highest thing inside). They are
+  // not measured; the resize carries them with the edge they are mounted on (RESIZE_ELEMENT re-snaps them).
+  const kids = els.filter((e) => e.parentId === ep.id && e.boundaryHostId !== ep.id);
   if (!kids.length) return { error: `${nameOf(ep)} is empty — there is nothing to compress it to` };
   const contentTop = Math.min(...kids.map((k) => k.y));
   const contentBottom = Math.max(...kids.map((k) => k.y + k.height));

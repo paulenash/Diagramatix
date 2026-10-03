@@ -182,6 +182,22 @@ export function repairDeleteWord(text: string): SelectedWordRepair {
   });
   return { text: out, corrected };
 }
+/**
+ * "complete selected" → "compress selected" (Paul's capture, 2026-10-03: said twice, heard twice, "didn't understand
+ * that"). "Complete" starts no command, and "complete" + a pointing word ("selected", "this", "that", "it") + at most a
+ * container's kind word is a shape no name or sentence takes — so only that exact shape is read as the compress verb.
+ * A name that merely starts with "complete" ("complete documentation") has no pointing word after it and is untouched.
+ */
+const COMPRESS_MISHEARD_RE = /^(complete|completed)(?=\s+(?:the\s+)?(?:selected|this|that|it)(?:\s+(?:expanded\s+)?(?:sub-?\s?process|ep|pool|lane|sub-?\s?lane))?[\s.,!?]*$)/i;
+export function repairCompressWord(text: string): SelectedWordRepair {
+  if (!text) return { text, corrected: false };
+  let corrected = false;
+  const out = text.replace(COMPRESS_MISHEARD_RE, (heard: string) => {
+    corrected = true;
+    return /^[A-Z]/.test(heard) ? "Compress" : "compress";
+  });
+  return { text: out, corrected };
+}
 export function repairMoveWord(text: string): SelectedWordRepair {
   if (!text) return { text, corrected: false };
   let corrected = false;
@@ -284,7 +300,7 @@ export const MISHEARD_ADD_LEADING_WORDS = MISHEARD_ADD_LEADING;
 export function repairHeardWords(text: string): string {
   // A spelled-out name ("F I N A N C E") is joined first, so every rule below
   // and every name slot sees the word (spelledWord.ts).
-  return repairSelectedWord(repairAddWord(repairTurnWord(repairConvertWord(repairMoveWord(repairDeleteWord(joinSpelledLetters(text)).text).text).text).text).text).text;
+  return repairSelectedWord(repairAddWord(repairTurnWord(repairConvertWord(repairMoveWord(repairCompressWord(repairDeleteWord(joinSpelledLetters(text)).text).text).text).text).text).text).text;
 }
 
 /** True when this word already refers to the selection. */

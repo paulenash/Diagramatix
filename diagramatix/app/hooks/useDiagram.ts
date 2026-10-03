@@ -8379,7 +8379,10 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         const oldHost = oldElementMap.get(el.boundaryHostId);
         const newHost = newElementMap.get(el.boundaryHostId);
         if (!oldHost || !newHost) return el;
-        if (oldHost.type === "subprocess-expanded") {
+        // …except when making room FOR an element (`underId`): the EP that grows to hold it, and the EPs round it, take
+        // their edge events with the edge (Paul, 2026-10-03: an Event EP added to an EP left its edge events behind when
+        // the EP grew). An EP the line merely passes through is frozen — its host did not change, so nothing moves.
+        if (oldHost.type === "subprocess-expanded" && !(targetEl && ancestorIds.has(oldHost.id))) {
           const cutsHorizontally = dy !== 0
             && markerY > oldHost.y && markerY < oldHost.y + oldHost.height;
           const cutsVertically = dx !== 0
