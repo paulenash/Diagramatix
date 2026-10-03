@@ -260,3 +260,16 @@ Design:
 New tests: a saved diagram with a shared point opens healed with `HEAL_ENDPOINTS` on the stack and a single Undo deep-equals the saved data; a clean diagram opens with no history entry; the changed-id list is exactly the connectors that moved; the phone viewer's load path leaves the diagram as saved; a flagged diagram is never healed; heal then save then reopen produces no second heal.
 
 **Still needs your ruling:** with Undo as the safety net, do you still want the "exact as drawn" flag for imports and image generations (my recommendation: yes — otherwise the first open of an imported drawing would flash and change it), or should every BPMN diagram be healed with Undo as the only protection?
+
+## 14. Ruling on the "exact as drawn" flag (Paul, 2026-10-03)
+
+**Keep "exact as drawn" on image-generated diagrams.** This closes the open question at the end of §13.
+
+- Diagrams created by **generation from an image** are marked when created (a diagram-level flag, e.g. `exactAsDrawn: true`). Heal-on-load, the editor post-pass's heal and the generation spread all skip a marked diagram; it opens with no flash and no history entry.
+- Decision 6 (imported BPMN XML / Visio drawings stay as drawn) is unchanged, so the same flag is set for those imports. If you meant the flag for image-generated diagrams *only* and want imports healed like any saved diagram, say so and I will drop it for imports.
+- The flag only protects what the heal does on **load**. Once someone edits a marked diagram, the normal editor rule (§5) applies to the connectors that edit touches, as for any diagram. (Open point, no ruling needed unless you disagree: editing a marked diagram does not clear the flag.)
+- Diagrams imported or image-generated **before** the flag exists cannot be recognised and will be healed on first load, with the green flash and a one-step Undo as the safety net (§13).
+- Implementation note for slice 5: the flag is set where each of those diagrams is first saved (the image-generation paths that use `layoutBpmnPreserved`, the BPMN XML importer, the Visio V3 importers). It needs no schema change if it lives in the diagram's existing JSON `data`/properties; to be confirmed when slice 5 is built.
+- Added tests: a marked diagram with shared points opens unchanged (no flash, no history entry); the flag survives save and reload; a diagram generated from an image carries the flag.
+
+**Status:** the plan is complete pending your review. No code has been written for it.
