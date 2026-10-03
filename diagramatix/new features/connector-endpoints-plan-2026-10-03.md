@@ -240,3 +240,23 @@ Each slice ships on its own with the full suite green; nothing starts until you 
 **One interaction to settle before slice 3:** decisions 6 and 7 pull against each other. An imported or image-generated diagram is saved, and the next load would heal it. Proposal: mark such a diagram when it is created by import / image generation (a `properties` flag on the diagram, e.g. `exactAsDrawn: true`), and heal-on-load skips marked diagrams. Diagrams already imported before the flag exists cannot be told apart and would be healed. Alternatively heal only when something is edited. Needs Paul's ruling.
 
 **Revised slices:** 1 allocator (Activities and Events, sequence and messages; gateway ends skipped) · 2 generation (replace R8.11/R8.12, R5.06, R05.10 with the module, excluding image-preserved layout) · 3 editor post-pass and carve-outs for A3 / R7.02 / obstacle reset (gateway carve-out not needed) · 4 NL Assist · 5 heal-on-load (with the flag) · 6 rule text, checks (the shared-point check keeps its gateway exemption) and User Guide.
+
+## 13. Heal on load — how it behaves (Paul, 2026-10-03)
+
+**Ruling:** heal-on-load flashes the affected connectors **green**, and **Undo returns the diagram to exactly what was saved.**
+
+What the code gives us today:
+- `healOnLoad` (`app/lib/diagram/healOnLoad.ts`, pure) is the `useReducer` initialiser in `useDiagram.ts:10354` and is also used by the phone viewer (`MobileDiagramScreen.tsx:146`). It runs silently and leaves no history entry, so today an undo cannot reach the pre-heal state.
+- Flash overlays already exist: `GoldFlashOverlay` (gold outline of what a voice command touched, `Canvas.tsx` `goldFlash`) and the Group-Connect green/red line flash (`groupFlash`).
+
+Design:
+1. **Split the heal in two.** The existing silent heals stay in `healOnLoad`. The endpoint heal is a *separate* pass, `healEndpoints(data)`, that returns `{ data, changedConnectorIds }`. The phone viewer and read-only views never call it (they draw as saved, with no flash).
+2. **Editor only, after load:** the editor keeps the saved diagram, runs `healEndpoints`, and if `changedConnectorIds` is non-empty dispatches one new reducer action, `HEAL_ENDPOINTS`, that applies the healed connectors **as a normal undoable step** (so the history stack holds the saved diagram underneath). One Undo restores the diagram as saved; Redo re-applies the heal.
+3. **Green flash** of exactly those connectors (new `healFlash` prop, a green sibling of `goldFlash`, 3 flashes then off), plus a one-line notice: "n connectors were separated where they shared an attachment point — Undo to restore the saved drawing."
+4. **Not saved until the user saves or edits**: the heal makes the diagram dirty like any edit, so nothing is written behind the user's back; if they leave without saving, the stored diagram is untouched. Undo back to the saved state makes it clean again.
+5. **Never repeats once healed and saved;** a diagram with nothing to heal opens exactly as today (no flash, no history entry, not dirty). Idempotence of the allocator (test A7) guarantees this.
+6. **Exempt:** diagrams marked "exact as drawn" (imports and image generations, per decision 6), non-BPMN diagrams, read-only / impersonated / shared-view-only sessions (they could not Undo-and-save anyway), and gateway ends (decision 1).
+
+New tests: a saved diagram with a shared point opens healed with `HEAL_ENDPOINTS` on the stack and a single Undo deep-equals the saved data; a clean diagram opens with no history entry; the changed-id list is exactly the connectors that moved; the phone viewer's load path leaves the diagram as saved; a flagged diagram is never healed; heal then save then reopen produces no second heal.
+
+**Still needs your ruling:** with Undo as the safety net, do you still want the "exact as drawn" flag for imports and image generations (my recommendation: yes — otherwise the first open of an imported drawing would flash and change it), or should every BPMN diagram be healed with Undo as the only protection?
