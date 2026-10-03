@@ -87,6 +87,7 @@ import { elementUnderPointer, hoverConnectorAt } from "@/app/lib/assist/pointerR
 import { PropertiesPanel } from "@/app/components/canvas/PropertiesPanel";
 import { captureTemplate, instantiateTemplate } from "@/app/lib/diagram/templates";
 import { buildCollapsedEpDiagram, movedIdsForCollapse } from "@/app/lib/diagram/epToDiagram";
+import { connectorVisibleSegments } from "@/app/lib/mobile/voiceEdit";
 import { resolvePackageNameLink } from "@/app/lib/diagram/packageLink";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { SimulatorOverlay } from "@/app/components/simulation/SimulatorOverlay";
@@ -2509,8 +2510,12 @@ export function DiagramEditor({
   const helpPath = useMemo(() => {
     if (!helpActive || helpTarget.kind !== "cursor" || !helpTarget.connectorId) return null;
     const c = data.connectors.find((x) => x.id === helpTarget.connectorId);
-    return c && c.waypoints && c.waypoints.length > 1 ? c.waypoints : null;
-  }, [helpActive, helpTarget.kind, helpTarget.connectorId, data.connectors]);
+    if (!c || !c.waypoints || c.waypoints.length < 2) return null;
+    // Only what can be SEEN: from one attachment point to the other. The stored route runs on to the centres of the two
+    // elements (the invisible leaders), which would light up the part hidden behind them (Paul, 2026-10-04).
+    const segs = connectorVisibleSegments(c, data);
+    return segs.length ? segs.map(([p, q]) => [p, q]) : null;
+  }, [helpActive, helpTarget.kind, helpTarget.connectorId, data]);
 
   const isContext =diagramType === "context" || diagramType === "basic";
   const defaultDirectionType: DirectionType =

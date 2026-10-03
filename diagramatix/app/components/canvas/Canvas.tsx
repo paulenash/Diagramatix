@@ -434,7 +434,8 @@ interface Props {
    *  (world coordinates). Decorative and pointer-transparent; null draws nothing. */
   voiceTargetOutline?: { x: number; y: number; width: number; height: number } | null;
   /** The connector under the cursor, as its line — highlighted like the outline above (Voice Assist, 2026-10-02). */
-  voiceTargetPath?: { x: number; y: number }[] | null;
+  /** The hovered connector's VISIBLE line(s) — between its attachment points, not the part hidden behind its elements. */
+  voiceTargetPath?: { x: number; y: number }[][] | null;
   /** Ids travelling with the current drag — drawn above everything they cross. */
   liftedIds?: readonly string[] | null;
 }
@@ -6417,14 +6418,15 @@ export function Canvas({
               style={{ pointerEvents: "none" }} aria-hidden="true" data-voice-target-outline
             />
           )}
-          {voiceTargetPath && voiceTargetPath.length > 1 && (
+          {voiceTargetPath && voiceTargetPath.map((line, i) => line.length > 1 && (
             <polyline
-              points={voiceTargetPath.map((p) => `${p.x},${p.y}`).join(" ")}
+              key={i}
+              points={line.map((p) => `${p.x},${p.y}`).join(" ")}
               fill="none" stroke="#7c3aed" strokeWidth={6} strokeLinecap="round" strokeLinejoin="round"
               vectorEffect="non-scaling-stroke" opacity={0.35}
               style={{ pointerEvents: "none" }} aria-hidden="true" data-voice-target-path
             />
-          )}
+          ))}
 
           {/* Association connectors — rendered above all elements.
 
