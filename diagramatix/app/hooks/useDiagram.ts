@@ -9580,6 +9580,26 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         });
       }
 
+      // THE POOLS ABOVE AND BELOW FOLLOW THE EDGE THAT MOVED (Paul, 2026-10-03): if the compressed pool's TOP boundary moved,
+      // every pool above it moves with it (and with everything in them); if its BOTTOM boundary moved, every pool below does.
+      // The gaps between the pools stay as they were — nothing is left floating, nothing is left overlapped.
+      {
+        const after = els.find((e) => e.id === poolId);
+        if (after) {
+          const dTop = after.y - pool.y;
+          const dBottom = (after.y + after.height) - (pool.y + pool.height);
+          const shifted = new Map<string, number>();
+          for (const p of els) {
+            if (p.type !== "pool" || p.id === poolId) continue;
+            const d = p.y + p.height <= pool.y + 0.5 ? dTop : p.y >= pool.y + pool.height - 0.5 ? dBottom : 0;
+            if (!d) continue;
+            shifted.set(p.id, d);
+            for (const id of getAllDescendantIds(els, p.id)) shifted.set(id, d);
+          }
+          if (shifted.size) els = els.map((e) => (shifted.has(e.id) ? { ...e, y: e.y + shifted.get(e.id)! } : e));
+        }
+      }
+
       // Black-box pools always take the white-box pool's width.
       if (wbWidth != null) {
         els = els.map((e) => (e.type === "pool" && poolTypeOf(e) === "black-box" ? { ...e, width: wbWidth } : e));
