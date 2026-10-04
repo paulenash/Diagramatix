@@ -123,9 +123,10 @@ export async function startDictation(cb: DictationCallbacks): Promise<DictationH
   // is running before the handshake — speech during the handshake is queued
   // and sent once the socket opens (pcmQueue.ts). The first word used to go
   // into that gap.
+  // (Echo cancellation is asked for explicitly below — Diagramatix may be speaking through the same speakers.)
   const micPromise: Promise<MediaStream | null> =
     typeof navigator !== "undefined" && navigator.mediaDevices?.getUserMedia
-      ? navigator.mediaDevices.getUserMedia({ audio: true }).catch(() => null)
+      ? navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true } }).catch(() => null)
       : Promise.resolve(null);
 
   // B8 — the three ways this can fail are not the same thing. A 403 is the

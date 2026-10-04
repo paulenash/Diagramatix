@@ -14,6 +14,8 @@ import { COMMAND_CATALOG } from "@/app/lib/assist/commandCatalog";
 import { FloatingPanel } from "./FloatingPanel";
 import { formatCostReport, type CostReport } from "@/app/lib/assist/usageCost";
 import { correctionTally, formatCorrectionTally } from "@/app/lib/assist/correctionPairs";
+import { TTS_VOICES, TTS_VOICE_INFO, type TtsVoice } from "@/app/lib/voice/speakParams";
+import type { SpeechVerbosity } from "@/app/lib/voice/spokenText";
 import { describeTouched, type CommandLogEntry as LogEntry, type CommandVerdict as Verdict } from "@/app/lib/assist/commandLog";
 
 // The log entry shape moved to `app/lib/assist/commandLog.ts` (2026-09-24) so it
@@ -44,6 +46,7 @@ export function VoiceAssistBar({
   saveState = "idle",
   snapshotCount = 0,
   assistHelp,
+  speech,
 }: {
   listening: boolean;
   /** Mic pressed but the recogniser not yet live — shown as "connecting…" so
@@ -77,6 +80,16 @@ export function VoiceAssistBar({
    * switched it on. This person's own on/off lives in the editor; the bar just shows the button.
    */
   assistHelp?: { on: boolean; onToggle: () => void };
+  /**
+   * Spoken replies (Diagramatix Voice): present only for a person the SuperAdmin has granted speech to. The choices
+   * are this browser's own; the switch is off until they turn it on.
+   */
+  speech?: {
+    enabled: boolean; onToggle: (on: boolean) => void;
+    voice: TtsVoice; onVoice: (v: TtsVoice) => void;
+    verbosity: SpeechVerbosity; onVerbosity: (v: SpeechVerbosity) => void;
+    speaking: boolean; error: string | null; onStop: () => void;
+  };
 }) {
   const [text, setText] = useState("");
   const [showCommands, setShowCommands] = useState(false);
@@ -191,6 +204,35 @@ export function VoiceAssistBar({
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none" title="Close">×</button>
           </div>
         </div>
+
+        {/* Spoken replies — Diagramatix talks back: its questions and what it could not do (the default). Off until
+            switched on; while it speaks the microphone ignores everything but "stop". */}
+        {speech && (
+          <div className="px-3 py-1.5 border-b border-gray-100 text-[11px] text-gray-600 flex items-center gap-2 flex-wrap">
+            <label className="flex items-center gap-1 cursor-pointer" title="Diagramatix speaks its questions and refusals aloud">
+              <input type="checkbox" checked={speech.enabled} onChange={(e) => speech.onToggle(e.target.checked)} />
+              <span>🔊 Speak replies</span>
+            </label>
+            {speech.enabled && (
+              <>
+                <select value={speech.voice} onChange={(e) => speech.onVoice(e.target.value as TtsVoice)}
+                  className="border border-gray-200 rounded px-1 py-0.5 text-[11px] bg-white" title="Which voice">
+                  {TTS_VOICES.map((v) => <option key={v} value={v}>{TTS_VOICE_INFO[v].name} ({TTS_VOICE_INFO[v].accent})</option>)}
+                </select>
+                <select value={speech.verbosity} onChange={(e) => speech.onVerbosity(e.target.value as SpeechVerbosity)}
+                  className="border border-gray-200 rounded px-1 py-0.5 text-[11px] bg-white" title="How much it says">
+                  <option value="questions">Questions only</option>
+                  <option value="problems">Questions and problems</option>
+                  <option value="everything">Everything</option>
+                </select>
+                {speech.speaking && (
+                  <button onClick={speech.onStop} className="text-[10px] px-1.5 py-0.5 rounded border border-red-300 text-red-600 hover:bg-red-50" title="Stop talking — or just say “stop”">■ stop</button>
+                )}
+              </>
+            )}
+            {speech.error && <span className="text-amber-600" title={speech.error}>couldn’t speak</span>}
+          </div>
+        )}
 
         {/* Cost readout — an estimate at list rates; the open mic session is included by the editor. */}
         {(cost.report || cost.state === "error") && (

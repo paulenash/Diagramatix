@@ -79,12 +79,22 @@ function isRefusal(s: string): boolean {
  * @param verbosity off → silent; questions → only what needs an answer;
  *   problems → that plus refusals (the default); everything → successes too.
  */
-export function spokenText(text: string, verbosity: SpeechVerbosity): string {
+export function spokenText(text: string, verbosity: SpeechVerbosity, opts: { ok?: boolean } = {}): string {
   if (verbosity === "off") return "";
 
   const trimmed = text.trim();
   if (verbosity === "questions" && !isQuestion(trimmed)) return "";
-  if (verbosity === "problems" && !isQuestion(trimmed) && !isRefusal(trimmed)) return "";
+  // A command that did not happen is a problem whatever its wording ("didn't understand that"), so the log's own
+  // verdict counts as well as the opening words.
+  if (verbosity === "problems" && !isQuestion(trimmed) && !isRefusal(trimmed) && opts.ok !== false) return "";
 
   return speechTransform(trimmed);
+}
+
+/** Why a log line is being spoken — recorded on the usage row. A question first, then a failure, else a success. */
+export function speechPurposeFor(text: string, ok?: boolean): "question" | "refusal" | "success" {
+  const t = text.trim();
+  if (isQuestion(t)) return "question";
+  if (ok === false || isRefusal(t)) return "refusal";
+  return "success";
 }

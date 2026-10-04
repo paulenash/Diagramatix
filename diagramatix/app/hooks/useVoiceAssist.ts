@@ -10,6 +10,7 @@ import { useEffect, useState, useCallback } from "react";
 import type { TtsVoice } from "@/app/lib/voice/speakParams";
 import { DEFAULT_TTS_VOICE } from "@/app/lib/voice/speakParams";
 import { speaker, type SpeechPurpose } from "@/app/lib/voice/speaker";
+import { noteSpeaking } from "@/app/lib/voice/micGate";
 import type { SpeechVerbosity } from "@/app/lib/voice/spokenText";
 import {
   DEFAULT_VERBOSITY,
@@ -38,6 +39,7 @@ export function useVoiceAssist() {
     setError(null);
     if (!on) {
       speaker.stop();
+      noteSpeaking(false);
       setIsSpeaking(false);
     }
   }, []);
@@ -56,7 +58,8 @@ export function useVoiceAssist() {
     (text: string, purpose: SpeechPurpose) => {
       if (!speakEnabled) return;
       speaker.speak(text, voice, purpose, {
-        onSpeakingChange: setIsSpeaking,
+        // The mic gate (micGate.ts) hears every start and stop, however the voice ends.
+        onSpeakingChange: (on) => { noteSpeaking(on); setIsSpeaking(on); },
         onError: setError,
       });
     },

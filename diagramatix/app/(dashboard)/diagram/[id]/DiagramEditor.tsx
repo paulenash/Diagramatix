@@ -25,6 +25,11 @@ import {
 import { useAutoSave } from "@/app/hooks/useAutoSave";
 import { elementLimitBlock } from "@/app/lib/diagram/elementLimit";
 import { useVoiceSession } from "@/app/hooks/useVoiceSession";
+import { useVoiceAssist } from "@/app/hooks/useVoiceAssist";
+import { useSpeechAvailable } from "@/app/hooks/useSpeechAvailable";
+import { speaker } from "@/app/lib/voice/speaker";
+import { isMicGated } from "@/app/lib/voice/micGate";
+import { spokenText, speechPurposeFor } from "@/app/lib/voice/spokenText";
 import type { TemplateFlow, TemplateReport } from "@/app/hooks/voiceTemplateTypes";
 export type { SaveConflict } from "@/app/hooks/useAutoSave";
 import { AI_PROMPT_ANNOTATION_ID, buildPromptAnnotation, contentBBox, stripPromptAnnotations } from "@/app/lib/ai/promptAnnotation";
@@ -2425,6 +2430,17 @@ export function DiagramEditor({
 
   // ── Voice Assist: session hook (app/hooks/useVoiceSession.ts) ──
   const repairCommandRef = useRef<((heard: string) => { text: string; note: string | null }) | null>(null);
+  // SPOKEN REPLIES (Diagramatix Voice, V1). May this person hear it (the SuperAdmin tile's decision, fails closed), and
+  // their own switch / voice / how-much-to-say (kept per browser). Every line the session logs is offered to
+  // `speakReply`; while the voice sounds the microphone is gated (echoGate.ts) and a stop word cuts it off.
+  const speechAvail = useSpeechAvailable();
+  const voiceSpeech = useVoiceAssist();
+  const speakReply = useCallback((summary: string, ok: boolean) => {
+    if (!speechAvail?.available || !voiceSpeech.speakEnabled) return;
+    const text = spokenText(summary, voiceSpeech.verbosity, { ok });
+    if (text) voiceSpeech.speak(text, speechPurposeFor(summary, ok));
+  }, [speechAvail?.available, voiceSpeech.speakEnabled, voiceSpeech.verbosity, voiceSpeech.speak]);
+  const stopSpeech = useCallback(() => { speaker.stop(); }, []);
   // The Voice Assist session — its state, the command router, the guided
   // flows, the microphone loop — lives in the hook, called exactly where the
   // block was so its effects keep their place among the editor's (Stage 4 of
@@ -2441,6 +2457,7 @@ export function DiagramEditor({
     repairCommandRef,
     debugAllowed: isActingAdmin,
     collapseEpToDiagram: (epId: string, diagramName?: string) => doCollapseEpToSubprocess(epId, diagramName),
+    speakReply, isMicGated: isMicGated, stopSpeech,
     addConnector, addElementGated, addLaneAt, addPool, alignElements, beginHistoryGroup, beginLabelEdit,
     cancelLabelEdit, clearDiagram, compressLane, compressPool, connectorsRef, convertTaskSubprocess, data,
     deleteConnector, reverseConnector, deleteElement, diagramColorConfig, diagramId, diagramName, diagramType, displayMode,
@@ -5397,6 +5414,12 @@ export function DiagramEditor({
             saveState={debugSaveState}
             snapshotCount={debugSnapshots.length}
             assistHelp={assistHelp.tree ? { on: assistHelp.on, onToggle: () => assistHelp.setOn(!assistHelp.on) } : undefined}
+            speech={speechAvail?.available ? {
+              enabled: voiceSpeech.speakEnabled, onToggle: voiceSpeech.toggleSpeak,
+              voice: voiceSpeech.voice, onVoice: voiceSpeech.setVoice,
+              verbosity: voiceSpeech.verbosity, onVerbosity: voiceSpeech.setVerbosity,
+              speaking: voiceSpeech.isSpeaking, error: voiceSpeech.error, onStop: stopSpeech,
+            } : undefined}
           />
         )}
 

@@ -105,6 +105,8 @@ export async function mountSession(opts: {
   initial?: DiagramData;
   diagramId?: string;
   templateWindowReply?: string;
+  /** Extra host props (spoken replies: speakReply / isMicGated / stopSpeech) — added to what the editor hands the session. */
+  host?: Record<string, unknown>;
 } = {}): Promise<Mounted> {
   const { useVoiceSession } = await loadVoiceSession();
   const initial: DiagramData = opts.initial ?? { elements: [], connectors: [], viewport: { x: 0, y: 0, zoom: 1 } } as DiagramData;
@@ -149,7 +151,8 @@ export async function mountSession(opts: {
       cancelLabelEdit: d.cancelLabelEdit,
       beginHistoryGroup: d.beginHistoryGroup, endHistoryGroup: d.endHistoryGroup,
       handleExportJson: () => { rec.exports++; },
-    });
+      ...(opts.host ?? {}),
+    } as Parameters<typeof useVoiceSession>[0]);
     seen.d = d;
     seen.session = session;
     seen.select = setSelectedElementIds;

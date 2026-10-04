@@ -63,7 +63,7 @@ describe("2 — nothing said during the handshake is lost", () => {
     const dict = read("app", "lib", "dictation", "index.ts");
     // The microphone opens in parallel with the token fetch, the audio graph is
     // connected BEFORE onopen, chunks queue while CONNECTING, and onopen drains.
-    expect(dict).toMatch(/const micPromise[\s\S]{0,240}?getUserMedia\(\{ audio: true \}\)/);
+    expect(dict).toMatch(/const micPromise[\s\S]{0,240}?getUserMedia\(\{ audio: \{ echoCancellation: true \} \}\)/);
     const graph = dict.indexOf("source.connect(processor);");
     const open = dict.indexOf("sock.onopen = () => {");
     expect(graph, "capture is wired before the socket opens").toBeLessThan(open);

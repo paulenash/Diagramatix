@@ -34,6 +34,7 @@ import { FRAGMENT_CONTINUE_MS, FRAGMENT_MAX_WAITS, FRAGMENT_SILENCE_MS } from "@
 import { batchFlashes, type FlashBox, flashTargets, isGoldFlashOn, setGoldFlash } from "@/app/lib/assist/goldFlash";
 import { isIncompleteCommand } from "@/app/lib/assist/incompleteCommand";
 import { isLonePixelWord } from "@/app/lib/assist/loneUnit";
+import { echoVerdict } from "@/app/lib/voice/echoGate";
 import { twoLanesSelected } from "@/app/lib/assist/laneSwapSelection";
 import { elementUnderPointer, hoverConnectorAt } from "@/app/lib/assist/pointerRef";
 import { type MessagePick, parseMessageAnswer, resolveMessageAnswer } from "@/app/lib/assist/messageTargets";
@@ -76,6 +77,12 @@ export interface VoiceSessionHost extends Pick<AssistDiagramActions, "addConnect
   handleExportJson: () => void | Promise<void>;
   /** "collapse this subprocess to a new diagram" — creates the linked diagram on the server. Absent on the phone. */
   collapseEpToDiagram?: (epId: string, diagramName?: string) => void | Promise<void>;
+  /** Spoken replies: offered every line the log receives; the host speaks it, or not (switch, voice, how much). */
+  speakReply?: (summary: string, ok: boolean) => void;
+  /** True while Diagramatix is speaking (and a moment after): the microphone's transcript is its own voice. */
+  isMicGated?: () => boolean;
+  /** Barge-in: cut the voice off at once. */
+  stopSpeech?: () => void;
   nextStepRef: AssistApplyContext["refs"]["nextStepRef"];
   openTemplateWindowRef: AssistApplyContext["refs"]["openTemplateWindowRef"];
   riskCatalog: AssistApplyContext["riskCatalog"];
@@ -119,10 +126,15 @@ export function useVoiceSession(host: VoiceSessionHost) {
    * ops just applied (plan: "The editor's single log closure … gains at and
    * ops"). A dozen direct appends once skipped the time.
    */
+  // Spoken replies (Diagramatix Voice, V1): the host decides whether, in which voice and how much — every line
+  // that reaches the log is offered to it, here, once. (An absent host callback is silence: the phone, the tests.)
+  const speakReplyRef = useRef(host.speakReply);
+  speakReplyRef.current = host.speakReply;
   const appendLog = useCallback((entry: Omit<CommandLogEntry, "id" | "at">) => {
     const ops = appliedOpsRef.current;
     appliedOpsRef.current = null;
     setVoiceLog((prev) => [...prev, { id: nanoid(), at: Date.now(), ...entry, ...(ops ? { ops } : {}) }]);
+    if (entry.summary) speakReplyRef.current?.(entry.summary, entry.ok);
   }, []);
   const [voiceListening, setVoiceListening] = useState(false);
   const [abraEngine, setAbraEngine] = useState<"deepgram" | "browser" | null>(null);
@@ -1152,8 +1164,13 @@ export function useVoiceSession(host: VoiceSessionHost) {
       onEngine: (e) => setAbraEngine(e),
       onReady: () => setAbraConnecting(false),
       // Show the command building: buffered fragments + the in-progress words.
-      onInterim: (t) => { bumpAbraIdle(); setVoiceInterim((voiceBuffer.current ? voiceBuffer.current + " " : "") + t); },
+      // While Diagramatix is SPEAKING the microphone hears its own voice: nothing it hears is shown or buffered, except
+      // the stop words (echoGate.ts).
+      onInterim: (t) => { if (echoVerdict(t, host.isMicGated?.() === true) === "ignore") return; bumpAbraIdle(); setVoiceInterim((voiceBuffer.current ? voiceBuffer.current + " " : "") + t); },
       onText: (t) => {
+        const heardWhileSpeaking = echoVerdict(t, host.isMicGated?.() === true);
+        if (heardWhileSpeaking === "ignore") return;
+        if (heardWhileSpeaking === "bargeIn") host.stopSpeech?.();      // barge-in: the voice stops at once
         bumpAbraIdle();
         const txt = t.trim();
         if (!txt) return;
