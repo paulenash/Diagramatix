@@ -289,10 +289,13 @@ export function AdminClient({ users: initialUsers, currentUserId, currentUserEma
           on columns have room to breathe. Per-column min-widths declared
           on the <th> stops the smaller numeric / date columns from
           starving the text-heavy ones. */}
-      <div className="flex-1 min-h-0 overflow-y-auto max-w-none w-full mx-auto px-6 py-8">
+      <div data-testid="admin-scroll" className="flex-1 min-h-0 overflow-auto max-w-none w-full mx-auto px-6 py-8">
         {isSuperAdmin && !showUsers && <SuperAdminToolsGrid onShowUsers={() => setShowUsers(true)} currentUserEmail={currentUserEmail} />}
         {showUsers && (
-        <table className="w-full bg-white rounded-lg border border-gray-200 overflow-hidden table-fixed">
+        <div data-testid="registered-users-scroll" className="rounded-lg">
+        {/* A horizontal scroll bar for the Registered Users table (Paul, 2026-10-05): the columns have a floor, so a narrow window
+            scrolls sideways instead of squashing every column. */}
+        <table className="w-full min-w-[1280px] bg-white rounded-lg border border-gray-200 overflow-hidden table-fixed">
           <thead>
             <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               <th className="px-3 py-3" style={{ width: "11%" }}>
@@ -544,6 +547,7 @@ export function AdminClient({ users: initialUsers, currentUserId, currentUserEma
             })}
           </tbody>
         </table>
+        </div>
         )}
         {showUsers && (
         <p className="text-xs text-gray-400 mt-4">

@@ -148,3 +148,33 @@ describe("T5239 the editor wiring", () => {
     expect(readFileSync("app/m/diagram/[id]/MobileDiagramScreen.tsx", "utf8")).not.toContain("healEndpoints");
   });
 });
+
+describe("T5239 the heal waits for the reload on entry (Paul, 2026-10-05: “it flashes the connectors but does not repair them or allow undo”)", () => {
+  it("with co-authoring live the heal waits for the reload; without it, or read-only, it runs at once", async () => {
+    const { healMayRun } = await import("@/app/lib/diagram/healTiming");
+    expect(healMayRun({ collabLive: true, freshLoadDone: false })).toBe(false);
+    expect(healMayRun({ collabLive: true, freshLoadDone: true })).toBe(true);
+    expect(healMayRun({ collabLive: false, freshLoadDone: false })).toBe(true);
+  });
+  it("the editor's reload-on-entry reports when it is done — even if the fetch failed — and the heal is gated on it", () => {
+    const editor = readFileSync("app/(dashboard)/diagram/[id]/DiagramEditor.tsx", "utf8");
+    expect(editor).toMatch(/try \{ const s = await revertToSaved\(\); if \(s\) setData\(s\); \}\s+finally \{ setFreshLoadDone\(true\);/);
+    expect(editor).toContain("healMayRun({ collabLive: collabEnabled && !readOnly, freshLoadDone })");
+    // …and the heal block sits AFTER the reload effect, so the order of effects is the order of events.
+    expect(editor.indexOf("healMayRun({ collabLive")).toBeGreaterThan(editor.indexOf("Reload-fresh on entry"));
+  });
+  it("the replacement is exactly what throws a heal away: setData replaces the state and clears the undo history", () => {
+    const hook = readFileSync("app/hooks/useDiagram.ts", "utf8");
+    const at = hook.indexOf("const setData = useCallback");
+    expect(hook.slice(at, at + 400)).toContain("pastRef.current = [];");
+  });
+  it("on the file Paul sent (new diagram from phone image 1): the heal separates the message and the sequence flow on the event's top face", () => {
+    const j = JSON.parse(readFileSync("tests/fixtures/endpoint-heal/phone-image-1.json", "utf8"));
+    const d = j.diagrams[0].data as DiagramData;
+    expect(shared(d).length).toBe(1);
+    const r = healEndpoints(d);
+    expect(r.changedIds.sort()).toEqual(["conn-pC-ie1-15", "conn-t4-pC-11", "conn-t5-ie1-14"]);   // …and the message that started under the timer (R8.42)
+    expect(findLayoutViolations(r.data).filter((v) => v.startsWith("message attaches inside an edge-mounted event"))).toEqual([]);
+    expect(shared(r.data)).toEqual([]);
+  });
+});

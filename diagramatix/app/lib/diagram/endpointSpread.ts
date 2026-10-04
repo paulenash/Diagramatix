@@ -66,17 +66,34 @@ export interface SpreadResult {
 }
 
 // ── crossings ──────────────────────────────────────────────────────────────────
-const cross = (o: Point, a: Point, b: Point) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
-/** A proper crossing: the two segments meet strictly inside both. Touching at an end, or running along each other, is not one. */
-function segmentsCross(p1: Point, p2: Point, p3: Point, p4: Point): boolean {
-  const d1 = cross(p3, p4, p1), d2 = cross(p3, p4, p2), d3 = cross(p1, p2, p3), d4 = cross(p1, p2, p4);
-  const T = 1e-6;
-  return ((d1 > T && d2 < -T) || (d1 < -T && d2 > T)) && ((d3 > T && d4 < -T) || (d3 < -T && d4 > T));
+/**
+ * Where two segments meet, or null. Closed segments, so a line that passes THROUGH a corner of the other route counts —
+ * the corner is where one segment of that route ends and the next begins, and a strict "inside both" test saw neither
+ * (Paul, 2026-10-05: a loop-back leaving an event's face climbed through the corner of the flow arriving on the same face,
+ * a real crossing the allocator could not see, so it put them the wrong way round). Parallel / collinear runs are not a
+ * crossing here (the 3 px spread keeps them apart; overlap is what the spread exists to prevent).
+ */
+function meetAt(p1: Point, p2: Point, p3: Point, p4: Point): Point | null {
+  const rx = p2.x - p1.x, ry = p2.y - p1.y, sx = p4.x - p3.x, sy = p4.y - p3.y;
+  const den = rx * sy - ry * sx;
+  if (Math.abs(den) < 1e-9) return null;                                   // parallel or collinear
+  const t = ((p3.x - p1.x) * sy - (p3.y - p1.y) * sx) / den;
+  const u = ((p3.x - p1.x) * ry - (p3.y - p1.y) * rx) / den;
+  const E = 1e-6;
+  if (t < -E || t > 1 + E || u < -E || u > 1 + E) return null;
+  return { x: p1.x + t * rx, y: p1.y + t * ry };
 }
+/** The number of distinct points where two routes cross. A meeting at either route's own two ends (an attachment) is not a crossing. */
 function crossingsBetween(a: Point[], b: Point[]): number {
-  let n = 0;
-  for (let i = 1; i < a.length; i++) for (let j = 1; j < b.length; j++) if (segmentsCross(a[i - 1], a[i], b[j - 1], b[j])) n++;
-  return n;
+  const ends = [a[0], a[a.length - 1], b[0], b[b.length - 1]];
+  const seen = new Set<string>();
+  for (let i = 1; i < a.length; i++) for (let j = 1; j < b.length; j++) {
+    const m = meetAt(a[i - 1], a[i], b[j - 1], b[j]);
+    if (!m) continue;
+    if (ends.some((e) => Math.abs(e.x - m.x) < 0.75 && Math.abs(e.y - m.y) < 0.75)) continue;
+    seen.add(`${Math.round(m.x * 2)}|${Math.round(m.y * 2)}`);
+  }
+  return seen.size;
 }
 function bbox(r: Point[]) {
   return { x0: Math.min(...r.map((p) => p.x)), x1: Math.max(...r.map((p) => p.x)), y0: Math.min(...r.map((p) => p.y)), y1: Math.max(...r.map((p) => p.y)) };
@@ -143,7 +160,9 @@ export function spreadEndpoints(
     };
     if (!fits(s) || !fits(t)) return false;
     const so = round4((x - s.x) / s.width), to = round4((x - t.x) / t.width);
-    if (Math.abs(so - offOf(c, "source")) < 1e-6 && Math.abs(to - offOf(c, "target")) < 1e-6) return true;
+    // Already there (at both ends, to a quarter of a pixel — offsets are stored rounded, and a pool end can differ from the
+    // spine by that rounding): not a change, or a second run over its own output would report it moved.
+    if (Math.abs(s.x + offOf(c, "source") * s.width - x) < EPS && Math.abs(t.x + offOf(c, "target") * t.width - x) < EPS) return true;
     work.set(id, { ...c, sourceOffsetAlong: so, targetOffsetAlong: to });
     changed.add(id);
     return true;
@@ -265,10 +284,81 @@ export function spreadEndpoints(
 
   const unresolvedFaces = new Set<string>();
 
+  /**
+   * KEEP-OUT ZONES (rule R8.42, Paul, 2026-10-05): along a face, the stretches an edge-mounted intermediate event (EMIE)
+   * sits on. A MESSAGE never attaches inside one — its line would start under the event. Each zone is the event's extent
+   * along the face plus a clearance, in px from the face's start.
+   */
+  const KEEP_OUT_CLEARANCE = 3;
+  const keepOutZones = (host: DiagramElement, side: Side): { lo: number; hi: number }[] => {
+    const zones: { lo: number; hi: number }[] = [];
+    for (const b of elementList) {
+      if (b.boundaryHostId !== host.id) continue;
+      const cx = b.x + b.width / 2, cy = b.y + b.height / 2;
+      const onFace = side === "top" ? Math.abs(cy - host.y) <= b.height
+        : side === "bottom" ? Math.abs(cy - (host.y + host.height)) <= b.height
+        : side === "left" ? Math.abs(cx - host.x) <= b.width
+        : Math.abs(cx - (host.x + host.width)) <= b.width;
+      if (!onFace) continue;
+      const start = horizontal(side) ? b.x - host.x : b.y - host.y;
+      const len = horizontal(side) ? b.width : b.height;
+      zones.push({ lo: start - KEEP_OUT_CLEARANCE, hi: start + len + KEEP_OUT_CLEARANCE });
+    }
+    return zones;
+  };
+
+  /** Move every movable message on this face that sits inside a keep-out zone to the nearest legal point. */
+  function clearOfEvents(key: string, ends: End[], zones: { lo: number; hi: number }[]): boolean {
+    let moved = false;
+    const L = faceLength(ends[0].el, ends[0].side);
+    const margin = SPREAD.activity.margin;
+    // A point placed ON a zone's edge is stored rounded to 4 places of the offset, so allow that much slop (0.05 px) or a
+    // second pass would see it "inside" and move it again — generated layouts must be a fixed point of this allocator.
+    const inside = (v: number) => zones.some((z) => v > z.lo + 0.05 && v < z.hi - 0.05);
+    for (const e of ends) {
+      if (!e.isMessage || !e.movableHere) continue;
+      const pos = posOf(e);
+      if (!inside(pos)) continue;
+      const candidates: number[] = [];
+      for (const z of zones) candidates.push(z.lo, z.hi);
+      const legal = candidates.filter((v) => v >= margin - 1e-6 && v <= L - margin + 1e-6 && !inside(v)).sort((a, b) => Math.abs(a - pos) - Math.abs(b - pos));
+      if (!legal.length || !setPos(e, legal[0])) { unresolvedFaces.add(key); continue; }
+      moved = true;
+    }
+    return moved;
+  }
+
+  /**
+   * Evenly spaced slots, none inside a keep-out zone (R8.42): walk right from the first slot hopping over any zone; if that
+   * runs off the face walk left from the last; if neither fits, keep the plain slots (the face is reported unresolved).
+   * Without this the spread would put a message back under the event that clearing had just moved it out from.
+   */
+  function slotsClearOf(plain: number[], step: number, lo: number, hi: number, zones: { lo: number; hi: number }[]): number[] {
+    const inZone = (v: number) => zones.find((z) => v > z.lo + 0.05 && v < z.hi - 0.05);
+    const right: number[] = [];
+    for (let k = 0; k < plain.length; k++) {
+      let v = k === 0 ? plain[0] : Math.max(plain[k], right[k - 1] + step);
+      for (let guard = 0; guard < 8; guard++) { const z = inZone(v); if (!z) break; v = z.hi; }
+      right.push(v);
+    }
+    if (right[right.length - 1] <= hi + EPS) return right;
+    const left: number[] = new Array(plain.length);
+    for (let k = plain.length - 1; k >= 0; k--) {
+      let v = k === plain.length - 1 ? plain[k] : Math.min(plain[k], left[k + 1] - step);
+      for (let guard = 0; guard < 8; guard++) { const z = inZone(v); if (!z) break; v = z.lo; }
+      left[k] = v;
+    }
+    return left[0] >= lo - EPS ? left : plain;
+  }
+
   /** A face on an Activity or an Event: spread the colliding ends. */
   function resolveFace(key: string, ends: End[], cl: "activity" | "event"): boolean {
     const L = faceLength(ends[0].el, ends[0].side);
     const spec = SPREAD[cl];
+    // A message never attaches inside an edge-mounted event on this face (R8.42): clear those first, then spread.
+    const zones = cl === "activity" ? keepOutZones(ends[0].el, ends[0].side) : [];
+    const clearedAny = zones.length ? clearOfEvents(key, ends, zones) : false;
+    if (ends.length < 2) return clearedAny;
     const sorted = ends.map((e) => ({ e, pos: posOf(e) })).sort((a, b) => a.pos - b.pos || a.e.id.localeCompare(b.e.id));
     const clusters: { e: End; pos: number }[][] = [];
     for (const it of sorted) {
@@ -279,8 +369,13 @@ export function spreadEndpoints(
     let moved = false;
     for (const cluster of clusters) {
       if (cluster.length < 2) continue;                          // a lone end, or one that collides with nothing: never touched
-      const movables = cluster.filter((x) => x.e.movableHere);
-      const fixed = cluster.filter((x) => !x.e.movableHere);
+      // On a face with an edge-mounted event a message is doubly held (the zone here, its neighbours at the pool), so a
+      // sequence flow in its cluster gives way instead; otherwise the pool pass pulls the message straight back and the
+      // two passes never agree (a generated layout must be a fixed point of this allocator).
+      const pinMsgs = zones.length > 0 && cluster.some((x) => !x.e.isMessage && x.e.movableHere);
+      const isMovable = (x: { e: End }) => x.e.movableHere && !(pinMsgs && x.e.isMessage);
+      const movables = cluster.filter(isMovable);
+      const fixed = cluster.filter((x) => !isMovable(x));
       if (!movables.length) { if (fixed.some((f) => !f.e.frozen)) unresolvedFaces.add(key); continue; }   // all frozen: left as it was
       const hasMsg = cluster.some((x) => x.e.isMessage);
       const lo = spec.margin, hi = L - spec.margin;
@@ -291,12 +386,14 @@ export function spreadEndpoints(
         // movable ends round EVERY other end on the face — not just the ones in this cluster, or a placement can land on a
         // neighbour just outside it (and which one wins would depend on nothing but the order the ids sort in).
         const placed = sorted.filter((x) => !movables.some((m) => m.e.id === x.e.id)).map((x) => ({ e: x.e, pos: x.pos }));
-        const base = hasMsg ? (cl === "activity" ? SPREAD.messageActivity : SPREAD.messageEvent) : spec.step;
+        const base = zones.length ? 1 : hasMsg ? (cl === "activity" ? SPREAD.messageActivity : SPREAD.messageEvent) : spec.step;   // beside an event the gaps are tight: search by the pixel
+        const maxK = zones.length ? Math.ceil(L) : 12;
         for (const m of [...movables].sort((x, y) => otherCoord(x.e) - otherCoord(y.e) || x.e.id.localeCompare(y.e.id))) {
           let done = false;
-          for (let k = 0; k <= 12 && !done; k++) {
+          for (let k = 0; k <= maxK && !done; k++) {
             for (const sign of k === 0 ? [0] : [1, -1]) {
               const px = clamp(m.pos + sign * k * base, lo, hi);
+              if (zones.length && !m.e.isMessage && zones.some((z) => px > z.lo + 0.05 && px < z.hi - 0.05)) continue;     // nothing else sits under the event either
               if (placed.every((q) => Math.abs(q.pos - px) >= pairGap(m.e, q.e) - EPS) && setPos(m.e, px)) {
                 if (Math.abs(px - m.pos) > 1e-6) moved = true;
                 placed.push({ e: m.e, pos: px });
@@ -316,7 +413,8 @@ export function spreadEndpoints(
       if (step < minGap - EPS) unresolvedFaces.add(key);          // no room for the full gap: spread as far as the face allows
       const mean = movables.reduce((s, x) => s + x.pos, 0) / m;
       const start = clamp(mean - ((m - 1) * step) / 2, lo, hi - (m - 1) * step);
-      const slots = Array.from({ length: m }, (_, k) => start + k * step);
+      let slots = Array.from({ length: m }, (_, k) => start + k * step);
+      if (zones.length && hasMsg) slots = slotsClearOf(slots, step, lo, hi, zones);
       // The order along the face follows the order of the elements the connectors go to; flipped only to cross less.
       const ordered = [...movables].sort((a, b) => otherCoord(a.e) - otherCoord(b.e) || a.e.id.localeCompare(b.e.id));
       const perm = bestOrder(ordered.map((x) => x.e), slots);
@@ -341,6 +439,16 @@ export function spreadEndpoints(
         const el = els.get(eid)!, cl = classOf(el);
         const m = Math.min(cl ? SPREAD[cl].margin : 0, el.width / 2);
         lo = Math.max(lo, el.x + m); hi = Math.min(hi, el.x + el.width - m);
+      }
+      // R8.42: a message must not be pushed INTO an edge-mounted event's keep-out zone on its Task. It stays on the side of
+      // the zone it is on, so its neighbours give way instead (else this pass and the keep-out clearing undo each other).
+      const role = ctrlRole(c), host = els.get(role === "source" ? c.sourceId : c.targetId)!;
+      if (classOf(host) === "activity") {
+        const local = spineX(c) - host.x;
+        for (const z of keepOutZones(host, role === "source" ? c.sourceSide : c.targetSide)) {
+          if (local <= z.lo + 0.05) hi = Math.min(hi, host.x + z.lo);
+          else if (local >= z.hi - 0.05) lo = Math.max(lo, host.x + z.hi);
+        }
       }
       return { lo, hi };
     };
@@ -377,8 +485,9 @@ export function spreadEndpoints(
     const isPoolFace = (k: string) => classOf(faces.get(k)![0].el) === "pool";
     for (const key of [...faces.keys()].sort((a, b) => Number(isPoolFace(a)) - Number(isPoolFace(b)) || (a < b ? -1 : a > b ? 1 : 0))) {
       const ends = faces.get(key)!;
-      if (ends.length < 2) continue;
       const cl = classOf(ends[0].el)!;
+      // A lone message can still be under an edge-mounted event (R8.42), so such a face is visited too.
+      if (ends.length < 2 && !(cl === "activity" && ends.some((e) => e.isMessage) && keepOutZones(ends[0].el, ends[0].side).length)) continue;
       moved = (cl === "pool" ? resolvePoolFace(key, ends) : resolveFace(key, ends, cl)) || moved;
     }
     if (!moved) break;

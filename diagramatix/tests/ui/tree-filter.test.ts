@@ -54,7 +54,7 @@ describe("the tree applies the filter in one place, for every folder", () => {
     const src = read("app", "(dashboard)", "dashboard", "projects", "[id]", "ProjectDetailClient.tsx");
     const fn = src.slice(src.indexOf("function getOrderedDiagramsInFolder"));
     const body = fn.slice(0, fn.indexOf("if (diagramSort === \"manual\")"));
-    expect(body, "the per-folder list is filtered at its source").toMatch(/matchesTreeFilter\(d, badgesByDiagram\.get\(d\.id\) \?\? \[\], treeFilter\)/);
+    expect(body, "the per-folder list is filtered at its source").toMatch(/matchesTreeFilter\(d, badgesByDiagram\.get\(d\.id\) \?\? \[\], showBadges \? treeFilter : \{ \.\.\.treeFilter, badges: \[\] \}\)/);
     // The control: name box, type select, and one toggle per badge facet. The
     // toggles are rendered from a table of [key, code, title], so the check is
     // that every badge key is in that table and each row calls the toggle.

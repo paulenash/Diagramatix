@@ -284,6 +284,29 @@ export function findLayoutViolations(data: DiagramData): string[] {
     if (ids.length > 1) v.push(`shared attachment point ${key} — connectors ${ids.join(", ")}`);
   }
 
+  // 2b ── R8.42: a message never attaches inside an edge-mounted event ───────
+  // (Paul, 2026-10-05.) An edge-mounted intermediate event (EMIE) sits ON its host's boundary; a message that leaves or
+  // arrives on that boundary where the event is would start under it. The attachment point — the visible end of the
+  // connector — must lie outside every event mounted on the element it attaches to.
+  for (const c of conns) {
+    if (c.type !== "messageBPMN") continue;
+    const w = c.waypoints ?? [];
+    if (w.length < 2) continue;
+    const ends: [string, { x: number; y: number }][] = [
+      [c.sourceId, c.sourceInvisibleLeader ? w[1] : w[0]],
+      [c.targetId, c.targetInvisibleLeader ? w[w.length - 2] : w[w.length - 1]],
+    ];
+    for (const [hostId, pt] of ends) {
+      if (!pt) continue;
+      for (const b of els) {
+        if (b.boundaryHostId !== hostId) continue;
+        if (pt.x > b.x + 0.5 && pt.x < b.x + b.width - 0.5 && pt.y > b.y + 0.5 && pt.y < b.y + b.height - 0.5) {
+          v.push(`message attaches inside an edge-mounted event — connector ${c.id} on ${hostId}, under ${b.id}`);
+        }
+      }
+    }
+  }
+
   // 3 ── gateway labels stay clear of flow nodes + connectors ───────────────
   const segs = conns.filter((c) => RULED.has(c.type)).flatMap(segmentsOf);
   for (const g of els) {

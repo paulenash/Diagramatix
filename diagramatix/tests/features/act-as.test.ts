@@ -188,6 +188,12 @@ describe("T5112 — the switch, the banner and the tools are wired", () => {
     expect(read("app/layout.tsx")).toContain("<ActingAsBanner superAdmin={superAdmin} />");
   });
 
+  it("…but it is NOT SHOWN: acting as a level must look exactly like being that customer, for video and screenshots (Paul, 2026-10-05)", () => {
+    const b = read("app/components/ActingAsBanner.tsx");
+    expect(b).toContain("export const SHOW_ACTING_AS_BANNER = false;");
+    expect(b.indexOf("if (!SHOW_ACTING_AS_BANNER) return null;")).toBeLessThan(b.indexOf("if (!superAdmin) return null;"));
+  });
+
   it("the tools are a SuperAdmin-only POST returning the fresh snapshot, and a Test tools panel in the admin popover", () => {
     const r = read("app/api/admin/users/[id]/usage/route.ts");
     expect(r).toContain('case "set-counter"');

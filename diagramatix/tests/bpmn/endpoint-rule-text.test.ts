@@ -13,7 +13,7 @@ const sql = readFileSync("scripts/sql/patch-rule-r8-41-one-connector-per-point.s
 function ruleFromSeed(): string {
   const at = seed.indexOf("R8.41:");
   const end = seed.indexOf('"', seed.indexOf("stays exactly as drawn.", at));
-  return JSON.parse(`"${seed.slice(at, end)}"`);
+  return (JSON.parse(`"${seed.slice(at, end)}"`) as string).split("\nR8.42:")[0];   // R8.42 is appended to the same string
 }
 function ruleFromSql(): string {
   const m = sql.match(/\$NEW\$(R8\.41:[\s\S]*?)\$NEW\$/);

@@ -4401,7 +4401,21 @@ export function layoutBpmnDiagram(
   // It runs TWICE: here, so the passes that read the offsets (R8.14–R8.18 …) see spread ends, and again just before the
   // routes are drawn (below), because those passes move elements and a spread that was right can stop being right.
   // It is idempotent, so the second run changes only what the movement broke.
-  const spreadConnectorEnds = () => {
+  // The ORDER along a face is decided by the routes the connectors will take, and those depend on where everything ends up.
+  // So the second run does not merely keep what the first decided: it puts back the offsets the first run changed and
+  // decides again on the final geometry (Paul, 2026-10-05: on the intermediate event the sequence flow was left of the
+  // message and crossed it; the other way round they would not touch — the order had been fixed on early geometry).
+  const spreadOriginals = new Map<string, { so: number | undefined; to: number | undefined }>();
+  const spreadConnectorEnds = (revertFirst = false) => {
+    if (revertFirst) {
+      for (const c of connectors) {
+        const o = spreadOriginals.get(c.id);
+        if (!o) continue;
+        if (o.so === undefined) delete c.sourceOffsetAlong; else c.sourceOffsetAlong = o.so;
+        if (o.to === undefined) delete c.targetOffsetAlong; else c.targetOffsetAlong = o.to;
+      }
+      spreadOriginals.clear();
+    }
     for (const c of connectors) {
       if (c.type !== "sequence") continue;
       if (elMap.get(c.sourceId)?.type === "gateway") c.sourceOffsetAlong = 0.5;
@@ -4412,6 +4426,7 @@ export function layoutBpmnDiagram(
     for (const id of spread.changedIds) {
       const to = spreadById.get(id), from = connectors.find((c) => c.id === id);
       if (!to || !from) continue;
+      if (!spreadOriginals.has(id)) spreadOriginals.set(id, { so: from.sourceOffsetAlong, to: from.targetOffsetAlong });
       from.sourceOffsetAlong = to.sourceOffsetAlong;
       from.targetOffsetAlong = to.targetOffsetAlong;
     }
@@ -6012,7 +6027,7 @@ export function layoutBpmnDiagram(
   phase(`connectors built (${connectors.length})`);
 
   // The final geometry is settled: spread again (see spreadConnectorEnds) before any route is drawn.
-  spreadConnectorEnds();
+  spreadConnectorEnds(true);
 
   // Compute waypoints for all connectors
   const computedConnectors = connectors.map((conn, i) => {

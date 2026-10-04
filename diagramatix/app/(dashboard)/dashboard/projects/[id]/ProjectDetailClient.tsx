@@ -910,6 +910,14 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
   // The selection is cleared on Escape or when the user opens any
   // diagram via plain click.
   const [selectedDiagramIds, setSelectedDiagramIds] = useState<Set<string>>(new Set());
+  // The right-hand Properties panel: collapsed on entry, openable (Paul, 2026-10-05).
+  const [propertiesOpen, setPropertiesOpen] = useState(false);
+  // The navigation panel's "Badges" tick (Paul, 2026-10-05): off hides the feature badges beside each diagram AND the filter
+  // badges, and a badge filter is ignored while they are hidden (nothing may be filtered out by something you cannot see).
+  // Remembered on this browser; on until ticked off.
+  const [showBadges, setShowBadges] = useState(true);
+  useEffect(() => { try { if (localStorage.getItem("dgx.nav.showBadges") === "off") setShowBadges(false); } catch { /* default */ } }, []);
+  const chooseShowBadges = (on: boolean) => { setShowBadges(on); try { localStorage.setItem("dgx.nav.showBadges", on ? "on" : "off"); } catch { /* not kept */ } };
   const [lastSelectedDiagramId, setLastSelectedDiagramId] = useState<string | null>(null);
   // Single-clicked "preview" diagram → shows the read/edit Diagram Properties
   // aside (item 1). Distinct from the Ctrl/Shift multi-select set above.
@@ -1092,7 +1100,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
   function getOrderedDiagramsInFolder(folderId: string): DiagramSummary[] {
     const direct = diagrams
       .filter(d => (folderTree.diagramFolderMap[d.id] ?? ROOT_ID) === folderId)
-      .filter(d => matchesTreeFilter(d, badgesByDiagram.get(d.id) ?? [], treeFilter));
+      .filter(d => matchesTreeFilter(d, badgesByDiagram.get(d.id) ?? [], showBadges ? treeFilter : { ...treeFilter, badges: [] }));
     if (diagramSort === "manual") {
       const order = folderTree.diagramOrder?.[folderId];
       if (!order) return direct;
@@ -2637,7 +2645,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
                         reveal on hover — those overlay the end of the row, and
                         a badge that vanished when you reached for it would be
                         worse than one that is always there. */}
-                    <DiagramFeatureBadges badges={badgesByDiagram.get(d.id) ?? []} />
+                    {showBadges && <DiagramFeatureBadges badges={badgesByDiagram.get(d.id) ?? []} />}
                     <button onClick={(e) => { e.stopPropagation(); startRename(d.id, d.name); }}
                       className="opacity-0 group-hover/dgname:opacity-100 hover:!opacity-100 text-gray-400 hover:text-blue-500 px-0.5"
                       title="Rename diagram"
@@ -3124,6 +3132,10 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
                 <path d="M21 3v6h-6" />
               </svg>
             </button>
+            <label className="shrink-0 flex items-center gap-1 text-[10px] text-gray-600 cursor-pointer select-none" title="Show the feature badges beside each diagram, and the badge filters">
+              <input type="checkbox" checked={showBadges} onChange={(e) => chooseShowBadges(e.target.checked)} className="h-3 w-3" aria-label="Badges" />
+              Badges
+            </label>
           </div>
           {/* Filter — by type, by name, by feature badge. The badges are the
               same AI / SI / MN / AP / RC chips drawn beside each diagram, so
@@ -3150,7 +3162,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
               <option value="">Any type</option>
               {projectDiagramTypes.map((t) => <option key={t} value={t}>{diagramTypeStyle(t).code || t}</option>)}
             </select>
-            {([
+            {showBadges && ([
               ["ai", "AI", "Has an AI prompt"],
               ["simulator", "SI", "Has simulation data"],
               ["mining", "MN", "Has mining data"],
@@ -3349,6 +3361,27 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
           </div>
         </main>
 
+        {/* THE RIGHT-HAND PROPERTIES PANEL — collapsible, and COLLAPSED on entry (Paul, 2026-10-05: "add a hide arrow to the
+            Project Properties and show it collapsed on initial entry to the project. Show it collapsed but openable if a Diagram
+            is selected"). One state for both panels (the project's and the selected diagram's): a slim strip with an arrow opens
+            it, an arrow in its corner hides it again. */}
+        {(() => {
+          const diagramPanel = !!previewDiagramId && diagrams.some((x) => x.id === previewDiagramId);
+          const projectPanel = !previewDiagramId && selectedFolderId === ROOT_ID && selectedDiagramIds.size === 0 && !selectedDiagram;
+          if (!diagramPanel && !projectPanel) return null;
+          if (!propertiesOpen) {
+            return (
+              <aside data-testid="properties-collapsed" className="shrink-0 w-8 border-l border-gray-200 bg-white flex flex-col items-center py-2 gap-2">
+                <button type="button" onClick={() => setPropertiesOpen(true)} aria-label="Show properties" title="Show properties"
+                  className="h-6 w-6 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 text-sm leading-none">‹</button>
+                <span className="text-[10px] uppercase tracking-wide text-gray-400 [writing-mode:vertical-rl] select-none">{diagramPanel ? "Diagram properties" : "Project properties"}</span>
+              </aside>
+            );
+          }
+          return (
+            <div data-testid="properties-open" className="relative flex shrink-0">
+              <button type="button" onClick={() => setPropertiesOpen(false)} aria-label="Hide properties" title="Hide properties"
+                className="absolute top-1.5 left-1 z-10 h-6 w-6 rounded border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 text-sm leading-none">›</button>
         {/* Right: per-diagram Properties — shown when a tile is single-clicked
             (double-click opens). Takes priority over the Project Properties. */}
         {previewDiagramId && (() => {
@@ -3390,6 +3423,9 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
             onToggleNonApqc={numberingHasPcf ? toggleShowNonApqc : undefined}
           />
         )}
+            </div>
+          );
+        })()}
       </div>
 
       {showPcfCoverage && (

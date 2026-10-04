@@ -94,6 +94,7 @@ import { captureTemplate, instantiateTemplate } from "@/app/lib/diagram/template
 import { buildCollapsedEpDiagram, movedIdsForCollapse } from "@/app/lib/diagram/epToDiagram";
 import { connectorVisibleSegments } from "@/app/lib/mobile/voiceEdit";
 import type { HealFlashLine } from "@/app/components/canvas/HealFlashOverlay";
+import { healMayRun } from "@/app/lib/diagram/healTiming";
 import { resolvePackageNameLink } from "@/app/lib/diagram/packageLink";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { SimulatorOverlay } from "@/app/components/simulation/SimulatorOverlay";
@@ -1099,36 +1100,6 @@ export function DiagramEditor({
   saveNowRef.current = saveNow;
   saveStatusRef.current = saveStatus;
 
-  // HEAL ON LOAD (connector-endpoint plan, slice 5; Paul, 2026-10-04: "heal-on-load should flash the affected connectors green
-  // and allow an undo to return to the diagram as originally saved"). Once per opened diagram, in the EDITOR only — the phone
-  // viewer and every read-only view draw the diagram as saved. Separates connectors that share an attachment point, as ONE
-  // undoable step (the snapshot is taken first), flashes them green, and says so. An image-generated or imported diagram
-  // stays exactly as drawn (relaxedLayout / exactAsDrawn), gateways are out of scope, and a diagram with nothing to heal
-  // opens exactly as before: no flash, no history entry, not dirtied. Like any edit it is then autosaved; Undo restores
-  // the saved drawing (and is autosaved in turn).
-  const [healFlash, setHealFlash] = useState<{ runId: number; lines: HealFlashLine[] } | null>(null);
-  const [healNotice, setHealNotice] = useState<string | null>(null);
-  const healDoneFor = useRef<string | null>(null);
-  useEffect(() => {
-    if (healDoneFor.current === diagramId) return;
-    healDoneFor.current = diagramId;
-    if (diagramType !== "bpmn" || readOnly || templateEditState !== null || historyPreviewActive) return;
-    const { ids, data: healed } = healEndpointsNow();
-    if (!ids.length) return;
-    const lines: HealFlashLine[] = [];
-    for (const id of ids) {
-      const c = healed.connectors.find((x) => x.id === id);
-      if (c) connectorVisibleSegments(c, healed).forEach(([a, b], i) => lines.push({ id: `${id}:${i}`, points: [a, b] }));
-    }
-    setHealFlash({ runId: Date.now(), lines });
-    setHealNotice(`${ids.length} connector${ids.length === 1 ? " was" : "s were"} separated where ${ids.length === 1 ? "it" : "they"} shared an attachment point — Undo restores the saved drawing.`);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [diagramId]);
-  useEffect(() => {
-    if (!healNotice) return;
-    const t = setTimeout(() => setHealNotice(null), 9000);
-    return () => clearTimeout(t);
-  }, [healNotice]);
   const effectiveUpdatedAt = lastSavedAt ?? updatedAt;
 
   // Warn user about unsaved changes when leaving the page
@@ -1258,8 +1229,47 @@ export function DiagramEditor({
   useEffect(() => {
     if (!collabEnabled || readOnly || didFreshLoad.current) return;
     didFreshLoad.current = true;
-    void (async () => { const s = await revertToSaved(); if (s) setData(s); })();
+    void (async () => {
+      try { const s = await revertToSaved(); if (s) setData(s); }
+      finally { setFreshLoadDone(true); }       // heal-on-load waits for this (below): setData replaces the state AND clears the history
+    })();
   }, [collabEnabled, readOnly, revertToSaved, setData]);
+
+  // HEAL ON LOAD (connector-endpoint plan, slice 5; Paul, 2026-10-04: "heal-on-load should flash the affected connectors green
+  // and allow an undo to return to the diagram as originally saved"). Once per opened diagram, in the EDITOR only — the phone
+  // viewer and every read-only view draw the diagram as saved. Separates connectors that share an attachment point, as ONE
+  // undoable step (the snapshot is taken first), flashes them green, and says so. An image-generated or imported diagram
+  // stays exactly as drawn (relaxedLayout / exactAsDrawn), gateways are out of scope, and a diagram with nothing to heal
+  // opens exactly as before: no flash, no history entry, not dirtied. Like any edit it is then autosaved; Undo restores
+  // the saved drawing (and is autosaved in turn).
+  const [healFlash, setHealFlash] = useState<{ runId: number; lines: HealFlashLine[] } | null>(null);
+  const [healNotice, setHealNotice] = useState<string | null>(null);
+  const healDoneFor = useRef<string | null>(null);
+  // "Reload-fresh on entry" (co-authoring, below) re-fetches the committed diagram and REPLACES the state — clearing the
+  // undo history with it. A heal made before that lands is silently thrown away (Paul, 2026-10-05: "it flashes the
+  // connectors but does not repair them or allow undo"). So the heal waits until that reload has finished.
+  const [freshLoadDone, setFreshLoadDone] = useState(false);
+  useEffect(() => {
+    if (!healMayRun({ collabLive: collabEnabled && !readOnly, freshLoadDone })) return;
+    if (healDoneFor.current === diagramId) return;
+    healDoneFor.current = diagramId;
+    if (diagramType !== "bpmn" || readOnly || templateEditState !== null || historyPreviewActive) return;
+    const { ids, data: healed } = healEndpointsNow();
+    if (!ids.length) return;
+    const lines: HealFlashLine[] = [];
+    for (const id of ids) {
+      const c = healed.connectors.find((x) => x.id === id);
+      if (c) connectorVisibleSegments(c, healed).forEach(([a, b], i) => lines.push({ id: `${id}:${i}`, points: [a, b] }));
+    }
+    setHealFlash({ runId: Date.now(), lines });
+    setHealNotice(`${ids.length} connector${ids.length === 1 ? " was" : "s were"} separated where ${ids.length === 1 ? "it" : "they"} shared an attachment point — Undo restores the saved drawing.`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [diagramId, freshLoadDone, collabEnabled, readOnly]);
+  useEffect(() => {
+    if (!healNotice) return;
+    const t = setTimeout(() => setHealNotice(null), 9000);
+    return () => clearTimeout(t);
+  }, [healNotice]);
 
   // Soft lock: an element another editor is holding is not editable by us.
   const isCoLocked = useCallback((id: string) => !!presenceLocks[id], [presenceLocks]);
