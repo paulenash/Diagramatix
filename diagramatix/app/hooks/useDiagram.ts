@@ -21,7 +21,7 @@ import type {
   Side,
   SymbolType,
 } from "@/app/lib/diagram/types";
-import { gatewayVertex, nudgeGatewayEndpoint, computeWaypoints, recomputeAllConnectors, consolidateWaypoints, rectifyWaypoints, constrainControlPoint, safeSidePair, selfLoopWaypoints, measureSelfLoopBulge, SELF_LOOP_BULGE, fuseCollinearWaypoints, boundaryEndpointSides, withBoundaryEndpointSides, getBoundaryEventOuterSide, isAxisAligned } from "@/app/lib/diagram/routing";
+import { gatewayVertex, nudgeGatewayEndpoint, computeWaypoints, recomputeAllConnectors, consolidateWaypoints, rectifyWaypoints, constrainControlPoint, safeSidePair, selfLoopWaypoints, measureSelfLoopBulge, SELF_LOOP_BULGE, fuseCollinearWaypoints, eventSpineX, boundaryEndpointSides, withBoundaryEndpointSides, getBoundaryEventOuterSide, isAxisAligned } from "@/app/lib/diagram/routing";
 import { flowScopeOf, messageFlowRefusal, messageTraffic } from "@/app/lib/diagram/canConnect";
 import { LANE_CHILD_PAD } from "@/app/lib/diagram/assistPlacement";
 import { planWrapInSubprocess, planUnwrapSubprocess, planWrapInContainer, type WrapIds } from "@/app/lib/diagram/subprocessWrap";
@@ -30,6 +30,7 @@ import { capitaliseFirstWord, needsCapital, decisionLabel, isDecisionGateway } f
 import { contentBoundsOf, clampRectToContent, clampRectToLimits, poolFollowsLanes, leftGapShortfall, MIN_LEFT_GAP } from "@/app/lib/diagram/poolLaneBounds";
 import { getLaneHeaderWidth, getPoolHeaderWidth, healPoolHeaderWidths, laneMetrics, minHeightForContainer, poolMetrics } from "@/app/lib/diagram/containerMetrics";
 import { shiftNeighbourPools } from "@/app/lib/diagram/poolNeighbours";
+import { spreadAfter } from "@/app/lib/diagram/spreadPass";
 import { carveGeometry, refitStackAtEdge, shiftSublanesBy } from "@/app/lib/diagram/laneStack";
 import { uniqueContainerLabel } from "@/app/lib/diagram/containerNames";
 import { planCarve, planLaneDrop, type CarvePlan } from "@/app/lib/diagram/laneDropPlan";
@@ -163,7 +164,7 @@ function clampParallelFace(
 
 function messageBpmnWaypoints(
   source: DiagramElement, target: DiagramElement,
-  sourceSide: Side, targetSide: Side, sourceOffset: number, _targetOffset?: number
+  sourceSide: Side, targetSide: Side, sourceOffset: number, targetOffset?: number
 ): { waypoints: Point[]; sourceInvisibleLeader: true; targetInvisibleLeader: true } {
   const srcIsEvent = BPMN_EVENT_TYPES.has(source.type);
   const tgtIsEvent = BPMN_EVENT_TYPES.has(target.type);
@@ -171,9 +172,9 @@ function messageBpmnWaypoints(
   const effectiveSrcAlong = srcIsEvent ? 0.5 : sourceOffset;
   let x: number;
   if (tgtIsEvent) {
-    x = target.x + target.width / 2;
+    x = eventSpineX(target, targetOffset);       // the centre, or a fan of ±3 px when two messages meet one Event
   } else if (srcIsEvent) {
-    x = source.x + source.width / 2;
+    x = eventSpineX(source, sourceOffset);
   } else {
     // Use the source offset to position, clamped to both element boundaries
     const rawX = source.x + source.width * effectiveSrcAlong;
@@ -3742,6 +3743,17 @@ export function reducer(state: DiagramData, action: Action): DiagramData {
 
 function reducerWithPasses(state: DiagramData, action: Action): DiagramData {
   let next = reducerCore(state, action);
+  // ONE CONNECTOR PER ATTACHMENT POINT (Paul, 2026-10-03; connector-endpoint plan, slice 3). Whatever the action did —
+  // a connector drawn, an end dragged, an element moved, a voice command, a template — the connectors it touched are
+  // separated from each other and from their neighbours on the same faces (spreadPass.ts → the one allocator). Last in
+  // the action, so the places that force an offset back to 0.5 (A3, R7.02, the obstacle reset) are spread afterwards,
+  // not undone. NOT on SET_DATA: undo, redo and load restore a state exactly; repairing an old diagram is slice 5.
+  // (Nor on APPLY_TEMPLATE: a template's flows keep the routes they were saved with — T4872.)
+  if (action.type !== "SET_DATA" && action.type !== "APPLY_TEMPLATE") {
+    next = spreadAfter(state, next, (orig, re, els) => (re.type === "messageBPMN"
+      ? adjustMsgLabelOffset(orig, orig.waypoints, re.waypoints, els.find((e) => e.id === re.sourceId), els.find((e) => e.id === re.targetId))
+      : preserveLabelWorldPos(orig, re.waypoints)));
+  }
   // Gateway branch labels stay put when their gateway moves — except the
   // middle-vertex branch (Paul, 2026-09-22; see labelFollow.ts). Here in the
   // wrapper because an element move has a dozen exits and each would
@@ -4548,7 +4560,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
             targetSide: optTargetSide,
           };
           const wp = messageBpmnWaypoints(source, target,
-            updated.sourceSide, updated.targetSide, newSrcOffset);
+            updated.sourceSide, updated.targetSide, newSrcOffset, updated.targetOffsetAlong);
 
           // Label handling — anchor by the same rule as
           // `pickMsgLabelAnchorEnd`: default to SOURCE, except for
@@ -4822,7 +4834,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
               const priorX = conn.waypoints[1]?.x ?? (source.x + source.width * (conn.sourceOffsetAlong ?? 0.5));
               const newSharedX = priorX + dx;
               const newSrcOffset = source.width > 0 ? (newSharedX - source.x) / source.width : 0.5;
-              const wp = messageBpmnWaypoints(source, target, conn.sourceSide, conn.targetSide, newSrcOffset);
+              const wp = messageBpmnWaypoints(source, target, conn.sourceSide, conn.targetSide, newSrcOffset, conn.targetOffsetAlong);
               const labelAdj = adjustMsgLabelOffset(conn, conn.waypoints, wp.waypoints, source, target);
               return { ...conn, sourceOffsetAlong: newSrcOffset, waypoints: wp.waypoints,
                 sourceInvisibleLeader: wp.sourceInvisibleLeader, targetInvisibleLeader: wp.targetInvisibleLeader, ...labelAdj };
@@ -5277,7 +5289,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
             const priorX = conn.waypoints[1]?.x ?? (source.x + source.width * (conn.sourceOffsetAlong ?? 0.5));
             const newSharedX = priorX + dx;
             const newSrcOffset = source.width > 0 ? (newSharedX - source.x) / source.width : 0.5;
-            const wp = messageBpmnWaypoints(source, target, conn.sourceSide, conn.targetSide, newSrcOffset);
+            const wp = messageBpmnWaypoints(source, target, conn.sourceSide, conn.targetSide, newSrcOffset, conn.targetOffsetAlong);
             const labelAdj = adjustMsgLabelOffset(conn, conn.waypoints, wp.waypoints, source, target);
             return { ...conn, sourceOffsetAlong: newSrcOffset, waypoints: wp.waypoints,
               sourceInvisibleLeader: wp.sourceInvisibleLeader, targetInvisibleLeader: wp.targetInvisibleLeader, ...labelAdj };

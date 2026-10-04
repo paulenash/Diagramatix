@@ -94,7 +94,12 @@ function permutations(n: number): number[][] {
 export function spreadEndpoints(
   elements: readonly DiagramElement[],
   connectors: readonly Connector[],
-  opts: { /** Free-form / imported layout: messages are not vertical there, so they are left alone. */ relaxed?: boolean } = {},
+  opts: {
+    /** Free-form / imported layout: messages are not vertical there, so they are left alone. */
+    relaxed?: boolean;
+    /** Connectors that must NOT move (the editor freezes everything an action did not touch). Their ends still count as occupied. */
+    frozen?: ReadonlySet<string>;
+  } = {},
 ): SpreadResult {
   const elementList = elements as DiagramElement[];
   const els = new Map(elements.map((e) => [e.id, e] as const));
@@ -145,7 +150,7 @@ export function spreadEndpoints(
   };
 
   // ── an end: where it sits on its face, and how to move it ──────────────────
-  interface End { id: string; role: "source" | "target"; el: DiagramElement; side: Side; isMessage: boolean; movableHere: boolean }
+  interface End { id: string; role: "source" | "target"; el: DiagramElement; side: Side; isMessage: boolean; movableHere: boolean; frozen: boolean }
   const endsByFace = (): Map<string, End[]> => {
     const faces = new Map<string, End[]>();
     for (const id of play) {
@@ -156,9 +161,10 @@ export function spreadEndpoints(
         if (!cl) continue;                                         // a gateway, a data object …: not in scope
         const side = role === "source" ? c.sourceSide : c.targetSide;
         const isMessage = c.type === "messageBPMN";
-        const movableHere = isMessage ? ctrlRole(c) === role && cl !== "pool" : cl !== "pool";
+        const frozen = opts.frozen?.has(id) === true;
+        const movableHere = !frozen && (isMessage ? ctrlRole(c) === role && cl !== "pool" : cl !== "pool");
         const key = `${el.id}|${side}`;
-        (faces.get(key) ?? faces.set(key, []).get(key)!).push({ id, role, el, side, isMessage, movableHere });
+        (faces.get(key) ?? faces.set(key, []).get(key)!).push({ id, role, el, side, isMessage, movableHere, frozen });
       }
     }
     return faces;
@@ -176,9 +182,17 @@ export function spreadEndpoints(
     changed.add(e.id);
     return true;
   };
+  /** The class of the element a message is MOVED at (its Task / Event), whichever face it is being measured on. */
+  const ctrlCls = (id: string): Cls | null => {
+    const c = work.get(id)!;
+    const e = els.get(ctrlRole(c) === "source" ? c.sourceId : c.targetId);
+    return e ? classOf(e) : null;
+  };
+  /** How far apart two ends on one face must be. On a POOL's face it is what the messages can give: 24 px from Tasks, 3 px from Events. */
   const pairGap = (a: End, b: End): number => {
     const cl = classOf(a.el)!;
-    if (a.isMessage || b.isMessage) return cl === "activity" ? SPREAD.messageActivity : cl === "event" ? SPREAD.messageEvent : SPREAD.pool.gap;
+    if (cl === "pool") return ctrlCls(a.id) === "event" || ctrlCls(b.id) === "event" ? SPREAD.messageEvent : SPREAD.pool.gap;
+    if (a.isMessage || b.isMessage) return cl === "activity" ? SPREAD.messageActivity : SPREAD.messageEvent;
     return SPREAD[cl].gap;
   };
   /** Where the OTHER end of this connector is, along the face's axis — the order that does not cross. */
@@ -267,7 +281,7 @@ export function spreadEndpoints(
       if (cluster.length < 2) continue;                          // a lone end, or one that collides with nothing: never touched
       const movables = cluster.filter((x) => x.e.movableHere);
       const fixed = cluster.filter((x) => !x.e.movableHere);
-      if (!movables.length) { unresolvedFaces.add(key); continue; }
+      if (!movables.length) { if (fixed.some((f) => !f.e.frozen)) unresolvedFaces.add(key); continue; }   // all frozen: left as it was
       const hasMsg = cluster.some((x) => x.e.isMessage);
       const lo = spec.margin, hi = L - spec.margin;
       const minGap = hasMsg ? (cl === "activity" ? SPREAD.messageActivity : SPREAD.messageEvent) : spec.gap;
@@ -308,12 +322,13 @@ export function spreadEndpoints(
 
   /** A pool's face holds only message ends (a sequence flow never attaches to a pool): separate the spines by 24 px. */
   function resolvePoolFace(key: string, ends: End[]): boolean {
-    const gap = SPREAD.pool.gap;
     const sorted = ends.map((e) => ({ e, x: spineX(work.get(e.id)!) })).sort((a, b) => a.x - b.x || a.e.id.localeCompare(b.e.id));
-    if (!sorted.some((it, i) => i > 0 && it.x - sorted[i - 1].x < gap - EPS)) return false;     // nothing collides
+    const gaps = sorted.map((it, k) => (k === 0 ? 0 : pairGap(sorted[k - 1].e, it.e)));      // the gap to the one before
+    if (!sorted.some((it, i) => i > 0 && it.x - sorted[i - 1].x < gaps[i] - EPS && !(it.e.frozen && sorted[i - 1].e.frozen))) return false;   // nothing (movable) collides
     // Each message can slide only as far as BOTH its ends allow: the Task / Event it leaves (margins), and the pool.
     const range = (id: string) => {
       const c = work.get(id)!;
+      if (opts.frozen?.has(id)) { const fx = spineX(c); return { lo: fx, hi: fx }; }     // frozen: it stays where it is
       let lo = -Infinity, hi = Infinity;
       for (const eid of [c.sourceId, c.targetId]) {
         const el = els.get(eid)!, cl = classOf(el);
@@ -327,10 +342,10 @@ export function spreadEndpoints(
     // Minimal movement, in order: push right where too close, then pull back left where a bound stops it; repeat.
     const x = sorted.map((it, k) => clamp(it.x, lo[k], hi[k]));
     for (let round = 0; round < 4; round++) {
-      for (let k = 1; k < n; k++) x[k] = Math.max(x[k], x[k - 1] + gap);
+      for (let k = 1; k < n; k++) x[k] = Math.max(x[k], x[k - 1] + gaps[k]);
       for (let k = n - 1; k >= 0; k--) {
         x[k] = Math.min(x[k], hi[k]);
-        if (k > 0) x[k - 1] = Math.min(x[k - 1], x[k] - gap);
+        if (k > 0) x[k - 1] = Math.min(x[k - 1], x[k] - gaps[k]);
       }
       for (let k = 0; k < n; k++) x[k] = Math.max(x[k], lo[k]);
     }
@@ -340,7 +355,7 @@ export function spreadEndpoints(
       if (setSpine(sorted[k].e.id, x[k])) moved = true;
     }
     // Feasible only if every gap is held and every message is inside its bounds; otherwise report it, do not hide it.
-    const ok = x.every((v, k) => v >= lo[k] - EPS && v <= hi[k] + EPS && (k === 0 || v - x[k - 1] >= gap - EPS));
+    const ok = x.every((v, k) => v >= lo[k] - EPS && v <= hi[k] + EPS && (k === 0 || v - x[k - 1] >= gaps[k] - EPS));
     if (!ok) unresolvedFaces.add(key);
     return moved;
   }
@@ -366,7 +381,10 @@ export function spreadEndpoints(
   const unresolved = new Set<string>(unresolvedFaces);
   for (const [key, ends] of endsByFace()) {
     const sorted = ends.map((e) => ({ e, pos: posOf(e) })).sort((a, b) => a.pos - b.pos);
-    for (let i = 1; i < sorted.length; i++) if (sorted[i].pos - sorted[i - 1].pos < pairGap(sorted[i - 1].e, sorted[i].e) - EPS) unresolved.add(key);
+    for (let i = 1; i < sorted.length; i++) {
+      if (sorted[i].e.frozen && sorted[i - 1].e.frozen) continue;               // legacy, left as it was
+      if (sorted[i].pos - sorted[i - 1].pos < pairGap(sorted[i - 1].e, sorted[i].e) - EPS) unresolved.add(key);
+    }
   }
 
   return { connectors: connectors.map((c) => work.get(c.id) ?? c), changedIds: [...changed], unresolved: [...unresolved].sort() };

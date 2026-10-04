@@ -1253,6 +1253,19 @@ export function nudgeGatewayEndpoint(
   return { side, offset: next };
 }
 
+/**
+ * The x a message flow drops from / onto an EVENT. The Event's centre — unless the endpoint allocator has fanned two
+ * messages on it apart (endpointSpread.ts, ±3 px), in which case the offset is honoured. A stored offset further from
+ * the centre than a fan can be is an old diagram's arbitrary value, and keeps meaning "the centre" as it always did.
+ */
+export const EVENT_FAN_MAX_PX = 4;
+export function eventSpineX(el: DiagramElement, offset: number | undefined): number {
+  const centre = el.x + el.width / 2;
+  if (offset === undefined) return centre;
+  const x = el.x + offset * el.width;
+  return Math.abs(x - centre) <= EVENT_FAN_MAX_PX ? x : centre;
+}
+
 export function sidePoint(el: DiagramElement, side: Side, offset = 0.5): Point {
   if (el.type === "gateway") {
     const cx = el.x + el.width / 2;
@@ -1992,9 +2005,9 @@ export function recomputeAllConnectors(
         x = elem.x + elem.width / 2;
         repairedSrcOffset = source.width > 0 ? (x - source.x) / source.width : 0.5;
       } else if (tgtIsEvent) {
-        x = target.x + target.width / 2;
+        x = eventSpineX(target, conn.targetOffsetAlong);
       } else if (srcIsEvent) {
-        x = source.x + source.width / 2;
+        x = eventSpineX(source, conn.sourceOffsetAlong);
       } else {
         // Case 2 (Pool ↔ Pool) or aligned Element ↔ Element: a shared x inside the
         // overlap of both boundaries (source offset, clamped) keeps it vertical.

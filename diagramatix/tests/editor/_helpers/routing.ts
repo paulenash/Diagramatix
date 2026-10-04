@@ -53,7 +53,12 @@ export function findRoutingViolations(data: DiagramData): string[] {
 
     // 2 — orthogonality
     if (ORTHOGONAL.has(c.type)) {
-      for (let i = 1; i < wps.length; i++) {
+      // Only the VISIBLE segments: edge point to edge point. The centre leader at each end is never drawn (routing.ts
+      // isAxisAligned says the same), and it slants whenever the attachment is not exactly the middle of its face — which
+      // a spread end is by design (endpointSpread.ts), as is any end the user slid along a face.
+      const from = c.sourceInvisibleLeader ? 2 : 1;
+      const upto = c.targetInvisibleLeader ? wps.length - 1 : wps.length;
+      for (let i = from; i < upto; i++) {
         const p = wps[i - 1], q = wps[i];
         if (Math.abs(p.x - q.x) > EPS && Math.abs(p.y - q.y) > EPS) {
           v.push(`connector ${c.id} has a diagonal segment (${Math.round(p.x)},${Math.round(p.y)})→(${Math.round(q.x)},${Math.round(q.y)})`);

@@ -135,6 +135,9 @@ describe("T5234 messages", () => {
     const r = spreadEndpoints(els, [msg("m1", "e", "C", "bottom", "top"), msg("m2", "e", "C", "bottom", "top")]);
     const x = (id: string) => 300 + off(get(r.connectors, id), "source") * 36;
     expect(Math.abs(x("m1") - x("m2"))).toBeGreaterThanOrEqual(SPREAD.messageEvent - 0.1);
+    // …and on the POOL's face they are 3 px apart too — an Event cannot give 24, so the pool face asks for what it can.
+    expect(Math.abs(x("m1") - x("m2"))).toBeLessThan(SPREAD.pool.gap);
+    expect(r.unresolved).toEqual([]);
   });
   it("two tasks in one column messaging one pool: they were on the same x of the pool face, now 24 px apart", () => {
     const els = [el("P", "pool", 0, 0, 1000, 600), TASK("t1", 300, 100), TASK("t2", 300, 300), el("C", "pool", 0, 800, 1000, 100, { properties: { poolType: "black-box" } })];

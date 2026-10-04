@@ -289,3 +289,17 @@ New tests: a saved diagram with a shared point opens healed with `HEAL_ENDPOINTS
 Measured on the 34 corpus diagrams: V22.01 1 → 0 (the two messages sharing pClaimant's face) and EP01 3 → 2 (the two subprocess connectors sharing pLR) — both ratchet entries lowered; the worklist regenerated. The only shared point left in the corpus is on a GATEWAY (VTT01, gw_split|top), out of scope by decision. A second run of the allocator over every generated diagram changes nothing (T5236).
 
 Two changes to the allocator came out of running it on real output: a bounded separation for a pool face where several messages from narrow Tasks must fit (the greedy version could not, though a solution existed), and a collision tolerance of 0.25 px (later generation passes recompute an offset from a world x, so a 24 px gap arrives as 23.9).
+
+**Slice 3 — the editor — built (2026-10-04).** `reducerWithPasses` now ends every action (except `SET_DATA` — undo, redo and load restore exactly — and `APPLY_TEMPLATE`, whose flows keep the routes they were saved with) with `spreadAfter` (`spreadPass.ts` → the one allocator).
+
+Shape of it, decided while building:
+- **Only what an action touched may move.** A connector is "touched" if it is new, or its attachment changed (ends, sides, offsets, routing), or an element it is attached to moved or was resized. A label edit, a rename, a recolour or a move of an unrelated element touches nothing. Every other connector is **frozen**: it keeps the offsets it was saved with and counts as occupied, and the touched ones are placed round it. So an old diagram's legacy collision is not silently rearranged by an unrelated edit — that repair is slice 5, with its flash and its Undo. The allocator gained a `frozen` option for this.
+- **A hand-shaped route is as good as a hand-placed point**: nine or more waypoints — routing.ts keeps its interior and only re-fits the end stubs — is frozen too. Re-fitting one end of such a route leaves a slanted segment.
+- **Last in the action**, so the places that force offset 0.5 (A3 inline events, R7.02 boundary events, the obstacle-validation reset) are spread afterwards rather than undone. They needed no carve-out.
+- **A moved connector's label goes with it** (a sequence label keeps its world position; a message label follows its anchor end).
+- **The router honours a message's offset on an Event, within a fan of ±4 px** (`eventSpineX`, both message routers); a stored offset further out is an old diagram's arbitrary value and still means "the centre". Without that, two messages on one Event always drew on top of each other.
+- **On a pool's face, messages from Events need only 3 px, not 24** — an Event 36 px wide cannot give 24, and asking for it pushed one message to the Event's edge where the router (rightly) showed it at the centre.
+
+Findings: the editor sweeps (`edit-sequence`, `obstacle-sweep`) flagged "diagonal segments" that were the invisible centre-leader of a connector whose attachment is not the middle of its face. The leader is never drawn (`isAxisAligned` already says so), so the sweep helper now checks visible segments only. Obstacle crossings stayed at the baseline of 10.
+
+Still for later slices: NL Assist's own spread in `addMessage` (20 px, now overtaken by the post-pass's 24) and the gateway-point moves (slice 4); heal-on-load with flash and Undo, and the "exact as drawn" flag (slice 5); rule text, checks and User Guide (slice 6).
