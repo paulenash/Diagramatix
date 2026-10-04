@@ -178,3 +178,39 @@ describe("T5239 the heal waits for the reload on entry (Paul, 2026-10-05: “it 
     expect(shared(r.data)).toEqual([]);
   });
 });
+
+describe("T5244 repair places a flow on the side its other end lies on (Paul, 2026-10-05: MCMO ECOM-57 — the repair made a crossover)", () => {
+  // “Enter Mobile Service# you want to recontract”: a flow from the gateway on the LEFT and a hand-shaped (frozen) flow from the
+  // gateway on the RIGHT both arrive on the Task's bottom face. The repair put the left one to the RIGHT of the frozen one, and
+  // the two routes crossed. Put on the left, they do not touch.
+  const j = JSON.parse(readFileSync("tests/fixtures/endpoint-heal/mcmo-ecom-57.json", "utf8"));
+  const saved = j.diagrams[0].data as DiagramData;
+  // the file as Paul saved it is already repaired; put the left-hand flow back where an old diagram had it — the middle
+  const old: DiagramData = { ...saved, connectors: saved.connectors.map((c) => c.id === "zr76vifg" ? { ...c, targetOffsetAlong: 0.5 } : c) };
+  const cross = (a: { x: number; y: number }[], b: { x: number; y: number }[]) => {
+    for (let i = 1; i < a.length; i++) for (let k = 1; k < b.length; k++) {
+      const p1 = a[i - 1], p2 = a[i], p3 = b[k - 1], p4 = b[k];
+      const rx = p2.x - p1.x, ry = p2.y - p1.y, sx = p4.x - p3.x, sy = p4.y - p3.y, den = rx * sy - ry * sx;
+      if (Math.abs(den) < 1e-9) continue;
+      const t = ((p3.x - p1.x) * sy - (p3.y - p1.y) * sx) / den, u = ((p3.x - p1.x) * ry - (p3.y - p1.y) * rx) / den;
+      if (t >= 0 && t <= 1 && u >= 0 && u <= 1) return true;
+    }
+    return false;
+  };
+  it("the left-hand flow goes to the LEFT of the frozen right-hand one, and the two routes do not cross", () => {
+    const r = healEndpoints(old);
+    const left = r.data.connectors.find((c) => c.id === "zr76vifg")!, right = r.data.connectors.find((c) => c.id === "waiskl3d")!;
+    expect(r.changedIds).toContain("zr76vifg");
+    expect(left.targetOffsetAlong).toBeLessThan(right.targetOffsetAlong ?? 0.5);
+    expect(cross(left.waypoints.slice(1, -1), right.waypoints.slice(1, -1))).toBe(false);
+  });
+  it("the same, mirrored: the flow from the right of a frozen flow from the left goes to the right", () => {
+    const els = [TASK("t", 300, 300), el("l", "gateway", 100, 500, 40, 40), el("r", "gateway", 700, 500, 40, 40)];
+    const mk = (id: string, s: string, o: number, extra: Partial<Connector> = {}) => conn(id, s, "t", "top", "bottom", { targetOffsetAlong: o, ...extra });
+    const frozenShape = Array.from({ length: 9 }, (_, i) => ({ x: 120 + i * 40, y: i % 2 ? 480 : 470 }));
+    const d = { ...EMPTY_DIAGRAM, elements: els, connectors: [mk("keep", "l", 0.5, { waypoints: frozenShape }), mk("new", "r", 0.5)] } as DiagramData;
+    const r = healEndpoints(d);
+    const mover = r.data.connectors.find((c) => c.id === "new")!;
+    expect(mover.targetOffsetAlong).toBeGreaterThan(0.5);
+  });
+});

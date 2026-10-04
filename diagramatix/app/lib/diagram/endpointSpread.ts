@@ -390,8 +390,13 @@ export function spreadEndpoints(
         const maxK = zones.length ? Math.ceil(L) : 12;
         for (const m of [...movables].sort((x, y) => otherCoord(x.e) - otherCoord(y.e) || x.e.id.localeCompare(y.e.id))) {
           let done = false;
+          // Which way to step off first: the side the connector's OTHER end lies on, relative to the end it is stepping round —
+          // else a flow from the left is placed right of a frozen flow from the right and the two cross (Paul, 2026-10-05,
+          // MCMO ECOM-57: "Enter Mobile Service# you want to recontract").
+          const near = placed.filter((q) => Math.abs(q.pos - m.pos) < pairGap(m.e, q.e)).sort((a, b) => Math.abs(a.pos - m.pos) - Math.abs(b.pos - m.pos))[0];
+          const signs = near && otherCoord(m.e) < otherCoord(near.e) ? [-1, 1] : [1, -1];
           for (let k = 0; k <= maxK && !done; k++) {
-            for (const sign of k === 0 ? [0] : [1, -1]) {
+            for (const sign of k === 0 ? [0] : signs) {
               const px = clamp(m.pos + sign * k * base, lo, hi);
               if (zones.length && !m.e.isMessage && zones.some((z) => px > z.lo + 0.05 && px < z.hi - 0.05)) continue;     // nothing else sits under the event either
               if (placed.every((q) => Math.abs(q.pos - px) >= pairGap(m.e, q.e) - EPS) && setPos(m.e, px)) {

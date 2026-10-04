@@ -3371,17 +3371,16 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
           if (!diagramPanel && !projectPanel) return null;
           if (!propertiesOpen) {
             return (
-              <aside data-testid="properties-collapsed" className="shrink-0 w-8 border-l border-gray-200 bg-white flex flex-col items-center py-2 gap-2">
-                <button type="button" onClick={() => setPropertiesOpen(true)} aria-label="Show properties" title="Show properties"
-                  className="h-6 w-6 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 text-sm leading-none">‹</button>
-                <span className="text-[10px] uppercase tracking-wide text-gray-400 [writing-mode:vertical-rl] select-none">{diagramPanel ? "Diagram properties" : "Project properties"}</span>
-              </aside>
+              <div data-testid="properties-collapsed" role="button" aria-label="Show properties" onClick={() => setPropertiesOpen(true)} title="Expand panel"
+                className="w-6 border-l border-gray-200 bg-gray-50 flex flex-col items-center cursor-pointer hover:bg-gray-100 shrink-0">
+                <span className="text-gray-400 text-xs mt-2">{"◀"}</span>
+                <span className="text-[9px] text-gray-500 font-semibold uppercase tracking-widest mt-3"
+                  style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}>{diagramPanel ? "Diagram" : "Project"}</span>
+              </div>
             );
           }
           return (
-            <div data-testid="properties-open" className="relative flex shrink-0">
-              <button type="button" onClick={() => setPropertiesOpen(false)} aria-label="Hide properties" title="Hide properties"
-                className="absolute top-1.5 left-1 z-10 h-6 w-6 rounded border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 text-sm leading-none">›</button>
+            <div data-testid="properties-open" className="flex shrink-0">
         {/* Right: per-diagram Properties — shown when a tile is single-clicked
             (double-click opens). Takes priority over the Project Properties. */}
         {previewDiagramId && (() => {
@@ -3393,6 +3392,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
               diagram={d}
               readOnly={!!readOnly}
               onClose={() => setPreviewDiagramId(null)}
+              onCollapse={() => setPropertiesOpen(false)}
               onOpen={() => handleOpenDiagram(d.id)}
               onLocalPatch={(patch) => setDiagrams((prev) => prev.map((x) => x.id === d.id ? { ...x, ...patch } : x))}
             />
@@ -3415,6 +3415,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
             onPcf={setProjectPcf}
             save={saveProjectField}
             onViewCoverage={projectPcf?.frameworkId ? () => setShowPcfCoverage(true) : undefined}
+            onCollapse={() => setPropertiesOpen(false)}
             numberingSummary={numberingConfig.applied
               ? `${numberingConfig.mode === "apqc" ? "APQC-preserving" : "Full"}${numberingConfig.prefix ? ` · ${numberingConfig.prefix}` : ""} · applied`
               : "Not yet numbered"}

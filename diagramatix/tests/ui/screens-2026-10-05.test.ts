@@ -25,9 +25,9 @@ describe("T5243 1 — no banner while acting as a subscription level", () => {
 
 describe("T5243 2 — the Registered Users tile has a horizontal scroll bar", () => {
   const admin = read("app/(dashboard)/dashboard/admin/AdminClient.tsx");
-  it("the page container scrolls both ways and the table has a floor, so a narrow window scrolls sideways instead of squashing the columns", () => {
+  it("the table sits in its OWN scroll box capped to the window (so its horizontal bar is always on screen, not at the foot of a long list) and has a floor, so a narrow window scrolls sideways instead of squashing the columns", () => {
     expect(admin).toMatch(/data-testid="admin-scroll" className="flex-1 min-h-0 overflow-auto /);
-    expect(admin).toContain('data-testid="registered-users-scroll"');
+    expect(admin).toContain('data-testid="registered-users-scroll" className="rounded-lg overflow-auto border border-gray-200" style={{ maxHeight: "calc(100vh - 9rem)" }}');
     expect(admin).toMatch(/<table className="w-full min-w-\[1280px\]/);
   });
   it("the table is still inside its wrapper (the wrapper closes after it)", () => {
@@ -46,12 +46,22 @@ describe("T5243 3 — the Properties panel: hide arrow, collapsed on entry", () 
     expect(project).toContain('aria-label="Show properties"');
     expect(project).toContain("setPropertiesOpen(true)");
     expect(project).toContain('const diagramPanel = !!previewDiagramId && diagrams.some((x) => x.id === previewDiagramId);');
-    expect(project).toContain('"Diagram properties" : "Project properties"');
   });
-  it("open: a hide arrow in its corner, and the two panels are unchanged inside it", () => {
+  it("it is the SAME control as the Diagram screen's Properties panel: the slim grey tab with the ◀ arrow and a vertical label, and a ▶ in the panel's own header (never floating over the title)", () => {
+    const editor = readFileSync("app/components/canvas/PropertiesPanel.tsx", "utf8");
+    expect(editor).toContain('className="w-6 border-l border-gray-200 bg-gray-50 flex flex-col items-center cursor-pointer hover:bg-gray-100 shrink-0"');
+    expect(project).toContain('className="w-6 border-l border-gray-200 bg-gray-50 flex flex-col items-center cursor-pointer hover:bg-gray-100 shrink-0"');
+    expect(project).toContain('title="Expand panel"');
+    expect(project).not.toContain('className="absolute top-1.5 left-1 z-10');
+    for (const f of ["ProjectPropertiesPanel", "DiagramPropertiesPanel"]) {
+      const src = readFileSync("app/(dashboard)/dashboard/projects/[id]/" + f + ".tsx", "utf8");
+      expect(src).toContain("onCollapse?: () => void;");
+      expect(src).toContain('title="Collapse panel"');
+    }
+  });
+  it("open: both panels carry the hide arrow, and are unchanged otherwise", () => {
     expect(project).toContain('data-testid="properties-open"');
-    expect(project).toContain('aria-label="Hide properties"');
-    expect(project).toContain("setPropertiesOpen(false)");
+    expect(project.split("onCollapse={() => setPropertiesOpen(false)}").length - 1).toBe(2);
     const open = project.indexOf('data-testid="properties-open"');
     expect(project.indexOf("<DiagramPropertiesPanel", open)).toBeGreaterThan(open);
     expect(project.indexOf("<ProjectPropertiesPanel", open)).toBeGreaterThan(open);

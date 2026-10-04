@@ -26,8 +26,10 @@ interface Hit { id: string; pcfId: number; hierarchyId: string; name: string; le
 export function ProjectPropertiesPanel({
   projectId, name, description, ownerName, pcf, readOnly,
   onName, onDescription, onOwner, onPcf, save, onViewCoverage,
-  numberingSummary, onOpenNumbering, showNonApqc, onToggleNonApqc,
+  numberingSummary, onOpenNumbering, showNonApqc, onToggleNonApqc, onCollapse,
 }: {
+  /** Hide the panel to its slim tab (same arrow as the Diagram screen's Properties panel). */
+  onCollapse?: () => void;
   projectId: string;
   name: string; description: string; ownerName: string;
   pcf: ProjectPcf | null;
@@ -90,7 +92,10 @@ export function ProjectPropertiesPanel({
 
   return (
     <aside className="w-72 border-l border-gray-200 bg-white overflow-y-auto shrink-0 p-3 space-y-4">
-      <h2 className="text-sm font-semibold text-gray-900">Project Properties</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-gray-900">Project Properties</h2>
+        {onCollapse && <button onClick={onCollapse} title="Collapse panel" aria-label="Hide properties" className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-600 text-xs rounded hover:bg-gray-100">{"▶"}</button>}
+      </div>
 
       <div>
         <label className={label}>Name</label>

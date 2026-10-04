@@ -292,10 +292,11 @@ export function AdminClient({ users: initialUsers, currentUserId, currentUserEma
       <div data-testid="admin-scroll" className="flex-1 min-h-0 overflow-auto max-w-none w-full mx-auto px-6 py-8">
         {isSuperAdmin && !showUsers && <SuperAdminToolsGrid onShowUsers={() => setShowUsers(true)} currentUserEmail={currentUserEmail} />}
         {showUsers && (
-        <div data-testid="registered-users-scroll" className="rounded-lg">
+        <div data-testid="registered-users-scroll" className="rounded-lg overflow-auto border border-gray-200" style={{ maxHeight: "calc(100vh - 9rem)" }}>
         {/* A horizontal scroll bar for the Registered Users table (Paul, 2026-10-05): the columns have a floor, so a narrow window
-            scrolls sideways instead of squashing every column. */}
-        <table className="w-full min-w-[1280px] bg-white rounded-lg border border-gray-200 overflow-hidden table-fixed">
+            scrolls sideways instead of squashing every column. The scroll area is the table's OWN box, capped to the window, so its
+            horizontal bar is always on screen — on the page it sat at the very bottom of a long user list, out of sight. */}
+        <table className="w-full min-w-[1280px] bg-white table-fixed">
           <thead>
             <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               <th className="px-3 py-3" style={{ width: "11%" }}>

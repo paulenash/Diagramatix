@@ -33,12 +33,15 @@ export function DiagramPropertiesPanel({
   diagram,
   readOnly,
   onClose,
+  onCollapse,
   onOpen,
   onLocalPatch,
 }: {
   diagram: DiagramLite;
   readOnly: boolean;
   onClose: () => void;
+  /** Hide the panel to its slim tab (same arrow as the Diagram screen's Properties panel). */
+  onCollapse?: () => void;
   onOpen: () => void;
   onLocalPatch: (patch: { name?: string; data?: unknown; version?: number }) => void;
 }) {
@@ -106,6 +109,7 @@ export function DiagramPropertiesPanel({
         <div className="flex items-center gap-2">
           <button onClick={onOpen} className="text-[10px] text-blue-600 hover:text-blue-700" title="Open this diagram">Open ↗</button>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-sm leading-none" title="Close">✕</button>
+          {onCollapse && <button onClick={onCollapse} title="Collapse panel" aria-label="Hide properties" className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-600 text-xs rounded hover:bg-gray-100">{"▶"}</button>}
         </div>
       </div>
 
