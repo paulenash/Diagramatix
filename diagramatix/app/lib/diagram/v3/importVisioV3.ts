@@ -3304,6 +3304,7 @@ export async function importVisioV3(
       elements,
       connectors,
       viewport: { x: 0, y: 0, zoom: 1 },
+      exactAsDrawn: true,     // an imported drawing stays as drawn: no endpoint repair on load
     },
     warnings,
     stats: {

@@ -1172,6 +1172,7 @@ export async function importBpmnXml(
     elements: ctx.elements,
     connectors: ctx.connectors,
     viewport: { x: 0, y: 0, zoom: 1 },
+    exactAsDrawn: true,     // an imported drawing stays as drawn: no endpoint repair on load
   };
 
   // Expose the bpmn-id → minted-id map so callers (e.g. BPSim parameter

@@ -73,9 +73,12 @@ export function spreadAfter(prev: DiagramData, next: DiagramData, labelFor?: Lab
   const changed = r.changedIds.filter((id) => touched.has(id));
   if (!changed.length) return next;
 
-  const changedSet = new Set(changed);
-  const byId = new Map(r.connectors.map((c) => [c.id, c] as const));
-  // Only the offsets of the eligible, changed connectors are taken; each is then re-routed.
+  return applyOffsets(next, new Set(changed), r.connectors, labelFor);
+}
+
+/** Take the new offsets of the changed connectors from `spread`, re-route just those, and carry their labels with them. */
+function applyOffsets(next: DiagramData, changedSet: ReadonlySet<string>, spread: readonly Connector[], labelFor?: LabelFor): DiagramData {
+  const byId = new Map(spread.map((c) => [c.id, c] as const));
   const taken = next.connectors.map((c) => (changedSet.has(c.id)
     ? { ...c, sourceOffsetAlong: byId.get(c.id)!.sourceOffsetAlong, targetOffsetAlong: byId.get(c.id)!.targetOffsetAlong }
     : c));
@@ -89,4 +92,28 @@ export function spreadAfter(prev: DiagramData, next: DiagramData, labelFor?: Lab
     }),
   );
   return { ...next, connectors: taken.map((c) => rerouted.get(c.id) ?? c) as Connector[] };
+}
+
+/**
+ * HEAL ON LOAD (slice 5): the same rule applied to a whole saved diagram, once, when it is opened — for diagrams drawn
+ * before the rule existed (or by something that ignored it) that have two connectors on one point.
+ *
+ * Left alone, by Paul's rulings: a diagram generated from an image (`relaxedLayout`) or imported (`exactAsDrawn`) stays
+ * exactly as drawn; gateways are out of scope (the allocator never touches them); a route shaped by hand is never moved.
+ * Everything else that collides is separated, in the order that avoids crossings, and re-routed.
+ *
+ * Returns the healed diagram and the ids it changed — the editor flashes those green and applies the heal as ONE undoable
+ * step, so a single Undo gives back the diagram as it was saved. `changedIds` empty means nothing to do (and `data` is the
+ * same object). Idempotent: healing a healed diagram changes nothing.
+ */
+export function healEndpoints(data: DiagramData, labelFor?: LabelFor): { data: DiagramData; changedIds: string[] } {
+  const none = { data, changedIds: [] as string[] };
+  if (data.relaxedLayout || data.exactAsDrawn) return none;
+  if (!data.connectors.some((c) => RULED.has(c.type))) return none;
+  const frozen = new Set<string>();
+  for (const c of data.connectors) if (RULED.has(c.type) && (c.waypoints?.length ?? 0) >= SHAPED_MIN_POINTS) frozen.add(c.id);
+  const r = spreadEndpoints(data.elements, data.connectors, { frozen });
+  if (!r.changedIds.length) return none;
+  const healed = applyOffsets(data, new Set(r.changedIds), r.connectors, labelFor);
+  return { data: healed, changedIds: [...r.changedIds] };
 }

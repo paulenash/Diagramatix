@@ -50,6 +50,7 @@ import { FloatingPanel } from "./FloatingPanel";
 import { edgeIsResizable, type EdgeSide as ResizableSide } from "@/app/lib/diagram/resizeEdges";
 import { connectorTravels } from "@/app/lib/diagram/liftedLayer";
 import { GoldFlashOverlay, type GoldFlashTarget } from "./GoldFlashOverlay";
+import { HealFlashOverlay, type HealFlashLine } from "./HealFlashOverlay";
 import {
   planEditZoomAim,
   computeEditZoom,
@@ -430,6 +431,9 @@ interface Props {
   /** Gold flashing: outline what the last Voice Assist command touched. `runId`
    *  is bumped per command so the overlay can tell a new run from a re-render. */
   goldFlash?: { runId: number; targets: readonly GoldFlashTarget[] };
+  /** Heal on load: the connectors that were separated when this diagram was opened, flashed green (their VISIBLE lines).
+   *  `runId` is bumped once per heal. Decorative and pointer-transparent. */
+  healFlash?: { runId: number; lines: readonly HealFlashLine[] };
   /** Voice Assist Help: a dashed outline on the element "this" would act on right now
    *  (world coordinates). Decorative and pointer-transparent; null draws nothing. */
   voiceTargetOutline?: { x: number; y: number; width: number; height: number } | null;
@@ -662,6 +666,7 @@ export function Canvas({
   renameBadges,
   dividerRulers,
   goldFlash,
+  healFlash,
   voiceTargetOutline,
   voiceTargetPath,
   liftedIds,
@@ -6404,6 +6409,10 @@ export function Canvas({
               pointer-transparent throughout; it can never eat a click. */}
           {goldFlash && goldFlash.runId > 0 && (
             <GoldFlashOverlay runId={goldFlash.runId} targets={goldFlash.targets} />
+          )}
+          {/* Heal on load: the connectors it moved, flashed green (slice 5 of the connector-endpoint plan). */}
+          {healFlash && healFlash.runId > 0 && (
+            <HealFlashOverlay runId={healFlash.runId} lines={healFlash.lines} />
           )}
 
           {/* Voice Assist Help: what "this" would act on right now. Same rules as the

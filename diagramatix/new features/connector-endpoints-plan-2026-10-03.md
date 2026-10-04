@@ -310,3 +310,12 @@ Still for later slices: NL Assist's own spread in `addMessage` (20 px, now overt
 - Unchanged by decision: the gateway-point refusals ("the X already has one") and gateways themselves.
 
 A real bug found by the new tests (it showed as a flaky test, because connector ids are random and a tie-break sorted by id): placing a new connector round frozen neighbours only looked at the frozen ends in its own cluster, so it could land on one just outside it. It now considers every other end on the face. Pinned deterministically for all six id orders.
+
+**Slice 5 — heal on load — built (2026-10-04).**
+- `healEndpoints(data)` (spreadPass.ts): the same allocator over a whole saved diagram, nothing frozen except hand-shaped routes; returns the healed diagram and the ids it changed, or the SAME object when there is nothing to do.
+- New action `HEAL_ENDPOINTS` and a hook callback `healEndpointsNow()`: it takes the history snapshot FIRST, then applies the heal — so one Undo gives back the diagram exactly as saved (tested through the real hook, T5240).
+- The editor runs it once per opened diagram — BPMN only, not read-only, not while editing a template or previewing history. The phone viewer and read-only views never call it, so they draw the diagram as saved.
+- The connectors it moved flash green three times (`HealFlashOverlay`, their VISIBLE lines only, honouring reduced-motion), and a one-line notice says how many were separated and that Undo restores the saved drawing.
+- A diagram with nothing to heal opens exactly as before: no flash, no history entry, not dirtied.
+- **Exact as drawn.** A diagram generated from an IMAGE already carries `relaxedLayout` (set by `layoutBpmnPreserved` and by the free-form regeneration) — "exactly as drawn" already existed, so no new flag was needed for those. BPMN XML and Visio imports now carry the new `exactAsDrawn` (type, schema, both importers). Heal skips either. Diagrams imported before this change cannot be told apart and are healed on first open — Undo is the safety net.
+- **One thing to know:** the heal is an edit like any other, so the editor's autosave (1.5 s) will save it unless the person undoes it first; Undo is then saved in turn. Nothing is written on a read-only or phone view.

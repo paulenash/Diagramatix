@@ -145,6 +145,7 @@ const baseDiagramData = z.object({
   descriptionFontSize: z.number().optional(),
   database: z.string().optional(),
   relaxedLayout: z.boolean().optional(),
+  exactAsDrawn: z.boolean().optional(),
   showPainPoints: z.boolean().optional(),
   showPainPointDescriptions: z.boolean().optional(),
   showIssues: z.boolean().optional(),

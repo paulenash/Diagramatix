@@ -30,7 +30,7 @@ import { capitaliseFirstWord, needsCapital, decisionLabel, isDecisionGateway } f
 import { contentBoundsOf, clampRectToContent, clampRectToLimits, poolFollowsLanes, leftGapShortfall, MIN_LEFT_GAP } from "@/app/lib/diagram/poolLaneBounds";
 import { getLaneHeaderWidth, getPoolHeaderWidth, healPoolHeaderWidths, laneMetrics, minHeightForContainer, poolMetrics } from "@/app/lib/diagram/containerMetrics";
 import { shiftNeighbourPools } from "@/app/lib/diagram/poolNeighbours";
-import { spreadAfter } from "@/app/lib/diagram/spreadPass";
+import { spreadAfter, healEndpoints, type LabelFor } from "@/app/lib/diagram/spreadPass";
 import { carveGeometry, refitStackAtEdge, shiftSublanesBy } from "@/app/lib/diagram/laneStack";
 import { uniqueContainerLabel } from "@/app/lib/diagram/containerNames";
 import { planCarve, planLaneDrop, type CarvePlan } from "@/app/lib/diagram/laneDropPlan";
@@ -371,6 +371,8 @@ function adjustMsgLabelOffset(
 
 export type Action =
   | { type: "SET_DATA"; payload: DiagramData }
+  /** Heal on load: separate connectors that share an attachment point (spreadPass.ts healEndpoints). One undoable step. */
+  | { type: "HEAL_ENDPOINTS" }
   | { type: "ADD_ELEMENT"; payload: { symbolType: SymbolType; position: Point; taskType?: BpmnTaskType; eventType?: EventType; id?: string; initial?: { properties?: Record<string, unknown>; width?: number; height?: number; label?: string; parentId?: string; keepInLane?: boolean } } }
   | { type: "MOVE_ELEMENT"; payload: { id: string; x: number; y: number; unconstrained?: boolean; travellingIds?: string[] } }
   | { type: "SWAP_LANES_VERTICAL"; payload: { laneId: string; direction: "up" | "down" } }
@@ -3741,6 +3743,11 @@ export function reducer(state: DiagramData, action: Action): DiagramData {
   return next;
 }
 
+/** A moved connector's label goes with it: a message label follows its anchor end, any other keeps its place in the world. */
+const endpointLabelFor: LabelFor = (orig, re, els) => (re.type === "messageBPMN"
+  ? adjustMsgLabelOffset(orig, orig.waypoints, re.waypoints, els.find((e) => e.id === re.sourceId), els.find((e) => e.id === re.targetId))
+  : preserveLabelWorldPos(orig, re.waypoints));
+
 function reducerWithPasses(state: DiagramData, action: Action): DiagramData {
   let next = reducerCore(state, action);
   // ONE CONNECTOR PER ATTACHMENT POINT (Paul, 2026-10-03; connector-endpoint plan, slice 3). Whatever the action did —
@@ -3750,9 +3757,7 @@ function reducerWithPasses(state: DiagramData, action: Action): DiagramData {
   // not undone. NOT on SET_DATA: undo, redo and load restore a state exactly; repairing an old diagram is slice 5.
   // (Nor on APPLY_TEMPLATE: a template's flows keep the routes they were saved with — T4872.)
   if (action.type !== "SET_DATA" && action.type !== "APPLY_TEMPLATE") {
-    next = spreadAfter(state, next, (orig, re, els) => (re.type === "messageBPMN"
-      ? adjustMsgLabelOffset(orig, orig.waypoints, re.waypoints, els.find((e) => e.id === re.sourceId), els.find((e) => e.id === re.targetId))
-      : preserveLabelWorldPos(orig, re.waypoints)));
+    next = spreadAfter(state, next, endpointLabelFor);
   }
   // Gateway branch labels stay put when their gateway moves — except the
   // middle-vertex branch (Paul, 2026-09-22; see labelFollow.ts). Here in the
@@ -3850,6 +3855,9 @@ function reducerCore(state: DiagramData, action: Action): DiagramData {
 
 function reducerImpl(state: DiagramData, action: Action): DiagramData {
   switch (action.type) {
+    case "HEAL_ENDPOINTS":
+      return healEndpoints(state, endpointLabelFor).data;
+
     case "SET_DATA":
       // Saved width/height is preserved verbatim — imported diagrams keep
       // their Visio dimensions; in-app edits go through UPDATE_LABEL which
@@ -11346,6 +11354,18 @@ export function useDiagram(initialData: DiagramData) {
     convertProcessCollapsed: useCallback((id: string) => {
       pushHistory(snapshotData());
       dispatch({ type: "CONVERT_PROCESS_COLLAPSED", payload: { id } });
+    }, []),
+    /**
+     * HEAL ON LOAD (connector-endpoint plan, slice 5). Separates connectors that share an attachment point in the diagram
+     * as it stands, as ONE undoable step — the snapshot is taken first, so a single Undo restores the diagram exactly as it
+     * was saved. Returns the ids of the connectors it changed (empty: nothing to heal, no history entry, nothing dirtied).
+     */
+    healEndpointsNow: useCallback((): { ids: string[]; data: DiagramData } => {
+      const r = healEndpoints(dataRef.current, endpointLabelFor);
+      if (!r.changedIds.length) return { ids: [], data: dataRef.current };
+      pushHistory(snapshotData());
+      dispatch({ type: "HEAL_ENDPOINTS" });
+      return { ids: r.changedIds, data: r.data };
     }, []),
     convertEpToSubprocess: useCallback((id: string, linkedDiagramId: string | null) => {
       pushHistory(snapshotData());

@@ -410,6 +410,10 @@ export interface DiagramData {
    *  when the AI reproduces an imported image's positions; also toggleable in
    *  Diagram Properties. Optional — absent/false means normal Diagramatix rules. */
   relaxedLayout?: boolean;
+  /** "EXACT AS DRAWN": the connector-endpoint repair (healEndpoints, on load) leaves this diagram alone. Set on BPMN XML and
+   *  Visio imports, which keep the drawing they came with (Paul, 2026-10-04); a diagram generated from an IMAGE already
+   *  carries `relaxedLayout`, which means the same. Absent = a normal diagram, repaired when opened. */
+  exactAsDrawn?: boolean;
   /** Obstacle-avoidance OFF for this diagram — connectors route straight without
    *  detouring around intervening elements. Set automatically when generating an
    *  ArchiMate diagram (whose layered/nested layout already spaces elements). The
