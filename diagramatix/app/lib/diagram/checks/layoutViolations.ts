@@ -234,7 +234,7 @@ export function findLayoutViolations(data: DiagramData): string[] {
     if (!c.waypoints || c.waypoints.length < 2) v.push(`connector ${c.id} (${c.type}) has no waypoints`);
   }
 
-  // 2 ── no two ruled connectors share an attachment point ──────────────────
+  // 2 ── no two ruled connectors share an attachment point (R8.41; gateways exempt past three — R6.29/R6.33) ──
   const points = new Map<string, string[]>(); // `elId|side|offset` → connector ids
   const add = (elId: string, side: string, off: number, cid: string) => {
     const key = `${elId}|${side}|${off.toFixed(3)}`;

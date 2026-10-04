@@ -4389,7 +4389,7 @@ export function layoutBpmnDiagram(
     } as Connector);
   }
 
-  // ── R5.06 / R8.11 / R8.12 → ONE allocator: no two sequence or message connectors on one attachment point ──
+  // ── R8.41 (replaces R5.06 / R8.11 / R8.12): ONE allocator — no two sequence or message connectors on one attachment point ──
   // (Paul, 2026-10-03/04: "never allow 2 connectors (sequence or message) to attach to the same source or target
   // endpoint, but avoid connectors crossing each other"; new features/connector-endpoints-plan-2026-10-03.md, slice 2.)
   // The three separate passes that used to live here — messages (R5.06), sequence ends (R8.11) and sequence-vs-message
