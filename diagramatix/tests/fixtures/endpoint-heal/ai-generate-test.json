@@ -1,0 +1,1379 @@
+{
+  "schemaVersion": "49",
+  "appVersion": "2.13",
+  "exportedAt": "2026-10-04T22:30:08.367Z",
+  "project": {
+    "name": "(single diagram)",
+    "description": "",
+    "ownerName": "",
+    "colorConfig": {}
+  },
+  "diagrams": [
+    {
+      "originalId": "cmtzqr4cp000h01pi06qq7po3",
+      "name": "AI Generate test",
+      "type": "bpmn",
+      "data": {
+        "elements": [
+          {
+            "id": "pCust",
+            "type": "pool",
+            "x": 50,
+            "y": 50,
+            "width": 1618,
+            "height": 78,
+            "label": "Customer",
+            "properties": {
+              "poolType": "black-box",
+              "isSystem": false,
+              "poolHeaderWidth": 36
+            }
+          },
+          {
+            "id": "p1",
+            "type": "pool",
+            "x": 50,
+            "y": 226,
+            "width": 1618,
+            "height": 752.5,
+            "label": "Sales Organisation",
+            "properties": {
+              "poolType": "white-box"
+            }
+          },
+          {
+            "id": "l1",
+            "type": "lane",
+            "x": 86,
+            "y": 226,
+            "width": 1582,
+            "height": 294,
+            "label": "Customer Service",
+            "properties": {},
+            "parentId": "p1"
+          },
+          {
+            "id": "e1",
+            "type": "start-event",
+            "x": 158,
+            "y": 720,
+            "width": 36,
+            "height": 36,
+            "label": "Order to validate received",
+            "properties": {
+              "labelOffsetX": 0,
+              "labelOffsetY": 7
+            },
+            "parentId": "l2",
+            "eventType": "message"
+          },
+          {
+            "id": "g2",
+            "type": "gateway",
+            "x": 1066,
+            "y": 493.75,
+            "width": 40,
+            "height": 40,
+            "label": "New or blocked customer?",
+            "properties": {
+              "gatewayType": "none",
+              "gatewayRole": "decision",
+              "labelOffsetX": -44,
+              "labelOffsetY": -103,
+              "labelWidth": 80
+            },
+            "parentId": "l1",
+            "gatewayType": "none"
+          },
+          {
+            "id": "t4",
+            "type": "task",
+            "x": 1224,
+            "y": 390,
+            "width": 102,
+            "height": 65,
+            "label": "Request customer\nonboarding",
+            "properties": {},
+            "parentId": "l1",
+            "taskType": "send"
+          },
+          {
+            "id": "ie1",
+            "type": "intermediate-event",
+            "x": 1386,
+            "y": 404.5,
+            "width": 36,
+            "height": 36,
+            "label": "Customer details confirmed",
+            "properties": {
+              "labelOffsetX": 0,
+              "labelOffsetY": 7
+            },
+            "parentId": "l1",
+            "eventType": "message"
+          },
+          {
+            "id": "t5",
+            "type": "task",
+            "x": 1420,
+            "y": 291,
+            "width": 102,
+            "height": 65,
+            "label": "Chase customer\nfor details",
+            "properties": {},
+            "parentId": "l1",
+            "taskType": "send"
+          },
+          {
+            "id": "e3",
+            "type": "end-event",
+            "x": 1582,
+            "y": 305.5,
+            "width": 36,
+            "height": 36,
+            "label": "Customer chased",
+            "properties": {
+              "labelOffsetX": 0,
+              "labelOffsetY": 7
+            },
+            "parentId": "l1"
+          },
+          {
+            "id": "l2",
+            "type": "lane",
+            "x": 86,
+            "y": 520,
+            "width": 1582,
+            "height": 458.5,
+            "label": "Order Processing",
+            "properties": {},
+            "parentId": "p1"
+          },
+          {
+            "id": "g0",
+            "type": "gateway",
+            "x": 264,
+            "y": 718,
+            "width": 40,
+            "height": 40,
+            "label": "",
+            "properties": {
+              "gatewayType": "none",
+              "gatewayRole": "merge"
+            },
+            "parentId": "l2",
+            "gatewayType": "none"
+          },
+          {
+            "id": "t1",
+            "type": "task",
+            "x": 394,
+            "y": 705.5,
+            "width": 102,
+            "height": 65,
+            "label": "Look up customer\nmaster data",
+            "properties": {},
+            "parentId": "l2",
+            "taskType": "service"
+          },
+          {
+            "id": "t2",
+            "type": "task",
+            "x": 584,
+            "y": 705.5,
+            "width": 102,
+            "height": 65,
+            "label": "Validate order\ndata",
+            "properties": {},
+            "parentId": "l2",
+            "taskType": "user"
+          },
+          {
+            "id": "g1",
+            "type": "gateway",
+            "x": 746,
+            "y": 683.625,
+            "width": 40,
+            "height": 40,
+            "label": "Customer and order valid?",
+            "properties": {
+              "gatewayType": "none",
+              "gatewayRole": "decision",
+              "labelOffsetX": -23,
+              "labelOffsetY": -91,
+              "labelWidth": 80
+            },
+            "parentId": "l2",
+            "gatewayType": "none"
+          },
+          {
+            "id": "t3",
+            "type": "task",
+            "x": 904,
+            "y": 848.5,
+            "width": 102,
+            "height": 65,
+            "label": "Refer to\nCustomer Service",
+            "properties": {},
+            "parentId": "l2",
+            "taskType": "user"
+          },
+          {
+            "id": "g3",
+            "type": "gateway",
+            "x": 1224,
+            "y": 683.625,
+            "width": 40,
+            "height": 40,
+            "label": "",
+            "properties": {
+              "gatewayType": "none",
+              "gatewayRole": "merge"
+            },
+            "parentId": "l2",
+            "gatewayType": "none"
+          },
+          {
+            "id": "t6",
+            "type": "task",
+            "x": 1354,
+            "y": 671.125,
+            "width": 102,
+            "height": 65,
+            "label": "Flag order\nas validated",
+            "properties": {},
+            "parentId": "l2",
+            "taskType": "service"
+          },
+          {
+            "id": "e2",
+            "type": "end-event",
+            "x": 1526,
+            "y": 685.625,
+            "width": 36,
+            "height": 36,
+            "label": "Order validated for credit check",
+            "properties": {
+              "labelOffsetX": 0,
+              "labelOffsetY": 7
+            },
+            "parentId": "l2"
+          },
+          {
+            "id": "pCMD",
+            "type": "pool",
+            "x": 50,
+            "y": 1076.5,
+            "width": 1618,
+            "height": 128,
+            "label": "Customer Master\nData System",
+            "properties": {
+              "poolType": "black-box",
+              "isSystem": true,
+              "poolHeaderWidth": 46
+            }
+          },
+          {
+            "id": "bt1",
+            "type": "intermediate-event",
+            "x": 1257,
+            "y": 372,
+            "width": 36,
+            "height": 36,
+            "label": "No response in 2 business days",
+            "properties": {
+              "interruptionType": "interrupting",
+              "boundarySide": "top",
+              "labelOffsetX": -64,
+              "labelOffsetY": -66
+            },
+            "boundaryHostId": "t4",
+            "eventType": "timer"
+          }
+        ],
+        "viewport": {
+          "x": 0,
+          "y": 0,
+          "zoom": 0.6
+        },
+        "connectors": [
+          {
+            "id": "conn-e1-g0-0",
+            "sourceId": "e1",
+            "targetId": "g0",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 176,
+                "y": 738
+              },
+              {
+                "x": 176,
+                "y": 756
+              },
+              {
+                "x": 176,
+                "y": 760
+              },
+              {
+                "x": 176,
+                "y": 704
+              },
+              {
+                "x": 284,
+                "y": 704
+              },
+              {
+                "x": 284,
+                "y": 714
+              },
+              {
+                "x": 284,
+                "y": 718
+              },
+              {
+                "x": 284,
+                "y": 738
+              }
+            ],
+            "label": "",
+            "targetOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-g0-t1-1",
+            "sourceId": "g0",
+            "targetId": "t1",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 284,
+                "y": 738
+              },
+              {
+                "x": 304,
+                "y": 738
+              },
+              {
+                "x": 324,
+                "y": 738
+              },
+              {
+                "x": 370,
+                "y": 738
+              },
+              {
+                "x": 394,
+                "y": 738
+              },
+              {
+                "x": 445,
+                "y": 738
+              }
+            ],
+            "label": "",
+            "sourceOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-t1-pCMD-2",
+            "sourceId": "t1",
+            "targetId": "pCMD",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "type": "messageBPMN",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 445,
+                "y": 738
+              },
+              {
+                "x": 445,
+                "y": 770.5
+              },
+              {
+                "x": 445,
+                "y": 1076.5
+              },
+              {
+                "x": 859,
+                "y": 1140.5
+              }
+            ],
+            "label": "Customer record request",
+            "targetOffsetAlong": 0.24412855377008652,
+            "sourceOffsetAlong": 0.5,
+            "labelOffsetX": -54,
+            "labelOffsetY": 115,
+            "labelWidth": 80
+          },
+          {
+            "id": "conn-pCMD-t2-3",
+            "sourceId": "pCMD",
+            "targetId": "t2",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "type": "messageBPMN",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 859,
+                "y": 1140.5
+              },
+              {
+                "x": 635,
+                "y": 1076.5
+              },
+              {
+                "x": 635,
+                "y": 770.5
+              },
+              {
+                "x": 635,
+                "y": 738
+              }
+            ],
+            "label": "Customer status, credit block, terms",
+            "sourceOffsetAlong": 0.361557478368356,
+            "targetOffsetAlong": 0.5,
+            "labelOffsetX": -69,
+            "labelOffsetY": 115,
+            "labelWidth": 80
+          },
+          {
+            "id": "conn-t1-t2-4",
+            "sourceId": "t1",
+            "targetId": "t2",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 445,
+                "y": 738
+              },
+              {
+                "x": 496,
+                "y": 738
+              },
+              {
+                "x": 520,
+                "y": 738
+              },
+              {
+                "x": 560,
+                "y": 738
+              },
+              {
+                "x": 584,
+                "y": 738
+              },
+              {
+                "x": 635,
+                "y": 738
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-t2-g1-5",
+            "sourceId": "t2",
+            "targetId": "g1",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 635,
+                "y": 738
+              },
+              {
+                "x": 686,
+                "y": 738
+              },
+              {
+                "x": 710,
+                "y": 738
+              },
+              {
+                "x": 718,
+                "y": 738
+              },
+              {
+                "x": 718,
+                "y": 703.625
+              },
+              {
+                "x": 726,
+                "y": 703.625
+              },
+              {
+                "x": 746,
+                "y": 703.625
+              },
+              {
+                "x": 766,
+                "y": 703.625
+              }
+            ],
+            "label": "",
+            "targetOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-g1-g3-6",
+            "sourceId": "g1",
+            "targetId": "g3",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 766,
+                "y": 703.625
+              },
+              {
+                "x": 786,
+                "y": 703.625
+              },
+              {
+                "x": 806,
+                "y": 703.625
+              },
+              {
+                "x": 1204,
+                "y": 703.625
+              },
+              {
+                "x": 1224,
+                "y": 703.625
+              },
+              {
+                "x": 1244,
+                "y": 703.625
+              }
+            ],
+            "label": "Yes",
+            "labelOffsetX": 21,
+            "labelOffsetY": -24,
+            "labelWidth": 60,
+            "labelAnchor": "source",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-g1-t3-7",
+            "sourceId": "g1",
+            "targetId": "t3",
+            "sourceSide": "bottom",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 766,
+                "y": 703.625
+              },
+              {
+                "x": 766,
+                "y": 723.625
+              },
+              {
+                "x": 766,
+                "y": 881
+              },
+              {
+                "x": 904,
+                "y": 881
+              },
+              {
+                "x": 955,
+                "y": 881
+              }
+            ],
+            "label": "No",
+            "labelOffsetX": 21,
+            "labelOffsetY": 10,
+            "labelWidth": 60,
+            "labelAnchor": "source",
+            "sourceOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-t3-g2-8",
+            "sourceId": "t3",
+            "targetId": "g2",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 955,
+                "y": 881
+              },
+              {
+                "x": 1006,
+                "y": 881
+              },
+              {
+                "x": 1030,
+                "y": 881
+              },
+              {
+                "x": 1038,
+                "y": 881
+              },
+              {
+                "x": 1038,
+                "y": 513.75
+              },
+              {
+                "x": 1046,
+                "y": 513.75
+              },
+              {
+                "x": 1066,
+                "y": 513.75
+              },
+              {
+                "x": 1086,
+                "y": 513.75
+              }
+            ],
+            "label": "",
+            "targetOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-g2-t4-9",
+            "sourceId": "g2",
+            "targetId": "t4",
+            "sourceSide": "top",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1086,
+                "y": 513.75
+              },
+              {
+                "x": 1086,
+                "y": 493.75
+              },
+              {
+                "x": 1086,
+                "y": 422.5
+              },
+              {
+                "x": 1224,
+                "y": 422.5
+              },
+              {
+                "x": 1275,
+                "y": 422.5
+              }
+            ],
+            "label": "New",
+            "labelOffsetX": 21,
+            "labelOffsetY": -24,
+            "labelWidth": 60,
+            "labelAnchor": "source",
+            "sourceOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-g2-g3-10",
+            "sourceId": "g2",
+            "targetId": "g3",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1086,
+                "y": 513.75
+              },
+              {
+                "x": 1086,
+                "y": 533.75
+              },
+              {
+                "x": 1086,
+                "y": 553.75
+              },
+              {
+                "x": 1086,
+                "y": 608.6875
+              },
+              {
+                "x": 1244,
+                "y": 608.6875
+              },
+              {
+                "x": 1244,
+                "y": 663.625
+              },
+              {
+                "x": 1244,
+                "y": 683.625
+              },
+              {
+                "x": 1244,
+                "y": 703.625
+              }
+            ],
+            "label": "Existing and clear",
+            "labelOffsetX": 66,
+            "labelOffsetY": 10,
+            "labelWidth": 60,
+            "labelAnchor": "source",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-t4-pCust-11",
+            "sourceId": "t4",
+            "targetId": "pCust",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "type": "messageBPMN",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1275,
+                "y": 422.5
+              },
+              {
+                "x": 1253.9982,
+                "y": 390
+              },
+              {
+                "x": 1253.9982,
+                "y": 128
+              },
+              {
+                "x": 859,
+                "y": 89
+              }
+            ],
+            "label": "Onboarding request",
+            "targetOffsetAlong": 0.7441274412855376,
+            "sourceOffsetAlong": 0.2941,
+            "labelOffsetX": -66,
+            "labelOffsetY": -121,
+            "labelWidth": 80
+          },
+          {
+            "id": "conn-bt1-t5-12",
+            "sourceId": "bt1",
+            "targetId": "t5",
+            "sourceSide": "top",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1275,
+                "y": 390
+              },
+              {
+                "x": 1275,
+                "y": 372
+              },
+              {
+                "x": 1275,
+                "y": 323.5
+              },
+              {
+                "x": 1420,
+                "y": 323.5
+              },
+              {
+                "x": 1471,
+                "y": 323.5
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-t5-e3-13",
+            "sourceId": "t5",
+            "targetId": "e3",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1471,
+                "y": 323.5
+              },
+              {
+                "x": 1522,
+                "y": 323.5
+              },
+              {
+                "x": 1546,
+                "y": 323.5
+              },
+              {
+                "x": 1564,
+                "y": 323.5
+              },
+              {
+                "x": 1582,
+                "y": 323.5
+              },
+              {
+                "x": 1600,
+                "y": 323.5
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-t4-ie1-14",
+            "sourceId": "t4",
+            "targetId": "ie1",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1275,
+                "y": 422.5
+              },
+              {
+                "x": 1326,
+                "y": 422.5
+              },
+              {
+                "x": 1350,
+                "y": 422.5
+              },
+              {
+                "x": 1359,
+                "y": 422.5
+              },
+              {
+                "x": 1359,
+                "y": 420.9988
+              },
+              {
+                "x": 1368,
+                "y": 420.9988
+              },
+              {
+                "x": 1386,
+                "y": 420.9988
+              },
+              {
+                "x": 1404,
+                "y": 422.5
+              }
+            ],
+            "label": "",
+            "targetOffsetAlong": 0.4583
+          },
+          {
+            "id": "conn-pCust-ie1-15",
+            "sourceId": "pCust",
+            "targetId": "ie1",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "type": "messageBPMN",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 859,
+                "y": 89
+              },
+              {
+                "x": 1404,
+                "y": 128
+              },
+              {
+                "x": 1404,
+                "y": 404.5
+              },
+              {
+                "x": 1404,
+                "y": 422.5
+              }
+            ],
+            "label": "Customer details",
+            "sourceOffsetAlong": 0.8368355995055624,
+            "targetOffsetAlong": 0.5,
+            "labelOffsetX": -60,
+            "labelOffsetY": -128.25,
+            "labelWidth": 80
+          },
+          {
+            "id": "conn-ie1-g0-16",
+            "sourceId": "ie1",
+            "targetId": "g0",
+            "sourceSide": "left",
+            "targetSide": "bottom",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1404,
+                "y": 422.5
+              },
+              {
+                "x": 1386,
+                "y": 424.0012
+              },
+              {
+                "x": 1368,
+                "y": 424.0012
+              },
+              {
+                "x": 1368,
+                "y": 923.5
+              },
+              {
+                "x": 284,
+                "y": 923.5
+              },
+              {
+                "x": 284,
+                "y": 778
+              },
+              {
+                "x": 284,
+                "y": 758
+              },
+              {
+                "x": 284,
+                "y": 738
+              }
+            ],
+            "label": "",
+            "targetOffsetAlong": 0.5,
+            "sourceOffsetAlong": 0.5417
+          },
+          {
+            "id": "conn-g3-t6-17",
+            "sourceId": "g3",
+            "targetId": "t6",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1244,
+                "y": 703.625
+              },
+              {
+                "x": 1264,
+                "y": 703.625
+              },
+              {
+                "x": 1284,
+                "y": 703.625
+              },
+              {
+                "x": 1330,
+                "y": 703.625
+              },
+              {
+                "x": 1354,
+                "y": 703.625
+              },
+              {
+                "x": 1405,
+                "y": 703.625
+              }
+            ],
+            "label": "",
+            "sourceOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-t6-e2-18",
+            "sourceId": "t6",
+            "targetId": "e2",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1405,
+                "y": 703.625
+              },
+              {
+                "x": 1456,
+                "y": 703.625
+              },
+              {
+                "x": 1480,
+                "y": 703.625
+              },
+              {
+                "x": 1508,
+                "y": 703.625
+              },
+              {
+                "x": 1526,
+                "y": 703.625
+              },
+              {
+                "x": 1544,
+                "y": 703.625
+              }
+            ],
+            "label": ""
+          }
+        ],
+        "aiGeneration": {
+          "promptId": "cmtzqrrkz000p01pi5oo282vi",
+          "promptName": "AI Generate test — AI prompt",
+          "promptText": "Build the BPMN process from this meeting transcript. Treat each distinct speaker as a role / lane, and use roles or job functions — never an individual person's name — in pool, lane, task and annotation names. Ignore small talk.\n\nProcess: V01.02 — Validate Customer and Order (second stage of the Order to Cash value chain). Purpose: confirm the customer exists, is active and unblocked, and that the order's products, quantities and terms are valid — onboarding or unblocking where needed — leaving a validated order ready for the Check Credit and Pricing stage (V01.03).\n\nParticipants (pools, top to bottom):\n1. Customer — external party whose order is being validated. Black-box, single instance; no internal flow, only sends/receives messages.\n2. Sales Organisation — the white-box pool holding the entire process flow. Two lanes, top to bottom: Customer Service (upper) and Order Processing (lower).\n3. Customer Master Data System (CRM/ERP) — black-box, single instance, flagged as a System (System = true); no internal flow, only sends/receives messages.\n\nAll sequence flows stay inside the Sales Organisation pool; all four message flows cross to the Customer (above) or the Customer Master Data System (below).\n\nProcess flow:\n1. (Order Processing lane) Message start event \"Order to validate received\" — triggered by the hand-off message arriving from the preceding order capture stage.\n2. (Order Processing) Service task \"Look up customer master data\" — automated; sends a message flow down to the Customer Master Data System to retrieve the customer record.\n3. The Customer Master Data System returns a message flow into the next task carrying customer status, credit-block flag and account terms.\n4. (Order Processing) User task \"Validate order data\" — a person checks products, SKUs, quantities and terms against the data returned by the system.\n5. (Order Processing) Exclusive gateway \"Customer and order valid?\":\n   - Yes: continue directly to step 11 (\"Flag order as validated\").\n   - No — customer missing or blocked: continue to step 6.\n6. (Order Processing) User task \"Refer to Customer Service\"; the flow then crosses up into the Customer Service lane.\n7. (Customer Service) Exclusive gateway \"New or blocked customer?\" with two branches: \"New\" and \"Existing and clear\".\n   - Branch \"New\": go to step 8.\n   - Branch \"Existing and clear\": no onboarding needed; continue directly to step 11.\n8. (Customer Service) User task \"Request customer onboarding / master-data setup\" — Customer Service contacts the customer to get them properly set up in the records; a message flow goes up to the Customer pool.\n   - Boundary event: non-interrupting timer \"No response in 2 business days\" attached to this task. The onboarding request stays active; in parallel the timer triggers send task \"Chase customer for details\", after which the flow returns to waiting. The timer can fire repeatedly, every two business days of continued silence.\n9. (Customer Service) Intermediate message catch event \"Customer details confirmed\" — waits for the Customer's reply (message flow from the Customer pool down into this event).\n10. On receipt, the flow loops back to step 2 \"Look up customer master data\", so validation is always re-run against the now-complete master data.\n11. Service task \"Flag order as validated\" — automated; stamps the order as validated in the system. Converging inputs: the \"Yes\" branch of the validity gateway and the \"Existing and clear\" branch.\n12. End event \"Order validated, ready for Check Credit and Pricing\" (hand-off to V01.03).\n\nHappy path (no exceptions): message start \"Order to validate received\" → \"Look up customer master data\" → \"Validate order data\" → gateway \"Customer and order valid?\" = Yes → \"Flag order as validated\" → end event.\n\nMessage flows (four in total):\n- \"Look up customer master data\" → Customer Master Data System.\n- Customer Master Data System → \"Validate order data\" (customer status, credit-block flag, account terms).\n- \"Request customer onboarding / master-data setup\" → Customer.\n- Customer → \"Customer details confirmed\" catch event.",
+          "model": "claude-fable-5-1",
+          "generatedAt": "2026-10-04T22:28:57.294Z",
+          "autoNamed": true,
+          "plan": {
+            "elements": [
+              {
+                "id": "pCust",
+                "type": "pool",
+                "label": "Customer",
+                "poolType": "black-box",
+                "isSystem": false
+              },
+              {
+                "id": "p1",
+                "type": "pool",
+                "label": "Sales Organisation",
+                "poolType": "white-box"
+              },
+              {
+                "id": "l1",
+                "type": "lane",
+                "label": "Customer Service",
+                "parentPool": "p1",
+                "pool": "p1"
+              },
+              {
+                "id": "l2",
+                "type": "lane",
+                "label": "Order Processing",
+                "parentPool": "p1",
+                "pool": "p1"
+              },
+              {
+                "id": "pCMD",
+                "type": "pool",
+                "label": "Customer\nMaster Data\nSystem",
+                "poolType": "black-box",
+                "isSystem": true
+              },
+              {
+                "id": "e1",
+                "type": "start-event",
+                "label": "Order to validate received",
+                "eventType": "message",
+                "pool": "p1",
+                "lane": "l1"
+              },
+              {
+                "id": "g0",
+                "type": "gateway",
+                "label": "",
+                "gatewayType": "exclusive",
+                "gatewayRole": "merge",
+                "pool": "p1",
+                "lane": "l2"
+              },
+              {
+                "id": "t1",
+                "type": "task",
+                "label": "Look up customer\nmaster data",
+                "taskType": "service",
+                "pool": "p1",
+                "lane": "l2"
+              },
+              {
+                "id": "t2",
+                "type": "task",
+                "label": "Validate order\ndata",
+                "taskType": "user",
+                "pool": "p1",
+                "lane": "l2"
+              },
+              {
+                "id": "g1",
+                "type": "gateway",
+                "label": "Customer and order valid?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "decision",
+                "pool": "p1",
+                "lane": "l2"
+              },
+              {
+                "id": "t3",
+                "type": "task",
+                "label": "Refer to\nCustomer Service",
+                "taskType": "user",
+                "pool": "p1",
+                "lane": "l2"
+              },
+              {
+                "id": "g2",
+                "type": "gateway",
+                "label": "New or blocked customer?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "decision",
+                "pool": "p1",
+                "lane": "l1"
+              },
+              {
+                "id": "t4",
+                "type": "task",
+                "label": "Request customer\nonboarding",
+                "taskType": "send",
+                "pool": "p1",
+                "lane": "l1"
+              },
+              {
+                "id": "bt1",
+                "type": "intermediate-event",
+                "label": "No response in 2 business days",
+                "eventType": "timer",
+                "boundaryHost": "t4",
+                "boundarySide": "bottom",
+                "properties": {
+                  "interruptionType": "non-interrupting"
+                }
+              },
+              {
+                "id": "t5",
+                "type": "task",
+                "label": "Chase customer\nfor details",
+                "taskType": "send",
+                "pool": "p1",
+                "lane": "l1"
+              },
+              {
+                "id": "e3",
+                "type": "end-event",
+                "label": "Customer chased",
+                "pool": "p1",
+                "lane": "l1"
+              },
+              {
+                "id": "ie1",
+                "type": "intermediate-event",
+                "label": "Customer details confirmed",
+                "eventType": "message",
+                "pool": "p1",
+                "lane": "l1"
+              },
+              {
+                "id": "g3",
+                "type": "gateway",
+                "label": "",
+                "gatewayType": "exclusive",
+                "gatewayRole": "merge",
+                "pool": "p1",
+                "lane": "l2"
+              },
+              {
+                "id": "t6",
+                "type": "task",
+                "label": "Flag order\nas validated",
+                "taskType": "service",
+                "pool": "p1",
+                "lane": "l2"
+              },
+              {
+                "id": "e2",
+                "type": "end-event",
+                "label": "Order validated for credit check",
+                "pool": "p1",
+                "lane": "l2"
+              }
+            ],
+            "connections": [
+              {
+                "sourceId": "e1",
+                "targetId": "g0",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "g0",
+                "targetId": "t1",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t1",
+                "targetId": "pCMD",
+                "type": "message",
+                "label": "Customer record request"
+              },
+              {
+                "sourceId": "pCMD",
+                "targetId": "t2",
+                "type": "message",
+                "label": "Customer status, credit block, terms"
+              },
+              {
+                "sourceId": "t1",
+                "targetId": "t2",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t2",
+                "targetId": "g1",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "g1",
+                "targetId": "g3",
+                "type": "sequence",
+                "label": "Yes"
+              },
+              {
+                "sourceId": "g1",
+                "targetId": "t3",
+                "type": "sequence",
+                "label": "No"
+              },
+              {
+                "sourceId": "t3",
+                "targetId": "g2",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "g2",
+                "targetId": "t4",
+                "type": "sequence",
+                "label": "New"
+              },
+              {
+                "sourceId": "g2",
+                "targetId": "g3",
+                "type": "sequence",
+                "label": "Existing and clear"
+              },
+              {
+                "sourceId": "t4",
+                "targetId": "pCust",
+                "type": "message",
+                "label": "Onboarding request"
+              },
+              {
+                "sourceId": "bt1",
+                "targetId": "t5",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t5",
+                "targetId": "e3",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t4",
+                "targetId": "ie1",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "pCust",
+                "targetId": "ie1",
+                "type": "message",
+                "label": "Customer details"
+              },
+              {
+                "sourceId": "ie1",
+                "targetId": "g0",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "g3",
+                "targetId": "t6",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t6",
+                "targetId": "e2",
+                "type": "sequence"
+              }
+            ]
+          },
+          "fromImage": false,
+          "fromDocument": false
+        }
+      },
+      "colorConfig": {},
+      "displayMode": "normal"
+    }
+  ]
+}

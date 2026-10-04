@@ -122,7 +122,7 @@ describe("T5242 R8.42 is written down", () => {
   it("in the seeded BPMN rules, Group 8, after R8.41, and in an idempotent patch that says the same thing", () => {
     expect(seed.indexOf("R8.42:")).toBeGreaterThan(seed.indexOf("R8.41:"));
     const at = seed.indexOf("R8.42:");
-    const text = JSON.parse(`"${seed.slice(at, seed.indexOf('"', at))}"`) as string;
+    const text = (JSON.parse(`"${seed.slice(at, seed.indexOf('"', at))}"`) as string).split("\nR8.43:")[0];   // R8.43 / R8.44 follow in the same string
     expect(sql).toContain(text.trim());
     expect(sql).toContain("AND rules NOT LIKE '%R8.42:%'");
     expect(sql).toContain("LIKE 'Group 8: Auto-Layout Placement%'");

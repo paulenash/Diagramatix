@@ -6026,6 +6026,93 @@ export function layoutBpmnDiagram(
 
   phase(`connectors built (${connectors.length})`);
 
+  // ── R8.44: a Start Event's flow leaves by its RIGHT-hand point, and enters a level target by its LEFT ──
+  //
+  // Paul, 2026-10-05 ("AI Generate test"): the flow from the Start Event to the first (merge) gateway left from the
+  // Start's BOTTOM and entered the gateway's TOP, looping up through the Start itself, though the two sat on one row
+  // with the gateway's left point free. The sides were chosen while the Start was still above the gateway; a later pass
+  // brought it level (it moved to its target's lane row) and nothing chose again. Like R6.31 / R6.34 this decides on
+  // FINAL geometry: the Start leaves by its right-hand point whenever its target lies to its right, and a target level
+  // with it is entered at the left — unless that gateway vertex already takes another arrival.
+  for (const s of elements) {
+    if (s.type !== "start-event" || s.boundaryHostId) continue;
+    const outs = connectors.filter(c => c.type === "sequence" && c.sourceId === s.id);
+    if (outs.length !== 1) continue;
+    const c = outs[0];
+    const t = elMap.get(c.targetId);
+    if (!t || t.type === "pool" || t.type === "lane" || t.x < s.x + s.width) continue;
+    c.sourceSide = "right";
+    c.sourceOffsetAlong = 0.5;
+    const level = Math.abs((t.y + t.height / 2) - (s.y + s.height / 2)) <= t.height / 2 + 6;
+    if (!level) continue;
+    const leftTaken = connectors.some(o => o !== c && o.type === "sequence" && o.targetId === t.id && o.targetSide === "left");
+    if (t.type === "gateway" && leftTaken) continue;
+    c.targetSide = "left";
+    c.targetOffsetAlong = 0.5;
+  }
+
+  // ── R8.43: a sequence flow never passes through another element ──
+  //
+  // Paul, 2026-10-05 ("AI Generate test"): the loop-back from "Customer details confirmed" to the first merge ran down
+  // through the task "Flag order as validated". Inside an Expanded Subprocess the rule is the same for its sibling
+  // elements. Sides are picked while the connectors are built, long before the final positions, so a side that was clear
+  // then can be blocked now. On FINAL geometry, a flow whose route cuts through an element tries the other side pairs and
+  // takes the shortest one that is clear; a flow that cannot be cleared is left as it is (reported, not hidden, by the
+  // routing check). A boundary event's exit side (R7.02) is never changed, and a gateway keeps one flow per vertex.
+  {
+    const FLOW_OBST = new Set(["task", "subprocess", "subprocess-expanded", "start-event", "end-event", "intermediate-event", "gateway"]);
+    const ancestorsOf = (id: string): Set<string> => {
+      const out = new Set<string>();
+      for (let cur = elMap.get(id), d = 0; cur?.parentId && d < 16; d++) { out.add(cur.parentId); cur = elMap.get(cur.parentId); }
+      return out;
+    };
+    const cuts = (pts: { x: number; y: number }[], skip: Set<string>): boolean => {
+      const M = 3;
+      for (const o of elements) {
+        if (!FLOW_OBST.has(o.type) || o.boundaryHostId || skip.has(o.id)) continue;
+        const x0 = o.x + M, x1 = o.x + o.width - M, y0 = o.y + M, y1 = o.y + o.height - M;
+        if (x1 <= x0 || y1 <= y0) continue;
+        for (let i = 1; i < pts.length; i++) {
+          const p = pts[i - 1], q = pts[i];
+          if (Math.abs(p.x - q.x) < 0.5) { if (p.x > x0 && p.x < x1 && Math.max(p.y, q.y) > y0 && Math.min(p.y, q.y) < y1) return true; }
+          else if (Math.abs(p.y - q.y) < 0.5) { if (p.y > y0 && p.y < y1 && Math.max(p.x, q.x) > x0 && Math.min(p.x, q.x) < x1) return true; }
+        }
+      }
+      return false;
+    };
+    const visibleOf = (r: { waypoints: { x: number; y: number }[]; sourceInvisibleLeader?: boolean; targetInvisibleLeader?: boolean }) =>
+      r.waypoints.slice(r.sourceInvisibleLeader ? 1 : 0, r.targetInvisibleLeader ? -1 : undefined);
+    const lengthOf = (pts: { x: number; y: number }[]) => pts.reduce((n, p, i) => (i ? n + Math.abs(p.x - pts[i - 1].x) + Math.abs(p.y - pts[i - 1].y) : 0), 0);
+    const SIDES: Connector["sourceSide"][] = ["right", "left", "top", "bottom"];
+    for (const c of connectors) {
+      if (c.type !== "sequence") continue;
+      const src = elMap.get(c.sourceId), tgt = elMap.get(c.targetId);
+      if (!src || !tgt || src.boundaryHostId) continue;
+      const skip = new Set<string>([c.sourceId, c.targetId, ...ancestorsOf(c.sourceId), ...ancestorsOf(c.targetId)]);
+      try {
+        const now = computeWaypoints(src, tgt, elements, c.sourceSide, c.targetSide, c.routingType, c.sourceOffsetAlong ?? 0.5, c.targetOffsetAlong ?? 0.5);
+        if (!cuts(visibleOf(now), skip)) continue;
+        const taken = (el: DiagramElement, side: string, role: "source" | "target") =>
+          el.type === "gateway" && connectors.some(o => o !== c && o.type === "sequence"
+            && ((o.sourceId === el.id && o.sourceSide === side) || (o.targetId === el.id && o.targetSide === side)));
+        let best: { ss: Connector["sourceSide"]; ts: Connector["targetSide"]; len: number } | null = null;
+        for (const ss of SIDES) for (const ts of SIDES) {
+          if (ss === c.sourceSide && ts === c.targetSide) continue;
+          if (taken(src, ss, "source") || taken(tgt, ts, "target")) continue;
+          const r = computeWaypoints(src, tgt, elements, ss, ts, c.routingType, 0.5, 0.5);
+          const vis = visibleOf(r);
+          if (cuts(vis, skip)) continue;
+          const len = lengthOf(vis);
+          if (!best || len < best.len) best = { ss, ts, len };
+        }
+        if (best) {
+          if (best.ss !== c.sourceSide) { c.sourceSide = best.ss; c.sourceOffsetAlong = 0.5; }
+          if (best.ts !== c.targetSide) { c.targetSide = best.ts; c.targetOffsetAlong = 0.5; }
+        }
+      } catch { /* an unroutable pair is left as it is */ }
+    }
+  }
+
   // The final geometry is settled: spread again (see spreadConnectorEnds) before any route is drawn.
   spreadConnectorEnds(true);
 
