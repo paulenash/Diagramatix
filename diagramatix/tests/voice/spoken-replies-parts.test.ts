@@ -78,3 +78,20 @@ describe("T5232 the wiring", () => {
     expect(read("app/hooks/useVoiceAssist.ts")).toContain("noteSpeaking(false)");
   });
 });
+
+describe("T5233 the same spoken replies on the phone", () => {
+  const read = (p: string) => readFileSync(p, "utf8");
+  it("the phone editor hands the session the speech callbacks, in the phone's own words", () => {
+    const m = read("app/components/mobile/MobileVoiceEditor.tsx");
+    expect(m).toContain("speakReply, isMicGated, stopSpeech,");
+    expect(m).toContain("const wording = phoneWording(summary);");
+    expect(m).toContain("spokenText(wording, voiceSpeech.verbosity, { ok })");
+    expect(m).toContain("useSpeechAvailable()");
+  });
+  it("the controls appear only when speech is granted; a tap unlocks the audio (switch and mic button)", () => {
+    const m = read("app/components/mobile/MobileVoiceEditor.tsx");
+    expect(m).toContain("{speechAvail?.available && (");
+    expect(m).toContain("if (voiceSpeech.speakEnabled) speaker.unlock();");
+    expect(read("app/hooks/useVoiceAssist.ts")).toContain("if (on) speaker.unlock();");
+  });
+});

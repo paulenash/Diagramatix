@@ -37,6 +37,7 @@ beforeEach(() => {
     resume() { return Promise.resolve(); }
     decodeAudioData() { return Promise.resolve({ duration: 1 }); }
     createBufferSource() { return new FakeSource(started); }
+    createBuffer() { return {}; }
   }
   vi.stubGlobal("window", { AudioContext: FakeCtx });
   vi.stubGlobal("fetch", (_url: string, init: RequestInit) =>
@@ -134,5 +135,19 @@ describe("T4770 — failure is reported, not swallowed", () => {
     s.speak("   ", "aura-2-theia-en", "narration");
     await flush();
     expect(fetches).toHaveLength(0);
+  });
+});
+
+describe("T5233 — unlock: a phone plays nothing until audio has been started inside a tap", () => {
+  it("creates the audio context and plays one silent sample, without fetching anything", async () => {
+    const s = new Speaker();
+    s.unlock();
+    expect(started, "a silent sample was started").toHaveLength(1);
+    expect(fetches, "nothing was requested from the voice service").toHaveLength(0);
+    expect(s.isSpeaking, "the silent sample is not 'speaking' — the mic gate stays open").toBe(false);
+  });
+  it("never throws where there is no audio at all", () => {
+    vi.stubGlobal("window", {});
+    expect(() => new Speaker().unlock()).not.toThrow();
   });
 });

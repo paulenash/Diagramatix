@@ -37,6 +37,7 @@ export function useVoiceAssist() {
     setSpeakEnabled(on);
     writeSpeakEnabled(on);
     setError(null);
+    if (on) speaker.unlock();       // inside the tap that turned it on — a phone will not play audio otherwise
     if (!on) {
       speaker.stop();
       noteSpeaking(false);

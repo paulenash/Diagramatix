@@ -25,6 +25,12 @@ import { useDiagram } from "@/app/hooks/useDiagram";
 import { useAutoSave } from "@/app/hooks/useAutoSave";
 import { useVoiceSession } from "@/app/hooks/useVoiceSession";
 import { useVoiceAssistHelp } from "@/app/hooks/useVoiceAssistHelp";
+import { useVoiceAssist } from "@/app/hooks/useVoiceAssist";
+import { useSpeechAvailable } from "@/app/hooks/useSpeechAvailable";
+import { speaker } from "@/app/lib/voice/speaker";
+import { isMicGated } from "@/app/lib/voice/micGate";
+import { spokenText, speechPurposeFor, type SpeechVerbosity } from "@/app/lib/voice/spokenText";
+import { TTS_VOICES, TTS_VOICE_INFO, type TtsVoice } from "@/app/lib/voice/speakParams";
 import { computePanel, namesOf, type OpenFlow } from "@/app/lib/assist/commandTree";
 import { repairForRun } from "@/app/lib/assist/commandTree/positionRepair";
 import { selectedKinds as selectedKindsOf } from "@/app/lib/assist/commandTree/kinds";
@@ -121,9 +127,22 @@ export function MobileVoiceEditor({
   // position-aware repair, both driven by the SuperAdmin's tile. The repair is read through a ref because the
   // session is created before the tree has arrived.
   const repairCommandRef = useRef<((heard: string) => { text: string; note: string | null }) | null>(null);
+  // SPOKEN REPLIES on the phone (Diagramatix Voice V5): the same switch, voice and how-much as the desktop (one set of
+  // per-browser preferences), offered only to a person the Text to Speech tile has granted speech to. The words are the
+  // phone's own (phoneWording), and a tap unlocks the audio (a phone plays nothing until it has been tapped).
+  const speechAvail = useSpeechAvailable();
+  const voiceSpeech = useVoiceAssist();
+  const speakReply = useCallback((summary: string, ok: boolean) => {
+    if (!speechAvail?.available || !voiceSpeech.speakEnabled) return;
+    const wording = phoneWording(summary);
+    const text = spokenText(wording, voiceSpeech.verbosity, { ok });
+    if (text) voiceSpeech.speak(text, speechPurposeFor(wording, ok));
+  }, [speechAvail?.available, voiceSpeech.speakEnabled, voiceSpeech.verbosity, voiceSpeech.speak]);
+  const stopSpeech = useCallback(() => { speaker.stop(); }, []);
   const session = useVoiceSession({
     ...actions,
     repairCommandRef,
+    speakReply, isMicGated, stopSpeech,
     addElementGated,
     data, diagramId, diagramName, diagramType: "bpmn",
     diagramColorConfig: colorConfig ?? {}, displayMode: "normal", riskCatalog: [],
@@ -376,7 +395,7 @@ export function MobileVoiceEditor({
           </div>
         )}
         <div className="flex items-center gap-2">
-          <button onClick={() => void session.toggleAbraListening()}
+          <button onClick={() => { if (voiceSpeech.speakEnabled) speaker.unlock(); void session.toggleAbraListening(); }}
             aria-label={listening ? "Stop listening" : "Start listening"}
             className={`h-14 w-14 shrink-0 rounded-full text-2xl flex items-center justify-center shadow ${listening ? "bg-red-50 text-red-600 animate-pulse" : "bg-pink-600 text-white active:bg-pink-700"}`}>
             {listening ? "■" : "🎤"}
@@ -399,7 +418,31 @@ export function MobileVoiceEditor({
             <input type="checkbox" checked={autoConnect} onChange={toggleAutoConnect} className="h-4 w-4" />
             Auto-connect
           </label>
+          {speechAvail?.available && (
+            <label className="flex items-center gap-1.5 text-[12px] text-gray-700" title="Diagramatix speaks its questions and what it could not do">
+              <input type="checkbox" checked={voiceSpeech.speakEnabled} onChange={(e) => voiceSpeech.toggleSpeak(e.target.checked)} className="h-4 w-4" />
+              🔊 Speak replies
+            </label>
+          )}
         </div>
+        {speechAvail?.available && voiceSpeech.speakEnabled && (
+          <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+            <select value={voiceSpeech.voice} onChange={(e) => voiceSpeech.setVoice(e.target.value as TtsVoice)}
+              aria-label="Voice" className="text-[12px] border border-gray-300 rounded px-1.5 h-8 bg-white">
+              {TTS_VOICES.map((v) => <option key={v} value={v}>{TTS_VOICE_INFO[v].name} ({TTS_VOICE_INFO[v].accent})</option>)}
+            </select>
+            <select value={voiceSpeech.verbosity} onChange={(e) => voiceSpeech.setVerbosity(e.target.value as SpeechVerbosity)}
+              aria-label="How much it says" className="text-[12px] border border-gray-300 rounded px-1.5 h-8 bg-white">
+              <option value="questions">Questions only</option>
+              <option value="problems">Questions and problems</option>
+              <option value="everything">Everything</option>
+            </select>
+            {voiceSpeech.isSpeaking && (
+              <button onClick={stopSpeech} className="h-8 px-2.5 rounded border border-red-300 text-red-600 text-[12px] active:bg-red-50">■ stop</button>
+            )}
+            {voiceSpeech.error && <span className="text-[11px] text-amber-700">couldn’t speak</span>}
+          </div>
+        )}
         {showExamples && (
           <ul className="mt-1 space-y-0.5">
             {VOICE_EXAMPLES.map((x) => (

@@ -125,6 +125,22 @@ export class Speaker {
     void this.pump();
   }
 
+  /**
+   * Call from a TAP. iPhones (and Safari generally) only let audio play once something has been started inside a
+   * user gesture, and a reply arrives long after the tap — from a fetch. So the "Speak replies" switch and the mic
+   * button call this: it creates / resumes the audio context and plays one silent sample, which unlocks it for good.
+   * Never throws — a browser without audio just stays silent.
+   */
+  unlock(): void {
+    try {
+      const ctx = this.audioContext();
+      const src = ctx.createBufferSource();
+      src.buffer = ctx.createBuffer(1, 1, 22050);
+      src.connect(ctx.destination);
+      src.start(0);
+    } catch { /* no audio here; replies will report their own error */ }
+  }
+
   /** Stop at once and forget what was waiting — barge-in, pause, and unmount. */
   stop(): void {
     this.generation += 1;
