@@ -273,3 +273,13 @@ New tests: a saved diagram with a shared point opens healed with `HEAL_ENDPOINTS
 - Added tests: a marked diagram with shared points opens unchanged (no flash, no history entry); the flag survives save and reload; a diagram generated from an image carries the flag.
 
 **Status:** the plan is complete pending your review. No code has been written for it.
+
+## 15. Progress (2026-10-04)
+
+**Slice 1 — the allocator — built.** `app/lib/diagram/endpointSpread.ts`, `spreadEndpoints(elements, connectors, { relaxed })`: pure, idempotent, returns new offsets plus the ids it changed (the caller re-routes them); Activities 8 px, Events 3 px, messages 24 px on an Activity and 3 px on an Event, 24 px on a pool face; gateway ends and associations untouched; a lone or user-placed non-colliding end never moves; order follows the targets, flipped only to cross less (every order tried up to four ends). Tests T5234 (19 cases) and T5235 (the 34 corpus diagrams: no throw, idempotent, no shared point left on an Activity or Event; 10 of 34 diagrams change).
+
+**Not wired anywhere yet** — nothing in generation, the editor or heal-on-load calls it. Slices 2–6 are unbuilt.
+
+**Two things slice 3 must handle, found while building slice 1:**
+1. The router ignores a message's offset when an Event is one of its ends (it uses the Event's centre), so two messages on one Event always coincide whatever the allocator says. Honouring the offset for Events is part of slice 3.
+2. A message's spine is one world x shared by both ends, so the allocator moves it at the Activity / Event end and sets both ends' offsets; the pool end follows. A pool face where two messages from different Tasks fall within 24 px is resolved by moving a spine at its Task end.
