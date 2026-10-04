@@ -1610,31 +1610,11 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       const fcy = f.y + f.height / 2, tcy = t.y + t.height / 2;
       const fSide: Side = fcy <= tcy ? "bottom" : "top";
       const tSide: Side = fcy <= tcy ? "top" : "bottom";
-      // #2c — the connection point sits in the MIDDLE of the activity but at
-      // least 20px clear of any other message point on the same boundary. The
-      // vertical message shares one x, so we spread on the activity (the non-
-      // pool end) and drive it through the source offset.
-      const activity = f.type === "pool" ? (t.type === "pool" ? f : t) : f;
-      const MIN_GAP = 20;
-      const takenX: number[] = [];
-      for (const c of data.connectors) {
-        if (c.type !== "messageBPMN") continue;
-        if (c.sourceId !== activity.id && c.targetId !== activity.id) continue;
-        const wx = c.waypoints?.[1]?.x;
-        if (typeof wx === "number") takenX.push(wx);
-      }
-      const midX = activity.x + activity.width / 2;
-      const clear = (x: number) => takenX.every((v) => Math.abs(v - x) >= MIN_GAP);
-      let sharedX = midX;
-      if (!clear(sharedX)) {
-        for (let k = 1; k <= 12; k++) {
-          const lo = midX - k * MIN_GAP, hi = midX + k * MIN_GAP;
-          if (lo >= activity.x + 8 && clear(lo)) { sharedX = lo; break; }
-          if (hi <= activity.x + activity.width - 8 && clear(hi)) { sharedX = hi; break; }
-        }
-      }
-      const srcOff = f.width > 0 ? Math.max(0, Math.min(1, (sharedX - f.x) / f.width)) : 0.5;
-      addConnector(f.id, t.id, "messageBPMN", "directed", "rectilinear", fSide, tSide, srcOff, 0.5, false, op.label);
+      // #2c — WHERE on the activity it attaches is the one endpoint rule's business (endpointSpread.ts, run by the reducer
+      // after every action — connector-endpoint plan, slice 4). The message starts at the middle of the activity; if another
+      // message or flow is already there, the new one is placed round it (24 px on an Activity, 3 px on an Event). This op used
+      // to do its own 20 px spread here; two rules for one thing go stale in one of them.
+      addConnector(f.id, t.id, "messageBPMN", "directed", "rectilinear", fSide, tSide, undefined, undefined, false, op.label);
       results.push(`added message${op.label ? ` “${op.label}”` : ""} ${nameOf(f)} → ${nameOf(t)}`);
       continue;
     }

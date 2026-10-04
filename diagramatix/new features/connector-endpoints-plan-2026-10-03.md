@@ -303,3 +303,10 @@ Shape of it, decided while building:
 Findings: the editor sweeps (`edit-sequence`, `obstacle-sweep`) flagged "diagonal segments" that were the invisible centre-leader of a connector whose attachment is not the middle of its face. The leader is never drawn (`isAxisAligned` already says so), so the sweep helper now checks visible segments only. Obstacle crossings stayed at the baseline of 10.
 
 Still for later slices: NL Assist's own spread in `addMessage` (20 px, now overtaken by the post-pass's 24) and the gateway-point moves (slice 4); heal-on-load with flash and Undo, and the "exact as drawn" flag (slice 5); rule text, checks and User Guide (slice 6).
+
+**Slice 4 — NL Assist — built (2026-10-04).** Every voice command that draws or re-attaches a connector already ran through the reducer, so the slice-3 post-pass covers them; slice 4 removes the one place that had its own rule and proves the rest:
+- `addMessage` no longer spreads messages itself (the 20 px, up-to-12-steps loop is gone): it adds the message at the middle of the Activity and the one rule places it round what is there — 24 px on an Activity, 3 px on an Event; the first message keeps the middle. (Two rules for one thing go stale in one of them; the old 20 px was also tighter than the 24 px rule.)
+- Tested through the real commands: three messages from one Task, messages from an Event, "connect A to B" with a flow already leaving that face, "add a task … after A" three times, a boundary event's two follow-on flows, and wrapping a flow in a subprocess then adding after it — none ends with two connectors on one point.
+- Unchanged by decision: the gateway-point refusals ("the X already has one") and gateways themselves.
+
+A real bug found by the new tests (it showed as a flaky test, because connector ids are random and a tie-break sorted by id): placing a new connector round frozen neighbours only looked at the frozen ends in its own cluster, so it could land on one just outside it. It now considers every other end on the face. Pinned deterministically for all six id orders.

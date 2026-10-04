@@ -287,18 +287,25 @@ export function spreadEndpoints(
       const minGap = hasMsg ? (cl === "activity" ? SPREAD.messageActivity : SPREAD.messageEvent) : spec.gap;
 
       if (fixed.length) {
-        // Some ends cannot move here (a message whose other end is the one that moves): place the movable ends round them.
-        const taken = fixed.map((f) => f.pos);
+        // Some ends cannot move here (frozen by the editor, or a message whose other end is the one that moves): place the
+        // movable ends round EVERY other end on the face — not just the ones in this cluster, or a placement can land on a
+        // neighbour just outside it (and which one wins would depend on nothing but the order the ids sort in).
+        const placed = sorted.filter((x) => !movables.some((m) => m.e.id === x.e.id)).map((x) => ({ e: x.e, pos: x.pos }));
         const base = hasMsg ? (cl === "activity" ? SPREAD.messageActivity : SPREAD.messageEvent) : spec.step;
-        for (const m of [...movables].sort((a, b) => otherCoord(a.e) - otherCoord(b.e) || a.e.id.localeCompare(b.e.id))) {
-          let placed = false;
-          for (let k = 0; k <= 12 && !placed; k++) {
+        for (const m of [...movables].sort((x, y) => otherCoord(x.e) - otherCoord(y.e) || x.e.id.localeCompare(y.e.id))) {
+          let done = false;
+          for (let k = 0; k <= 12 && !done; k++) {
             for (const sign of k === 0 ? [0] : [1, -1]) {
-              const p = clamp(m.pos + sign * k * base, lo, hi);
-              if (taken.every((q) => Math.abs(q - p) >= minGap - EPS) && setPos(m.e, p)) { taken.push(p); placed = true; moved = true; break; }
+              const px = clamp(m.pos + sign * k * base, lo, hi);
+              if (placed.every((q) => Math.abs(q.pos - px) >= pairGap(m.e, q.e) - EPS) && setPos(m.e, px)) {
+                if (Math.abs(px - m.pos) > 1e-6) moved = true;
+                placed.push({ e: m.e, pos: px });
+                done = true;
+                break;
+              }
             }
           }
-          if (!placed) unresolvedFaces.add(key);
+          if (!done) unresolvedFaces.add(key);
         }
         continue;
       }

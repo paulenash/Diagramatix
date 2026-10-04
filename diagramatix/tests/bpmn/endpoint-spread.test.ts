@@ -194,3 +194,33 @@ describe("T5234 idempotent", () => {
     expect(JSON.stringify(cs)).toBe(before);
   });
 });
+
+describe("T5234 frozen connectors (the editor freezes what an action did not touch)", () => {
+  const pools = () => [el("P", "pool", 0, 0, 1000, 300), TASK("t", 300, 100), el("C", "pool", 0, 500, 1000, 100, { properties: { poolType: "black-box" } })];
+  /** Messages m@351 (frozen), m@375 (frozen) and a NEW one at 351 — the new one must end up clear of BOTH, whatever the ids sort like. */
+  it("a new connector is placed round every frozen neighbour on the face, never on one just outside its cluster — for every id order", () => {
+    const names = ["a", "b", "c"];
+    const orders = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
+    for (const o of orders) {
+      const [idFirst, idSecond, idNew] = o.map((i) => names[i]);
+      const cs = [
+        msg(idFirst, "t", "C", "bottom", "top"),                                                    // centre: x 351
+        msg(idSecond, "t", "C", "bottom", "top", { sourceOffsetAlong: 0.7353, targetOffsetAlong: 0.325 }),   // x 375
+        msg(idNew, "t", "C", "bottom", "top"),                                                      // NEW, also at the centre
+      ];
+      const r = spreadEndpoints(pools(), cs, { frozen: new Set([idFirst, idSecond]) });
+      expect(r.changedIds, `ids ${o.join("")}`).toEqual([idNew]);
+      const x = (id: string) => 300 + off(get(r.connectors, id), "source") * 102;
+      const xs = [x(idFirst), x(idSecond), x(idNew)].sort((a, b) => a - b);
+      expect(xs[1] - xs[0], `ids ${o.join("")}`).toBeGreaterThanOrEqual(SPREAD.messageActivity - 0.5);
+      expect(xs[2] - xs[1], `ids ${o.join("")}`).toBeGreaterThanOrEqual(SPREAD.messageActivity - 0.5);
+      expect(r.unresolved, `ids ${o.join("")}`).toEqual([]);
+    }
+  });
+  it("frozen connectors never move, even when they collide with each other (legacy)", () => {
+    const cs = [msg("a", "t", "C", "bottom", "top"), msg("b", "t", "C", "bottom", "top")];
+    const r = spreadEndpoints(pools(), cs, { frozen: new Set(["a", "b"]) });
+    expect(r.changedIds).toEqual([]);
+    expect(r.unresolved).toEqual([]);                      // legacy: left as it was, not reported as a failure of this pass
+  });
+});
