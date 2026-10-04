@@ -43,8 +43,11 @@ export const SPREAD = {
   messageEvent: 3,
 } as const;
 
-/** Rounding slack: a spread that lands exactly one gap apart must not read as a collision on the next run. */
-const EPS = 0.05;
+/**
+ * Rounding slack, px: a spread that lands one gap apart must not read as a collision on the next run, and neither must the
+ * sub-pixel drift of later passes that recompute an offset from a world x (generation does: 23.9 px for a 24 px gap).
+ */
+const EPS = 0.25;
 const MAX_PASSES = 8;
 /** Up to this many ends in a group, every order is tried for fewest crossings (4! = 24). */
 const MAX_PERMUTE = 4;
@@ -305,21 +308,40 @@ export function spreadEndpoints(
 
   /** A pool's face holds only message ends (a sequence flow never attaches to a pool): separate the spines by 24 px. */
   function resolvePoolFace(key: string, ends: End[]): boolean {
-    const sorted = ends.map((e) => ({ e, pos: posOf(e) })).sort((a, b) => a.pos - b.pos || a.e.id.localeCompare(b.e.id));
     const gap = SPREAD.pool.gap;
-    let moved = false;
-    let prev = sorted[0]?.pos ?? 0;
-    for (let i = 1; i < sorted.length; i++) {
-      const it = sorted[i];
-      const pos = posOf(it.e);
-      if (pos - prev >= gap - EPS) { prev = pos; continue; }
-      const poolX = it.e.el.x;
-      if (setSpine(it.e.id, poolX + prev + gap)) { prev = prev + gap; moved = true; continue; }
-      // No room to the right: try to the left of the first one.
-      if (setSpine(it.e.id, poolX + sorted[0].pos - gap * i)) { moved = true; continue; }
-      unresolvedFaces.add(key);
-      prev = pos;
+    const sorted = ends.map((e) => ({ e, x: spineX(work.get(e.id)!) })).sort((a, b) => a.x - b.x || a.e.id.localeCompare(b.e.id));
+    if (!sorted.some((it, i) => i > 0 && it.x - sorted[i - 1].x < gap - EPS)) return false;     // nothing collides
+    // Each message can slide only as far as BOTH its ends allow: the Task / Event it leaves (margins), and the pool.
+    const range = (id: string) => {
+      const c = work.get(id)!;
+      let lo = -Infinity, hi = Infinity;
+      for (const eid of [c.sourceId, c.targetId]) {
+        const el = els.get(eid)!, cl = classOf(el);
+        const m = Math.min(cl ? SPREAD[cl].margin : 0, el.width / 2);
+        lo = Math.max(lo, el.x + m); hi = Math.min(hi, el.x + el.width - m);
+      }
+      return { lo, hi };
+    };
+    const lo = sorted.map((it) => range(it.e.id).lo), hi = sorted.map((it) => range(it.e.id).hi);
+    const n = sorted.length;
+    // Minimal movement, in order: push right where too close, then pull back left where a bound stops it; repeat.
+    const x = sorted.map((it, k) => clamp(it.x, lo[k], hi[k]));
+    for (let round = 0; round < 4; round++) {
+      for (let k = 1; k < n; k++) x[k] = Math.max(x[k], x[k - 1] + gap);
+      for (let k = n - 1; k >= 0; k--) {
+        x[k] = Math.min(x[k], hi[k]);
+        if (k > 0) x[k - 1] = Math.min(x[k - 1], x[k] - gap);
+      }
+      for (let k = 0; k < n; k++) x[k] = Math.max(x[k], lo[k]);
     }
+    let moved = false;
+    for (let k = 0; k < n; k++) {
+      if (Math.abs(x[k] - sorted[k].x) < 1e-6) continue;
+      if (setSpine(sorted[k].e.id, x[k])) moved = true;
+    }
+    // Feasible only if every gap is held and every message is inside its bounds; otherwise report it, do not hide it.
+    const ok = x.every((v, k) => v >= lo[k] - EPS && v <= hi[k] + EPS && (k === 0 || v - x[k - 1] >= gap - EPS));
+    if (!ok) unresolvedFaces.add(key);
     return moved;
   }
 

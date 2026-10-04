@@ -9,17 +9,29 @@ worse; this says what the defects ARE so one can be picked up and finished.
 A diagram leaves this list when its count reaches zero — at which point its
 entry in `KNOWN` (tests/bpmn/layout-corpus.test.ts) is deleted.
 
-**3 diagram(s) with 4 defect(s)**, out of 30 in the corpus.
+**5 diagram(s) with 10 defect(s)**, out of 34 in the corpus.
+
+## AI Generation - Warehouse Picking and Quality Process - Opus 5 (copy)  `EP01.plan.json` — 2
+
+- gateway "Complete and Verified?" label overlaps subprocess-expanded spLoop
+- gateway "Merge" label overlaps subprocess-expanded spLoop
+
+## AI Generation - Meeting Planner Test · Opus 5 (copy)  `EP02.plan.json` — 3
+
+- gateway "Payment Path Merge" label overlaps subprocess-expanded sp3
+- BODY/BODY: "Invoice Customer" overlaps "X Days Elapsed"
+- LABEL/BODY: label of "X Days Elapsed" over "Invoice Customer"
 
 ## V04.01 V04.01 Workforce Planning  `V04.01.plan.json` — 2
 
 - LABEL/BODY: label of "Headcount request rejected — no va" over "Budget Approval Record"
 - LABEL/LABEL: "Budget Approval Record" and "Headcount request rejected — no va"
 
-## V22.01 V22.01 Receive Notification  `V22.01.plan.json` — 1
-
-- shared attachment point pClaimant|bottom|0.500 — connectors conn-pClaimant-pCustomerPortal, conn-tSendAck-pClaimant
-
 ## V22.01 Receive Notification (regenerated)  `V22.01b.plan.json` — 1
 
 - LABEL/BODY: label of "Duplicate notification closed — no" over "Notification Record"
+
+## New vtt Process  `VTT01.plan.json` — 2
+
+- shared attachment point gw_split|top|0.500 — connectors conn-t_handoff-gw_split-12, conn-gw_split-t_d1-23
+- BRANCH-LABEL/RUN: "Record session" lies along its own horizontal segment

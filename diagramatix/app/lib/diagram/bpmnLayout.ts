@@ -8,6 +8,7 @@ import { getSymbolDefinition } from "./symbols/definitions";
 import { closeFlowVoids } from "./closeFlowVoids";
 import { EVENT_EP_START_LABEL } from "./eventSubprocess";
 import { computeWaypoints, recomputeAllConnectors, pickBoundaryEventSide } from "./routing";
+import { spreadEndpoints } from "./endpointSpread";
 import { clampExitTargetToBand } from "./assistPlacement";
 import { analysePaths } from "./bpmnPaths";
 import { connectorLabelBox } from "./checks/layoutViolations";
@@ -4388,115 +4389,34 @@ export function layoutBpmnDiagram(
     } as Connector);
   }
 
-  // ── R5.06: message connection-point de-overlap ──
-  // R5.06 — two or more message flows attaching to the SAME element on the same
-  // side must not share a connection point: spread their attachment x's so
-  // they're ≥10px apart (the classic case is one element that both SENDS and
-  // RECEIVES a message — both would otherwise land on its centre). The vertical
-  // message line is driven by the NON-pool endpoint's x, so we spread that
-  // endpoint's offsetAlong and re-align the pool partner to match.
-  // (R5.07, which staggered the labels here, went with R05.05: the labels are
-  // placed once, from the final geometry, by the one message-label rule.)
-  {
-    const MIN_SEP = 24;   // ≥10px point separation, doubled (Paul)
-    const msgs = connectors.filter(c => c.type === "messageBPMN");
-    // The endpoint that drives the vertical line = the non-pool element.
-    const anchorOf = (c: Connector) => {
-      const s = elMap.get(c.sourceId), t = elMap.get(c.targetId);
-      if (s && s.type !== "pool") return { elId: c.sourceId, side: c.sourceSide, isSource: true, el: s };
-      if (t && t.type !== "pool") return { elId: c.targetId, side: c.targetSide, isSource: false, el: t };
-      return null;
-    };
-    // R5.06
-    const groups = new Map<string, { c: Connector; a: NonNullable<ReturnType<typeof anchorOf>> }[]>();
-    for (const c of msgs) {
-      const a = anchorOf(c);
-      if (!a) continue;
-      const k = `${a.elId}|${a.side}`;
-      const g = groups.get(k); if (g) g.push({ c, a }); else groups.set(k, [{ c, a }]);
-    }
-    for (const grp of groups.values()) {
-      if (grp.length < 2) continue;
-      const el = grp[0].a.el;
-      const stepFrac = MIN_SEP / Math.max(1, el.width);
-      grp.forEach((g, i) => {
-        const off = Math.max(0.08, Math.min(0.92, 0.5 + (i - (grp.length - 1) / 2) * stepFrac));
-        const attachX = el.x + off * el.width;
-        if (g.a.isSource) g.c.sourceOffsetAlong = off; else g.c.targetOffsetAlong = off;
-        // Re-align the pool partner so its attachment sits at the same x.
-        const partnerId = g.a.isSource ? g.c.targetId : g.c.sourceId;
-        const partner = elMap.get(partnerId);
-        if (partner && partner.type === "pool" && partner.width > 0) {
-          const poolOff = Math.max(0.02, Math.min(0.98, (attachX - partner.x) / partner.width));
-          if (g.a.isSource) g.c.targetOffsetAlong = poolOff; else g.c.sourceOffsetAlong = poolOff;
-        }
-      });
-    }
-  }
-
-  // ── R8.11 / R8.12: sequence connection-point de-overlap ─────────────────────
-  // SEQUENCE connectors that attach to the SAME element on the SAME side must
-  // not share a connection point (R8.11), and must also stay ≥10px clear of any
-  // MESSAGE point already on that side (R8.12). Spread the sequence attachment
-  // offsets so every point is ≥10px from its neighbours; a lone sequence end
-  // with nothing to clash with is left centred so straight flows stay straight.
-  {
-    const MIN_PX = 10;
-    type SeqEnd = { c: Connector; isSource: boolean };
-    const seqEnds = new Map<string, SeqEnd[]>();   // `elId|side` → sequence ends there
-    const msgPts  = new Map<string, number[]>();   // `elId|side` → message offsets there
-    const addSeq = (k: string, v: SeqEnd) => { const a = seqEnds.get(k); if (a) a.push(v); else seqEnds.set(k, [v]); };
-    const addMsg = (k: string, v: number) => { const a = msgPts.get(k); if (a) a.push(v); else msgPts.set(k, [v]); };
+  // ── R5.06 / R8.11 / R8.12 → ONE allocator: no two sequence or message connectors on one attachment point ──
+  // (Paul, 2026-10-03/04: "never allow 2 connectors (sequence or message) to attach to the same source or target
+  // endpoint, but avoid connectors crossing each other"; new features/connector-endpoints-plan-2026-10-03.md, slice 2.)
+  // The three separate passes that used to live here — messages (R5.06), sequence ends (R8.11) and sequence-vs-message
+  // clearance (R8.12) — are ONE rule now, `spreadEndpoints` (endpointSpread.ts), also the rule the editor will apply
+  // (one rule, one place). Activities are spread ~8 px, Events ~3 px, messages 24 px, in the order of the elements
+  // they reach, flipped only to cross less; a lone end stays centred so straight flows stay straight. A message is
+  // moved at its Activity / Event and the pool end follows. Gateways are out of scope: R6.29 — a diamond's only valid
+  // points are its four vertices — so a gateway end is always the vertex, offset 0.5.
+  // It runs TWICE: here, so the passes that read the offsets (R8.14–R8.18 …) see spread ends, and again just before the
+  // routes are drawn (below), because those passes move elements and a spread that was right can stop being right.
+  // It is idempotent, so the second run changes only what the movement broke.
+  const spreadConnectorEnds = () => {
     for (const c of connectors) {
-      if (c.type === "sequence") {
-        addSeq(`${c.sourceId}|${c.sourceSide}`, { c, isSource: true });
-        addSeq(`${c.targetId}|${c.targetSide}`, { c, isSource: false });
-      } else if (c.type === "messageBPMN") {
-        addMsg(`${c.sourceId}|${c.sourceSide}`, c.sourceOffsetAlong ?? 0.5);
-        addMsg(`${c.targetId}|${c.targetSide}`, c.targetOffsetAlong ?? 0.5);
-      }
+      if (c.type !== "sequence") continue;
+      if (elMap.get(c.sourceId)?.type === "gateway") c.sourceOffsetAlong = 0.5;
+      if (elMap.get(c.targetId)?.type === "gateway") c.targetOffsetAlong = 0.5;
     }
-    for (const [key, ends] of seqEnds) {
-      const bar = key.indexOf("|");
-      const el = elMap.get(key.slice(0, bar));
-      const side = key.slice(bar + 1);
-      if (!el) continue;
-      // R6.29: A gateway is a DIAMOND — its only valid attachment points are its
-      // four vertices (offset 0.5 on each side). Never spread gateway ends off the
-      // vertex: any other offset lands mid-edge on the sloped diamond, which
-      // reads as "the connector isn't joined to the vertex, just near it"
-      // (Paul 2026-07-12). Multiple flows on the same face share the vertex —
-      // BPMN-correct, they fan out from it.
-      if (el.type === "gateway") {
-        for (const e of ends) { if (e.isSource) e.c.sourceOffsetAlong = 0.5; else e.c.targetOffsetAlong = 0.5; }
-        continue;
-      }
-      const faceLen = (side === "top" || side === "bottom") ? el.width : el.height;
-      if (faceLen <= 1) continue;
-      const occupied = msgPts.get(key) ?? [];
-      if (ends.length < 2 && occupied.length === 0) continue;   // nothing to separate
-      const minFrac = MIN_PX / faceLen;
-      const horiz = side === "top" || side === "bottom";
-      // Order by the OTHER endpoint's position along the face, so the points run
-      // in the same order as the elements they reach (no crossed connectors).
-      const otherCoord = (e: SeqEnd) => {
-        const o = elMap.get(e.isSource ? e.c.targetId : e.c.sourceId);
-        if (!o) return 0;
-        return horiz ? o.x + o.width / 2 : o.y + o.height / 2;
-      };
-      const sorted = [...ends].sort((a, b) => otherCoord(a) - otherCoord(b));
-      const n = sorted.length;
-      const stepFrac = Math.max(minFrac, n > 1 ? 1 / (n + 1) : 0);
-      sorted.forEach((e, i) => {
-        let off = 0.5 + (i - (n - 1) / 2) * stepFrac;
-        for (const m of occupied) {   // keep ≥10px clear of message points (R8.12)
-          if (Math.abs(off - m) < minFrac) off = off >= m ? m + minFrac : m - minFrac;
-        }
-        off = Math.max(0.1, Math.min(0.9, off));
-        if (e.isSource) e.c.sourceOffsetAlong = off; else e.c.targetOffsetAlong = off;
-      });
+    const spread = spreadEndpoints([...elMap.values()], connectors);
+    const spreadById = new Map(spread.connectors.map((c) => [c.id, c] as const));
+    for (const id of spread.changedIds) {
+      const to = spreadById.get(id), from = connectors.find((c) => c.id === id);
+      if (!to || !from) continue;
+      from.sourceOffsetAlong = to.sourceOffsetAlong;
+      from.targetOffsetAlong = to.targetOffsetAlong;
     }
-  }
+  };
+  spreadConnectorEnds();
 
   // Re-tile lanes after the late EP-wrapping + merge passes. Those run AFTER the
   // earlier fitLanesToChildren and can GROW a lane (to enclose a re-wrapped EP)
@@ -6090,6 +6010,9 @@ export function layoutBpmnDiagram(
   }
 
   phase(`connectors built (${connectors.length})`);
+
+  // The final geometry is settled: spread again (see spreadConnectorEnds) before any route is drawn.
+  spreadConnectorEnds();
 
   // Compute waypoints for all connectors
   const computedConnectors = connectors.map((conn, i) => {

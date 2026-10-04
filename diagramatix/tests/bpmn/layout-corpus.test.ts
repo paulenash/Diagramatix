@@ -70,7 +70,9 @@ const KNOWN: Record<string, number> = {
    *   • two gateway LABELS inside the EP drawn over its box
    *   • two subprocess connectors sharing one attachment point on pLR
    */
-  "EP01.plan.json": 3,
+  // 3 -> 2 on 2026-10-04 (connector-endpoint plan, slice 2): generation now spreads connector ends with the ONE allocator
+  // (endpointSpread.ts), so the two subprocess connectors no longer share a point on pLR. The two gateway labels remain.
+  "EP01.plan.json": 2,
   /**
    * HAND-ADDED 2026-09-13. Two sibling EPs — parallel branches off one gateway
    * — overlapped by 439×70px: R8.26 set the top-vertex EP's bottom ON the
@@ -105,8 +107,8 @@ const KNOWN: Record<string, number> = {
    */
   "VTT01.plan.json": 2,
   "V04.01.plan.json": 2,
-  // 3 -> 1 when R55.7 gave the exception path a row clear of the main line.
-  "V22.01.plan.json": 1,
+  // 3 -> 1 when R55.7 gave the exception path a row clear of the main line; 1 -> 0 on 2026-10-04 when the endpoint
+  // allocator (slice 2) separated the two messages that shared pClaimant|bottom at the same x — the entry is gone.
   // The regenerated V22.01 (2026-09-06), kept alongside the older capture: it is
   // the shape that put an End event under a gateway. Its one remaining defect is
   // a branch LABEL over a data object — the K/L family, not this one.
