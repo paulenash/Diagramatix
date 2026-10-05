@@ -5043,6 +5043,29 @@ export function Canvas({
    *  whose BOTH ends are travelling has to rise with them, or the pool body
    *  that lifted above everything covers its own sequence flows. */
   let renderRegularConn: ((conn: Connector) => React.ReactNode) | null = null;
+  /** A non-interactive copy of an element for the lifted overlay (an Expanded Subprocess, a boundary event). */
+  const liftedPicture = (el: DiagramElement) => (
+    <SymbolRenderer
+      key={`lifted-${el.id}`}
+      element={el}
+      selected={selectedElementIds.has(el.id)}
+      isDropTarget={false}
+      isDisallowedTarget={false}
+      isLabelEditing={editingLabel?.elementId === el.id}
+      onSelect={() => {}}
+      onMove={() => {}}
+      onDoubleClick={() => startEditingLabel(el)}
+      onConnectionPointDragStart={() => {}}
+      showConnectionPoints={false}
+      onResizeDragStart={() => {}}
+      svgToWorld={clientToWorld}
+      onUpdateProperties={onUpdateProperties}
+      onUpdateLabel={onUpdateLabel}
+      onMoveEnd={() => {}}
+      colorConfig={colorConfig}
+      debugMode={debugMode}
+    />
+  );
   /** True for anything travelling with the current drag. */
   const isLifted = (id: string) => !!liftedIds && liftedIds.length > 0 && liftedIds.includes(id);
   /** A connector rises with the drag only when BOTH its ends do — one that
@@ -6195,12 +6218,19 @@ export function Canvas({
                   travels with the pool rises with it, in the diagram's natural
                   order: pool, then lanes, then flows, then elements. */}
               {renderContainerEl && lanes.filter(el => isLifted(el.id)).map(renderContainerEl)}
+              {/* Paul, 2026-10-05: "When moving a Pool with an EP inside it, the EP and any EMIEs disappear during the move."
+                  Same cause as the lanes and flows above: the travelling pool and its lanes are drawn up here, and the
+                  Expanded Subprocess (its own pass, after the lanes) and the boundary events on it (a pass of their own)
+                  stayed down in the normal passes, covered by the pool body. They rise with it: pool, lanes, EPs, flows,
+                  elements, boundary events. A picture only — no handlers. */}
+              {expandedSubprocesses.filter(el => isLifted(el.id)).map(liftedPicture)}
               {renderRegularConn && regularConns
                 .filter(c => c.id !== selectedConnectorId && isLiftedConn(c))
                 .map(renderRegularConn)}
               {renderNonContainerEl && nonContainers
                 .filter(el => isLifted(el.id))
                 .map(renderNonContainerEl)}
+              {boundaryEvents.filter(el => isLifted(el.id) || (!!el.boundaryHostId && isLifted(el.boundaryHostId))).map(liftedPicture)}
             </g>
           )}
 

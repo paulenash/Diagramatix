@@ -106,6 +106,35 @@ function closure(elements: DiagramElement[], roots: Iterable<string>): Set<strin
   return ids;
 }
 
+/**
+ * The flow that hangs off an EP's boundary events: the tasks, gateways, events and sub-processes reached ONLY through them,
+ * plus the notes and data objects that belong only to those (Paul, 2026-10-05: removing the EP must remove the activities
+ * associated with the flows from its boundary events). An element that is also reached some other way — a merge back into
+ * the main flow, say — is NOT part of it, and where the exception path rejoins the main flow it simply stops.
+ */
+const PATH_KINDS = new Set<string>(["task", "subprocess", "subprocess-expanded", "gateway", "intermediate-event", "end-event"]);
+function exceptionPathIds(shape: Shape, seeds: Set<string>, keep: Set<string>): Set<string> {
+  const seq = shape.connectors.filter((c) => c.type === "sequence");
+  const reached = new Set<string>(seeds);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const e of shape.elements) {
+      if (reached.has(e.id) || keep.has(e.id) || e.boundaryHostId || !PATH_KINDS.has(e.type)) continue;
+      const incoming = seq.filter((c) => c.targetId === e.id);
+      if (incoming.length > 0 && incoming.every((c) => reached.has(c.sourceId))) { reached.add(e.id); grew = true; }
+    }
+  }
+  for (const id of seeds) reached.delete(id);
+  const withKids = closure(shape.elements, reached);
+  for (const e of shape.elements) {   // a note or data object that belongs only to what goes
+    if (withKids.has(e.id) || keep.has(e.id) || (e.type !== "text-annotation" && e.type !== "data-object")) continue;
+    const mine = shape.connectors.filter((c) => c.sourceId === e.id || c.targetId === e.id);
+    if (mine.length > 0 && mine.every((c) => withKids.has(c.sourceId === e.id ? c.targetId : c.sourceId))) withKids.add(e.id);
+  }
+  return withKids;
+}
+
 function bbox(els: DiagramElement[]) {
   const x = Math.min(...els.map((e) => e.x)), y = Math.min(...els.map((e) => e.y));
   const right = Math.max(...els.map((e) => e.x + e.width)), bottom = Math.max(...els.map((e) => e.y + e.height));
@@ -235,6 +264,9 @@ export function planUnwrapSubprocess(shape: Shape, epId: string): WrapPlan {
   const shellEvents = shape.elements.filter((e) => e.boundaryHostId === ep.id);
   // The shell, its Start/End and anything mounted on its edge go; everything else inside stays.
   const removed = new Set<string>([ep.id, ...starts.map((e) => e.id), ...ends.map((e) => e.id), ...shellEvents.map((e) => e.id)]);
+  // …and so does what hangs off the shell's boundary events.
+  const pathIds = exceptionPathIds(shape, new Set(shellEvents.map((e) => e.id)), new Set([...inside, ep.id]));
+  for (const id of pathIds) removed.add(id);
   const content = shape.elements.filter((e) => inside.has(e.id) && !removed.has(e.id));
   if (content.length === 0) return { error: `${nameOf(ep)} has nothing inside it` };
 
@@ -282,7 +314,7 @@ export function planUnwrapSubprocess(shape: Shape, epId: string): WrapPlan {
   const contentRight = Math.max(...elements.filter((e) => !SWIMLANE.has(e.type)).map((e) => e.x + e.width));
   return {
     elements, connectors, contentRight,
-    summary: `dissolved ${nameOf(ep)} — its ${content.length} element${content.length === 1 ? " is" : "s are"} back in the flow`,
+    summary: `dissolved ${nameOf(ep)} — its ${content.length} element${content.length === 1 ? " is" : "s are"} back in the flow${pathIds.size ? `; also removed ${pathIds.size} element${pathIds.size === 1 ? "" : "s"} on the flow${shellEvents.length === 1 ? "" : "s"} from its boundary event${shellEvents.length === 1 ? "" : "s"}` : ""}`,
   };
 }
 

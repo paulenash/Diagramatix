@@ -3732,6 +3732,21 @@ export function DiagramEditor({
     if (offer) setPkgLinkOffer({ pkgId: id, diagramId: offer.diagramId, name: offer.name });
   }, [data.elements, siblingDiagrams, updateLabel, updateProperties]);
 
+  /**
+   * Delete / the Delete key / the context menu on an element. An Expanded Subprocess WITH CONTENTS is dissolved, not wiped
+   * (Paul, 2026-10-05: "delete (del) on an EP with an internal flow must follow the same rules as voice assist 'delete
+   * this'"): the shell, its Start / End and its boundary events go — with the flows hanging off those events — and the
+   * contents stay in the flow. The very same plan the voice command runs (planUnwrapSubprocess), so the two cannot differ.
+   */
+  function deleteElementLikeVoice(id: string) {
+    const el = data.elements.find((e) => e.id === id);
+    if (el?.type === "subprocess-expanded" && data.elements.some((k) => k.parentId === id)) {
+      const plan = planUnwrapSubprocess({ elements: data.elements, connectors: data.connectors }, id);
+      if (!("error" in plan)) { unwrapSubprocess(id); return; }
+    }
+    deleteElement(id);
+  }
+
   async function handleDeleteTemplate(templateId: string, isBuiltIn = false) {
     // Immediately show as pending delete
     setDeletingTemplateIds(prev => { const next = new Set(prev); next.add(templateId); return next; });
@@ -5348,7 +5363,7 @@ export function DiagramEditor({
           onDeleteElement={(id) => {
             if (feedbackMode && !isFeedbackNote(id)) return; // feedback: notes only
             if (isCoLocked(id)) return; // another editor is holding this element
-            deleteElement(id);
+            deleteElementLikeVoice(id);
             setSelectedElementIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
           }}
           onAddConnector={(sourceId, targetId, type, directionType, routingType, sourceSide, targetSide, sourceOffsetAlong, targetOffsetAlong, force, initialLabel) => {
@@ -5556,7 +5571,7 @@ export function DiagramEditor({
             onUpdateConnectorLabel={(id, label) => updateConnectorLabel(id, label)}
             onUpdateConnectorFields={updateConnectorFields}
             onDeleteElement={(id) => {
-              deleteElement(id);
+              deleteElementLikeVoice(id);
               setSelectedElementIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
             }}
             onDeleteConnector={(id) => {
