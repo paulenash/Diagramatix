@@ -72,3 +72,18 @@ describe("T5249 “highlighted” also means the element under the pointer", () 
     expect(resolveRef("highlighted task", els, null, ["t1"], over(420, 120))).toEqual({ id: "t1" });
   });
 });
+
+describe("T5251 the recogniser's “Subject” and “Enter” (Paul, 2026-10-05: “selected keeps being heard as Subject”)", () => {
+  it("“move Subject twenty pixels right” is “move selected …”", () => {
+    expect(move("move Subject twenty pixels right")).toMatchObject({ op: "move", ref: "selected", direction: "right", pixels: 20 });
+    expect(move("move subject 10 pixels left")).toMatchObject({ ref: "selected", pixels: 10 });
+    expect(move("move Subject right")).toMatchObject({ ref: "selected", direction: "right" });
+  });
+  it("“Enter” is ten, right before “pixels”", () => {
+    expect(move("move selected Enter pixels right")).toMatchObject({ ref: "selected", direction: "right", pixels: 10 });
+  });
+  it("a real name that starts with “Subject” keeps its word", () => {
+    expect(move("move Subject Matter Expert right")).toMatchObject({ ref: "Subject Matter Expert", direction: "right" });
+    expect(move("move Subject Matter Expert twenty pixels right")).toMatchObject({ ref: "Subject Matter Expert", pixels: 20 });
+  });
+});

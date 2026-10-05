@@ -13,7 +13,7 @@ const TENS: Record<string, number> = { twenty: 20, thirty: 30, forty: 40, fifty:
  * What the recogniser writes for "ten" — ONLY ever read here, in the one place a number is certain (right before "pixels"),
  * so it cannot turn a real word into a number anywhere else ("move highlighted task Send pixels left" was "ten pixels").
  */
-const HEARD_AS_TEN = new Set(["send", "sent", "tin", "then", "tan", "tenn"]);
+const HEARD_AS_TEN = new Set(["send", "sent", "tin", "then", "tan", "tenn", "enter"]);
 
 /** The number a spoken distance names — digits, words ("ten", "twenty five", "a hundred"), or null. */
 export function pixelAmount(text: string): number | null {

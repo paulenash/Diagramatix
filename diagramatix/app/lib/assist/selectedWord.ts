@@ -97,6 +97,14 @@ export interface SelectedWordRepair {
 export function repairSelectedWord(text: string): SelectedWordRepair {
   if (!text) return { text, corrected: false };
   let corrected = false;
+  // "move Subject twenty pixels right" (Paul, 2026-10-05: "selected keeps being heard as Subject"). "Subject" is also the first
+  // word of real names ("Subject Matter Expert"), so it is read as "selected" ONLY when what follows is a distance or a
+  // direction — a number, "pixels", "to the", left / right / up / down — and nothing else. A name keeps its word.
+  const afterSubject = "(?=\\s+(?:\\d+|(?:a|one)\\s+hundred|zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|px|pixels?|to\\s+the|left|right|up|down)\\b)";
+  text = text.replace(new RegExp(`\\b(move|nudge|slide|shift)(\\s+)(subject)${afterSubject}`, "gi"), (_m, verb: string, gap: string) => {
+    corrected = true;
+    return `${verb}${gap}selected`;      // after a verb, never sentence-initial: always lower case
+  });
   const out = text.replace(REPAIR_RE, (_m, verb: string, gap: string, heard: string) => {
     corrected = true;
     // Preserve whatever filler the speaker used ("the", "these", …) and keep
