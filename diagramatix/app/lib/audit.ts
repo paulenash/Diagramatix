@@ -20,6 +20,7 @@ export const AUDIT = {
   ShareRevoke: "share.revoke",
   UserOverridesUpdate: "user.overrides.update",
   UserOverridesRevert: "user.overrides.revert",
+  AiOrgModelsUpdate: "ai.org-models.update",
 } as const;
 
 interface SessionLike { user?: { id?: string; email?: string | null } }

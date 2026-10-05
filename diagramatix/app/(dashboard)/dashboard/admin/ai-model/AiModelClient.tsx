@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { AiModel } from "@/app/lib/ai/models";
+import { OrgModelListsEditor } from "./OrgModelListsEditor";
 import { pricingFor, typicalCost, TYPICAL_GEN, PRICING_SNAPSHOT_DATE } from "@/app/lib/ai/pricing";
 
 const fmtRate = (n: number) => `$${n % 1 === 0 ? n.toFixed(0) : n.toFixed(2)}`;
@@ -276,6 +277,9 @@ export function AiModelClient({
           : <span className="text-xs text-green-700">✓ Saved</span>}
         {err && <span className="text-xs text-red-600">{err}</span>}
       </div>
+
+      {/* Per-Org lists (Paul, 2026-10-05): which models each Org's OrgAdmin may choose from. */}
+      <OrgModelListsEditor models={models} />
     </div>
   );
 }
