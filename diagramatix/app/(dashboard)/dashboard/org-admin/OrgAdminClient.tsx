@@ -83,6 +83,13 @@ const CARDS: MenuCard[] = [
     feature: "ai",
   },
   {
+    href: "/dashboard/org-admin/ai-models?from=/dashboard/org-admin",
+    title: "AI Models",
+    description:
+      "Choose the AI model your organisation runs on — Default, Vision and Voice Assist Command — from the lists your SuperAdmin has offered you.",
+    feature: "ai",
+  },
+  {
     href: "/dashboard/ai-usage?from=/dashboard/org-admin",
     title: "AI Usage",
     description:

@@ -125,9 +125,9 @@ describe("T5255 users do not choose", () => {
     expect(all()).toContain(await resolveOrgModel({ purpose: "command" }));
     expect(all()).toContain(await resolveOrgModel({ hasImage: true }));
   });
-  it("the models list for an ordinary user is the one model in force", () => {
+  it("the models list: an ordinary user gets nothing (slice 5); a SuperAdmin gets the model in force and the full list", () => {
     const src = readFileSync("app/api/ai/models/route.ts", "utf8");
-    expect(src).toContain("allowedGenerateModels(current, false, byo).filter((m) => m.id === current)");
+    expect(src).toContain("if (!isSuperuser(session)) return NextResponse.json({ current: null, models: [] });");
     expect(src).toContain("resolveOrgModel({ hasImage: false })");
   });
 });

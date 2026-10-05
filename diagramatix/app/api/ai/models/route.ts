@@ -36,6 +36,10 @@ export async function GET(req: Request) {
     byo = new Set((await listUserAiKeys(userId)).map((k) => k.provider));
   } catch { /* no own keys is the normal case; never fail the picker over it */ }
 
+  // Only a SuperAdmin ever sees a model name (Paul, 2026-10-05: "Only OrgAdmins and SuperAdmins should ever see what model is being used";
+  // an OrgAdmin sees theirs on their own AI Models page). Everyone else gets nothing to show and nothing to pick.
+  if (!isSuperuser(session)) return NextResponse.json({ current: null, models: [] });
+
   // The model in force for THIS person: their Org's for an ordinary user, the global setting for a SuperAdmin (orgModels.ts).
   const current = await resolveOrgModel({ hasImage: false });
   const saMode = new URL(req.url).searchParams.get("saMode") === "1" && isSuperuser(session);

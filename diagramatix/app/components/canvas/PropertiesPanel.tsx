@@ -1202,7 +1202,7 @@ export function PropertiesPanel({
                     matters. The prompt's author decides how much process the
                     prompt describes at all; the diagram's decides how well that
                     description was drawn. */}
-                {aiPromptModel && (
+                {aiPromptModel && _isAdmin && (
                   <div className="text-[9px] text-gray-500 mt-0.5">
                     Prompt written by{" "}
                     <span className={aiPromptModel === "unknown" ? "text-amber-700" : "text-gray-700"}

@@ -903,7 +903,7 @@ export function PlanPanel({
     }
     setBusy("narrative");
     setError(null);
-    setStatus("Asking Sonnet for a staff narrative (15–30 s)…");
+    setStatus("Asking the AI for a staff narrative (15–30 s)…");
     try {
       const res = await fetch("/api/ai/staff-narrative", {
         method: "POST",
@@ -1541,8 +1541,8 @@ export function PlanPanel({
               {busy === "apply"
                 ? "Running the layout engine…"
                 : (() => {
-                    // Name the model actually in use (not always Sonnet now).
-                    const mLabel = aiModels.find((m) => m.id === (model || currentAiModelId))?.label || "the AI model";
+                    // Name the model actually in use — only to a SuperAdmin in SuperAdmin view (Paul, 2026-10-05); everyone else is told "the AI".
+                    const mLabel = isAdmin && !superAdminHidden ? (aiModels.find((m) => m.id === (model || currentAiModelId))?.label || "the AI model") : "the AI";
                     return busy === "narrative"
                       ? `Asking ${mLabel} for a staff narrative — this usually takes 15–30 s…`
                       : `Asking ${mLabel} for a plan — this usually takes 15–30 s…`;

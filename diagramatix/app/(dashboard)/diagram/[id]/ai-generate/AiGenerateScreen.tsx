@@ -806,8 +806,9 @@ export function AiGenerateScreen({
 
   const planning = busy === "plan";
   const applying = busy === "apply";
-  const modelLabel = aiModels.find((m) => m.id === (model || currentAiModelId))?.label || "the AI model";
   const saAvailable = (isSuperuser || isAdmin) && !superAdminHidden;
+  // The model is named only to a SuperAdmin in SuperAdmin view (Paul, 2026-10-05); everyone else is told "the AI".
+  const modelLabel = saAvailable ? (aiModels.find((m) => m.id === (model || currentAiModelId))?.label || "the AI model") : "the AI";
 
   return (
     <div className="fixed inset-0 z-[60] bg-black text-white/80 font-mono overflow-hidden" data-no-capture>

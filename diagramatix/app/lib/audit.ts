@@ -21,6 +21,7 @@ export const AUDIT = {
   UserOverridesUpdate: "user.overrides.update",
   UserOverridesRevert: "user.overrides.revert",
   AiOrgModelsUpdate: "ai.org-models.update",
+  AiOrgModelChosen: "ai.org-models.choose",
 } as const;
 
 interface SessionLike { user?: { id?: string; email?: string | null } }
