@@ -33,7 +33,7 @@ describe("T5258 no picker for users", () => {
   it("Regenerate shows its drop-down only when canSeeModel, which is the SuperAdmin flag", () => {
     const src = read("app/components/canvas/PropertiesPanel.tsx");
     expect(src).toContain("{canSeeModel && (");
-    expect(src).toContain("canSeeModel={_isAdmin}");
+    expect(src).toContain("canSeeModel={canSeeModelNames}");
   });
   it("a request that names a model is ignored for everyone but a SuperAdmin (the server end of it)", () => {
     expect(read("app/lib/ai/modelAccess.ts")).toContain("if (!superAdminAllowed) return currentModelId;");
@@ -54,7 +54,7 @@ describe("T5258 no model name for users", () => {
     expect(plan).toContain('setStatus("Asking the AI for a staff narrative (15–30 s)…");');
   });
   it("the Properties panel's “Prompt written by … / drawn by …” line is for a SuperAdmin only", () => {
-    expect(read("app/components/canvas/PropertiesPanel.tsx")).toContain("{aiPromptModel && _isAdmin && (");
+    expect(read("app/components/canvas/PropertiesPanel.tsx")).toContain("{aiPromptModel && canSeeModelNames && (");
   });
   it("no screen carries a hard-coded model name in what it says to the person (comments aside)", () => {
     const bad: string[] = [];
@@ -65,6 +65,13 @@ describe("T5258 no model name for users", () => {
       });
     }
     expect(bad).toEqual([]);
+  });
+  it("…and the editor gives the Properties panel its ACTING-SuperAdmin flag, so a SuperAdmin imitating a normal user does not see a model either (2026-10-06)", () => {
+    const editor = read("app/(dashboard)/diagram/[id]/DiagramEditor.tsx");
+    expect(editor).toContain("canSeeModelNames={isActingAdmin}");
+    expect(editor).not.toContain("canSeeModelNames={isAdmin}");
+    const panel = read("app/components/canvas/PropertiesPanel.tsx");
+    expect(panel).toContain("canSeeModelNames = false,");        // off unless the caller says so
   });
   it("a ratchet: a screen outside the admin areas that calls aiModelLabel() must be behind a SuperAdmin flag", () => {
     const ok = (r: string) => r.startsWith("app/(dashboard)/dashboard/admin/") || r.startsWith("app/(dashboard)/dashboard/org-admin/") || r.startsWith("app/(dashboard)/dashboard/ai-usage/");

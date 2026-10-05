@@ -273,6 +273,12 @@ interface Props {
    *  passes its acting-SuperAdmin flag, so a SuperAdmin presenting in a customer
    *  view mode sees the list a normal user would — without prices. */
   showModelCost?: boolean;
+  /**
+   * May this viewer see WHICH AI model drew / wrote the diagram, and pick one to regenerate with? Only a SuperAdmin in SuperAdmin
+   * view (Paul, 2026-10-06: remove it for ordinary users and for a SuperAdmin imitating a normal user). The editor passes its
+   * ACTING-SuperAdmin flag — NOT the raw SuperAdmin flag `isAdmin`, which stays true while a SuperAdmin presents as a customer.
+   */
+  canSeeModelNames?: boolean;
 }
 
 // Min/max height for the task/subprocess Name textarea.
@@ -900,6 +906,7 @@ export function PropertiesPanel({
   onSetDiagramOwner,
   isAdmin: _isAdmin,
   showModelCost,
+  canSeeModelNames = false,
   riskCatalog,
   showRiskControls,
   showSimulation,
@@ -1202,7 +1209,7 @@ export function PropertiesPanel({
                     matters. The prompt's author decides how much process the
                     prompt describes at all; the diagram's decides how well that
                     description was drawn. */}
-                {aiPromptModel && _isAdmin && (
+                {aiPromptModel && canSeeModelNames && (
                   <div className="text-[9px] text-gray-500 mt-0.5">
                     Prompt written by{" "}
                     <span className={aiPromptModel === "unknown" ? "text-amber-700" : "text-gray-700"}
@@ -1222,7 +1229,7 @@ export function PropertiesPanel({
                   initialModel={aiGeneration.model || currentAiModelId || ""}
                   onRegenerate={onRegenerate}
                   onRegenerateNew={onRegenerateNew}
-                  canSeeModel={_isAdmin}
+                  canSeeModel={canSeeModelNames}
                   showCost={showModelCost}
                 />
               </div>
