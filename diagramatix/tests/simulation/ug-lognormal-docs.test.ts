@@ -60,7 +60,7 @@ describe("T5260 the anchor-free v2 patch (Paul, 2026-10-06: the first patch ran 
   });
   it("carries exactly the seed script's text (one text, two places), with the row, the guidance and the Tasks bullet", () => {
     const m = seed.match(/const MD = `([\s\S]*?)`;\r?\n/)!;
-    const md = m[1].replace(/\`/g, "`").replace(/\r\n/g, "\n");
+    const md = m[1].replace(/\\`/g, "`").replace(/\r\n/g, "\n");
     expect(v2.replace(/\r\n/g, "\n")).toContain(md);
     expect(md).toContain("| **Lognormal** |");
     expect(md).toContain("**When to prefer Lognormal**");
