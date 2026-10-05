@@ -1,3 +1,4 @@
+import { isOrgAdminRole } from "@/app/lib/auth/orgAdminRole";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -28,7 +29,7 @@ export default async function CompliancePage({ searchParams }: Props) {
     where: { userId: session.user.id, orgId },
     select: { role: true, org: { select: { name: true } } },
   });
-  const isOrgAdmin = membership?.role === "Owner" || membership?.role === "Admin";
+  const isOrgAdmin = isOrgAdminRole(membership?.role);
   if (!su && !isOrgAdmin) redirect("/dashboard");
 
   // A SuperAdmin targeting an org they're not a member of still needs the name.

@@ -52,7 +52,7 @@ describe("registerUser + domain claim", () => {
     expect(await prisma.org.count()).toBe(1);
   });
 
-  it("gives an unmanaged-domain user their own personal org as Owner", async () => {
+  it("gives an unmanaged-domain user their own personal org as OrgAdmin", async () => {
     await seedFreeTier();
     await claimOrg("GetAI Org", ["getai.com.au"], "ProcessOwner");
     const res = await registerUser({ email: "solo@elsewhere.com", name: "Solo", password: "password12" });
@@ -60,7 +60,7 @@ describe("registerUser + domain claim", () => {
 
     const mships = await membershipsOf("solo@elsewhere.com");
     expect(mships).toHaveLength(1);
-    expect(mships[0].role).toBe("Owner");
+    expect(mships[0].role).toBe("Admin");
     expect(mships[0].org.name).toBe("Solo's Org");
   });
 });

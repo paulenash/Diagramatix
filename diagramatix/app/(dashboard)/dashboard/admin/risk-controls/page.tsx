@@ -1,3 +1,4 @@
+import { isOrgAdminRole } from "@/app/lib/auth/orgAdminRole";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -32,7 +33,7 @@ export default async function RiskControlsPage({ searchParams }: { searchParams:
       where: { userId: session.user.id, orgId: selectedOrgId },
       select: { role: true },
     });
-    if (membership?.role !== "Owner" && membership?.role !== "Admin") redirect("/dashboard");
+    if (!isOrgAdminRole(membership?.role)) redirect("/dashboard");
   }
 
   const [org, orgList] = await Promise.all([

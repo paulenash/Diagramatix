@@ -14,7 +14,8 @@
 import type { OrgRole } from "@/app/lib/auth/orgRoleType";
 
 export const ORG_ROLE_LABELS: Record<OrgRole, string> = {
-  Owner: "Owner",
+  // One Org administration role (Paul, 2026-10-05): a stray `Owner` row (before the conversion SQL runs) reads as OrgAdmin too.
+  Owner: "OrgAdmin",
   Admin: "OrgAdmin",
   // Specialty GRC roles retained in the schema for forward-compat
   // (no migration), but no longer surfaced in the SuperAdmin user

@@ -16,6 +16,7 @@
  *     The payload is filtered to the caller's Org first, so even a wider
  *     backup can only ever restore that Org's data. No "wipe" mode.
  */
+import { ORG_ADMIN_ROLES } from "@/app/lib/auth/orgAdminRole";
 import { NextResponse } from "next/server";
 import { serverError } from "@/app/lib/apiError";
 import { cookies } from "next/headers";
@@ -44,7 +45,7 @@ async function requireOrgAdminOrg(session: Session | null): Promise<{ orgId: str
   if (!orgId) return null;
   if (!isSuperuser(session)) {
     const m = await prisma.orgMember.findFirst({
-      where: { userId: session.user.id, orgId, role: { in: ["Owner", "Admin"] } },
+      where: { userId: session.user.id, orgId, role: { in: [...ORG_ADMIN_ROLES] } },
       select: { id: true },
     });
     if (!m) return null;

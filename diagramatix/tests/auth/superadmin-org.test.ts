@@ -25,15 +25,15 @@ describe("T5248 which organisation, for whom", () => {
 });
 
 describe("T5248 how it is made true", () => {
-  it("one transaction; a role that already administers (Owner / Admin) is kept, anything lower is raised to Admin; a new org's creator is Owner", () => {
+  it("one transaction; a role that already administers is kept, anything lower is raised to the one OrgAdmin role", () => {
     expect(lib).toContain("prisma.$transaction");
-    expect(lib).toContain('new Set(["Owner", "Admin"])');
-    expect(lib).toContain('"Admin"');
-    expect(lib).toContain('? "Owner" : "Admin"');
+    expect(lib).toContain("isOrgAdminRole(existing.role)");
+    expect(lib).toContain('import { ORG_ADMIN_ROLE, ORG_ADMIN_ROLES, isOrgAdminRole }');
+    expect(lib).toContain("role = ORG_ADMIN_ROLE;");
     expect(lib).not.toMatch(/\.delete(Many)?\(/);
   });
   it("it only adopts an org the person OWNS and that is named like a personal org (\"…'s Org\")", () => {
-    expect(lib).toContain('role: "Owner", org: { name: { endsWith: "\'s Org" } }');
+    expect(lib).toContain("role: { in: [...ORG_ADMIN_ROLES] }, org: { name: { endsWith: \"'s Org\" } }");
   });
 });
 

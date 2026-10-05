@@ -1,3 +1,4 @@
+import { ORG_ADMIN_ROLES } from "@/app/lib/auth/orgAdminRole";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -8,7 +9,7 @@ export default async function OrgAdminDiffRunsPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
   try {
-    await requireRole(session, await cookies(), ["Owner", "Admin"]);
+    await requireRole(session, await cookies(), [...ORG_ADMIN_ROLES]);
   } catch (err) {
     if (err instanceof OrgContextError) redirect("/dashboard");
     throw err;

@@ -8,6 +8,7 @@
  * "Access-scoped": the Portal never widens visibility — a reader sees exactly
  * the published processes they could already open via /processes.
  */
+import { ORG_ADMIN_ROLES } from "@/app/lib/auth/orgAdminRole";
 import { prisma } from "@/app/lib/db";
 import { SUPERUSER_EMAILS } from "@/app/lib/superuser";
 import type { PortalRow } from "./facets";
@@ -19,7 +20,7 @@ export async function listAccessiblePublishedDiagrams(userId: string, orgId: str
   // sees every project in the org (matches isAdminElevatedForOrg in orgContext).
   const [user, adminMember] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { email: true } }),
-    prisma.orgMember.findFirst({ where: { userId, orgId, role: { in: ["Owner", "Admin"] } }, select: { id: true } }),
+    prisma.orgMember.findFirst({ where: { userId, orgId, role: { in: [...ORG_ADMIN_ROLES] } }, select: { id: true } }),
   ]);
   const elevated = (!!user && SUPERUSER_EMAILS.has(user.email.toLowerCase())) || !!adminMember;
 

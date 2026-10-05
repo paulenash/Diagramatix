@@ -1,3 +1,4 @@
+import { isOrgAdminRole } from "@/app/lib/auth/orgAdminRole";
 import { redirect } from "next/navigation";
 import { hasAnyOverride } from "@/app/lib/features/userOverrides";
 import { cookies } from "next/headers";
@@ -30,7 +31,7 @@ export default async function AdminPage() {
       select: { role: true, org: { select: { name: true } } },
     });
     const isOrgAdmin =
-      callerMembership?.role === "Owner" || callerMembership?.role === "Admin";
+      isOrgAdminRole(callerMembership?.role);
     if (!isOrgAdmin) redirect("/dashboard");
     activeOrgName = callerMembership?.org.name ?? null;
   }

@@ -1,3 +1,4 @@
+import { ORG_ADMIN_ROLES } from "@/app/lib/auth/orgAdminRole";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -35,7 +36,7 @@ export default async function NotificationsPage({ searchParams }: Props) {
     const orgId = await tryGetCurrentOrgId(session, cookieStore);
     if (orgId) {
       const membership = await prisma.orgMember.findFirst({
-        where: { userId: session.user.id, orgId, role: { in: ["Owner", "Admin"] } },
+        where: { userId: session.user.id, orgId, role: { in: [...ORG_ADMIN_ROLES] } },
         select: { id: true },
       });
       if (membership) adminScope = "org";

@@ -8,6 +8,7 @@
  * is a single global config (like the code/colour identity); the OrgAdmin tile
  * edits the same shared order.
  */
+import { ORG_ADMIN_ROLES } from "@/app/lib/auth/orgAdminRole";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -26,7 +27,7 @@ export async function PUT(req: Request) {
   // SuperAdmin everywhere; otherwise must be Owner/Admin in the current org.
   if (!isSuperuser(session)) {
     try {
-      await requireRole(session, await cookies(), ["Owner", "Admin"] as OrgRole[]);
+      await requireRole(session, await cookies(), [...ORG_ADMIN_ROLES] as OrgRole[]);
     } catch {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }

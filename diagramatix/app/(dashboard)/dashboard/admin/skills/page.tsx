@@ -1,3 +1,4 @@
+import { isOrgAdminRole } from "@/app/lib/auth/orgAdminRole";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -41,7 +42,7 @@ export default async function SkillsAdminPage({ searchParams }: Props) {
       select: { role: true },
     });
     if (!m) redirect("/dashboard");
-    canEdit = m.role === "Owner" || m.role === "Admin";
+    canEdit = isOrgAdminRole(m.role);
   }
 
   const [org, orgs] = await Promise.all([

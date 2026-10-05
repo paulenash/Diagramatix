@@ -1,5 +1,6 @@
 "use client";
 
+import { isOrgAdminRole } from "@/app/lib/auth/orgAdminRole";
 import { useState, useRef, useEffect } from "react";
 import { showGateNotice } from "@/app/lib/subscription/gateNotice";
 import { SubscriptionBanner } from "@/app/components/SubscriptionBanner";
@@ -408,7 +409,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
     window.addEventListener("keydown", onKey);
     return () => { window.removeEventListener("click", close); window.removeEventListener("keydown", onKey); };
   }, [tileContextMenu]);
-  const isOrgAdmin = !readOnly && (orgRole === "Owner" || orgRole === "Admin");
+  const isOrgAdmin = !readOnly && (isOrgAdminRole(orgRole));
 
   // Refetch share list — used after the dialog closes (we don't know
   // exactly what changed, so just re-pull the source of truth) and on
@@ -1639,7 +1640,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                   to a SuperAdmin who has cycled the logo into the "orgadmin" view
                   (so they can act as / demo an OrgAdmin for their own org). Orange
                   styling matches the elevated-role convention. */}
-              {((!isSu && (orgRole === "Owner" || orgRole === "Admin")) || (isSu && adminViewMode === "orgadmin")) && (
+              {((!isSu && (isOrgAdminRole(orgRole))) || (isSu && adminViewMode === "orgadmin")) && (
                 <a
                   href="/dashboard/org-admin?from=/dashboard"
                   className="text-xs text-orange-600 hover:text-orange-800 font-medium border border-orange-300 rounded px-2 py-1"

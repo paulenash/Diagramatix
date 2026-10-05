@@ -1,3 +1,4 @@
+import { ORG_ADMIN_ROLES } from "@/app/lib/auth/orgAdminRole";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -18,7 +19,7 @@ export default async function OrgBackupPage() {
 
   if (!isSuperuser(session)) {
     const m = await prisma.orgMember.findFirst({
-      where: { userId: session.user.id, orgId, role: { in: ["Owner", "Admin"] } },
+      where: { userId: session.user.id, orgId, role: { in: [...ORG_ADMIN_ROLES] } },
       select: { id: true },
     });
     if (!m) redirect("/dashboard");

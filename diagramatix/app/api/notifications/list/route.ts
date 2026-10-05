@@ -1,3 +1,4 @@
+import { ORG_ADMIN_ROLES } from "@/app/lib/auth/orgAdminRole";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -38,7 +39,7 @@ export async function GET(req: Request) {
     callerOrgId = await tryGetCurrentOrgId(session, cookieStore);
     if (callerOrgId) {
       const m = await prisma.orgMember.findFirst({
-        where: { userId: callerId, orgId: callerOrgId, role: { in: ["Owner", "Admin"] } },
+        where: { userId: callerId, orgId: callerOrgId, role: { in: [...ORG_ADMIN_ROLES] } },
         select: { id: true },
       });
       callerIsOrgAdmin = !!m;

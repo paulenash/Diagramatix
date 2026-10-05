@@ -1,3 +1,4 @@
+import { isOrgAdminRole } from "@/app/lib/auth/orgAdminRole";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -50,7 +51,7 @@ export default async function AdminSharingPage({
       select: { role: true },
     });
     const role = membership?.role;
-    if (role !== "Owner" && role !== "Admin") redirect("/dashboard");
+    if (!isOrgAdminRole(role)) redirect("/dashboard");
   }
 
   const { orgId: orgIdFilter } = await searchParams;

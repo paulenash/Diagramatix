@@ -1,3 +1,4 @@
+import { ORG_ADMIN_ROLES } from "@/app/lib/auth/orgAdminRole";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -19,7 +20,7 @@ export default async function DiagramTypeSortOrderPage() {
   let allowed = superAdmin;
   if (!allowed) {
     try {
-      await requireRole(session, await cookies(), ["Owner", "Admin"] as OrgRole[]);
+      await requireRole(session, await cookies(), [...ORG_ADMIN_ROLES] as OrgRole[]);
       allowed = true;
     } catch {
       /* not an org admin */

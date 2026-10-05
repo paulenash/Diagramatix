@@ -3,6 +3,7 @@
  * org, with author info, for the OrgAdmin management screen (grouped by user
  * client-side). OrgAdmin (Owner/Admin) or SuperAdmin.
  */
+import { ORG_ADMIN_ROLES } from "@/app/lib/auth/orgAdminRole";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -14,7 +15,7 @@ export async function GET() {
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   let orgId: string;
   try {
-    ({ orgId } = await requireRole(session, await cookies(), ["Owner", "Admin"]));
+    ({ orgId } = await requireRole(session, await cookies(), [...ORG_ADMIN_ROLES]));
   } catch (err) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;

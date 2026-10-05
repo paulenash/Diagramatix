@@ -1,3 +1,4 @@
+import { ORG_ADMIN_ROLES } from "@/app/lib/auth/orgAdminRole";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -14,7 +15,7 @@ import { recordAudit, AUDIT, ipFromRequest } from "@/app/lib/audit";
 
 type Params = { params: Promise<{ id: string }> };
 
-const ADMIN_ROLES = ["Owner", "Admin"] as const;
+const ADMIN_ROLES = [...ORG_ADMIN_ROLES] as const;
 
 /** Minimal session shape the gate consumes. NextAuth's `auth()` return
  *  type is a union that includes a middleware-handler variant; this

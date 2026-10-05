@@ -1,3 +1,4 @@
+import { isOrgAdminRole } from "@/app/lib/auth/orgAdminRole";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -35,7 +36,7 @@ export default async function OrgAdminPage() {
     where: { userId: session.user.id, orgId: activeOrgId },
     select: { role: true, org: { select: { name: true } } },
   });
-  const isOrgAdmin = membership?.role === "Owner" || membership?.role === "Admin";
+  const isOrgAdmin = isOrgAdminRole(membership?.role);
   if (!isOrgAdmin && !asOrgAdmin) redirect("/dashboard");
 
   // Feature entitlements for THIS OrgAdmin's own subscription — tiles whose

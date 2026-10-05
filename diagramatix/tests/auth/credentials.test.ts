@@ -67,7 +67,7 @@ describe("verifyCredentials — login check", () => {
 describe("registerUser — account creation", () => {
   beforeEach(async () => { await truncateAll(); await seedFreeTier(); });
 
-  it("creates a new user with a HASHED password (not plaintext) + default Org/Owner", async () => {
+  it("creates a new user with a HASHED password (not plaintext) + default Org/OrgAdmin", async () => {
     const res = await registerUser({ email: "new@test.dev", name: "New User", password: "supersecret1" });
     expect(res.ok).toBe(true);
     if (!res.ok) return;
@@ -78,9 +78,9 @@ describe("registerUser — account creation", () => {
     expect(await bcrypt.compare("supersecret1", stored!.password)).toBe(true);
     expect(stored?.subscriptionLevelId).toBe("free");
 
-    // CPS 230: a default Org with an Owner membership exists.
+    // CPS 230: a default Org with an OrgAdmin (stored Admin — one Org administration role) membership exists.
     const membership = await prisma.orgMember.findFirst({ where: { userId: res.user.id } });
-    expect(membership?.role).toBe("Owner");
+    expect(membership?.role).toBe("Admin");
   });
 
   it("rejects a duplicate email (409)", async () => {

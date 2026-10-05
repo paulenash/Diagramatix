@@ -1,3 +1,4 @@
+import { ORG_ADMIN_ROLES } from "@/app/lib/auth/orgAdminRole";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -28,7 +29,7 @@ export async function GET(_req: Request, { params }: Params) {
   }
 
   const admins = await prisma.orgMember.findMany({
-    where: { orgId: id, role: { in: ["Owner", "Admin"] } },
+    where: { orgId: id, role: { in: [...ORG_ADMIN_ROLES] } },
     orderBy: { createdAt: "asc" },
     select: {
       id: true,

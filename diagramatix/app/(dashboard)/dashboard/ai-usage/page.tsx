@@ -1,3 +1,4 @@
+import { isOrgAdminRole } from "@/app/lib/auth/orgAdminRole";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -57,7 +58,7 @@ export default async function AiUsagePage({
       where: { userId: session.user.id, orgId: activeOrgId },
       select: { role: true, org: { select: { name: true } } },
     });
-    if (!(m?.role === "Owner" || m?.role === "Admin")) redirect("/dashboard");
+    if (!(isOrgAdminRole(m?.role))) redirect("/dashboard");
     activeOrgName = m?.org.name ?? null;
   }
 

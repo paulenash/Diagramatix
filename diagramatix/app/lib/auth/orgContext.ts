@@ -14,6 +14,7 @@
  */
 
 // Server-only module — must never be imported from client components.
+import { isOrgAdminRole, ORG_ADMIN_ROLES } from "@/app/lib/auth/orgAdminRole";
 import { prisma } from "@/app/lib/db";
 import { getEffectiveUserId, SUPERUSER_EMAILS, isSuperuser } from "@/app/lib/superuser";
 
@@ -142,7 +143,7 @@ export async function requireOrgAdminFor(
     where: { userId, orgId: targetOrgId },
     select: { role: true },
   });
-  if (!member || (member.role !== "Owner" && member.role !== "Admin")) {
+  if (!member || (!isOrgAdminRole(member.role))) {
     throw new OrgContextError("Not an OrgAdmin for this org", 403);
   }
   return { userId, isSuperAdmin: false };
@@ -261,7 +262,7 @@ async function isAdminElevatedForOrg(
       select: { email: true },
     }),
     prisma.orgMember.findFirst({
-      where: { userId, orgId: projectOrgId, role: { in: ["Admin", "Owner"] } },
+      where: { userId, orgId: projectOrgId, role: { in: [...ORG_ADMIN_ROLES] } },
       select: { id: true },
     }),
   ]);

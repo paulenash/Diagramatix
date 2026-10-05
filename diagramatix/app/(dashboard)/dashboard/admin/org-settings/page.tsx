@@ -1,3 +1,5 @@
+import type { OrgRole } from "@/app/lib/auth/orgRoleType";
+import { isOrgAdminRole, ORG_ADMIN_ROLES } from "@/app/lib/auth/orgAdminRole";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -57,7 +59,7 @@ export default async function OrgSettingsPage({
       select: { role: true },
     });
     const role = membership?.role;
-    if (role !== "Owner" && role !== "Admin") redirect("/dashboard");
+    if (!isOrgAdminRole(role)) redirect("/dashboard");
   }
 
   // Parallel fetch: selected Org detail, selected Org's OrgAdmins,
@@ -84,7 +86,7 @@ export default async function OrgSettingsPage({
       },
     }),
     prisma.orgMember.findMany({
-      where: { orgId: selectedOrgId, role: { in: ["Owner", "Admin"] } },
+      where: { orgId: selectedOrgId, role: { in: [...ORG_ADMIN_ROLES] } },
       orderBy: { createdAt: "asc" },
       select: {
         id: true,
@@ -132,7 +134,7 @@ export default async function OrgSettingsPage({
   const admins: OrgAdminRow[] = adminsRow.map((m) => ({
     id: m.id,
     userId: m.userId,
-    role: m.role as "Owner" | "Admin",
+    role: m.role as OrgRole,
     createdAt: m.createdAt.toISOString(),
     user: { id: m.user.id, name: m.user.name, email: m.user.email },
   }));

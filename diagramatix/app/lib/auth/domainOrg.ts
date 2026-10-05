@@ -7,6 +7,7 @@
  * org-creation endpoint (POST /api/orgs is SuperAdmin-only) — cannot end up with
  * their own org. Everyone else keeps the previous behaviour (a personal org).
  */
+import { ORG_ADMIN_ROLE } from "@/app/lib/auth/orgAdminRole";
 import { prisma } from "@/app/lib/db";
 import type { OrgRole } from "@/app/lib/auth/orgRoleType";
 
@@ -67,6 +68,6 @@ export async function joinDomainOrgOrCreatePersonal(
     return { orgId: managed.orgId, managed: true };
   }
   const org = await db.org.create({ data: { name: `${displayName}'s Org`, entityType: "Other" } });
-  await db.orgMember.create({ data: { orgId: org.id, userId, role: "Owner" } });
+  await db.orgMember.create({ data: { orgId: org.id, userId, role: ORG_ADMIN_ROLE } });
   return { orgId: org.id, managed: false };
 }

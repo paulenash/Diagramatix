@@ -25,8 +25,8 @@ enum OrgEntityType {
 }
 
 enum OrgRole {
-  Owner // full control of the org, including billing and deletion
-  Admin // manage members and settings, no destructive ops
+  Owner // RETIRED (2026-10-05): no longer written; existing rows are converted to Admin. Still accepted as an Org administrator until then.
+  Admin // the ONE Org administration role, shown as "OrgAdmin": manage members and settings, delete nothing (only SuperAdmin deletes)
   RiskOwner // create/edit Risks, Controls, link to processes
   ProcessOwner // create/edit critical operations + BPMN process content
   ControlOwner // edit Controls and test outcomes

@@ -6,8 +6,8 @@ import type { OrgRole } from "@/app/lib/auth/orgRoleType";
 
 type Params = { params: Promise<{ id: string }> };
 
+// "Owner" is no longer assignable: there is one Org administration role, OrgAdmin (stored as Admin).
 const VALID_ROLES: ReadonlySet<OrgRole> = new Set([
-  "Owner",
   "Admin",
   "RiskOwner",
   "ProcessOwner",

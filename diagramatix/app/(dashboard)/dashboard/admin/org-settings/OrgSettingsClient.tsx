@@ -1,5 +1,6 @@
 "use client";
 
+import type { OrgRole } from "@/app/lib/auth/orgRoleType";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AlertDialog } from "@/app/components/AlertDialog";
@@ -51,7 +52,7 @@ export interface OrgListItem {
 export interface OrgAdminRow {
   id: string;
   userId: string;
-  role: "Owner" | "Admin";
+  role: OrgRole;      // an OrgAdmin: stored Admin (a stray Owner until the conversion SQL runs)
   createdAt: string;
   user: { id: string; name: string | null; email: string };
 }

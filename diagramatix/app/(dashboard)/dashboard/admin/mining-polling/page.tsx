@@ -1,3 +1,4 @@
+import { isOrgAdminRole } from "@/app/lib/auth/orgAdminRole";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -29,7 +30,7 @@ export default async function MiningPollingPage() {
       where: { userId: session.user.id, orgId: activeOrgId },
       select: { role: true, org: { select: { name: true } } },
     });
-    const isOrgAdmin = membership?.role === "Owner" || membership?.role === "Admin";
+    const isOrgAdmin = isOrgAdminRole(membership?.role);
     if (!isOrgAdmin) redirect("/dashboard");
     scopeName = membership?.org.name ?? null;
   }

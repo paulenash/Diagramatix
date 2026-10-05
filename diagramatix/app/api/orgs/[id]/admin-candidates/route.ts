@@ -1,3 +1,4 @@
+import { ORG_ADMIN_ROLES } from "@/app/lib/auth/orgAdminRole";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -45,7 +46,7 @@ export async function GET(req: Request, { params }: Params) {
   // Existing OrgAdmins to exclude — they're already in the list above
   // the picker, so don't surface them as candidates.
   const existingAdmins = await prisma.orgMember.findMany({
-    where: { orgId: id, role: { in: ["Owner", "Admin"] } },
+    where: { orgId: id, role: { in: [...ORG_ADMIN_ROLES] } },
     select: { userId: true },
   });
   const excludeUserIds = new Set(existingAdmins.map((m) => m.userId));

@@ -1,3 +1,4 @@
+import { isOrgAdminRole } from "@/app/lib/auth/orgAdminRole";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -25,7 +26,7 @@ export default async function PcfPage({ searchParams }: Props) {
 
   if (!su) {
     const m = await prisma.orgMember.findFirst({ where: { userId: session.user.id, orgId: selectedOrgId }, select: { role: true } });
-    if (!(m?.role === "Owner" || m?.role === "Admin")) redirect("/dashboard");
+    if (!(isOrgAdminRole(m?.role))) redirect("/dashboard");
   }
 
   const [org, orgs] = await Promise.all([

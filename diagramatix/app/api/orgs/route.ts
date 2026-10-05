@@ -1,3 +1,4 @@
+import { ORG_ADMIN_ROLE } from "@/app/lib/auth/orgAdminRole";
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
@@ -106,7 +107,7 @@ export async function POST(req: Request) {
       data: {
         orgId: org.id,
         userId: owner.id,
-        role: "Owner",
+        role: ORG_ADMIN_ROLE,
         createdBy: actorUserId,
       },
     });

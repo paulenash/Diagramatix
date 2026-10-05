@@ -105,7 +105,7 @@ export function SuperAdminWelcome() {
         )}
         {org && org.orgId && (
           <p className="text-sm text-gray-600 mb-3" data-testid="superadmin-org">
-            Your organisation is <b>{org.orgName}</b>, and you are its {org.role === "Owner" ? "Owner and administrator" : "administrator"}.
+            Your organisation is <b>{org.orgName}</b>, and you are its OrgAdmin.
           </p>
         )}
         {org && !org.orgId && <p className="text-sm text-amber-700 mb-3">{org.changes[0]}.</p>}

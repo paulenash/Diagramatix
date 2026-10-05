@@ -1,3 +1,4 @@
+import { ORG_ADMIN_ROLES } from "@/app/lib/auth/orgAdminRole";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -59,7 +60,7 @@ export async function GET() {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const callerMembership = await prisma.orgMember.findFirst({
-    where: { userId: session.user.id, orgId: callerOrgId, role: { in: ["Owner", "Admin"] } },
+    where: { userId: session.user.id, orgId: callerOrgId, role: { in: [...ORG_ADMIN_ROLES] } },
     select: { id: true },
   });
   if (!callerMembership) {

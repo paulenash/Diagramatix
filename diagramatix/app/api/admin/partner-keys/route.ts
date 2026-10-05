@@ -11,6 +11,7 @@
  *     access to every project in the org — through a key held by a third party.
  *     Checked here, and again on every call in `authenticatePartner`.
  */
+import { isOrgAdminRole } from "@/app/lib/auth/orgAdminRole";
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma, pgPool } from "@/app/lib/db";
@@ -72,7 +73,7 @@ export async function GET(req: Request) {
         name: o.name,
         members: o.members.map((m) => {
           const superAdmin = isSuperuser({ user: { email: m.user.email } });
-          const elevated = m.role === "Admin" || m.role === "Owner";
+          const elevated = isOrgAdminRole(m.role);
           return {
             email: m.user.email,
             role: m.role,
@@ -246,7 +247,7 @@ export async function POST(req: Request) {
   if (!member) {
     return NextResponse.json({ error: "That user is not a member of that organisation" }, { status: 400 });
   }
-  if (member.role === "Admin" || member.role === "Owner") {
+  if (isOrgAdminRole(member.role)) {
     return NextResponse.json(
       { error: `That user is ${member.role} of the org, which grants owner access to every project in it. Use a ProcessOwner service account.` },
       { status: 400 },

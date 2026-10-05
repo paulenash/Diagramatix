@@ -15,6 +15,7 @@
  *     demote the last remaining OrgAdmin (the SuperAdmin path does NOT bypass
  *     this — the count threshold is `adminCount <= 1`).
  */
+import { isOrgAdminRole, ORG_ADMIN_ROLES } from "@/app/lib/auth/orgAdminRole";
 import { prisma } from "@/app/lib/db";
 
 /** The user identity selection both the route and lib return on the OrgMember. */
@@ -133,13 +134,13 @@ export async function demoteAdmin(
   if (!member) {
     return { error: "Not an OrgMember of this Org", status: 404 };
   }
-  if (member.role !== "Owner" && member.role !== "Admin") {
+  if (!isOrgAdminRole(member.role)) {
     return { error: "User is not currently an OrgAdmin of this Org", status: 400 };
   }
 
   // Last-admin guard.
   const adminCount = await prisma.orgMember.count({
-    where: { orgId, role: { in: ["Owner", "Admin"] } },
+    where: { orgId, role: { in: [...ORG_ADMIN_ROLES] } },
   });
   if (adminCount <= 1) {
     return {
