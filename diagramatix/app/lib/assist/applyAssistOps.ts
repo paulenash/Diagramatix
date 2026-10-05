@@ -1063,7 +1063,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       // "move these right", "move the selected task up two".
       const selIds = resolveSelectionRefs(op.ref, els, selectedIds);
       if (selIds && selIds.length > 0) {
-        const step = 100 * (op.count ?? 1);
+        const step = op.pixels ?? 100 * (op.count ?? 1);
         const gdx = op.direction === "right" ? step : op.direction === "left" ? -step : 0;
         const gdy = op.direction === "down" ? step : op.direction === "up" ? -step : 0;
         moveElements(selIds, gdx, gdy);
@@ -1080,7 +1080,7 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       // over Office and out of its stack, content out of the pool). Up or down,
       // a lane moves AS a lane — the same move as "move the Finance lane up".
       if (!horiz && isAnyLane(e)) {
-        if (!moveLaneInStack(e, op.direction as "up" | "down", 32 * (op.count ?? 1))) anyFail = true;
+        if (!moveLaneInStack(e, op.direction as "up" | "down", op.pixels ?? 32 * (op.count ?? 1))) anyFail = true;
         continue;
       }
       // A pool or lane is not a shape to slide sideways — its "span" is its
@@ -1089,6 +1089,16 @@ export function applyAssistOps(ops: AssistOp[], ctx: AssistApplyContext): { ok: 
       if (horiz && (e.type === "pool" || isAnyLane(e))) {
         results.push(`${nameOf(e)} is a ${e.type === "pool" ? "pool" : laneKindWord(e, els)} — to move what is in it, say “move everything in ${nameOf(e)} one step to the ${op.direction}”`);
         anyFail = true; continue;
+      }
+      // An exact distance ("move this ten pixels right"): just that far, with no counting of neighbours.
+      if (op.pixels !== undefined) {
+        const dx = op.direction === "right" ? op.pixels : op.direction === "left" ? -op.pixels : 0;
+        const dy = op.direction === "down" ? op.pixels : op.direction === "up" ? -op.pixels : 0;
+        moveElements([e.id], dx, dy);
+        elementsMoveEnd();
+        setSelectedElementIds(new Set());
+        results.push(`moved ${nameOf(e)} ${op.direction} ${op.pixels}px`);
+        continue;
       }
       // "N elements over" → move past the N nearest elements in that direction
       // (same band), else fall back to N element-spans.

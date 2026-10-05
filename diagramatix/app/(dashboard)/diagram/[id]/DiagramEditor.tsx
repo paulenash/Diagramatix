@@ -54,6 +54,7 @@ import { CollabDebug } from "@/app/components/canvas/CollabDebug";
 import { suggestNextSteps, type NextStepCandidate } from "@/app/lib/diagram/nextSteps";
 import { sizeOf, placeInline, placeGatewayBranch, placeBoundaryEvent, planBoundaryFollowOn, followOnParentId, findFreeSlot, HALF_TASK_W, HALF_TASK_H } from "@/app/lib/diagram/assistPlacement";
 import { planWrapInSubprocess, planUnwrapSubprocess, planWrapInContainer } from "@/app/lib/diagram/subprocessWrap";
+import { SUPERUSER_EMAILS } from "@/app/lib/superuser";
 import { matchIntent, matchAssistRules, type IntentRow } from "@/app/lib/diagram/intentMatch";
 import { canConnect } from "@/app/lib/diagram/canConnect";
 import { resolveRef, resolveSelectionRefs, isSelectionRef, nearestRefs, spokenNumbersAsDigits } from "@/app/lib/assist/resolveRef";
@@ -1725,7 +1726,9 @@ export function DiagramEditor({
   }, [projectId, diagramId]);
 
   // Template state (BPMN only)
-  const isAdmin = userEmail?.toLowerCase() === "paul@nashcc.com.au";
+  // Every SuperAdmin — not one address (Paul, 2026-10-05: signed in as paul@diagramatix.com.au he was SuperAdmin on the
+  // Dashboard and the Project screen but not on this one, which only knew his old address).
+  const isAdmin = !!userEmail && SUPERUSER_EMAILS.has(userEmail.toLowerCase());
   // SuperAdmin "presentation mode" — double-click the logo to cycle view modes
   // (superadmin → orgadmin → expert → professional → introductory). No-op for non-SuperAdmins.
   const { mode: adminViewMode, hidden: superAdminHidden, toggle: toggleSuperAdminChrome } = useSuperAdminChrome(isAdmin);

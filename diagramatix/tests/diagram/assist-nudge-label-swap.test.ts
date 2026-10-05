@@ -44,7 +44,7 @@ describe("1 & 2 — nudge and move", () => {
     expect(parseCommand("move the selected task two steps up")?.[0]).toMatchObject({ op: "move", direction: "up", count: 2 });
     const ed = editor();
     expect(ed).toMatch(/const selIds = op\.ref \? resolveSelectionRefs\(op\.ref, els, selectedIds\) : null;\s*if \(selIds && selIds\.length > 1\) \{\s*moveElements\(selIds, dx, dy\);/);
-    expect(ed).toMatch(/const step = 100 \* \(op\.count \?\? 1\);[\s\S]{0,400}moveElements\(selIds, gdx, gdy\);\s*elementsMoveEnd\(\);\s*setSelectedElementIds\(new Set\(\)\);/);
+    expect(ed).toMatch(/const step = op\.pixels \?\? 100 \* \(op\.count \?\? 1\);[\s\S]{0,400}moveElements\(selIds, gdx, gdy\);\s*elementsMoveEnd\(\);\s*setSelectedElementIds\(new Set\(\)\);/);
   });
 });
 

@@ -39,7 +39,7 @@ export type AssistOp =
   | { op: "reverseConnector" }
   | { op: "rename"; ref: Ref; label: string }
   | { op: "renameByType"; itemType: string }
-  | { op: "move"; ref: Ref; direction: "left" | "right" | "up" | "down"; count?: number }
+  | { op: "move"; ref: Ref; direction: "left" | "right" | "up" | "down"; count?: number; /** an exact distance ("ten pixels"), instead of steps */ pixels?: number }
   | { op: "wrapInPool"; label?: string }
   /** "surround selected with an expanded subprocess called X" — the SELECTION, one flow in, one out. */
   | { op: "wrapInSubprocess"; label?: string }

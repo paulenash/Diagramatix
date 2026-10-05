@@ -395,6 +395,15 @@ export function resolveRef(spoken: string, elements: DiagramElement[], lastAdded
   }
 
   const sel = resolveSelectionRefs(s, elements, selectedIds);
+  // "highlighted" is what the canvas shows for the element the mouse rests on as well as for a selection (Paul, 2026-10-05:
+  // "move highlighted task … → nothing is selected"). With nothing selected, it means the one under the pointer — of the
+  // kind named, when one is.
+  if (sel && sel.length === 0 && /^(?:the\s+)?highlighted\b/.test(s)) {
+    const under = elementUnderPointer(opts.pointer ?? null, elements);
+    const kind = stripArticle(s).match(SELECTION_KIND)?.[1];
+    const ofKind = kind ? kindToType(kind, elements) : null;
+    if (under && (!ofKind || ofKind(under))) return { id: under.id };
+  }
   if (sel) return pick(sel);
 
   const pos = positional(s, elements);

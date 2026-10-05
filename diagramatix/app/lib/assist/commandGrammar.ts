@@ -3,6 +3,7 @@
  * commands. Returns an op list for phrasings it recognises, or null so the
  * caller falls back to the AI interpreter. Pure + tested.
  */
+import { readPixelMove } from "./pixelDistance";
 import type { AssistOp } from "./ops";
 import { SYMBOL_SYNONYMS, SYMBOL_PHRASES } from "./ops";
 import { namesNonContainerKind, laneWordIsAttached, looksPositionalNotAName, namesAContainer, namesOnlyTemplate } from "./greedyGuards";
@@ -837,6 +838,16 @@ export function parseCommand(utterance: string): AssistOp[] | null {
       const fromRef = clean(fromPart.replace(/\s*,\s*$/, "").replace(/\s+(?:on|onwards?|forwards?)$/i, ""));
       const ref = inPart ? clean(inPart.replace(/^,\s*/, "")) : "";
       if (fromRef) return [{ op: "moveContents", fromRef, ...(ref ? { ref } : {}), direction: sh.direction, ...sh.amount }];
+    }
+  }
+
+  // ── Move by a distance in pixels (Paul, 2026-10-05) ──
+  // "move ten pixels right", "move selected 10 pixels left", "move highlighted task right by fifty pixels". The distance used to
+  // be read as part of the NAME ("couldn't find 'ten pixels'"). A pool / lane / boundary keeps its own rules above.
+  {
+    const px = readPixelMove(raw);
+    if (px && !mentionsPoolBoundary(raw) && !/\b(?:pool|lane|sub-?lane|divider|boundary|everything|contents?)\b/i.test(px.ref)) {
+      return [{ op: "move", ref: px.ref ? clean(px.ref) : "this", direction: px.direction, pixels: px.pixels }];
     }
   }
 

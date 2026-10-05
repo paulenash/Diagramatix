@@ -129,7 +129,9 @@ export async function POST(req: Request) {
 }
 
 // The SuperAdmin whose "Support" project collects help-requested diagrams.
-const SUPPORT_ADMIN_EMAIL = "paul@nashcc.com.au";
+// Paul's two addresses, newest first: the account that already holds the Support project wins, else the first that exists
+// (his data moves from the old address to the new one — 2026-10-05).
+const SUPPORT_ADMIN_EMAILS = ["paul@diagramatix.com.au", "paul@nashcc.com.au"];
 const SUPPORT_PROJECT_NAME = "Support";
 
 /**
@@ -144,10 +146,12 @@ async function depositToSupportProject(input: {
   fromUserEmail: string;
   message: string;
 }): Promise<void> {
-  const admin = await prisma.user.findUnique({
-    where: { email: SUPPORT_ADMIN_EMAIL },
-    select: { id: true },
-  });
+  const candidates = await prisma.user.findMany({ where: { email: { in: SUPPORT_ADMIN_EMAILS } }, select: { id: true, email: true } });
+  candidates.sort((a, b) => SUPPORT_ADMIN_EMAILS.indexOf(a.email) - SUPPORT_ADMIN_EMAILS.indexOf(b.email));
+  let admin = candidates[0];
+  for (const c of candidates) {
+    if (await prisma.project.findFirst({ where: { userId: c.id, name: SUPPORT_PROJECT_NAME }, select: { id: true } })) { admin = c; break; }
+  }
   if (!admin) return; // deployment without the SuperAdmin account — skip silently
 
   const adminOrg = await prisma.orgMember.findFirst({
