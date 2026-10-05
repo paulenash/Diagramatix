@@ -17,7 +17,7 @@ import { prisma } from "@/app/lib/db";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 import { orgPolicyAllows, orgRedactionEnabled } from "@/app/lib/auth/orgPolicy";
 import { makeRedactor } from "@/app/lib/ai/redaction";
-import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
+import { resolveOrgModel } from "@/app/lib/ai/orgModels";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { enterAiContext, AI_INVOCATION_POINTS } from "@/app/lib/ai/aiTelemetry";
 import { loadStudyRuns } from "@/app/lib/simulation/loadStudyRuns";
@@ -52,7 +52,7 @@ export async function POST(_req: Request, { params }: Params) {
 
   const facts = buildNextStepsFacts(report, study.name);
 
-  const model = await getAiGenerateModel();
+  const model = await resolveOrgModel();
   const apiKey = aiApiKey(model);
   // The narration is an AI call, so it counts against the AI attempts limit. At the limit it falls back to
   // the deterministic summary (a 200, like AI-off) rather than failing the whole request.

@@ -12,7 +12,7 @@
  * exists, and this output is meant to survive a finance director reading it.
  */
 import { makeAiClient } from "@/app/lib/ai/anthropicClient";
-import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
+import { resolveOrgModel } from "@/app/lib/ai/orgModels";
 import type { Redactor } from "@/app/lib/ai/redaction";
 import type { NextStepsReport, SuggestionKind } from "../nextSteps";
 
@@ -103,7 +103,7 @@ export async function generateNextStepsNarrative(
   args: { apiKey: string; facts: NextStepsFacts },
   redactor?: Redactor,
 ): Promise<NextStepsAiResult> {
-  const model = await getAiGenerateModel();
+  const model = await resolveOrgModel();
   const client = makeAiClient(model, args.apiKey);
   const payload = JSON.stringify(args.facts, null, 2);
   try {

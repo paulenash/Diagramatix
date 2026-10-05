@@ -14,7 +14,7 @@
  * whole thing is unit-testable without an API call.
  */
 import { makeAiClient } from "@/app/lib/ai/anthropicClient";
-import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
+import { resolveOrgModel } from "@/app/lib/ai/orgModels";
 import type { Redactor } from "@/app/lib/ai/redaction";
 import type { RunMetrics } from "../results";
 
@@ -165,7 +165,7 @@ export type SimAssessmentResult =
 const ASSESS_MAX_TOKENS = 1500;
 
 export async function generateSimAssessment(args: { apiKey: string; facts: ComparisonFacts }, redactor?: Redactor): Promise<SimAssessmentResult> {
-  const model = await getAiGenerateModel();
+  const model = await resolveOrgModel();
   const client = makeAiClient(model, args.apiKey);
   // ENT-06: pseudonymise scenario/team names in the facts JSON before egress,
   // restore them in the reply. redactor is undefined (no-op) unless the org opts in.

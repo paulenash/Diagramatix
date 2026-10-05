@@ -14,7 +14,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { requireDiagramAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
-import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
+import { resolveOrgModel } from "@/app/lib/ai/orgModels";
 import { makeAiClient, aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { resolveAiRouteContext } from "@/app/lib/ai/aiTelemetryRoute";
 import { AI_INVOCATION_POINTS, enterAiContext } from "@/app/lib/ai/aiTelemetry";
@@ -154,7 +154,7 @@ export async function POST(req: Request) {
   const pol = await gateOrgPolicy(session, "allowAi");
   if (pol) return pol;
   enterAiContext(await resolveAiRouteContext(session, AI_INVOCATION_POINTS.ProcessDiff));
-  const model = await getAiGenerateModel();
+  const model = await resolveOrgModel();
   const apiKey = aiApiKey(model);
   if (!apiKey) return NextResponse.json({ error: "AI not configured for the selected model." }, { status: 503 });
   const featBlock = await gateFeature(session.user.id, "diff-processes");

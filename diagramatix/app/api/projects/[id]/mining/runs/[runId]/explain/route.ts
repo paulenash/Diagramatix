@@ -12,7 +12,7 @@ import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext
 import { gateFeature } from "@/app/lib/subscription-route";
 import { orgPolicyAllows, orgRedactionEnabled } from "@/app/lib/auth/orgPolicy";
 import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
-import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
+import { resolveOrgModel } from "@/app/lib/ai/orgModels";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { enterAiContext, AI_INVOCATION_POINTS } from "@/app/lib/ai/aiTelemetry";
 import { makeRedactor } from "@/app/lib/ai/redaction";
@@ -68,7 +68,7 @@ export async function POST(_req: Request, { params }: Params) {
   // Branch: AI narrates only when the org allows AI AND a key is configured.
   // Otherwise fall back to the deterministic templated summary (ENT-05) — a 200,
   // not a 403 — so strict/AI-off tenants still get a Results summary.
-  const model = await getAiGenerateModel();
+  const model = await resolveOrgModel();
   const apiKey = aiApiKey(model);
   const aiOn = (await orgPolicyAllows(session, "allowAi")) && !!apiKey;
   if (!aiOn) {

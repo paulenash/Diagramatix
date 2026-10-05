@@ -12,7 +12,7 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { makeAiClient, aiApiKey } from "@/app/lib/ai/anthropicClient";
-import { getAiCommandModel } from "@/app/lib/ai/aiModelSetting";
+import { resolveOrgModel } from "@/app/lib/ai/orgModels";
 import { resolveAiRouteContext } from "@/app/lib/ai/aiTelemetryRoute";
 import { AI_INVOCATION_POINTS, enterAiContext } from "@/app/lib/ai/aiTelemetry";
 import { auth } from "@/auth";
@@ -170,7 +170,7 @@ export async function POST(req: Request) {
   const state = body?.state ?? { elements: [], connectors: [] } as unknown as DiagramData;
   const selectedIds = Array.isArray(body?.selectedIds) ? body!.selectedIds!.filter((s) => typeof s === "string") : [];
 
-  const model = await getAiCommandModel();
+  const model = await resolveOrgModel({ purpose: "command" });
   const apiKey = aiApiKey(model);
   if (!apiKey) return NextResponse.json({ canonical: "", ops: [] }); // no AI configured → no-op
 

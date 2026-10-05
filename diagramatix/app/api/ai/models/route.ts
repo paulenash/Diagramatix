@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { getEffectiveUserId, isSuperuser } from "@/app/lib/superuser";
-import { resolveGenerateModel } from "@/app/lib/ai/aiModelSetting";
+import { resolveOrgModel } from "@/app/lib/ai/orgModels";
 import { allowedGenerateModels, modelCostUsd } from "@/app/lib/ai/modelAccess";
 import { aiModelLabel, providerForModel } from "@/app/lib/ai/models";
 import { listUserAiKeys } from "@/app/lib/ai/userAiKey";
@@ -36,9 +36,12 @@ export async function GET(req: Request) {
     byo = new Set((await listUserAiKeys(userId)).map((k) => k.provider));
   } catch { /* no own keys is the normal case; never fail the picker over it */ }
 
-  const current = await resolveGenerateModel(false);
+  // The model in force for THIS person: their Org's for an ordinary user, the global setting for a SuperAdmin (orgModels.ts).
+  const current = await resolveOrgModel({ hasImage: false });
   const saMode = new URL(req.url).searchParams.get("saMode") === "1" && isSuperuser(session);
-  const models = allowedGenerateModels(current, saMode, byo).map((m) => ({
+  // Ordinary users do not choose (Paul, 2026-10-05): the list is the one model in force. A SuperAdmin in SuperAdmin mode gets them all.
+  const offered = saMode ? allowedGenerateModels(current, true, byo) : allowedGenerateModels(current, false, byo).filter((m) => m.id === current);
+  const models = offered.map((m) => ({
     id: m.id,
     label: m.label,
     costUsd: modelCostUsd(m.id),

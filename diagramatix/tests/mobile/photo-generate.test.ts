@@ -63,6 +63,11 @@ vi.mock("@/app/lib/ai/aiModelSetting", async (orig) => ({
   ...(await orig<typeof import("@/app/lib/ai/aiModelSetting")>()),
   resolveGenerateModel: async (hasImage: boolean) => { ai.hasImageAsked.push(hasImage); return ai.model; },
 }));
+// The route asks the per-Org resolver now (2026-10-05); the question it asks — "is there an image?" — is the same.
+vi.mock("@/app/lib/ai/orgModels", async (orig) => ({
+  ...(await orig<typeof import("@/app/lib/ai/orgModels")>()),
+  resolveOrgModel: async (o: { hasImage?: boolean } = {}) => { ai.hasImageAsked.push(!!o.hasImage); return ai.model; },
+}));
 vi.mock("@/app/lib/ai/anthropicClient", async (orig) => ({
   ...(await orig<typeof import("@/app/lib/ai/anthropicClient")>()),
   aiApiKey: () => "test-key",

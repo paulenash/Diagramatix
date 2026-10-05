@@ -67,6 +67,10 @@ export function chooseModel(
    */
   unlocked?: ReadonlySet<string>,
 ): string {
+  // ONLY a SuperAdmin chooses (Paul, 2026-10-05: "Individual users should not be able to choose what model they use"). For everyone
+  // else `currentModelId` IS the answer — the model their Org's OrgAdmin chose from the lists SuperAdmin gave it (orgModels.ts) —
+  // and a model named in the request is ignored, including one a user's own key would unlock (the key changes who pays, not what runs).
+  if (!superAdminAllowed) return currentModelId;
   if (requested && isModelAllowed(requested, currentModelId, superAdminAllowed, unlocked)) return requested;
   return currentModelId;
 }

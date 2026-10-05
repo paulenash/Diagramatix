@@ -10,7 +10,7 @@ import { auth } from "@/auth";
 import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
 import { prisma } from "@/app/lib/db";
 import { planFlowchart } from "@/app/lib/ai/planFlowchart";
-import { resolveGenerateModel } from "@/app/lib/ai/aiModelSetting";
+import { resolveOrgModel } from "@/app/lib/ai/orgModels";
 import { chooseModel } from "@/app/lib/ai/modelAccess";
 import { isSuperuser } from "@/app/lib/superuser";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
 
   // Image input uses the Vision-model override when set; else the main model. A
   // caller may override with a cost-gated model (SuperAdmin → any); disallowed → default.
-  const defaultModel = await resolveGenerateModel(attachment?.type === "image");
+  const defaultModel = await resolveOrgModel({ hasImage: attachment?.type === "image" });
   if (requestedModel && requestedModel !== defaultModel) {
     const modelBlock = await gateFeature(session.user.id, "choice-of-llms");
     if (modelBlock) return modelBlock;

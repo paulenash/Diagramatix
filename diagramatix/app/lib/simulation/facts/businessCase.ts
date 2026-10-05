@@ -29,7 +29,7 @@
  * Pure — no DB, no React. The AI narrates these figures and cannot add to them.
  */
 import { makeAiClient } from "@/app/lib/ai/anthropicClient";
-import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
+import { resolveOrgModel } from "@/app/lib/ai/orgModels";
 import type { Redactor } from "@/app/lib/ai/redaction";
 import type { RunMetrics } from "../results";
 import { SECONDS_PER_UNIT, type ClockUnit } from "../types";
@@ -353,7 +353,7 @@ export async function generateBusinessCaseNarrative(
   args: { apiKey: string; facts: BusinessCaseFacts },
   redactor?: Redactor,
 ): Promise<BusinessCaseAiResult> {
-  const model = await getAiGenerateModel();
+  const model = await resolveOrgModel();
   const client = makeAiClient(model, args.apiKey);
   const payload = JSON.stringify(args.facts, null, 2);
   try {

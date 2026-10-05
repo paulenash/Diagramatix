@@ -24,7 +24,7 @@ import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 import { gateFeature, gateLimit, recordUsage } from "@/app/lib/subscription-route";
 import { orgPolicyAllows } from "@/app/lib/auth/orgPolicy";
-import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
+import { resolveOrgModel } from "@/app/lib/ai/orgModels";
 import { aiApiKey, makeAiClient, cappedMaxTokens } from "@/app/lib/ai/anthropicClient";
 import { enterAiContext, AI_INVOCATION_POINTS } from "@/app/lib/ai/aiTelemetry";
 import { findActions, narrationFacts } from "@/app/lib/mining/nextSteps";
@@ -75,7 +75,7 @@ export async function POST(_req: Request, { params }: Params) {
     return NextResponse.json({ ...result, narration: null, deterministic: true });
   }
 
-  const model = await getAiGenerateModel();
+  const model = await resolveOrgModel();
   const apiKey = aiApiKey(model);
   const aiOn = (await orgPolicyAllows(session, "allowAi")) && !!apiKey;
   if (!aiOn) return NextResponse.json({ ...result, narration: null, deterministic: true });

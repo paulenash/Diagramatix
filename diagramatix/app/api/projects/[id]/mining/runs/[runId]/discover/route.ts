@@ -17,7 +17,7 @@ import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 import { gateFeature, gateLimit, recordUsage } from "@/app/lib/subscription-route";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
-import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
+import { resolveOrgModel } from "@/app/lib/ai/orgModels";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { enterAiContext, AI_INVOCATION_POINTS, recordDiagramGenerated } from "@/app/lib/ai/aiTelemetry";
 import { discoverProcess } from "@/app/lib/mining/discoverProcess";
@@ -100,7 +100,7 @@ export async function POST(req: Request, { params }: Params) {
   if (useAi) {
     const _pol = await gateOrgPolicy(session, "allowAi");
     if (_pol) return _pol;
-    const model = await getAiGenerateModel();
+    const model = await resolveOrgModel();
     const apiKey = aiApiKey(model);
     if (!apiKey) return NextResponse.json({ error: "AI is not configured for the selected model. An administrator can add a key for this provider, or you can add your own under Account Settings → Your own AI keys." }, { status: 503 });
     if (userId) { const block = await gateLimit(userId, "aiAttempts"); if (block) return block; }

@@ -12,7 +12,7 @@ import { prisma } from "@/app/lib/db";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 import { orgPolicyAllows, orgRedactionEnabled } from "@/app/lib/auth/orgPolicy";
 import { makeRedactor } from "@/app/lib/ai/redaction";
-import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
+import { resolveOrgModel } from "@/app/lib/ai/orgModels";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { enterAiContext, AI_INVOCATION_POINTS } from "@/app/lib/ai/aiTelemetry";
 import type { RunMetrics } from "@/app/lib/simulation/results";
@@ -86,7 +86,7 @@ export async function POST(req: Request, { params }: Params) {
   // Branch: AI narrates only when the org allows AI AND a key is configured.
   // Otherwise fall back to the deterministic templated comparison (ENT-05) — a 200,
   // not a 403 — so strict/AI-off tenants still get a Comparison summary.
-  const model = await getAiGenerateModel();
+  const model = await resolveOrgModel();
   const apiKey = aiApiKey(model);
   // The narration is an AI call, so it counts against the AI attempts limit. At the limit it falls back to
   // the deterministic summary (a 200, like AI-off) rather than failing the whole request.

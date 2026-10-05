@@ -38,7 +38,7 @@ describe("a user's own key unlocks that provider's models", () => {
     expect(allModels(OR).some((m) => m.provider === "openrouter")).toBe(true);
   });
 
-  it("T4214 — a model only the user's key unlocks survives chooseModel instead of being swapped", () => {
+  it("T4214 — a model only the user's key unlocks is NOT chosen by an ordinary user (2026-10-05: users do not choose; the key changes who pays, not what runs)", () => {
     delete process.env.OPENROUTER_API_KEY;
     const unlockedId = openrouterModels(OR)[0].id;
 
@@ -46,8 +46,9 @@ describe("a user's own key unlocks that provider's models", () => {
     // test exists for. Note it does NOT throw or 403: it succeeds, wrongly.
     expect(chooseModel(unlockedId, "claude-opus-5", false)).toBe("claude-opus-5");
 
-    // With it, the caller gets the model they asked for.
-    expect(chooseModel(unlockedId, "claude-opus-5", false, OR)).toBe(unlockedId);
+    // …and with the key unlocked, an ordinary user still gets their Org's model. Only a SuperAdmin chooses.
+    expect(chooseModel(unlockedId, "claude-opus-5", false, OR)).toBe("claude-opus-5");
+    expect(chooseModel(unlockedId, "claude-opus-5", true, OR)).toBe(unlockedId);
   });
 
   it("T4215 — the unlock widens the list without widening it for anybody else", () => {

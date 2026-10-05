@@ -98,7 +98,7 @@ describe("T4563 — the command model is small, and overridable", () => {
 
   it("is what the route asks for — not the generation model", () => {
     const route = read("app", "api", "ai", "command", "route.ts");
-    expect(route).toContain("getAiCommandModel()");
+    expect(route).toContain('resolveOrgModel({ purpose: "command" })');       // the Org's command model; a SuperAdmin's is the global one (orgModels.ts)
     expect(route, "the generation default must not leak back in").not.toContain("getAiGenerateModel");
   });
 

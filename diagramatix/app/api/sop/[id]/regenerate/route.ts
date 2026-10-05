@@ -12,7 +12,7 @@ import { prisma } from "@/app/lib/db";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 import { blockReadOnlyImpersonation } from "@/app/lib/routeGuard";
 import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
-import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
+import { resolveOrgModel } from "@/app/lib/ai/orgModels";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { resolveAiRouteContext } from "@/app/lib/ai/aiTelemetryRoute";
 import { AI_INVOCATION_POINTS, enterAiContext } from "@/app/lib/ai/aiTelemetry";
@@ -46,7 +46,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   const _pol = await gateOrgPolicy(session, "allowAi");
   if (_pol) return _pol;
   enterAiContext(await resolveAiRouteContext(session, AI_INVOCATION_POINTS.GenerateSop));
-  const model = await getAiGenerateModel();
+  const model = await resolveOrgModel();
   const apiKey = aiApiKey(model);
   if (!apiKey) return NextResponse.json({ error: "AI not configured for the selected model." }, { status: 503 });
   const featBlock = await gateFeature(session.user.id, "sop-generation");

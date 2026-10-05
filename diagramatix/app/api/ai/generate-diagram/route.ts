@@ -13,7 +13,7 @@ import { gateFeature, gateLimit, gateElementCount, recordUsage } from "@/app/lib
 import { buildGenericSystemPrompt } from "@/app/lib/ai/generateDiagramPrompt";
 import { extractBalancedJson, repairJsonCommas, closeTruncatedJson } from "@/app/lib/ai/planBpmn";
 import { groundRulesWithPcf } from "@/app/lib/pcf/promptGrounding";
-import { resolveGenerateModel } from "@/app/lib/ai/aiModelSetting";
+import { resolveOrgModel } from "@/app/lib/ai/orgModels";
 import { chooseModel } from "@/app/lib/ai/modelAccess";
 import { isSuperuser } from "@/app/lib/superuser";
 
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
   // Provider-aware + vision-aware: image input uses the Vision-model override when
   // set; the selected model then decides the key/endpoint (Claude vs Kimi). A caller
   // may override with a cost-gated model (SuperAdmin → any); disallowed → default.
-  const defaultModel = await resolveGenerateModel(attachment?.type === "image");
+  const defaultModel = await resolveOrgModel({ hasImage: attachment?.type === "image" });
   if (requestedModel && requestedModel !== defaultModel) {
     const modelBlock = await gateFeature(session.user.id, "choice-of-llms");
     if (modelBlock) return modelBlock;

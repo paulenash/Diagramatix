@@ -99,7 +99,7 @@ Prod SQL needed: documentation text only. **No schema change** with the AppSetti
 8. **Starting lists:** Default = all Anthropic; Vision = all Anthropic with vision; Command = all Anthropic (Haiku 4.5 remains the shipped choice).
 9. **Existing Orgs on day one:** all Anthropic offered; chosen = today's global setting, so nothing changes on the day it ships.
 
-Status: planned, not built. Build order: the role merge first (the other plan's slice 1), then this plan's slices 1–6.
+Status: **slice 1 built** (2026-10-05) — `app/lib/ai/orgModels.ts` (per-Org offered / chosen storage as AppSetting rows, `pickModelInForce`, `resolveOrgModel`), 27 call sites moved onto the one resolver, `chooseModel` ignores a user's request, `/api/ai/models` returns the one model in force for a user; ratchet T5255. The OrgAdmin role plan is complete. **Slices 2–6 remain** (SuperAdmin per-Org list editor, OrgAdmin tile, remove the user pickers, hide model names, docs + SQL).
 
 ## 5. Risks
 

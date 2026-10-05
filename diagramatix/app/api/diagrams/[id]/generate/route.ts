@@ -33,7 +33,7 @@ import { requireDiagramAccess, OrgContextError } from "@/app/lib/auth/orgContext
 import { blockReadOnlyImpersonation } from "@/app/lib/routeGuard";
 import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
 import { getEffectiveUserId } from "@/app/lib/superuser";
-import { resolveGenerateModel } from "@/app/lib/ai/aiModelSetting";
+import { resolveOrgModel } from "@/app/lib/ai/orgModels";
 import { modelVision } from "@/app/lib/ai/models";
 import { correctionAdded, isWhiteboardPhotoPrompt } from "@/app/lib/ai/promptPreambles";
 import { correctionRefusalText, correctionSource, type CorrectionSource } from "@/app/lib/mobile/correction";
@@ -178,7 +178,7 @@ export async function POST(req: Request, { params }: Params) {
 
   // The default model, as the partner API uses: no picker on the phone. A photo
   // uses the vision model when one is set, as the consoles do.
-  const model = await resolveGenerateModel(!!photo);
+  const model = await resolveOrgModel({ hasImage: !!photo });
   if (photo && modelVision(model) === false) {
     return NextResponse.json({ error: "Photos need an AI model that can read images. An administrator can set one under AI Model → Vision model." }, { status: 503 });
   }

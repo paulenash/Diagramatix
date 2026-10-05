@@ -8,7 +8,7 @@
  * Keep the Anthropic-facing logic here so the API route stays thin.
  */
 import { makeAiClient } from "@/app/lib/ai/anthropicClient";
-import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
+import { resolveOrgModel } from "@/app/lib/ai/orgModels";
 import type { Redactor } from "@/app/lib/ai/redaction";
 
 // Model is resolved centrally via getAiGenerateModel() (the admin AI-model
@@ -98,7 +98,7 @@ export async function generateStaffNarrative(args: {
     return { ok: false, status: 400, error: "Technical description is empty" };
   }
   const systemPrompt = briefing.trim() || DEFAULT_STAFF_NARRATIVE_BRIEFING;
-  const model = await getAiGenerateModel();
+  const model = await resolveOrgModel();
   const client = makeAiClient(model, apiKey);
   try {
     // ENT-06: pseudonymise the named people/teams/systems in the technical

@@ -10,7 +10,7 @@
  * Anthropic-facing logic here so the route stays thin.
  */
 import { makeAiClient } from "@/app/lib/ai/anthropicClient";
-import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
+import { resolveOrgModel } from "@/app/lib/ai/orgModels";
 import type { SopSkeleton } from "@/app/lib/sop/skeleton";
 import type { SopTemplateSpec } from "@/app/lib/sop/defaultTemplate";
 
@@ -76,7 +76,7 @@ export async function generateSop(args: {
   briefing: string;
 }): Promise<GenerateSopResult> {
   const { apiKey, skeleton, briefing } = args;
-  const model = await getAiGenerateModel();
+  const model = await resolveOrgModel();
   const client = makeAiClient(model, apiKey);
   try {
     const message = await client.messages.create({
