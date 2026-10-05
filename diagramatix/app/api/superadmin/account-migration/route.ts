@@ -4,6 +4,7 @@ import { prisma } from "@/app/lib/db";
 import { isSuperuser } from "@/app/lib/superuser";
 import { blockReadOnlyImpersonation } from "@/app/lib/routeGuard";
 import { recordAudit, auditActor } from "@/app/lib/audit";
+import { ensureSuperAdminOrg } from "@/app/lib/superAdminOrg";
 import { countReferences, describeCounts, migrationSettingKey, moveReferences, oldAddressFor } from "@/app/lib/superAdminMigration";
 
 /**
@@ -47,7 +48,17 @@ export async function POST(req: Request) {
   if ("error" in ctx) return ctx.error;
   const blocked = await blockReadOnlyImpersonation(ctx.session);
   if (blocked) return blocked;
-  const body = (await req.json().catch(() => ({}))) as { confirm?: boolean };
+  const body = (await req.json().catch(() => ({}))) as { confirm?: boolean; action?: string };
+  // Not a confirmation: Paul's standing instruction (2026-10-05) is that Paul's org is "Diagramatix" and Greg's "GetAI Org", with
+  // each of them as its administrator. Idempotent, so it is simply made true on sign-in.
+  if (body.action === "ensure-org") {
+    const mine = await prisma.user.findUnique({ where: { id: ctx.me.id }, select: { id: true, email: true, name: true } });
+    const org = mine ? await ensureSuperAdminOrg(mine) : null;
+    if (org && org.changes.length) {
+      await recordAudit({ ...auditActor(ctx.session, req), action: "superadmin.org-setup", targetType: "org", targetId: org.orgId, meta: { changes: org.changes } });
+    }
+    return NextResponse.json({ ok: true, org });
+  }
   if (body.confirm !== true) return NextResponse.json({ error: "Confirmation required" }, { status: 400 });
 
   const key = migrationSettingKey(ctx.me.id);

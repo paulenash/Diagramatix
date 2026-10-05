@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 interface Status {
   eligible: boolean;
@@ -11,6 +12,7 @@ interface Status {
   pending?: boolean;
   summary?: string;
 }
+interface OrgInfo { orgName: string; orgId: string | null; role: string | null; changes: string[] }
 
 const SEEN_KEY = "dgx.superadminWelcome.seen";
 
@@ -25,6 +27,8 @@ export function SuperAdminWelcome() {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
+  const [org, setOrg] = useState<OrgInfo | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     let alive = true;
@@ -35,6 +39,14 @@ export function SuperAdminWelcome() {
         const s = (await r.json()) as Status;
         if (!alive || !s.eligible) return;
         setStatus(s);
+        // Make the organisation right (Paul: "Diagramatix"; Greg: "GetAI Org"; each its administrator) — idempotent.
+        try {
+          const o = await fetch("/api/superadmin/account-migration", {
+            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "ensure-org" }),
+          });
+          const oj = (await o.json().catch(() => ({}))) as { org?: OrgInfo | null };
+          if (alive && oj.org) { setOrg(oj.org); if (oj.org.changes.some((c) => !c.endsWith("was not found"))) router.refresh(); }
+        } catch { /* a courtesy */ }
         let seen = false;
         try { seen = sessionStorage.getItem(SEEN_KEY) === "1"; } catch { /* private window: show it */ }
         if (!seen || s.pending) setOpen(true);
@@ -91,6 +103,12 @@ export function SuperAdminWelcome() {
         {result && (
           <p className={`text-sm mb-4 ${result.ok ? "text-green-700" : "text-red-600"}`} role="status">{result.text}</p>
         )}
+        {org && org.orgId && (
+          <p className="text-sm text-gray-600 mb-3" data-testid="superadmin-org">
+            Your organisation is <b>{org.orgName}</b>, and you are its {org.role === "Owner" ? "Owner and administrator" : "administrator"}.
+          </p>
+        )}
+        {org && !org.orgId && <p className="text-sm text-amber-700 mb-3">{org.changes[0]}.</p>}
         {!status.pending && !result && <p className="text-sm text-gray-600 mb-4">Everything is in place on this account.</p>}
         <div className="flex justify-end gap-2">
           {status.pending && !result?.ok ? (
