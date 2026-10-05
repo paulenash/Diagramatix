@@ -1319,6 +1319,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
 
         const res = await fetch(`/api/projects/${id}`, { method: "DELETE" });
         if (!res.ok) {
+          if (await showGateNotice(res)) return;      // an OrgAdmin deletes nothing: say who can (deleteRules.ts)
           const txt = await res.text().catch(() => "");
           setConfirmDialog({
             title: "Delete failed",

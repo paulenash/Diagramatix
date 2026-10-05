@@ -1,5 +1,6 @@
 "use client";
 
+import { showGateNotice } from "@/app/lib/subscription/gateNotice";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { usePcfLevelColors } from "@/app/lib/pcf/usePcfLevelColors";
@@ -63,7 +64,8 @@ export function PcfBuilder({ orgId, frameworkId, frameworks, onChanged }: {
     await load(); onChanged();
   }
   async function deleteNode(nodeId: string) {
-    await fetch(`${base}/nodes/${nodeId}`, { method: "DELETE" });
+    const r = await fetch(`${base}/nodes/${nodeId}`, { method: "DELETE" });
+    if (await showGateNotice(r)) return;      // an OrgAdmin deletes nothing: say who can (deleteRules.ts)
     await load(); onChanged();
   }
 

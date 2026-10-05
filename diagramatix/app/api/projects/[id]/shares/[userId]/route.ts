@@ -1,3 +1,4 @@
+import { orgAdminCannotDelete } from "@/app/lib/auth/deleteRules";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -66,6 +67,7 @@ export async function PUT(req: Request, { params }: Params) {
  * Owner-only. Idempotent — 200 even if the share was already gone.
  */
 export async function DELETE(_req: Request, { params }: Params) {
+  { const denied = await orgAdminCannotDelete({ projectId: (await params).id }); if (denied) return denied; }
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 

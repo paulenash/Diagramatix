@@ -1,3 +1,4 @@
+import { superAdminOnlyDelete } from "@/app/lib/auth/deleteRules";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -49,6 +50,7 @@ export async function PATCH(req: Request, { params }: Params) {
  * Remove a node and its descendants (parentId cascade). SuperAdmin OR Owner/Admin.
  */
 export async function DELETE(_req: Request, { params }: Params) {
+  { const denied = await superAdminOnlyDelete(); if (denied) return denied; }
   const session = await auth();
   const { id, frameworkId, nodeId } = await params;
   try {

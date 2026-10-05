@@ -1,3 +1,4 @@
+import { superAdminOnlyDelete } from "@/app/lib/auth/deleteRules";
 import { guardOrg } from "@/app/lib/riskControls/routeAuth";
 import { hLink, hUnlink } from "@/app/lib/riskControls/handlers";
 
@@ -12,6 +13,7 @@ export async function POST(req: Request, { params }: Params) {
 
 /** DELETE { controlId, riskId } — remove a mitigation link. */
 export async function DELETE(req: Request, { params }: Params) {
+  { const denied = await superAdminOnlyDelete(); if (denied) return denied; }
   const { id, libraryId } = await params;
   const g = await guardOrg(id, true); if (g.error) return g.error;
   return hUnlink(libraryId, { orgId: id }, await req.json().catch(() => ({})));

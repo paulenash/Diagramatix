@@ -1,3 +1,4 @@
+import { orgAdminCannotDelete } from "@/app/lib/auth/deleteRules";
 import { guardProject } from "@/app/lib/riskControls/routeAuth";
 import { hUpdateItem, hDeleteItem } from "@/app/lib/riskControls/handlers";
 
@@ -12,6 +13,7 @@ export async function PUT(req: Request, { params }: Params) {
 
 /** DELETE — remove an item (owner). */
 export async function DELETE(_req: Request, { params }: Params) {
+  { const denied = await orgAdminCannotDelete({ projectId: (await params).id }); if (denied) return denied; }
   const { id, libraryId, itemId } = await params;
   const g = await guardProject(id, "owner", true); if (g.error) return g.error;
   return hDeleteItem(libraryId, itemId, { projectId: id });

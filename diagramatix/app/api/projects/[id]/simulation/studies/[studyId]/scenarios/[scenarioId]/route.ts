@@ -1,3 +1,4 @@
+import { orgAdminCannotDelete } from "@/app/lib/auth/deleteRules";
 import { NextResponse } from "next/server";
 import { gateFeature } from "@/app/lib/subscription-route";
 import { cookies } from "next/headers";
@@ -71,6 +72,7 @@ export async function PUT(req: Request, { params }: Params) {
 
 /** DELETE — remove a scenario (cascades to its runs). */
 export async function DELETE(_req: Request, { params }: Params) {
+  { const denied = await orgAdminCannotDelete({ projectId: (await params).id }); if (denied) return denied; }
   const session = await auth();
   if (isReadOnlyImpersonation(session, await cookies())) {
     return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });

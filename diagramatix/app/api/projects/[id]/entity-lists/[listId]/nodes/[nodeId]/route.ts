@@ -1,3 +1,4 @@
+import { orgAdminCannotDelete } from "@/app/lib/auth/deleteRules";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -43,6 +44,7 @@ export async function PUT(req: Request, { params }: Params) {
 
 /** DELETE — remove a node (cascades children). Edit access. */
 export async function DELETE(_req: Request, { params }: Params) {
+  { const denied = await orgAdminCannotDelete({ projectId: (await params).id }); if (denied) return denied; }
   const { id, listId, nodeId } = await params;
   try {
     await editGate(id, listId);

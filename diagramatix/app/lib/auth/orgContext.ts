@@ -223,6 +223,8 @@ export interface ProjectAccess {
   projectOrgId: string;
   /** UserId of the project owner (i.e. Project.userId). */
   ownerUserId: string;
+  /** True when this caller is an implicit owner only because they are an OrgAdmin of the project's Org (not the owner, not a SuperAdmin) — they may not DELETE it. */
+  viaOrgAdmin?: boolean;
 }
 
 /** Numeric rank so we can compare role tiers. Higher = more privileged. */
@@ -252,10 +254,18 @@ const PROJECT_ROLE_RANK: Record<ProjectAccessRole, number> = {
  * Returns `true` if either path applies. The two probe queries run in
  * parallel so this adds at most one round-trip to the access check.
  */
-async function isAdminElevatedForOrg(
+async function isAdminElevatedForOrg(userId: string, projectOrgId: string): Promise<boolean> {
+  return (await adminElevationFor(userId, projectOrgId)) !== null;
+}
+
+/**
+ * WHICH path elevated the caller. The difference matters for deleting (Paul, 2026-10-05: "OrgAdmins delete nothing"): an OrgAdmin
+ * is an implicit owner for everything EXCEPT deleting it — see auth/deleteRules.ts — while a SuperAdmin keeps every power.
+ */
+export async function adminElevationFor(
   userId: string,
   projectOrgId: string,
-): Promise<boolean> {
+): Promise<"superadmin" | "orgadmin" | null> {
   const [user, member] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
@@ -266,9 +276,9 @@ async function isAdminElevatedForOrg(
       select: { id: true },
     }),
   ]);
-  if (user && SUPERUSER_EMAILS.has(user.email)) return true;
-  if (member) return true;
-  return false;
+  if (user && SUPERUSER_EMAILS.has(user.email)) return "superadmin";
+  if (member) return "orgadmin";
+  return null;
 }
 
 /**
@@ -311,8 +321,9 @@ export async function getProjectAccess(
   // so they don't appear in any share list. Checked before share-row
   // resolution so an OrgAdmin who's also a VIEW share recipient is
   // still treated as an owner.
-  if (await isAdminElevatedForOrg(userId, project.orgId)) {
-    return { role: "owner", projectOrgId: project.orgId, ownerUserId: project.userId };
+  const elevation = await adminElevationFor(userId, project.orgId);
+  if (elevation) {
+    return { role: "owner", projectOrgId: project.orgId, ownerUserId: project.userId, viaOrgAdmin: elevation === "orgadmin" };
   }
 
   // Non-owner, non-elevated — must have a ProjectShare row.
@@ -400,6 +411,8 @@ export interface DiagramAccess {
    * project owner read it from here.
    */
   projectAccess: ProjectAccess | null;
+  /** True when the caller is an implicit owner only as an OrgAdmin (orphan-diagram path; the project path carries it on projectAccess). */
+  viaOrgAdmin?: boolean;
   /**
    * For `business-user` role: the active bundle whose audience grant
    * resolved this access. Useful for the viewer's "back to bundle"
@@ -432,7 +445,7 @@ export async function getDiagramAccess(
   if (diagram.projectId) {
     const projectAccess = await getProjectAccess(userId, diagram.projectId);
     if (projectAccess) {
-      return { diagram, role: projectAccess.role, projectAccess };
+      return { diagram, role: projectAccess.role, projectAccess, viaOrgAdmin: projectAccess.viaOrgAdmin };
     }
     // Project path denied — fall through to the bundle-audience check
     // before giving up. A business user who isn't a project sharee can
@@ -449,8 +462,9 @@ export async function getDiagramAccess(
     // Without this an OrgAdmin trying to support a user's pre-Slice-1
     // orphan diagram would be denied even though they have full project-
     // path access to everything else in the Org.
-    if (await isAdminElevatedForOrg(userId, diagram.orgId)) {
-      return { diagram, role: "owner", projectAccess: null };
+    const elevation = await adminElevationFor(userId, diagram.orgId);
+    if (elevation) {
+      return { diagram, role: "owner", projectAccess: null, viaOrgAdmin: elevation === "orgadmin" };
     }
   }
 

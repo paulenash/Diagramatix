@@ -1,3 +1,4 @@
+import { superAdminOnlyDelete } from "@/app/lib/auth/deleteRules";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -30,6 +31,7 @@ export async function PUT(req: Request, { params }: Params) {
 
 /** DELETE — remove a structure and its lists/nodes (cascade). */
 export async function DELETE(_req: Request, { params }: Params) {
+  { const denied = await superAdminOnlyDelete(); if (denied) return denied; }
   const { id, structureId } = await params;
   try { await guardMut(id); }
   catch (err) { if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status }); throw err; }

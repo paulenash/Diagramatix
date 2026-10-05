@@ -1,5 +1,6 @@
 "use client";
 
+import { showGateNotice } from "@/app/lib/subscription/gateNotice";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PcfBuilder } from "./PcfBuilder";
@@ -105,7 +106,8 @@ export function PcfClient({
 
   async function deleteFramework() {
     setConfirmDeleteFw(false);
-    await fetch(`/api/orgs/${orgId}/pcf/${selectedId}`, { method: "DELETE" });
+    const r = await fetch(`/api/orgs/${orgId}/pcf/${selectedId}`, { method: "DELETE" });
+    if (await showGateNotice(r)) return;      // an OrgAdmin deletes nothing: say who can (deleteRules.ts)
     setSelectedId("");
     await loadFrameworks();
   }

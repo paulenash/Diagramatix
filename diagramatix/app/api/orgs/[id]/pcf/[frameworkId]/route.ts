@@ -1,3 +1,4 @@
+import { superAdminOnlyDelete } from "@/app/lib/auth/deleteRules";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -98,6 +99,7 @@ export async function PATCH(req: Request, { params }: Params) {
  * cannot be deleted here. SuperAdmin OR Owner/Admin.
  */
 export async function DELETE(_req: Request, { params }: Params) {
+  { const denied = await superAdminOnlyDelete(); if (denied) return denied; }
   const session = await auth();
   const { id, frameworkId } = await params;
   try {

@@ -1,3 +1,4 @@
+import { superAdminOnlyDelete } from "@/app/lib/auth/deleteRules";
 import { guardOrg } from "@/app/lib/riskControls/routeAuth";
 import { hUpdateItem, hDeleteItem } from "@/app/lib/riskControls/handlers";
 
@@ -12,6 +13,7 @@ export async function PUT(req: Request, { params }: Params) {
 
 /** DELETE — remove an item (cascades its mitigation links). */
 export async function DELETE(_req: Request, { params }: Params) {
+  { const denied = await superAdminOnlyDelete(); if (denied) return denied; }
   const { id, libraryId, itemId } = await params;
   const g = await guardOrg(id, true); if (g.error) return g.error;
   return hDeleteItem(libraryId, itemId, { orgId: id });

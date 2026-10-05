@@ -3,6 +3,7 @@
  * DELETE /api/sop-templates/:id
  * Access follows the template's scope (project-edit or OrgAdmin).
  */
+import { orgAdminCannotDelete, superAdminOnlyDelete } from "@/app/lib/auth/deleteRules";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -50,6 +51,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   const { id } = await params;
   const g = await guard(id);
   if (g.error) return g.error;
+  { const denied = g.tpl?.projectId ? await orgAdminCannotDelete({ projectId: g.tpl.projectId }) : await superAdminOnlyDelete(); if (denied) return denied; }
   await prisma.sopTemplate.delete({ where: { id } });
   return NextResponse.json({ ok: true });
 }

@@ -1,3 +1,4 @@
+import { superAdminOnlyDelete } from "@/app/lib/auth/deleteRules";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -33,6 +34,7 @@ export async function PUT(req: Request, { params }: Params) {
 
 /** DELETE /api/orgs/[id]/entity-lists/[listId] — delete the list (cascades nodes). */
 export async function DELETE(_req: Request, { params }: Params) {
+  { const denied = await superAdminOnlyDelete(); if (denied) return denied; }
   const { id, listId } = await params;
   try { await gate(id); } catch (err) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });

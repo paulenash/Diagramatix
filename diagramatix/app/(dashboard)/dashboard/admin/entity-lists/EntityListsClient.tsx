@@ -1,5 +1,6 @@
 "use client";
 
+import { showGateNotice } from "@/app/lib/subscription/gateNotice";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -60,7 +61,8 @@ export function EntityListsClient({
     setRenaming(false);
   }
   async function deleteStructure(s: EntityStructureDTO) {
-    await fetch(`${structPath}/${s.id}`, { method: "DELETE" });
+    const r = await fetch(`${structPath}/${s.id}`, { method: "DELETE" });
+    if (await showGateNotice(r)) return;      // an OrgAdmin deletes nothing: say who can (deleteRules.ts)
     await refresh();
   }
 

@@ -5,6 +5,7 @@
  *   DELETE /api/sop/:id
  * Access is the SOP's project access (view for GET, edit for PUT/DELETE).
  */
+import { orgAdminCannotDelete } from "@/app/lib/auth/deleteRules";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -133,6 +134,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   const { id } = await params;
   const g = await guard(id, "edit");
   if (g.error) return g.error;
+  { const pid = await loadProjectId(id); const denied = pid ? await orgAdminCannotDelete({ projectId: pid }) : null; if (denied) return denied; }
   await prisma.sopDocument.delete({ where: { id } });
   return NextResponse.json({ ok: true });
 }

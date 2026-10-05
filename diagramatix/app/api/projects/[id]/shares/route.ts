@@ -1,3 +1,4 @@
+import { orgAdminCannotDelete } from "@/app/lib/auth/deleteRules";
 import { NextResponse } from "next/server";
 import { gateFeature } from "@/app/lib/subscription-route";
 import { cookies } from "next/headers";
@@ -56,6 +57,7 @@ export async function GET(_req: Request, { params }: Params) {
  * parallel deletes.
  */
 export async function DELETE(_req: Request, { params }: Params) {
+  { const denied = await orgAdminCannotDelete({ projectId: (await params).id }); if (denied) return denied; }
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 

@@ -63,4 +63,4 @@ Then the **AI Model Selection Changes** plan builds on this (its Q1 is answered:
 3. **Org library deletes:** no delete button for an OrgAdmin; a visible line "ask your SuperAdmin to remove this". Create, edit and rename stay.
 4. **A user deleting their own shared project:** unchanged — owner-only, and it goes to the archive.
 
-Status: planned, not built. Next step is slice 1 (the role merge).
+Status: **slice 1 (role merge) built and pushed 39fe3d9d; slice 2 (delete lockdown) built** — the server refuses (`app/lib/auth/deleteRules.ts`, ratchet T5253) and the pages show a notice "Only a SuperAdmin can delete this" instead of hiding the buttons. Slices 3–4 remain.

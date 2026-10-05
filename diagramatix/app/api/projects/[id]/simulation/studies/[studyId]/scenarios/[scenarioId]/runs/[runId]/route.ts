@@ -6,6 +6,7 @@
  *  DELETE — remove a saved run from the history.
  * Both require edit access and verify the run → scenario → study → project chain.
  */
+import { orgAdminCannotDelete } from "@/app/lib/auth/deleteRules";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -83,6 +84,7 @@ export async function PATCH(req: Request, { params }: Params) {
 }
 
 export async function DELETE(_req: Request, { params }: Params) {
+  { const denied = await orgAdminCannotDelete({ projectId: (await params).id }); if (denied) return denied; }
   const { id, studyId, scenarioId, runId } = await params;
   const g = await guard(id);
   if (g.error) return g.error;

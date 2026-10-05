@@ -1,3 +1,4 @@
+import { superAdminOnlyDelete } from "@/app/lib/auth/deleteRules";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -41,6 +42,7 @@ export async function PUT(req: Request, { params }: Params) {
 
 /** DELETE /api/orgs/[id]/entity-lists/[listId]/nodes/[nodeId] — cascades children. */
 export async function DELETE(_req: Request, { params }: Params) {
+  { const denied = await superAdminOnlyDelete(); if (denied) return denied; }
   const { id, listId, nodeId } = await params;
   try {
     await gate(id, listId);

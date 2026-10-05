@@ -5,6 +5,7 @@
  * DELETE — remove a run (the discovered diagrams are ordinary diagrams and are
  *          left intact).
  */
+import { orgAdminCannotDelete } from "@/app/lib/auth/deleteRules";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -68,6 +69,7 @@ export async function PATCH(req: Request, { params }: Params) {
 }
 
 export async function DELETE(_req: Request, { params }: Params) {
+  { const denied = await orgAdminCannotDelete({ projectId: (await params).id }); if (denied) return denied; }
   const session = await auth();
   if (isReadOnlyImpersonation(session, await cookies())) {
     return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });

@@ -1,5 +1,6 @@
 "use client";
 
+import { showGateNotice } from "@/app/lib/subscription/gateNotice";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DiffRunViewer } from "./DiffRunViewer";
@@ -43,7 +44,7 @@ export function DiffRunsAdminClient({ scope }: { scope: "org" | "super" }) {
     setPendingDelete(null);
     const res = await fetch(`/api/diagrams/diff/runs/${id}`, { method: "DELETE" });
     if (res.ok) setRuns((prev) => prev.filter((r) => r.id !== id));
-    else setErr("Delete failed");
+    else if (!(await showGateNotice(res))) setErr("Delete failed");
   }
 
   const userLabel = (r: AdminRun) => r.userName || r.userEmail || "(unknown user)";

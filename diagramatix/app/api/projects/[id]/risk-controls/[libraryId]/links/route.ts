@@ -1,3 +1,4 @@
+import { orgAdminCannotDelete } from "@/app/lib/auth/deleteRules";
 import { guardProject } from "@/app/lib/riskControls/routeAuth";
 import { hLink, hUnlink } from "@/app/lib/riskControls/handlers";
 
@@ -12,6 +13,7 @@ export async function POST(req: Request, { params }: Params) {
 
 /** DELETE { controlId, riskId } — remove a mitigation link (owner). */
 export async function DELETE(req: Request, { params }: Params) {
+  { const denied = await orgAdminCannotDelete({ projectId: (await params).id }); if (denied) return denied; }
   const { id, libraryId } = await params;
   const g = await guardProject(id, "owner", true); if (g.error) return g.error;
   return hUnlink(libraryId, { projectId: id }, await req.json().catch(() => ({})));

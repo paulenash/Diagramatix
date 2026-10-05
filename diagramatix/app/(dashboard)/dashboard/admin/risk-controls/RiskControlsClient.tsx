@@ -1,5 +1,6 @@
 "use client";
 
+import { showGateNotice } from "@/app/lib/subscription/gateNotice";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { RiskControlEditor } from "@/app/components/riskControls/RiskControlEditor";
@@ -53,7 +54,7 @@ export function RiskControlsClient({
     await fetch(basePath, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
     setNewName(""); refresh();
   }
-  async function delLibrary(id: string) { await fetch(`${basePath}/${id}`, { method: "DELETE" }); refresh(); }
+  async function delLibrary(id: string) { const r = await fetch(`${basePath}/${id}`, { method: "DELETE" }); if (await showGateNotice(r)) return; refresh(); }
 
   return (
     <div className="max-w-5xl mx-auto p-6">

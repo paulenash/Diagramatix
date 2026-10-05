@@ -3,6 +3,7 @@
  * auto-refresh / rotate the ingest key) and DELETE. The live run is left intact
  * on delete (it becomes an ordinary run).
  */
+import { orgAdminCannotDelete } from "@/app/lib/auth/deleteRules";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -74,6 +75,7 @@ export async function PATCH(req: Request, { params }: Params) {
 }
 
 export async function DELETE(_req: Request, { params }: Params) {
+  { const denied = await orgAdminCannotDelete({ projectId: (await params).id }); if (denied) return denied; }
   const { id, sourceId } = await params;
   const g = await gate(id); if (g) return g;
   const source = await prisma.miningSource.findFirst({ where: { id: sourceId, projectId: id }, select: { id: true } });

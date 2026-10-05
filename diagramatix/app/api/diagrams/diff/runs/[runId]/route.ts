@@ -66,10 +66,8 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ runI
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const run = await prisma.processDiffRun.findUnique({ where: { id: runId }, select: { createdById: true, orgId: true } });
   if (!run) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  let allowed = run.createdById === session.user.id || isSuperuser(session);
-  if (!allowed && run.orgId) {
-    try { await requireOrgAdminFor(session, await cookies(), run.orgId); allowed = true; } catch { /* not an org admin */ }
-  }
+  // Only the person who ran it, or a SuperAdmin (an OrgAdmin deletes nothing — Paul, 2026-10-05).
+  const allowed = run.createdById === session.user.id || isSuperuser(session);
   if (!allowed) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   await prisma.processDiffRun.delete({ where: { id: runId } });
   return NextResponse.json({ ok: true });
