@@ -3387,11 +3387,11 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
         const role = deriveProjectRole(p);
         const isOwnerOfThis = role === "owner";
         // Tier visibility per Paul's 2026-06-08 spec:
-        //   x  : project Owner OR OrgAdmin OR SuperAdmin
-        //   x+ : OrgAdmin (any project in the Org)
+        //   x  : project Owner OR SuperAdmin
+        //   x+ : SuperAdmin, or the project Owner who is an OrgAdmin (an OrgAdmin deletes nothing of anyone else's — 2026-10-05)
         //   x++: SuperAdmin AND project Owner
-        const canSee_x      = isOwnerOfThis || isOrgAdmin || !!isSu;
-        const canSee_xPlus  = isOrgAdmin;
+        const canSee_x      = isOwnerOfThis || !!isSu;
+        const canSee_xPlus  = !!isSu || (isOrgAdmin && isOwnerOfThis);
         const canSee_xPlus2 = !!isSu && isOwnerOfThis;
         const close = () => setTileContextMenu(null);
         // Stop click from bubbling to the window-level close listener.

@@ -101,8 +101,8 @@ describe("authorizeProjectDelete — three-tier verdict (all combinations)", () 
   /** Reference oracle of the exact current rules. */
   function expected(mode: ProjectDeleteMode, o: boolean, s: boolean, a: boolean): boolean {
     if (mode === "hard") return s && o;
-    if (mode === "archive") return a;
-    return o || s || a; // unorganise
+    if (mode === "archive") return s || (a && o);
+    return o || s; // unorganise — an OrgAdmin who is not the owner deletes nothing (2026-10-05)
   }
 
   for (const mode of modes) {
