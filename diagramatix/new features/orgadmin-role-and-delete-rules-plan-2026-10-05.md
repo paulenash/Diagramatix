@@ -8,7 +8,8 @@ Written for: Paul (to review before anything is built). Nothing here is implemen
 2. An OrgAdmin has the **OrgAdmin screen**, where they can do all the settings implied by its tiles.
 3. **Only SuperAdmins can destructively restore, or delete, anything of an administrative kind.** Ordinary users still delete **their own** work (diagrams, projects, templates, comments) — confirmed: "administration only".
 4. An OrgAdmin **can** restore from an Org backup **non-destructively** (additive: it only ever adds). The full wipe-and-restore stays SuperAdmin-only.
-5. Billing: none is tied to the Owner role. Stripe checkout and portal belong to the individual user. The schema comment "Owner … billing and deletion" is stale and gets corrected.
+5. **Deleted diagrams go to an archive** (Paul, 2026-10-05). A user's own delete is therefore not destructive: it moves the diagram to the system archive project (`app/lib/archive.ts`), from where its owner can list and restore it (`GET/POST /api/diagrams/deleted`). **Purging** the archive, and restoring other people's archived diagrams, is SuperAdmin only (`/api/admin/archive`, already). The same archive-first rule is the model for any other delete we keep for users.
+6. Billing: none is tied to the Owner role. Stripe checkout and portal belong to the individual user. The schema comment "Owner … billing and deletion" is stale and gets corrected.
 
 ## 2. What the code does today (found by reading it)
 
@@ -29,7 +30,8 @@ Read from the `DELETE` handlers and their guards:
 | Project shares removed by an OrgAdmin | `projects/[id]/shares/**` | project owner / OrgAdmin | owner may remove their own shares; OrgAdmin may not remove others' |
 | Demote / remove an OrgAdmin | `orgs/[id]/admins/[userId]` | OrgAdmin (with a last-admin guard) | **decision needed (Q2)** |
 | A user deleting their OWN diagram / project / template / prompt / comment | `diagrams/[id]`, `projects/[id]`, `templates/[id]`, `prompts/[id]` … | the owner | unchanged |
-| Deleted-diagram recycle bin: restore | `diagrams/deleted` | the owner | unchanged (restoring only adds back) |
+| A user's deleted diagrams (archive) | `diagrams/deleted` | the owner lists and restores their own | unchanged — a restore only adds back; **purging** stays SuperAdmin-only (`admin/archive`) |
+| Does an OrgAdmin see or restore other members' archived diagrams? | `diagrams/deleted` (own only) | no | stays no; SuperAdmin only |
 | Org backup restore | `org-admin/backup` POST | OrgAdmin | unchanged — additive only |
 
 Mechanism: one helper, `requireSuperAdminToDelete(session)`, used by every OrgAdmin-reachable DELETE; plus a source-scan ratchet (like the mutating-route one) so a **new** DELETE route under `orgs/**` or `org-admin/**` that lets an OrgAdmin delete fails the build. The UI hides the delete buttons for OrgAdmins, and the server refuses regardless.
