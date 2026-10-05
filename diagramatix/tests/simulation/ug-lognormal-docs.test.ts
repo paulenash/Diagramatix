@@ -49,3 +49,27 @@ describe("T5260 the Lognormal documentation", () => {
     expect(sorted[xs.length - 1]).toBeGreaterThan(3 * mean);               // …and the occasional very long case
   });
 });
+
+describe("T5260 the anchor-free v2 patch (Paul, 2026-10-06: the first patch ran on prod and the section still had no Lognormal entry)", () => {
+  const v2 = readFileSync("scripts/sql/patch-ug-simulation-lognormal-v2-2026-10-06.sql", "utf8");
+  const v2code = v2.split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
+  it("finds the section by HEADING, not by phrases, and only changes one that has no Lognormal row", () => {
+    expect(v2code).toContain("s.heading ILIKE 'Choosing a distribution%'");
+    expect(v2code).toContain("AND s.\"bodyMarkdown\" NOT LIKE '%| **Lognormal** |%'");
+    expect((v2code.match(/^\s*UPDATE "HelpSection"/gm) ?? []).length).toBe(1);
+  });
+  it("carries exactly the seed script's text (one text, two places), with the row, the guidance and the Tasks bullet", () => {
+    const m = seed.match(/const MD = `([\s\S]*?)`;\r?\n/)!;
+    const md = m[1].replace(/\`/g, "`").replace(/\r\n/g, "\n");
+    expect(v2.replace(/\r\n/g, "\n")).toContain(md);
+    expect(md).toContain("| **Lognormal** |");
+    expect(md).toContain("**When to prefer Lognormal**");
+    expect(md).toContain("**Lognormal** when real work has a long tail of slow cases");
+  });
+  it("is safe: it shows what is there first, deletes nothing, reports after the commit — and says so when the section is not found", () => {
+    expect(v2.indexOf("SELECT s.id")).toBeLessThan(v2.indexOf("BEGIN;"));
+    expect(v2code).not.toMatch(/^\s*(DELETE\s+FROM|DROP\s+|TRUNCATE\s+)/im);
+    expect(v2code.indexOf("COMMIT;")).toBeLessThan(v2code.indexOf("SELECT\n  (SELECT"));
+    expect(v2).toContain("NOT FOUND — no User Guide section is titled");
+  });
+});
