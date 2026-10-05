@@ -8,6 +8,7 @@ Written for: Paul (to review before anything is built). Nothing here is implemen
 2. An OrgAdmin has the **OrgAdmin screen**, where they can do all the settings implied by its tiles.
 3. **Only SuperAdmins can destructively restore, or delete, anything of an administrative kind.** Ordinary users still delete **their own** work (diagrams, projects, templates, comments) — confirmed: "administration only".
 4. An OrgAdmin **can** restore from an Org backup **non-destructively** (additive: it only ever adds). The full wipe-and-restore stays SuperAdmin-only.
+4a. **Simple rule, no overrides: OrgAdmins delete nothing** (Paul, 2026-10-05). There is no per-Org switch to grant delete powers; SuperAdmin alone can delete, purge or destructively restore, and keeps doing so everywhere. An OrgAdmin has no function for seeing, restoring or purging other members' archived diagrams.
 5. **Deleted diagrams go to an archive** (Paul, 2026-10-05). A user's own delete is therefore not destructive: it moves the diagram to the system archive project (`app/lib/archive.ts`), from where its owner can list and restore it (`GET/POST /api/diagrams/deleted`). **Purging** the archive, and restoring other people's archived diagrams, is SuperAdmin only (`/api/admin/archive`, already). The same archive-first rule is the model for any other delete we keep for users.
 6. Billing: none is tied to the Owner role. Stripe checkout and portal belong to the individual user. The schema comment "Owner … billing and deletion" is stale and gets corrected.
 
