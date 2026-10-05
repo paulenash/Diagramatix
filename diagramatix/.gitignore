@@ -58,6 +58,7 @@ next-env.d.ts
 !/new features/voice-assist-plan-updated-2026-09-21.md
 !/new features/voice-assist-help-plan-2026-10-01.md
 !/new features/connector-endpoints-plan-2026-10-03.md
+!/new features/ai-model-selection-changes-plan-2026-10-05.md
 
 # The GETAI partner-API plan. The FOLDER has to be un-ignored before a file
 # inside it can be — git cannot re-include a file whose parent directory is
