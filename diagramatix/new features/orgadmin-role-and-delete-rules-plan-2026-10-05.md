@@ -56,9 +56,11 @@ Mechanism: one helper, `requireSuperAdminToDelete(session)`, used by every OrgAd
 
 Then the **AI Model Selection Changes** plan builds on this (its Q1 is answered: "OrgAdmin").
 
-## 6. Questions
+## 6. Decisions (all four questions answered, Paul, 2026-10-05 — every recommendation accepted)
 
-1. **Existing Owners** become OrgAdmin — any Org where that is wrong? *Recommend:* all of them, as you said.
-2. **Demoting / removing an OrgAdmin or a member** is not a deletion of data. May an OrgAdmin still do it (with the last-admin guard)? *Recommend:* yes — managing who can administer is administration, and nothing is destroyed.
-3. **Editing without deleting:** an OrgAdmin who wants to remove an Org library item (a risk control, an entity-list node) must ask a SuperAdmin. Acceptable? *Recommend:* yes, as you said; add a visible "ask your SuperAdmin to remove this" line instead of a delete button.
-4. **A user's own delete of a project that others share** — unchanged for now (owner only). OK?
+1. **Every existing Owner becomes OrgAdmin** (one idempotent SQL file).
+2. **An OrgAdmin may still demote or remove admins and members** — it destroys no data; the last-admin guard stays.
+3. **Org library deletes:** no delete button for an OrgAdmin; a visible line "ask your SuperAdmin to remove this". Create, edit and rename stay.
+4. **A user deleting their own shared project:** unchanged — owner-only, and it goes to the archive.
+
+Status: planned, not built. Next step is slice 1 (the role merge).

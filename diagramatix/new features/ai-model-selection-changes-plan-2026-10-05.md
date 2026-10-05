@@ -87,17 +87,19 @@ Hiding in the UI is not enough: the **server** must not echo model ids to non-pr
 
 Prod SQL needed: documentation text only. **No schema change** with the AppSetting design, so no deploy step beyond the push.
 
-## 4. Questions for you (each with my recommendation)
+## 4. Decisions (all answered, Paul, 2026-10-05 — every recommendation accepted)
 
-1. ~~Who counts as "OrgAdmin"?~~ **Answered (Paul, 2026-10-05):** there is one role, OrgAdmin (Owner and Admin are merged) — see `orgadmin-role-and-delete-rules-plan-2026-10-05.md`. Also decided there: OrgAdmins cannot delete anything; only SuperAdmin deletes or restores destructively.
-2. **What do other roles/members see?** Nothing about models at all — no tile, no picker, no names. *Recommend:* as stated.
-3. **Empty offered list:** treat as "use the global setting" (AI keeps working) rather than "AI off" — AI on/off stays on the existing `allowAi` switch. *Recommend:* yes.
-4. **Bring-your-own-key users** (a user can store their own Anthropic/other key): today that unlocks models for them. With "users cannot choose", should their key *pay* but the Org's model still *run*? *Recommend:* yes — the key only changes who is billed; nobody but SuperAdmin picks the model.
-5. **Stored model in diagrams / exports** (`aiGeneration.model`): keep the data (it is the audit trail and what "regenerate with the same model" needs), hide it on screen from plain users. Alternatively strip it on export. *Recommend:* keep stored, hide displayed, leave exports alone.
-6. **SuperAdmin acting as a lower level** (the "Acting as" modes you use for video): should the model pickers hide in those modes, as they would for a real customer? *Recommend:* yes — the same rule as the acting-as banner (it must look like the real thing).
-7. **Cost gate:** the "equal or cheaper" rule disappears for users (they cannot choose). Should OrgAdmin's pick also be limited by cost, or is "any model SuperAdmin put in my list" enough? *Recommend:* the list is the gate; no cost ceiling.
-8. **Default lists for the three purposes:** Default = all Anthropic; Vision = all Anthropic with vision; Command = all Anthropic (Haiku 4.5 stays the shipped choice). *Recommend:* yes, as you said "all Anthropic models that are available".
-9. **Existing Orgs today** (including yours and GetAI Org): start with all Anthropic offered and **chosen = whatever the global setting is now** (so nothing changes on the day this ships). *Recommend:* yes.
+1. **One role, OrgAdmin** (Owner and Admin merged) — see `orgadmin-role-and-delete-rules-plan-2026-10-05.md`. OrgAdmins delete nothing; only SuperAdmin deletes or restores destructively.
+2. **Members and other roles see nothing** about models: no tile, no picker, no names. Only OrgAdmin and SuperAdmin do.
+3. **An empty offered list** means "use the global setting" (AI keeps working; on/off stays on `allowAi`).
+4. **Bring-your-own-key users:** the key only changes who is billed; the Org's model runs; nobody but SuperAdmin picks.
+5. **Stored model** (`aiGeneration.model`): kept in diagrams and exports, hidden on screen from plain users.
+6. **SuperAdmin "Acting as" a lower level:** pickers and model names hide, exactly as for a real customer.
+7. **No cost ceiling:** the Org's list is the gate; OrgAdmin may pick any model in it.
+8. **Starting lists:** Default = all Anthropic; Vision = all Anthropic with vision; Command = all Anthropic (Haiku 4.5 remains the shipped choice).
+9. **Existing Orgs on day one:** all Anthropic offered; chosen = today's global setting, so nothing changes on the day it ships.
+
+Status: planned, not built. Build order: the role merge first (the other plan's slice 1), then this plan's slices 1–6.
 
 ## 5. Risks
 
