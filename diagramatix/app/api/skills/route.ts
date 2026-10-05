@@ -9,6 +9,7 @@
  * WRITE is OrgAdmin-only — the point of a master list is that it is governed, and
  * a list every user may extend at will is the free text it replaced.
  */
+import { superAdminOnlyDelete } from "@/app/lib/auth/deleteRules";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -109,6 +110,7 @@ export async function PATCH(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  { const denied = await superAdminOnlyDelete(); if (denied) return denied; }
   const c = await ctx(req);
   if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const blocked = await gateWrite(c);

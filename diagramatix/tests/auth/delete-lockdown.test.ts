@@ -84,6 +84,7 @@ describe("T5253 every OrgAdmin-reachable DELETE handler is guarded (a ratchet)",
   /** Reviewed: managing who administers is administration, not data deletion (Paul, 2026-10-05, Q2). */
   const EXEMPT: Record<string, string> = {
     "orgs/[id]/admins/[userId]/route.ts": "demotes an OrgAdmin to Normal — destroys nothing; the last-admin guard stays",
+    "orgs/[id]/member-teams/route.ts": "assigning / unassigning a member to a team is managing who is where — administration like demoting, not deleting data",
   };
   it("every DELETE under orgs/** and projects/** calls a delete guard, or is SuperAdmin-only itself, or is on the reviewed list", () => {
     const bad: string[] = [];
@@ -102,14 +103,22 @@ describe("T5253 every OrgAdmin-reachable DELETE handler is guarded (a ratchet)",
     const diff = deleteHandler(read("diagrams/diff/runs/[runId]/route.ts"))!;
     expect(diff).not.toContain("requireOrgAdminFor");
     expect(diff).toContain("run.createdById === session.user.id || isSuperuser(session)");
+    expect(deleteHandler(read("skills/route.ts"))).toContain("superAdminOnlyDelete()");
   });
-  it("the exempt list is exactly the one reviewed route, and it exists", () => {
-    expect(Object.keys(EXEMPT)).toEqual(["orgs/[id]/admins/[userId]/route.ts"]);
-    expect(routes(API)).toContain("orgs/[id]/admins/[userId]/route.ts");
+  it("the exempt list is exactly the two reviewed routes, and they exist", () => {
+    expect(Object.keys(EXEMPT)).toEqual(["orgs/[id]/admins/[userId]/route.ts", "orgs/[id]/member-teams/route.ts"]);
+    for (const r of Object.keys(EXEMPT)) expect(routes(API)).toContain(r);
   });
 });
 
 describe("T5253 what stays", () => {
+  it("the OrgAdmin screen says plainly that deleting is for a SuperAdmin, and no tile still promises a delete", () => {
+    const src = readFileSync("app/(dashboard)/dashboard/org-admin/OrgAdminClient.tsx", "utf8");
+    expect(src).toContain("orgadmin-delete-note");
+    expect(src).toContain("Deleting is for a SuperAdmin");
+    expect(src).not.toContain("or remove runs");
+    expect(src).toContain("A restore only ever adds");
+  });
   it("the additive Org-backup restore is still OrgAdmin's, with no wipe mode; the wipe restore is SuperAdmin-only", () => {
     const org = readFileSync("app/api/org-admin/backup/route.ts", "utf8");
     expect(org).toContain("restoreOrgBackupAdditive");

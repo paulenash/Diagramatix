@@ -7,7 +7,6 @@
  *   POST   { userId, entityNodeId }      → assign (idempotent)
  *   DELETE { userId, entityNodeId }      → unassign
  */
-import { superAdminOnlyDelete } from "@/app/lib/auth/deleteRules";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -86,7 +85,6 @@ export async function POST(req: Request, { params }: Params) {
 }
 
 export async function DELETE(req: Request, { params }: Params) {
-  { const denied = await superAdminOnlyDelete(); if (denied) return denied; }
   const { id } = await params;
   const session = await auth();
   if (isReadOnlyImpersonation(session, await cookies())) {

@@ -1,5 +1,6 @@
 "use client";
 
+import { showGateNotice } from "@/app/lib/subscription/gateNotice";
 import { useEffect, useRef, useState } from "react";
 
 interface Tpl { id: string; name: string; isDefault: boolean; docxTemplateName: string | null; hasDocx: boolean; updatedAt: string }
@@ -56,8 +57,10 @@ export function SopTemplatesManager({ scope, scopeId }: { scope: "org" | "projec
     load();
   }
   async function del(id: string) {
-    await fetch(`/api/sop-templates/${id}`, { method: "DELETE" });
-    setConfirmDelete(null); load();
+    const r = await fetch(`/api/sop-templates/${id}`, { method: "DELETE" });
+    setConfirmDelete(null);
+    if (await showGateNotice(r)) return;      // an OrgAdmin deletes nothing: say who can (deleteRules.ts)
+    load();
   }
 
   return (

@@ -55,13 +55,13 @@ const CARDS: MenuCard[] = [
     href: "/dashboard/org-admin/backup",
     title: "Backup & Restore",
     description:
-      "Download a backup of your whole Org, or selectively restore an Org member's projects / diagrams.",
+      "Download a backup of your whole Org, or selectively add back an Org member's projects / diagrams. A restore only ever adds: it never overwrites or deletes anything.",
   },
   {
     href: "/dashboard/org-admin/diff-runs",
     title: "Diff Process Runs",
     description:
-      "Every saved Diff Processes comparison in your Org, grouped by user. View the full results + AI summary, or remove runs.",
+      "Every saved Diff Processes comparison in your Org, grouped by user. View the full results + AI summary.",
   },
   {
     href: "/dashboard/org-admin/simulation-teams?from=/dashboard/org-admin",
@@ -171,6 +171,9 @@ export function OrgAdminClient({ orgName, entitlements }: { orgName: string; ent
         <p className="text-sm text-gray-600 mb-6">
           Pick a management surface. Each option opens its own page; the
           back link there returns you here.
+        </p>
+        <p className="text-xs text-gray-500 mb-6" data-testid="orgadmin-delete-note">
+          You can create, edit and rename everything here. Deleting is for a SuperAdmin: if something needs to be removed, ask your SuperAdmin.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {CARDS.map((card) => {
