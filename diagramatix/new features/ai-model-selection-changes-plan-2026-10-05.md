@@ -89,7 +89,7 @@ Prod SQL needed: documentation text only. **No schema change** with the AppSetti
 
 ## 4. Questions for you (each with my recommendation)
 
-1. **Who counts as "OrgAdmin"?** The app's Org roles are Owner and Admin. *Recommend:* both.
+1. ~~Who counts as "OrgAdmin"?~~ **Answered (Paul, 2026-10-05):** there is one role, OrgAdmin (Owner and Admin are merged) — see `orgadmin-role-and-delete-rules-plan-2026-10-05.md`. Also decided there: OrgAdmins cannot delete anything; only SuperAdmin deletes or restores destructively.
 2. **What do other roles/members see?** Nothing about models at all — no tile, no picker, no names. *Recommend:* as stated.
 3. **Empty offered list:** treat as "use the global setting" (AI keeps working) rather than "AI off" — AI on/off stays on the existing `allowAi` switch. *Recommend:* yes.
 4. **Bring-your-own-key users** (a user can store their own Anthropic/other key): today that unlocks models for them. With "users cannot choose", should their key *pay* but the Org's model still *run*? *Recommend:* yes — the key only changes who is billed; nobody but SuperAdmin picks the model.
