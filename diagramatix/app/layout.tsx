@@ -5,6 +5,8 @@ import { SessionProvider } from "@/app/components/SessionProvider";
 import { GlobalOverlays } from "@/app/components/GlobalOverlays";
 import { ScreenBrightness } from "@/app/components/ScreenBrightness";
 import { ActingAsBanner } from "@/app/components/ActingAsBanner";
+import { SuperAdminWelcome } from "@/app/components/SuperAdminWelcome";
+import { oldAddressFor } from "@/app/lib/superAdminMigration";
 import { displayBootScript } from "@/app/lib/ui/screenDisplay";
 import { auth } from "@/auth";
 import { isSuperuser } from "@/app/lib/superuser";
@@ -50,7 +52,10 @@ export default async function RootLayout({
   // Screencast Studio is gated on REAL SuperAdmin identity (not the view-aware
   // acting mode), so it stays available while a SuperAdmin films the OrgAdmin /
   // User experience via the dgx_sa_mode switch.
-  const superAdmin = isSuperuser(await auth());
+  const session = await auth();
+  const superAdmin = isSuperuser(session);
+  // Paul and Greg, on their NEW addresses: welcomed as SuperAdmin, and asked once to move the old account's data across.
+  const welcomeNewSuperAdmin = superAdmin && !!oldAddressFor(session?.user?.email);
   return (
     <html lang="en">
       <head>
@@ -66,6 +71,7 @@ export default async function RootLayout({
             <GlobalOverlays superAdmin={superAdmin} />
             <ActingAsBanner superAdmin={superAdmin} />
             <GateNoticeHost />
+            {welcomeNewSuperAdmin && <SuperAdminWelcome />}
             {/* Above everything, so the dimmer covers the whole window. */}
             <ScreenBrightness />
           </SessionProvider>

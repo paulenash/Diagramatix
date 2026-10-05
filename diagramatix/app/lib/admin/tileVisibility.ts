@@ -11,8 +11,8 @@
  * it does not add a second lock on the room.
  */
 
-/** The people the Fun Extensions tiles are for. Exact emails, lowercase. */
-export const FUN_TILE_OWNERS: readonly string[] = ["paul@nashcc.com.au"];
+/** The people the Fun Extensions tiles are for (the games and the n-body simulation). Exact emails, lowercase. Paul alone, on both his addresses (2026-10-05: "Permission to view should go to paul@diagramatix.com.au as well"); Greg and every other SuperAdmin do not see them. */
+export const FUN_TILE_OWNERS: readonly string[] = ["paul@nashcc.com.au", "paul@diagramatix.com.au"];
 
 export function tileVisibleTo(
   tile: { onlyFor?: readonly string[] },

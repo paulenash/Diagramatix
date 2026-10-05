@@ -4,6 +4,7 @@ import { verifySignedValue } from "@/app/lib/crypto/signedValue";
 export const SUPERUSER_EMAILS = new Set([
   "paul@nashcc.com.au",
   "paul@diagramatix.com.au",
+  "greg@diagramatix.com.au",
   "greg.nash@getai.com.au",
 ]);
 

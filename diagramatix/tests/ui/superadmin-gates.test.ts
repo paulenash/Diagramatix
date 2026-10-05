@@ -34,7 +34,9 @@ describe("tileVisibleTo — an exact-email gate, narrower than SuperAdmin", () =
   });
 
   it("T4379 — the owners list is Paul alone, the five Fun tiles carry it, and the grid applies it once", () => {
-    expect([...FUN_TILE_OWNERS]).toEqual(["paul@nashcc.com.au"]);
+    expect([...FUN_TILE_OWNERS]).toEqual(["paul@nashcc.com.au", "paul@diagramatix.com.au"]);   // Paul alone, on both his addresses
+    expect(tileVisibleTo({ onlyFor: FUN_TILE_OWNERS }, "paul@diagramatix.com.au")).toBe(true);
+    expect(tileVisibleTo({ onlyFor: FUN_TILE_OWNERS }, "greg@diagramatix.com.au")).toBe(false);
     const src = read("app", "(dashboard)", "dashboard", "admin", "AdminClient.tsx");
     for (const id of ["nimb", "mastermind", "life", "life-3d", "orbit-sim"]) {
       const re = new RegExp(`href: "/dashboard/admin/${id}", feature: "funExtensions", onlyFor: FUN_TILE_OWNERS \\}`);
