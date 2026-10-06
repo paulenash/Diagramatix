@@ -2,12 +2,11 @@
  * Domain-managed org membership.
  *
  * An Org can "claim" one or more email domains (Org.emailDomains). A user whose
- * email domain matches auto-JOINS that org on registration / SSO instead of
- * getting a personal "<name>'s Org", and — because there is no self-serve
- * org-creation endpoint (POST /api/orgs is SuperAdmin-only) — cannot end up with
- * their own org. Everyone else keeps the previous behaviour (a personal org).
+ * email domain matches auto-JOINS that org on registration / SSO. Everyone else
+ * joins the one shared "Default Org" — never a personal org of their own, and never
+ * as its administrator (Paul, 2026-10-06). There is no self-serve org creation
+ * (POST /api/orgs is SuperAdmin-only).
  */
-import { ORG_ADMIN_ROLE } from "@/app/lib/auth/orgAdminRole";
 import { prisma } from "@/app/lib/db";
 import type { OrgRole } from "@/app/lib/auth/orgRoleType";
 
@@ -42,20 +41,25 @@ export async function isDomainManaged(email: string): Promise<boolean> {
   return (await resolveDomainOrg(email)) !== null;
 }
 
+/** The one Org that everybody without a claiming email domain belongs to. A fixed id, so two
+ *  sign-ups at once cannot create two. */
+export const DEFAULT_ORG_ID = "default-org";
+export const DEFAULT_ORG_NAME = "Default Org";
+
 /** Minimal DB surface — satisfied by both `prisma` and a `$transaction` client,
  *  so the caller can run this inside its own transaction. */
 type OrgDb = { org: typeof prisma.org; orgMember: typeof prisma.orgMember };
 
 /**
  * Ensure the user has an org: JOIN the org claiming their email domain
- * (managed), else create a personal "<name>'s Org" with Owner. Idempotent on the
- * managed path (upsert on the (orgId,userId) unique). Pass a transaction client
+ * (managed), else the shared Default Org as a plain member (not an OrgAdmin).
+ * Idempotent on both paths (upserts). Pass a transaction client
  * as `db` to run inside the caller's transaction.
  */
 export async function joinDomainOrgOrCreatePersonal(
   userId: string,
   email: string,
-  displayName: string,
+  _displayName?: string,
   db: OrgDb = prisma,
 ): Promise<{ orgId: string; managed: boolean }> {
   const managed = await resolveDomainOrg(email);
@@ -67,7 +71,15 @@ export async function joinDomainOrgOrCreatePersonal(
     });
     return { orgId: managed.orgId, managed: true };
   }
-  const org = await db.org.create({ data: { name: `${displayName}'s Org`, entityType: "Other" } });
-  await db.orgMember.create({ data: { orgId: org.id, userId, role: ORG_ADMIN_ROLE } });
+  const org = await db.org.upsert({
+    where: { id: DEFAULT_ORG_ID },
+    create: { id: DEFAULT_ORG_ID, name: DEFAULT_ORG_NAME, entityType: "Other" },
+    update: {},
+  });
+  await db.orgMember.upsert({
+    where: { orgId_userId: { orgId: org.id, userId } },
+    create: { orgId: org.id, userId, role: DEFAULT_DOMAIN_JOIN_ROLE },
+    update: {},
+  });
   return { orgId: org.id, managed: false };
 }

@@ -30,6 +30,7 @@ function RegisterForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (loading) return;
     setError("");
     setLoading(true);
 
@@ -39,12 +40,13 @@ function RegisterForm() {
       body: JSON.stringify({ email, name, password }),
     });
 
-    setLoading(false);
-
     if (!res.ok) {
+      setLoading(false);
       const data = await res.json();
       setError(data.error || "Registration failed");
     } else {
+      // Stay disabled ("Creating account…") until the navigation takes over — re-enabling here let a second
+      // click register the same address again.
       // Carry the chosen plan through to /login (URL only — the register
       // API doesn't accept a tier).
       router.push(plan ? `/login?registered=1&plan=${plan}` : "/login?registered=1");

@@ -52,9 +52,9 @@ describe("T5252 the code asks one place", () => {
     }
     expect(bad).toEqual([]);
   });
-  it("new Orgs, domain auto-join and the SuperAdmin Org set-up create the one role", () => {
+  it("new Orgs and the SuperAdmin Org set-up create the one role; the Default Org's members are not given it", () => {
     expect(readFileSync("app/api/orgs/route.ts", "utf8")).toContain("role: ORG_ADMIN_ROLE,");
-    expect(readFileSync("app/lib/auth/domainOrg.ts", "utf8")).toContain("role: ORG_ADMIN_ROLE }");
+    expect(readFileSync("app/lib/auth/domainOrg.ts", "utf8")).not.toContain("ORG_ADMIN_ROLE");
     expect(readFileSync("app/lib/superAdminOrg.ts", "utf8")).toContain("role = ORG_ADMIN_ROLE;");
   });
   it("Owner can no longer be assigned from the SuperAdmin user table", () => {

@@ -52,15 +52,19 @@ describe("registerUser + domain claim", () => {
     expect(await prisma.org.count()).toBe(1);
   });
 
-  it("gives an unmanaged-domain user their own personal org as OrgAdmin", async () => {
+  it("puts an unmanaged-domain user in the shared Default Org as a plain member — no personal org, not an OrgAdmin (T5268)", async () => {
     await seedFreeTier();
     await claimOrg("GetAI Org", ["getai.com.au"], "ProcessOwner");
-    const res = await registerUser({ email: "solo@elsewhere.com", name: "Solo", password: "password12" });
-    expect(res.ok).toBe(true);
-
-    const mships = await membershipsOf("solo@elsewhere.com");
-    expect(mships).toHaveLength(1);
-    expect(mships[0].role).toBe("Admin");
-    expect(mships[0].org.name).toBe("Solo's Org");
+    for (const [email, name] of [["solo@elsewhere.com", "Solo"], ["two@another.com", "Two"]]) {
+      expect((await registerUser({ email, name, password: "password12" })).ok).toBe(true);
+    }
+    const a = await membershipsOf("solo@elsewhere.com");
+    const b = await membershipsOf("two@another.com");
+    expect(a).toHaveLength(1);
+    expect(a[0].org.name).toBe("Default Org");
+    expect(a[0].role).toBe(DEFAULT_DOMAIN_JOIN_ROLE);
+    expect(a[0].role).not.toBe("Admin");
+    expect(b[0].orgId).toBe(a[0].orgId);                                   // the same Org for everyone
+    expect(await prisma.org.count({ where: { name: { contains: "'s Org" } } })).toBe(0);
   });
 });

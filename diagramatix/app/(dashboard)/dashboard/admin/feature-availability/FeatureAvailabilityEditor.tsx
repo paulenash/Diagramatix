@@ -3,7 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { EnterpriseOrgsPanel } from "./EnterpriseOrgsPanel";
-import { applyDependencies } from "@/app/lib/features/dependencies";
+import { applyDependencies, blockedBy } from "@/app/lib/features/dependencies";
 
 type State = "available" | "disabled" | "hidden";
 interface Level { id: string; name: string; sortOrder: number }
@@ -197,7 +197,7 @@ export function FeatureAvailabilityEditor() {
           </thead>
           <tbody>
             {sections.map(([cat, feats]) => (
-              <FeatureGroup key={cat} cat={cat} feats={feats} levels={levels} matrix={matrix} effective={effective} setCell={setCell} setAll={setAll} />
+              <FeatureGroup key={cat} cat={cat} feats={feats} all={features} levels={levels} matrix={matrix} effective={effective} setCell={setCell} setAll={setAll} />
             ))}
           </tbody>
         </table>
@@ -234,11 +234,13 @@ function GateDetail({ f, colSpan }: { f: Feature; colSpan: number }) {
   );
 }
 
-function FeatureGroup({ cat, feats, levels, matrix, effective, setCell, setAll }: {
-  cat: string; feats: Feature[]; levels: Level[]; matrix: Matrix; effective: Matrix;
+function FeatureGroup({ cat, feats, all, levels, matrix, effective, setCell, setAll }: {
+  cat: string; feats: Feature[]; all: Feature[]; levels: Level[]; matrix: Matrix; effective: Matrix;
   setCell: (l: string, k: string, s: State) => void; setAll: (k: string, s: State) => void;
 }) {
   const [open, setOpen] = useState<Set<string>>(new Set());
+  const defs = Object.fromEntries(all.map((x) => [x.key, { requires: x.requires }]));
+  const labelOf = (k: string) => all.find((x) => x.key === k)?.label ?? k;
   const toggle = (k: string) => setOpen((o) => { const n = new Set(o); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   return (
     <>
@@ -265,11 +267,16 @@ function FeatureGroup({ cat, feats, levels, matrix, effective, setCell, setAll }
                   className={`text-[11px] rounded border px-1 py-0.5 ${clsFor(st)}`}>
                   {STATE_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
-                {eff !== st && (
-                  <div className="text-[9px] text-amber-700 mt-0.5" title="A feature it needs is not available at this level">
-                    in effect: {STATE_OPTS.find((o) => o.value === eff)?.label}
-                  </div>
-                )}
+                {eff !== st && (() => {
+                  const need = blockedBy(matrix[l.id] as Record<string, State>, f.key, defs);
+                  return (
+                    <div className="text-[9px] text-amber-700 mt-0.5" title="A feature it needs is not available at this level, so this cell has no effect until that one is">
+                      in effect: {STATE_OPTS.find((o) => o.value === eff)?.label}
+                      {need && <> — needs {labelOf(need)}{" "}
+                        <button onClick={() => setCell(l.id, need, "available")} className="underline text-blue-600 hover:text-blue-800" title={`Set ${labelOf(need)} to Available for ${l.name}`}>make it Available</button></>}
+                    </div>
+                  );
+                })()}
               </td>
             );
           })}
