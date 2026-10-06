@@ -1,4 +1,4 @@
-import nodemailer from "nodemailer";
+import { deliverMail, type MailAttachment, type MailRoute } from "@/app/lib/mail/deliver";
 
 /**
  * DATA-10: strip CR/LF (and other control chars) from any user-controlled value
@@ -17,43 +17,23 @@ export function mailHeader(s: string | null | undefined): string {
     .slice(0, 200);
 }
 
-// Shared transport factory — keeps every send-* helper consistent on
-// host / port / auth so a config tweak in .env only changes one place.
-// Returns null when SMTP_HOST is unset (dev mode), and the caller falls
-// back to console-logging the message.
-function smtpTransport() {
-  const smtpHost = process.env.SMTP_HOST;
-  if (!smtpHost) return null;
-  return nodemailer.createTransport({
-    host: smtpHost,
-    port: Number(process.env.SMTP_PORT || 587),
-    secure: process.env.SMTP_SECURE === "true",
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  });
-}
-
-const defaultFrom = () => process.env.SMTP_FROM || "noreply@diagramatix.com";
+// Every send-* helper goes through deliverMail (app/lib/mail/deliver.ts): Microsoft Graph when it is configured, SMTP as the fallback,
+// and — with neither configured (dev) — it sends nothing and the helper prints the message to the console, as it always has.
 
 export async function sendPasswordResetEmail(
   email: string,
   resetUrl: string
 ): Promise<void> {
-  const transport = smtpTransport();
-  if (transport) {
-    await transport.sendMail({
-      from: defaultFrom(),
-      to: email,
-      subject: "Reset your Diagramatix password",
-      html: `
+  const { via } = await deliverMail({
+    to: email,
+    subject: "Reset your Diagramatix password",
+    html: `
         <p>You requested a password reset for your Diagramatix account.</p>
         <p><a href="${resetUrl}">Click here to reset your password</a></p>
         <p>This link expires in 1 hour. If you didn't request this, you can safely ignore this email.</p>
       `,
-    });
-  } else {
+  });
+  if (via === "console") {
     console.log("\n========================================");
     console.log("[PASSWORD RESET]");
     console.log(`Email: ${email}`);
@@ -64,7 +44,7 @@ export async function sendPasswordResetEmail(
 
 // User-initiated "Help with this diagram" send. Wraps the user's note
 // in some context (who they are, which diagram, when) and attaches the
-// diagram's JSON payload + a PNG screenshot the client generated.
+// diagram's JSON payload + an SVG of the canvas the client generated.
 //
 // Reply-To is set to the user's email so the support team can hit Reply
 // in their inbox and the response goes back to the user, not to the
@@ -82,8 +62,8 @@ export interface SupportEmailInput {
   svgBase64: string | null;
 }
 
-export async function sendSupportDiagramEmail(input: SupportEmailInput): Promise<void> {
-  const transport = smtpTransport();
+/** Sends the request to the support mailbox. Returns the route that delivered it ("console" when nothing is configured — dev). Throws when every route failed. */
+export async function sendSupportDiagramEmail(input: SupportEmailInput): Promise<{ via: MailRoute }> {
   const supportAddress = process.env.SMTP_FROM || "support@diagramatix.com.au";
   const userDisplay = input.fromUserName ? `${input.fromUserName} <${input.fromUserEmail}>` : input.fromUserEmail;
   const sentAt = new Date().toISOString();
@@ -100,7 +80,7 @@ export async function sendSupportDiagramEmail(input: SupportEmailInput): Promise
     <p style="font-family:Arial,sans-serif;font-size:12px;color:#666;">Attachments: diagram JSON ${input.svgBase64 ? "+ SVG" : "only"}.</p>
   `;
 
-  const attachments: nodemailer.SendMailOptions["attachments"] = [
+  const attachments: MailAttachment[] = [
     {
       filename: `${safeFileName(input.diagramName)}.json`,
       content: input.diagramJson,
@@ -115,16 +95,14 @@ export async function sendSupportDiagramEmail(input: SupportEmailInput): Promise
     });
   }
 
-  if (transport) {
-    await transport.sendMail({
-      from: defaultFrom(),
-      to: supportAddress,
-      replyTo: input.fromUserEmail,
-      subject: mailHeader(input.subject) || `Help with: ${mailHeader(input.diagramName)}`,
-      html,
-      attachments,
-    });
-  } else {
+  const result = await deliverMail({
+    to: supportAddress,
+    replyTo: input.fromUserEmail,
+    subject: mailHeader(input.subject) || `Help with: ${mailHeader(input.diagramName)}`,
+    html,
+    attachments,
+  });
+  if (result.via === "console") {
     console.log("\n========================================");
     console.log("[SUPPORT DIAGRAM]");
     console.log(`From:    ${userDisplay}`);
@@ -137,6 +115,7 @@ export async function sendSupportDiagramEmail(input: SupportEmailInput): Promise
     console.log(`SVG:     ${input.svgBase64 ? `${input.svgBase64.length} chars` : "(none)"}`);
     console.log("========================================\n");
   }
+  return result;
 }
 
 // Sent when a bundle owner invites someone who doesn't yet have a
@@ -152,7 +131,6 @@ export interface BundleInviteEmailInput {
 }
 
 export async function sendBundleInvitationEmail(input: BundleInviteEmailInput): Promise<void> {
-  const transport = smtpTransport();
   const inviterDisplay = input.inviterName ? `${input.inviterName} (${input.inviterEmail})` : input.inviterEmail;
   const html = `
     <p>${escapeHtml(inviterDisplay)} has invited you to view a published process on Diagramatix.</p>
@@ -170,15 +148,13 @@ export async function sendBundleInvitationEmail(input: BundleInviteEmailInput): 
       <br/><br/>${escapeHtml(input.registerUrl)}
     </p>
   `;
-  if (transport) {
-    await transport.sendMail({
-      from: defaultFrom(),
-      to: input.toEmail,
-      replyTo: input.inviterEmail,
-      subject: `${mailHeader(input.inviterName ?? input.inviterEmail)} invited you to view "${mailHeader(input.bundleName)}"`,
-      html,
-    });
-  } else {
+  const { via } = await deliverMail({
+    to: input.toEmail,
+    replyTo: input.inviterEmail,
+    subject: `${mailHeader(input.inviterName ?? input.inviterEmail)} invited you to view "${mailHeader(input.bundleName)}"`,
+    html,
+  });
+  if (via === "console") {
     console.log("\n========================================");
     console.log("[BUNDLE INVITE]");
     console.log(`To:        ${input.toEmail}`);

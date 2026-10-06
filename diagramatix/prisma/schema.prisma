@@ -2702,3 +2702,38 @@ model VoiceTestRun {
   @@index([leg, startedAt])
   @@index([corpusSeed, startedAt])
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// "Send to support" requests (app/api/support/diagram). Written BEFORE the email is attempted, so a request is never lost when mail
+// delivery fails (2026-10-06: the Microsoft 365 SMTP login was refused and every request vanished). `status` is received → sent | failed;
+// the SuperAdmin's Support Requests list shows the failures and can resend them. The SVG is kept only while a send has failed (so a
+// resend can attach it) and cleared once delivered. No relation to User on purpose — a user's erasure deletes their rows explicitly
+// (eraseUser).
+// ────────────────────────────────────────────────────────────────────────────
+model SupportRequest {
+  id            String    @id @default(cuid())
+  userId        String
+  userEmail     String
+  userName      String?
+  diagramId     String
+  diagramName   String
+  subject       String
+  message       String
+  /// "received" | "sent" | "failed"
+  status        String    @default("received")
+  /// Which route delivered it: "graph" | "smtp" | "console"
+  via           String?
+  /// Every attempt's failure, e.g. "graph: … | smtp: Invalid login: 535 5.7.3 …"
+  error         String?
+  attempts      Int       @default(0)
+  /// base64 SVG, kept only while status = "failed"
+  svgBase64     String?
+  /// The org policy forbade sending the diagram with the request — a resend honours that too.
+  withDiagram   Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  lastAttemptAt DateTime?
+  sentAt        DateTime?
+
+  @@index([status, createdAt])
+  @@index([userId])
+}

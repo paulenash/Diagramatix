@@ -828,6 +828,7 @@ const ADMIN_TILES: AdminTile[] = [
   { id: "ai-usage", title: "AI Usage", description: "AI invocations, tokens, retries & estimated cost across every provider, model, org, user & invocation point — filterable, with an editable cost-rate catalog.", href: "/dashboard/ai-usage", feature: "ai" },
   { id: "database", title: "Database Access", description: "Inspect the live database and run maintenance queries.", href: "/dashboard/admin/database" },
   { id: "schema-validation", title: "Schema Validation", description: "Runtime Diagram-JSON validation findings (parallel Zod validator) — corruption, dangling refs, drift. Log-only observability.", href: "/dashboard/admin/schema-validation" },
+  { id: "support-requests", title: "Support Requests", description: "Every \"Send to support\" request, saved before its email is tried — see which emails failed and why, and resend them.", href: "/dashboard/admin/support-requests" },
   { id: "audit-log", title: "Audit Log", description: "Append-only record of privileged actions — impersonation, exports & backups, wipe restores, user deletes, org policy changes. Who did what, when, to which tenant.", href: "/dashboard/admin/audit-log" },
   { id: "ddl", title: "DDL Generation", description: "Download the Diagramatix schema as DDL — the curated LOGICAL model (PostgreSQL / MySQL / SQL Server) or the PHYSICAL DDL of the live database.", ddl: true },
   { id: "archive", title: "System Archive", description: "Archived projects and diagrams across the system.", href: "/dashboard/admin/archive" },

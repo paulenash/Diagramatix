@@ -45,6 +45,8 @@ export async function eraseUser(
   // Runs on their own diagrams went with the cascade; runs on diagrams they
   // could edit but did not own go here.
   await prisma.diagramGenerateJob.deleteMany({ where: { userId } });
+  // Their "send to support" requests hold their words and their email address.
+  await prisma.supportRequest.deleteMany({ where: { userId } });
 
   let orgsRemoved = 0;
   for (const orgId of orgIds) {

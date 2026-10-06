@@ -10,7 +10,8 @@ interface Props {
   // support gets the JSON only).
   getSvgEl: () => SVGSVGElement | null;
   onClose: () => void;
-  onSent: () => void;
+  /** Called when the request is on file. `emailed` is false when it is saved but the email could not be sent just now. */
+  onSent: (info: { emailed: boolean }) => void;
 }
 
 // SupportRequestDialog — "Get help with this diagram".
@@ -79,7 +80,8 @@ export function SupportRequestDialog({
         setError(err.error ?? `Send failed (${res.status})`);
         return;
       }
-      onSent();
+      const body = (await res.json().catch(() => ({}))) as { emailed?: boolean };
+      onSent({ emailed: body.emailed !== false });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Network error");
     } finally {

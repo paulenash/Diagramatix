@@ -6,7 +6,7 @@ import {
   requireDiagramAccess,
   OrgContextError,
 } from "@/app/lib/auth/orgContext";
-import { sendSupportDiagramEmail } from "@/app/lib/email";
+import { attemptSupportSend } from "@/app/lib/support/supportRequests";
 import { orgPolicyAllows } from "@/app/lib/auth/orgPolicy";
 
 // POST /api/support/diagram
@@ -87,27 +87,22 @@ export async function POST(req: Request) {
   // copy into the vendor Support project (ENT-10).
   const withDiagram = await orgPolicyAllows(session, "allowSupportDiagram");
 
-  try {
-    await sendSupportDiagramEmail({
-      fromUserName: session.user.name ?? null,
-      fromUserEmail: session.user.email,
+  // RECORD FIRST, EMAIL SECOND. The request is saved before any mail is attempted, so a delivery failure (2026-10-06: the Microsoft 365
+  // login was refused) never loses the user's message: it stays on file, marked failed, in the SuperAdmin's Support Requests list.
+  const saved = await prisma.supportRequest.create({
+    data: {
+      userId: session.user.id,
+      userEmail: session.user.email,
+      userName: session.user.name ?? null,
       diagramId: diagram.id,
       diagramName: diagram.name,
       subject: subject || `Help with: ${diagram.name}`,
       message,
-      diagramJson: withDiagram
-        ? JSON.stringify(diagram.data, null, 2)
-        : "(diagram content omitted by your organisation's policy)",
-      svgBase64: withDiagram ? svgBase64 : null,
-    });
-  } catch (err) {
-    const errMsg = err instanceof Error ? err.message : String(err);
-    console.error("[POST /api/support/diagram] send error:", errMsg);
-    return NextResponse.json(
-      { error: "Failed to send. Please try again or email support directly." },
-      { status: 500 },
-    );
-  }
+      withDiagram,
+    },
+    select: { id: true },
+  });
+  const outcome = await attemptSupportSend(saved.id, { svgBase64: withDiagram ? svgBase64 : null });
 
   // Best-effort: deposit an annotated copy into the SuperAdmin "Support"
   // project. Never fail the user's request if this side-effect errors.
@@ -125,7 +120,8 @@ export async function POST(req: Request) {
     }
   }
 
-  return NextResponse.json({ ok: true });
+  // ok:true either way — the request IS recorded. `emailed` says whether the email went; when it did not, the dialog tells the user so.
+  return NextResponse.json({ ok: true, emailed: outcome.ok, requestId: saved.id });
 }
 
 // The SuperAdmin whose "Support" project collects help-requested diagrams.

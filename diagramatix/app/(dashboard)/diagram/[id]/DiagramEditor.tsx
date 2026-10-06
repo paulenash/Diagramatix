@@ -810,7 +810,7 @@ export function DiagramEditor({
   const [showPublishDialog, setShowPublishDialog] = useState(false);
   const [showPublishBundleDialog, setShowPublishBundleDialog] = useState(false);
   const [showSupportDialog, setShowSupportDialog] = useState(false);
-  const [supportSentToast, setSupportSentToast] = useState(false);
+  const [supportSentToast, setSupportSentToast] = useState<null | "sent" | "saved">(null);
   // Feedback panel (owner-only) — lists business-user feedback on this
   // published diagram and lets the owner triage it. Opens automatically
   // when arrived via a feedback-received notification (?feedback=1).
@@ -6466,17 +6466,22 @@ export function DiagramEditor({
           diagramName={diagramName}
           getSvgEl={() => document.querySelector<SVGSVGElement>("svg[data-canvas]")}
           onClose={() => setShowSupportDialog(false)}
-          onSent={() => {
+          onSent={({ emailed }) => {
             setShowSupportDialog(false);
-            setSupportSentToast(true);
-            setTimeout(() => setSupportSentToast(false), 4000);
+            setSupportSentToast(emailed ? "sent" : "saved");
+            setTimeout(() => setSupportSentToast(null), emailed ? 4000 : 9000);
           }}
         />
       )}
 
-      {supportSentToast && (
-        <div className="fixed bottom-6 right-6 bg-green-600 text-white text-sm font-medium rounded shadow-lg px-4 py-2 z-50">
+      {supportSentToast === "sent" && (
+        <div role="status" className="fixed bottom-6 right-6 bg-green-600 text-white text-sm font-medium rounded shadow-lg px-4 py-2 z-50">
           Sent to support — they&apos;ll reply by email.
+        </div>
+      )}
+      {supportSentToast === "saved" && (
+        <div role="status" className="fixed bottom-6 right-6 max-w-sm bg-amber-600 text-white text-sm font-medium rounded shadow-lg px-4 py-2 z-50">
+          Your request is saved, but we couldn&apos;t email it just now. Support will see it and reply to you.
         </div>
       )}
 

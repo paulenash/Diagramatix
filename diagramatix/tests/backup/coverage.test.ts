@@ -187,6 +187,10 @@ const SCOPED_OMITTED = new Set<string>([
   // per-user/org data — deliberately NOT carried by a tenant backup. It's in the
   // SuperAdmin full backup (catalog-driven).
   "AuditLog",
+  // "Send to support" requests (SupportRequest) are correspondence with the vendor — a user's note to us, with its delivery status — not
+  // tenant content: a scoped backup restoring somebody else's support history would be odd, and the user's erasure deletes them. The full
+  // SuperAdmin backup still takes them (catalog-driven).
+  "SupportRequest",
   // AI usage telemetry (AiInvocation + AiDiagramGeneration "# diagrams generated")
   // is system-global observability like AuditLog, and the model cost-rate catalog
   // (AiModelRate) is global admin config like AppSetting / DiagramTypeStyle — none
