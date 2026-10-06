@@ -20,6 +20,7 @@ import { useMatrixRunning } from "./useMatrixRunning";
 
 type Rect = { x: number; y: number; w: number; h: number };
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+const TOOLBAR_POS_KEY = "diagramatix.capture.toolbarPos";
 
 // A 1×1 transparent PNG. html-to-image swaps in this placeholder for any image it
 // can't fetch/inline, so one broken/cross-origin image degrades gracefully instead
@@ -113,6 +114,17 @@ export function ScreenCapture() {
   const [toast, setToast] = useState<string | null>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
   const drag = useRef<{ mode: string; sx: number; sy: number; orig: Rect } | null>(null);
+  // The panel's own position. It sat over the bottom edge of the screen, so the crop box's lower handles were out of the mouse's reach
+  // (Paul, 2026-10-06): it can now be dragged by its title strip, and where it was left is remembered. null = the default, bottom centre.
+  const [tbPos, setTbPos] = useState<{ left: number; top: number } | null>(null);
+  const tbRef = useRef<HTMLDivElement | null>(null);
+  const tbDrag = useRef<{ sx: number; sy: number; left: number; top: number; w: number; h: number } | null>(null);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(TOOLBAR_POS_KEY);
+      if (raw) { const p = JSON.parse(raw) as { left?: number; top?: number }; if (typeof p.left === "number" && typeof p.top === "number") setTbPos({ left: p.left, top: p.top }); }
+    } catch { /* no memory of it — the default */ }
+  }, []);
 
   const reset = useCallback(() => {
     setFrozen(null); setNat(null); setRect(null); setAlt(""); setError(null);
@@ -198,6 +210,34 @@ export function ScreenCapture() {
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
   }, [rect, onMove, onUp]);
+
+  const onToolbarMove = useCallback((e: PointerEvent) => {
+    const d = tbDrag.current;
+    if (!d) return;
+    const W = window.innerWidth, H = window.innerHeight;
+    setTbPos({ left: clamp(d.left + e.clientX - d.sx, 0, Math.max(0, W - d.w)), top: clamp(d.top + e.clientY - d.sy, 0, Math.max(0, H - d.h)) });
+  }, []);
+  const onToolbarUp = useCallback(() => {
+    tbDrag.current = null;
+    window.removeEventListener("pointermove", onToolbarMove);
+    window.removeEventListener("pointerup", onToolbarUp);
+    setTbPos((p) => { try { if (p) localStorage.setItem(TOOLBAR_POS_KEY, JSON.stringify(p)); } catch { /* not remembered */ } return p; });
+  }, [onToolbarMove]);
+  /** Drag the panel by its title strip, out of the way of the crop box's handles. */
+  const startToolbarDrag = useCallback((e: React.PointerEvent) => {
+    const el = tbRef.current;
+    if (!el) return;
+    e.preventDefault(); e.stopPropagation();
+    const r = el.getBoundingClientRect();
+    tbDrag.current = { sx: e.clientX, sy: e.clientY, left: r.left, top: r.top, w: r.width, h: r.height };
+    setTbPos({ left: r.left, top: r.top });
+    window.addEventListener("pointermove", onToolbarMove);
+    window.addEventListener("pointerup", onToolbarUp);
+  }, [onToolbarMove, onToolbarUp]);
+  const resetToolbarPos = useCallback(() => {
+    setTbPos(null);
+    try { localStorage.removeItem(TOOLBAR_POS_KEY); } catch { /* ignore */ }
+  }, []);
 
   function preset(kind: "whole" | "canvas") {
     const W = window.innerWidth, H = window.innerHeight;
@@ -304,9 +344,20 @@ export function ScreenCapture() {
           </div>
 
           {/* toolbar */}
-          <div className="absolute left-1/2 -translate-x-1/2 bottom-6 z-[9999] bg-white rounded-lg shadow-xl border border-gray-200 p-3 w-[28rem] max-w-[92vw]">
-            <p className="text-xs text-gray-500 mb-2">
-              Capturing <span className="font-medium text-gray-800">{screen}</span>
+          <div
+            ref={tbRef}
+            data-testid="capture-toolbar"
+            className={`absolute ${tbPos ? "" : "left-1/2 -translate-x-1/2 bottom-6"} z-[9999] bg-white rounded-lg shadow-xl border border-gray-200 p-3 w-[28rem] max-w-[92vw]`}
+            style={tbPos ? { left: clamp(tbPos.left, 0, Math.max(0, window.innerWidth - 120)), top: clamp(tbPos.top, 0, Math.max(0, window.innerHeight - 60)) } : undefined}
+          >
+            <p
+              data-testid="capture-toolbar-handle"
+              onPointerDown={startToolbarDrag}
+              onDoubleClick={resetToolbarPos}
+              title="Drag to move this panel out of the way of the selection handles · double-click to put it back"
+              className="text-xs text-gray-500 mb-2 cursor-move select-none touch-none -mt-1 pt-1 pb-1 border-b border-gray-100"
+            >
+              <span aria-hidden className="mr-1 text-gray-400">⠿</span>Capturing <span className="font-medium text-gray-800">{screen}</span>
               {diagram && <> — <span className="font-medium text-gray-800">{diagram}</span></>}
               · {Math.round(rect.w)}×{Math.round(rect.h)} px
             </p>
