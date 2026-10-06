@@ -43,7 +43,7 @@ export async function POST(_req: Request, { params }: Params) {
   // Calibration crosses into the Simulator, so BOTH tiers have to pass — mining
   // is what produces the twin, the simulator is what runs it.
   const fg = await gateFeature(session?.user?.id ?? "", "process-mining-twin")
-    ?? await gateFeature(session?.user?.id ?? "", "simulator");
+    ?? await gateFeature(session?.user?.id ?? "", "simulator", id);
   if (fg) return fg;
   const userId = session?.user?.id;
 

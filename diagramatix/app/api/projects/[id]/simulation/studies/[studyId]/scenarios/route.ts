@@ -23,7 +23,7 @@ export async function POST(req: Request, { params }: Params) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
-  const fg = await gateFeature(session?.user?.id ?? "", "simulator");
+  const fg = await gateFeature(session?.user?.id ?? "", "simulator", id);
   if (fg) return fg;
   // Study must belong to this project.
   const study = await prisma.simulationStudy.findFirst({ where: { id: studyId, projectId: id }, select: { id: true } });

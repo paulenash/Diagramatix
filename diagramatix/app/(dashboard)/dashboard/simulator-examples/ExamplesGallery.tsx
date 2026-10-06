@@ -27,6 +27,8 @@ interface ExampleCard {
   concept: string;
   description: string;
   difficulty: string;
+  /** Free / Introductory: shown, but greyed out and not loadable (server: features/exampleAccess.ts). */
+  locked?: boolean;
   summary: { diagrams: number; teams: number; scenarios: number; roots: number };
 }
 
@@ -102,7 +104,8 @@ export function ExamplesGallery({ isAdmin }: { isAdmin: boolean }) {
 
         <div className="grid gap-4 sm:grid-cols-2">
           {examples.map((ex) => (
-            <div key={ex.id} className="rounded-lg border border-green-500/40 bg-black p-4 flex flex-col shadow-[0_0_18px_rgba(34,197,94,0.12)]">
+            <div key={ex.id} data-locked={ex.locked ? "true" : undefined} title={ex.locked ? "Not included in your subscription — upgrade to load this example" : undefined}
+              className={`rounded-lg border border-green-500/40 bg-black p-4 flex flex-col shadow-[0_0_18px_rgba(34,197,94,0.12)] ${ex.locked ? "opacity-40 grayscale" : ""}`}>
               <div className="flex items-start justify-between gap-2">
                 <h2 className="text-base font-semibold text-green-200">{ex.title}</h2>
                 <span className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded border ${DIFF_STYLE[ex.difficulty] ?? "border-green-400/40 text-green-400/70"}`}>
@@ -117,9 +120,13 @@ export function ExamplesGallery({ isAdmin }: { isAdmin: boolean }) {
               </div>
               <div className="flex-1" />
               <div className="mt-3 flex items-center gap-2">
-                <MatrixButton onClick={() => adopt(ex.id)}>
-                  {adopting === ex.id ? "◴ Loading…" : "▶ Load"}
-                </MatrixButton>
+                {ex.locked ? (
+                  <button disabled className="rounded border border-green-500/30 px-3 py-1.5 text-sm text-green-400/60 cursor-not-allowed">🔒 Not in your plan</button>
+                ) : (
+                  <MatrixButton onClick={() => adopt(ex.id)}>
+                    {adopting === ex.id ? "◴ Loading…" : "▶ Load"}
+                  </MatrixButton>
+                )}
                 <button
                   onClick={() => setSummaryFor(ex.id)}
                   className="rounded border border-green-500/30 px-3 py-1.5 text-sm text-green-400/80 hover:bg-green-500/10 hover:text-green-200"
@@ -136,7 +143,7 @@ export function ExamplesGallery({ isAdmin }: { isAdmin: boolean }) {
             url={`/api/simulation-examples/${summaryFor}/summary`}
             tone="green"
             onClose={() => setSummaryFor(null)}
-            onLoad={() => adopt(summaryFor)}
+            onLoad={examples.find((e) => e.id === summaryFor)?.locked ? undefined : () => adopt(summaryFor)}
             loadLabel="▶ Load"
             loading={adopting !== null}
           />

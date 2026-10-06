@@ -20,7 +20,7 @@ export async function GET(_req: Request, { params }: Params) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
-  const fg = await gateFeature(session?.user?.id ?? "", "processMining");
+  const fg = await gateFeature(session?.user?.id ?? "", "processMining", id);
   if (fg) return fg;
   const runs = await prisma.processMiningRun.findMany({
     where: { projectId: id },

@@ -51,7 +51,7 @@ export async function PUT(req: Request, { params }: Params) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
-  const fg = await gateFeature(session?.user?.id ?? "", "simulator");
+  const fg = await gateFeature(session?.user?.id ?? "", "simulator", id);
   if (fg) return fg;
   if (!(await studyInProject(studyId, id))) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const body = await req.json().catch(() => ({}));
@@ -100,7 +100,7 @@ export async function DELETE(_req: Request, { params }: Params) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
-  const fg = await gateFeature(session?.user?.id ?? "", "simulator");
+  const fg = await gateFeature(session?.user?.id ?? "", "simulator", id);
   if (fg) return fg;
   if (!(await studyInProject(studyId, id))) return NextResponse.json({ error: "Not found" }, { status: 404 });
   await prisma.simulationStudy.delete({ where: { id: studyId } });

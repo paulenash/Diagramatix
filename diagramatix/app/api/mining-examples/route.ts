@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { gateFeature } from "@/app/lib/subscription-route";
+import { EXAMPLE_ORDER, getExampleAccess, isExampleLocked } from "@/app/lib/features/exampleAccess";
 import { summarizeMiningPackage, type MiningExamplePackage } from "@/app/lib/mining/examplePackage";
 
 export async function GET() {
@@ -19,9 +20,12 @@ export async function GET() {
 
   const rows = await prisma.miningExample.findMany({
     where: { published: true },
-    orderBy: { sortOrder: "asc" },
+    orderBy: EXAMPLE_ORDER,
   });
-  const examples = rows.map((e) => ({
+  // Free / Introductory: only the first N are adoptable; the rest are listed, greyed out (features/exampleAccess.ts).
+  const access = await getExampleAccess(session.user.id ?? "");
+  const examples = rows.map((e, i) => ({
+    locked: isExampleLocked(access, i),
     id: e.id,
     slug: e.slug,
     title: e.title,

@@ -862,7 +862,7 @@
             "isBaseline": true,
             "runConfig": {
               "clockUnit": "minute",
-              "horizon": 2880,
+              "horizon": 21600,
               "warmUp": 120,
               "replications": 5,
               "seed": 1,
@@ -874,7 +874,7 @@
             "name": "Add Sales staff",
             "runConfig": {
               "clockUnit": "minute",
-              "horizon": 2880,
+              "horizon": 21600,
               "warmUp": 120,
               "replications": 5,
               "seed": 1,

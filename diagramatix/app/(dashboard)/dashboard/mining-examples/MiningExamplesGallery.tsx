@@ -29,6 +29,8 @@ interface ExampleCard {
   concept: string;
   description: string;
   difficulty: string;
+  /** Free / Introductory: shown, but greyed out and not loadable (server: features/exampleAccess.ts). */
+  locked?: boolean;
   summary: { references: number; cases: number; variants: number; states: number };
 }
 
@@ -115,7 +117,8 @@ export function MiningExamplesGallery({ isAdmin }: { isAdmin: boolean }) {
 
         <div className="grid gap-4 sm:grid-cols-2">
           {examples.map((ex) => (
-            <div key={ex.id} className="rounded-lg border border-amber-500/40 bg-stone-900 p-4 flex flex-col shadow-[0_0_18px_rgba(180,83,9,0.15)]">
+            <div key={ex.id} data-locked={ex.locked ? "true" : undefined} title={ex.locked ? "Not included in your subscription — upgrade to load this example" : undefined}
+              className={`rounded-lg border border-amber-500/40 bg-stone-900 p-4 flex flex-col shadow-[0_0_18px_rgba(180,83,9,0.15)] ${ex.locked ? "opacity-40 grayscale" : ""}`}>
               <div className="flex items-start justify-between gap-2">
                 <h2 className="text-base font-semibold text-amber-100">{ex.title}</h2>
                 <span className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded border ${DIFF_STYLE[ex.difficulty] ?? "border-amber-400/40 text-amber-200/70"}`}>
@@ -132,10 +135,10 @@ export function MiningExamplesGallery({ isAdmin }: { isAdmin: boolean }) {
               <div className="mt-3 flex items-center gap-2">
                 <button
                   onClick={() => adopt(ex.id)}
-                  disabled={adopting !== null}
+                  disabled={adopting !== null || !!ex.locked}
                   className="rounded border border-amber-500/60 bg-amber-500/10 px-3 py-1.5 text-sm text-amber-200 hover:bg-amber-500/20 disabled:opacity-50 shadow-[0_0_12px_rgba(180,83,9,0.25)]"
                 >
-                  {adopting === ex.id ? "◴ Loading…" : "▶ Load & open"}
+                  {ex.locked ? "🔒 Not in your plan" : adopting === ex.id ? "◴ Loading…" : "▶ Load & open"}
                 </button>
                 <button
                   onClick={() => setSummaryFor(ex.id)}
@@ -153,7 +156,7 @@ export function MiningExamplesGallery({ isAdmin }: { isAdmin: boolean }) {
             url={`/api/mining-examples/${summaryFor}/summary`}
             tone="amber"
             onClose={() => setSummaryFor(null)}
-            onLoad={() => adopt(summaryFor)}
+            onLoad={examples.find((e) => e.id === summaryFor)?.locked ? undefined : () => adopt(summaryFor)}
             loading={adopting !== null}
           />
         )}

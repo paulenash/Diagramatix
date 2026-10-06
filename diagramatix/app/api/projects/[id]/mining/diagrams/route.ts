@@ -19,7 +19,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
-  const fg = await gateFeature(session?.user?.id ?? "", "processMining");
+  const fg = await gateFeature(session?.user?.id ?? "", "processMining", id);
   if (fg) return fg;
   const diagrams = await prisma.diagram.findMany({
     where: { projectId: id, type: { in: ["bpmn", "state-machine"] } },

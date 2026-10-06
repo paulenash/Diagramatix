@@ -114,6 +114,10 @@ export function StudyManager({ projectId, isAdmin, onRan, initialStudyId }: { pr
 
   useEffect(() => { loadStudies(); }, [loadStudies]);
   useEffect(() => { if (selectedId) loadDetail(selectedId); else setDetail(null); }, [selectedId, loadDetail]);
+  // ONE study: its Root diagrams and Scenarios are always showing — there is nothing to choose between, so no
+  // collapsed state to get stuck in (Paul, 2026-10-06). With two or more, the list works as before.
+  const onlyStudyId = studies.length === 1 ? studies[0].id : null;
+  useEffect(() => { if (onlyStudyId && selectedId !== onlyStudyId) setSelectedId(onlyStudyId); }, [onlyStudyId, selectedId]);
   // Studies sit well down a long single-scroll page, so an expanded study nobody
   // can see is barely better than one nobody selected.
   useEffect(() => {
@@ -160,7 +164,8 @@ export function StudyManager({ projectId, isAdmin, onRan, initialStudyId }: { pr
         {studies.map((s) => (
           <div key={s.id} ref={s.id === initialStudyId ? focusRef : undefined}
             className={`flex items-center gap-2 px-1 rounded ${selectedId === s.id ? "bg-green-400/10" : ""}`}>
-            <button onClick={() => setSelectedId(selectedId === s.id ? null : s.id)} className="flex-1 text-left text-green-300 hover:text-green-200 truncate">
+            <button onClick={() => { if (!onlyStudyId) setSelectedId(selectedId === s.id ? null : s.id); }}
+              className={`flex-1 text-left text-green-300 truncate ${onlyStudyId ? "cursor-default" : "hover:text-green-200"}`}>
               {selectedId === s.id ? "▾" : "▸"} {s.name}
             </button>
             <span className="text-green-400/40">{s._count?.roots ?? 0}r · {s._count?.scenarios ?? 0}s</span>

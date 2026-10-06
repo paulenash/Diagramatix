@@ -11,6 +11,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireRole, WRITE_ROLES, OrgContextError } from "@/app/lib/auth/orgContext";
+import { isExampleLockedFor } from "@/app/lib/features/exampleAccess";
 import { gateFeature, gateLimit } from "@/app/lib/subscription-route";
 import { validateMiningExamplePackage, type MiningExamplePackage } from "@/app/lib/mining/examplePackage";
 import { adoptMiningPackage } from "@/app/lib/mining/adoptMiningPackage";
@@ -40,6 +41,9 @@ export async function POST(_req: Request, { params }: Params) {
   const { id } = await params;
   const example = await prisma.miningExample.findFirst({ where: { id, published: true } });
   if (!example) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (await isExampleLockedFor(session.user.id, "mining", example.id)) {
+    return NextResponse.json({ error: "This example is not included in your subscription.", metric: "feature", feature: "process-mining-examples" }, { status: 403 });
+  }
 
   const pkg = (example.package ?? {}) as unknown as MiningExamplePackage;
   const errs = validateMiningExamplePackage(pkg);

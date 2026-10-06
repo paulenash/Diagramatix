@@ -38,7 +38,7 @@ async function guard(projectId: string) {
     if (err instanceof OrgContextError) return { error: NextResponse.json({ error: err.message }, { status: err.status }) };
     throw err;
   }
-  const fg = await gateFeature(session?.user?.id ?? "", "simulator");
+  const fg = await gateFeature(session?.user?.id ?? "", "simulator", projectId);
   if (fg) return { error: fg };
   return {};
 }

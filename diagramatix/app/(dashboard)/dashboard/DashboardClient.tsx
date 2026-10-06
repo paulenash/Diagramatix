@@ -33,6 +33,7 @@ import { lightenHex } from "@/app/lib/diagram/diagramTypeStyles";
 import { BackupProgressModal } from "@/app/components/BackupProgressModal";
 import { SimulatorOverlay } from "@/app/components/simulation/SimulatorOverlay";
 import { ProcessMiningOverlay } from "@/app/components/mining/ProcessMiningOverlay";
+import { useExampleAccess, canEnter, EXAMPLES_ONLY_TITLE } from "@/app/hooks/useExampleAccess";
 import { useReopenFromGuide } from "@/app/hooks/useReopenFromGuide";
 import { UserGuideLink } from "@/app/components/UserGuideLink";
 import { returnProjectOf } from "@/app/lib/help/guideReturn";
@@ -278,6 +279,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
     adminViewMode,
     usageSnapshot?.entitlements ?? { simulator: true, processMining: true, riskControl: true, apqc: true },
   );
+  const exampleAccess = useExampleAccess();
   const featureScheme = useFeatureColors();
   // The Hide-Examples toggle only makes sense if the profile includes at least
   // one feature that HAS an examples gallery (Simulator / Mining / Risk-Control).
@@ -3414,8 +3416,9 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
             {ent.processMining && (
             <button
               onClick={() => { close(); setSkipMiningIntro(false); setMiningProject({ id: p.id, name: p.name }); }}
-              className="w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700"
-              title="Process Mining — discover the real process from event logs + check conformance"
+              disabled={!canEnter(exampleAccess, "processMining", p.exampleType)}
+              className="w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700 disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+              title={canEnter(exampleAccess, "processMining", p.exampleType) ? "Process Mining — discover the real process from event logs + check conformance" : EXAMPLES_ONLY_TITLE}
             >
               ⛏ Process Mining
             </button>

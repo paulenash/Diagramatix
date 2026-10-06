@@ -26,7 +26,7 @@ export async function GET(_req: Request, { params }: Params) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
-  const fg = await gateFeature(session?.user?.id ?? "", "processMining");
+  const fg = await gateFeature(session?.user?.id ?? "", "processMining", id);
   if (fg) return fg;
   const run = await prisma.processMiningRun.findFirst({ where: { id: runId, projectId: id } });
   if (!run) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -45,7 +45,7 @@ export async function PATCH(req: Request, { params }: Params) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
-  const fg = await gateFeature(session?.user?.id ?? "", "processMining");
+  const fg = await gateFeature(session?.user?.id ?? "", "processMining", id);
   if (fg) return fg;
   const existing = await prisma.processMiningRun.findFirst({ where: { id: runId, projectId: id }, select: { id: true } });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -81,7 +81,7 @@ export async function DELETE(_req: Request, { params }: Params) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
-  const fg = await gateFeature(session?.user?.id ?? "", "processMining");
+  const fg = await gateFeature(session?.user?.id ?? "", "processMining", id);
   if (fg) return fg;
   const existing = await prisma.processMiningRun.findFirst({ where: { id: runId, projectId: id } });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });

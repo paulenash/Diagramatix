@@ -46,6 +46,7 @@ import { ProjectStructureDialog } from "@/app/components/entityLists/ProjectStru
 import { ProjectSopsDialog } from "@/app/components/sop/ProjectSopsSection";
 import { RiskControlConsole } from "@/app/components/riskControls/RiskControlConsole";
 import { RiskControlDialog } from "@/app/components/riskControls/RiskControlDialog";
+import { useExampleAccess, canEnter, EXAMPLES_ONLY_TITLE } from "@/app/hooks/useExampleAccess";
 import { useReopenFromGuide } from "@/app/hooks/useReopenFromGuide";
 import { SimulatorOverlay } from "@/app/components/simulation/SimulatorOverlay";
 import { TeamLibraryManager } from "@/app/components/simulation/TeamLibraryManager";
@@ -482,6 +483,11 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
   // is hidden by accident on a legacy/unseeded profile. In a SuperAdmin tier-preview
   // view, overlay that tier's feature set so the project menus gate accordingly.
   const ent = effectiveEntitlements(adminViewMode, entitlements ?? { simulator: true, processMining: true, riskControl: true, apqc: true });
+  // Free / Introductory: the Simulator and Process Mining open only on an adopted example of their own kind.
+  const exampleAccess = useExampleAccess();
+  const projectExampleType = (project as { exampleType?: string | null }).exampleType ?? null;
+  const simEnterAllowed = canEnter(exampleAccess, "simulator", projectExampleType);
+  const miningEnterAllowed = canEnter(exampleAccess, "processMining", projectExampleType);
   const aiAllowed = useAiAllowed(); // hide AI-generation entry points when the org disables AI
   const pcfColors = usePcfLevelColors();
   const [diagrams, setDiagrams] = useState(project.diagrams);
@@ -3146,8 +3152,9 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
               {ent.simulator && (
               <button
                 onClick={() => setShowSim(true)}
-                className="px-3 py-1 text-xs font-medium rounded-md border text-green-700 border-green-400 hover:bg-green-50"
-                title="Simulate + compare the processes in this project (As-is / To-be)"
+                disabled={!simEnterAllowed}
+                className="px-3 py-1 text-xs font-medium rounded-md border text-green-700 border-green-400 hover:bg-green-50 disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+                title={simEnterAllowed ? "Simulate + compare the processes in this project (As-is / To-be)" : EXAMPLES_ONLY_TITLE}
               >
                 {"◈"} Simulator
               </button>
@@ -3155,8 +3162,9 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
               {ent.processMining && (
               <button
                 onClick={() => setShowMining(true)}
-                className="px-3 py-1 text-xs font-medium rounded-md border text-amber-700 border-amber-400 hover:bg-amber-50"
-                title="Process Mining - discover the real process from event logs + check conformance"
+                disabled={!miningEnterAllowed}
+                className="px-3 py-1 text-xs font-medium rounded-md border text-amber-700 border-amber-400 hover:bg-amber-50 disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+                title={miningEnterAllowed ? "Process Mining - discover the real process from event logs + check conformance" : EXAMPLES_ONLY_TITLE}
               >
                 {"⛏"} Process Mining
               </button>

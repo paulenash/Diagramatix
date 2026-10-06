@@ -43,7 +43,7 @@ export async function GET(req: Request, { params }: Params) {
     throw err;
   }
   const userId = session?.user?.id ?? "";
-  const fg = await gateFeature(userId, "processMining");
+  const fg = await gateFeature(userId, "processMining", id);
   if (fg) return fg;
   // The tier key that has been declared and enforced nowhere since it shipped.
   const tg = await gateFeature(userId, "task-mining");

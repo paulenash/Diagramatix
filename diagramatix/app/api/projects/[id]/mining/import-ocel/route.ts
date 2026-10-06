@@ -37,7 +37,7 @@ export async function POST(req: Request, { params }: Params) {
   }
   // Object-centric import is its own tier: OCEL is sold separately from ordinary
   // process mining, so both keys have to pass.
-  const fg = await gateFeature(session?.user?.id ?? "", "processMining")
+  const fg = await gateFeature(session?.user?.id ?? "", "processMining", id)
     ?? await gateFeature(session?.user?.id ?? "", "process-mining-ocel");
   if (fg) return fg;
   const userId = session?.user?.id ?? null;

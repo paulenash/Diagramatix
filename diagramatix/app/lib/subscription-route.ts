@@ -22,6 +22,8 @@ import { FEATURE_DEF } from "./features/registry";
 import { blockedBy } from "./features/dependencies";
 import { getFeatureStates, requiredLevelNameFor } from "./features/availability";
 import { featureNotice, limitNotice, trialNotice } from "./subscription/messages";
+import { getExampleAccess, mayEnterOnProject } from "./features/exampleAccess";
+import { prisma } from "./db";
 
 /**
  * Feature entitlement gate. Returns null when the user's tier includes the
@@ -32,13 +34,34 @@ import { featureNotice, limitNotice, trialNotice } from "./subscription/messages
  * Use at the ENTRY route(s) of each gated feature so a locked feature can't be
  * reached by calling the API directly. `feature` is any key from the feature
  * registry (app/lib/features/registry.ts). A `disabled` or `hidden` state blocks.
+ *
+ * Pass `projectId` at the Simulator / Process Mining entry routes: a Free or Introductory user (examples-only plans,
+ * features/exampleAccess.ts) is then refused unless that project is an adopted example of the matching kind.
  */
 export async function gateFeature(
   userId: string,
   feature: string,
+  projectId?: string,
 ): Promise<NextResponse | null> {
   const states = await getFeatureStates(userId);
-  if (states[feature] === "available") return null;
+  if (states[feature] === "available") {
+    if (!projectId) return null;
+    const access = await getExampleAccess(userId);
+    if (!access.examplesOnly) return null;
+    const p = await prisma.project.findUnique({ where: { id: projectId }, select: { exampleType: true } });
+    if (mayEnterOnProject(access, feature, p?.exampleType)) return null;
+    const label = FEATURE_DEF[feature]?.label ?? feature;
+    return NextResponse.json(
+      {
+        error: `${label} is available on the ready-made examples only on your subscription.`,
+        message: `Your plan can use ${label} on the examples, not on your own diagrams. Upgrade to use it on your own work.`,
+        metric: "feature",
+        feature,
+        examplesOnly: true,
+      },
+      { status: 403 },
+    );
+  }
   const label = FEATURE_DEF[feature]?.label ?? feature;
   // The notice says WHY and what to do: not in the plan / switched off / held back by a prerequisite,
   // and the lowest plan that has it (subscription/messages.ts).

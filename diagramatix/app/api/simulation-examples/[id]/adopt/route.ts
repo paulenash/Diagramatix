@@ -17,6 +17,7 @@ import { prisma } from "@/app/lib/db";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireRole, WRITE_ROLES, OrgContextError } from "@/app/lib/auth/orgContext";
 import { gateFeature, gateLimit } from "@/app/lib/subscription-route";
+import { isExampleLockedFor } from "@/app/lib/features/exampleAccess";
 import { validateExamplePackage, type ExamplePackage } from "@/app/lib/simulation/examplePackage";
 import { adoptPackage } from "@/app/lib/simulation/adoptPackage";
 import { purgePriorExampleCopies } from "@/app/lib/examples/singleCopy";
@@ -45,6 +46,9 @@ export async function POST(_req: Request, { params }: Params) {
   const { id } = await params;
   const example = await prisma.simulationExample.findFirst({ where: { id, published: true } });
   if (!example) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (await isExampleLockedFor(session.user.id, "simulation", example.id)) {
+    return NextResponse.json({ error: "This example is not included in your subscription.", metric: "feature", feature: "simulator-examples" }, { status: 403 });
+  }
 
   const pkg = (example.package ?? {}) as unknown as ExamplePackage;
   const errs = validateExamplePackage(pkg);

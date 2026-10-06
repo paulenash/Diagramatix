@@ -22,6 +22,7 @@ import {
   type SymbolType,
   type TemplateData,
 } from "@/app/lib/diagram/types";
+import { useExampleAccess, canEnter, EXAMPLES_ONLY_TITLE } from "@/app/hooks/useExampleAccess";
 import { useAutoSave } from "@/app/hooks/useAutoSave";
 import { elementLimitBlock } from "@/app/lib/diagram/elementLimit";
 import { useVoiceSession } from "@/app/hooks/useVoiceSession";
@@ -231,6 +232,8 @@ interface Props {
   /** True when this diagram's project is an adopted example — such projects
    *  can't be shared or published, so the Publish dropdown is hidden. */
   isExampleProject?: boolean;
+  /** The project's example kind ("simulation" | "mining" | …) — Free / Introductory may enter the Simulator only on a simulation example. */
+  projectExampleType?: string | null;
   /** Current user's id, for the "am I the diagram owner?" check that
    *  gates the publish button. */
   currentUserId?: string;
@@ -508,6 +511,7 @@ export function DiagramEditor({
   diagramOwnerCandidates = [],
   canEditDiagramOwner = false,
   isExampleProject = false,
+  projectExampleType = null,
   currentUserId,
   backFromHref = null,
   openFeedbackPanel = false,
@@ -1740,6 +1744,8 @@ export function DiagramEditor({
   // the buttons stay (no flash of missing menu items); the server enforces either way.
   const { states: featureStates, ready: featureStatesReady } = useFeatureStates();
   const rcAllowed = viewEnt ? viewEnt.riskControl : (!featureStatesReady || featureStates["riskControl"] === "available");
+  const exampleAccess = useExampleAccess();
+  const simEnterAllowed = canEnter(exampleAccess, "simulator", projectExampleType);
   const simAllowed = viewEnt ? viewEnt.simulator : (!featureStatesReady || featureStates["simulator"] === "available");
   // Enterprise policy binds everyone EXCEPT an active (non-presenting) SuperAdmin.
   // So a SuperAdmin keeps AI; "Hide SuperAdmin" makes the org policy take effect
@@ -5114,8 +5120,9 @@ export function DiagramEditor({
                 {supportsSimulator && simAllowed && (
                   <button
                     onClick={() => { setClearMenuOpen(false); setShowSimulator(true); }}
-                    className="w-full text-left px-3 py-2 text-xs text-green-700 hover:bg-green-50 font-mono tracking-wider"
-                    title="Enter the Diagramatix Simulator — event-based process simulation"
+                    disabled={!simEnterAllowed}
+                    className="w-full text-left px-3 py-2 text-xs text-green-700 hover:bg-green-50 font-mono tracking-wider disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+                    title={simEnterAllowed ? "Enter the Diagramatix Simulator — event-based process simulation" : EXAMPLES_ONLY_TITLE}
                   >
                     ◈ Simulator
                   </button>
