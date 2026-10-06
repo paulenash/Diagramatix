@@ -59,15 +59,15 @@ describe("T5243 3 — the Properties panel: hide arrow, collapsed on entry", () 
       expect(src).toContain('title="Collapse panel"');
     }
   });
-  it("open: both panels carry the hide arrow, and are unchanged otherwise", () => {
+  it("open: all three panels (project, folder, diagram) carry the hide arrow, and are unchanged otherwise (the Folder panel arrived 2026-10-06)", () => {
     expect(project).toContain('data-testid="properties-open"');
-    expect(project.split("onCollapse={() => setPropertiesOpen(false)}").length - 1).toBe(2);
+    expect(project.split("onCollapse={() => setPropertiesOpen(false)}").length - 1).toBe(3);
     const open = project.indexOf('data-testid="properties-open"');
     expect(project.indexOf("<DiagramPropertiesPanel", open)).toBeGreaterThan(open);
     expect(project.indexOf("<ProjectPropertiesPanel", open)).toBeGreaterThan(open);
   });
   it("it is not drawn at all when there is no panel to show (nothing new appears on screens that had none)", () => {
-    expect(project).toContain("if (!diagramPanel && !projectPanel) return null;");
+    expect(project).toContain("if (!diagramPanel && !projectPanel && !folderPanel) return null;");
   });
 });
 

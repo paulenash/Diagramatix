@@ -1,5 +1,6 @@
 "use client";
 
+import { MoveToProjectDialog } from "@/app/components/MoveToProjectDialog";
 import { isOrgAdminRole } from "@/app/lib/auth/orgAdminRole";
 import { useState, useRef, useEffect } from "react";
 import { showGateNotice } from "@/app/lib/subscription/gateNotice";
@@ -193,32 +194,13 @@ function DiagramCard({
         </div>
         <div className="flex gap-1 opacity-0 group-hover:opacity-100">
           {projects.length > 0 && (
-            <div className="relative">
-              <button
-                onClick={(e) => { e.stopPropagation(); setShowMove((v) => !v); }}
-                className="text-gray-400 hover:text-blue-500 text-xs px-1"
-                title="Move to project"
-              >
-                ↗
-              </button>
-              {showMove && (
-                <div
-                  onClick={(e) => e.stopPropagation()}
-                  className="absolute right-0 top-5 z-20 bg-white border border-gray-200 rounded shadow-lg min-w-36 py-1"
-                >
-                  <p className="px-3 py-1 text-xs text-gray-400 font-medium uppercase tracking-wide">Move to</p>
-                  {projects.map((p) => (
-                    <button
-                      key={p.id}
-                      onClick={() => { onMove(diagram.id, p.id); setShowMove(false); }}
-                      className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
-                    >
-                      {p.name}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowMove(true); }}
+              className="text-gray-400 hover:text-blue-500 text-xs px-1"
+              title="Move to project"
+            >
+              ↗
+            </button>
           )}
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(diagram.id); }}
@@ -228,6 +210,18 @@ function DiagramCard({
           </button>
         </div>
       </div>
+      {/* One Move-to-project dialog for every tile (Paul, 2026-10-06): wide, scrolling, with a Close button. Shielded so a click in it does not open the diagram. */}
+      {showMove && (
+        <div onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+          <MoveToProjectDialog
+            diagramName={diagram.name}
+            projects={projects}
+            sandpit={false}
+            onClose={() => setShowMove(false)}
+            onPick={(pid) => { setShowMove(false); onMove(diagram.id, pid); }}
+          />
+        </div>
+      )}
       <div className="mt-1">
         <h3 className="font-medium text-gray-900 text-xs truncate">{diagram.name}</h3>
         <div className="flex items-center gap-2 mt-0.5">

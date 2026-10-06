@@ -25,6 +25,11 @@ import { useFeatureColors } from "@/app/lib/theme/useFeatureColors";
 import { DiagramFeatureBadges } from "@/app/components/DiagramFeatureBadges";
 import { diagramFeatureBadges, type DiagramBadgeKey } from "@/app/lib/diagram/diagramFeatureBadges";
 import { matchesTreeFilter, isTreeFilterActive, EMPTY_TREE_FILTER, type TreeFilter } from "@/app/lib/diagram/treeFilter";
+import { ContextMenuPopup, type ContextMenuItem } from "@/app/components/ContextMenuPopup";
+import { MoveToProjectDialog } from "@/app/components/MoveToProjectDialog";
+import { RenameDialog } from "@/app/components/RenameDialog";
+import { summariseFolder } from "@/app/lib/projects/folderSummary";
+import { FolderPropertiesPanel } from "./FolderPropertiesPanel";
 import {
   DEFAULT_TILE_LAYOUT, TILE_LAYOUTS, TILE_LAYOUT_SPEC,
   readTileLayout, writeTileLayout, tileColumnsFor, type TileLayout,
@@ -922,6 +927,11 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
   // Single-clicked "preview" diagram → shows the read/edit Diagram Properties
   // aside (item 1). Distinct from the Ctrl/Shift multi-select set above.
   const [previewDiagramId, setPreviewDiagramId] = useState<string | null>(null);
+  // Right-click menus (Paul, 2026-10-06). The browser's own menu is off on this screen; these replace it on a diagram (tree row or tile),
+  // a folder, and the project. "Move to project" and "Rename" are small dialogs, never browser prompts.
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; kind: "diagram" | "folder" | "project"; id: string } | null>(null);
+  const [moveDialogFor, setMoveDialogFor] = useState<string | null>(null);   // a diagram id
+  const [renameDlg, setRenameDlg] = useState<{ kind: "diagram" | "folder" | "project"; id: string; name: string } | null>(null);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [showBulkMoveDialog, setShowBulkMoveDialog] = useState(false);
   const [projectColorConfig, setProjectColorConfig] = useState<SymbolColorConfig>((project.colorConfig as SymbolColorConfig | null) ?? {});
@@ -2140,6 +2150,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
       setLastSelectedDiagramId(null);
     }
     setPreviewDiagramId(diagramId);
+    setPropertiesOpen(true);
   }
 
   function clearDiagramSelection() {
@@ -2305,6 +2316,67 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
     if (toRemove.has(selectedFolderId)) setSelectedFolderId(ROOT_ID);
   }
 
+  /** Open a right-click menu here, and keep the browser's own menu away. */
+  function openCtx(e: React.MouseEvent, kind: "diagram" | "folder" | "project", id: string) {
+    e.preventDefault(); e.stopPropagation();
+    setCtxMenu({ x: e.clientX, y: e.clientY, kind, id });
+  }
+  function setFolderCollapsed(folderId: string, collapsed: boolean) {
+    updateTree(t => ({ ...t, folders: t.folders.map(f => f.id === folderId ? { ...f, collapsed } : f) }));
+  }
+  /** Apply a rename from the dialog: a folder in the tree, a diagram through the API, or the project. */
+  function applyRename(kind: "diagram" | "folder" | "project", id: string, name: string) {
+    if (kind === "folder") {
+      updateTree(t => ({ ...t, folders: t.folders.map(f => f.id === id ? { ...f, name } : f) }));
+    } else if (kind === "diagram") {
+      fetch(`/api/diagrams/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) })
+        .then(res => { if (!res.ok) console.error("Failed to rename diagram:", res.status); })
+        .catch(err => console.error("Failed to rename diagram:", err));
+      setDiagrams(prev => prev.map(d => d.id === id ? { ...d, name } : d));
+    } else {
+      setProjectName(name);
+      saveProjectField({ name });
+    }
+  }
+  /** The items of the right-click menu in force. */
+  function ctxItems(m: { kind: "diagram" | "folder" | "project"; id: string }): ContextMenuItem[] {
+    const ro = !!readOnly;
+    const roTitle = ro ? "Read-only" : undefined;
+    if (m.kind === "diagram") {
+      const d = diagrams.find(x => x.id === m.id);
+      return [
+        { label: "Open", onClick: () => handleOpenDiagram(m.id) },
+        { label: "Rename", disabled: ro, title: roTitle, onClick: () => setRenameDlg({ kind: "diagram", id: m.id, name: d?.name ?? "" }) },
+        { label: "Clone", disabled: ro, title: roTitle, onClick: () => handleCloneDiagram(m.id) },
+        { label: "Move to project…", disabled: ro, title: roTitle, onClick: () => setMoveDialogFor(m.id) },
+        { label: "Delete", danger: true, separatorBefore: true, disabled: ro, title: roTitle, onClick: () => handleDeleteDiagram(m.id) },
+      ];
+    }
+    if (m.kind === "folder") {
+      const folder = folderTree.folders.find(f => f.id === m.id);
+      const parentId = folder ? (folder.parentId ?? ROOT_ID) : ROOT_ID;
+      const sibs = getOrderedChildFolders(parentId).map(f => f.id);
+      const at = sibs.indexOf(m.id);
+      const hasContent = folderHasContent(m.id);
+      return [
+        { label: "Rename", disabled: ro, title: roTitle, onClick: () => setRenameDlg({ kind: "folder", id: m.id, name: folder?.name ?? "" }) },
+        { label: "New Subfolder", disabled: ro, title: roTitle, onClick: () => { setFolderCollapsed(m.id, false); handleAddFolder(m.id); } },
+        { label: "Expand", separatorBefore: true, onClick: () => setFolderCollapsed(m.id, false) },
+        { label: "Collapse", onClick: () => setFolderCollapsed(m.id, true) },
+        { label: "Move up", separatorBefore: true, disabled: ro || at <= 0, title: ro ? roTitle : at <= 0 ? "Already first" : undefined, onClick: () => moveTreeItem(m.id, -1) },
+        { label: "Move down", disabled: ro || at < 0 || at >= sibs.length - 1, title: ro ? roTitle : at >= sibs.length - 1 ? "Already last" : undefined, onClick: () => moveTreeItem(m.id, 1) },
+        { label: "Delete", danger: true, separatorBefore: true, disabled: ro || hasContent, title: ro ? roTitle : hasContent ? "Cannot delete: the folder is not empty" : undefined, onClick: () => handleDeleteFolder(m.id) },
+      ];
+    }
+    return [
+      { label: "Rename", disabled: ro, title: roTitle, onClick: () => setRenameDlg({ kind: "project", id: project.id, name: projectName }) },
+      { label: "New Folder", disabled: ro, title: roTitle, onClick: () => handleAddFolder(ROOT_ID) },
+      { label: "Refresh", separatorBefore: true, onClick: () => { void refreshProjectData(); } },
+      { label: "Expand all", onClick: () => setAllDescendantsCollapsed(ROOT_ID, false) },
+      { label: "Collapse all", onClick: () => setAllDescendantsCollapsed(ROOT_ID, true) },
+    ];
+  }
+
   function startRename(id: string, currentName: string) {
     setEditingId(id);
     setEditingName(currentName);
@@ -2441,7 +2513,12 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
             : "text-gray-700 hover:bg-gray-100"
           }`}
           style={{ paddingLeft: depth * 12 + 4, ...(highlightNonApqc && isNonApqcFolder ? { boxShadow: `inset 3px 0 0 ${apqcTone.text}` } : {}) }}
-          onClick={() => { setSelectedFolderId(folderId); setSelectedTreeItem(isRoot ? null : folderId); }}
+          onClick={() => {
+            setSelectedFolderId(folderId); setSelectedTreeItem(isRoot ? null : folderId);
+            // Left-click shows the Project's / the Folder's Properties panel (Paul, 2026-10-06).
+            setPreviewDiagramId(null); setPropertiesOpen(true);
+          }}
+          onContextMenu={(e) => openCtx(e, isRoot ? "project" : "folder", folderId)}
           onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add("bg-blue-50"); }}
           onDragLeave={(e) => { e.currentTarget.classList.remove("bg-blue-50"); }}
           onDrop={(e) => {
@@ -2612,11 +2689,13 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
                     setLastSelectedDiagramId(d.id);
                     return;
                   }
-                  // Plain click in the tree: highlight only, clear multi-select.
+                  // Plain click in the tree: highlight, clear multi-select, and show the diagram's Properties panel (Paul, 2026-10-06).
                   if (selectedDiagramIds.size > 0) clearDiagramSelection();
                   setSelectedTreeItem(d.id);
                   setLastSelectedDiagramId(d.id);
+                  setPreviewDiagramId(d.id); setPropertiesOpen(true);
                 }}
+                onContextMenu={(e) => openCtx(e, "diagram", d.id)}
                 onDoubleClick={() => handleOpenDiagram(d.id)}
               >
                 <span className="w-3" />
@@ -2682,7 +2761,11 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
     // own — the tile area, the nav tree and the properties panel. dvh, not vh,
     // so a phone's collapsing address bar cannot hide the last row of tiles
     // (as the /m shell does).
-    <div className={`h-dvh ${isImpersonating ? "bg-orange-50" : "dgx-dashboard-bg"} flex flex-col overflow-hidden`}>
+    <div
+      className={`h-dvh ${isImpersonating ? "bg-orange-50" : "dgx-dashboard-bg"} flex flex-col overflow-hidden`}
+      // No browser right-click menu in any panel (Paul, 2026-10-06) — except in a text box, where Cut / Copy / Paste are wanted.
+      onContextMenu={(e) => { if ((e.target as HTMLElement).closest?.("input, textarea, select, [contenteditable='true']")) return; e.preventDefault(); }}
+    >
       {isImpersonating && viewingAsName !== undefined && viewingAsEmail !== undefined && (
         <ImpersonationBanner viewingAsName={viewingAsName ?? ""} viewingAsEmail={viewingAsEmail ?? ""} mode={impersonationMode} />
       )}
@@ -3346,7 +3429,8 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
                     onDelete={handleDeleteDiagram}
                     onClone={handleCloneDiagram}
                     onTranslate={handleTranslateDiagram}
-                    onMove={handleMoveDiagram}
+                    onRequestMove={(id) => setMoveDialogFor(id)}
+                    onContextMenu={(e, id) => openCtx(e, "diagram", id)}
                     onCardClick={handleDiagramCardClick}
                     onOpen={handleOpenDiagram}
                     selected={selectedDiagramIds.has(d.id)}
@@ -3368,14 +3452,16 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
         {(() => {
           const diagramPanel = !!previewDiagramId && diagrams.some((x) => x.id === previewDiagramId);
           const projectPanel = !previewDiagramId && selectedFolderId === ROOT_ID && selectedDiagramIds.size === 0 && !selectedDiagram;
-          if (!diagramPanel && !projectPanel) return null;
+          // A folder entry was clicked: its Properties panel, a summary of what it holds (Paul, 2026-10-06).
+          const folderPanel = !diagramPanel && selectedFolderId !== ROOT_ID && folderTree.folders.some((f) => f.id === selectedFolderId);
+          if (!diagramPanel && !projectPanel && !folderPanel) return null;
           if (!propertiesOpen) {
             return (
               <div data-testid="properties-collapsed" role="button" aria-label="Show properties" onClick={() => setPropertiesOpen(true)} title="Expand panel"
                 className="w-6 border-l border-gray-200 bg-gray-50 flex flex-col items-center cursor-pointer hover:bg-gray-100 shrink-0">
                 <span className="text-gray-400 text-xs mt-2">{"◀"}</span>
                 <span className="text-[9px] text-gray-500 font-semibold uppercase tracking-widest mt-3"
-                  style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}>{diagramPanel ? "Diagram" : "Project"}</span>
+                  style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}>{diagramPanel ? "Diagram" : folderPanel ? "Folder" : "Project"}</span>
               </div>
             );
           }
@@ -3395,6 +3481,24 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
               onCollapse={() => setPropertiesOpen(false)}
               onOpen={() => handleOpenDiagram(d.id)}
               onLocalPatch={(patch) => setDiagrams((prev) => prev.map((x) => x.id === d.id ? { ...x, ...patch } : x))}
+              parentNames={((d.data as { parentDiagramIds?: string[] } | undefined)?.parentDiagramIds ?? [])
+                .map((pid) => diagrams.find((x) => x.id === pid)?.name)
+                .filter((n): n is string => !!n)}
+            />
+          );
+        })()}
+
+        {/* Right: Folder Properties — a folder entry was clicked in the navigation tree. */}
+        {!previewDiagramId && selectedFolderId !== ROOT_ID && (() => {
+          const fo = folderTree.folders.find((f) => f.id === selectedFolderId);
+          if (!fo) return null;
+          return (
+            <FolderPropertiesPanel
+              key={fo.id}
+              name={fo.name}
+              summary={summariseFolder(folderTree, diagrams, fo.id, ROOT_ID)}
+              onCollapse={() => setPropertiesOpen(false)}
+              onOpenDiagram={(id) => { setPreviewDiagramId(id); setSelectedTreeItem(id); }}
             />
           );
         })()}
@@ -3428,6 +3532,30 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
           );
         })()}
       </div>
+
+      {ctxMenu && <ContextMenuPopup x={ctxMenu.x} y={ctxMenu.y} items={ctxItems(ctxMenu)} onClose={() => setCtxMenu(null)}
+        label={ctxMenu.kind === "diagram" ? "Diagram menu" : ctxMenu.kind === "folder" ? "Folder menu" : "Project menu"} />}
+
+      {moveDialogFor && (() => {
+        const d = diagrams.find((x) => x.id === moveDialogFor);
+        return (
+          <MoveToProjectDialog
+            diagramName={d?.name ?? "this diagram"}
+            projects={otherProjects}
+            onClose={() => setMoveDialogFor(null)}
+            onPick={(pid) => { const id = moveDialogFor; setMoveDialogFor(null); void handleMoveDiagram(id, pid); }}
+          />
+        );
+      })()}
+
+      {renameDlg && (
+        <RenameDialog
+          title={renameDlg.kind === "diagram" ? "Rename diagram" : renameDlg.kind === "folder" ? "Rename folder" : "Rename project"}
+          initial={renameDlg.name}
+          onClose={() => setRenameDlg(null)}
+          onSave={(name) => { const r = renameDlg; setRenameDlg(null); applyRename(r.kind, r.id, name); }}
+        />
+      )}
 
       {showPcfCoverage && (
         <PcfCoveragePanel projectId={project.id} onClose={() => setShowPcfCoverage(false)} />
@@ -4688,7 +4816,8 @@ function DiagramCard({
   onDelete,
   onClone,
   onTranslate,
-  onMove,
+  onRequestMove,
+  onContextMenu,
   onCardClick,
   onOpen,
   selected,
@@ -4703,7 +4832,9 @@ function DiagramCard({
   onDelete: (id: string) => void;
   onClone: (id: string) => void;
   onTranslate: (id: string) => void;
-  onMove: (diagramId: string, projectId: string | null) => void;
+  /** Ask for the Move-to-project dialog (it lives in the screen, so the tile, the menu and the tree all use the one). */
+  onRequestMove: (diagramId: string) => void;
+  onContextMenu: (e: React.MouseEvent, diagramId: string) => void;
   onCardClick: (
     diagramId: string,
     mods: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean },
@@ -4717,7 +4848,6 @@ function DiagramCard({
   /** 2-wide layout: double width (from the grid), double height, large thumbnail. */
   large?: boolean;
 }) {
-  const [showMove, setShowMove] = useState(false);
   // Colour-code the tile with a soft tint of the diagram-type colour.
   const typeStyle = useDiagramTypeStyles()(diagram.type);
   const tileTint = lightenHex(typeStyle.bgColor, 0.5);
@@ -4745,7 +4875,8 @@ function DiagramCard({
         shiftKey: e.shiftKey, ctrlKey: e.ctrlKey, metaKey: e.metaKey,
       })}
       onDoubleClick={(e) => { e.preventDefault(); onOpen(diagram.id); }}
-      title={`${diagram.name} — double-click to open`}
+      onContextMenu={(e) => onContextMenu(e, diagram.id)}
+      title={`${diagram.name} — double-click to open · right-click for more`}
       style={{ backgroundColor: tileTint, ...(nonApqc && apqcColor && !selected && !preview ? { boxShadow: `0 0 0 2px ${apqcColor}` } : {}) }}
       className={`rounded-md ${sz.card} hover:shadow-sm cursor-pointer group transition-all relative ${
         selected
@@ -4778,28 +4909,11 @@ function DiagramCard({
               <path d="M11 5V2.5A1.5 1.5 0 009.5 1H2.5A1.5 1.5 0 001 2.5v7A1.5 1.5 0 002.5 11H5" />
             </svg>
           </button>
-          <div className="relative">
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowMove((v) => !v); }}
-              className={`text-gray-400 hover:text-blue-500 ${sz.glyph} px-0.5`}
-              title="Move to project..."
-            >{"\u2197"}</button>
-            {showMove && (
-              <div onClick={(e) => e.stopPropagation()}
-                className="absolute right-0 top-5 z-20 bg-white border border-gray-200 rounded shadow-lg min-w-36 py-1">
-                <p className="px-3 py-1 text-[10px] text-gray-400 font-medium uppercase tracking-wide">Move to project</p>
-                {otherProjects.map((p) => (
-                  <button key={p.id}
-                    onClick={() => { onMove(diagram.id, p.id); setShowMove(false); }}
-                    className="block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-50">{p.name}</button>
-                ))}
-                <hr className="my-1 border-gray-100" />
-                <button
-                  onClick={() => { onMove(diagram.id, null); setShowMove(false); }}
-                  className="block w-full text-left px-3 py-1 text-xs text-gray-500 hover:bg-gray-50 italic">Sandpit</button>
-              </div>
-            )}
-          </div>
+          <button
+            onClick={(e) => { e.stopPropagation(); onRequestMove(diagram.id); }}
+            className={`text-gray-400 hover:text-blue-500 ${sz.glyph} px-0.5`}
+            title="Move to project..."
+          >{"↗"}</button>
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(diagram.id); }}
             className={`text-gray-400 hover:text-red-500 ${sz.glyph} px-0.5`}
