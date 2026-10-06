@@ -40,6 +40,8 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isSuperuser, SUPERUSER_EMAILS } from "@/app/lib/superuser";
 import { recordAudit, AUDIT, ipFromRequest } from "@/app/lib/audit";
+import { eraseUser } from "@/app/lib/account/eraseUser";
+import { endSubscriptionNow } from "@/app/lib/stripe/endSubscription";
 
 export async function DELETE(
   req: Request,
@@ -100,18 +102,26 @@ export async function DELETE(
     );
   }
 
-  // Single delete — Prisma's onDelete:Cascade rules on the dependents
-  // (Diagram, Project, OrgMember, DiagramTemplate, Prompt, DiagramRules,
-  // UsageCounter) handle the rest. DiagramHistory cascades from Diagram.
+  // A complete erasure — the same one the person gets from their own "delete my account" (eraseUser): their live Stripe subscription is
+  // ended first (so they are never billed for a deleted account), then the user and everything cascading from them go, then the AI source
+  // images and phone Generate runs that hang off the org rather than the user, then any org left empty. A cancelled customer's data is
+  // KEPT until a SuperAdmin does this — on request, or because the person asked.
   await recordAudit({
     actorUserId: session?.user?.id ?? null, actorEmail: session?.user?.email ?? null,
     action: AUDIT.UserDelete, targetType: "user", targetId: target.id,
     meta: { targetEmail: target.email, projects: target._count.projects, diagrams: target._count.diagrams },
     ip: ipFromRequest(req),
   });
-  await prisma.user.delete({ where: { id } });
+  let orgsRemoved = 0;
+  try {
+    ({ orgsRemoved } = await eraseUser(id, { endSubscription: endSubscriptionNow }));
+  } catch (err) {
+    console.error(`[admin DELETE user ${id}] erase failed:`, err);
+    return NextResponse.json({ error: "Could not end the user's Stripe subscription, so nothing was deleted. Try again, or end it in the Stripe dashboard first." }, { status: 502 });
+  }
 
   return NextResponse.json({
+    orgsRemoved,
     deleted: {
       id: target.id,
       email: target.email,

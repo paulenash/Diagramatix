@@ -11,6 +11,7 @@ import {
 } from "@/app/lib/auth/orgContext";
 import { recordAudit, AUDIT, ipFromRequest } from "@/app/lib/audit";
 import { eraseUser } from "@/app/lib/account/eraseUser";
+import { endSubscriptionNow } from "@/app/lib/stripe/endSubscription";
 
 /** GET /api/account — return current user profile + org details */
 export async function GET() {
@@ -179,6 +180,11 @@ export async function DELETE(req: Request) {
     ip: ipFromRequest(req),
   });
 
-  const { orgsRemoved } = await eraseUser(userId);
-  return NextResponse.json({ deleted: true, orgsRemoved });
+  try {
+    const { orgsRemoved } = await eraseUser(userId, { endSubscription: endSubscriptionNow });
+    return NextResponse.json({ deleted: true, orgsRemoved });
+  } catch (err) {
+    console.error("[account DELETE] erase failed:", err);
+    return NextResponse.json({ error: "We could not end your paid subscription, so nothing was deleted. Please try again or contact support." }, { status: 502 });
+  }
 }

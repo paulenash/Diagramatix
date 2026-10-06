@@ -11,12 +11,22 @@ import { prisma } from "@/app/lib/db";
  * no projects/diagrams. `Project`/`Diagram` are onDelete:Restrict on the org, so
  * an org that still has another member's data is skipped (never errors the erase).
  */
-export async function eraseUser(userId: string): Promise<{ orgsRemoved: number }> {
+export async function eraseUser(
+  userId: string,
+  deps: {
+    /** Ends the person's Stripe subscription (stripe/endSubscription.ts) so an erased account is never still billed. The routes pass it;
+     *  if it throws, NOTHING is deleted. */
+    endSubscription?: (subscriptionId: string) => Promise<void>;
+  } = {},
+): Promise<{ orgsRemoved: number }> {
   const me = await prisma.user.findUnique({
     where: { id: userId },
-    select: { orgMembers: { select: { orgId: true } } },
+    select: { stripeSubscriptionId: true, orgMembers: { select: { orgId: true } } },
   });
   const orgIds = me?.orgMembers.map((m) => m.orgId) ?? [];
+
+  // First, so that a failure here leaves the person and their data exactly as they were.
+  if (me?.stripeSubscriptionId && deps.endSubscription) await deps.endSubscription(me.stripeSubscriptionId);
 
   await prisma.user.delete({ where: { id: userId } });
 
