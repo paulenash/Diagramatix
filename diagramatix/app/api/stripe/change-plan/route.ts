@@ -40,7 +40,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "You do not have an active paid subscription to change. Use Upgrade to subscribe." }, { status: 409 });
   }
   if (user.subscriptionEndsAt) {
-    return NextResponse.json({ error: "Your subscription is set to end. Resume it in Manage Subscription before changing plan." }, { status: 409 });
+    return NextResponse.json({ error: "Your subscription is set to end. Resume it (System ▸ Resume Subscription) before changing plan." }, { status: 409 });
   }
 
   const kind = changeKind(user.subscriptionLevelId ?? "free", tierId);

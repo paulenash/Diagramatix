@@ -122,6 +122,34 @@ export async function cancelPendingChange(stripe: PlanChangeStripe, scheduleId: 
   await stripe.subscriptionSchedules.release(scheduleId);
 }
 
+/**
+ * Cancel at the end of the current subscription month (no refund; the person keeps their plan until then). A pending downgrade is
+ * released first — cancelling supersedes it. Returns when the subscription ends.
+ */
+export async function cancelAtPeriodEnd(stripe: PlanChangeStripe, subscriptionId: string): Promise<{ endsAt: Date | null }> {
+  const sub = (await stripe.subscriptions.retrieve(subscriptionId)) as SubShape;
+  const sched = scheduleIdOf(sub);
+  if (sched) await stripe.subscriptionSchedules.release(sched);
+  await stripe.subscriptions.update(subscriptionId, { cancel_at_period_end: true });
+  return { endsAt: periodEndOf(sub) };
+}
+
+/** Take back a cancellation that has not taken effect yet: the subscription simply carries on. */
+export async function resumeSubscription(stripe: PlanChangeStripe, subscriptionId: string): Promise<void> {
+  await stripe.subscriptions.update(subscriptionId, { cancel_at_period_end: false });
+}
+
+/** Pure. What the person is told before cancelling. */
+export function cancelNote(planName: string, endsAt: Date | null): string {
+  const on = endsAt ? ` (${fmtDate(endsAt)})` : "";
+  return `Your subscription will end at the end of your current subscription month${on}. You keep your ${planName} plan until then and are not charged again. There is no pro-rata refund for the part of the month already paid. After that you move to the Free plan; your projects and diagrams are not deleted, and you can subscribe again at any time.`;
+}
+
+/** Pure. What the person is told before resuming. */
+export function resumeNote(planName: string): string {
+  return `Your ${planName} subscription will carry on and renew as usual instead of ending.`;
+}
+
 const fmtDate = (d: Date) => d.toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" });
 
 /** Pure. A date as the plan window shows it ("6 November 2026"). */

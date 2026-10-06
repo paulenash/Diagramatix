@@ -6,7 +6,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import {
-  applyPlanChange, cancelPendingChange, changeKind, changeNote, changeOptions, periodEndOf, SUBSCRIBE_NOTE, type PlanChangeStripe,
+  applyPlanChange, cancelAtPeriodEnd, cancelNote, cancelPendingChange, changeKind, resumeNote, resumeSubscription, changeNote, changeOptions, periodEndOf, SUBSCRIBE_NOTE, type PlanChangeStripe,
 } from "@/app/lib/stripe/planChange";
 
 describe("T5272 which changes are offered", () => {
@@ -108,11 +108,20 @@ describe("T5272 Stripe: downgrade", () => {
 
 describe("T5272 the chips and the window", () => {
   const dash = readFileSync("app/(dashboard)/dashboard/DashboardClient.tsx", "utf8");
-  it("the plan chip is display-only for a customer, with Upgrade (Free) or Change Subscription (paid) beside it", () => {
+  it("the plan chip is display-only for a customer; only FREE keeps a prominent Upgrade chip on the top panel", () => {
     expect(dash).toContain("const planChip = !usageSnapshot.isAdmin && !usageSnapshot.comp;");
     expect(dash).toContain('const Chip = planChip ? "div" : "button";');
-    expect(dash).toContain('{onFree ? "Upgrade" : "Change Subscription"}');
+    expect(dash).toContain("{planChip && onFree && (");
+    expect(dash).not.toContain('{onFree ? "Upgrade" : "Change Subscription"}');   // no paid-plan chip on the top panel (2026-10-07)
     expect(dash).toContain('data-testid="plan-chip"');
+  });
+  it("the System menu holds Upgrade (Free) / Change Subscription (paid) and Cancel — or Resume — Subscription (paid), for a customer only", () => {
+    expect(dash).toContain('data-testid="menu-change-subscription"');
+    expect(dash).toContain('"Upgrade\\u2026" : "Change Subscription\\u2026"');
+    expect(dash).toContain('data-testid="menu-cancel-subscription"');
+    expect(dash).toContain('"Resume Subscription\\u2026" : "Cancel Subscription\\u2026"');
+    expect(dash).toContain("usageSnapshot && !usageSnapshot.isAdmin && !usageSnapshot.comp && (");
+    expect(dash).toContain('"/api/stripe/cancel-subscription"');
   });
   it('the chip no longer says "Subscription:"', () => {
     expect(dash).not.toContain("<span>Subscription:</span>");
@@ -148,5 +157,43 @@ describe("T5272 the route and the webhook", () => {
     const sub = readFileSync("app/lib/subscription.ts", "utf8");
     expect(sub).toContain("periodEnd: user.currentPeriodEnd");
     expect(sub).toContain("pendingChange: user.pendingLevelId && user.pendingAt");
+  });
+});
+
+describe("T5272 cancel and resume", () => {
+  it("cancel releases a pending downgrade, then ends the subscription at the period end (no refund)", async () => {
+    const { stripe, calls } = fake({ schedule: "sched_old" });
+    const r = await cancelAtPeriodEnd(stripe, "sub_1");
+    const order = calls.map((c) => c.fn);
+    expect(order.indexOf("schedules.release")).toBeLessThan(order.indexOf("subscriptions.update"));
+    const upd = calls.find((c) => c.fn === "subscriptions.update")!;
+    expect(upd.args).toEqual(["sub_1", { cancel_at_period_end: true }]);
+    expect(r.endsAt?.getTime()).toBe(1_800_000_000_000);
+  });
+  it("cancel without a pending downgrade touches only the subscription", async () => {
+    const { stripe, calls } = fake();
+    await cancelAtPeriodEnd(stripe, "sub_1");
+    expect(calls.some((c) => c.fn === "schedules.release")).toBe(false);
+  });
+  it("resume turns cancel-at-period-end off", async () => {
+    const { stripe, calls } = fake();
+    await resumeSubscription(stripe, "sub_1");
+    expect(calls).toEqual([{ fn: "subscriptions.update", args: ["sub_1", { cancel_at_period_end: false }] }]);
+  });
+  it("the wording says when it ends, that there is no refund, and that nothing is deleted", () => {
+    const n = cancelNote("Professional", new Date("2026-11-06T00:00:00Z"));
+    expect(n).toContain("end of your current subscription month");
+    expect(n).toContain("keep your Professional plan until then");
+    expect(n).toContain("no pro-rata refund");
+    expect(n).toContain("not deleted");
+    expect(resumeNote("Professional")).toContain("carry on");
+  });
+  it("the route: a live subscription only, no admin or read-only viewer, cancel only when not already ending, resume only when ending", () => {
+    const route = readFileSync("app/api/stripe/cancel-subscription/route.ts", "utf8");
+    expect(route).toContain("isReadOnlyImpersonation(session, await cookies())");
+    expect(route).toContain("isSuperuser(session)");
+    expect(route).toContain('if (body.action === "cancel" && ending)');
+    expect(route).toContain('if (body.action === "resume" && !ending)');
+    expect(route).toContain("applySubscriptionToUser(user.id, fresh, { reassignTrial: false })");
   });
 });

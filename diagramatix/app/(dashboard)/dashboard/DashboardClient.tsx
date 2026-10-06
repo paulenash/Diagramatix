@@ -19,6 +19,7 @@ import { AiKeySettings } from "@/app/components/AiKeySettings";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { PromptDialog } from "@/app/components/PromptDialog";
 import { UsagePopover } from "@/app/components/UsagePopover";
+import { cancelNote, resumeNote } from "@/app/lib/stripe/planChange";
 import { NotificationsBell } from "@/app/components/NotificationsBell";
 import { TierPicker, type TierCard } from "@/app/components/TierPicker";
 import { ReviewsSection } from "./ReviewsSection";
@@ -302,6 +303,10 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
     return nv;
   });
   const [showUsagePopover, setShowUsagePopover] = useState(false);
+  // System ▸ Cancel / Resume Subscription: which dialog is open, whether the request is running, and any error it came back with.
+  const [subDlg, setSubDlg] = useState<"cancel" | "resume" | null>(null);
+  const [subBusy, setSubBusy] = useState(false);
+  const [subErr, setSubErr] = useState<string | null>(null);
   // Welcome tier picker — initialised from the SSR-fetched flag. After
   // the user picks or skips, we close locally (router.refresh() is fired
   // by the picker itself so the next render gets hasChosenTier=true).
@@ -1520,8 +1525,9 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           />
           <span className="text-xs text-gray-900 ml-1" title="Diagramatix product version — major.minor.build">v{PRODUCT_VERSION}.{version ?? 0}</span>
           {usageSnapshot && (() => {
-            // A customer on a plan (not a SuperAdmin, not on a comp) gets the plan chip as a DISPLAY, with a separate chip beside it:
-            // "Upgrade" on Free, "Change Subscription" on a paid plan (Paul, 2026-10-06). The SuperAdmin and a comp holder keep the one
+            // A customer on a plan (not a SuperAdmin, not on a comp) gets the plan chip as a DISPLAY. On FREE a prominent "Upgrade" chip
+            // sits beside it — Paul wants that one as visible as possible; on a PAID plan the options (Change / Cancel / Resume
+            // Subscription) live in the System menu, not the top panel (2026-10-07). The SuperAdmin and a comp holder keep the one
             // clickable chip that opens the usage window.
             const planChip = !usageSnapshot.isAdmin && !usageSnapshot.comp;
             const onFree = usageSnapshot.tier.id === "free";
@@ -1568,14 +1574,14 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                 <span className="text-xs font-semibold">• expired</span>
               )}
             </Chip>
-            {planChip && (
+            {planChip && onFree && (
               <button
                 onClick={() => setShowUsagePopover(true)}
                 data-testid="plan-chip"
                 className="inline-flex items-center text-sm font-medium border rounded-md px-3 py-1.5 transition-colors text-white border-blue-600 bg-blue-600 hover:bg-blue-700"
-                title={onFree ? "See the plans you can upgrade to" : "Upgrade or downgrade your subscription"}
+                title="See the plans you can upgrade to"
               >
-                {onFree ? "Upgrade" : "Change Subscription"}
+                Upgrade
               </button>
             )}
             </>);
@@ -1880,6 +1886,33 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                     >
                       Collaboration Groups
                     </button>
+                    {/* Subscription — a customer on a plan (not a SuperAdmin, not on a comp). Free: Upgrade (also a chip on the top panel).
+                        Paid: Change Subscription, and Cancel — or Resume once a cancellation is pending. */}
+                    {usageSnapshot && !usageSnapshot.isAdmin && !usageSnapshot.comp && (
+                      <>
+                        <div className="border-t border-gray-100" />
+                        <button
+                          data-testid="menu-change-subscription"
+                          onClick={() => { setFileMenuOpen(false); setShowUsagePopover(true); }}
+                          title={usageSnapshot.tier.id === "free" ? "See the plans you can upgrade to" : "Upgrade or downgrade your subscription"}
+                          className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                        >
+                          {usageSnapshot.tier.id === "free" ? "Upgrade\u2026" : "Change Subscription\u2026"}
+                        </button>
+                        {usageSnapshot.tier.id !== "free" && (
+                          <button
+                            data-testid="menu-cancel-subscription"
+                            onClick={() => { setFileMenuOpen(false); setSubErr(null); setSubDlg(usageSnapshot.billing.endsAt ? "resume" : "cancel"); }}
+                            title={usageSnapshot.billing.endsAt
+                              ? "Your subscription is set to end — resume it so it carries on"
+                              : "End your subscription at the end of the current subscription month"}
+                            className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                          >
+                            {usageSnapshot.billing.endsAt ? "Resume Subscription\u2026" : "Cancel Subscription\u2026"}
+                          </button>
+                        )}
+                      </>
+                    )}
                     {/* Admin moved out of the System menu and into the
                         top-level header bar as the leftmost menu item. */}
                   </div>
@@ -3510,6 +3543,31 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           skipIntro={skipMiningIntro}
           onClose={() => setMiningProject(null)}
           onOpenSimulator={(studyId) => { const p = miningProject; setMiningProject(null); setSimFromMining(p); setSimStudyId(studyId ?? null); setSimProject(p); }}
+        />
+      )}
+
+      {subDlg && usageSnapshot && (
+        <ConfirmDialog
+          title={subDlg === "cancel" ? "Cancel your subscription?" : "Resume your subscription?"}
+          message={`${subDlg === "cancel"
+            ? cancelNote(usageSnapshot.tier.name, usageSnapshot.billing.periodEnd ? new Date(usageSnapshot.billing.periodEnd) : null)
+            : resumeNote(usageSnapshot.tier.name)}${subErr ? `\n\n${subErr}` : ""}`}
+          confirmLabel={subBusy ? "Working\u2026" : subDlg === "cancel" ? "Cancel subscription" : "Resume subscription"}
+          cancelLabel={subDlg === "cancel" ? "Keep my subscription" : "Close"}
+          destructive={subDlg === "cancel"}
+          onCancel={() => { if (!subBusy) setSubDlg(null); }}
+          onConfirm={async () => {
+            if (subBusy) return;
+            setSubBusy(true); setSubErr(null);
+            try {
+              const res = await fetch("/api/stripe/cancel-subscription", {
+                method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: subDlg }),
+              });
+              const body = await res.json().catch(() => ({}));
+              if (!res.ok) throw new Error(body.error ?? `The request failed (${res.status})`);
+              window.location.reload();
+            } catch (e) { setSubErr(e instanceof Error ? e.message : "The request failed"); setSubBusy(false); }
+          }}
         />
       )}
 
