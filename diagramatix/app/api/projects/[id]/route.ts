@@ -205,9 +205,9 @@ export async function DELETE(req: Request, { params }: Params) {
   const { id } = await params;
 
   // Three-tier delete model (Paul's spec, 2026-06-08):
-  //   x   — default — diagrams → Unorganised. SuperAdmin only (2026-10-06): a project's diagrams must not be left loose by anyone else.
-  //   x+  — ?cascade=archive — diagrams → system Archive (under their Org and owner, recoverable). SuperAdmin, or an OrgAdmin of the
-  //         project's Org. A member who is not an OrgAdmin has no project delete at all.
+  //   x   — default — diagrams → Sandpit (Unorganised). SuperAdmin, or the person who CREATED the project (2026-10-06).
+  //   x+  — ?cascade=archive — diagrams → system Archive (under their Org and owner, recoverable). SuperAdmin, the creator, or an OrgAdmin
+  //         of the project's Org (any project in it).
   //   x++ — ?hardDelete=true — hard delete project + every diagram.
   //         SuperAdmin AND project Owner only.
   //
@@ -248,17 +248,20 @@ export async function DELETE(req: Request, { params }: Params) {
     else throw e;
   }
 
-  const decision = authorizeProjectDelete(
-    hardDelete ? "hard" : cascade === "archive" ? "archive" : "unorganise",
-    { isProjectOwner, isSuperuser: su, isOrgAdmin },
-  );
-  if (!decision.allowed) {
-    return NextResponse.json({ error: decision.message }, { status: 403 });
-  }
-
   const existing = await prisma.project.findUnique({ where: { id } });
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  // Their OWN project (Project.userId) — an adopted example, renamed or not, is the adopter's own. NOT the implicit ownership an
+  // OrgAdmin has over everyone's projects.
+  const isOwnProject = existing.userId === session.user.id;
+
+  const decision = authorizeProjectDelete(
+    hardDelete ? "hard" : cascade === "archive" ? "archive" : "unorganise",
+    { isProjectOwner, isSuperuser: su, isOrgAdmin, isOwnProject },
+  );
+  if (!decision.allowed) {
+    return NextResponse.json({ error: decision.message }, { status: 403 });
   }
   const orgId = projectOrgId;
 

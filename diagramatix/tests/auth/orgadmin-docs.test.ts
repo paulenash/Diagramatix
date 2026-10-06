@@ -38,9 +38,16 @@ describe("T5254 the documentation patch", () => {
 });
 
 describe("T5254 the project-delete tiers follow the rule (reset 2026-10-06: an OrgAdmin may delete a project to the Archive)", () => {
-  const ctx = (owner: boolean, su: boolean, oa: boolean) => ({ isProjectOwner: owner, isSuperuser: su, isOrgAdmin: oa });
-  it("a member who is not an OrgAdmin has no project delete at any tier — even their own project", () => {
+  const ctx = (owner: boolean, su: boolean, oa: boolean, own = false) => ({ isProjectOwner: owner, isSuperuser: su, isOrgAdmin: oa, isOwnProject: own });
+  it("a member who is not an OrgAdmin has no project delete at any tier on a project they did NOT create (an implicit or shared 'owner' is not enough); never a hard delete", () => {
     for (const mode of ["unorganise", "archive", "hard"] as const) expect(authorizeProjectDelete(mode, ctx(true, false, false)).allowed).toBe(false);
+  });
+  it("the person who CREATED a project — an OrgAdmin included — may delete it to the Sandpit or the Archive, never hard (reset 2026-10-06; T5271)", () => {
+    for (const oa of [false, true]) {
+      expect(authorizeProjectDelete("unorganise", ctx(true, false, oa, true)).allowed).toBe(true);
+      expect(authorizeProjectDelete("archive", ctx(true, false, oa, true)).allowed).toBe(true);
+      expect(authorizeProjectDelete("hard", ctx(true, false, oa, true)).allowed).toBe(false);
+    }
   });
   it("an OrgAdmin may archive a project of their Org (the owner's or anyone's) but not leave its diagrams loose and never hard-delete", () => {
     expect(authorizeProjectDelete("archive", ctx(false, false, true)).allowed).toBe(true);
@@ -54,12 +61,12 @@ describe("T5254 the project-delete tiers follow the rule (reset 2026-10-06: an O
     expect(authorizeProjectDelete("hard", ctx(true, true, true)).allowed).toBe(true);
     expect(authorizeProjectDelete("hard", ctx(false, true, true)).allowed).toBe(false);
   });
-  it("the dashboard's right-click menu: x for a SuperAdmin only, x+ for a SuperAdmin or an OrgAdmin, x++ for a SuperAdmin in SuperAdmin view who owns it", () => {
+  it("the dashboard's right-click menu: x for a SuperAdmin or the creator, x+ for a SuperAdmin, an OrgAdmin or the creator, x++ for a SuperAdmin in SuperAdmin view who owns it", () => {
     const src = readFileSync("app/(dashboard)/dashboard/DashboardClient.tsx", "utf8");
     expect(src).toContain("const asSuper = !readOnly && !!isSu && !superAdminHidden;");
     expect(src).toContain('const asOrgAdmin = !readOnly && (isOrgAdminRole(orgRole) || (!!isSu && adminViewMode === "orgadmin"));');
-    expect(src).toContain("const canSee_x      = asSuper;");
-    expect(src).toContain("const canSee_xPlus  = asSuper || asOrgAdmin;");
+    expect(src).toContain("const canSee_x      = asSuper || createdByMe;");
+    expect(src).toContain("const canSee_xPlus  = asSuper || asOrgAdmin || createdByMe;");
     expect(src).toContain("const canSee_xPlus2 = asSuper && isOwnerOfThis;");
   });
   it("the route lets an OrgAdmin through its first-line guard for the archive tier only", () => {

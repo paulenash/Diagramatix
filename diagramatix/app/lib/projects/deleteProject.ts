@@ -27,27 +27,30 @@ export type ProjectDeleteMode = "unorganise" | "archive" | "hard";
  * Rules (Paul's three-tier delete model, 2026-06-08; reset 2026-10-06 — "as long as the diagrams go to the Archive under the Org and User"
  * an OrgAdmin may delete a project; a member who is not an OrgAdmin may not delete one at all; SuperAdmin has every tier):
  *   - hard       — SuperAdmin who owns the project.
- *   - archive    — SuperAdmin, or an OrgAdmin of the project's Org (any project in the Org). The diagrams go to the system Archive, which
- *                  records their Org and owner, so they are recoverable.
- *   - unorganise — SuperAdmin only (it leaves diagrams loose, with nothing recording where they came from).
+ *   - archive    — SuperAdmin; the project's OWN creator (any member, OrgAdmin included); or an OrgAdmin of the project's Org (any project
+ *                  in the Org). The diagrams go to the system Archive, which records their Org and owner, so they are recoverable.
+ *   - unorganise — SuperAdmin, or the project's OWN creator — the diagrams go to the Sandpit. An OrgAdmin may not do this to someone
+ *                  else's project (it leaves their diagrams loose).
+ * Changed 2026-10-06 (Paul): "Normal and OrgAdmin users need to be able to delete projects they create, and any example projects or
+ * renamed example projects" — an adopted example is created by its user, so it is theirs to delete, renamed or not.
  * (The route's first line — auth/deleteRules.ts — lets a caller who reaches a project only by being an OrgAdmin through for the archive
- * tier and refuses every other.)
+ * tier and refuses every other; a real owner does not reach it that way.)
  */
 export function authorizeProjectDelete(
   mode: ProjectDeleteMode,
-  ctx: { isProjectOwner: boolean; isSuperuser: boolean; isOrgAdmin: boolean },
+  ctx: { isProjectOwner: boolean; isSuperuser: boolean; isOrgAdmin: boolean; /** The caller CREATED the project (Project.userId) — not merely an implicit owner. */ isOwnProject?: boolean },
 ): { allowed: boolean; message?: string } {
   if (mode === "hard") {
     if (ctx.isSuperuser && ctx.isProjectOwner) return { allowed: true };
     return { allowed: false, message: "Hard delete requires SuperAdmin who owns the project" };
   }
   if (mode === "archive") {
-    if (ctx.isSuperuser || ctx.isOrgAdmin) return { allowed: true };
-    return { allowed: false, message: "Only a SuperAdmin or an OrgAdmin can delete a project" };
+    if (ctx.isSuperuser || ctx.isOrgAdmin || ctx.isOwnProject) return { allowed: true };
+    return { allowed: false, message: "Only the person who created a project, an OrgAdmin or a SuperAdmin can delete it" };
   }
   // unorganise (the default tier)
-  if (ctx.isSuperuser) return { allowed: true };
-  return { allowed: false, message: "Only a SuperAdmin can delete a project this way — an OrgAdmin deletes it to the Archive" };
+  if (ctx.isSuperuser || ctx.isOwnProject) return { allowed: true };
+  return { allowed: false, message: "Only the person who created a project can delete it this way — an OrgAdmin deletes someone else's to the Archive" };
 }
 
 export interface ProjectDeleteResult {

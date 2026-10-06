@@ -36,9 +36,10 @@ describe("T5266 the rule in the menu", () => {
     expect(dash).toContain("const canSee_xPlus2 = asSuper && isOwnerOfThis;");
     expect(dash).toContain('(!!isSu && adminViewMode === "orgadmin")');            // in OrgAdmin mode: only the OrgAdmin's one option
   });
-  it("a member who is neither sees no project-delete option: all three depend on a SuperAdmin / OrgAdmin flag", () => {
-    expect(dash).toContain("const canSee_x      = asSuper;");
-    expect(dash).toContain("const canSee_xPlus  = asSuper || asOrgAdmin;");
+  it("a member sees a project-delete option only on a project they created (or as an OrgAdmin / SuperAdmin): the flags depend on who made it", () => {
+    expect(dash).toContain("const createdByMe = !readOnly && (p.user?.id ? p.user.id === currentUserId : isOwnerOfThis);");
+    expect(dash).toContain("const canSee_x      = asSuper || createdByMe;");
+    expect(dash).toContain("const canSee_xPlus  = asSuper || asOrgAdmin || createdByMe;");
     expect(dash).toContain("{(canSee_x || canSee_xPlus || canSee_xPlus2) && (");
   });
   it("the Archive option says where the diagrams go", () => {

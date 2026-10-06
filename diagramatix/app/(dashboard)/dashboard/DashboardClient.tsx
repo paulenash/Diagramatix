@@ -3385,14 +3385,17 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
         const role = deriveProjectRole(p);
         const isOwnerOfThis = role === "owner";
         // Tier visibility (Paul, 2026-10-06 — "as long as the diagrams go to the Archive under the Org and User"):
-        //   x  : SuperAdmin (in SuperAdmin view) only
-        //   x+ : SuperAdmin, or an OrgAdmin — a SuperAdmin presenting as an OrgAdmin sees just this one
+        //   x  : SuperAdmin (in SuperAdmin view), or the person who created the project (reset 2026-10-06 — see createdByMe)
+        //   x+ : SuperAdmin, an OrgAdmin, or the creator — a SuperAdmin presenting as an OrgAdmin sees just this one
         //   x++: SuperAdmin (in SuperAdmin view) AND project Owner — never an OrgAdmin, and not while a SuperAdmin presents as one
-        // A member who is neither sees no project-delete option at all, and the server refuses it (authorizeProjectDelete).
+        // Someone else's project, for a member who is not an OrgAdmin: no project-delete option at all, and the server refuses it.
         const asSuper = !readOnly && !!isSu && !superAdminHidden;
         const asOrgAdmin = !readOnly && (isOrgAdminRole(orgRole) || (!!isSu && adminViewMode === "orgadmin"));
-        const canSee_x      = asSuper;
-        const canSee_xPlus  = asSuper || asOrgAdmin;
+        // Their OWN project (an adopted example, renamed or not, is the adopter's own) may be deleted by its creator, to the Sandpit or the
+        // Archive. "No shares on it" alone is not ownership — an OrgAdmin sees every project in the Org that way.
+        const createdByMe = !readOnly && (p.user?.id ? p.user.id === currentUserId : isOwnerOfThis);
+        const canSee_x      = asSuper || createdByMe;
+        const canSee_xPlus  = asSuper || asOrgAdmin || createdByMe;
         const canSee_xPlus2 = asSuper && isOwnerOfThis;
         const close = () => setTileContextMenu(null);
         // Stop click from bubbling to the window-level close listener.
