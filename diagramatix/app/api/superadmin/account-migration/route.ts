@@ -5,7 +5,7 @@ import { isSuperuser } from "@/app/lib/superuser";
 import { blockReadOnlyImpersonation } from "@/app/lib/routeGuard";
 import { recordAudit, auditActor } from "@/app/lib/audit";
 import { ensureSuperAdminOrg } from "@/app/lib/superAdminOrg";
-import { countReferences, describeCounts, migrationSettingKey, moveReferences, oldAddressFor } from "@/app/lib/superAdminMigration";
+import { countReferences, describeCounts, migrationSettingKey, moveReferences, oldAddressFor, welcomedSettingKey } from "@/app/lib/superAdminMigration";
 
 /**
  * The one-time move of a new-address SuperAdmin's data from their old address's account (Paul, 2026-10-05).
@@ -25,10 +25,11 @@ async function context() {
 export async function GET() {
   const ctx = await context();
   if ("error" in ctx) return ctx.error;
-  const [done, old, mine] = await Promise.all([
+  const [done, old, mine, welcomed] = await Promise.all([
     prisma.appSetting.findUnique({ where: { key: migrationSettingKey(ctx.me.id) } }),
     prisma.user.findUnique({ where: { email: ctx.oldEmail }, select: { id: true } }),
     prisma.user.findUnique({ where: { id: ctx.me.id }, select: { name: true } }),
+    prisma.appSetting.findUnique({ where: { key: welcomedSettingKey(ctx.me.id) } }),
   ]);
   const refs = !done && old ? await countReferences(old.id) : [];
   return NextResponse.json({
@@ -36,6 +37,8 @@ export async function GET() {
     name: mine?.name ?? null,
     oldEmail: ctx.oldEmail,
     done: !!done,
+    /** The welcome has been shown and dismissed once: never again (Paul, 2026-10-06). */
+    welcomed: !!welcomed,
     oldFound: !!old,
     pending: !done && !!old && refs.length > 0,
     summary: describeCounts(refs),
@@ -51,6 +54,12 @@ export async function POST(req: Request) {
   const body = (await req.json().catch(() => ({}))) as { confirm?: boolean; action?: string };
   // Not a confirmation: Paul's standing instruction (2026-10-05) is that Paul's org is "Diagramatix" and Greg's "GetAI Org", with
   // each of them as its administrator. Idempotent, so it is simply made true on sign-in.
+  // The welcome is shown ONCE per account, then never again (Paul, 2026-10-06: "Only display it once then never again").
+  if (body.action === "welcomed") {
+    const key = welcomedSettingKey(ctx.me.id);
+    await prisma.appSetting.upsert({ where: { key }, create: { key, value: new Date().toISOString() }, update: { value: new Date().toISOString() } });
+    return NextResponse.json({ ok: true });
+  }
   if (body.action === "ensure-org") {
     const mine = await prisma.user.findUnique({ where: { id: ctx.me.id }, select: { id: true, email: true, name: true } });
     const org = mine ? await ensureSuperAdminOrg(mine) : null;

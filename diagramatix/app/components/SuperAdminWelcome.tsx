@@ -2,12 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { firstNameOf } from "@/app/lib/auth/firstName";
 
 interface Status {
   eligible: boolean;
   name?: string | null;
   oldEmail?: string;
   done?: boolean;
+  /** The welcome was shown and dismissed once already — never again. */
+  welcomed?: boolean;
   oldFound?: boolean;
   pending?: boolean;
   summary?: string;
@@ -49,7 +52,10 @@ export function SuperAdminWelcome() {
         } catch { /* a courtesy */ }
         let seen = false;
         try { seen = sessionStorage.getItem(SEEN_KEY) === "1"; } catch { /* private window: show it */ }
-        if (!seen || s.pending) setOpen(true);
+        // Shown ONLY when it has something to ask (the one-time account move), or — for an account that has done neither — once, ever.
+        // An account whose move is already done, or that has dismissed the welcome, never sees it again (Paul, 2026-10-06).
+        const wanted = s.pending || (!s.done && !s.welcomed);
+        if (wanted && !seen) setOpen(true);
       } catch { /* the welcome is a courtesy; never break the page */ }
     })();
     return () => { alive = false; };
@@ -57,6 +63,12 @@ export function SuperAdminWelcome() {
 
   function close() {
     try { sessionStorage.setItem(SEEN_KEY, "1"); } catch { /* ignore */ }
+    // Dismissing the plain welcome (nothing left to ask) ends it for good. "Not now" on the move leaves it to ask again next sign-in.
+    if (!status?.pending || result?.ok) {
+      void fetch("/api/superadmin/account-migration", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "welcomed" }),
+      }).catch(() => { /* it will simply show once more */ });
+    }
     setOpen(false);
   }
   useEffect(() => {
@@ -83,7 +95,7 @@ export function SuperAdminWelcome() {
   }
 
   if (!open || !status) return null;
-  const first = (status.name ?? "").trim().split(/\s+/)[0];
+  const first = firstNameOf(status.name);
   return (
     <div className="fixed inset-0 z-[85] flex items-center justify-center bg-black/40 p-4" data-testid="superadmin-welcome">
       <div role="dialog" aria-labelledby="sa-welcome-title" className="w-full max-w-md rounded-xl bg-white shadow-xl p-5">

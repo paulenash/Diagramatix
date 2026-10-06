@@ -25,6 +25,8 @@ export const NOT_MOVED: ReadonlySet<string> = new Set(["MicrosoftConnection", "U
 /** Where "this has been done" is recorded (an AppSetting, one per new account). The audit trail is never re-attributed. */
 export const MIGRATION_SETTING_PREFIX = "superadmin.migrated.";
 export const migrationSettingKey = (newUserId: string) => MIGRATION_SETTING_PREFIX + newUserId;
+/** Where "the welcome has been shown (and dismissed)" is recorded, once per account, so it is never shown again. */
+export const welcomedSettingKey = (newUserId: string) => "superadmin.welcomed." + newUserId;
 
 const LABELS: Record<string, string> = {
   Project: "projects",
