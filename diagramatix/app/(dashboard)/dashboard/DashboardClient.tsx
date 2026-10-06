@@ -1,5 +1,7 @@
 "use client";
 
+import { ScreenHintBar } from "@/app/components/ScreenHintBar";
+import { DASHBOARD_HINTS } from "@/app/lib/screenHints";
 import { MoveToProjectDialog } from "@/app/components/MoveToProjectDialog";
 import { isOrgAdminRole } from "@/app/lib/auth/orgAdminRole";
 import { useState, useRef, useEffect } from "react";
@@ -3523,6 +3525,9 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           onClose={() => { setBackupModal(null); setBackingUp(false); }}
         />
       )}
+
+      {/* The hint line along the foot of the screen, as on the Diagram screen (Paul, 2026-10-06). */}
+      <ScreenHintBar hints={DASHBOARD_HINTS} />
     </div>
   );
 }

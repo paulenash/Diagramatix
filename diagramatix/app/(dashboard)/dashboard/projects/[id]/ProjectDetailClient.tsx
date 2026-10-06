@@ -1,5 +1,7 @@
 "use client";
 
+import { ScreenHintBar } from "@/app/components/ScreenHintBar";
+import { PROJECT_SCREEN_HINTS } from "@/app/lib/screenHints";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { showGateNotice, downloadWithNotice } from "@/app/lib/subscription/gateNotice";
 import { useRouter } from "next/navigation";
@@ -3532,6 +3534,9 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
           );
         })()}
       </div>
+
+      {/* The hint line along the foot of the screen, as on the Diagram screen (Paul, 2026-10-06). */}
+      <ScreenHintBar hints={PROJECT_SCREEN_HINTS} />
 
       {ctxMenu && <ContextMenuPopup x={ctxMenu.x} y={ctxMenu.y} items={ctxItems(ctxMenu)} onClose={() => setCtxMenu(null)}
         label={ctxMenu.kind === "diagram" ? "Diagram menu" : ctxMenu.kind === "folder" ? "Folder menu" : "Project menu"} />}
