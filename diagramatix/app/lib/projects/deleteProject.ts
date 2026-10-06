@@ -24,11 +24,14 @@ export type ProjectDeleteMode = "unorganise" | "archive" | "hard";
  * directly. The route computes the three booleans (from requireProjectAccess +
  * isSuperuser + a requireRole probe) and asks this for the verdict.
  *
- * Rules (Paul's three-tier delete model, 2026-06-08, tightened 2026-10-05: "OrgAdmins delete nothing"):
+ * Rules (Paul's three-tier delete model, 2026-06-08; reset 2026-10-06 — "as long as the diagrams go to the Archive under the Org and User"
+ * an OrgAdmin may delete a project; a member who is not an OrgAdmin may not delete one at all; SuperAdmin has every tier):
  *   - hard       — SuperAdmin who owns the project.
- *   - archive    — SuperAdmin, or the project Owner who is an OrgAdmin of the Org. Being an OrgAdmin of the Org alone gives nothing.
- *   - unorganise — the project Owner, or a SuperAdmin.
- * (The route also refuses, first, a caller who reaches the project ONLY as an OrgAdmin — auth/deleteRules.ts.)
+ *   - archive    — SuperAdmin, or an OrgAdmin of the project's Org (any project in the Org). The diagrams go to the system Archive, which
+ *                  records their Org and owner, so they are recoverable.
+ *   - unorganise — SuperAdmin only (it leaves diagrams loose, with nothing recording where they came from).
+ * (The route's first line — auth/deleteRules.ts — lets a caller who reaches a project only by being an OrgAdmin through for the archive
+ * tier and refuses every other.)
  */
 export function authorizeProjectDelete(
   mode: ProjectDeleteMode,
@@ -39,12 +42,12 @@ export function authorizeProjectDelete(
     return { allowed: false, message: "Hard delete requires SuperAdmin who owns the project" };
   }
   if (mode === "archive") {
-    if (ctx.isSuperuser || (ctx.isOrgAdmin && ctx.isProjectOwner)) return { allowed: true };
-    return { allowed: false, message: "Only a SuperAdmin, or the project's owner as an OrgAdmin, can archive a project" };
+    if (ctx.isSuperuser || ctx.isOrgAdmin) return { allowed: true };
+    return { allowed: false, message: "Only a SuperAdmin or an OrgAdmin can delete a project" };
   }
-  // unorganise (default)
-  if (ctx.isProjectOwner || ctx.isSuperuser) return { allowed: true };
-  return { allowed: false, message: "No access to this project" };
+  // unorganise (the default tier)
+  if (ctx.isSuperuser) return { allowed: true };
+  return { allowed: false, message: "Only a SuperAdmin can delete a project this way — an OrgAdmin deletes it to the Archive" };
 }
 
 export interface ProjectDeleteResult {

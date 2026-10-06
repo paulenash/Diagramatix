@@ -37,21 +37,35 @@ describe("T5254 the documentation patch", () => {
   });
 });
 
-describe("T5254 the project-delete tiers follow the rule", () => {
+describe("T5254 the project-delete tiers follow the rule (reset 2026-10-06: an OrgAdmin may delete a project to the Archive)", () => {
   const ctx = (owner: boolean, su: boolean, oa: boolean) => ({ isProjectOwner: owner, isSuperuser: su, isOrgAdmin: oa });
-  it("an OrgAdmin who is not the owner deletes nothing, at any tier", () => {
-    for (const mode of ["unorganise", "archive", "hard"] as const) expect(authorizeProjectDelete(mode, ctx(false, false, true)).allowed).toBe(false);
+  it("a member who is not an OrgAdmin has no project delete at any tier — even their own project", () => {
+    for (const mode of ["unorganise", "archive", "hard"] as const) expect(authorizeProjectDelete(mode, ctx(true, false, false)).allowed).toBe(false);
   });
-  it("the owner may unorganise; the owner who is an OrgAdmin may archive; only a SuperAdmin who owns it may hard-delete", () => {
-    expect(authorizeProjectDelete("unorganise", ctx(true, false, false)).allowed).toBe(true);
+  it("an OrgAdmin may archive a project of their Org (the owner's or anyone's) but not leave its diagrams loose and never hard-delete", () => {
+    expect(authorizeProjectDelete("archive", ctx(false, false, true)).allowed).toBe(true);
     expect(authorizeProjectDelete("archive", ctx(true, false, true)).allowed).toBe(true);
-    expect(authorizeProjectDelete("archive", ctx(true, false, false)).allowed).toBe(false);
-    expect(authorizeProjectDelete("hard", ctx(true, true, true)).allowed).toBe(true);
+    expect(authorizeProjectDelete("unorganise", ctx(true, false, true)).allowed).toBe(false);
     expect(authorizeProjectDelete("hard", ctx(true, false, true)).allowed).toBe(false);
   });
-  it("the dashboard's right-click menu offers x to the owner or a SuperAdmin, never to an OrgAdmin alone", () => {
+  it("a SuperAdmin has every tier — hard only on a project they own", () => {
+    expect(authorizeProjectDelete("unorganise", ctx(false, true, true)).allowed).toBe(true);
+    expect(authorizeProjectDelete("archive", ctx(false, true, false)).allowed).toBe(true);
+    expect(authorizeProjectDelete("hard", ctx(true, true, true)).allowed).toBe(true);
+    expect(authorizeProjectDelete("hard", ctx(false, true, true)).allowed).toBe(false);
+  });
+  it("the dashboard's right-click menu: x for a SuperAdmin only, x+ for a SuperAdmin or an OrgAdmin, x++ for a SuperAdmin in SuperAdmin view who owns it", () => {
     const src = readFileSync("app/(dashboard)/dashboard/DashboardClient.tsx", "utf8");
-    expect(src).toContain("const canSee_x      = isOwnerOfThis || !!isSu;");
-    expect(src).toContain("const canSee_xPlus  = !!isSu || (isOrgAdmin && isOwnerOfThis);");
+    expect(src).toContain("const asSuper = !readOnly && !!isSu && !superAdminHidden;");
+    expect(src).toContain('const asOrgAdmin = !readOnly && (isOrgAdminRole(orgRole) || (!!isSu && adminViewMode === "orgadmin"));');
+    expect(src).toContain("const canSee_x      = asSuper;");
+    expect(src).toContain("const canSee_xPlus  = asSuper || asOrgAdmin;");
+    expect(src).toContain("const canSee_xPlus2 = asSuper && isOwnerOfThis;");
+  });
+  it("the route lets an OrgAdmin through its first-line guard for the archive tier only", () => {
+    const route = readFileSync("app/api/projects/[id]/route.ts", "utf8");
+    expect(route).toContain('const archiveOnly = q.get("cascade") === "archive" && q.get("hardDelete") !== "true";');
+    expect(route).toContain("orgAdminCannotDelete({ projectId: (await params).id, allowArchive: archiveOnly })");
+    expect(readFileSync("app/lib/auth/deleteRules.ts", "utf8")).toContain("?.viaOrgAdmin && !target.allowArchive ? refused() : null");
   });
 });

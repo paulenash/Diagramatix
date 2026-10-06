@@ -181,7 +181,13 @@ export async function PUT(req: Request, { params }: Params) {
 }
 
 export async function DELETE(req: Request, { params }: Params) {
-  { const denied = await orgAdminCannotDelete({ projectId: (await params).id }); if (denied) return denied; }
+  {
+    // An OrgAdmin may ARCHIVE a project of their Org (its diagrams go to the Archive, recoverable — Paul, 2026-10-06); nothing else.
+    const q = new URL(req.url).searchParams;
+    const archiveOnly = q.get("cascade") === "archive" && q.get("hardDelete") !== "true";
+    const denied = await orgAdminCannotDelete({ projectId: (await params).id, allowArchive: archiveOnly });
+    if (denied) return denied;
+  }
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -199,9 +205,9 @@ export async function DELETE(req: Request, { params }: Params) {
   const { id } = await params;
 
   // Three-tier delete model (Paul's spec, 2026-06-08):
-  //   x   — default — diagrams → Unorganised. Allowed for project Owner
-  //         OR OrgAdmin (Owner/Admin in the project's Org) OR SuperAdmin.
-  //   x+  — ?cascade=archive — diagrams → system Archive. OrgAdmin only.
+  //   x   — default — diagrams → Unorganised. SuperAdmin only (2026-10-06): a project's diagrams must not be left loose by anyone else.
+  //   x+  — ?cascade=archive — diagrams → system Archive (under their Org and owner, recoverable). SuperAdmin, or an OrgAdmin of the
+  //         project's Org. A member who is not an OrgAdmin has no project delete at all.
   //   x++ — ?hardDelete=true — hard delete project + every diagram.
   //         SuperAdmin AND project Owner only.
   //

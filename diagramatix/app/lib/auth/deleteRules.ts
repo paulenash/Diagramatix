@@ -29,13 +29,17 @@ export async function superAdminOnlyDelete(): Promise<NextResponse | null> {
 }
 
 /** Project / diagram delete: refused when the caller is an implicit owner only by being an OrgAdmin of the Org. */
-export async function orgAdminCannotDelete(target: { projectId?: string; diagramId?: string }): Promise<NextResponse | null> {
+export async function orgAdminCannotDelete(target: {
+  projectId?: string; diagramId?: string;
+  /** The ARCHIVE tier of a project delete (diagrams move to the system Archive under their Org and owner): an OrgAdmin may (Paul, 2026-10-06). */
+  allowArchive?: boolean;
+}): Promise<NextResponse | null> {
   const session = await auth();
   if (!session?.user?.id) return null;                         // the route's own guard answers 401
   if (isSuperuser(session)) return null;                       // a SuperAdmin keeps every power
   const userId = getEffectiveUserId(session, await cookies());
   if (!userId) return null;
-  if (target.projectId) return (await getProjectAccess(userId, target.projectId))?.viaOrgAdmin ? refused() : null;
+  if (target.projectId) return (await getProjectAccess(userId, target.projectId))?.viaOrgAdmin && !target.allowArchive ? refused() : null;
   if (target.diagramId) return (await getDiagramAccess(userId, target.diagramId))?.viaOrgAdmin ? refused() : null;
   return null;
 }

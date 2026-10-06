@@ -3382,13 +3382,16 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
         if (!p) return null;
         const role = deriveProjectRole(p);
         const isOwnerOfThis = role === "owner";
-        // Tier visibility per Paul's 2026-06-08 spec:
-        //   x  : project Owner OR SuperAdmin
-        //   x+ : SuperAdmin, or the project Owner who is an OrgAdmin (an OrgAdmin deletes nothing of anyone else's — 2026-10-05)
-        //   x++: SuperAdmin AND project Owner
-        const canSee_x      = isOwnerOfThis || !!isSu;
-        const canSee_xPlus  = !!isSu || (isOrgAdmin && isOwnerOfThis);
-        const canSee_xPlus2 = !!isSu && isOwnerOfThis;
+        // Tier visibility (Paul, 2026-10-06 — "as long as the diagrams go to the Archive under the Org and User"):
+        //   x  : SuperAdmin (in SuperAdmin view) only
+        //   x+ : SuperAdmin, or an OrgAdmin — a SuperAdmin presenting as an OrgAdmin sees just this one
+        //   x++: SuperAdmin (in SuperAdmin view) AND project Owner — never an OrgAdmin, and not while a SuperAdmin presents as one
+        // A member who is neither sees no project-delete option at all, and the server refuses it (authorizeProjectDelete).
+        const asSuper = !readOnly && !!isSu && !superAdminHidden;
+        const asOrgAdmin = !readOnly && (isOrgAdminRole(orgRole) || (!!isSu && adminViewMode === "orgadmin"));
+        const canSee_x      = asSuper;
+        const canSee_xPlus  = asSuper || asOrgAdmin;
+        const canSee_xPlus2 = asSuper && isOwnerOfThis;
         const close = () => setTileContextMenu(null);
         // Stop click from bubbling to the window-level close listener.
         const stopBubble = (e: React.MouseEvent) => e.stopPropagation();
@@ -3440,7 +3443,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
               <button
                 onClick={(e) => { close(); handleDeleteProjectCascade(p.id, e); }}
                 className="w-full text-left px-3 py-1.5 hover:bg-orange-50 text-orange-700"
-                title="OrgAdmin: delete project. Diagrams move to system Archive."
+                title="Delete project. Its diagrams move to the system Archive, under their Org and owner, where they can be recovered."
               >
                 <span className="font-mono mr-2">x+</span>
                 Delete project (diagrams → Archive)

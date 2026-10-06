@@ -56,6 +56,10 @@ Mechanism: one helper, `requireSuperAdminToDelete(session)`, used by every OrgAd
 
 Then the **AI Model Selection Changes** plan builds on this (its Q1 is answered: "OrgAdmin").
 
+## 5a. Change of mind, 2026-10-06 — one exception
+
+Paul: "as long as the diagrams go to the Archive under the Org and User [OrgAdmins] should have this capability". So **an OrgAdmin may delete a PROJECT of their Org to the Archive** (the `x+` tier: its diagrams go to the system Archive, which records their Org and owner). Every other tier stays as decided: `x` (diagrams left loose) and `x++` (hard delete) are SuperAdmin only, hard delete is never shown to an OrgAdmin or to a SuperAdmin presenting as one, and a member who is not an OrgAdmin has no project delete at all. `orgAdminCannotDelete({ projectId, allowArchive })` carries the exception; T5254 and T5266.
+
 ## 6. Decisions (all four questions answered, Paul, 2026-10-05 — every recommendation accepted)
 
 1. **Every existing Owner becomes OrgAdmin** (one idempotent SQL file).
