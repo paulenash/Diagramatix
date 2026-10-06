@@ -1519,30 +1519,36 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
             draggable={false}
           />
           <span className="text-xs text-gray-900 ml-1" title="Diagramatix product version — major.minor.build">v{PRODUCT_VERSION}.{version ?? 0}</span>
-          {usageSnapshot && (
-            <button
-              onClick={() => setShowUsagePopover(true)}
-              className={`inline-flex items-center gap-2 text-sm font-medium border rounded-md px-3 py-1.5 ml-3 transition-colors ${
-                usageSnapshot.isAdmin && !superAdminHidden
-                  ? "text-orange-700 border-orange-300 bg-orange-50 hover:bg-orange-100"
-                  : usageSnapshot.trial.expired && !superAdminHidden
-                  ? "text-red-700 border-red-300 bg-red-50 hover:bg-red-100"
-                  : "text-blue-700 border-blue-300 bg-blue-50 hover:bg-blue-100"
-              }`}
-              title={
-                usageSnapshot.isAdmin && !superAdminHidden
-                  ? "SuperAdmin — bypasses all limits. Click for usage details."
-                  : usageSnapshot.trial.expired && !superAdminHidden
-                  ? "Trial expired — click for details and upgrade"
-                  : "View subscription usage and limits"
-              }
+          {usageSnapshot && (() => {
+            // A customer on a plan (not a SuperAdmin, not on a comp) gets the plan chip as a DISPLAY, with a separate chip beside it:
+            // "Upgrade" on Free, "Change Subscription" on a paid plan (Paul, 2026-10-06). The SuperAdmin and a comp holder keep the one
+            // clickable chip that opens the usage window.
+            const planChip = !usageSnapshot.isAdmin && !usageSnapshot.comp;
+            const onFree = usageSnapshot.tier.id === "free";
+            const chipClass = `inline-flex items-center gap-2 text-sm font-medium border rounded-md px-3 py-1.5 ml-3 transition-colors ${
+              usageSnapshot.isAdmin && !superAdminHidden
+                ? "text-orange-700 border-orange-300 bg-orange-50 hover:bg-orange-100"
+                : usageSnapshot.trial.expired && !superAdminHidden
+                ? "text-red-700 border-red-300 bg-red-50 hover:bg-red-100"
+                : "text-blue-700 border-blue-300 bg-blue-50 hover:bg-blue-100"
+            }`;
+            const chipTitle =
+              usageSnapshot.isAdmin && !superAdminHidden
+                ? "SuperAdmin — bypasses all limits. Click for usage details."
+                : usageSnapshot.trial.expired && !superAdminHidden
+                ? "Trial expired — click for details and upgrade"
+                : "View subscription usage and limits";
+            const Chip = planChip ? "div" : "button";
+            return (<>
+            <Chip
+              {...(planChip ? { "data-testid": "subscription-chip", title: "Your subscription" } : { onClick: () => setShowUsagePopover(true), title: chipTitle })}
+              className={planChip ? chipClass.replace(/ hover:bg-[a-z]+-\d+/g, "") : chipClass}
             >
               <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <rect x={2} y={3} width={12} height={10} rx={2} />
                 <path d="M2 7h12" />
                 <path d="M5 11h3" />
               </svg>
-              <span>Subscription:</span>
               {usageSnapshot.underlyingTier && !superAdminHidden && (
                 <>
                   <span className="text-xs opacity-70 line-through">{usageSnapshot.underlyingTier.name}</span>
@@ -1561,8 +1567,19 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
               {usageSnapshot.trial.expired && !usageSnapshot.isAdmin && !usageSnapshot.comp && (
                 <span className="text-xs font-semibold">• expired</span>
               )}
-            </button>
-          )}
+            </Chip>
+            {planChip && (
+              <button
+                onClick={() => setShowUsagePopover(true)}
+                data-testid="plan-chip"
+                className="inline-flex items-center text-sm font-medium border rounded-md px-3 py-1.5 transition-colors text-white border-blue-600 bg-blue-600 hover:bg-blue-700"
+                title={onFree ? "See the plans you can upgrade to" : "Upgrade or downgrade your subscription"}
+              >
+                {onFree ? "Upgrade" : "Change Subscription"}
+              </button>
+            )}
+            </>);
+          })()}
         </div>
         <div className="flex items-center gap-3">
           {!readOnly && (

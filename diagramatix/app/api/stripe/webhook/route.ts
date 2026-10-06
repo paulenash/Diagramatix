@@ -33,6 +33,7 @@ import type Stripe from "stripe";
 import { prisma } from "@/app/lib/db";
 import { stripe } from "@/app/lib/stripe";
 import { monthlyPeriodKey } from "@/app/lib/subscription";
+import { periodEndOf } from "@/app/lib/stripe/planChange";
 
 // Stripe SDK uses Node APIs (crypto for HMAC). Edge runtime would
 // break signature verification.
@@ -327,10 +328,8 @@ export async function applySubscriptionToUser(
 
   // current_period_end is on the subscription. Type quirk across SDK
   // versions — read via cast.
-  const periodEndUnix =
-    (subscription as Stripe.Subscription & { current_period_end?: number })
-      .current_period_end ?? null;
-  const currentPeriodEnd = periodEndUnix ? new Date(periodEndUnix * 1000) : null;
+  // (On the newer API versions it is on the subscription ITEM, not the subscription — periodEndOf reads both.)
+  const currentPeriodEnd = periodEndOf(subscription);
 
   // cancel_at_period_end being true means the user has scheduled a
   // cancel but is still in the paid period. We populate
@@ -340,9 +339,15 @@ export async function applySubscriptionToUser(
     ? currentPeriodEnd
     : null;
 
+  // A downgrade waiting for the end of the month is done once the tier has turned over to it — or the schedule that held it has gone
+  // (cancelled in Stripe). Either way the pending marker is cleared; otherwise it is left alone.
+  const before = await prisma.user.findUnique({ where: { id: userId }, select: { pendingSubscriptionLevelId: true } });
+  const pendingDone = !!before?.pendingSubscriptionLevelId && (tierId === before.pendingSubscriptionLevelId || !subscription.schedule);
+
   await prisma.user.update({
     where: { id: userId },
     data: {
+      ...(pendingDone ? { pendingSubscriptionLevelId: null, pendingSubscriptionAt: null, stripeScheduleId: null } : {}),
       subscriptionLevelId: tierId,
       stripeSubscriptionId: subscription.id,
       stripeSubscriptionStatus: subscription.status,

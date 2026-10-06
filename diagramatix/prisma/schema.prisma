@@ -231,6 +231,12 @@ model User {
   // their paid tier; after, `getEffectiveSubscriptionLevelId` returns
   // "free" so we downgrade lazily without a cron job.
   subscriptionEndsAt            DateTime?
+  // A DOWNGRADE the person has asked for, waiting for the end of the current subscription month (stripe/planChange.ts): the tier it
+  // will become, when, and the Stripe subscription schedule that holds it (so it can be cancelled). Cleared by the webhook when the
+  // tier turns over or the schedule is released.
+  pendingSubscriptionLevelId    String?
+  pendingSubscriptionAt         DateTime?
+  stripeScheduleId              String?
   // ── Admin-granted comp tier (Option A from 2026-05-25) ───────────────
   // Lets an admin temporarily grant a higher tier to a user (e.g. comp
   // an influencer to Expert for 30 days) without touching their

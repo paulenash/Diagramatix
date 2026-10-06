@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { UsageSnapshot } from "@/app/lib/subscription";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
+import { PlanChanger } from "@/app/components/PlanChanger";
 
 /**
  * Subscription usage popover. Two modes:
@@ -218,6 +219,9 @@ export function UsagePopover({
         <div className="flex-1 overflow-auto px-5 py-4">
           {loading && <p className="text-xs text-gray-500">Loading…</p>}
           {error && <p className="text-xs text-red-700">{error}</p>}
+          {mode.kind === "self" && snapshot && !snapshot.isAdmin && !snapshot.comp && (
+            <PlanChanger snapshot={snapshot} onBusy={setChanging} onError={setError} />
+          )}
           {snapshot && (() => {
             // AI headline: attempts left this month + diagrams generated. Attempts
             // left is derived from the aiAttempts row (limit − current); the reset
@@ -328,12 +332,15 @@ export function UsagePopover({
             )}
             {mode.kind === "self" && snapshot && !snapshot.isAdmin && (
               <>
-                <SelfUpgradeButtons
-                  currentTierId={snapshot.tier.id}
-                  disabled={changing}
-                  onStart={() => { setChanging(true); setError(null); }}
-                  onError={(msg) => { setError(msg); setChanging(false); }}
-                />
+                {/* A comp holder keeps the plain upgrade buttons; everyone else changes plan in the Plan section above. */}
+                {snapshot.comp && (
+                  <SelfUpgradeButtons
+                    currentTierId={snapshot.tier.id}
+                    disabled={changing}
+                    onStart={() => { setChanging(true); setError(null); }}
+                    onError={(msg) => { setError(msg); setChanging(false); }}
+                  />
+                )}
                 {snapshot.tier.id !== "free" && (
                   <ManageSubscriptionButton
                     disabled={changing}

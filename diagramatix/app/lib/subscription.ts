@@ -302,6 +302,11 @@ type UserWithTier = {
   subscriptionEndsAt: Date | null;
   /** Stripe's status for the paid subscription ("active", "past_due", "canceled" …), for the warnings. */
   stripeSubscriptionStatus: string | null;
+  /** When the current billing period ends / renews (Stripe), for "effective from …" dates. */
+  currentPeriodEnd: Date | null;
+  /** A downgrade waiting for the end of the subscription month (stripe/planChange.ts). */
+  pendingLevelId: string | null;
+  pendingAt: Date | null;
   /** The EFFECTIVE tier — comp wins when active, otherwise the
    *  underlying. Null only if neither is set (shouldn't happen in
    *  practice since registration assigns Free). */
@@ -402,6 +407,9 @@ async function loadUserWithTier(userId: string): Promise<UserWithTier | null> {
     subscriptionAssignedAt: u.subscriptionAssignedAt,
     subscriptionEndsAt: u.subscriptionEndsAt,
     stripeSubscriptionStatus: u.stripeSubscriptionStatus ?? null,
+    currentPeriodEnd: u.currentPeriodEnd ?? null,
+    pendingLevelId: u.pendingSubscriptionLevelId ?? null,
+    pendingAt: u.pendingSubscriptionAt ?? null,
     subscriptionLevel: effectiveLevel,
     underlyingLevel,
     actingAsLevelId,
@@ -782,7 +790,14 @@ export interface UsageSnapshot {
   /** Some allowance or feature was set for this person by support (userOverrides.ts) — the popover says so. */
   customised: boolean;
   /** The paid subscription's billing state, for the payment-failed and ending-soon warnings. */
-  billing: { status: string | null; endsAt: string | null };
+  billing: {
+    status: string | null;
+    endsAt: string | null;
+    /** The end of the current subscription month (ISO) — when a downgrade takes effect and the next charge falls. */
+    periodEnd: string | null;
+    /** A downgrade the person has asked for, due at periodEnd. */
+    pendingChange: { tierId: string; tierName: string; effectiveAt: string } | null;
+  };
   /** Per-tier feature access for the effective tier (SuperAdmin → all true).
    *  Drives hiding of feature launch buttons / example galleries and greying
    *  of OrgAdmin tiles. */
@@ -896,6 +911,10 @@ export async function getUsageSnapshot(
     where: { userId: user.id, ...(aiPeriodStart ? { createdAt: { gte: aiPeriodStart } } : {}) },
   });
 
+  const pendingTierName = user.pendingLevelId
+    ? (await prisma.subscriptionLevel.findUnique({ where: { id: user.pendingLevelId }, select: { name: true } }))?.name ?? null
+    : null;
+
   // Underlying tier — only worth surfacing to the UI when it actually
   // differs from the effective tier (i.e. a comp is overriding it).
   // When effective === underlying, the UI just shows one badge.
@@ -912,7 +931,14 @@ export async function getUsageSnapshot(
     /** A SuperAdmin acting as a customer level — the banner says so; limits are enforced. */
     actingAs: user.actingAsLevelId ? { id: user.actingAsLevelId, name: tier?.name ?? user.actingAsLevelId } : null,
     customised: user.customised,
-    billing: { status: user.stripeSubscriptionStatus, endsAt: user.subscriptionEndsAt ? user.subscriptionEndsAt.toISOString() : null },
+    billing: {
+      status: user.stripeSubscriptionStatus,
+      endsAt: user.subscriptionEndsAt ? user.subscriptionEndsAt.toISOString() : null,
+      periodEnd: user.currentPeriodEnd ? user.currentPeriodEnd.toISOString() : null,
+      pendingChange: user.pendingLevelId && user.pendingAt
+        ? { tierId: user.pendingLevelId, tierName: pendingTierName ?? user.pendingLevelId, effectiveAt: user.pendingAt.toISOString() }
+        : null,
+    },
     trial,
     comp: user.comp
       ? {

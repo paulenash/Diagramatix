@@ -265,6 +265,6 @@ describe("T5126 — wired: the silent failures now speak, and the strip and the 
     const b = read("app/components/SubscriptionBanner.tsx");
     expect(b).toContain("const key = JSON.stringify(input);");
     expect(b).toContain('aria-label="Dismiss for today"');
-    expect(read("app/lib/subscription.ts")).toContain("billing: { status: user.stripeSubscriptionStatus,");
+    expect(read("app/lib/subscription.ts")).toContain("status: user.stripeSubscriptionStatus,");
   });
 });
