@@ -12,6 +12,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { IMAGE_ACCEPT, isAllowedImage, ALLOWED_IMAGE_LABEL } from "@/app/lib/help/imageFormats";
+import { exportImages } from "@/app/lib/help/exportImages";
 
 const COLLECTION_LABEL: Record<string, string> = { "user-guide": "User Guide", "tech-design": "Technical Design Notes" };
 const docLabel = (c: string) => COLLECTION_LABEL[c] ?? c;
@@ -33,6 +34,8 @@ export function ImageLibraryClient() {
   const [uploading, setUploading] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [exporting, setExporting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [usagesPopup, setUsagesPopup] = useState<{ img: Img; usages: Usage[] | null } | null>(null);
@@ -117,7 +120,18 @@ export function ImageLibraryClient() {
     finally { setBusy(false); }
   }
 
-  const isTarget = (img: Img) => !!dragId && dragId !== img.id && img.refCount > 0;
+  function toggleSelected(id: string) {
+    setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  }
+  async function doExport(list: Img[]) {
+    setExporting(true); setError(null);
+    try { await exportImages(list); }
+    catch (e) { setError(e instanceof Error ? `Export failed — ${e.message}` : "Export failed"); }
+    finally { setExporting(false); }
+  }
+  const selectedImages = images.filter((i) => selected.has(i.id));
+
+  const isTarget =(img: Img) => !!dragId && dragId !== img.id && img.refCount > 0;
 
   return (
     <div className="min-h-screen dgx-dashboard-bg">
@@ -129,6 +143,19 @@ export function ImageLibraryClient() {
         <div className="flex items-center gap-2">
           <input ref={fileRef} type="file" accept={IMAGE_ACCEPT} className="hidden"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); e.target.value = ""; }} />
+          {images.length > 0 && (
+            <>
+              <button onClick={() => setSelected(selected.size === images.length ? new Set() : new Set(images.map((i) => i.id)))}
+                className="text-xs px-3 py-1.5 rounded border border-gray-300 text-gray-600 hover:bg-gray-50">
+                {selected.size === images.length ? "Clear selection" : "Select all"}
+              </button>
+              <button onClick={() => void doExport(selectedImages)} disabled={exporting || selectedImages.length === 0}
+                title={selectedImages.length > 1 ? "Download the selected images as one .zip" : "Download the selected image"}
+                className="text-xs px-3 py-1.5 rounded border border-blue-300 text-blue-700 hover:bg-blue-50 disabled:opacity-40">
+                {exporting ? "Exporting…" : `Export selected${selectedImages.length ? ` (${selectedImages.length})` : ""}`}
+              </button>
+            </>
+          )}
           <button onClick={() => fileRef.current?.click()} disabled={uploading}
             className="text-xs px-3 py-1.5 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">
             {uploading ? "Uploading…" : "Upload image…"}
@@ -158,10 +185,15 @@ export function ImageLibraryClient() {
                   onDragOver={(e) => { if (target) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; } }}
                   onDrop={(e) => { e.preventDefault(); onDropReplace(img); }}
                   className={`border rounded-lg overflow-hidden bg-white cursor-grab active:cursor-grabbing transition-shadow
-                    ${target ? "ring-2 ring-blue-400 border-blue-300" : "border-gray-200"} ${dragId === img.id ? "opacity-50" : ""}`}
+                    ${target ? "ring-2 ring-blue-400 border-blue-300" : selected.has(img.id) ? "ring-2 ring-blue-500 border-blue-500" : "border-gray-200"} ${dragId === img.id ? "opacity-50" : ""}`}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={img.url} alt={img.alt ?? img.filename} className="w-full h-32 object-contain bg-gray-50 pointer-events-none" />
+                  <div className="relative">
+                    <input type="checkbox" checked={selected.has(img.id)} onChange={() => toggleSelected(img.id)}
+                      aria-label={`Select ${img.filename}`} title="Select for export"
+                      className="absolute top-1.5 left-1.5 z-10 h-4 w-4 cursor-pointer" />
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={img.url} alt={img.alt ?? img.filename} className="w-full h-32 object-contain bg-gray-50 pointer-events-none" />
+                  </div>
                   <div className="px-2.5 py-2">
                     <p className="text-[11px] text-gray-800 truncate" title={img.filename}>{img.screenName}{img.diagramName ? ` — ${img.diagramName}` : ""}</p>
                     <div className="flex items-center justify-between mt-1">
@@ -176,7 +208,8 @@ export function ImageLibraryClient() {
                         <span className="text-[10px] text-gray-400 border border-gray-200 rounded px-1.5 py-0.5">unused</span>
                       )}
                     </div>
-                    <div className="mt-1.5 flex justify-end">
+                    <div className="mt-1.5 flex justify-end gap-3">
+                      <button onClick={() => void doExport([img])} disabled={exporting} className="text-[10px] text-blue-500 hover:text-blue-700 disabled:opacity-40">Export</button>
                       <button onClick={() => onDeleteClick(img)} className="text-[10px] text-red-400 hover:text-red-600">Delete</button>
                     </div>
                   </div>
