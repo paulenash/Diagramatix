@@ -571,6 +571,42 @@ function snapBoundaryEventToRim(
 }
 
 /**
+ * Edge-mounted events on one side of one host never overlap (Paul, 2026-10-07: an event moved onto an Expanded Subprocess landed on top of
+ * the one already there — "it should have been placed further left with an Event element width between them").
+ *
+ * snapBoundaryEventToRim clamps every event to the rim on its own, so two events that were apart before the host was resized can be clamped
+ * to nearly the same spot. This walks each side's events from the corner end inwards and keeps ONE EVENT WIDTH of clear space between
+ * neighbours: top / bottom edges move events LEFT of the rightmost, left / right edges move them UP from the lowest. An event is never
+ * pushed past the rim's inner margin (the same 1.5 × event size from the corner the snap uses).
+ */
+function spreadBoundaryEventsOnRim(
+  elements: DiagramElement[], hostId: string, nx: number, ny: number, nw: number, nh: number,
+): void {
+  const bySide: Record<string, DiagramElement[]> = {};
+  for (const be of elements) {
+    if (be.boundaryHostId !== hostId) continue;
+    const side = be.properties?.boundarySide as string | undefined;
+    if (side !== "left" && side !== "right" && side !== "top" && side !== "bottom") continue;
+    (bySide[side] ??= []).push(be);
+  }
+  for (const [side, evs] of Object.entries(bySide)) {
+    if (evs.length < 2) continue;
+    const horiz = side === "top" || side === "bottom";
+    const size = (e: DiagramElement) => (horiz ? e.width : e.height);
+    const centre = (e: DiagramElement) => (horiz ? e.x + e.width / 2 : e.y + e.height / 2);
+    const lo = horiz ? nx : ny, hi = horiz ? nx + nw : ny + nh;
+    evs.sort((a, b) => centre(b) - centre(a));            // far end (right / bottom) first
+    let limit = Infinity;
+    for (const e of evs) {
+      const margin = Math.min(size(e) * 1.5, (hi - lo) / 2);
+      const c = Math.max(lo + margin, Math.min(centre(e), limit, hi - margin));
+      if (horiz) e.x = c - e.width / 2; else e.y = c - e.height / 2;
+      limit = c - 2 * size(e);                            // next centre: one event width of clear space between the two
+    }
+  }
+}
+
+/**
  * Something the layout could not take at face value.
  *
  * Reported rather than swallowed. The layout has always had fallbacks — a float
@@ -2689,6 +2725,7 @@ export function layoutBpmnDiagram(
         if (be.boundaryHostId !== ep.id) continue;
         snapBoundaryEventToRim(be, nx, ny, nw, nh);
       }
+      spreadBoundaryEventsOnRim(elements, ep.id, nx, ny, nw, nh);
 
       // Conservative de-overlap: if the (possibly grown) EP now overlaps a
       // DOWNSTREAM sibling in the same lane/pool, push that sibling just past
@@ -3833,6 +3870,7 @@ export function layoutBpmnDiagram(
         if (be.boundaryHostId !== ep.id) continue;
         snapBoundaryEventToRim(be, nx, ny, nw, nh);
       }
+      spreadBoundaryEventsOnRim(elements, ep.id, nx, ny, nw, nh);
       // Keep ancestor lanes / pools enclosing the re-wrapped box (right/bottom).
       let cur: DiagramElement | undefined = ep.parentId ? elements.find(e => e.id === ep.parentId) : undefined;
       let guard = 0;
