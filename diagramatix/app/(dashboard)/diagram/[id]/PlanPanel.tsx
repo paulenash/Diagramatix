@@ -30,6 +30,8 @@ import { ConnectorsByTypeView } from "./ai-plan/ConnectorsByTypeView";
 import { PlanStructureModal } from "./ai-plan/PlanStructureModal";
 import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
+import { PlanSummaryDialog } from "@/app/components/ai/PlanSummaryDialog";
+import { summarisePlan, type PlanSummary } from "@/app/lib/ai/planSummary";
 import { AttachmentPreviewDialog } from "@/app/components/AttachmentPreviewDialog";
 import type { StoredSourceImage } from "@/app/lib/ai/sourceImage";
 import { useReattachSourceImage } from "./useReattachSourceImage";
@@ -382,6 +384,8 @@ export function PlanPanel({
   const [promptFilter, setPromptFilter] = useState("");
   const visiblePrompts = filterSavedPrompts(savedPrompts, promptFilter);
   const [replacePlanConfirm, setReplacePlanConfirm] = useState(false);
+  // What the finished plan found — shown in a pop-up with Re-plan / Refine Prompt / Layout Diagram / Cancel (Paul, 2026-10-07).
+  const [planSummary, setPlanSummary] = useState<PlanSummary | null>(null);
 
   // Raw JSON tab has its own draft so mid-typing doesn't nuke structured state.
   // It syncs FROM `asJson` whenever the tab is NOT focused; pushes BACK to
@@ -866,13 +870,14 @@ export function PlanPanel({
       planModelRef.current = (json.model as string) || model || "";
       lastSonnetResponseRef.current = JSON.stringify(json.plan, null, 2);
       setStatus(`Plan received: ${json.elementCount} elements, ${json.connectionCount} connections`);
+      setPlanSummary(summarisePlan(json.plan, { structured: !flatPlan }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Network error");
       setStatus(null);
     } finally {
       setBusy(null);
     }
-  }, [prompt, setPlan, attachment, apiBase, preserveLayout, pcf?.nodeId, model]);
+  }, [prompt, setPlan, attachment, apiBase, preserveLayout, pcf?.nodeId, model, flatPlan]);
 
   const callPlan = useCallback(async () => {
     if (!prompt.trim() || busy) return;
@@ -1684,6 +1689,18 @@ export function PlanPanel({
           setPlan={setPlan}
           onApply={() => { void callApplyLayout(); }}
           onClose={() => setStructOpen(false)}
+        />
+      )}
+
+
+      {planSummary && (
+        <PlanSummaryDialog
+          summary={planSummary}
+          canRefine={!flatPlan}
+          onReplan={() => { setPlanSummary(null); void executePlanCall(); }}
+          onRefine={() => { setPlanSummary(null); void handleRefine(); }}
+          onLayout={() => { setPlanSummary(null); void callApplyLayout(); }}
+          onCancel={() => setPlanSummary(null)}
         />
       )}
 

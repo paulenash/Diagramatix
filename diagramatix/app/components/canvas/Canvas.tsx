@@ -3,6 +3,7 @@
 import React, { useRef, useState, useCallback, useEffect, useMemo } from "react";
 import { findDrillBackAnchor } from "@/app/lib/diagram/drillBackAnchor";
 import { getBoundaryEventOuterSide, oppositeSide, boundaryEndSide } from "@/app/lib/diagram/routing";
+import { wholeFitZoom } from "@/app/lib/diagram/fitZoom";
 import { nanoid } from "nanoid";
 import type {
   ArchimateConnectorType,
@@ -1180,18 +1181,26 @@ export function Canvas({
   // Small diagrams that fit the viewport at the chosen zoom are centred;
   // larger diagrams anchor to the top-left with a margin. The chosen zoom
   // becomes the "100%" reference on the zoom slider.
-  const performFit = useCallback(() => {
-    if (!svgRef.current || data.elements.length === 0) return;
+  //
+  // `whole` (Paul, 2026-10-07: "the initial zoom after an AI Generation is too close — I would prefer to see the whole diagram that was
+  // generated and then zoom in if need be"): the zoom is the smaller of the usual initial zoom and the zoom at which the whole diagram fits
+  // the window, centred. A small diagram keeps its readable initial zoom; a large one shrinks until all of it shows.
+  // `override` is the diagram the fit is for, when the caller has it before the Canvas does (an AI generation sends its new elements in the
+  // event, so the fit never reads the previous diagram's bounds).
+  const performFit = useCallback((whole = false, override?: { elements: DiagramElement[]; title?: DiagramData["title"] }) => {
+    const fitElements = override?.elements ?? data.elements;
+    const fitTitle = override ? override.title : data.title;
+    if (!svgRef.current || fitElements.length === 0) return;
     const rect = svgRef.current.getBoundingClientRect();
     if (rect.width < 10 || rect.height < 10) return;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const el of data.elements) {
+    for (const el of fitElements) {
       if (el.x < minX) minX = el.x;
       if (el.y < minY) minY = el.y;
       if (el.x + el.width > maxX) maxX = el.x + el.width;
       if (el.y + el.height > maxY) maxY = el.y + el.height;
     }
-    if (data.title?.showTitle) {
+    if (fitTitle?.showTitle) {
       const titleLines = 4;
       const titleH = titleLines * 16 + 28;
       minY -= titleH;
@@ -1205,8 +1214,11 @@ export function Canvas({
     const DEFAULT_INITIAL_ZOOM = 0.7;
     const storedZoomRaw = typeof window !== "undefined"
       ? parseFloat(window.localStorage.getItem("initialZoom") ?? "") : NaN;
-    const initialZoom = Number.isFinite(storedZoomRaw) && storedZoomRaw > 0
+    const baseZoom = Number.isFinite(storedZoomRaw) && storedZoomRaw > 0
       ? storedZoomRaw : DEFAULT_INITIAL_ZOOM;
+    const initialZoom = whole
+      ? wholeFitZoom({ initialZoom: baseZoom, viewportW: rect.width, viewportH: rect.height, contentW, contentH })
+      : baseZoom;
 
     const EDGE_MARGIN = 40;
     const fitsHorizontally = contentW * initialZoom <= rect.width;
@@ -1217,7 +1229,8 @@ export function Canvas({
     const panY = fitsVertically   ? rect.height / 2 - cy * initialZoom : EDGE_MARGIN - minY * initialZoom;
     setPan({ x: panX, y: panY });
     setZoom(initialZoom);
-    baseZoomRef.current = initialZoom;
+    // The slider's "100%" stays the person's own initial zoom, so a whole-diagram fit reads as a percentage below it.
+    baseZoomRef.current = baseZoom;
   }, [data.elements, data.title]);
 
   // Initial mount fit — guarded so subsequent re-renders don't keep
@@ -1240,7 +1253,11 @@ export function Canvas({
 
   // External "please re-fit" trigger.
   useEffect(() => {
-    function onFit() { performFit(); }
+    function onFit(e: Event) {
+      const d = (e as CustomEvent<{ whole?: boolean; elements?: DiagramElement[]; title?: DiagramData["title"] } | undefined>).detail;
+      if (d?.whole) performFit(true, d.elements ? { elements: d.elements, title: d.title } : undefined);
+      else performFit();
+    }
     window.addEventListener("dgx:fitToContent", onFit);
     return () => window.removeEventListener("dgx:fitToContent", onFit);
   }, [performFit]);

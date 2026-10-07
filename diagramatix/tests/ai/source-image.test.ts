@@ -208,7 +208,7 @@ describe("T4999 — wired: kept at apply, shown in Properties, re-attached with 
     expect(rules).toContain("...(meta.freeForm !== undefined ? { freeForm: meta.freeForm } : {}),");
     expect(rules).toContain("...(meta.promptFromImage !== undefined ? { fromImage: meta.promptFromImage } : {}),");
     expect(rules).toContain("relaxedLayout: aiData.relaxedLayout ?? (meta?.freeForm ? true : undefined),");
-    expect(ed).toContain("setData(mergeGeneratedDiagram({ current: data, generated: aiData, aiGeneration, meta }));");
+    expect(ed).toContain("const merged = mergeGeneratedDiagram({ current: data, generated: aiData, aiGeneration, meta });\n    setData(merged);");
     for (const f of ["app/(dashboard)/diagram/[id]/PlanPanel.tsx", "app/(dashboard)/diagram/[id]/ai-generate/AiGenerateScreen.tsx"]) {
       const src = readFileSync(f, "utf8");
       // The plain apply AND the compare fill.
@@ -238,7 +238,7 @@ describe("T4999 — wired: kept at apply, shown in Properties, re-attached with 
     expect(plan).toContain("Attaching the source image ({reattach.pending})…");
     expect(plan).toContain("Free Form — reproduce the image&apos;s layout");
     expect(plan).toContain("that wasn&apos;t kept. Attach it again to use it");
-    expect(plan, "the model picker is read when it changes").toContain("}, [prompt, setPlan, attachment, apiBase, preserveLayout, pcf?.nodeId, model]);");
+    expect(plan, "the model picker is read when it changes").toContain("}, [prompt, setPlan, attachment, apiBase, preserveLayout, pcf?.nodeId, model, flatPlan]);");
   });
 
   it("Diagram Properties offers “View source image”; a Save As copy never rewrites its original's prompt", () => {

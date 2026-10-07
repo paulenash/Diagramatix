@@ -1435,7 +1435,8 @@ export function DiagramEditor({
         aiGeneration = nextAiGeneration({ prev: data.aiGeneration, linked, meta, generatedAt: new Date().toISOString() });
       }
     }
-    setData(mergeGeneratedDiagram({ current: data, generated: aiData, aiGeneration, meta }));
+    const merged = mergeGeneratedDiagram({ current: data, generated: aiData, aiGeneration, meta });
+    setData(merged);
     // The image is kept AFTER the diagram is on screen (the 2026-09-28 review:
     // holding the apply back for a 10 MB upload left the old diagram showing
     // under an "Applied" status, and edits made meanwhile were overwritten).
@@ -1448,7 +1449,8 @@ export function DiagramEditor({
     // Arm the "first canvas click dismisses the AI panel" behaviour (only for a real
     // generation, i.e. when meta is present).
     if (meta) aiJustGeneratedRef.current = true;
-    requestAnimationFrame(() => window.dispatchEvent(new CustomEvent("dgx:fitToContent")));
+    // Show the WHOLE generated diagram (then zoom in if need be). The new elements travel in the event, so the fit never reads the old diagram.
+    requestAnimationFrame(() => window.dispatchEvent(new CustomEvent("dgx:fitToContent", { detail: { whole: true, elements: merged.elements, title: merged.title } })));
   }, [data, setData, ensureLinkedPrompt, diagramId, setAiSourceImage]);
 
   // After an AI generation, the FIRST click on the canvas (select an element,

@@ -46,6 +46,8 @@ import { MatrixRain } from "@/app/components/simulation/matrix/MatrixRain";
 import { ConsoleUserGuideLink } from "@/app/components/ConsoleUserGuideLink";
 import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
+import { PlanSummaryDialog } from "@/app/components/ai/PlanSummaryDialog";
+import { summarisePlan, type PlanSummary } from "@/app/lib/ai/planSummary";
 import { SaveChangesDialog } from "@/app/components/SaveChangesDialog";
 import { AttachmentPreviewDialog } from "@/app/components/AttachmentPreviewDialog";
 import { ClarificationDialog } from "@/app/components/ClarificationDialog";
@@ -332,6 +334,8 @@ export function AiGenerateScreen({
 
   // ── Plan / Apply ──────────────────────────────────────────────────────────
   const [replacePlanConfirm, setReplacePlanConfirm] = useState(false);
+  // What the finished plan found — shown in a pop-up with Re-plan / Refine Prompt / Layout Diagram / Cancel (Paul, 2026-10-07).
+  const [planSummary, setPlanSummary] = useState<PlanSummary | null>(null);
 
   const executePlanCall = useCallback(async (promptOverride?: string) => {
     const effPrompt = (promptOverride ?? prompt).trim();
@@ -363,6 +367,7 @@ export function AiGenerateScreen({
       lastPlanResponseRef.current = JSON.stringify(json.plan, null, 2);
       setRawReply(null);
       setStatus(`Plan received: ${json.elementCount} elements, ${json.connectionCount} ${planCfg.connectorNoun}s`);
+      setPlanSummary(summarisePlan(json.plan, { structured: !flatPlan }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Network error");
       setStatus(null);
@@ -1121,6 +1126,18 @@ export function AiGenerateScreen({
             if (editingPromptId) void savePrompt();
             else setShowSave(true);
           }}
+        />
+      )}
+
+
+      {planSummary && (
+        <PlanSummaryDialog
+          summary={planSummary}
+          canRefine={!flatPlan}
+          onReplan={() => { setPlanSummary(null); void executePlanCall(); }}
+          onRefine={() => { setPlanSummary(null); void handleRefine(); }}
+          onLayout={() => { setPlanSummary(null); void callApplyLayout(); }}
+          onCancel={() => setPlanSummary(null)}
         />
       )}
 

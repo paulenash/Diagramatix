@@ -179,7 +179,8 @@ describe("T5009 — both callers use the one rule set", () => {
     expect(ed).toContain("return runPromptLinkFetch(decidePromptLink({ meta, prev: data.aiGeneration, diagramName, diagramType }), diagramId, meta.model);");
     expect(ed, "counted by the link — no second, owner-only count").not.toContain("markPromptUsedFetch");
     expect(ed).toContain("aiGeneration = nextAiGeneration({ prev: data.aiGeneration, linked, meta, generatedAt: new Date().toISOString() });");
-    expect(ed).toContain("setData(mergeGeneratedDiagram({ current: data, generated: aiData, aiGeneration, meta }));");
+    // (kept in a variable since 2026-10-07: the fit-to-content event carries the merged elements)
+    expect(ed).toContain("const merged = mergeGeneratedDiagram({ current: data, generated: aiData, aiGeneration, meta });\n    setData(merged);");
     expect(ed, "no second copy of the record-building rule").not.toContain("promptId: linked.id");
     expect(ed, "no second copy of the create").not.toContain("fetch(`/api/prompts`");
   });
