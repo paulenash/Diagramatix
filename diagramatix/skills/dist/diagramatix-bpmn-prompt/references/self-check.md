@@ -34,6 +34,7 @@ A prompt that asks for a shape BPMN does not allow is drawn faithfully and wrong
 
 ## Boundary events (section 5)
 - [ ] Each is attached to an **activity** (a task or an Expanded Subprocess) — never to an event, a gateway, or another boundary event.
+- [ ] A boundary event on a step **inside an Expanded Subprocess** (a loop included) leads only to another step **inside that same subprocess** — never to the main flow, an End event outside, or a reminder outside it. If the path has to leave, the event is mounted on **the Expanded Subprocess itself**, and a path that returns comes back to the subprocess by name, never to a step inside it.
 - [ ] Each is **interrupting**; the word "non-interrupting" does not appear.
 - [ ] Each exception path says where it goes (same forms as a branch) and **never returns to the activity it left**; it ends in its own End event or rejoins the flow after that activity.
 - [ ] Written "None." if there are none — none were invented.
@@ -53,6 +54,6 @@ node scripts/check_prompt.mjs prompt.txt        # a saved file
 cat prompt.txt | node scripts/check_prompt.mjs  # or from standard input
 ```
 
-It reports: branches that never say where they go; boundary events mounted on something that is not an activity; message flows between two lanes; missing or misordered sections; a Data Store; a loop-back phrase; "non-interrupting". It exits 0 when the prompt is clean and 1 otherwise. Paste only the prompt text (the part inside the fence) into the file.
+It reports: branches that never say where they go; boundary events mounted on something that is not an activity; boundary events on a step inside a subprocess whose path leads out of it; message flows between two lanes; missing or misordered sections; a Data Store; a loop-back phrase; "non-interrupting". It exits 0 when the prompt is clean and 1 otherwise. Paste only the prompt text (the part inside the fence) into the file.
 
 It cannot judge meaning — whether a decision is really a decision, whether a wait has a deadline, whether a party should be a pool. The checklist above covers those; do them by reading.

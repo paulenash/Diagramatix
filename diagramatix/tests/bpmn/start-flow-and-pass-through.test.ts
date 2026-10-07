@@ -63,7 +63,7 @@ describe("T5245 R8.43 — a sequence flow never passes through another element",
     const sql = readFileSync("scripts/sql/patch-rule-r8-43-r8-44-pass-through-and-start.sql", "utf8");
     const at = seed.indexOf("R8.43:");
     expect(at).toBeGreaterThan(seed.indexOf("R8.42:"));
-    const text = JSON.parse(`"${seed.slice(at, seed.indexOf('"', at))}"`) as string;
+    const text = (JSON.parse(`"${seed.slice(at, seed.indexOf('"', at))}"`) as string).split("\nR8.45:")[0];   // R8.45 is appended to the same string
     for (const line of text.split("\n")) expect(sql).toContain(line.trim());
     expect(sql).toContain("AND rules NOT LIKE '%R8.43:%'");
     expect(sql).toContain("LIKE 'Group 8: Auto-Layout Placement%'");

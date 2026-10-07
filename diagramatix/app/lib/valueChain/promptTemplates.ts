@@ -108,6 +108,8 @@ export const MD_PROMPT_TEMPLATE_HISTORY: Record<MdPromptType, TemplateVersion[]>
       description: "Six defects that were manufacturing diagram bugs: the missing \"continues to <element>\" closing form; the wait rule contradicting the boundary-event rule; merges only where two or more branches converge; a parallel split's join made mandatory; exception paths must terminate; and the non-interrupting flavour withdrawn." },
     { version: 7, at: "2026-09-05", commit: "2df08f65", shippedAt: "2026-09-05T00:27:52Z",
       description: "A loop subprocess holds only the steps that repeat — not the whole process. Its condition is about the repeating work, not the outcome the subprocess exists to produce." },
+    { version: 8, at: "2026-10-07", commit: "e71ff040", shippedAt: "2026-10-07T05:35:32Z",
+      description: "A boundary event on a step inside an Expanded Subprocess stays inside it: its exception path may lead only to another step in that subprocess. To leave, mount the event on the Expanded Subprocess itself, and bring any return path back to the subprocess by name (rule R8.45)." },
   ],
   "value-chain": [
     { version: 1, at: "2026-08-26", commit: "542a7141", shippedAt: "2026-08-26T12:52:13Z", description: "The master templates become editable." },

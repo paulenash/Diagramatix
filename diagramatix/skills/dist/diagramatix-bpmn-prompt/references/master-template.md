@@ -1,6 +1,6 @@
 # The Diagramatix BPMN prompt template (house standard)
 
-Version 7 (2026-09-05). **This is the authoritative template.** It is copied verbatim from Diagramatix's source (`DEFAULT_MD_PROMPT_BPMN`) by the build, so it is exactly what Diagramatix itself uses to write the prompts in its Process Repository.
+Version 8 (2026-10-07). **This is the authoritative template.** It is copied verbatim from Diagramatix's source (`DEFAULT_MD_PROMPT_BPMN`) by the build, so it is exactly what Diagramatix itself uses to write the prompts in its Process Repository.
 
 Read it all before drafting: its rules interact and are only correct together (for example, the wait rule and the boundary-event rule must be read as a pair).
 
@@ -179,6 +179,17 @@ Open with a single unnumbered line:
   left. It ends in its own End event, or it rejoins the flow at a point AFTER
   that activity — a merge gateway or a later named step. A path that loops back
   to its own host cannot be drawn and is the commonest thing written here.
+- A BOUNDARY EVENT ON A STEP INSIDE AN EXPANDED SUBPROCESS STAYS INSIDE IT.
+  When the activity an event is mounted on sits INSIDE an Expanded Subprocess
+  — a loop included — its exception path may lead only to another step INSIDE
+  that same subprocess. It must never lead out of it: not to the main flow, not
+  to an End event outside, not to a reminder or a hand-off that sits outside.
+  If the exception has to leave, mount the event on the Expanded Subprocess
+  ITSELF — write: boundary event on Expanded Subprocess "<name>" — and it may
+  then lead anywhere. A path that has left a subprocess comes back to the
+  subprocess BY NAME, never to a step inside it. So a chase after a wait inside
+  a loop is a timer on the loop, leading to the reminder, then back to the
+  loop — not a timer on the wait inside it.
 - Write "None." if the subprocess genuinely has none. Do not invent one.
 
 6. Connectors

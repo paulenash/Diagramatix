@@ -84,7 +84,10 @@ describe("master template history", () => {
      *
      * An instant needs no rounding and knows nothing about timezones.
      */
-    const sydneyMorningAfter = new Date("2026-09-06T07:30:00+10:00"); // = 2026-09-05T21:30Z
+    // Written against v7 (2026-09-05T00:27:52Z → the Sydney morning of 09-06 was 21:30Z, ~21h later). Stated relative to whichever version is
+    // newest, so a later template version does not turn the fixed date into a genuinely stale one.
+    const shippedAt = new Date(latestTemplateVersion("bpmn").shippedAt).getTime();
+    const sydneyMorningAfter = new Date(shippedAt + 21 * 3600_000);
     expect(promptIsStale("bpmn", sydneyMorningAfter)).toBe(false);
   });
 

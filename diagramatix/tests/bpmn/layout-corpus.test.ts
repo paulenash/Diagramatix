@@ -95,7 +95,8 @@ const KNOWN: Record<string, number> = {
    * false positive, second line; the job above covers both. Not headroom: the
    * count went up because the box is finally where the label was.
    */
-  "EP02.plan.json": 3,
+  // 3 → 1 on 2026-10-07: R8.45 (an EMIE on a step inside an EP is re-mounted on the EP when its flow leaves it) took two of the three away.
+  "EP02.plan.json": 1,
   /**
    * HAND-ADDED 2026-09-13: Paul's "New vtt Process", generated from a Teams
    * transcript. The first fixture with a lane-less white-box pool beside a laned

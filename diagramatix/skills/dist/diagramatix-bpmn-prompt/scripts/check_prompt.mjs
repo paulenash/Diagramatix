@@ -49,6 +49,15 @@ export function checkPromptShapes(prompt) {
         }
         joined.push({ text: text.replace(/\s+/g, " "), line: i + 1 });
     }
+    // Which steps each Expanded Subprocess holds, from its own line:
+    //   Expanded Subprocess "<name>" (standard loop) containing, in order: <type> "<a>", <type> "<b>", …
+    const norm = (s) => s.replace(/\s+/g, " ").trim().toLowerCase();
+    const epMembers = new Map();
+    for (const { text } of joined) {
+        const m = text.match(/Expanded Subprocess\s+"([^"]+)"[^"]*?containing,?\s*in order:\s*(.*)$/i);
+        if (m)
+            epMembers.set(norm(m[1]), { name: m[1], members: new Set([...m[2].matchAll(/"([^"]+)"/g)].map((x) => norm(x[1]))) });
+    }
     let inMessages = false;
     for (const { text, line } of joined) {
         if (/^Message flows:/i.test(text)) {
@@ -64,6 +73,24 @@ export function checkPromptShapes(prompt) {
                 line, kind: "boundary-on-non-activity",
                 detail: `mounted on "${b[1].trim().slice(0, 60)}" — a boundary event can only be attached to a task or subprocess`,
             });
+        }
+        // (c) A boundary event on a step INSIDE an Expanded Subprocess whose exception path leads OUT of it (Paul, 2026-10-07: rule R8.45, the
+        //     diagram check B41). An event on a child's rim sits inside the subprocess, so the path must stay inside; to leave, the event is
+        //     mounted on the Expanded Subprocess itself. The destinations are every name quoted after "leading to" / "continues to".
+        const bh = text.match(/boundary event on\s+(?:[A-Za-z-]+\s+){0,4}?"([^"]+)"/i);
+        const lead = text.search(/\b(?:leading to|continues to)\b/i);
+        if (bh && lead >= 0) {
+            const owner = [...epMembers.values()].find((ep) => ep.members.has(norm(bh[1])));
+            if (owner) {
+                const outside = [...text.slice(lead).matchAll(/"([^"]+)"/g)].map((x) => x[1])
+                    .find((d) => !owner.members.has(norm(d)) && norm(d) !== norm(owner.name));
+                if (outside) {
+                    issues.push({
+                        line, kind: "boundary-leaves-subprocess",
+                        detail: `mounted on "${bh[1]}", which is inside Expanded Subprocess "${owner.name}", but leads out of it to "${outside}" — mount the event on the Expanded Subprocess itself`,
+                    });
+                }
+            }
         }
         // (b) A message flow between two LANES. A message flow must cross a POOL
         //     boundary; between lanes of one pool it is a sequence flow, and if an

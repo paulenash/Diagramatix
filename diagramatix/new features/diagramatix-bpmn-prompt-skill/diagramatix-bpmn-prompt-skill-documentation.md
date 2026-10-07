@@ -6,7 +6,7 @@ date: "7 October 2026"
 
 # The Diagramatix BPMN Prompt Skill
 
-**Version 1 · 7 October 2026 · built from Diagramatix master template v7**
+**Version 1 · 7 October 2026 · built from Diagramatix master template v8**
 
 ## Contents
 
@@ -153,7 +153,7 @@ Its structure rests on four decisions:
 | **Built-in + editable additions** | `DiagramRules` row per diagram type | `references/house-rules.md` — an editable file with an *active* and a *not active* part; it never overrides the built-in. |
 | **"Refine" clarifying questions** | A step in the AI Generate screen: up to six questions, answers appended as a CLARIFICATIONS block | Stage 2, using **the same list of dimensions**, written into the skill by the build from the application's own source. |
 | **Automatic gates** (`checkPromptShapes`, `checkPromptBranches`) | Deterministic and free; run on every repository prompt | `scripts/check_prompt.mjs` — **the same two checkers, transpiled**, plus structural checks; a test confirms identical findings on all 104 repository BPMN prompts. |
-| **Template version history / staleness** | `MD_PROMPT_TEMPLATE_HISTORY`; the library screen flags stale prompts | `VERSION.json` and the version stamp in the skill's files (currently **v7**); a new zip is issued when the template changes. |
+| **Template version history / staleness** | `MD_PROMPT_TEMPLATE_HISTORY`; the library screen flags stale prompts | `VERSION.json` and the version stamp in the skill's files (currently **v8**); a new zip is issued when the template changes. |
 | **A proven example to follow** | The existing prompts | `references/example-prompt.md` — two real repository prompts, taken directly from the Process Repository by the build. |
 
 ### 4.3 The seven sections, and the rules each carries
@@ -167,7 +167,7 @@ The skill follows the template exactly; this table is a map, not a substitute. T
 | 2 | **Pool properties** | Black-box / white-box, `System = true`, single instance | Exactly one pool is white-box — the one holding the flow. |
 | 3 | **Layout** | Vertical order of pools | Triggering external party at the top; supporting systems at the bottom. |
 | 4 | **Lane contents in flow order** | Each element, typed and labelled, in order | See below — this section carries most of the rules. |
-| 5 | **Edge-mounted (boundary) events** | Events attached to an activity | Interrupting only; attached to an *activity* only; the exception path says where it goes and never returns to its host. |
+| 5 | **Edge-mounted (boundary) events** | Events attached to an activity | Interrupting only; attached to an *activity* only; the exception path says where it goes and never returns to its host; **an event on a step inside an Expanded Subprocess leads only to another step inside it — to leave, mount the event on the Expanded Subprocess itself.** |
 | 6 | **Connectors** | Sequence flows; message flows | A message flow must cross a pool boundary; every external and system pool appears in at least one. |
 | 7 | **Data objects** | Business records in flight | Never a Data Store; each attaches to a task. |
 | — | Closing paragraph | What the process achieves and what it hands on | Three or four lines. |
@@ -216,7 +216,7 @@ The judgement calls the skill settles, so every prompt makes them the same way:
 ### 4.6 What is not covered
 
 - **BPMN only.** The application has master templates for Value Chain, Context, Process Context and ArchiMate prompts too; this skill does not include them.
-- **The checks catch three kinds of defect automatically** — branches that never say where they go, boundary events mounted on something that is not an activity, and message flows between two lanes — plus structural problems (sections missing or out of order, a Data Store, a loop-back, "non-interrupting", a lane named as a destination). The template's other rules — whether a wait has a deadline, whether a decision really decides, whether a party should be a pool — need judgement and are covered by the **checklist, by reading**. The application's own checks have the same limit.
+- **The checks catch four kinds of defect automatically** — branches that never say where they go, boundary events mounted on something that is not an activity, boundary events on a step inside a subprocess whose path leads out of it, and message flows between two lanes — plus structural problems (sections missing or out of order, a Data Store, a loop-back, "non-interrupting", a lane named as a destination). The template's other rules — whether a wait has a deadline, whether a decision really decides, whether a party should be a pool — need judgement and are covered by the **checklist, by reading**. The application's own checks have the same limit.
 - **It does not guarantee the diagram.** A good prompt makes a good diagram *likely*; the layout is the application's, and it is worth a few minutes in the editor before a diagram goes in front of anyone.
 
 ### 4.7 How the two are kept from drifting apart
@@ -343,6 +343,7 @@ It reports, with line numbers:
 |---|---|
 | `branch-without-destination` | A gateway branch that never says where it goes. |
 | `boundary-on-non-activity` | A boundary event mounted on something that is not a task or subprocess. |
+| `boundary-leaves-subprocess` | A boundary event on a step *inside* an Expanded Subprocess whose exception path leads *out* of it. Mount the event on the Expanded Subprocess itself. |
 | `message-within-pool` | A message flow whose two ends are lanes of one pool. |
 | `opening-line` / `missing-section` / `section-order` | The structure is wrong. |
 | `data-store` | A Data Store appears. |
@@ -350,7 +351,7 @@ It reports, with line numbers:
 | `non-interrupting` | The word appears; every edge-mounted event is interrupting. |
 | `destination-not-an-element` | "Continue to the next task", or a lane named as a destination. |
 
-It exits **0** when the prompt is clean and **1** otherwise. The first three kinds are **the application's own checkers**, transpiled; the build's test proves they give identical findings to the application on every BPMN prompt in the Process Repository. The rest are structural checks added for the skill.
+It exits **0** when the prompt is clean and **1** otherwise. The first four kinds are **the application's own checkers**, transpiled; the build's test proves they give identical findings to the application on every BPMN prompt in the Process Repository. The rest are structural checks added for the skill.
 
 **What it cannot judge** is meaning: whether a decision is really a decision, whether a wait has a deadline, whether a party should be a pool. That is the checklist's job, done by reading.
 
@@ -716,6 +717,8 @@ A hosted connector (an MCP server) could later give the same ability in environm
 
 **The diagram has elements stacked in a column at the left, with no connections.** This is the symptom of a generation whose **connection list was cut off** — the AI produced all the elements but ran out of room before listing the flows between them. It happened on a very large, many-lane prompt: of 142 elements, the connection list stopped partway and the last three lanes had almost no connections. The remedy is on the prompt side: **split a big process** into a main prompt and prompts for its larger parts (the skill offers this above about 40 steps), and keep **lanes as roles, not phases**.
 
+**A timer on a step inside a loop, with a reminder path that leaves the loop.** This was the first real defect found in a skill-written prompt (7 October 2026): the timer was mounted on the *wait inside* the loop but its path led out to a reminder outside. BPMN does not allow it — an event on a step inside an Expanded Subprocess may lead only to another step inside it. The fix is to mount the timer on the loop *itself*, with the return path coming back to the loop by name. This is now in the master template (v8), in the skill's checklist and checker (`boundary-leaves-subprocess`), and enforced by Diagramatix's layout (rule R8.45), which re-mounts such an event automatically.
+
 **It would not apply one of my house rules.** The rule conflicted with a drawability rule in the template, and the skill said so under Checks. The template wins by design.
 
 **Can I use the prompt for something other than AI Generate?** Yes: it is plain text in the format of the Process Repository's prompts, so it can also be pasted into a repository Markdown document (add the process code to the opening line and the `**BPMN diagram prompt.**` label with the text in a fence), or sent to the Process API as described in section 9.
@@ -758,6 +761,7 @@ In the application repository (under `diagramatix/`): the hand-written sources i
 | 5 | 2026-09-02 | Every gateway branch must say where it goes, in one of four accepted closing forms. |
 | 6 | 2026-09-03 | Six defects that were manufacturing diagram bugs: the missing "continues to <element>" form; the wait rule contradicting the boundary-event rule; merges only where two or more branches converge; a parallel split's join made mandatory; exception paths must terminate; the non-interrupting flavour withdrawn. |
 | 7 | 2026-09-05 | A loop subprocess holds only the steps that repeat; its condition is about the repeating work, not the outcome. |
+| 8 | 2026-10-07 | A boundary event on a step inside an Expanded Subprocess stays inside it: its exception path may lead only to another step in that subprocess. To leave, mount the event on the Expanded Subprocess itself, and bring any return path back to the subprocess by name (rule R8.45). |
 
 ### 12.3 Glossary
 
