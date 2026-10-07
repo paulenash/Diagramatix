@@ -18,6 +18,7 @@ import { buildTestConnectors } from "./bpmnTestConnectors";
 import { tetherModeOnCreate } from "./labelTether";
 import { placeMessageLabels } from "./messageLabel";
 import { POOL_GAP } from "./poolLaneBounds";
+import { placeGatewayBranchLabels } from "./gatewayBranchLabels";
 import { titleCaseName } from "./nameCase";
 
 /**
@@ -7243,6 +7244,8 @@ export function layoutBpmnDiagram(
     }
   }
 
+  // R8.46 — a gateway's outgoing branch labels sit by one rule, close to the gateway (50 px along, 30 px clear), nudged apart if they touch.
+  placeGatewayBranchLabels(elements, finalConnectors);
   applyRepeatMarkers(elements, aiElements);
   // EXPERIMENTAL (SuperAdmin): swap sequence-connector geometry for the C1/C2
   // Test scheme. Element positions + non-sequence connectors are unchanged.

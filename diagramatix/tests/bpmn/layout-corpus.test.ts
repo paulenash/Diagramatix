@@ -106,7 +106,7 @@ const KNOWN: Record<string, number> = {
    *   • two connectors sharing one attachment point on gw_split
    *   • a branch label lying along its own horizontal run (the K/L family)
    */
-  "VTT01.plan.json": 2,
+  "VTT01.plan.json": 1,
   "V04.01.plan.json": 2,
   // 3 -> 1 when R55.7 gave the exception path a row clear of the main line; 1 -> 0 on 2026-10-04 when the endpoint
   // allocator (slice 2) separated the two messages that shared pClaimant|bottom at the same x — the entry is gone.

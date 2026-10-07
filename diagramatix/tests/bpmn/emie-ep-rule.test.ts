@@ -82,7 +82,7 @@ function ruleFromSeed(): string {
   const at = seed.indexOf("R8.45:");
   let end = at;
   for (;;) { end = seed.indexOf('"', end + 1); if (seed[end - 1] !== "\\") break; }
-  return JSON.parse(`"${seed.slice(at, end)}"`) as string;
+  return (JSON.parse(`"${seed.slice(at, end)}"`) as string).split("\nR8.46:")[0];   // R8.46 is appended to the same string
 }
 const ruleFromSql = () => sql.match(/\$NEW\$(R8\.45:[\s\S]*?)\$NEW\$/)?.[1] ?? "";
 
