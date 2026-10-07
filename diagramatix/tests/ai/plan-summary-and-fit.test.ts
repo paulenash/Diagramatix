@@ -77,6 +77,22 @@ describe("T5276 the plan summary", () => {
     expect(summarisePlan(p, { structured: true }).warnings.map((w) => w.code)).not.toContain("unconnected");
   });
 
+  it("T5281 a MERGE gateway (two flows in, one out) is not flagged as deciding nothing", () => {
+    // Paul, 2026-10-07: "Application complete" and "Acceptance checks complete" are joins — one way out is correct.
+    const p = {
+      elements: [
+        { id: "s", type: "start-event", label: "Start" }, { id: "a", type: "task", label: "A" }, { id: "b", type: "task", label: "B" },
+        { id: "sp", type: "gateway", gatewayType: "parallel", label: "Split" }, { id: "mg", type: "gateway", gatewayType: "parallel", label: "Joined" },
+        { id: "e", type: "end-event", label: "End" },
+      ],
+      connections: [
+        { sourceId: "s", targetId: "sp" }, { sourceId: "sp", targetId: "a" }, { sourceId: "sp", targetId: "b" },
+        { sourceId: "a", targetId: "mg" }, { sourceId: "b", targetId: "mg" }, { sourceId: "mg", targetId: "e" },
+      ],
+    };
+    expect(summarisePlan(p as never, { structured: false }).warnings.map((w) => w.code)).not.toContain("gateway-branches");
+  });
+
   it("flags a gateway that decides nothing, a plan with no start or no end, and a single lane", () => {
     const thin = sound();
     thin.connections = thin.connections.filter((c) => c.targetId !== "e2");           // the gateway now has one way out

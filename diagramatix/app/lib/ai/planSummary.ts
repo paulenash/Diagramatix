@@ -65,9 +65,13 @@ export function summarisePlan(plan: { elements?: SummaryElement[]; connections?:
   // A step is "connected" when something flows into or out of it. A boundary event belongs to its host, so is not judged on its own.
   const touched = new Set<string>();
   const outgoing = new Map<string, number>();
+  const incoming = new Map<string, number>();
   for (const c of connections) {
     touched.add(c.sourceId); touched.add(c.targetId);
-    if ((c.type ?? "sequence") === "sequence") outgoing.set(c.sourceId, (outgoing.get(c.sourceId) ?? 0) + 1);
+    if ((c.type ?? "sequence") === "sequence") {
+      outgoing.set(c.sourceId, (outgoing.get(c.sourceId) ?? 0) + 1);
+      incoming.set(c.targetId, (incoming.get(c.targetId) ?? 0) + 1);
+    }
   }
   const flow = elements.filter((e) => FLOW_TYPES.has(e.type) && !e.boundaryHost);
   const unconnected = flow.filter((e) => !touched.has(e.id));
@@ -104,7 +108,9 @@ export function summarisePlan(plan: { elements?: SummaryElement[]; connections?:
       });
     }
   }
-  const thin = flow.filter((e) => e.type === "gateway" && (outgoing.get(e.id) ?? 0) < 2 && touched.has(e.id));
+  // A MERGE gateway (two or more flows in, one out) is correct with a single outgoing flow — it joins, it does not decide. Only a gateway
+  // that neither splits nor joins is suspect.
+  const thin = flow.filter((e) => e.type === "gateway" && (outgoing.get(e.id) ?? 0) < 2 && (incoming.get(e.id) ?? 0) < 2 && touched.has(e.id));
   if (thin.length > 0) {
     const thinNames = thin.map(nameOf).filter((n) => !n.startsWith("(unnamed"));
     warnings.push({
