@@ -1404,7 +1404,24 @@ export function layoutBpmnDiagram(
       if (c.type === "message") continue;
       const src = byAiId.get(c.sourceId), tgt = byAiId.get(c.targetId);
       if (!src || !tgt) continue;
-      // A boundary event lives ON the rim: its flows legitimately leave the EP.
+      // An edge-mounted event on a step INSIDE an EP never leads out of that EP (R8.45 — Paul, 2026-10-07; the diagram check B41 says the
+      // same). Its rim is inside the EP, so a flow leaving it crosses the EP's boundary. The standard repair is to mount the event on the
+      // EP itself, where it may lead anywhere. This runs AFTER the eviction pass above, so the targets are where they finally sit — the
+      // exception path's own steps (reachable only through the event) were moved out of the EP by it, which is what made the flow leave.
+      if (src.type === "intermediate-event" && src.boundaryHost && !DATA_ARTIFACTS.has(tgt.type)) {
+        const theirsB = new Set([c.targetId, ...ancestors(c.targetId)]);
+        const liftHost = [...ancestors(String(src.boundaryHost))].reverse().find((ep) => !theirsB.has(ep));
+        if (liftHost) {
+          const was = byAiId.get(String(src.boundaryHost));
+          src.boundaryHost = liftHost;
+          diagnose({
+            kind: "recovered-reference", elementId: src.id, label: src.label ?? "", field: "boundaryHost",
+            detail: `edge-mounted event on "${was?.label ?? "a step"}" led out of "${byAiId.get(liftHost)?.label ?? liftHost}" — mounted it on that subprocess itself (R8.45)`,
+          });
+        }
+        continue;
+      }
+      // Any other boundary event lives ON the rim: its flows legitimately leave the EP.
       if (src.boundaryHost || tgt.boundaryHost) continue;
       // An ASSOCIATION to a data artifact crosses the boundary quite legally —
       // R8.02 deliberately moves a data object OUTSIDE the EP it belongs to, so
