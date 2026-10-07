@@ -95,3 +95,4 @@ next-env.d.ts
 
 !/new features/release-2.13-documentation-wording.md
 !/new features/accessability audit/
+!/new features/diagramatix-bpmn-prompt-skill/
