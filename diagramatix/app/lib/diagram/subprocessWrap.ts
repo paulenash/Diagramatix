@@ -260,10 +260,12 @@ export function planUnwrapSubprocess(shape: Shape, epId: string): WrapPlan {
   inside.delete(ep.id);
   const kids = shape.elements.filter((e) => e.parentId === ep.id);
   const starts = kids.filter((e) => e.type === "start-event").sort((a, b) => a.x - b.x);
-  const ends = kids.filter((e) => e.type === "end-event").sort((a, b) => b.x - a.x);
+  // The End that closes the MAIN flow is the one furthest right; any other End inside ends a side flow (a rejection, a cut-off) and stays.
+  const ends = kids.filter((e) => e.type === "end-event").sort((a, b) => (b.x + b.width) - (a.x + a.width));
   const shellEvents = shape.elements.filter((e) => e.boundaryHostId === ep.id);
-  // The shell, its Start/End and anything mounted on its edge go; everything else inside stays.
-  const removed = new Set<string>([ep.id, ...starts.map((e) => e.id), ...ends.map((e) => e.id), ...shellEvents.map((e) => e.id)]);
+  // The shell, its ONE Start, its ONE main-flow End and anything mounted on its edge go; everything else inside stays
+  // (Paul, 2026-10-07: deleting an EP must not delete the End Events of the flows it surrounded).
+  const removed = new Set<string>([ep.id, ...starts.slice(0, 1).map((e) => e.id), ...ends.slice(0, 1).map((e) => e.id), ...shellEvents.map((e) => e.id)]);
   // …and so does what hangs off the shell's boundary events.
   const pathIds = exceptionPathIds(shape, new Set(shellEvents.map((e) => e.id)), new Set([...inside, ep.id]));
   for (const id of pathIds) removed.add(id);
