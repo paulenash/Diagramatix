@@ -10,7 +10,9 @@
  * banner and the compare controls — so the bar you were told to watch was
  * off-screen on the panel where you pressed the button.
  */
+import { useRef } from "react";
 import { AiPanel, AiButton, AiSpinner, type AiTones } from "./AiConsoleChrome";
+import { PromptCheck } from "@/app/components/ai/PromptCheck";
 
 const MIC_PATH_TOP = "M8 11a3 3 0 0 0 3-3V4a3 3 0 1 0-6 0v4a3 3 0 0 0 3 3z";
 const MIC_PATH_BASE = "M13 8a1 1 0 1 0-2 0 3 3 0 0 1-6 0 1 1 0 1 0-2 0 5 5 0 0 0 4 4.9V14H5.5a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1H9v-1.1A5 5 0 0 0 13 8z";
@@ -49,6 +51,17 @@ export function PromptPanel({
   onDismissRefineMsg: () => void;
 }) {
   const showMicBlock = mic.testing || !!mic.err || !!mic.device || !!mic.recordingUrl;
+  const taRef = useRef<HTMLTextAreaElement>(null);
+  /** Select a whole line of the prompt and bring it into view (a finding names its line). */
+  const jumpToLine = (line: number) => {
+    const ta = taRef.current;
+    if (!ta) return;
+    const lines = prompt.split("\n");
+    const start = lines.slice(0, line - 1).reduce((n, l) => n + l.length + 1, 0);
+    ta.focus();
+    ta.setSelectionRange(start, start + (lines[line - 1]?.length ?? 0));
+    ta.scrollTop = Math.max(0, (line - 3) * 19);
+  };
 
   return (
     <AiPanel
@@ -117,6 +130,7 @@ export function PromptPanel({
       )}
 
       <textarea
+        ref={taRef}
         value={prompt}
         onChange={(e) => onPromptChange(e.target.value)}
         placeholder={placeholder}
@@ -125,6 +139,9 @@ export function PromptPanel({
         className="w-full px-3 py-2 text-[13px] rounded resize-y bg-black/50 text-white/90 placeholder:text-white/25 focus:outline-none border"
         style={{ borderColor: listening ? tones.accent : tones.line }}
       />
+
+      {/* Check before you Plan — the prompt checkers, for a house-format BPMN prompt. */}
+      {canRefine && <PromptCheck prompt={prompt} onJumpToLine={jumpToLine} />}
 
       {listening && (
         <p className="text-[10px] mt-1 animate-pulse" style={{ color: tones.bright }}>
