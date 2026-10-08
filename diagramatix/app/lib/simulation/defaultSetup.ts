@@ -24,6 +24,9 @@ export const DEFAULT_CALENDARS: { name: string; calendar: WorkCalendar }[] = [
   { name: "Business Hours + lunch", calendar: { intervals: MON_FRI.flatMap((day) => [{ day, start: "09:00", end: "12:00" }, { day, start: "13:00", end: "17:00" }]) } },
 ];
 
+/** The horizon a freshly seeded Baseline scenario runs for: 8 days, in the scenario's minute clock (Paul, 2026-10-08). */
+export const DEFAULT_STUDY_HORIZON_MINUTES = 8 * 24 * 60;
+
 const DEFAULT_STUDY_NAME = "Initial Study";
 const DEFAULT_SCENARIO_NAME = "Baseline";
 

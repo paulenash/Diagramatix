@@ -196,11 +196,14 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId,
       .map((id) => diagramsById.get(id))
       .filter((d): d is DiagramData => !!d);
     if (diagrams.length === 0) return;
-    const sig = usedTeamNames(diagrams).size === 0 ? "" : [...usedTeamNames(diagrams)].sort().join("|");
+    // Entered from a diagram: that diagram and everything it links to are the study's Root Diagrams (see SeedOptions). Part of the signature,
+    // so a link added during the session re-runs the seeding too.
+    const rootIds = diagramId ? reachableDiagramIds(diagramId, diagramsById) : undefined;
+    const sig = (usedTeamNames(diagrams).size === 0 ? "" : [...usedTeamNames(diagrams)].sort().join("|")) + (rootIds ? `#${[...rootIds].sort().join(",")}` : "");
     if (seededSigRef.current === sig) return;
     seededSigRef.current = sig;
-    seedSimulationDefaults(projectId, diagrams)
-      .then((res) => { if (res.calendarsCreated || res.teamsCreated || res.studyCreated) setSeedKey((k) => k + 1); })
+    seedSimulationDefaults(projectId, diagrams, undefined, { rootIds })
+      .then((res) => { if (res.calendarsCreated || res.teamsCreated || res.studyCreated || res.rootsAdded) setSeedKey((k) => k + 1); })
       .catch(() => { seededSigRef.current = null; }); // allow a retry on the next change
   }, [projectId, diagramsById, activeId, diagramId]);
 

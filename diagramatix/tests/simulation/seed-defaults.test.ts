@@ -58,7 +58,7 @@ describe("seedSimulationDefaults", () => {
     const { fetchImpl, calls } = mockServer({});
     const res = await seedSimulationDefaults("proj1", [twoLaneProject], fetchImpl as any);
 
-    expect(res).toEqual({ calendarsCreated: 3, teamsCreated: 2, studyCreated: true });
+    expect(res).toEqual({ calendarsCreated: 3, teamsCreated: 2, studyCreated: true, rootsAdded: 0 });
 
     const posts = calls.filter((c) => c.method === "POST");
     const calNames = posts.filter((c) => c.url.endsWith("/simulation-calendars")).map((c) => c.body.name);
@@ -84,7 +84,7 @@ describe("seedSimulationDefaults", () => {
       studies: [{ id: "s1" }],
     });
     const res = await seedSimulationDefaults("proj1", [twoLaneProject], fetchImpl as any);
-    expect(res).toEqual({ calendarsCreated: 0, teamsCreated: 0, studyCreated: false });
+    expect(res).toEqual({ calendarsCreated: 0, teamsCreated: 0, studyCreated: false, rootsAdded: 0 });
     expect(calls.some((c) => c.method === "POST"), "no POST should have been made").toBe(false);
   });
 });

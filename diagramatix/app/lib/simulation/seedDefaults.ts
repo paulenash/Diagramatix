@@ -12,12 +12,25 @@
  */
 
 import type { DiagramData } from "@/app/lib/diagram/types";
-import { planDefaultSetup, BUSINESS_HOURS_NAME } from "./defaultSetup";
+import { planDefaultSetup, BUSINESS_HOURS_NAME, DEFAULT_STUDY_HORIZON_MINUTES } from "./defaultSetup";
+import { DEFAULT_RUN_CONFIG } from "./types";
 
 export interface SeedResult {
   calendarsCreated: number;
   teamsCreated: number;
   studyCreated: boolean;
+  /** Diagrams added to the study's Root Diagrams. */
+  rootsAdded: number;
+}
+
+export interface SeedOptions {
+  /**
+   * The diagram the Simulator was entered from and everything it links to, down the link tree, current diagram first (Paul, 2026-10-08:
+   * "make sure the simulator checks the current diagram and any linked diagrams … down the link tree as root diagrams automatically").
+   * They are ticked as the study's Root Diagrams when the project has exactly ONE study (with several there is no telling which one is
+   * meant), by adding only — a root already ticked, or ticked for another process, is never removed. Absent in project mode.
+   */
+  rootIds?: string[];
 }
 
 type FetchLike = (url: string, init?: RequestInit) => Promise<{ ok: boolean; json: () => Promise<unknown> }>;
@@ -28,6 +41,7 @@ export async function seedSimulationDefaults(
   projectId: string,
   diagrams: DiagramData[],
   fetchImpl: FetchLike = fetch as unknown as FetchLike,
+  opts: SeedOptions = {},
 ): Promise<SeedResult> {
   const base = `/api/projects/${projectId}`;
   const getJson = async (url: string): Promise<Record<string, unknown> | null> => {
@@ -85,11 +99,38 @@ export async function seedSimulationDefaults(
       ? ((await created.json()) as { study?: { id?: string } }).study?.id
       : undefined;
     if (studyId) {
-      await post(`${base}/simulation/studies/${studyId}/scenarios`, {
+      const sc = await post(`${base}/simulation/studies/${studyId}/scenarios`, {
         name: plan.scenarioName,
         isBaseline: true,
       });
       studyCreated = true;
+      // The seeded Baseline runs for 8 days, not the stock 480 minutes (Paul, 2026-10-08).
+      const scenarioId = sc.ok ? ((await sc.json()) as { scenario?: { id?: string } }).scenario?.id : undefined;
+      if (scenarioId) {
+        await fetchImpl(`${base}/simulation/studies/${studyId}/scenarios/${scenarioId}`, {
+          method: "PUT", headers: JSON_HEADERS,
+          body: JSON.stringify({ runConfig: { ...DEFAULT_RUN_CONFIG, horizon: DEFAULT_STUDY_HORIZON_MINUTES } }),
+        });
+      }
+    }
+  }
+
+  // 4 · Root Diagrams: the diagram the Simulator was entered from and its whole link tree. Only when there is exactly one study; adds, never removes.
+  let rootsAdded = 0;
+  if (opts.rootIds && opts.rootIds.length > 0) {
+    const list = await getJson(`${base}/simulation/studies`);
+    const studies = rows(list, "studies");
+    if (studies.length === 1 && studies[0].id) {
+      const bpmn = new Set(rows(list, "diagrams").map((d) => d.id));       // only BPMN diagrams can be simulated
+      const detail = await getJson(`${base}/simulation/studies/${studies[0].id}`);
+      const have = new Set(((detail?.study as { roots?: { diagram: { id: string } }[] } | undefined)?.roots ?? []).map((r) => r.diagram.id));
+      const missing = opts.rootIds.filter((id) => bpmn.has(id) && !have.has(id));
+      if (missing.length > 0) {
+        const r = await fetchImpl(`${base}/simulation/studies/${studies[0].id}`, {
+          method: "PUT", headers: JSON_HEADERS, body: JSON.stringify({ rootDiagramIds: [...have, ...missing] }),
+        });
+        if (r.ok) rootsAdded = missing.length;
+      }
     }
   }
 
@@ -97,5 +138,6 @@ export async function seedSimulationDefaults(
     calendarsCreated: plan.calendarsToCreate.length,
     teamsCreated: plan.teamsToCreate.length,
     studyCreated,
+    rootsAdded,
   };
 }
