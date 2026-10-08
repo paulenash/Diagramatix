@@ -30,6 +30,15 @@ describe("T5288 1 — the RV badge", () => {
     expect(c.bg.toLowerCase()).toBe(REVIEW_COMMENT_PALETTE[0].fill.toLowerCase());     // the note's own light pink
     expect(contrastRatio(c.bg, c.text)).toBeGreaterThanOrEqual(4.5);                    // dark pink text on it
   });
+  it("the filter-line badges are coloured with their feature colours, faded when off and ringed when on", () => {
+    const src = readFileSync("app/(dashboard)/dashboard/projects/[id]/ProjectDetailClient.tsx", "utf8");
+    const at = src.indexOf("Coloured like the badges on the rows they filter");
+    const block = src.slice(at, at + 900);
+    expect(block).toContain("tonesFor(featureScheme, key)");
+    expect(block).toContain("readableTextOn(bg, text)");
+    expect(block).toContain("opacity: on ? 1 : 0.55");
+    expect(block).toContain("boxShadow: on ?");
+  });
   it("it can be filtered on in the tree like the others", () => {
     expect(readFileSync("app/(dashboard)/dashboard/projects/[id]/ProjectDetailClient.tsx", "utf8")).toContain('["reviewComment", "RV", "Has review comments"],');
   });

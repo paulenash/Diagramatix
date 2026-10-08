@@ -36,7 +36,7 @@ import {
   DEFAULT_TILE_LAYOUT, TILE_LAYOUTS, TILE_LAYOUT_SPEC,
   readTileLayout, writeTileLayout, tileColumnsFor, type TileLayout,
 } from "@/app/lib/project/tileLayout";
-import { tonesFor, featureVars } from "@/app/lib/theme/featureColors";
+import { tonesFor, readableTextOn } from "@/app/lib/theme/featureColors";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { SharePointPicker } from "@/app/components/SharePointPicker";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
@@ -3278,8 +3278,15 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
                 onClick={() => toggleBadgeFilter(key)}
                 title={title}
                 aria-pressed={treeFilter.badges.includes(key)}
-                style={treeFilter.badges.includes(key) ? featureVars(featureScheme, key) : undefined}
-                className={`w-6 h-5 rounded-full border text-[9px] font-semibold leading-none ${treeFilter.badges.includes(key) ? "feature-tile-active" : "border-gray-300 text-gray-500 hover:bg-gray-50"}`}
+                // Coloured like the badges on the rows they filter (Paul, 2026-10-08): always in the feature's own colours, faded when off, full
+                // strength with a ring when on — so the filter line reads as the same badges, not as a row of grey buttons.
+                style={(() => {
+                  const { bg, text } = tonesFor(featureScheme, key);
+                  const fg = readableTextOn(bg, text);
+                  const on = treeFilter.badges.includes(key);
+                  return { backgroundColor: bg, color: fg, borderColor: fg, opacity: on ? 1 : 0.55, boxShadow: on ? `0 0 0 2px ${fg}` : undefined };
+                })()}
+                className="w-6 h-5 rounded-full border text-[9px] font-semibold leading-none hover:opacity-100"
               >
                 {code}
               </button>
