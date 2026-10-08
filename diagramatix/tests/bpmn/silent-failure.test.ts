@@ -228,7 +228,7 @@ describe("T5284 — the rules are written down", () => {
     const sql = readFileSync("scripts/sql/patch-rule-r8-51-exception-step-clear-of-main-flow.sql", "utf8");
     const at = seed.indexOf("R8.51:");
     expect(at).toBeGreaterThan(seed.indexOf("R8.50:"));
-    const text = JSON.parse(`"${seed.slice(at, seed.indexOf('"', at))}"`) as string;
+    const text = (JSON.parse(`"${seed.slice(at, seed.indexOf('"', at))}"`) as string).split("\nR8.52:")[0];   // R8.52 has its own patch
     expect(sql).toContain(text.trim());
     expect(sql).toContain("AND rules NOT LIKE '%R8.51:%'");
     expect(sql).toContain("LIKE 'Group 8: Auto-Layout Placement%'");

@@ -82,4 +82,16 @@ describe("T5288 3 — an annotation never sits over another element (R8.52)", ()
   it("the rule is named in the layout", () => {
     expect(readFileSync("app/lib/diagram/bpmnLayout.ts", "utf8")).toContain("R8.52");
   });
+  it("R8.52 is a Red Rule: in the seed after R8.51, and its patch says the same and REPORTS whether it was already run", () => {
+    const seed = readFileSync("scripts/seed-diagram-rules.cjs", "utf8");
+    const sql = readFileSync("scripts/sql/patch-rule-r8-52-annotation-clear-of-elements.sql", "utf8");
+    const at = seed.indexOf("R8.52:");
+    expect(at).toBeGreaterThan(seed.indexOf("R8.51:"));
+    const text = JSON.parse(`"${seed.slice(at, seed.indexOf('"', at))}"`) as string;
+    expect(sql).toContain(text.trim());
+    expect(sql).toContain("AND rules NOT LIKE '%R8.52:%'");
+    expect(sql).toContain("LIKE 'Group 8: Auto-Layout Placement%'");
+    for (const word of ["ALREADY APPLIED", "APPLIED NOW", "NOT APPLIED"]) expect(sql).toContain(word);
+    expect(sql).not.toContain("DELETE FROM");
+  });
 });
