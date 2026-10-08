@@ -99,6 +99,36 @@ describe("T5284 3 — edge events on one horizontal edge keep their distance (R8
   });
 });
 
+describe("T5284 R8.51 — an exception-path step is moved clear of a main-flow line, not the line re-routed", () => {
+  it("in Paul's capture no flow runs through the two exception tasks, and they have moved LEFT of the merge's downward line", () => {
+    const g = layoutBpmnDiagram(plan.elements, plan.connections);
+    const rules = checkDiagram(g as never).map((v) => v.rule);
+    expect(rules).not.toContain("sequence-clips-foreign-node");
+    const merge = g.connectors.find((c) => c.sourceId === "gwCompleteMerge")!;
+    const dropX = merge.waypoints.find((p, i, a) => i > 0 && Math.abs(p.x - a[i - 1].x) < 0.5 && Math.abs(p.y - a[i - 1].y) > 100)!.x;
+    for (const id of ["tSendReminder", "_sf_task_bTimerLapse_0"]) {
+      const t = g.elements.find((e) => e.id === id)!;
+      expect(t.x + t.width, `${id} must clear the line at x=${Math.round(dropX)}`).toBeLessThan(dropX);
+    }
+  });
+  it("a step a horizontal flow runs through is moved up or down instead", () => {
+    // main: s → a → b → e along one row, with "ex" (the exception path of a timer on "a") placed by the layout on that same row to the right.
+    const els: AiElement[] = [
+      { id: "p", type: "pool", label: "P", poolType: "white-box" },
+      { id: "s", type: "start-event", label: "Start", pool: "p" }, { id: "a", type: "task", label: "A", pool: "p" },
+      { id: "tm", type: "intermediate-event", label: "Late", eventType: "timer", boundaryHost: "a" },
+      { id: "ex", type: "task", label: "Chase", pool: "p" }, { id: "xe", type: "end-event", label: "Stopped", pool: "p" },
+      { id: "b", type: "task", label: "B", pool: "p" }, { id: "e", type: "end-event", label: "Done", pool: "p" },
+    ];
+    const cs: AiConnection[] = [
+      { sourceId: "s", targetId: "a" }, { sourceId: "a", targetId: "b" }, { sourceId: "b", targetId: "e" },
+      { sourceId: "tm", targetId: "ex" }, { sourceId: "ex", targetId: "xe" },
+    ];
+    const g = layoutBpmnDiagram(els, cs);
+    expect(checkDiagram(g as never).map((v) => v.rule)).not.toContain("sequence-clips-foreign-node");
+  });
+});
+
 describe("T5284 4 — the Terminate circle is 15 % smaller", () => {
   it("r = 0.9945 × s (was 1.17 × s)", () => {
     const src = readFileSync("app/components/canvas/SymbolRenderer.tsx", "utf8");
@@ -113,8 +143,14 @@ describe("T5284 5 — the Plan-ready pop-up offers View AI Response", () => {
     const dlg = readFileSync("app/components/ai/PlanSummaryDialog.tsx", "utf8");
     expect(dlg).toContain("onViewResponse && (");
     expect(dlg).toContain("View AI Response");
-    expect(readFileSync("app/(dashboard)/diagram/[id]/ai-generate/AiGenerateScreen.tsx", "utf8")).toContain("onViewResponse={() => { setPlanSummary(null); setStructOpen(true); }}");
-    expect(readFileSync("app/(dashboard)/diagram/[id]/PlanPanel.tsx", "utf8")).toContain('onViewResponse={() => { setPlanSummary(null); setActiveTab("json"); setTabsExpanded(true); }}');
+    // Paul's test, 2026-10-08: it must open the EDITOR (the structure modal) with the JSON fully EXPANDED, in both consoles.
+    expect(readFileSync("app/(dashboard)/diagram/[id]/ai-generate/AiGenerateScreen.tsx", "utf8")).toContain("onViewResponse={() => { setPlanSummary(null); setStructExpand(true); setStructOpen(true); }}");
+    expect(readFileSync("app/(dashboard)/diagram/[id]/PlanPanel.tsx", "utf8")).toContain("onViewResponse={() => { setPlanSummary(null); setStructExpand(true); setStructOpen(true); }}");
+    expect(readFileSync("app/(dashboard)/diagram/[id]/ai-generate/AiGenerateScreen.tsx", "utf8")).toContain("expandJson={structExpand}");
+    expect(readFileSync("app/(dashboard)/diagram/[id]/PlanPanel.tsx", "utf8")).toContain("expandJson={structExpand}");
+    expect(readFileSync("app/(dashboard)/diagram/[id]/ai-plan/PlanStructureModal.tsx", "utf8")).toContain("expandAll={props.expandJson}");
+    const tree = readFileSync("app/(dashboard)/diagram/[id]/ai-plan/JsonTree.tsx", "utf8");
+    expect(tree).toContain("defaultOpen={expandAll ? true : undefined}");
   });
 });
 
@@ -181,10 +217,22 @@ describe("T5284 — the rules are written down", () => {
     const sql = readFileSync("scripts/sql/patch-rules-r8-47-to-r8-50-silent-failure-and-vertices.sql", "utf8");
     const at = seed.indexOf("R8.47:");
     expect(at).toBeGreaterThan(seed.indexOf("R8.46:"));
-    const text = JSON.parse(`"${seed.slice(at, seed.indexOf('"', at))}"`) as string;
+    const text = (JSON.parse(`"${seed.slice(at, seed.indexOf('"', at))}"`) as string).split("\nR8.51:")[0];   // R8.51 has its own patch
     for (const line of text.split("\n")) expect(sql).toContain(line.trim());
     for (const n of [47, 48, 49, 50]) expect(sql).toContain(`AND rules NOT LIKE '%R8.${n}:%'`);
     expect(sql).toContain("LIKE 'Group 8: Auto-Layout Placement%'");
+    expect(sql).not.toContain("DELETE FROM");
+  });
+  it("R8.51 is in the seed after R8.50, and its patch says the same and REPORTS whether it was already run", () => {
+    const seed = readFileSync("scripts/seed-diagram-rules.cjs", "utf8");
+    const sql = readFileSync("scripts/sql/patch-rule-r8-51-exception-step-clear-of-main-flow.sql", "utf8");
+    const at = seed.indexOf("R8.51:");
+    expect(at).toBeGreaterThan(seed.indexOf("R8.50:"));
+    const text = JSON.parse(`"${seed.slice(at, seed.indexOf('"', at))}"`) as string;
+    expect(sql).toContain(text.trim());
+    expect(sql).toContain("AND rules NOT LIKE '%R8.51:%'");
+    expect(sql).toContain("LIKE 'Group 8: Auto-Layout Placement%'");
+    for (const word of ["ALREADY APPLIED", "APPLIED NOW", "NOT APPLIED"]) expect(sql).toContain(word);   // Paul, 2026-10-08
     expect(sql).not.toContain("DELETE FROM");
   });
 });

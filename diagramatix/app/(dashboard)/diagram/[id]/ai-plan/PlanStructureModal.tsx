@@ -43,6 +43,8 @@ interface Props {
    * has (a viewer over the current plan).
    */
   initialRawJson?: string;
+  /** Open the JSON view with every node expanded (the Plan-ready pop-up's View AI Response). */
+  expandJson?: boolean;
 }
 
 function Panel({ title, accent, hint, children }: { title: string; accent: string; hint?: string; children: React.ReactNode }) {
@@ -163,7 +165,7 @@ export function PlanStructureModal(props: Props) {
           </div>
           {jsonMode === "tree" ? (
             <div className="rounded bg-[#0b0e14] p-2 text-white/90">
-              <JsonTree value={plan} accent={accent} />
+              <JsonTree value={plan} accent={accent} expandAll={props.expandJson} />
             </div>
           ) : (
             <div className="flex flex-col gap-1">

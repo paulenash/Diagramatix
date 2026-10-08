@@ -20,6 +20,7 @@ import { placeMessageLabels } from "./messageLabel";
 import { POOL_GAP } from "./poolLaneBounds";
 import { placeGatewayBranchLabels } from "./gatewayBranchLabels";
 import { enforceSilentFailureRules } from "./silentFailure";
+import { exceptionPath } from "./exceptionPaths";
 import { titleCaseName } from "./nameCase";
 
 /**
@@ -6123,6 +6124,93 @@ export function layoutBpmnDiagram(
     if (t.type === "gateway" && leftTaken) continue;
     c.targetSide = "left";
     c.targetOffsetAlong = 0.5;
+  }
+
+  // ── R8.51: a step on an exception path is moved clear of a main-flow line, rather than the line being re-routed ──
+  //
+  // Paul, 2026-10-08, on the Application Process capture: the flow leaving the merge "Application complete" dropped straight down through
+  // "Handle: Time limit for applicant response exceeded" and "Send reminder to Applicant" — two steps of the exception paths that hang off
+  // the subprocess's timers and sit under it, in the column where the main flow turns downwards. "Investigate moving the source element
+  // or the tasks instead of trying to re-route the actual connector … moving the tasks left would also fix the problem."
+  //
+  // On FINAL geometry, an exception-path task (or collapsed subprocess) that a sequence flow cuts through is slid sideways — LEFT first, as
+  // Paul's own fix did, then right — by the smallest step that clears the flow, keeps it inside its container and off every other
+  // element. The flow keeps its route. R8.43 below still re-routes whatever this cannot clear.
+  {
+    const evEdges = connectors.filter(c => c.type === "sequence").map(c => ({ from: c.sourceId, to: c.targetId }));
+    const onException = new Set<string>();
+    for (const ev of elements) {
+      if (ev.type !== "intermediate-event" || !ev.boundaryHostId) continue;
+      for (const id of exceptionPath(ev.id, evEdges)) onException.add(id);
+    }
+    const MOVABLE = new Set(["task", "subprocess"]);
+    const BODIES = new Set(["task", "subprocess", "subprocess-expanded", "start-event", "end-event", "intermediate-event", "gateway", "data-object", "data-store"]);
+    const routeOf = (c: Connector): { x: number; y: number }[] | null => {
+      const s = elMap.get(c.sourceId), t = elMap.get(c.targetId);
+      if (!s || !t) return null;
+      try {
+        const r = computeWaypoints(s, t, elements, c.sourceSide, c.targetSide, c.routingType, c.sourceOffsetAlong ?? 0.5, c.targetOffsetAlong ?? 0.5);
+        return r.waypoints.slice(r.sourceInvisibleLeader ? 1 : 0, r.targetInvisibleLeader ? -1 : undefined);
+      } catch { return null; }
+    };
+    const hits = (pts: { x: number; y: number }[], o: { x: number; y: number; width: number; height: number }): boolean => {
+      const M = 3, x0 = o.x + M, x1 = o.x + o.width - M, y0 = o.y + M, y1 = o.y + o.height - M;
+      for (let i = 1; i < pts.length; i++) {
+        const p = pts[i - 1], q = pts[i];
+        if (Math.abs(p.x - q.x) < 0.5) { if (p.x > x0 && p.x < x1 && Math.max(p.y, q.y) > y0 && Math.min(p.y, q.y) < y1) return true; }
+        else if (Math.abs(p.y - q.y) < 0.5) { if (p.y > y0 && p.y < y1 && Math.max(p.x, q.x) > x0 && Math.min(p.x, q.x) < x1) return true; }
+      }
+      return false;
+    };
+    /** Which way the cutting segment runs: "v" (a vertical line through the step) or "h" (a horizontal one). */
+    const cutOrientation = (pts: { x: number; y: number }[], o: { x: number; y: number; width: number; height: number }): "v" | "h" | null => {
+      const M = 3, x0 = o.x + M, x1 = o.x + o.width - M, y0 = o.y + M, y1 = o.y + o.height - M;
+      for (let i = 1; i < pts.length; i++) {
+        const p = pts[i - 1], q = pts[i];
+        if (Math.abs(p.x - q.x) < 0.5) { if (p.x > x0 && p.x < x1 && Math.max(p.y, q.y) > y0 && Math.min(p.y, q.y) < y1) return "v"; }
+        else if (Math.abs(p.y - q.y) < 0.5) { if (p.y > y0 && p.y < y1 && Math.max(p.x, q.x) > x0 && Math.min(p.x, q.x) < x1) return "h"; }
+      }
+      return null;
+    };
+    const GAP = 10;                                      // the step keeps this much room from every other element, too
+    const overlapsBody = (e: DiagramElement, x: number, y: number): boolean =>
+      elements.some(o => o.id !== e.id && BODIES.has(o.type) && !o.boundaryHostId
+        && o.id !== e.parentId
+        && x < o.x + o.width + GAP && x + e.width > o.x - GAP && y < o.y + o.height + GAP && y + e.height > o.y - GAP
+        // an Expanded Subprocess that CONTAINS the step is not an obstacle to it
+        && !(o.type === "subprocess-expanded" && x >= o.x && x + e.width <= o.x + o.width && y >= o.y && y + e.height <= o.y + o.height));
+    for (const e of elements) {
+      if (!onException.has(e.id) || !MOVABLE.has(e.type) || e.boundaryHostId) continue;
+      if (elements.some(o => o.boundaryHostId === e.id || o.parentId === e.id)) continue;      // keep it simple: a leaf step
+      const cutters = connectors.filter(c =>
+        c.type === "sequence" && c.sourceId !== e.id && c.targetId !== e.id && !onException.has(c.sourceId) && !onException.has(c.targetId));
+      const routes = cutters.map(routeOf).filter((r): r is { x: number; y: number }[] => !!r);
+      if (!routes.some(r => hits(r, e))) continue;
+      const parent = e.parentId ? elMap.get(e.parentId) : undefined;
+      const fits = (x: number, y: number) => !parent
+        || (x >= parent.x + 8 && x + e.width <= parent.x + parent.width - 8 && y >= parent.y + 8 && y + e.height <= parent.y + parent.height - 8);
+      const AIR = 14;                                    // a flow passing the step keeps this much room, not a hair's breadth
+      const clears = (x: number, y: number) => fits(x, y) && !overlapsBody(e, x, y)
+        && !routes.some(r => hits(r, { x: x - AIR, y: y - AIR, width: e.width + 2 * AIR, height: e.height + 2 * AIR }));
+      // Sideways for a flow that runs vertically through the step, up or down for one that runs horizontally through it (Paul, 2026-10-08):
+      // the smallest clear move in any of the four directions wins; at equal distance LEFT, then UP, then DOWN, then RIGHT.
+      const orient = routes.map(r => cutOrientation(r, e)).find(o => o !== null) ?? "v";
+      const SIDEWAYS: [number, number][] = [[-1, 0], [1, 0]], UPDOWN: [number, number][] = [[0, -1], [0, 1]];
+      // The axis that gets the line off the step first (left / up before right / down); the other axis only if that one cannot.
+      const axes = orient === "v" ? [SIDEWAYS, UPDOWN] : [UPDOWN, SIDEWAYS];
+      let best: { x: number; y: number } | null = null;
+      for (const dirs of axes) {
+        for (const [dx, dy] of dirs) {
+          for (let step = 10; step <= 260 && !best; step += 5) {
+            const nx = e.x + dx * step, ny = e.y + dy * step;
+            if (clears(nx, ny)) best = { x: nx, y: ny };
+          }
+          if (best) break;
+        }
+        if (best) break;
+      }
+      if (best) { e.x = best.x; e.y = best.y; }
+    }
   }
 
   // ── R8.43: a sequence flow never passes through another element ──

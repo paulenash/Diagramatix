@@ -659,6 +659,8 @@ export function PlanPanel({
   const [tabsH, setTabsH] = useState(280);
   const [tabsExpanded, setTabsExpanded] = useState(false);
   const [structOpen, setStructOpen] = useState(false);
+  /** Opened from the Plan-ready pop-up's View AI Response: the JSON view shows every node expanded. */
+  const [structExpand, setStructExpand] = useState(false);
 
   function startResize(
     setter: React.Dispatch<React.SetStateAction<number>>,
@@ -1619,7 +1621,7 @@ export function PlanPanel({
           </div>
           {hasPlan && (
             <button
-              onClick={() => setStructOpen(true)}
+              onClick={() => { setStructExpand(false); setStructOpen(true); }}
               className="px-2 py-1 text-blue-600 hover:text-blue-800 font-medium"
               title="Open the full structure editor in a pop-up"
             >
@@ -1687,6 +1689,7 @@ export function PlanPanel({
           deleteConnection={deleteConnection}
           moveElementRelativeTo={moveElementRelativeTo}
           setPlan={setPlan}
+          expandJson={structExpand}
           onApply={() => { void callApplyLayout(); }}
           onClose={() => setStructOpen(false)}
         />
@@ -1699,7 +1702,7 @@ export function PlanPanel({
           canRefine={!flatPlan}
           onReplan={() => { setPlanSummary(null); void executePlanCall(); }}
           onRefine={() => { setPlanSummary(null); void handleRefine(); }}
-          onViewResponse={() => { setPlanSummary(null); setActiveTab("json"); setTabsExpanded(true); }}
+          onViewResponse={() => { setPlanSummary(null); setStructExpand(true); setStructOpen(true); }}
           onLayout={() => { setPlanSummary(null); void callApplyLayout(); }}
           onCancel={() => setPlanSummary(null)}
         />

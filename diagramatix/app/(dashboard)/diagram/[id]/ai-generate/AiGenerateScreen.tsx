@@ -788,6 +788,8 @@ export function AiGenerateScreen({
 
   // ── Structure editor + close guard ────────────────────────────────────────
   const [structOpen, setStructOpen] = useState(false);
+  /** Opened from the Plan-ready pop-up's View AI Response: the JSON view shows every node expanded. */
+  const [structExpand, setStructExpand] = useState(false);
   const [closeConfirm, setCloseConfirm] = useState(false);
 
   /**
@@ -958,7 +960,7 @@ export function AiGenerateScreen({
                   {applying && <AiSpinner />}
                   {applying ? "Applying…" : "Apply Layout"}
                 </AiButton>
-                <AiButton tones={tones} onClick={() => setStructOpen(true)}
+                <AiButton tones={tones} onClick={() => { setStructExpand(false); setStructOpen(true); }}
                   disabled={!hasPlan && !rawReply}
                   title="Open the plan structure editor — pools and lanes, elements, connectors and the returned JSON">
                   ⤢ JSON / Plan structure
@@ -1041,6 +1043,7 @@ export function AiGenerateScreen({
           applying={applying}
           accent={accent}
           initialRawJson={rawReply ?? undefined}
+          expandJson={structExpand}
           updateElement={updateElement}
           deleteElement={deleteElement}
           updateConnection={updateConnection}
@@ -1136,7 +1139,7 @@ export function AiGenerateScreen({
           canRefine={!flatPlan}
           onReplan={() => { setPlanSummary(null); void executePlanCall(); }}
           onRefine={() => { setPlanSummary(null); void handleRefine(); }}
-          onViewResponse={() => { setPlanSummary(null); setStructOpen(true); }}
+          onViewResponse={() => { setPlanSummary(null); setStructExpand(true); setStructOpen(true); }}
           onLayout={() => { setPlanSummary(null); void callApplyLayout(); }}
           onCancel={() => setPlanSummary(null)}
         />

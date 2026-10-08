@@ -8,7 +8,7 @@
  */
 import { useState } from "react";
 
-function Node({ k, value, depth, accent, defaultOpen }: { k?: string | number; value: unknown; depth: number; accent: string; defaultOpen?: boolean }) {
+function Node({ k, value, depth, accent, defaultOpen, expandAll }: { k?: string | number; value: unknown; depth: number; accent: string; defaultOpen?: boolean; expandAll?: boolean }) {
   const isObj = value !== null && typeof value === "object";
   const isArr = Array.isArray(value);
   const [open, setOpen] = useState(defaultOpen ?? depth < 2);
@@ -40,7 +40,7 @@ function Node({ k, value, depth, accent, defaultOpen }: { k?: string | number; v
       {open && (
         <>
           {entries.map(([ck, cv]) => (
-            <Node key={String(ck)} k={ck} value={cv} depth={depth + 1} accent={accent} />
+            <Node key={String(ck)} k={ck} value={cv} depth={depth + 1} accent={accent} expandAll={expandAll} defaultOpen={expandAll ? true : undefined} />
           ))}
           <div style={{ paddingLeft: depth * 12 }}><span className="text-white/50">{close_}</span></div>
         </>
@@ -49,10 +49,11 @@ function Node({ k, value, depth, accent, defaultOpen }: { k?: string | number; v
   );
 }
 
-export function JsonTree({ value, accent = "#7dd3fc" }: { value: unknown; accent?: string }) {
+/** `expandAll` opens every node, so the whole response reads without clicking (the Plan-ready pop-up's View AI Response). */
+export function JsonTree({ value, accent = "#7dd3fc", expandAll }: { value: unknown; accent?: string; expandAll?: boolean }) {
   return (
     <div className="font-mono text-[10px] leading-relaxed">
-      <Node value={value} depth={0} accent={accent} defaultOpen />
+      <Node value={value} depth={0} accent={accent} defaultOpen expandAll={expandAll} />
     </div>
   );
 }
