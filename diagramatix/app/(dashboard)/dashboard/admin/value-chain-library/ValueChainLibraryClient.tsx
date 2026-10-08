@@ -77,6 +77,9 @@ export function ValueChainLibraryClient({ scope = "master" }: { scope?: "master"
     questions: RefineQuestion[]; answered: { label: string; answer: string }[];
   } | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
+  /** SuperAdmin (master scope) only: the model this screen generates with. Remembered on the server, shown here. */
+  const [model, setModel] = useState("");
+  const [models, setModels] = useState<{ id: string; label: string }[]>([]);
   const [genTypes, setGenTypes] = useState<MdPromptType[]>([...MD_PROMPT_TYPES]);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -110,6 +113,8 @@ export function ValueChainLibraryClient({ scope = "master" }: { scope?: "master"
       const j = await res.json();
       if (!res.ok) { setError(j.error ?? "Could not load the library"); return; }
       setChains(j.chains ?? []);
+      if (typeof j.model === "string") setModel(j.model);
+      if (Array.isArray(j.models)) setModels(j.models);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load the library");
@@ -286,7 +291,18 @@ export function ValueChainLibraryClient({ scope = "master" }: { scope?: "master"
           <strong>{totals.published} published</strong>
           {totals.dirty > 0 && <> · <span className="text-amber-700">{totals.dirty} with unpublished edits</span></>}
         </span>
-        <a href={`${API}?format=md`} className="ml-auto text-xs text-blue-600 hover:text-blue-800 underline">
+        {scope !== "org" && models.length > 0 && (
+          <label className="ml-auto flex items-center gap-1.5 text-xs text-gray-600" title="The AI model used to write prompts on this screen. Remembered for next time.">
+            AI model
+            <select value={model} disabled={busy || asking}
+              onChange={(e) => { const v = e.target.value; setModel(v); void post({ action: "set-model", model: v }, `Prompts on this screen will now be written with ${aiModelLabel(v)}.`); }}
+              className="border border-gray-300 rounded px-1.5 py-0.5 text-xs bg-white text-gray-900">
+              {!models.some((m) => m.id === model) && <option value={model}>{aiModelLabel(model)}</option>}
+              {models.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+            </select>
+          </label>
+        )}
+        <a href={`${API}?format=md`} className={`${scope !== "org" && models.length > 0 ? "" : "ml-auto "}text-xs text-blue-600 hover:text-blue-800 underline`}>
           Export the whole library as .md
         </a>
       </header>

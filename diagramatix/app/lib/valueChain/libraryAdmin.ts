@@ -7,6 +7,7 @@ import { resolveGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import { resolveOrgModel } from "@/app/lib/ai/orgModels";
 import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
 import { chooseModel } from "@/app/lib/ai/modelAccess";
+import { allModels, isKnownAiModel } from "@/app/lib/ai/models";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { AI_INVOCATION_POINTS, enterAiContext } from "@/app/lib/ai/aiTelemetry";
 import { checkPromptBranches } from "@/app/lib/valueChain/checkPromptBranches";
@@ -111,6 +112,7 @@ export async function libraryGet(req: Request, scopeOrg: string) {
     : new Map<string, Date | null>();
   return NextResponse.json({
     scope: scopeOrg ? "org" : "master",
+    ...(scopeOrg ? {} : { model: await masterLibraryModel(), models: allModels().map((m) => ({ id: m.id, label: m.label })) }),
     chains: chains.map((c) => ({
       id: c.id, code: c.code, title: c.title, groupName: c.groupName, hidden: c.hidden,
       sortOrder: c.sortOrder,
@@ -186,12 +188,27 @@ async function libraryStateFor(scopeOrg: string, codes: string[]) {
   });
   return here.map((h) => ({ code: h.code, prompts: h._count.prompts, published: !!h.publishedAt }));
 }
+/** The model the MASTER repository generates with: the SuperAdmin's remembered choice for this screen, else the app default. */
+export const LIBRARY_MODEL_KEY = "valueChain.library.model";
+async function masterLibraryModel(): Promise<string> {
+  const row = await prisma.appSetting.findUnique({ where: { key: LIBRARY_MODEL_KEY } }).catch(() => null);
+  const v = row?.value?.trim();
+  return v && isKnownAiModel(v) ? v : chooseModel(undefined, await resolveGenerateModel(false), true);
+}
 export async function libraryPost(req: Request, session: LibrarySession, scopeOrg: string) {
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
   const action = typeof body?.action === "string" ? body.action : "";
   /** Is this chain id inside the scope? An id from the master, or from another Org, is "not found" — never reachable from here. */
   const ownsChain = async (id: string) =>
     !!id && (await prisma.valueChainLibrary.findUnique({ where: { id }, select: { orgId: true } }))?.orgId === scopeOrg;
+  if (action === "set-model") {
+    if (scopeOrg) return NextResponse.json({ error: "Your Org's model is chosen on the AI Models page." }, { status: 403 });
+    const id = typeof body?.model === "string" ? body.model.trim() : "";
+    if (id && !isKnownAiModel(id)) return NextResponse.json({ error: `Unknown model: ${id}` }, { status: 400 });
+    if (!id) await prisma.appSetting.deleteMany({ where: { key: LIBRARY_MODEL_KEY } });
+    else await prisma.appSetting.upsert({ where: { key: LIBRARY_MODEL_KEY }, create: { key: LIBRARY_MODEL_KEY, value: id }, update: { value: id } });
+    return NextResponse.json({ ok: true, model: await masterLibraryModel() });
+  }
   // An Org does not upload the master's markdown file; it adopts from the master instead (below).
   if (scopeOrg && action === "import") return NextResponse.json({ error: "An Org adopts chains from the master repository; it does not import a file." }, { status: 403 });
 
@@ -447,7 +464,7 @@ export async function libraryPost(req: Request, session: LibrarySession, scopeOr
       if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
       throw err;
     }
-    const model = scopeOrg ? await resolveOrgModel() : chooseModel(undefined, await resolveGenerateModel(false), true);
+    const model = scopeOrg ? await resolveOrgModel() : await masterLibraryModel();
     const apiKey = aiApiKey(model);
     // No key is not fatal: the fixed core list can still be asked.
     if (!apiKey) return NextResponse.json(coreQuestionSet());
@@ -494,7 +511,7 @@ export async function libraryPost(req: Request, session: LibrarySession, scopeOr
       if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
       throw err;
     }
-    const model = scopeOrg ? await resolveOrgModel() : chooseModel(undefined, await resolveGenerateModel(false), true);
+    const model = scopeOrg ? await resolveOrgModel() : await masterLibraryModel();
     const apiKey = aiApiKey(model);
     if (!apiKey) return NextResponse.json({ error: "AI is not configured for the selected model." }, { status: 503 });
 

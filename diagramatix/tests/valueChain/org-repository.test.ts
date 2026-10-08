@@ -123,7 +123,7 @@ describe("T5290 the maintenance handlers keep an Org inside its own repository",
     expect(lib).toContain("already in your repository");
   });
   it("an Org's regeneration uses the Org's model and its own template additions, and is metered one attempt per prompt", () => {
-    expect(lib).toContain("scopeOrg ? await resolveOrgModel() : chooseModel(");
+    expect(lib).toContain("scopeOrg ? await resolveOrgModel() : await masterLibraryModel()");
     expect(lib).toContain("where: { category: mdPromptCategory(t), orgId: scopeOrg, userId: null }");
     expect(lib).toContain('if (scopeOrg) await recordUsage(userId, "aiAttempts");');
     expect(lib).toContain('const blocked = await gateLimit(userId, "aiAttempts");');

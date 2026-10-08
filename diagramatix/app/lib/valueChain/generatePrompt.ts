@@ -166,7 +166,7 @@ export async function generateMdPrompt(args: {
       // 4096 was truncating real prompts: 7 of 35 calls in one V22 run stopped
       // on max_tokens, and 6 of its 10 prompts were saved half-written (Paul,
       // 2026-09-04). Headroom is cheap; a silently half-described process is not.
-      max_tokens: 8192,
+      max_tokens: 16384, // was 8192; the v9 template + the question answers + models that reason before answering now overrun it (V01.05, V01.07, 2026-10-09)
       system: briefing,
       messages: [{ role: "user", content: buildUserMessage({ chainCode, chainTitle, narrative, subs, target, answers, entityNames }) }],
     });
