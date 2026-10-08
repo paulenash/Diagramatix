@@ -113,7 +113,7 @@ export function checkStructure(prompt) {
 export function runChecks(prompt) {
   return [
     ...checkStructure(prompt),
-    ...checkPromptShapes(prompt).map((i) => ({ line: i.line, kind: i.kind, detail: i.detail })),
+    ...checkPromptShapes(prompt, true).map((i) => ({ line: i.line, kind: i.kind, detail: i.detail })),
     ...checkPromptBranches(prompt).map((i) => ({ line: i.line, kind: "branch-without-destination", detail: 'gateway "' + i.gateway + '", branch "' + i.condition + '" never says where it goes' })),
   ].sort((a, b) => a.line - b.line);
 }

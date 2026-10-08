@@ -21,7 +21,7 @@
 export interface ShapeIssue {
   /** 1-based line of the offending instruction. */
   line: number;
-  kind: "boundary-on-non-activity" | "message-within-pool" | "boundary-leaves-subprocess";
+  kind: "boundary-on-non-activity" | "message-within-pool" | "boundary-leaves-subprocess" | "boundary-straight-to-end" | "exception-end-not-terminate";
   detail: string;
 }
 
@@ -36,7 +36,7 @@ const NOT_AN_ACTIVITY =
 /** The section-6 form for a message flow: "<a> → <b> (<payload>)". */
 const MESSAGE_ARROW = /^(.*?)\s*(?:→|->)\s*(.*)$/;
 
-export function checkPromptShapes(prompt: string): ShapeIssue[] {
+export function checkPromptShapes(prompt: string, advice = false): ShapeIssue[] {
   const lines = prompt.split(/\r?\n/);
   const issues: ShapeIssue[] = [];
 
@@ -94,6 +94,35 @@ export function checkPromptShapes(prompt: string): ShapeIssue[] {
           issues.push({
             line, kind: "boundary-leaves-subprocess",
             detail: `mounted on "${bh[1]}", which is inside Expanded Subprocess "${owner.name}", but leads out of it to "${outside}" — mount the event on the Expanded Subprocess itself`,
+          });
+        }
+      }
+    }
+
+    // (d) A boundary event whose path goes STRAIGHT to an End event — a "silent failure" (Paul, 2026-10-08: rule R8.47, the diagram check
+    //     B56). A task sits between them so a person can act when the exception occurs.
+    // (e) An End event on a boundary event's line that is not a TERMINATE End event (rule R8.48, check B57): the exception ends the
+    //     whole process.
+    //     These two are ADVICE, not "cannot be drawn": generation puts the task in and sets the Terminate itself (R8.47 / R8.48), so a
+    //     prompt that omits them still draws. They are reported only when asked for (`advice`) — by the prompt skill and the AI Generate
+    //     console, which want the prompt right at the source — and not in the repository's "undrawable" counts.
+    if (advice && /boundary event on/i.test(text)) {
+      // Straight = from the word that starts the path, the next thing named is an End event (no task, subprocess or gateway in between).
+      const from = text.search(/\b(?:triggers|leading to|leads to|continues to|goes to|ends? (?:in|at|with))\b/i);
+      const after = from >= 0 ? text.slice(from) : "";
+      const endAt = after.search(/\bEnd event\b/i);
+      const straight = endAt >= 0 && !/\b(?:task|subprocess|activity|gateway)\b/i.test(after.slice(0, endAt));
+      if (straight) {
+        issues.push({
+          line, kind: "boundary-straight-to-end",
+          detail: "leads straight to an End event — a silent failure. Put a task between them (the event triggers a User task, which then ends in the End event)",
+        });
+      }
+      for (const m of text.matchAll(/(Terminate\s+)?End event\s+"([^"]+)"/gi)) {
+        if (!m[1]) {
+          issues.push({
+            line, kind: "exception-end-not-terminate",
+            detail: `the End event "${m[2].slice(0, 50)}" finishes an exception path — write it as Terminate End event "${m[2].slice(0, 50)}"`,
           });
         }
       }

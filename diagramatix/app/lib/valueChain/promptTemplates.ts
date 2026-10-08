@@ -420,6 +420,16 @@ Open with a single unnumbered line:
   subprocess BY NAME, never to a step inside it. So a chase after a wait inside
   a loop is a timer on the loop, leading to the reminder, then back to the
   loop — not a timer on the wait inside it.
+- AN EXCEPTION NEVER ENDS SILENTLY. A boundary event's path never goes straight
+  to an End event: when the exception happens nobody is asked to do anything
+  and the process just stops (a "silent failure"). Put a TASK between them —
+  the event triggers User task "<what a person does about it>", and that task
+  then ends in the End event.
+  THE END EVENT THAT FINISHES AN EXCEPTION PATH IS A TERMINATE END EVENT —
+  write: Terminate End event "<name>" — because the exception ends the whole
+  process; it is not one of its normal outcomes. (A path that rejoins the flow
+  at a merge gateway or a later named step has no End event of its own and
+  needs neither.)
 - Write "None." if the subprocess genuinely has none. Do not invent one.
 
 6. Connectors

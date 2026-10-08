@@ -14,7 +14,8 @@ import { checkPromptShapes } from "./checkPromptShapes";
 import { looksTruncated } from "./checkPromptTruncated";
 
 export type ReadinessCode =
-  | "boundary-on-non-activity" | "message-within-pool" | "boundary-leaves-subprocess" | "branch-without-destination" | "looks-cut-off";
+  | "boundary-on-non-activity" | "message-within-pool" | "boundary-leaves-subprocess" | "boundary-straight-to-end" | "exception-end-not-terminate"
+  | "branch-without-destination" | "looks-cut-off";
 
 export interface ReadinessIssue {
   code: ReadinessCode;
@@ -31,7 +32,7 @@ export function checkPromptReadiness(prompt: string): ReadinessIssue[] {
   if (!isHousePrompt(prompt)) return [];
   const out: ReadinessIssue[] = [];
 
-  for (const s of checkPromptShapes(prompt)) {
+  for (const s of checkPromptShapes(prompt, true)) {
     out.push({ code: s.kind, line: s.line, message: `Line ${s.line}: ${s.detail}` });
   }
   for (const b of checkPromptBranches(prompt)) {
