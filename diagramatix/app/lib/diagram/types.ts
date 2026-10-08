@@ -1445,8 +1445,22 @@ export const SCHEMA_VERSION = "49";
  *   All OPERATIONAL: the curated diagram-model DDL in ddlGenerate.ts covers the
  *   diagram domain only and is unaffected. The XSD export shape is unchanged, so
  *   SCHEMA_VERSION stays at 49.
+ *
+ * 2.14 — DB: ValueChainLibrary.orgId + .masterPublishedAt and a per-repository
+ *   unique key (orgId, code) in place of the global unique code — the Process
+ *   Repository can now be an ORG'S OWN (an OrgAdmin adopts chains from the
+ *   master repository, changes them, regenerates their prompts and publishes;
+ *   the Org's users then see the Org's version), with the master repository
+ *   still the rows whose orgId is empty. User.pendingSubscriptionLevelId /
+ *   .pendingSubscriptionAt / .stripeScheduleId (a scheduled downgrade at the end
+ *   of the billing month). SupportRequest (every "Send to support" request is
+ *   recorded before it is sent, so a mail failure loses nothing).
+ *   All OPERATIONAL: the curated diagram-model DDL in ddlGenerate.ts covers the
+ *   diagram domain only and is unaffected. The XSD export shape is unchanged
+ *   (DiagramData.exactAsDrawn is a validation-schema flag the XML exporter does
+ *   not write), so SCHEMA_VERSION stays at 49.
  */
-export const PRODUCT_VERSION = "2.13";
+export const PRODUCT_VERSION = "2.14";
 
 /**
  * The structural (XSD) schema version of an export, as a single integer, tolerant of BOTH the

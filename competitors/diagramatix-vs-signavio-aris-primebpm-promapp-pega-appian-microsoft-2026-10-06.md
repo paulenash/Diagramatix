@@ -6,7 +6,7 @@ date: "6 October 2026"
 
 # Diagramatix vs SAP Signavio, ARIS, PRIME BPM, Promapp, Pega, Appian & Microsoft — Feature & AI Comparison
 
-**Date: 6 October 2026** · October 2026 edition (adds Promapp / Nintex Process Manager) · product 2.13 · export SCHEMA_VERSION 49
+**Date: 6 October 2026** · October 2026 edition (adds Promapp / Nintex Process Manager) · product 2.14 · export SCHEMA_VERSION 49
 
 *Diagramatix data read from the current codebase on 24 September 2026. **Six competitors verified against live vendor pages and documentation on 24 September 2026, and Promapp (Nintex Process Manager) on 6 October 2026** — see Sources. Competitor capability moves fast, particularly on AI; **re-verify before quoting externally.** In the Promapp column a **—** means *not established from public documentation*, not *absent*; Promapp's mining and simulation sit partly in other Nintex products and the public pages say little about depth. Where a competitor's behaviour could not be established from public documentation this document says so rather than guessing — and where a figure an earlier edition quoted can no longer be substantiated by the vendor, it has been withdrawn rather than repeated.*
 
@@ -334,7 +334,7 @@ The bottom four rows are the commercial argument in a single block: **self-hosta
 
 ## Sources
 
-**Diagramatix** — current codebase, 24 September 2026: product 2.13, export SCHEMA_VERSION 49, nine notations.
+**Diagramatix** — current codebase, 9 October 2026: product 2.14, export SCHEMA_VERSION 49, nine notations.
 
 **Verified live on 24 September 2026:**
 

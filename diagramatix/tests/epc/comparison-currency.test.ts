@@ -26,7 +26,7 @@ import { EDITABLE_DIAGRAM_TYPE_KEYS } from "@/app/lib/diagram/diagramTypeStyles"
  * supersedes it. (2026-09-24: Pega, Appian and Microsoft added, so the file name
  * changed.)
  */
-const DOC = "../competitors/diagramatix-vs-signavio-aris-primebpm-pega-appian-microsoft-2026-09-24.md";
+const DOC = "../competitors/diagramatix-vs-signavio-aris-primebpm-promapp-pega-appian-microsoft-2026-10-06.md";   // 2026-10-09: re-pointed to the October edition (Promapp added), as this comment asks
 const doc = () => readFileSync(DOC, "utf8");
 /** The feature guide is the same kind of document and makes the same claim, so it is pinned too. */
 const FEATURES_DOC = "../competitors/diagramatix-features-2026-09.md";

@@ -132,6 +132,15 @@ export async function buildOrgBackup(
     ? await prisma.sopSection.findMany({ where: { sopDocumentId: { in: sopDocuments.map(d => d.id) } } })
     : [];
   onProgress?.("SopSection", sopSections.length);
+  // The Org's OWN Process Repository (Paul, 2026-10-09): every chain the OrgAdmin adopted from the master and changed, or wrote — with its processes
+  // and prompts, drafts and published text both. The MASTER repository (orgId "") is SuperAdmin's global catalog and rides only in the full backup.
+  const valueChains = await prisma.valueChainLibrary.findMany({ where: { orgId }, orderBy: { code: "asc" } });
+  onProgress?.("ValueChainLibrary", valueChains.length);
+  const valueChainIds = valueChains.map((c) => c.id);
+  const valueChainProcesses = valueChainIds.length > 0 ? await prisma.valueChainProcess.findMany({ where: { chainId: { in: valueChainIds } } }) : [];
+  onProgress?.("ValueChainProcess", valueChainProcesses.length);
+  const valueChainPrompts = valueChainIds.length > 0 ? await prisma.valueChainPrompt.findMany({ where: { chainId: { in: valueChainIds } } }) : [];
+  onProgress?.("ValueChainPrompt", valueChainPrompts.length);
 
   // System config — only when a SuperAdmin requests a self-contained scoped
   // backup. OrgAdmin backups leave these empty (they restore into a system
@@ -229,6 +238,9 @@ export async function buildOrgBackup(
       SopTemplate: sopTemplates.length,
       SopDocument: sopDocuments.length,
       SopSection: sopSections.length,
+      ValueChainLibrary: valueChains.length,
+      ValueChainProcess: valueChainProcesses.length,
+      ValueChainPrompt: valueChainPrompts.length,
     },
     tables: {
       Org: serialise([org] as Record<string, unknown>[]),
@@ -263,6 +275,9 @@ export async function buildOrgBackup(
       SopTemplate: serialise(sopTemplates as Record<string, unknown>[]),
       SopDocument: serialise(sopDocuments as Record<string, unknown>[]),
       SopSection: serialise(sopSections as Record<string, unknown>[]),
+      ValueChainLibrary: serialise(valueChains as Record<string, unknown>[]),
+      ValueChainProcess: serialise(valueChainProcesses as Record<string, unknown>[]),
+      ValueChainPrompt: serialise(valueChainPrompts as Record<string, unknown>[]),
     },
     ...(Object.keys(simulationPackages).length ? { simulationPackages } : {}),
     ...(Object.keys(simulationLibraries).length ? { simulationLibraries } : {}),
@@ -294,6 +309,11 @@ export function scopePayloadToOrg(payload: FullBackupPayload, orgId: string): Fu
   const entityNodes = ((payload.tables.EntityNode as AnyRow[] | undefined) ?? []).filter(
     n => entityListIds.has(String(n.listId)),
   );
+  // The Org's OWN Process Repository chains (orgId = this Org; the master's "" rows never match), with their processes and prompts.
+  const valueChains = ((payload.tables.ValueChainLibrary as AnyRow[] | undefined) ?? []).filter(c => String(c.orgId ?? "") === orgId);
+  const valueChainIds = new Set(valueChains.map(c => String(c.id)));
+  const valueChainProcesses = ((payload.tables.ValueChainProcess as AnyRow[] | undefined) ?? []).filter(p => valueChainIds.has(String(p.chainId)));
+  const valueChainPrompts = ((payload.tables.ValueChainPrompt as AnyRow[] | undefined) ?? []).filter(p => valueChainIds.has(String(p.chainId)));
   // SOP: templates (org master OR this org's project copies), documents for this
   // org's diagrams, and their sections.
   const sopTemplates = ((payload.tables.SopTemplate as AnyRow[] | undefined) ?? []).filter(
@@ -346,6 +366,9 @@ export function scopePayloadToOrg(payload: FullBackupPayload, orgId: string): Fu
       SopTemplate: sopTemplates,
       SopDocument: sopDocuments,
       SopSection: sopSections,
+      ValueChainLibrary: valueChains,
+      ValueChainProcess: valueChainProcesses,
+      ValueChainPrompt: valueChainPrompts,
     },
     // unused fields below kept from the original
     counts: {
@@ -627,6 +650,40 @@ export async function restoreOrgBackupAdditive(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await tx.sopSection.createMany({ data: sopSectionData as any[] });
         inserted.SopSection = (inserted.SopSection ?? 0) + sopSectionData.length;
+      }
+
+      // The Org's OWN Process Repository (Paul, 2026-10-09). Chains of a SELECTED source Org are added to the target Org's repository by code — a
+      // chain the target already has is left exactly as it is (a restore only ever adds), a missing one is created with fresh ids together with its
+      // processes and prompts. masterPublishedAt rides along, so the "master has moved on" notice still works on a restored chain. The master
+      // repository is never touched here.
+      const selectedOrgs = new Set<string>(selection.orgIds);
+      const haveCodes = new Set(
+        (await tx.valueChainLibrary.findMany({ where: { orgId: targetOrgId }, select: { code: true } })).map((c) => c.code),
+      );
+      for (const c of (payload.tables.ValueChainLibrary as AnyRow[] | undefined) ?? []) {
+        const srcOrg = String(c.orgId ?? "");
+        if (!srcOrg || !selectedOrgs.has(srcOrg)) continue;            // never the master's (""), never an unselected Org's
+        const code = String(c.code);
+        if (haveCodes.has(code)) continue;                             // already there: additive means untouched
+        haveCodes.add(code);
+        const newChainId = shortCuid();
+        await tx.valueChainLibrary.create({
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          data: { ...convertDates("ValueChainLibrary", c), id: newChainId, orgId: targetOrgId } as any,
+        });
+        inserted.ValueChainLibrary = (inserted.ValueChainLibrary ?? 0) + 1;
+        const procs = ((payload.tables.ValueChainProcess as AnyRow[] | undefined) ?? []).filter((p) => String(p.chainId) === String(c.id));
+        if (procs.length > 0) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await tx.valueChainProcess.createMany({ data: procs.map((p) => ({ ...convertDates("ValueChainProcess", p), id: shortCuid(), chainId: newChainId })) as any[] });
+          inserted.ValueChainProcess = (inserted.ValueChainProcess ?? 0) + procs.length;
+        }
+        const prompts = ((payload.tables.ValueChainPrompt as AnyRow[] | undefined) ?? []).filter((p) => String(p.chainId) === String(c.id));
+        if (prompts.length > 0) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await tx.valueChainPrompt.createMany({ data: prompts.map((p) => ({ ...convertDates("ValueChainPrompt", p), id: shortCuid(), chainId: newChainId })) as any[] });
+          inserted.ValueChainPrompt = (inserted.ValueChainPrompt ?? 0) + prompts.length;
+        }
       }
 
       // Simulation configuration → the standalone library first (a project can

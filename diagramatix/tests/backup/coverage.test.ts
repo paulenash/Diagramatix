@@ -27,6 +27,10 @@ const SCOPED_COVERED = new Set<string>([
   "DiagramHistory", "DiagramTemplate", "Prompt", "DiagramRules",
   "EntityList", "EntityNode",
   "SopTemplate", "SopDocument", "SopSection",
+  // The Org's OWN Process Repository (orgId = the Org; Paul, 2026-10-09): the chains an OrgAdmin adopted from the master and modified, with their
+  // processes and prompts. Carried by the org backup and restored additively (by code, never overwriting). The MASTER repository (orgId "") is
+  // SuperAdmin's global catalog and rides only in the full backup, which reads the live schema.
+  "ValueChainLibrary", "ValueChainProcess", "ValueChainPrompt",
 ]);
 
 // Simulator tables: project/org-scoped teams + project-scoped studies /
@@ -133,13 +137,6 @@ const SCOPED_OMITTED = new Set<string>([
   "CollaborationGroup", "CollaborationGroupMember", "DiagramReview", "DiagramReviewer",
   "OwnershipTransfer", "ScannerRule", "SubscriptionLevel", "Feature", "BubbleHelp",
   "DiagramTypeStyle", "IntentKeywordMap", "DictationCommand",
-  // The Process Repository: a SuperAdmin-owned global catalog of value chains,
-  // their processes and generated diagram prompts. Not org data — every org sees
-  // the same published library — so the scoped org/user backups deliberately do
-  // not carry it, exactly like Feature / ScannerRule / SubscriptionLevel above.
-  // The full SuperAdmin backup DOES carry it: getBackupSchema() reads the table
-  // list from the live database, so these were picked up the moment they existed.
-  "ValueChainLibrary", "ValueChainProcess", "ValueChainPrompt",
   // Feature Availability matrix is global platform config (per subscription level),
   // like SubscriptionLevel — carried by the SuperAdmin full backup only, not a
   // per-user/org backup.
