@@ -20,7 +20,7 @@ const els: AiElement[] = [
   { id: "work", type: "task", label: "Await Response", parentSubprocess: "ep" },
   { id: "ee", type: "end-event", label: "", parentSubprocess: "ep" },
   { id: "tb", type: "intermediate-event", label: "10 working days elapsed", eventType: "timer", boundaryHost: "work", boundarySide: "top" },
-  { id: "lapse", type: "end-event", label: "Lapse Application", pool: "p" },
+  { id: "lapse", type: "task", label: "Lapse Application", pool: "p" },
   { id: "e", type: "end-event", label: "Done", pool: "p" },
 ];
 const conns: AiConnection[] = [

@@ -439,6 +439,15 @@ export function canConnect(
   const isEventToEvent = EVENT_CONN_TYPES.has(source.type) && EVENT_CONN_TYPES.has(target.type);
   if (!isDataConn && !isEventToEvent && !isCompensationLink && connectorType === "associationBPMN") return false;
 
+  // A data association attaches to a flow element (an activity or an event), never to a Pool or Lane (Paul, 2026-10-08: two "Application"
+  // Data Objects were drawn to a white-box Pool's top edge — the drop highlight never offered the pool, but the drop accepted it). B01
+  // flags one that already exists; this stops it being drawn.
+  if (connectorType === "associationBPMN") {
+    const dataEnd = (e: DiagramElement) => e.type === "data-object" || e.type === "data-store";
+    const container = (e: DiagramElement) => e.type === "pool" || e.type === "lane" || e.type === "sublane";
+    if ((dataEnd(source) && container(target)) || (dataEnd(target) && container(source))) return false;
+  }
+
   if (connectorType === "messageBPMN" && messageFlowRefusal(source, target, elements, opts) !== null) return false;
 
   // ── BPMN sequence rules ──

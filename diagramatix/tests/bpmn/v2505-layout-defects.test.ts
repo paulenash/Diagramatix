@@ -39,7 +39,9 @@ const els: AiElement[] = [
   { id: "epie", type: "intermediate-event", label: "Transformation job result received", eventType: "message", parentSubprocess: "ep" },
   { id: "epe", type: "end-event", label: "", parentSubprocess: "ep" },
   { id: "timer", type: "intermediate-event", label: "Max retry period elapsed", eventType: "timer", boundaryHost: "ep", boundarySide: "bottom" },
-  { id: "fail", type: "end-event", label: "Transformation failed — escalate to Data Engineering", pool: "p", lane: "ln" },
+  // A TASK, not an End event (R8.47, 2026-10-08): an edge-mounted event never leads straight to an End Event, so these tests, which are
+  // about where an event's exit target is placed, use a task as the target.
+  { id: "fail", type: "task", label: "Transformation failed — escalate to Data Engineering", pool: "p", lane: "ln" },
   { id: "gwm", type: "gateway", label: "Transformation job succeeded?", pool: "p", lane: "ln" },
   { id: "t3", type: "task", label: "Document Transformation Logic", pool: "p", lane: "ln" },
   { id: "e", type: "end-event", label: "Curated dataset ready", pool: "p", lane: "ln" },
@@ -203,7 +205,8 @@ describe("V25.05 — a decision gateway's two branches (R6.26 / R8.26)", () => {
     // guarded: R6.32 fires only when exactly ONE of the two is level.
     const a = conn("gw", "ep"), b = conn("gw", "gwm");
     expect(new Set([a.sourceSide, b.sourceSide]).size, "both left the diamond from one point").toBe(2);
-    expect(b.sourceSide, "the branch straight into its merge takes the right vertex").toBe("right");
+    // 2026-10-08 (Paul): middle vertices only when three connectors leave, so BOTH branches take a corner now.
+    expect(["top", "bottom"], "the branch into its merge takes a corner").toContain(b.sourceSide);
     expect(["top", "bottom"], "the fanning branch keeps a corner").toContain(a.sourceSide);
   });
 

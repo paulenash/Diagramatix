@@ -84,7 +84,7 @@ describe("T5280 R8.46 gateway branch labels", () => {
     const sql = readFileSync("scripts/sql/patch-rule-r8-46-gateway-branch-labels.sql", "utf8");
     const at = seed.indexOf("R8.46:");
     expect(at).toBeGreaterThan(seed.indexOf("R8.45:"));
-    const text = JSON.parse(`"${seed.slice(at, seed.indexOf('"', at))}"`) as string;
+    const text = (JSON.parse(`"${seed.slice(at, seed.indexOf('"', at))}"`) as string).split("\nR8.47:")[0];   // R8.47–R8.50 follow in the same string
     expect(sql).toContain(text.trim());
     expect(sql).toContain("AND rules NOT LIKE '%R8.46:%'");
     expect(sql).toContain("LIKE 'Group 8: Auto-Layout Placement%'");

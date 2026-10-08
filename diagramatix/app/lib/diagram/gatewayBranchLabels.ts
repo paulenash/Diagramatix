@@ -67,19 +67,23 @@ export const branchRole = (c: Connector): BranchRole =>
   c.sourceSide === "top" ? "top" : c.sourceSide === "bottom" ? "bottom" : "middle";
 
 /** The box the rule puts this label in (before any nudge), or null when it has no label / no route. */
-export function ruleLabelBox(c: Connector, els: DiagramElement[]): { box: Box; role: BranchRole } | null {
+export function ruleLabelBox(
+  c: Connector, els: DiagramElement[], along: number = GATEWAY_LABEL_ALONG_OFFSET, flip = false, lift = 0,
+): { box: Box; role: BranchRole } | null {
   const size = connectorLabelBox(c, els);              // width/height of the text box as drawn
   const vis = visiblePath(c);
   if (!size || vis.length < 2) return null;
-  const { p, horizontal } = walk(vis, GATEWAY_LABEL_ALONG_OFFSET);
+  const { p, horizontal } = walk(vis, along);
   const role = branchRole(c);
   // Top / bottom: beside the line, centred on the point — unless the line has already turned horizontal there, when the label would sit
   // ON it (a branch label is not drawn across its own run), so it goes just above (top branch) / below (bottom branch) the run.
-  const y = role === "top" && horizontal ? p.y - RUN_GAP - size.h
-    : role === "bottom" && horizontal ? p.y + RUN_GAP
+  // `flip` is the fallback used only when the rule's own side collides with something: the other side of the run.
+  const above = p.y - RUN_GAP - lift - size.h, below = p.y + RUN_GAP + lift;
+  const y = role === "top" && horizontal ? (flip ? below : above)
+    : role === "bottom" && horizontal ? (flip ? above : below)
     : p.y - size.h / 2;
   const box: Box = role === "middle"
-    ? { x: p.x, y: p.y - GATEWAY_LABEL_UP_OFFSET - size.h, w: size.w, h: size.h }
+    ? { x: p.x, y: flip ? below : p.y - GATEWAY_LABEL_UP_OFFSET - size.h, w: size.w, h: size.h }
     : { x: p.x + GATEWAY_LABEL_CLEAR_OFFSET, y, w: size.w, h: size.h };
   return { box, role };
 }
@@ -149,8 +153,27 @@ export function placeGatewayBranchLabels(elements: DiagramElement[], connectors:
       const before = violationCount(elements, connectors);
       const was = { x: it.c.labelOffsetX, y: it.c.labelOffsetY };
       setOffsets(it.c, it.box);
-      if (violationCount(elements, connectors) > before) { it.c.labelOffsetX = was.x; it.c.labelOffsetY = was.y; continue; }
-      placed++;
+      const atRule = violationCount(elements, connectors);
+      if (atRule < before || (atRule === before && before === 0)) { placed++; continue; }
+      // The rule's spot does not improve on where the label stands now (and the diagram has a defect somewhere): try the same rule further
+      // along the connector, then on the other side of the run. A spot that is strictly better is taken; failing that the rule's own spot is
+      // kept if it adds nothing, otherwise the label keeps its place.
+      let settled = false;
+      for (const flip of [false, true]) {
+        for (const lift of [0, 8, 16]) {
+          for (let along = GATEWAY_LABEL_ALONG_OFFSET + (flip || lift ? 0 : 10); along <= GATEWAY_LABEL_ALONG_OFFSET + 100 && !settled; along += 25) {
+            const alt = ruleLabelBox(it.c, elements, along, flip, lift);
+            if (!alt) break;
+            setOffsets(it.c, alt.box);
+            if (violationCount(elements, connectors) < before) settled = true;
+          }
+          if (settled) break;
+        }
+        if (settled) break;
+      }
+      if (settled) { placed++; continue; }
+      if (atRule <= before) { setOffsets(it.c, it.box); placed++; }
+      else { it.c.labelOffsetX = was.x; it.c.labelOffsetY = was.y; }
     }
   }
   return placed;

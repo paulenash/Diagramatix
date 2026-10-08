@@ -480,7 +480,8 @@ function EventMarker({ type, cx, cy, r, filled }: {
       );
     }
     case "terminate":
-      return <circle cx={cx} cy={cy} r={s * 1.17} fill="#374151" />;
+      // 15 % smaller in diameter than the original 1.17 × s (Paul, 2026-10-08) — 0.85 × 1.17 = 0.9945.
+      return <circle cx={cx} cy={cy} r={s * 0.9945} fill="#374151" />;
     case "escalation": {
       const es = s * 1.2;
       return (

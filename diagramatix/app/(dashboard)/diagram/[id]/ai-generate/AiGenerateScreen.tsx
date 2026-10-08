@@ -1136,6 +1136,7 @@ export function AiGenerateScreen({
           canRefine={!flatPlan}
           onReplan={() => { setPlanSummary(null); void executePlanCall(); }}
           onRefine={() => { setPlanSummary(null); void handleRefine(); }}
+          onViewResponse={() => { setPlanSummary(null); setStructOpen(true); }}
           onLayout={() => { setPlanSummary(null); void callApplyLayout(); }}
           onCancel={() => setPlanSummary(null)}
         />

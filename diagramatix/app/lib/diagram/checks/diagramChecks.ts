@@ -27,6 +27,7 @@ import { getRiskControl } from "../riskControl";
 import { canConnect } from "../canConnect";
 import { isLaneUnowned } from "../containment";
 import { outerSideOfBox, boundaryOutwardSide, oppositeSide } from "../routing";
+import { exceptionPath } from "../exceptionPaths";
 
 export interface DiagramLike {
   elements: DiagramElement[];
@@ -1764,6 +1765,8 @@ export function checkDataLabelOverlap(d: DiagramLike): Violation[] {
     // run to its element — as are data associations, which can span a diagram.
     for (const c of d.connectors) {
       if (c.type === "associationBPMN") continue;
+      // A message flow may be routed through elements and labels (Paul, 2026-10-08): it runs between pools across whatever is in the way.
+      if (c.type === "messageBPMN") continue;
       if (c.sourceId === a.id || c.targetId === a.id) continue;
       const w = c.waypoints ?? [];
       let clashed = false;
@@ -1778,9 +1781,10 @@ export function checkDataLabelOverlap(d: DiagramLike): Violation[] {
         if (rectsOverlapBy({ x: box.x, y: box.y, w: box.w, h: box.h }, seg, 2)) clashed = true;
       }
       if (!clashed) continue;
+      // A WARNING, not an error (Paul, 2026-10-08): a flow line passing through a data object's name is untidy, not wrong.
       out.push({
         rule: "data-label-overlap",
-        severity: "error",
+        severity: "warning",
         ids: [a.id, c.id],
         message: `"${nameOf(a)}" label is drawn across the connector from "${nameOf(byId.get(c.sourceId))}" to "${nameOf(byId.get(c.targetId))}" — a data artifact must clear the flow lines below it as well as the shapes.`,
       });
@@ -2063,6 +2067,7 @@ export function checkEventLabelOverlap(d: DiagramLike): Violation[] {
   for (const { e, box } of labels) {
     for (const c of d.connectors) {
       if (c.type === "associationBPMN") continue;
+      if (c.type === "messageBPMN") continue;           // message flows may cross labels (Paul, 2026-10-08)
       if (c.sourceId === e.id || c.targetId === e.id) continue;
       const w = c.waypoints ?? [];
       let clashed = false;
@@ -2335,6 +2340,54 @@ export function checkRegionEntryExit(d: DiagramLike): Violation[] {
       if (hasEntry && hasExit) continue;
       const missing = [!hasEntry && "an initial or history state", !hasExit && "a final state"].filter(Boolean).join(" and ");
       out.push({ rule: "region-entry-exit", severity: "warning", ids: [comp.id], message: `${count > 1 ? `region ${r + 1} of ` : ""}composite state "${labelOrType(comp)}" is missing ${missing}` });
+    }
+  }
+  return out;
+}
+
+/** B56 — "Silent failure": an edge-mounted intermediate event whose outgoing sequence flow goes STRAIGHT to an End Event. When the exception
+ *  happens nothing asks anyone to do anything — the process just stops. A well-constructed process puts a Task between them (Paul,
+ *  2026-10-08). Generation obeys the same rule (R8.47). */
+export function checkEmieDirectToEnd(d: DiagramLike): Violation[] {
+  const byId = new Map(d.elements.map((e) => [e.id, e]));
+  const out: Violation[] = [];
+  for (const e of d.elements) {
+    if (e.type !== "intermediate-event" || !e.boundaryHostId) continue;
+    for (const c of d.connectors) {
+      if (c.type !== "sequence" || c.sourceId !== e.id) continue;
+      const tgt = byId.get(c.targetId);
+      if (tgt?.type !== "end-event") continue;
+      out.push({
+        rule: "emie-direct-to-end",
+        severity: "warning",
+        ids: [e.id, tgt.id, c.id],
+        message: `Edge-mounted event "${nameOf(e)}" leads straight to the End event "${nameOf(tgt)}" — a silent failure. Put a Task between them so someone can act when the exception occurs.`,
+      });
+    }
+  }
+  return out;
+}
+
+/** B57 — an End Event that finishes an EXCEPTION path (what hangs off an edge-mounted event) should be a Terminate End Event: the exception
+ *  ends the process, it is not one of its normal outcomes. A path that rejoins the main line is not an exception path's end, so the walk
+ *  stops where the main line also feeds a step (exceptionPath). Generation obeys the same rule (R8.48). */
+export function checkExceptionEndTerminate(d: DiagramLike): Violation[] {
+  const byId = new Map(d.elements.map((e) => [e.id, e]));
+  const edges = d.connectors.filter((c) => c.type === "sequence").map((c) => ({ from: c.sourceId, to: c.targetId }));
+  const out: Violation[] = [];
+  const reported = new Set<string>();
+  for (const e of d.elements) {
+    if (e.type !== "intermediate-event" || !e.boundaryHostId) continue;
+    for (const id of exceptionPath(e.id, edges)) {
+      const end = byId.get(id);
+      if (end?.type !== "end-event" || end.eventType === "terminate" || reported.has(id)) continue;
+      reported.add(id);
+      out.push({
+        rule: "exception-end-terminate",
+        severity: "warning",
+        ids: [end.id, e.id],
+        message: `The End event "${nameOf(end)}" finishes the exception path from "${nameOf(e)}" — make it a Terminate End event.`,
+      });
     }
   }
   return out;
@@ -2813,6 +2866,24 @@ export const RULES: Rule[] = [
     severity: "warning",
     category: "bpmn-structure",
     check: checkRegionEntryExit,
+  },
+  {
+    code: "B56",
+    id: "emie-direct-to-end",
+    title: "Edge-mounted event leads straight to an End Event (silent failure)",
+    description: "An edge-mounted intermediate event whose outgoing sequence flow goes directly to an End Event is a silent failure: when the exception occurs nothing asks anyone to act, the process simply stops. A well-constructed process always has a Task between them, so a person can do something when the exception happens before the End Event terminates the process.",
+    severity: "warning",
+    category: "bpmn-structure",
+    check: checkEmieDirectToEnd,
+  },
+  {
+    code: "B57",
+    id: "exception-end-terminate",
+    title: "End Event on an exception path is not a Terminate End Event",
+    description: "An End Event that finishes an exception path — the flow that hangs off an edge-mounted intermediate event and does not rejoin the main line — should be a Terminate End Event: the exception ends the whole process, it is not one of the process's normal outcomes.",
+    severity: "warning",
+    category: "bpmn-structure",
+    check: checkExceptionEndTerminate,
   },
 ];
 

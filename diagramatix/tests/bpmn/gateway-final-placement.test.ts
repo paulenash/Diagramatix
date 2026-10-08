@@ -105,17 +105,17 @@ describe("a gateway is centred on where its branches FINALLY are", () => {
 describe("a merge is entered on the vertex that matches the approach", () => {
   const into = (id: string) => out.connectors.filter((c) => c.type === "sequence" && c.targetId === id);
 
-  it("T3135 — a branch arriving LEVEL enters on the left vertex", () => {
+  it("T3135 — two arrivals take TOP and BOTTOM, even when one arrives level (R8.49, 2026-10-08; was: level enters the left vertex)", () => {
+    // Paul, 2026-10-08: "The middle vertices of Gateway elements should only be used when 3 connectors are exiting the Gateway or
+    // entering a Gateway Merge." The higher source takes the top vertex, the other the bottom one.
     const arrivals = into("m2");
     expect(arrivals.length).toBe(2);
     const t12 = arrivals.find((c) => c.sourceId === "t12")!;
     const t15 = arrivals.find((c) => c.sourceId === "t15")!;
-    expect(Math.abs(cy("t12") - cy("m2")), "Task 12 is not level, so the case is not exercised").toBeLessThan(25);
-    expect(t12.targetSide, "Task 12 should enter on the left vertex").toBe("left");
-    expect(t12.targetOffsetAlong ?? 0.5).toBe(0.5);
-    // The one that really is above still takes the top corner.
-    expect(cy("t15")).toBeLessThan(cy("m2") - 25);
+    expect(cy("t15")).toBeLessThan(cy("t12"));
     expect(t15.targetSide).toBe("top");
+    expect(t12.targetSide).toBe("bottom");
+    expect(t12.targetOffsetAlong ?? 0.5).toBe(0.5);
   });
 
   it("T3136 — three or more arrivals keep the round-robin Paul chose (R6.28)", () => {
@@ -180,14 +180,11 @@ describe("a decision's outbound vertex follows final geometry too (R6.32)", () =
     return layoutBpmnDiagram(e, c);
   };
 
-  it("T3160 — the branch running straight ahead leaves by the RIGHT vertex", () => {
+  it("T3160 — a two-way split never uses the middle vertex, even for a branch running straight ahead (R8.49, 2026-10-08)", () => {
+    // Was: the level branch left by the RIGHT vertex (R6.32). Paul, 2026-10-08: middle vertices only when three connectors leave.
     const o = build(false);
     const yes = o.connectors.find((c) => /all required details/.test(String(c.label ?? "")))!;
-    const d = o.elements.find((e) => e.id === "d")!;
-    const m = o.elements.find((e) => e.id === "m")!;
-    expect(Math.abs((d.y + d.height / 2) - (m.y + m.height / 2)),
-      "the two are not level, so the case is not exercised").toBeLessThan(25);
-    expect(yes.sourceSide, "a level target must leave by the right vertex").toBe("right");
+    expect(["top", "bottom"], "a two-way split uses top and bottom only").toContain(yes.sourceSide);
     expect(yes.sourceOffsetAlong ?? 0.5).toBe(0.5);
   });
 

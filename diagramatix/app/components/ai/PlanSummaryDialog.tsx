@@ -13,9 +13,11 @@ import type { PlanSummary } from "@/app/lib/ai/planSummary";
  * plan looks sound, Re-plan when it has warnings — and returned to where it was on close.
  */
 export function PlanSummaryDialog({
-  summary, canRefine, onReplan, onRefine, onLayout, onCancel,
+  summary, canRefine, onReplan, onRefine, onViewResponse, onLayout, onCancel,
 }: {
   summary: PlanSummary;
+  /** Opens the full response the AI returned. Absent, the button is not shown. */
+  onViewResponse?: () => void;
   /** Refine asks clarifying questions — BPMN plans only. */
   canRefine: boolean;
   onReplan: () => void;
@@ -113,6 +115,10 @@ export function PlanSummaryDialog({
           {canRefine && (
             <button data-act="refine" onClick={onRefine} className={`${btn} border-gray-300 text-gray-700 hover:bg-gray-50`}
               title="Answer a few questions about the gaps in the prompt, then plan again">Refine Prompt</button>
+          )}
+          {onViewResponse && (
+            <button data-act="view-response" onClick={onViewResponse} className={`${btn} border-gray-300 text-gray-700 hover:bg-gray-50`}
+              title="Close this and open the full response the AI returned (the plan as JSON)">View AI Response</button>
           )}
           <button data-act="layout" onClick={onLayout} className={`${btn} border-blue-600 bg-blue-600 text-white hover:bg-blue-700`}
             title="Draw the diagram from this plan">Layout Diagram</button>

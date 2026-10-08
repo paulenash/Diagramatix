@@ -186,9 +186,11 @@ describe("T5028 — the phone draws every connector line exactly as the website 
   const svg = renderTemplateThumbnailSvg(d, { trueColors: true, fullLabels: true });
   const others = humpOthersById(d.connectors);
 
-  it("the diagram has what the test is about: rounded corners and at least two humps", () => {
+  it("the diagram has what the test is about: rounded corners and at least one hump", () => {
+    // Was "at least two". The fixture is a generated layout, and R8.49 (2026-10-08: a two-way gateway leaves by top and bottom, never the
+    // middle vertex) removed one of its line crossings. The parity below is per connector, so one hump still exercises the arc path.
     const humps = d.connectors.filter((c) => /\bA\b/.test(phonePath(svg, c.id) ?? ""));
-    expect(humps.length).toBeGreaterThanOrEqual(2);
+    expect(humps.length).toBeGreaterThanOrEqual(1);
     expect(d.connectors.some((c) => /\bQ\b/.test(phonePath(svg, c.id) ?? ""))).toBe(true);
   });
 

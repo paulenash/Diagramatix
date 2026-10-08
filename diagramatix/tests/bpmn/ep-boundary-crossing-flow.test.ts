@@ -86,10 +86,12 @@ describe("a sequence flow may not cross an expanded subprocess boundary", () => 
     // It lives ON the rim: leaving the subprocess is the entire point of it.
     const { els, conns } = build();
     els.push({ id: "be", type: "intermediate-event", label: "Validation deadline exceeded", boundaryHost: "sp1", eventType: "timer" });
-    els.push({ id: "esc", type: "end-event", label: "Escalate", pool: "p1", lane: "lFin" });
-    conns.push({ sourceId: "be", targetId: "esc" });
+    // A task sits between the event and the End (R8.47, 2026-10-08: an event never leads straight to an End Event).
+    els.push({ id: "tesc", type: "task", label: "Escalate", pool: "p1", lane: "lFin" });
+    els.push({ id: "esc", type: "end-event", label: "Escalated", pool: "p1", lane: "lFin" });
+    conns.push({ sourceId: "be", targetId: "tesc" }, { sourceId: "tesc", targetId: "esc" });
     const { out } = run(els, conns);
-    expect(out.connectors.some((c) => c.sourceId === "be" && c.targetId === "esc")).toBe(true);
+    expect(out.connectors.some((c) => c.sourceId === "be" && c.targetId === "tesc")).toBe(true);
   });
 
   it("T2933 — flows entirely inside, or entirely outside, are untouched", () => {

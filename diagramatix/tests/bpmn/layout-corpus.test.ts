@@ -114,6 +114,10 @@ const KNOWN: Record<string, number> = {
   // the shape that put an End event under a gateway. Its one remaining defect is
   // a branch LABEL over a data object — the K/L family, not this one.
   "V22.01b.plan.json": 1,
+  // 0 -> 1 on 2026-10-08 (R8.49: the middle vertices of a gateway carry branches only when there are THREE). With its two-way split now on
+  // top and bottom, "Notification timed out — escalated" (an End event label) meets the label of the data object "Missing Information
+  // Request". Neither is a gateway label; the end-event / data-object label pair is the job.
+  "V22.01.plan.json": 1,
 };
 
 describe("layout corpus — generated diagrams stay readable", () => {

@@ -1699,6 +1699,7 @@ export function PlanPanel({
           canRefine={!flatPlan}
           onReplan={() => { setPlanSummary(null); void executePlanCall(); }}
           onRefine={() => { setPlanSummary(null); void handleRefine(); }}
+          onViewResponse={() => { setPlanSummary(null); setActiveTab("json"); setTabsExpanded(true); }}
           onLayout={() => { setPlanSummary(null); void callApplyLayout(); }}
           onCancel={() => setPlanSummary(null)}
         />

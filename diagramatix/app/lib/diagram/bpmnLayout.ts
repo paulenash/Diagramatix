@@ -19,6 +19,7 @@ import { tetherModeOnCreate } from "./labelTether";
 import { placeMessageLabels } from "./messageLabel";
 import { POOL_GAP } from "./poolLaneBounds";
 import { placeGatewayBranchLabels } from "./gatewayBranchLabels";
+import { enforceSilentFailureRules } from "./silentFailure";
 import { titleCaseName } from "./nameCase";
 
 /**
@@ -579,6 +580,9 @@ function snapBoundaryEventToRim(
  * neighbours: top / bottom edges move events LEFT of the rightmost, left / right edges move them UP from the lowest. An event is never
  * pushed past the rim's inner margin (the same 1.5 × event size from the corner the snap uses).
  */
+/** Clear space between two edge events on a horizontal edge: room for the neighbour's label and its outgoing connector. */
+const EVENT_EDGE_CLEARANCE = 80;
+
 function spreadBoundaryEventsOnRim(
   elements: DiagramElement[], hostId: string, nx: number, ny: number, nw: number, nh: number,
 ): void {
@@ -601,7 +605,10 @@ function spreadBoundaryEventsOnRim(
       const margin = Math.min(size(e) * 1.5, (hi - lo) / 2);
       const c = Math.max(lo + margin, Math.min(centre(e), limit, hi - margin));
       if (horiz) e.x = c - e.width / 2; else e.y = c - e.height / 2;
-      limit = c - 2 * size(e);                            // next centre: one event width of clear space between the two
+      // Next centre: one event width of clear space at the very least. On a horizontal edge (top / bottom) an event's flow runs down to a
+      // task and an End event and its label sits beside it, so its neighbour needs room for that label and that connector too (Paul,
+      // 2026-10-08) — 80 px of clear space between the two events.
+      limit = c - (horiz ? size(e) + EVENT_EDGE_CLEARANCE : 2 * size(e));
     }
   }
 }
@@ -619,6 +626,7 @@ export interface LayoutDiagnostic {
   kind:
     | "recovered-reference" | "unresolved-reference" | "empty-subprocess" | "unplaced"
     | "no-sequence-flow" | "unreachable-event" | "message-within-pool" | "duplicate-label"
+    | "silent-failure-task-added" | "exception-end-terminated"
     // EPC (layoutEpc.ts). An AI plan never passes through canConnect, so the
     // rules the editor VETOES while you draw have to be reported here instead.
     | "epc-alternation" | "epc-event-decides" | "epc-connector-both-ways"
@@ -952,6 +960,23 @@ export function layoutBpmnDiagram(
   // Separate pools from other elements
   /** Report something the layout could not take at face value. Never throws. */
   const diagnose = (d: LayoutDiagnostic) => { try { opts?.onDiagnostic?.(d); } catch { /* a reporter must never break a layout */ } };
+
+  // ── "Silent failure" (R8.47 / R8.48, Paul 2026-10-08) ──
+  // An edge-mounted event that leads straight to an End Event does nothing when the exception happens. A User Task goes between them, and
+  // the End Event that finishes an exception path is a Terminate End Event.
+  {
+    const sf = enforceSilentFailureRules(aiElements, aiConnections);
+    aiElements = sf.elements;
+    aiConnections = sf.connections;
+    for (const t of sf.addedTasks) {
+      diagnose({ kind: "silent-failure-task-added", elementId: t.taskId, label: t.eventLabel,
+        detail: `"${t.eventLabel}" led straight to the End event "${t.endLabel}" — added a task between them so someone can act when it happens (R8.47)` });
+    }
+    for (const e of sf.terminated) {
+      diagnose({ kind: "exception-end-terminated", elementId: e.id, label: e.label,
+        detail: `the End event "${e.label}" finishes an exception path — made it a Terminate End event (R8.48)` });
+    }
+  }
 
   // ── A process with no SEQUENCE FLOW at all ──
   //
@@ -5505,31 +5530,24 @@ export function layoutBpmnDiagram(
   //
   // Late, on final positions, and only when exactly ONE of the two is level:
   // if both are, or neither, R6.26's answer stands.
+  //
+  // WITHDRAWN 2026-10-08 (Paul, on "Application complete?" in the Application Process capture): "The middle vertices of Gateway elements
+  // should only be used when 3 connectors are exiting the Gateway or entering a Gateway Merge." So a two-way split no longer sends its
+  // level branch out of the middle vertex: R8.49 below gives the two branches TOP and BOTTOM, the upper target on top. Merges likewise
+  // (R6.31 / R6.34 below).
+  //
+  // ── R8.49: a two-way split takes TOP and BOTTOM — never the middle vertex ──
   for (const dec of elements) {
-    if (!isDecisionGateway(dec)) continue;
+    if (!isGateway(dec)) continue;
     const outs = connectors.filter(c => c.type === "sequence" && c.sourceId === dec.id);
     if (outs.length !== 2) continue;
     const dcy = dec.y + dec.height / 2;
-    const LEVEL = dec.height / 2 + 6;
-    const info = outs.map(c => {
-      const t = elMap.get(c.targetId);
-      return { c, dy: t ? (t.y + t.height / 2) - dcy : 0 };
-    });
-    const level = info.filter(i => Math.abs(i.dy) <= LEVEL);
-    if (level.length !== 1) continue;
-    // ONLY when the level branch runs straight into a GATEWAY — its merge.
-    //
-    // Paul asked for top-then-bottom-then-middle-right on 2026-08-31 (T3036),
-    // and that still governs a pair that fans apart: a branch to a subprocess
-    // leaves by a corner, and R8.26 then places that subprocess on the side it
-    // left from. Overriding it everywhere broke exactly that. The case Paul
-    // reported in V22.01 is narrower — a branch going nowhere but its own merge
-    // should not climb to a corner to get there.
-    if (elMap.get(level[0].c.targetId)?.type !== "gateway") continue;
-    for (const i of info) {
-      i.c.sourceSide = (i === level[0] ? "right" : i.dy > 0 ? "bottom" : "top") as Connector["sourceSide"];
-      i.c.sourceOffsetAlong = 0.5;                      // R6.30: on the vertex
-    }
+    const ranked = outs
+      .map(c => { const t = elMap.get(c.targetId); return { c, dy: t ? (t.y + t.height / 2) - dcy : 0 }; })
+      .sort((a, b) => a.dy - b.dy);                       // the higher target first
+    ranked[0].c.sourceSide = "top";
+    ranked[1].c.sourceSide = "bottom";
+    for (const i of ranked) i.c.sourceOffsetAlong = 0.5;   // R6.30: on the vertex
   }
 
   // ── R6.33: no two branches leave a decision by the SAME vertex ──
@@ -5581,6 +5599,7 @@ export function layoutBpmnDiagram(
       console.log(`[R6.33] ${dec.id} outs=${outs.length} sides=${outs.map(c => c.sourceSide).join(",")} collides=${collides} dys=${info.map(i => Math.round(i.dy)).join(",")}`);
     }
     if (outs.length < 3 && !collides) continue;
+    if (outs.length === 2) continue;                    // R8.49 above: two branches are top and bottom, never the middle vertex
 
     // Where the target actually is: above, level, or below.
     const want = (dy: number): Connector["sourceSide"] =>
@@ -5636,15 +5655,13 @@ export function layoutBpmnDiagram(
       const src = elMap.get(c.sourceId);
       return { c, dy: src ? (src.y + src.height / 2) - mcy : 0 };
     });
-    const level = info.filter(i => Math.abs(i.dy) <= LEVEL);
-    // Exactly one arrives level: it takes the left vertex and the other takes
-    // the corner it is genuinely on. Both level, or neither, has no better
-    // answer than the existing top/bottom split — leave those alone.
-    if (level.length !== 1) continue;
-    for (const i of info) {
-      i.c.targetSide = (i === level[0] ? "left" : i.dy > 0 ? "bottom" : "top") as Connector["targetSide"];
-      i.c.targetOffsetAlong = 0.5;                      // R6.30: on the vertex, not near it
-    }
+    // 2026-10-08 (Paul): the middle (left) vertex of a merge is used ONLY when three connectors enter it. Two arrivals take TOP and BOTTOM,
+    // the higher source on top — even when one of them arrives level (it used to take the left vertex).
+    void LEVEL;
+    const ranked = [...info].sort((a, b) => a.dy - b.dy);
+    ranked[0].c.targetSide = "top";
+    ranked[1].c.targetSide = "bottom";
+    for (const i of ranked) i.c.targetOffsetAlong = 0.5;   // R6.30: on the vertex, not near it
   }
 
   // ── R6.34: no two branches ARRIVE at a merge by the same vertex ──
@@ -5682,6 +5699,7 @@ export function layoutBpmnDiagram(
 
     const collides = new Set(ins.map(c => c.targetSide)).size < ins.length;
     if (ins.length < 3 && !collides) continue;
+    if (ins.length === 2) continue;                     // R6.31 above: two arrivals are top and bottom, never the left vertex
 
     const want = (dy: number): Connector["targetSide"] =>
       dy < -LEVEL ? "top" : dy > LEVEL ? "bottom" : "left";
@@ -6155,6 +6173,14 @@ export function layoutBpmnDiagram(
         for (const ss of SIDES) for (const ts of SIDES) {
           if (ss === c.sourceSide && ts === c.targetSide) continue;
           if (taken(src, ss, "source") || taken(tgt, ts, "target")) continue;
+          // R8.49: the middle (left / right) vertices of a gateway carry its branches only when there are three or more of them.
+          const middle = (s: string) => s === "left" || s === "right";
+          const branchesOut = src.type === "gateway" ? connectors.filter(o => o.type === "sequence" && o.sourceId === src.id).length : 0;
+          const branchesIn = tgt.type === "gateway" ? connectors.filter(o => o.type === "sequence" && o.targetId === tgt.id).length : 0;
+          if (middle(ss) && branchesOut === 2) continue;
+          if (ss === "left" && branchesOut === 1 && src.type === "gateway") continue;     // a gateway's lone outgoing flow never leaves by its entry vertex
+          if (ts === "right" && branchesIn === 1 && tgt.type === "gateway") continue;     // …and a lone arrival never enters by its exit vertex
+          if (middle(ts) && branchesIn === 2) continue;
           const r = computeWaypoints(src, tgt, elements, ss, ts, c.routingType, 0.5, 0.5);
           const vis = visibleOf(r);
           if (cuts(vis, skip)) continue;
