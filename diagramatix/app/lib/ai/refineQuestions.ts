@@ -66,7 +66,7 @@ Return ONLY a JSON object of this exact shape, nothing else:
 If nothing needs asking: {"questions":[]}`;
 }
 
-function isValidQuestion(q: unknown): q is RefineQuestion {
+export function isValidQuestion(q: unknown): q is RefineQuestion {
   if (!q || typeof q !== "object") return false;
   const r = q as Record<string, unknown>;
   return typeof r.label === "string" && r.label.trim().length > 0

@@ -13,6 +13,8 @@ import {
   type MdPromptType, MD_PROMPT_TYPES, mdPromptCategory, buildMdPromptBriefing,
 } from "@/app/lib/valueChain/promptTemplates";
 import { generateMdPrompt, targetsFor } from "@/app/lib/valueChain/generatePrompt";
+import { answersBlock, choosePromptQuestions, coreQuestionSet, wantsEntityNames } from "@/app/lib/valueChain/promptQuestions";
+import { loadEntityNames } from "@/app/lib/valueChain/entityNames";
 
 /**
  * SuperAdmin — "Repository Master Template and .md Upload".
@@ -77,6 +79,31 @@ export async function POST(req: Request) {
   const chainCode = typeof body?.chainCode === "string" ? body.chainCode.trim() : "";
   if (!chainCode) return NextResponse.json({ error: "chainCode is required" }, { status: 400 });
 
+  // "questions" — the clarifying questions asked before BPMN process prompts are written (promptQuestions.ts). No writes.
+  if (body?.action === "questions") {
+    const sec = chainSection(md, chainCode);
+    if (!sec) return NextResponse.json({ error: `Value chain ${chainCode} not found` }, { status: 404 });
+    const qModel = chooseModel(undefined, await resolveGenerateModel(false), true);
+    const qKey = aiApiKey(qModel);
+    if (!qKey) return NextResponse.json(coreQuestionSet());           // the fixed list can still be asked without a key
+    let qOrgId: string;
+    try {
+      ({ orgId: qOrgId } = await requireRole(session, await cookies(), WRITE_ROLES));
+    } catch (err) {
+      if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
+      throw err;
+    }
+    enterAiContext({ userId: session.user.id, orgId: qOrgId, invocationPoint: AI_INVOCATION_POINTS.DiagramGenerate });
+    return NextResponse.json(await choosePromptQuestions({
+      apiKey: qKey, model: qModel, processTitle: `${chainCode} ${chainTitle(sec)}`, narrative: chainNarrative(sec),
+    }));
+  }
+  // The author's answers, applied to every BPMN process prompt in this run (chain-level prompts are written as before).
+  const answerItems = Array.isArray((body as { answers?: unknown } | null)?.answers)
+    ? ((body as { answers: unknown[] }).answers).filter((a): a is { label: string; answer: string } =>
+        !!a && typeof a === "object" && typeof (a as { label?: unknown }).label === "string" && typeof (a as { answer?: unknown }).answer === "string")
+    : [];
+
   const requested = Array.isArray(body?.types) ? body.types : [];
   const types = MD_PROMPT_TYPES.filter((t) => requested.includes(t));
   if (types.length === 0) return NextResponse.json({ error: "Pick at least one diagram type" }, { status: 400 });
@@ -126,6 +153,8 @@ export async function POST(req: Request) {
       }
 
       send({ t: "plan", chainCode, chainTitle: title, total: targets.length, subprocesses: subs.length });
+      const answersText = answersBlock(answerItems);
+      const entityNames = wantsEntityNames(answerItems) ? await loadEntityNames(orgId) : "";
 
       let written = 0, failed = 0, roundTripFailures = 0;
       for (let i = 0; i < targets.length; i++) {
@@ -136,6 +165,7 @@ export async function POST(req: Request) {
         const res = await generateMdPrompt({
           apiKey, model, briefing: briefings.get(target.type)!,
           chainCode, chainTitle: title, narrative, subs, target,
+          ...(target.type === "bpmn" ? { answers: answersText || undefined, entityNames: entityNames || undefined } : {}),
         });
         if (res.ok) {
           written++;

@@ -31,6 +31,8 @@ import { chainStaleness } from "@/app/lib/valueChain/staleness";
 import { aiModelLabel } from "@/app/lib/ai/models";
 import { tonesFor } from "@/app/lib/theme/featureColors";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
+import { RefineQuestionsDialog } from "@/app/components/RefineQuestionsDialog";
+import type { RefineQuestion } from "@/app/lib/ai/refineQuestions";
 import { useFeatureColors } from "@/app/lib/theme/useFeatureColors";
 
 interface Process { id: string; code: string; title: string; sortOrder: number }
@@ -64,6 +66,12 @@ export function ValueChainLibraryClient() {
   const [note, setNote] = useState<string | null>(null);
   const [selected, setSelected] = useState<string>("");
   const [busy, setBusy] = useState(false);
+  /** Preparing the questions (one small AI call), and the questions waiting to be answered. */
+  const [asking, setAsking] = useState(false);
+  const [pendingQs, setPendingQs] = useState<{
+    code: string; types: MdPromptType[]; processCode?: string; processCodes?: string[];
+    questions: RefineQuestion[]; answered: { label: string; answer: string }[];
+  } | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
   const [genTypes, setGenTypes] = useState<MdPromptType[]>([...MD_PROMPT_TYPES]);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -147,13 +155,15 @@ export function ValueChainLibraryClient() {
   }, [post, preview]);
 
   /** Regenerate, streaming progress the way the other AI tools do. */
-  const regenerate = useCallback(async (code: string, types: MdPromptType[], processCode?: string, processCodes?: string[]) => {
+  const runRegenerate = useCallback(async (
+    code: string, types: MdPromptType[], processCode?: string, processCodes?: string[], answers?: { label: string; answer: string }[],
+  ) => {
     if (busy) return;
     setBusy(true); setError(null); setNote(null); setRows([]);
     try {
       const res = await fetch("/api/admin/value-chain-library", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "regenerate", code, types, processCode, processCodes }),
+        body: JSON.stringify({ action: "regenerate", code, types, processCode, processCodes, answers }),
       });
       if (!res.ok || !res.body) {
         const j = await res.json().catch(() => ({}));
@@ -199,6 +209,30 @@ export function ValueChainLibraryClient() {
     } finally { setBusy(false); }
   }, [busy, load]);
 
+  /**
+   * Regenerate — with up to ten clarifying questions FIRST when process (BPMN) prompts are being written (Paul, 2026-10-08, to bring the
+   * Repository in line with the prompt skill). The questions are a fixed core list tailored to the chain's narrative by one small AI call;
+   * the answers go to the generator with the narrative. Chain-level prompts only: no questions, as before.
+   */
+  const regenerate = useCallback(async (code: string, types: MdPromptType[], processCode?: string, processCodes?: string[]) => {
+    if (busy || asking) return;
+    if (!types.includes("bpmn")) { void runRegenerate(code, types, processCode, processCodes); return; }
+    setAsking(true); setError(null); setNote("Preparing a few questions about this process…");
+    try {
+      const res = await fetch("/api/admin/value-chain-library", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "questions", code, processCode: processCode ?? (processCodes?.length === 1 ? processCodes[0] : undefined) }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || !Array.isArray(j.questions)) { setError(j.error ?? "Could not prepare the questions"); setNote(null); return; }
+      setNote(null);
+      if (j.questions.length === 0) { void runRegenerate(code, types, processCode, processCodes); return; }
+      setPendingQs({ code, types, processCode, processCodes, questions: j.questions, answered: Array.isArray(j.alreadyAnswered) ? j.alreadyAnswered : [] });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not prepare the questions"); setNote(null);
+    } finally { setAsking(false); }
+  }, [busy, asking, runRegenerate]);
+
   const totals = useMemo(() => ({
     chains: chains.length,
     published: chains.filter((c) => c.published).length,
@@ -209,6 +243,18 @@ export function ValueChainLibraryClient() {
 
   return (
     <div className="min-h-screen dgx-dashboard-bg">
+      {/* Up to ten questions before process prompts are written. Cancel writes nothing; skipping every question writes as before. */}
+      {pendingQs && (
+        <RefineQuestionsDialog
+          questions={pendingQs.questions}
+          onCancel={() => setPendingQs(null)}
+          onSubmit={(answers) => {
+            const p = pendingQs;
+            setPendingQs(null);
+            void runRegenerate(p.code, p.types, p.processCode, p.processCodes, answers);
+          }}
+        />
+      )}
       {/* Nothing destructive happens without this. The message NAMES the chains
           being replaced and what they lose, because "are you sure?" with no
           subject is a button people learn to click through. */}

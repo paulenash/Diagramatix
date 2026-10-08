@@ -13,6 +13,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { runMessageMatchesRow, type RunMessageLike } from "@/app/lib/valueChain/runRowMatch";
 import { aiModelLabel } from "@/app/lib/ai/models";
+import { RefineQuestionsDialog } from "@/app/components/RefineQuestionsDialog";
+import type { RefineQuestion } from "@/app/lib/ai/refineQuestions";
 
 type DiagKind = "value-chain" | "context" | "process-context" | "archimate" | "bpmn";
 interface ChainDiagram { name: string; type: DiagKind }
@@ -90,6 +92,9 @@ export function MdDiagramsClient() {
   const [copied, setCopied] = useState(false);
 
   const [running, setRunning] = useState(false);
+  /** Preparing the questions (one small AI call), and the questions waiting to be answered. */
+  const [asking, setAsking] = useState(false);
+  const [pendingQs, setPendingQs] = useState<RefineQuestion[] | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [summary, setSummary] = useState<{ created: number; failed: number } | null>(null);
@@ -207,7 +212,7 @@ export function MdDiagramsClient() {
     });
   }, []);
 
-  const run = useCallback(async () => {
+  const doRun = useCallback(async (answers?: { label: string; answer: string }[]) => {
     if (!selectedChain || running) return;
     const chosen = selectedChain.diagrams.filter((d) => picked.has(keyOf(d)));
     if (chosen.length === 0) return;
@@ -226,6 +231,7 @@ export function MdDiagramsClient() {
           // Omitted when the whole chain is picked, so a full run is byte-for-byte
           // the request it always was.
           ...(chosen.length < selectedChain.diagrams.length ? { diagramKeys: chosen.map(keyOf) } : {}),
+          ...(answers && answers.length > 0 ? { answers } : {}),
         }),
       });
       if (!res.ok || !res.body) {
@@ -258,6 +264,34 @@ export function MdDiagramsClient() {
       setRunning(false);
     }
   }, [selectedChain, running, md, projectName, source, picked, target, targetProjectId]);
+
+  /**
+   * Run — with up to ten clarifying questions FIRST when process (BPMN) diagrams from the Process Repository are being created (Paul,
+   * 2026-10-08: "adoption of a Repository Process"). The answers tailor each selected process's prompt before its diagram is drawn; the
+   * stored prompt is the fallback. Only for the library source — an uploaded file has no narrative to ask about here. Skipping every
+   * question runs exactly as before; Cancel runs nothing.
+   */
+  const run = useCallback(async () => {
+    if (!selectedChain || running || asking) return;
+    const chosen = selectedChain.diagrams.filter((d) => picked.has(keyOf(d)));
+    const bpmn = chosen.filter((d) => d.type === "bpmn");
+    if (chosen.length === 0) return;
+    if (source !== "library" || bpmn.length === 0) { void doRun(); return; }
+    setAsking(true); setError(null);
+    try {
+      const only = bpmn.length === 1 ? bpmn[0].name.match(/^(V\d{2}\.\d{2})/)?.[1] : undefined;
+      const res = await fetch("/api/admin/value-chain-library", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "questions", code: selectedChain.code, processCode: only }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || !Array.isArray(j.questions)) { setError(j.error ?? "Could not prepare the questions"); return; }
+      if (j.questions.length === 0) { void doRun(); return; }
+      setPendingQs(j.questions as RefineQuestion[]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not prepare the questions");
+    } finally { setAsking(false); }
+  }, [selectedChain, running, asking, picked, source, doRun]);
 
   /**
    * The two things a freshly generated project always needs, done for you.
@@ -399,6 +433,13 @@ export function MdDiagramsClient() {
 
   return (
     <div className="max-w-3xl mx-auto p-6">
+      {pendingQs && (
+        <RefineQuestionsDialog
+          questions={pendingQs}
+          onCancel={() => setPendingQs(null)}
+          onSubmit={(answers) => { setPendingQs(null); void doRun(answers); }}
+        />
+      )}
       <Link href="/dashboard/admin" className="text-sm text-gray-500 hover:text-gray-700">← SuperAdmin</Link>
       <h1 className="text-lg font-semibold text-gray-900 mt-2">Create Project Diagrams from .md</h1>
       <p className="text-sm text-gray-600 mt-1">

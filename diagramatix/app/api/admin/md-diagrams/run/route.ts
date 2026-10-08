@@ -13,7 +13,10 @@ import { chooseModel } from "@/app/lib/ai/modelAccess";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { AI_INVOCATION_POINTS, enterAiContext, recordDiagramGenerated } from "@/app/lib/ai/aiTelemetry";
 import { uniqueDiagramName } from "@/app/lib/valueChain/uniqueDiagramName";
-import { templateVersionAt, MD_PROMPT_TYPES, type MdPromptType } from "@/app/lib/valueChain/promptTemplates";
+import { templateVersionAt, MD_PROMPT_TYPES, mdPromptCategory, buildMdPromptBriefing, type MdPromptType } from "@/app/lib/valueChain/promptTemplates";
+import { generateMdPrompt } from "@/app/lib/valueChain/generatePrompt";
+import { answersBlock, wantsEntityNames } from "@/app/lib/valueChain/promptQuestions";
+import { loadEntityNames } from "@/app/lib/valueChain/entityNames";
 import { isQuotaExhausted, quotaResumesAt } from "@/app/lib/ai/quotaExhausted";
 
 /**
@@ -47,7 +50,7 @@ export async function POST(req: Request) {
 
   const body = (await req.json().catch(() => null)) as
     | { md?: unknown; chainCode?: unknown; projectName?: unknown; source?: unknown;
-        projectId?: unknown; diagramKeys?: unknown }
+        projectId?: unknown; diagramKeys?: unknown; answers?: unknown }
     | null;
   const md = typeof body?.md === "string" ? body.md : "";
   const chainCode = typeof body?.chainCode === "string" ? body.chainCode.trim() : "";
@@ -82,6 +85,16 @@ export async function POST(req: Request) {
    * prevent.
    */
   let chain: { code: string; title: string; diagrams: ParsedDiagram[] } | undefined;
+  /**
+   * The author's answers to the clarifying questions (promptQuestions.ts). Library source only: each selected BPMN process's prompt is
+   * REWRITTEN from the chain narrative and these answers just before its diagram is drawn; the stored prompt is the fallback.
+   */
+  const answerItems = Array.isArray(body?.answers)
+    ? (body.answers as unknown[]).filter((a): a is { label: string; answer: string } =>
+        !!a && typeof a === "object" && typeof (a as { label?: unknown }).label === "string" && typeof (a as { answer?: unknown }).answer === "string")
+    : [];
+  let libNarrative = "";
+  let libSubs: { code: string; title: string }[] = [];
   if (fromLibrary) {
     const row = await prisma.valueChainLibrary.findUnique({
       where: { code: chainCode },
@@ -120,6 +133,8 @@ export async function POST(req: Request) {
       },
     }));
     chain = { code: row.code, title: row.publishedTitle ?? row.title, diagrams };
+    libNarrative = row.publishedNarrative ?? row.narrative;
+    libSubs = row.processes.map((p) => ({ code: p.code, title: p.title }));
   } else {
     chain = parseValueChainMd(md).find((c) => c.code === chainCode);
     if (!chain) return NextResponse.json({ error: `Value chain ${chainCode} not found` }, { status: 404 });
@@ -244,16 +259,44 @@ export async function POST(req: Request) {
       const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 
+      // Built on first use, then shared by every tailored prompt in the run.
+      let tailorBriefing: string | undefined;
+      let tailorAnswers = "";
+      let tailorEntities = "";
+
       /** Ids created by THIS run — the client re-links only these by default. */
       const createdIds: string[] = [];
       let created = 0;
       let failed = 0;
       for (let i = 0; i < diagrams.length; i++) {
-        const d: ParsedDiagram = diagrams[i];
+        let d: ParsedDiagram = diagrams[i];
         const index = i + 1;
         send({ t: "diagram", index, total, name: d.name, type: d.type, status: "generating" });
         const t0 = Date.now();
         try {
+          // Adopting a Repository process: rewrite its prompt from the narrative and the author's answers (see answerItems). The stored
+          // prompt stands if there is nothing to tailor from or the rewrite fails, and the run says which happened.
+          const procCode = (d as { source?: { processCode?: string } }).source?.processCode;
+          if (answerItems.length > 0 && fromLibrary && d.type === "bpmn" && procCode && libNarrative.trim()) {
+            if (tailorBriefing === undefined) {
+              const rule = await prisma.diagramRules
+                .findFirst({ where: { category: mdPromptCategory("bpmn"), isDefault: true }, select: { rules: true } }).catch(() => null);
+              tailorBriefing = buildMdPromptBriefing("bpmn", rule?.rules);
+              tailorAnswers = answersBlock(answerItems);
+              tailorEntities = wantsEntityNames(answerItems) ? await loadEntityNames(orgId) : "";
+            }
+            const res = await generateMdPrompt({
+              apiKey, model, briefing: tailorBriefing, chainCode: chain.code, chainTitle: chain.title, narrative: libNarrative, subs: libSubs,
+              target: { type: "bpmn", code: procCode, title: libSubs.find((p) => p.code === procCode)?.title ?? d.name },
+              answers: tailorAnswers || undefined, entityNames: tailorEntities || undefined,
+            });
+            if (res.ok) {
+              d = { ...d, prompt: res.prompt, source: { ...(d as { source?: object }).source, tailoredFromAnswers: true } } as unknown as ParsedDiagram;
+              send({ t: "diagram", index, total, name: d.name, type: d.type, status: "generating", message: "prompt tailored to your answers" });
+            } else {
+              send({ t: "diagram", index, total, name: d.name, type: d.type, status: "generating", message: `could not tailor the prompt (${res.error}) — using the stored one` });
+            }
+          }
           const rules = await rulesFor(d.type);
           // Anything the layout could not take at face value. Collected per
           // diagram and reported with it: a run of fifteen diagrams is unattended,

@@ -69,8 +69,12 @@ export function buildUserMessage(args: {
   narrative: string;
   subs: SubprocessHeading[];
   target: PromptTarget;
+  /** The author's answers to the clarifying questions, already formatted (promptQuestions.answersBlock). */
+  answers?: string;
+  /** The organisation's own entity names (org units, roles, systems), already formatted, when the author asked to align to them. */
+  entityNames?: string;
 }): string {
-  const { chainCode, chainTitle, narrative, subs, target } = args;
+  const { chainCode, chainTitle, narrative, subs, target, answers, entityNames } = args;
   const list = subs.length
     ? subs.map((s) => `- ${s.code} ${s.title}`).join("\n")
     : "(none declared in the document)";
@@ -88,6 +92,13 @@ export function buildUserMessage(args: {
     "",
     narrative.slice(0, MAX_NARRATIVE_CHARS),
     "",
+    ...(entityNames ? [
+      "THE ORGANISATION'S OWN NAMES — where a lane, role or system in the narrative matches one of these, use the organisation's name exactly;",
+      "do not invent names that are not in the narrative or in this list:",
+      entityNames,
+      "",
+    ] : []),
+    ...(answers ? [answers, ""] : []),
     "---",
     asking,
   ].join("\n");
@@ -141,8 +152,11 @@ export async function generateMdPrompt(args: {
   narrative: string;
   subs: SubprocessHeading[];
   target: PromptTarget;
+  /** See buildUserMessage. */
+  answers?: string;
+  entityNames?: string;
 }): Promise<PromptResult> {
-  const { apiKey, model, briefing, chainCode, chainTitle, narrative, subs, target } = args;
+  const { apiKey, model, briefing, chainCode, chainTitle, narrative, subs, target, answers, entityNames } = args;
   if (!narrative.trim()) return { ok: false, error: "That chain has no narrative to write a prompt from" };
 
   const client = makeAiClient(model, apiKey);
@@ -154,7 +168,7 @@ export async function generateMdPrompt(args: {
       // 2026-09-04). Headroom is cheap; a silently half-described process is not.
       max_tokens: 8192,
       system: briefing,
-      messages: [{ role: "user", content: buildUserMessage({ chainCode, chainTitle, narrative, subs, target }) }],
+      messages: [{ role: "user", content: buildUserMessage({ chainCode, chainTitle, narrative, subs, target, answers, entityNames }) }],
     });
     const textBlock = message.content.find((b) => b.type === "text");
     if (!textBlock || textBlock.type !== "text") return { ok: false, error: "No response from the model" };

@@ -23,6 +23,8 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { RefineQuestionsDialog } from "@/app/components/RefineQuestionsDialog";
+import type { RefineQuestion } from "@/app/lib/ai/refineQuestions";
 import {
   MD_PROMPT_TYPES, MD_PROMPT_LABEL, MD_PROMPT_TEMPLATE_HISTORY,
   latestTemplateVersion, mdPromptCategory, type MdPromptType,
@@ -50,6 +52,9 @@ export function MdPromptsClient() {
   const [types, setTypes] = useState<MdPromptType[]>([...MD_PROMPT_TYPES]);
   const [rows, setRows] = useState<Row[]>([]);
   const [running, setRunning] = useState(false);
+  /** Preparing the questions (one small AI call), and the questions waiting to be answered. */
+  const [asking, setAsking] = useState(false);
+  const [pendingQs, setPendingQs] = useState<RefineQuestion[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<{ written: number; failed: number; roundTripFailures: number } | null>(null);
   const [copied, setCopied] = useState(false);
@@ -86,14 +91,14 @@ export function MdPromptsClient() {
     }
   }, []);
 
-  const run = useCallback(async () => {
+  const doRun = useCallback(async (answers?: { label: string; answer: string }[]) => {
     if (!chain || running || types.length === 0) return;
     setRunning(true); setError(null); setRows([]); setSummary(null); setCopied(false);
     try {
       const res = await fetch("/api/admin/md-prompts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ md, chainCode: chain.code, types }),
+        body: JSON.stringify({ md, chainCode: chain.code, types, answers }),
       });
       if (!res.ok || !res.body) {
         const j = await res.json().catch(() => ({}));
@@ -124,6 +129,28 @@ export function MdPromptsClient() {
       setRunning(false);
     }
   }, [chain, running, md, types]);
+
+  /**
+   * Generate — with up to ten clarifying questions FIRST when process (BPMN) prompts are being written (Paul, 2026-10-08): the same question
+   * engine as the Process Repository screen. Cancel writes nothing; skipping every question writes as before.
+   */
+  const run = useCallback(async () => {
+    if (!chain || running || asking || types.length === 0) return;
+    if (!types.includes("bpmn")) { void doRun(); return; }
+    setAsking(true); setError(null);
+    try {
+      const res = await fetch("/api/admin/md-prompts", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "questions", md, chainCode: chain.code }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || !Array.isArray(j.questions)) { setError(j.error ?? "Could not prepare the questions"); return; }
+      if (j.questions.length === 0) { void doRun(); return; }
+      setPendingQs(j.questions as RefineQuestion[]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not prepare the questions");
+    } finally { setAsking(false); }
+  }, [chain, running, asking, types, md, doRun]);
 
   function handle(msg: Record<string, unknown>) {
     if (msg.t === "error") { setError(String(msg.message ?? "Failed")); return; }
@@ -179,6 +206,13 @@ export function MdPromptsClient() {
 
   return (
     <div className="min-h-screen dgx-dashboard-bg">
+      {pendingQs && (
+        <RefineQuestionsDialog
+          questions={pendingQs}
+          onCancel={() => setPendingQs(null)}
+          onSubmit={(answers) => { setPendingQs(null); void doRun(answers); }}
+        />
+      )}
       <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-3">
         <Link href="/dashboard/admin" className="text-sm text-blue-600 hover:text-blue-800 underline">← SuperAdmin</Link>
         <h1 className="text-lg font-semibold text-gray-900">Repository Master Template and .md Upload</h1>

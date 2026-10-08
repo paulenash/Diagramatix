@@ -19,6 +19,8 @@ import {
 } from "@/app/lib/valueChain/library";
 import { type MdPromptType, MD_PROMPT_TYPES, MD_PROMPT_LABEL, mdPromptCategory, buildMdPromptBriefing } from "@/app/lib/valueChain/promptTemplates";
 import { generateMdPrompt } from "@/app/lib/valueChain/generatePrompt";
+import { answersBlock, choosePromptQuestions, coreQuestionSet, wantsEntityNames } from "@/app/lib/valueChain/promptQuestions";
+import { loadEntityNames } from "@/app/lib/valueChain/entityNames";
 import { auditPrompts } from "@/app/lib/valueChain/spliceBlocks";
 
 /**
@@ -355,6 +357,34 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, removed: removed.length, total: finalOrder.length });
   }
 
+  // ── The questions asked before a process prompt is written ────────────────
+  // Up to MAX_PROMPT_QUESTIONS: a fixed core list trimmed and sharpened by ONE small AI call on the chain's narrative (promptQuestions.ts).
+  // No writes; the answers come back with the "regenerate" request below.
+  if (action === "questions") {
+    const code = typeof body?.code === "string" ? body.code : "";
+    const processCode = typeof body?.processCode === "string" ? body.processCode : "";
+    const chain = code ? (await chainPayload(code))[0] : undefined;
+    if (!chain) return NextResponse.json({ error: `Chain ${code} not found` }, { status: 404 });
+    let orgId: string;
+    try {
+      ({ orgId } = await requireRole(session, await cookies(), WRITE_ROLES));
+    } catch (err) {
+      if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
+      throw err;
+    }
+    const model = chooseModel(undefined, await resolveGenerateModel(false), true);
+    const apiKey = aiApiKey(model);
+    // No key is not fatal: the fixed core list can still be asked.
+    if (!apiKey) return NextResponse.json(coreQuestionSet());
+    enterAiContext({ userId: session.user.id, orgId, invocationPoint: AI_INVOCATION_POINTS.DiagramGenerate });
+    const proc = processCode ? chain.processes.find((p) => p.code === processCode) : undefined;
+    const set = await choosePromptQuestions({
+      apiKey, model, processTitle: proc ? `${proc.code} ${proc.title} (in ${chain.code} ${chain.title})` : `${chain.code} ${chain.title}`,
+      narrative: chain.narrative,
+    });
+    return NextResponse.json(set);
+  }
+
   // ── Regenerate prompts from the master templates ─────────────────────────
   if (action === "regenerate") {
     const code = typeof body?.code === "string" ? body.code : "";
@@ -370,6 +400,12 @@ export async function POST(req: Request) {
       ? (body.processCodes as unknown[]).filter((c): c is string => typeof c === "string")
       : [];
     const only = new Set<string>(manyCodes.length ? manyCodes : onlyProcess ? [onlyProcess] : []);
+    // The author's answers to the clarifying questions (promptQuestions.ts), applied to every BPMN process prompt in this run. Chain-level
+    // prompts (value chain, context, …) are not process prompts and are written as before.
+    const answerItems = Array.isArray(body?.answers)
+      ? (body.answers as unknown[]).filter((a): a is { label: string; answer: string } =>
+          !!a && typeof a === "object" && typeof (a as { label?: unknown }).label === "string" && typeof (a as { answer?: unknown }).answer === "string")
+      : [];
     if (!code || types.length === 0) return NextResponse.json({ error: "code and types are required" }, { status: 400 });
 
     const chain = (await chainPayload(code))[0];
@@ -419,6 +455,8 @@ export async function POST(req: Request) {
         // was the error text, and a stale failed row reads exactly like a fresh
         // one. A run should state its own model.
         send({ t: "plan", total: targets.length, chain: chain.code, model });
+        const answersText = answersBlock(answerItems);
+        const entityNames = wantsEntityNames(answerItems) ? await loadEntityNames(orgId) : "";
         let written = 0, failed = 0, refused = 0;
         for (let i = 0; i < targets.length; i++) {
           const target = targets[i];
@@ -430,6 +468,7 @@ export async function POST(req: Request) {
           const res = await generateMdPrompt({
             apiKey, model, briefing: briefs.get(target.type)!,
             chainCode: chain.code, chainTitle: chain.title, narrative: chain.narrative, subs, target,
+            ...(target.type === "bpmn" ? { answers: answersText || undefined, entityNames: entityNames || undefined } : {}),
           });
           if (!res.ok) {
             failed++;
