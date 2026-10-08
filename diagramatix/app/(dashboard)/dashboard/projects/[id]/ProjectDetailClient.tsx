@@ -2244,7 +2244,16 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
       const created = await res.json();
 
       // Add the clone to the diagram list in the same folder as the original
-      setDiagrams(prev => [{ id: created.id, name: created.name, type: created.type, createdAt: created.createdAt, updatedAt: created.updatedAt }, ...prev]);
+      // The clone carries its DATA (and colours / display mode) into the list: the feature badges (AI, SI, AP, RC, RV, …) are read from it, so
+      // an entry without it showed none until the page was reloaded (Paul, 2026-10-08: "cloning a diagram should also take the badges").
+      setDiagrams(prev => [{
+        id: created.id, name: created.name, type: created.type, createdAt: created.createdAt, updatedAt: created.updatedAt,
+        data: created.data ?? src.data,
+        colorConfig: created.colorConfig ?? src.colorConfig,
+        displayMode: created.displayMode ?? src.displayMode,
+        version: created.version,
+        diagramOwnerId: created.diagramOwnerId ?? null,
+      }, ...prev]);
       const srcFolder = folderTree.diagramFolderMap[diagramId];
       if (srcFolder) {
         updateTree(t => ({
@@ -3261,6 +3270,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
               ["mining", "MN", "Has mining data"],
               ["apqc", "AP", "Classified against APQC"],
               ["riskControl", "RC", "Has risks & controls"],
+              ["reviewComment", "RV", "Has review comments"],
             ] as [DiagramBadgeKey, string, string][]).map(([key, code, title]) => (
               <button
                 key={key}

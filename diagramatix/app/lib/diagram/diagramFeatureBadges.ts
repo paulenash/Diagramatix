@@ -27,7 +27,7 @@ import { hasRiskControl } from "./riskControl";
 import type { FeatureColorKey } from "@/app/lib/theme/featureColors";
 
 /** The badges, in the order they read on the row. */
-export type DiagramBadgeKey = "ai" | "simulator" | "mining" | "apqc" | "riskControl";
+export type DiagramBadgeKey = "ai" | "simulator" | "mining" | "apqc" | "riskControl" | "reviewComment";
 
 export interface DiagramBadge {
   key: DiagramBadgeKey;
@@ -96,6 +96,15 @@ export function diagramFeatureBadges(data: unknown, ctx: BadgeContext = {}): Dia
     badges.push({
       key: "riskControl", code: "RC", color: "riskControl",
       title: `${rcCount} step${rcCount === 1 ? "" : "s"} carry Risk & Control annotations`,
+    });
+  }
+
+  // Reviewer comments (the pink review notes) — the same element type the canvas draws, counted rather than guessed at.
+  const rvCount = d ? d.elements.filter((el) => el.type === "review-comment").length : 0;
+  if (rvCount > 0) {
+    badges.push({
+      key: "reviewComment", code: "RV", color: "reviewComment",
+      title: `${rvCount} review comment${rvCount === 1 ? "" : "s"}`,
     });
   }
 

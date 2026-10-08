@@ -6213,6 +6213,66 @@ export function layoutBpmnDiagram(
     }
   }
 
+  // ── R8.52: a text annotation never sits over another element ──
+  //
+  // Paul, 2026-10-08, "General Email Processing": an annotation the AI added ("Update within the specified time") was drawn over the data
+  // store "Approvals Spreadsheet". It is placed ONCE, early, above its target, before the data objects, lanes and exception rows have settled,
+  // and nothing later asked whether that spot was still free. On FINAL geometry, an annotation that overlaps another element is moved to the
+  // nearest clear spot around its target — above, below, right, left, then shifted along the edge, then further out — staying inside its
+  // container, and its association line is re-pointed at the side it now faces.
+  {
+    const MARGIN = 6;
+    const ANN_BODIES = new Set(["task", "subprocess", "subprocess-expanded", "start-event", "end-event", "intermediate-event", "gateway", "data-object", "data-store", "text-annotation"]);
+    const containerOfEl = (el: DiagramElement): DiagramElement | null => {
+      let cur: DiagramElement | undefined = el;
+      for (let g = 0; cur?.parentId && g < 32; g++) {
+        const p: DiagramElement | undefined = elMap.get(cur.parentId);
+        if (!p) break;
+        if (p.type === "lane" || p.type === "sublane" || p.type === "pool" || p.type === "subprocess-expanded") return p;
+        cur = p;
+      }
+      return null;
+    };
+    const overlapsAt = (a: DiagramElement, x: number, y: number): boolean =>
+      elements.some(o => o.id !== a.id && ANN_BODIES.has(o.type)
+        && x < o.x + o.width + MARGIN && x + a.width > o.x - MARGIN && y < o.y + o.height + MARGIN && y + a.height > o.y - MARGIN
+        // an Expanded Subprocess that CONTAINS the annotation is not something it is "over"
+        && !(o.type === "subprocess-expanded" && x >= o.x && x + a.width <= o.x + o.width && y >= o.y && y + a.height <= o.y + o.height));
+    for (const a of elements) {
+      if (a.type !== "text-annotation" || a.id === "_ai_gen_annotation") continue;
+      const link = connectors.find(c => c.type === "associationBPMN" && (c.sourceId === a.id || c.targetId === a.id));
+      const t = link ? elMap.get(link.sourceId === a.id ? link.targetId : link.sourceId) : undefined;
+      if (!link || !t || t.type === "text-annotation") continue;
+      if (!overlapsAt(a, a.x, a.y)) continue;                       // already clear: leave it exactly where it is
+      const box = containerOfEl(t);
+      const inside = (x: number, y: number) => !box
+        || (x >= box.x + 4 && x + a.width <= box.x + box.width - 4 && y >= box.y + 4 && y + a.height <= box.y + box.height - 4);
+      const cx = t.x + t.width / 2 - a.width / 2, cy = t.y + t.height / 2 - a.height / 2;
+      const shift = a.width / 2 + 12;
+      let spot: { x: number; y: number } | null = null;
+      for (const gap of [20, 40, 70, 110]) {
+        const cands: [number, number][] = [
+          [cx, t.y - a.height - gap],                                // above
+          [cx, t.y + t.height + gap],                                // below
+          [t.x + t.width + gap, cy],                                 // right
+          [t.x - a.width - gap, cy],                                 // left
+          [cx - shift, t.y - a.height - gap], [cx + shift, t.y - a.height - gap],   // above, along the edge
+          [cx - shift, t.y + t.height + gap], [cx + shift, t.y + t.height + gap],   // below, along the edge
+        ];
+        spot = cands.map(([x, y]) => ({ x, y })).find(p => inside(p.x, p.y) && !overlapsAt(a, p.x, p.y)) ?? null;
+        if (spot) break;
+      }
+      if (!spot) continue;                                          // nowhere clear nearby: leave it (reported by the overlap check)
+      a.x = spot.x; a.y = spot.y;
+      // The association line faces the side the annotation is now on (the same centre-to-centre rule the connectors were built with).
+      const s = elMap.get(link.sourceId)!, g = elMap.get(link.targetId)!;
+      const dx = (g.x + g.width / 2) - (s.x + s.width / 2), dy = (g.y + g.height / 2) - (s.y + s.height / 2);
+      if (Math.abs(dx) >= Math.abs(dy)) { link.sourceSide = dx >= 0 ? "right" : "left"; link.targetSide = dx >= 0 ? "left" : "right"; }
+      else { link.sourceSide = dy >= 0 ? "bottom" : "top"; link.targetSide = dy >= 0 ? "top" : "bottom"; }
+      link.sourceOffsetAlong = 0.5; link.targetOffsetAlong = 0.5;
+    }
+  }
+
   // ── R8.43: a sequence flow never passes through another element ──
   //
   // Paul, 2026-10-05 ("AI Generate test"): the loop-back from "Customer details confirmed" to the first merge ran down

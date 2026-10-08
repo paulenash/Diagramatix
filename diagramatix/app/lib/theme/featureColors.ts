@@ -12,7 +12,7 @@
  */
 
 export type FeatureColorKey =
-  | "simulator" | "mining" | "riskControl" | "apqc" | "portal" | "projectSharing"
+  | "simulator" | "mining" | "riskControl" | "reviewComment" | "apqc" | "portal" | "projectSharing"
   | "processRepository"
   | "processApi"
   | "funExtensions"
@@ -30,6 +30,7 @@ export const FEATURE_META: { key: FeatureColorKey; label: string; group: "produc
   { key: "simulator",   label: "Simulator",           group: "product", note: "Simulator Examples (menu + tile), Simulator admin" },
   { key: "mining",      label: "Process Mining",      group: "product", note: "Mining Examples, Diagramatix Miner admin" },
   { key: "riskControl", label: "Risk & Control",      group: "product", note: "Risk & Control Examples, RCM / GRC admin" },
+  { key: "reviewComment", label: "Review Comments",   group: "product", note: "The RV badge on diagrams that carry reviewer comments (the pink review notes)" },
   { key: "apqc",        label: "APQC PCF",            group: "product", note: "APQC tiles, Create APQC Process" },
   { key: "portal",      label: "Portal / Publishing", group: "product", note: "Process Portal & publishing surfaces" },
   { key: "projectSharing", label: "Project Sharing",  group: "product", note: "Project Sharing tiles (SuperAdmin + OrgAdmin)" },
@@ -52,6 +53,8 @@ export const DEFAULT_FEATURE_COLORS: Record<FeatureColorKey, FeatureColor> = {
   simulator:   { bg: "#f0fdfa", text: "#0f766e" }, // teal
   mining:      { bg: "#fffbeb", text: "#92400e" }, // amber
   riskControl: { bg: "#f0f9ff", text: "#075985" }, // sky
+  // Pink, to match the review-comment note itself (REVIEW_COMMENT_PALETTE[0]): its light-pink fill behind a dark-pink text.
+  reviewComment: { bg: "#fce7f3", text: "#be185d" },
   apqc:        { bg: "#eef2ff", text: "#4338ca" }, // indigo
   portal:      { bg: "#eff6ff", text: "#1d4ed8" }, // blue
   projectSharing: { bg: "#ecfdf5", text: "#047857" }, // emerald
