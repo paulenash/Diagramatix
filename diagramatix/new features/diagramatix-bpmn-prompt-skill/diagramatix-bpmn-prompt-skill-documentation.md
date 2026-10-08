@@ -6,7 +6,7 @@ date: "7 October 2026"
 
 # The Diagramatix BPMN Prompt Skill
 
-**Version 1 · 7 October 2026 · built from Diagramatix master template v8**
+**Version 1 · updated 8 October 2026 · built from Diagramatix master template v9**
 
 ## Contents
 
@@ -153,7 +153,7 @@ Its structure rests on four decisions:
 | **Built-in + editable additions** | `DiagramRules` row per diagram type | `references/house-rules.md` — an editable file with an *active* and a *not active* part; it never overrides the built-in. |
 | **"Refine" clarifying questions** | A step in the AI Generate screen: up to six questions, answers appended as a CLARIFICATIONS block | Stage 2, using **the same list of dimensions**, written into the skill by the build from the application's own source. |
 | **Automatic gates** (`checkPromptShapes`, `checkPromptBranches`) | Deterministic and free; run on every repository prompt | `scripts/check_prompt.mjs` — **the same two checkers, transpiled**, plus structural checks; a test confirms identical findings on all 104 repository BPMN prompts. |
-| **Template version history / staleness** | `MD_PROMPT_TEMPLATE_HISTORY`; the library screen flags stale prompts | `VERSION.json` and the version stamp in the skill's files (currently **v8**); a new zip is issued when the template changes. |
+| **Template version history / staleness** | `MD_PROMPT_TEMPLATE_HISTORY`; the library screen flags stale prompts | `VERSION.json` and the version stamp in the skill's files (currently **v9**); a new zip is issued when the template changes. |
 | **A proven example to follow** | The existing prompts | `references/example-prompt.md` — two real repository prompts, taken directly from the Process Repository by the build. |
 
 ### 4.3 The seven sections, and the rules each carries
@@ -167,7 +167,7 @@ The skill follows the template exactly; this table is a map, not a substitute. T
 | 2 | **Pool properties** | Black-box / white-box, `System = true`, single instance | Exactly one pool is white-box — the one holding the flow. |
 | 3 | **Layout** | Vertical order of pools | Triggering external party at the top; supporting systems at the bottom. |
 | 4 | **Lane contents in flow order** | Each element, typed and labelled, in order | See below — this section carries most of the rules. |
-| 5 | **Edge-mounted (boundary) events** | Events attached to an activity | Interrupting only; attached to an *activity* only; the exception path says where it goes and never returns to its host; **an event on a step inside an Expanded Subprocess leads only to another step inside it — to leave, mount the event on the Expanded Subprocess itself.** |
+| 5 | **Edge-mounted (boundary) events** | Events attached to an activity | Interrupting only; attached to an *activity* only; the exception path says where it goes and never returns to its host; **an event on a step inside an Expanded Subprocess leads only to another step inside it — to leave, mount the event on the Expanded Subprocess itself.** **An exception never ends silently: a task sits between the event and an End event, and that End event is a Terminate End event.** |
 | 6 | **Connectors** | Sequence flows; message flows | A message flow must cross a pool boundary; every external and system pool appears in at least one. |
 | 7 | **Data objects** | Business records in flight | Never a Data Store; each attaches to a task. |
 | — | Closing paragraph | What the process achieves and what it hands on | Three or four lines. |
@@ -344,6 +344,8 @@ It reports, with line numbers:
 | `branch-without-destination` | A gateway branch that never says where it goes. |
 | `boundary-on-non-activity` | A boundary event mounted on something that is not a task or subprocess. |
 | `boundary-leaves-subprocess` | A boundary event on a step *inside* an Expanded Subprocess whose exception path leads *out* of it. Mount the event on the Expanded Subprocess itself. |
+| `boundary-straight-to-end` | A boundary event whose path goes straight to an End event — a *silent failure*. Put a task between them: the event triggers a User task, which then ends in the End event. |
+| `exception-end-not-terminate` | The End event that finishes an exception path is not written as a `Terminate End event`. |
 | `message-within-pool` | A message flow whose two ends are lanes of one pool. |
 | `opening-line` / `missing-section` / `section-order` | The structure is wrong. |
 | `data-store` | A Data Store appears. |
@@ -719,6 +721,8 @@ A hosted connector (an MCP server) could later give the same ability in environm
 
 **A timer on a step inside a loop, with a reminder path that leaves the loop.** This was the first real defect found in a skill-written prompt (7 October 2026): the timer was mounted on the *wait inside* the loop but its path led out to a reminder outside. BPMN does not allow it — an event on a step inside an Expanded Subprocess may lead only to another step inside it. The fix is to mount the timer on the loop *itself*, with the return path coming back to the loop by name. This is now in the master template (v8), in the skill's checklist and checker (`boundary-leaves-subprocess`), and enforced by Diagramatix's layout (rule R8.45), which re-mounts such an event automatically.
 
+**An exception path that goes straight to an End event.** Template v9 (8 October 2026): the skill writes a *task* between a boundary event and an End event, and makes the End event a *Terminate End event*. This is the "silent failure" rule (Diagramatix rules R8.47 and R8.48; scan checks B56 and B57): when the exception happens, something must ask a person to act, and the process then ends outright. Diagramatix itself repairs a prompt that omits it — it inserts a task called "Handle: <event>" and makes the End a Terminate — but a prompt that says it from the start gives the diagram you meant. The first of the two shipped examples was adjusted to follow it.
+
 **It would not apply one of my house rules.** The rule conflicted with a drawability rule in the template, and the skill said so under Checks. The template wins by design.
 
 **Can I use the prompt for something other than AI Generate?** Yes: it is plain text in the format of the Process Repository's prompts, so it can also be pasted into a repository Markdown document (add the process code to the opening line and the `**BPMN diagram prompt.**` label with the text in a fence), or sent to the Process API as described in section 9.
@@ -762,6 +766,7 @@ In the application repository (under `diagramatix/`): the hand-written sources i
 | 6 | 2026-09-03 | Six defects that were manufacturing diagram bugs: the missing "continues to <element>" form; the wait rule contradicting the boundary-event rule; merges only where two or more branches converge; a parallel split's join made mandatory; exception paths must terminate; the non-interrupting flavour withdrawn. |
 | 7 | 2026-09-05 | A loop subprocess holds only the steps that repeat; its condition is about the repeating work, not the outcome. |
 | 8 | 2026-10-07 | A boundary event on a step inside an Expanded Subprocess stays inside it: its exception path may lead only to another step in that subprocess. To leave, mount the event on the Expanded Subprocess itself, and bring any return path back to the subprocess by name (rule R8.45). |
+| 9 | 2026-10-08 | An exception never ends silently: a boundary event's path never goes straight to an End event — a task sits between them — and the End event that finishes an exception path is a Terminate End event (rules R8.47 / R8.48). |
 
 ### 12.3 Glossary
 

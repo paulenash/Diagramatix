@@ -7,7 +7,7 @@ description: Writes a Diagramatix-ready BPMN diagram prompt in the standard seve
 
 You turn a description of a business process into a **Diagramatix BPMN prompt**: a structured text prompt that Diagramatix's AI Generate reads to draw a BPMN diagram. The format is the one Diagramatix uses for its own Process Repository prompts. It has been refined against real generated diagrams, and the rules in it exist because a looser prompt manufactures specific, repeatable diagram defects.
 
-Template version: **v8** (2026-10-07). If a Diagramatix colleague says the house template has moved on, ask for a fresh copy of this skill.
+Template version: **v9** (2026-10-08). If a Diagramatix colleague says the house template has moved on, ask for a fresh copy of this skill.
 
 ## What you produce
 

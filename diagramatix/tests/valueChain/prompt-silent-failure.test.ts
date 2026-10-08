@@ -40,6 +40,21 @@ describe("T5285 the prompt checker and the silent-failure rules", () => {
     expect(r.some((i) => i.code === "boundary-straight-to-end" && /^Line \d+:/.test(i.message))).toBe(true);
     expect(r.some((i) => i.code === "exception-end-not-terminate" && /Terminate End event/.test(i.message))).toBe(true);
   });
+  it("the shipped skill is v9: template, checker, checklist, and an example that follows the rule", async () => {
+    const { readFileSync } = await import("node:fs");
+    const dist = "skills/dist/diagramatix-bpmn-prompt";
+    expect(JSON.parse(readFileSync(`${dist}/VERSION.json`, "utf8")).templateVersion).toBe(9);
+    expect(readFileSync(`${dist}/references/master-template.md`, "utf8")).toContain("AN EXCEPTION NEVER ENDS SILENTLY");
+    expect(readFileSync(`${dist}/scripts/check_prompt.mjs`, "utf8")).toContain("exception-end-not-terminate");
+    expect(readFileSync(`${dist}/references/self-check.md`, "utf8")).toContain("No silent failures");
+    const ex = readFileSync(`${dist}/references/example-prompt.md`, "utf8");
+    expect(ex).toContain('Terminate End event "Order abandoned — customer unresponsive"');
+    expect(ex).toContain("Template v9 note");
+    // …and the examples pass the skill's own (advice-on) checker.
+    for (const block of [...ex.matchAll(/```text\n([\s\S]*?)\n```/g)].map((m) => m[1])) {
+      expect(checkPromptShapes(block, true)).toEqual([]);
+    }
+  });
   it("the master template (v9) says both things", () => {
     expect(DEFAULT_MD_PROMPT_BPMN).toMatch(/AN EXCEPTION NEVER ENDS SILENTLY/);
     expect(DEFAULT_MD_PROMPT_BPMN).toMatch(/TERMINATE END EVENT/);

@@ -4,6 +4,7 @@ These are two prompts from Diagramatix's Process Repository — prompts it gener
 
 - **Example 1 — simple.** The format; a decision whose branches close at a named merge; a loop written as a standard-loop subprocess; a timer boundary event on that subprocess; message flows that cross pool boundaries (to a customer pool and to a system pool); data objects.
 - **Example 2 — richer.** Adds a **parallel** split with its matching **parallel merge**, **nested decisions** (a decision inside a branch of another), several **boundary events**, and branches that end in their own End events.
+- **Template v9 note.** In Example 1 the timer's exception path has been adjusted from the repository text to follow template v9: a User task sits between the timer and its End event, and that End event is a **Terminate End event** ("an exception never ends silently"). Write your own exception paths that way.
 
 ## Example 1 — V01.01 — Receive Order
 
@@ -62,8 +63,9 @@ Order Processing lane:
 5. Edge-mounted (boundary) events
 
 Interrupting timer boundary event on Expanded Subprocess "Repeat Until
-  Details Complete", labelled "48-hour response deadline exceeded", leading
-  to End event "Order abandoned — customer unresponsive".
+  Details Complete", labelled "48-hour response deadline exceeded", triggers
+  User task "Close the order as abandoned", which then ends in
+  Terminate End event "Order abandoned — customer unresponsive".
 
 6. Connectors
 

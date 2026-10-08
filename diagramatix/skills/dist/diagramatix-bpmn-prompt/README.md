@@ -1,6 +1,6 @@
 # Diagramatix BPMN prompt skill — for Greg
 
-A skill that writes a **Diagramatix-ready BPMN prompt** in the standard house format, with a refinement stage that fills the gaps and a self-check that the prompt can actually be drawn. Template version **v8** (2026-10-07).
+A skill that writes a **Diagramatix-ready BPMN prompt** in the standard house format, with a refinement stage that fills the gaps and a self-check that the prompt can actually be drawn. Template version **v9** (2026-10-08).
 
 ## What's in the folder
 

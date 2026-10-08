@@ -37,6 +37,8 @@ A prompt that asks for a shape BPMN does not allow is drawn faithfully and wrong
 - [ ] A boundary event on a step **inside an Expanded Subprocess** (a loop included) leads only to another step **inside that same subprocess** — never to the main flow, an End event outside, or a reminder outside it. If the path has to leave, the event is mounted on **the Expanded Subprocess itself**, and a path that returns comes back to the subprocess by name, never to a step inside it.
 - [ ] Each is **interrupting**; the word "non-interrupting" does not appear.
 - [ ] Each exception path says where it goes (same forms as a branch) and **never returns to the activity it left**; it ends in its own End event or rejoins the flow after that activity.
+- [ ] **No silent failures:** no exception path goes straight from the boundary event to an End event. A **task** sits between them (the event triggers a User task, which then ends in the End event), so a person can act when the exception happens.
+- [ ] The End event that finishes an exception path is written as a **Terminate End event** (`Terminate End event "<name>"`). A path that rejoins the flow at a merge gateway or a later step has no End event of its own and needs neither.
 - [ ] Written "None." if there are none — none were invented.
 
 ## Connectors and data (sections 6 and 7)
@@ -54,6 +56,6 @@ node scripts/check_prompt.mjs prompt.txt        # a saved file
 cat prompt.txt | node scripts/check_prompt.mjs  # or from standard input
 ```
 
-It reports: branches that never say where they go; boundary events mounted on something that is not an activity; boundary events on a step inside a subprocess whose path leads out of it; message flows between two lanes; missing or misordered sections; a Data Store; a loop-back phrase; "non-interrupting". It exits 0 when the prompt is clean and 1 otherwise. Paste only the prompt text (the part inside the fence) into the file.
+It reports: branches that never say where they go; boundary events mounted on something that is not an activity; boundary events on a step inside a subprocess whose path leads out of it; exception paths that go straight to an End event, or whose End event is not a Terminate End event; message flows between two lanes; missing or misordered sections; a Data Store; a loop-back phrase; "non-interrupting". It exits 0 when the prompt is clean and 1 otherwise. Paste only the prompt text (the part inside the fence) into the file.
 
 It cannot judge meaning — whether a decision is really a decision, whether a wait has a deadline, whether a party should be a pool. The checklist above covers those; do them by reading.

@@ -59,8 +59,27 @@ function exampleBlock(code: string): { title: string; text: string } {
   const open = md.indexOf("```text\n", at);
   const close = md.indexOf("\n```", open + 8);
   if (open < 0 || close < 0) throw new Error("example prompt fence not found");
-  return { title, text: md.slice(open + 8, close).replace(/\s+$/, "") };
+  let text = md.slice(open + 8, close).replace(/\s+$/, "");
+  for (const edit of EXAMPLE_EDITS.filter((x) => x.code === code)) {
+    if (!text.includes(edit.from)) throw new Error(`${code}: the text the v9 adjustment replaces is no longer in the Process Repository`);
+    text = text.replace(edit.from, edit.to);
+  }
+  return { title, text };
 }
+
+/**
+ * The repository prompts predate template v9 ("an exception never ends silently", 2026-10-08), so V01.01's timer led straight to a plain End
+ * event — the very thing the template now forbids, in the skill's own example. This one adjustment makes the example follow v9: a task between
+ * the timer and its End event, which is a Terminate End event. It is exact-match, so if the repository text changes the build fails loudly
+ * rather than shipping an example that contradicts the template.
+ */
+const EXAMPLE_EDITS: { code: string; from: string; to: string }[] = [
+  {
+    code: "V01.01",
+    from: 'leading\n  to End event "Order abandoned — customer unresponsive".',
+    to: 'triggers\n  User task "Close the order as abandoned", which then ends in\n  Terminate End event "Order abandoned — customer unresponsive".',
+  },
+];
 
 /** Transpile one of the app's checkers to plain ESM JavaScript. Both are self-contained (no imports). */
 function transpile(file: string): string {
@@ -188,6 +207,7 @@ export function buildSkillFiles(): Record<string, string> {
     "",
     "- **Example 1 — simple.** The format; a decision whose branches close at a named merge; a loop written as a standard-loop subprocess; a timer boundary event on that subprocess; message flows that cross pool boundaries (to a customer pool and to a system pool); data objects.",
     "- **Example 2 — richer.** Adds a **parallel** split with its matching **parallel merge**, **nested decisions** (a decision inside a branch of another), several **boundary events**, and branches that end in their own End events.",
+    "- **Template v9 note.** In Example 1 the timer's exception path has been adjusted from the repository text to follow template v9: a User task sits between the timer and its End event, and that End event is a **Terminate End event** (\"an exception never ends silently\"). Write your own exception paths that way.",
     "",
     ...examples.flatMap((ex, i) => [`## Example ${i + 1} — ${ex.title}`, "", "```text", ex.text, "```", ""]),
   ].join("\n");

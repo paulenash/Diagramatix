@@ -110,6 +110,8 @@ export const MD_PROMPT_TEMPLATE_HISTORY: Record<MdPromptType, TemplateVersion[]>
       description: "A loop subprocess holds only the steps that repeat — not the whole process. Its condition is about the repeating work, not the outcome the subprocess exists to produce." },
     { version: 8, at: "2026-10-07", commit: "e71ff040", shippedAt: "2026-10-07T05:35:32Z",
       description: "A boundary event on a step inside an Expanded Subprocess stays inside it: its exception path may lead only to another step in that subprocess. To leave, mount the event on the Expanded Subprocess itself, and bring any return path back to the subprocess by name (rule R8.45)." },
+    { version: 9, at: "2026-10-08", commit: "1b8c24d3", shippedAt: "2026-10-08T02:52:27Z",
+      description: "An exception never ends silently: a boundary event's path never goes straight to an End event — a task sits between them — and the End event that finishes an exception path is a Terminate End event (rules R8.47 / R8.48)." },
   ],
   "value-chain": [
     { version: 1, at: "2026-08-26", commit: "542a7141", shippedAt: "2026-08-26T12:52:13Z", description: "The master templates become editable." },
