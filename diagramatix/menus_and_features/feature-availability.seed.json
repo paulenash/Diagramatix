@@ -456,6 +456,26 @@
         "expert": "available",
         "enterprise": "available"
       }
+    },
+    {
+      "key": "process-repository-restricted",
+      "states": {
+        "free": "available",
+        "introductory": "available",
+        "professional": "hidden",
+        "expert": "hidden",
+        "enterprise": "hidden"
+      }
+    },
+    {
+      "key": "process-repository-complete",
+      "states": {
+        "free": "hidden",
+        "introductory": "hidden",
+        "professional": "available",
+        "expert": "available",
+        "enterprise": "available"
+      }
     }
   ]
 }

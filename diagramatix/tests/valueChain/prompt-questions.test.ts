@@ -128,7 +128,7 @@ describe("T5287 wiring", () => {
     expect(ui).toContain('if (source !== "library" || bpmn.length === 0) { void doRun(); return; }');
     expect(ui).toContain('action: "questions"');
     expect(ui).toContain("void doRun(answers);");
-    const route = readFileSync("app/api/admin/md-diagrams/run/route.ts", "utf8");
+    const route = readFileSync("app/lib/valueChain/runLibraryProject.ts", "utf8");
     expect(route).toContain('answerItems.length > 0 && fromLibrary && d.type === "bpmn" && procCode && libNarrative.trim()');
     expect(route).toContain("prompt tailored to your answers");
     expect(route).toContain("using the stored one");

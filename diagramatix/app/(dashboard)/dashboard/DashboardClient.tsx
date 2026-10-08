@@ -27,6 +27,8 @@ import { PublishedSection } from "./PublishedSection";
 import { CollapsibleSection } from "./CollapsibleSection";
 import { ProjectShareDialog } from "./ProjectShareDialog";
 import { PcfCreateProjectDialog } from "./PcfCreateProjectDialog";
+import { CreateFromRepositoryDialog } from "@/app/components/repository/CreateFromRepositoryDialog";
+import { useFeatureStates } from "@/app/components/FeatureGate";
 import { NotificationsClient } from "../notifications/NotificationsClient";
 import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
 import { useDiagramTypeStyles } from "@/app/hooks/useDiagramTypeStyles";
@@ -475,6 +477,11 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   // New project state
   const [showNewProject, setShowNewProject] = useState(false);
   const [showPcfProject, setShowPcfProject] = useState(false);
+  // Create Project from Process Repository (Paul, 2026-10-08): shown when either Process Repository feature is available to this level.
+  const [showRepoCreate, setShowRepoCreate] = useState(false);
+  const { states: repoFeatureStates } = useFeatureStates();
+  const repoState = repoFeatureStates["process-repository-complete"] === "available" || repoFeatureStates["process-repository-restricted"] === "available"
+    ? "available" : "hidden";
   const [newProjectName, setNewProjectName] = useState("");
   const [creatingProject, setCreatingProject] = useState(false);
 
@@ -2016,6 +2023,15 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                 ◎ Create APQC Project
               </button>
               )}
+              {repoState === "available" && (
+              <button
+                onClick={() => setShowRepoCreate(true)}
+                className="px-3 py-1.5 rounded-md border border-indigo-300 text-indigo-700 hover:bg-indigo-50 text-xs font-medium"
+                title="Create a project from the Process Repository — pick a value chain and the processes you want; the diagrams are generated for you"
+              >
+                ▤ Create Project from Process Repository
+              </button>
+              )}
             </div>
           ) : undefined}
         >
@@ -3287,6 +3303,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
       )}
 
       {showPcfProject && <PcfCreateProjectDialog onClose={() => setShowPcfProject(false)} />}
+      {showRepoCreate && <CreateFromRepositoryDialog onClose={() => setShowRepoCreate(false)} />}
 
       {/* New Project dialog */}
       {showNewProject && (

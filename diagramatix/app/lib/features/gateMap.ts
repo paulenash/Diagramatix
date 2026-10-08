@@ -397,6 +397,27 @@ export const FEATURE_GATES: Record<string, FeatureGateInfo> = {
     server: [{ file: "app/api/diagrams/[id]/publish/route.ts", needle: '"process-portal"', what: "POST publish a diagram" }],
     note: "Publishing; what is already published stays readable.",
   },
+  "process-repository-restricted": {
+    description: "Create a project from the Process Repository — Order to Cash (V01) only. Free: the V01 Value Chain diagram and processes V01.01 and V01.02. Introductory: all of V01.",
+    status: "wired", ui: [],
+    server: [
+      { file: "app/lib/valueChain/repositoryAccess.ts", needle: 'featureStates["process-repository-restricted"]', what: "Which mode the user is in (read by the chain list and the create-project run)" },
+      { file: "app/api/repository/chains/route.ts", needle: "repositoryAccessFor(", what: "GET the chains the user may see, each diagram marked allowed or disabled" },
+      { file: "app/lib/valueChain/runLibraryProject.ts", needle: "repositoryAccessFor(", what: "POST create the project — only the allowed diagrams are generated" },
+    ],
+    alsoLimitedBy: ["AI attempts limit (one attempt per diagram generated)", "Projects limit", "Organisation policy: allowAi"],
+    note: "Complete wins when both are on. The per-level content limits (Free: V01.01 and V01.02) are in repositoryAccess.ts, like the examples-only limits.",
+  },
+  "process-repository-complete": {
+    description: "Create a project from the Process Repository — every value chain. Professional, Expert and Enterprise.",
+    status: "wired", ui: [],
+    server: [
+      { file: "app/lib/valueChain/repositoryAccess.ts", needle: 'featureStates["process-repository-complete"]', what: "Which mode the user is in (read by the chain list and the create-project run)" },
+      { file: "app/api/repository/chains/route.ts", needle: "repositoryAccessFor(", what: "GET the chains the user may see" },
+      { file: "app/lib/valueChain/runLibraryProject.ts", needle: "repositoryAccessFor(", what: "POST create the project" },
+    ],
+    alsoLimitedBy: ["AI attempts limit (one attempt per diagram generated)", "Projects limit", "Organisation policy: allowAi"],
+  },
   "mobile": {
     description: "Mobile Access: the phone app (view, review, edit by voice). Needs Process Review and Voice Assist.",
     status: "wired",

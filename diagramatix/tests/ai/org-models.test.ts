@@ -147,7 +147,10 @@ describe("T5255 one resolver (a ratchet)", () => {
   const GLOBAL_OK = (rel: string) =>
     rel === "app/lib/ai/aiModelSetting.ts" || rel === "app/lib/ai/orgModels.ts" || rel === "app/lib/ai/planGeneric.ts" ||
     rel.startsWith("app/api/admin/") || rel.startsWith("app/(dashboard)/dashboard/admin/") ||
-    rel === "app/lib/partner/worker.ts" || rel === "app/api/ai/generate-bpmn/export-prompt/route.ts" || rel === "app/api/ai/generate-bpmn/compare/route.ts";
+    rel === "app/lib/partner/worker.ts" || rel === "app/api/ai/generate-bpmn/export-prompt/route.ts" || rel === "app/api/ai/generate-bpmn/compare/route.ts" ||
+    // The shared Create-Project-from-Repository runner: its SuperAdmin mode is the old admin route's code (the SuperAdmin model setting);
+    // its USER mode resolves the Org's model with resolveOrgModel() — pinned in tests/valueChain/repository-access.test.ts.
+    rel === "app/lib/valueChain/runLibraryProject.ts";
   it("no other file reads the global model getters — a route that calls a provider goes through resolveOrgModel()", () => {
     const bad: string[] = [];
     for (const f of [...files("app/api"), ...files("app/lib"), ...files("app/(dashboard)"), ...files("app/components")]) {

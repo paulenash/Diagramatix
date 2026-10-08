@@ -14,6 +14,8 @@ import { DiagramMaintenanceModal, type FontConfig } from "./DiagramMaintenanceMo
 import { LinkScanDialog } from "./LinkScanDialog";
 import { PcfSeedFoldersDialog } from "./PcfSeedFoldersDialog";
 import { PcfCreateProcessDialog } from "./PcfCreateProcessDialog";
+import { CreateFromRepositoryDialog } from "@/app/components/repository/CreateFromRepositoryDialog";
+import { useFeatureStates } from "@/app/components/FeatureGate";
 import { folderSubtree, folderCode } from "@/app/lib/pcf/bulkFolders";
 import { usePcfLevelColors } from "@/app/lib/pcf/usePcfLevelColors";
 import { pcfLevelStyle, pcfLevelFromCode } from "@/app/lib/pcf/levelColors";
@@ -675,6 +677,12 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
   const fileMenuRef = useRef<HTMLDivElement>(null);
   // "Project ▾" dropdown: groups Project Configuration + Scan together.
   const [showProjectMenu, setShowProjectMenu] = useState(false);
+  // Create Project from Process Repository (Paul, 2026-10-08): on when either Process Repository feature is available to this level.
+  const { states: repoFeatureStates } = useFeatureStates();
+  const repoState: "available" | "disabled" | "hidden" =
+    repoFeatureStates["process-repository-complete"] === "available" || repoFeatureStates["process-repository-restricted"] === "available" ? "available"
+      : repoFeatureStates["process-repository-complete"] === "disabled" || repoFeatureStates["process-repository-restricted"] === "disabled" ? "disabled" : "hidden";
+  const [showRepoCreate, setShowRepoCreate] = useState(false);
   // Project-menu popups (Paul, 2026-09-14): the SOP list, the Entity Structure
   // and the Risk & Controls launcher moved out of the header and sidebar into
   // small dialogs opened from the Project menu.
@@ -2900,6 +2908,18 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
                     {"⚙"} Resources
                   </button>
                   )}
+                  {!readOnly && aiAllowed && repoState !== "hidden" && (
+                  <button
+                    disabled={repoState !== "available"}
+                    className={`block w-full text-left px-3 py-1.5 text-xs ${repoState === "available" ? "text-gray-700 hover:bg-gray-100" : "text-gray-400 cursor-not-allowed"}`}
+                    onClick={() => { setShowProjectMenu(false); setShowRepoCreate(true); }}
+                    title={repoState === "available"
+                      ? "Create a project from the Process Repository — pick a value chain and the processes you want, answer a few questions, and the diagrams are generated"
+                      : "The Process Repository is not part of your subscription"}
+                  >
+                    {"▤"} Create Project from Process Repository…
+                  </button>
+                  )}
                   {!readOnly && <div className="my-1 border-t border-gray-100" />}
                   {!readOnly && (<>
                   <button
@@ -3912,6 +3932,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
         <PcfSeedFoldersDialog projectId={project.id} onClose={() => setShowPcfSeed(false)} onDone={refreshProjectData} />
       )}
 
+      {showRepoCreate && <CreateFromRepositoryDialog currentProjectId={project.id} onClose={() => setShowRepoCreate(false)} />}
       {showPcfCreate && (() => {
         const selFolder = selectedFolderId !== ROOT_ID ? folderTree.folders.find(f => f.id === selectedFolderId) : null;
         const subtree = selFolder ? folderSubtree(folderTree.folders, selFolder.id) : [];

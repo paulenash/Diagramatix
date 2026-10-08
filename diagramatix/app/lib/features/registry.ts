@@ -85,6 +85,10 @@ export const FEATURES: FeatureDef[] = [
   // Platform
   { key: "process-portal",         label: "Process Portal",              category: "Platform" },
   { key: "mobile",                 label: "Mobile Diagramatix",          category: "Platform", requires: ["process-review", "voice-assist"] },
+  // The user-facing "Create Project from Process Repository" (Paul, 2026-10-08). Restricted = the Order to Cash chain V01 only (Free: its Value
+  // Chain diagram + V01.01 + V01.02; Introductory: all of V01). Complete = every value chain. Complete wins when both are on.
+  { key: "process-repository-restricted", label: "Process Repository — Restricted (Order to Cash only)", category: "Platform" },
+  { key: "process-repository-complete",   label: "Process Repository — Complete (all value chains)",     category: "Platform" },
   // AI Models
   { key: "choice-of-llms",         label: "Choice of LLMs",              category: "AI Models" },
   { key: "local-llm",              label: "Local LLM Support",           category: "AI Models" },
