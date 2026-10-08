@@ -102,7 +102,8 @@ describe("T5289 the runner's user mode", () => {
     expect(create).toContain("isReadOnlyImpersonation");
     expect(readFileSync("app/api/repository/questions/route.ts", "utf8")).toContain("isReadOnlyImpersonation");
     const chains = readFileSync("app/api/repository/chains/route.ts", "utf8");
-    expect(chains).toContain("hidden: false, publishedAt: { not: null }");
+    expect(chains).toContain("publishedChainsFor(orgId)");
+    expect(readFileSync("app/lib/valueChain/repositoryChains.ts", "utf8")).toContain("orgId: MASTER_ORG, publishedAt: { not: null }");
     expect(chains).toContain("allowed: itemAllowed(access, item)");
   });
 });

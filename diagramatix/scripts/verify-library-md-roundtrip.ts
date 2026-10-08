@@ -18,6 +18,7 @@ import type { MdPromptType } from "../app/lib/valueChain/promptTemplates";
 
 async function main() {
   const rows = await prisma.valueChainLibrary.findMany({
+    where: { orgId: "" },
     orderBy: [{ sortOrder: "asc" }, { code: "asc" }],
     include: { processes: { orderBy: { sortOrder: "asc" } }, prompts: true },
   });

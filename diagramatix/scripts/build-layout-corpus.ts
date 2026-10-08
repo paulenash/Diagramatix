@@ -47,6 +47,7 @@ async function main() {
   // One BPMN prompt per chain — the FIRST process, so the choice is stable and
   // nobody has to curate a list. Breadth across 26 chains beats depth in one.
   const chains = await prisma.valueChainLibrary.findMany({
+    where: { orgId: "" },
     orderBy: { sortOrder: "asc" },
     select: {
       code: true, title: true,

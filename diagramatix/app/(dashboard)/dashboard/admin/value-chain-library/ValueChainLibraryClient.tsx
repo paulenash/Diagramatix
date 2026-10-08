@@ -55,11 +55,15 @@ interface Chain {
   id: string; code: string; title: string; groupName: string; hidden: boolean; sortOrder: number;
   narrative: string; published: boolean; publishedAt: string | null; dirty: boolean;
   processes: Process[]; prompts: Prompt[];
+  /** Org repository only: the master has published since this chain was adopted or last updated. */
+  masterMoved?: boolean;
 }
 
 type Row = { index: number; name: string; type: MdPromptType; status: string; message?: string; chars?: number; ms?: number; roundTrips?: boolean };
 
-export function ValueChainLibraryClient() {
+export function ValueChainLibraryClient({ scope = "master" }: { scope?: "master" | "org" } = {}) {
+  // The MASTER repository (SuperAdmin) or this Org's own (OrgAdmin: "Master Template Value Chain Generation"). Same screen, different rows.
+  const API = scope === "org" ? "/api/org-admin/value-chain-library" : "/api/admin/value-chain-library";
   const [chains, setChains] = useState<Chain[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -102,7 +106,7 @@ export function ValueChainLibraryClient() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/value-chain-library");
+      const res = await fetch(API);
       const j = await res.json();
       if (!res.ok) { setError(j.error ?? "Could not load the library"); return; }
       setChains(j.chains ?? []);
@@ -118,7 +122,7 @@ export function ValueChainLibraryClient() {
   const post = useCallback(async (payload: Record<string, unknown>, okNote?: string) => {
     setBusy(true); setError(null); setNote(null);
     try {
-      const res = await fetch("/api/admin/value-chain-library", {
+      const res = await fetch(API, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
       });
       const j = await res.json().catch(() => ({}));
@@ -161,7 +165,7 @@ export function ValueChainLibraryClient() {
     if (busy) return;
     setBusy(true); setError(null); setNote(null); setRows([]);
     try {
-      const res = await fetch("/api/admin/value-chain-library", {
+      const res = await fetch(API, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "regenerate", code, types, processCode, processCodes, answers }),
       });
@@ -219,7 +223,7 @@ export function ValueChainLibraryClient() {
     if (!types.includes("bpmn")) { void runRegenerate(code, types, processCode, processCodes); return; }
     setAsking(true); setError(null); setNote("Preparing a few questions about this process…");
     try {
-      const res = await fetch("/api/admin/value-chain-library", {
+      const res = await fetch(API, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "questions", code, processCode: processCode ?? (processCodes?.length === 1 ? processCodes[0] : undefined) }),
       });
@@ -273,14 +277,16 @@ export function ValueChainLibraryClient() {
         />
       )}
       <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-3">
-        <Link href="/dashboard/admin" className="text-sm text-blue-600 hover:text-blue-800 underline">← SuperAdmin</Link>
-        <h1 className="text-lg font-semibold text-gray-900">Process Repository</h1>
+        <Link href={scope === "org" ? "/dashboard/org-admin" : "/dashboard/admin"} className="text-sm text-blue-600 hover:text-blue-800 underline">
+          {scope === "org" ? "← OrgAdmin" : "← SuperAdmin"}
+        </Link>
+        <h1 className="text-lg font-semibold text-gray-900">{scope === "org" ? "Master Template Value Chain Generation" : "Process Repository"}</h1>
         <span className="text-xs text-gray-500">
           {totals.chains} chains · {totals.processes} processes · {totals.prompts} prompts ·{" "}
           <strong>{totals.published} published</strong>
           {totals.dirty > 0 && <> · <span className="text-amber-700">{totals.dirty} with unpublished edits</span></>}
         </span>
-        <a href="/api/admin/value-chain-library?format=md" className="ml-auto text-xs text-blue-600 hover:text-blue-800 underline">
+        <a href={`${API}?format=md`} className="ml-auto text-xs text-blue-600 hover:text-blue-800 underline">
           Export the whole library as .md
         </a>
       </header>
@@ -288,6 +294,7 @@ export function ValueChainLibraryClient() {
       <main className="max-w-[100rem] mx-auto p-6 grid gap-5 lg:grid-cols-[22rem_1fr] items-start">
         {/* ── Chains ─────────────────────────────────────────────── */}
         <div className="space-y-3">
+          {scope !== "org" && (
           <section className="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
             <h2 className="text-sm font-semibold text-gray-900 mb-2">Import</h2>
             <p className="text-[11px] text-gray-500 mb-2">
@@ -369,6 +376,8 @@ export function ValueChainLibraryClient() {
               </div>
             )}
           </section>
+          )}
+          {scope === "org" && <AdoptFromMaster api={API} busy={busy} reloadKey={chains} onAdopt={(code) => void post({ action: "adopt", code }, `${code} adopted into your repository as a draft. Review it, regenerate its prompts if you wish, then publish.`)} onSync={(code) => void post({ action: "sync", code }, `${code} brought up to date with the master. Your edits to it were replaced; publish when you are happy.`)} />}
 
           <section className="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
             <div className="flex items-baseline justify-between mb-2">
@@ -394,6 +403,7 @@ export function ValueChainLibraryClient() {
                           <span className="text-xs text-gray-800 flex-1 truncate">{c.title}</span>
                           {c.dirty && <span className="text-[9px] px-1 rounded bg-amber-100 text-amber-800">draft</span>}
                           {c.published && !c.dirty && <span className="text-[9px] px-1 rounded bg-green-100 text-green-800">live</span>}
+                          {c.masterMoved && <span className="text-[9px] px-1 rounded bg-amber-100 text-amber-800" title="The master repository has published a newer version of this chain since you adopted or updated it">master updated</span>}
                         </span>
                         <span className="block text-[10px] text-gray-500">
                           {c.processes.length} processes · {c.prompts.length} prompts
@@ -424,6 +434,19 @@ export function ValueChainLibraryClient() {
 
         {/* ── The selected chain ─────────────────────────────────── */}
         <div className="space-y-4">
+          {/* Org repository: a NEW master template version is the OrgAdmin's cue to regenerate and publish (Paul, 2026-10-08). Counted from the same
+              per-chain staleness the list shows, so the banner and the red marks cannot disagree. */}
+          {scope === "org" && (() => {
+            const behind = chains.reduce((n, c) => n + chainStaleness(c.processes, c.prompts).count, 0);
+            const t = latestTemplateVersion("bpmn");
+            return (
+              <p className={`text-xs rounded px-3 py-2 border ${behind > 0 ? "text-red-800 bg-red-50 border-red-300" : "text-gray-700 bg-gray-50 border-gray-200"}`} role="status">
+                {behind > 0
+                  ? <>The master template is now <strong>v{t.version}</strong> ({t.at}). <strong>{behind}</strong> prompt{behind === 1 ? "" : "s"} in your repository {behind === 1 ? "was" : "were"} written to an older version: regenerate {behind === 1 ? "it" : "them"} here (with the questions), review, then <strong>Publish</strong> — until you do, your Org&apos;s users keep the prompts you last published.</>
+                  : <>Your repository is up to date with the master template <strong>v{t.version}</strong>. A chain you have not published here is the master&apos;s for your Org&apos;s users.</>}
+              </p>
+            );
+          })()}
           {error && <p className="text-xs text-red-700 bg-red-50 border border-red-300 rounded px-3 py-2">{error}</p>}
           {note && <p className="text-xs text-green-800 bg-green-50 border border-green-300 rounded px-3 py-2">{note}</p>}
 
@@ -433,7 +456,7 @@ export function ValueChainLibraryClient() {
             </section>
           ) : (
             <>
-              <ChainEditor chain={chain} busy={busy} tone={tone}
+              <ChainEditor chain={chain} busy={busy} tone={tone} apiBase={API}
                 onSave={(patch) => void post({ action: "save-chain", id: chain.id, ...patch }, "Saved.")}
                 onPublish={() => void post({ action: "publish", code: chain.code }, `${chain.code} published.`)}
                 onUnpublish={() => void post({ action: "unpublish", code: chain.code }, `${chain.code} withdrawn.`)}
@@ -454,7 +477,63 @@ export function ValueChainLibraryClient() {
   );
 }
 
-function ChainEditor({ chain, busy, tone, onSave, onPublish, onUnpublish, onDelete }: {
+/**
+ * OrgAdmin only: the MASTER repository's published chains, each with Adopt (copy it into this Org's repository as a draft), and for one already
+ * adopted, Update from master when the master has published since (the Org's edits to it are replaced — it asks first). Nothing here changes what the
+ * Org's users see: that happens when the OrgAdmin PUBLISHES the Org's version of a chain.
+ */
+function AdoptFromMaster({ api, busy, reloadKey, onAdopt, onSync }: {
+  api: string; busy: boolean; reloadKey: unknown; onAdopt: (code: string) => void; onSync: (code: string) => void;
+}) {
+  interface MasterRow { code: string; title: string; groupName: string; processes: number; prompts: number; adopted: boolean; masterMoved: boolean }
+  const [rows, setRows] = useState<MasterRow[] | null>(null);
+  const [confirmSync, setConfirmSync] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    fetch(`${api}?master=1`).then((r) => (r.ok ? r.json() : null)).then((j) => { if (live) setRows(j?.master ?? []); }).catch(() => { if (live) setRows([]); });
+    return () => { live = false; };
+  }, [api, reloadKey]);
+  return (
+    <section className="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
+      <h2 className="text-sm font-semibold text-gray-900 mb-1">Adopt from the master repository</h2>
+      <p className="text-[11px] text-gray-500 mb-2">
+        The master repository is kept by Diagramatix. Adopt a chain to take your own copy as a <strong>draft</strong>: change its narrative and processes,
+        regenerate its prompts from the master template (plus your Org&apos;s own additions), then <strong>Publish</strong> it. A chain you publish replaces
+        the master&apos;s for your Org&apos;s users; every chain you have not adopted is still the master&apos;s.
+      </p>
+      {confirmSync && (
+        <ConfirmDialog
+          title={`Update ${confirmSync} from the master?`}
+          message={`Your copy of ${confirmSync} is replaced by the master's current published version — your edits to its narrative, processes and prompts are lost. If it is published, it stays published (as unpublished edits) until you publish again.`}
+          confirmLabel="Update from master" cancelLabel="Keep mine" destructive
+          onCancel={() => setConfirmSync(null)}
+          onConfirm={() => { const c = confirmSync; setConfirmSync(null); onSync(c); }}
+        />
+      )}
+      {rows === null ? <p className="text-xs text-gray-500">Loading…</p>
+        : rows.length === 0 ? <p className="text-xs text-gray-500">The master repository has no published chains yet.</p>
+        : (
+          <ul className="space-y-1 max-h-[22rem] overflow-y-auto">
+            {rows.map((r) => (
+              <li key={r.code} className="flex items-center gap-2 text-xs border border-gray-200 rounded px-2 py-1">
+                <span className="font-semibold">{r.code}</span>
+                <span className="flex-1 truncate" title={r.title}>{r.title}</span>
+                {r.masterMoved && <span className="text-[9px] px-1 rounded bg-amber-100 text-amber-800" title="The master has published a newer version since you adopted or updated this chain">master updated</span>}
+                {r.adopted
+                  ? (r.masterMoved
+                    ? <button disabled={busy} onClick={() => setConfirmSync(r.code)} className="text-[11px] underline text-blue-600 disabled:opacity-40">Update from master</button>
+                    : <span className="text-[10px] text-green-700">in your repository</span>)
+                  : <button disabled={busy} onClick={() => onAdopt(r.code)} className="px-2 py-0.5 text-[11px] border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40">Adopt</button>}
+              </li>
+            ))}
+          </ul>
+        )}
+    </section>
+  );
+}
+
+function ChainEditor({ chain, busy, tone, apiBase, onSave, onPublish, onUnpublish, onDelete }: {
+  apiBase: string;
   chain: Chain; busy: boolean; tone: { bg: string; text: string };
   onSave: (p: Record<string, unknown>) => void;
   onPublish: () => void; onUnpublish: () => void; onDelete: () => void;
@@ -475,7 +554,7 @@ function ChainEditor({ chain, busy, tone, onSave, onPublish, onUnpublish, onDele
           : <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">never published</span>}
         {chain.dirty && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">unpublished edits</span>}
         <div className="ml-auto flex gap-2">
-          <a href={`/api/admin/value-chain-library?format=md&code=${chain.code}`}
+          <a href={`${apiBase}?format=md&code=${chain.code}`}
             className="px-2.5 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50">Export .md</a>
           {chain.published && (
             <button disabled={busy} onClick={onUnpublish}

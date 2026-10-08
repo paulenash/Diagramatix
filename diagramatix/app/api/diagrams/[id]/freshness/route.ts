@@ -35,7 +35,7 @@ export async function GET(_req: Request, { params }: Params) {
     throw err;
   }
 
-  const diagram = await prisma.diagram.findUnique({ where: { id }, select: { name: true, type: true, data: true } });
+  const diagram = await prisma.diagram.findUnique({ where: { id }, select: { name: true, type: true, data: true, orgId: true } });
   if (!diagram) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const data = (diagram.data as Record<string, unknown>) ?? {};
@@ -67,8 +67,11 @@ export async function GET(_req: Request, { params }: Params) {
    */
   let promptModel: string | null = null;
   if (processCode) {
+    // WHICH repository the prompt came from: the Org's own (the generation stamped scope "org") or the master. Without this an Org's copy of
+    // V01.03 and the master's would be mistaken for each other.
+    const chainOrg = source?.scope === "org" && diagram.orgId ? diagram.orgId : "";
     const row = await prisma.valueChainPrompt.findFirst({
-      where: { type, processCode },
+      where: { type, processCode, chain: { orgId: chainOrg } },
       select: { generatedAt: true, model: true },
       orderBy: { generatedAt: "desc" },
     });

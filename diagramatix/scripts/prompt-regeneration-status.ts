@@ -20,6 +20,7 @@ async function main() {
   console.log(`Master BPMN template v${v.version}, shipped ${v.shippedAt}\n`);
 
   const chains = await prisma.valueChainLibrary.findMany({
+    where: { orgId: "" },
     orderBy: [{ sortOrder: "asc" }, { code: "asc" }],
     include: { processes: true, prompts: true },
   });

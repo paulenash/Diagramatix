@@ -23,6 +23,8 @@ import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
 import { resolveOrgModel } from "@/app/lib/ai/orgModels";
 import { requireProjectAccess } from "@/app/lib/auth/orgContext";
 import { itemAllowed, repositoryAccessFor } from "@/app/lib/valueChain/repositoryAccess";
+import { MASTER_ORG, publishedChainFor } from "@/app/lib/valueChain/repositoryChains";
+import { getCurrentOrgId } from "@/app/lib/auth/orgContext";
 import { isQuotaExhausted, quotaResumesAt } from "@/app/lib/ai/quotaExhausted";
 
 /**
@@ -123,10 +125,17 @@ export async function runLibraryProject(req: Request, mode: RunMode = "superadmi
   let libNarrative = "";
   let libSubs: { code: string; title: string }[] = [];
   if (fromLibrary) {
-    const row = await prisma.valueChainLibrary.findUnique({
-      where: { code: chainCode },
-      include: { processes: { orderBy: { sortOrder: "asc" } }, prompts: true },
-    });
+    // A USER sees their Org's published chain in place of the master's (repositoryChains.ts); SuperAdmin always works from the master.
+    let libOrg: string | null = null;
+    if (userMode) {
+      try { libOrg = await getCurrentOrgId(session, await cookies()); } catch { libOrg = null; }
+    }
+    const row = userMode
+      ? await publishedChainFor(chainCode, libOrg)
+      : await prisma.valueChainLibrary.findFirst({
+        where: { orgId: MASTER_ORG, code: chainCode },
+        include: { processes: { orderBy: { sortOrder: "asc" } }, prompts: true },
+      });
     if (!row) return NextResponse.json({ error: `Value chain ${chainCode} is not in the library` }, { status: 404 });
     if (!row.publishedAt) {
       return NextResponse.json({ error: `${chainCode} has never been published — publish it in the Process Repository first` }, { status: 409 });
@@ -146,6 +155,8 @@ export async function runLibraryProject(req: Request, mode: RunMode = "superadmi
       // has moved on since", which is the question Paul asked it to answer.
       source: {
         kind: "value-chain-library" as const,
+        // "org" when the prompt came from the user's Org's own repository, "master" otherwise — the freshness check needs to know which.
+        scope: row.orgId ? "org" as const : "master" as const,
         chainCode: row.code,
         processCode: p.processCode,
         promptType: p.type,

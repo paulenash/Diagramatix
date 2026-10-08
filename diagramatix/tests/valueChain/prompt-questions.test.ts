@@ -109,7 +109,7 @@ describe("T5287 the answers reach the generator", () => {
 
 describe("T5287 wiring", () => {
   it("the library route has a 'questions' action and gives the answers only to BPMN process prompts", () => {
-    const route = readFileSync("app/api/admin/value-chain-library/route.ts", "utf8");
+    const route = readFileSync("app/lib/valueChain/libraryAdmin.ts", "utf8");
     expect(route).toContain('action === "questions"');
     expect(route).toContain("choosePromptQuestions");
     expect(route).toContain('...(target.type === "bpmn" ? { answers: answersText || undefined, entityNames: entityNames || undefined } : {})');

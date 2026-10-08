@@ -892,7 +892,10 @@ model Prompt {
 
 model ValueChainLibrary {
   id        String  @id @default(cuid())
-  code      String  @unique // "V01"
+  /// "" = the MASTER Process Repository (SuperAdmin); otherwise the id of the Org whose own repository this chain belongs to. Empty rather than
+  /// null for the same reason as processCode below: a nullable column would let Postgres treat two (NULL, "V01") rows as distinct in the unique index.
+  orgId     String  @default("")
+  code      String // "V01" — unique within a repository (the master, or one Org)
   title     String
   groupName String  @default("")
   sortOrder Int     @default(0)
@@ -904,10 +907,17 @@ model ValueChainLibrary {
   publishedTitle     String?
   publishedAt        DateTime?
 
+  /// Org chains only: the master chain's publishedAt when the OrgAdmin adopted it or last brought it up to date, so the Org screen can say
+  /// "the master has moved on since". Null for the master itself and for a chain the Org wrote from scratch.
+  masterPublishedAt DateTime?
+
   processes ValueChainProcess[]
   prompts   ValueChainPrompt[]
   createdAt DateTime            @default(now())
   updatedAt DateTime            @updatedAt
+
+  @@unique([orgId, code])
+  @@index([orgId])
 }
 
 model ValueChainProcess {

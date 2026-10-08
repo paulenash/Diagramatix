@@ -33,7 +33,7 @@ async function main() {
   const { prisma } = await import("@/app/lib/db");
   const only = process.argv[2];
   const chains = await prisma.valueChainLibrary.findMany({
-    where: only ? { code: only } : undefined,
+    where: only ? { orgId: "", code: only } : { orgId: "" },
     orderBy: { code: "asc" },
     include: { prompts: { orderBy: { processCode: "asc" } } },
   });

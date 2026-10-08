@@ -31,7 +31,7 @@ async function main() {
   const apply = process.argv.includes("--apply");
 
   const chains = await prisma.valueChainLibrary.findMany({
-    where: { publishedAt: { not: null } },
+    where: { orgId: "", publishedAt: { not: null } },
     select: { id: true, code: true, publishedAt: true, _count: { select: { prompts: true } } },
     orderBy: { code: "asc" },
   });

@@ -1,7 +1,8 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { prisma } from "@/app/lib/db";
+import { getCurrentOrgId } from "@/app/lib/auth/orgContext";
+import { publishedChainFor } from "@/app/lib/valueChain/repositoryChains";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
@@ -34,10 +35,9 @@ export async function POST(req: Request) {
   const body = (await req.json().catch(() => null)) as { code?: unknown; processCode?: unknown } | null;
   const code = typeof body?.code === "string" ? body.code : "";
   const processCode = typeof body?.processCode === "string" ? body.processCode : "";
-  const chain = code ? await prisma.valueChainLibrary.findFirst({
-    where: { code, hidden: false, publishedAt: { not: null } },
-    include: { processes: true },
-  }) : null;
+  let orgId: string | null = null;
+  try { orgId = await getCurrentOrgId(session, await cookies()); } catch { orgId = null; }
+  const chain = code ? await publishedChainFor(code, orgId) : null;
   if (!chain) return NextResponse.json({ error: `Value chain ${code} is not available` }, { status: 404 });
 
   const model = await resolveOrgModel();

@@ -114,7 +114,7 @@ function tidyEmptySection(text: string): string {
 
   // ── 2. the library (draft AND published, both must move together) ────────
   const rows = await prisma.valueChainPrompt.findMany({
-    where: { type: "bpmn" },
+    where: { type: "bpmn", chain: { orgId: "" } },
     select: { id: true, name: true, prompt: true, publishedPrompt: true },
   });
   let touched = 0, bullets = 0;

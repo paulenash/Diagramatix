@@ -57,7 +57,7 @@ async function main() {
     if (!c) { console.log(`${code} — not in the file, skipped`); skipped++; continue; }
     const open = c.prompts.reduce((s, p) => s + checkPromptBranches(p.prompt).length, 0);
     openBranches += open;
-    const existing = await prisma.valueChainLibrary.findUnique({ where: { code: c.code } });
+    const existing = await prisma.valueChainLibrary.findUnique({ where: { orgId_code: { orgId: "", code: c.code } } });
     const verb = existing ? (replace ? "replace" : "skip") : "create";
     console.log(`${code} ${c.title} — ${c.processes.length} process(es), ${c.prompts.length} prompt(s)`
       + `${open ? `, ${open} OPEN BRANCH(ES)` : ""} · ${verb}`);

@@ -58,6 +58,13 @@ const CARDS: MenuCard[] = [
       "Download a backup of your whole Org, or selectively add back an Org member's projects / diagrams. A restore only ever adds: it never overwrites or deletes anything.",
   },
   {
+    href: "/dashboard/org-admin/value-chain-generation?from=/dashboard/org-admin",
+    title: "Master Template Value Chain Generation",
+    description:
+      "Your Org's own Process Repository. Adopt value chains from the master repository, change them, regenerate their prompts from the master template, and publish — your people then create projects from your versions. You are told here when a new master template version is out.",
+    feature: "processRepository",
+  },
+  {
     href: "/dashboard/org-admin/diff-runs",
     title: "Diff Process Runs",
     description:
