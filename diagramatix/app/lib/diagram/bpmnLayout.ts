@@ -2696,7 +2696,17 @@ export function layoutBpmnDiagram(
         if (neededH > container.height) container.height = neededH;
       }
     } else {
-      if (neededH > container.height) container.height = neededH;
+      if (neededH > container.height) {
+        container.height = neededH;
+        // Paul, 2026-10-09 (V01.02: "Customer Service" overlapped "Order Processing" by 25px). A lane that grew while the lanes below
+        // stayed put sits on top of them, and the pool no longer covers its lanes. Only the POOL branch above re-stacks, so a lane
+        // that grows finishes through its pool: later lanes (and their contents) shift down and the pool height follows.
+        const owner = container.parentId ? elements.find(e => e.id === container.parentId) : undefined;
+        if (containerType === "lane" && owner?.type === "pool") {
+          expandContainerToFitChildren(owner.id, "pool");
+          restackPoolsR52();                              // R8.03: the pool is taller now — pools below it must not be overlapped (V22.07)
+        }
+      }
     }
   }
 
@@ -4700,23 +4710,44 @@ export function layoutBpmnDiagram(
   /** Grow a lane band (with its pool, and the bands stacked after it) so the
    *  span [top, bottom] fits. Growing upward leaves the band's own children
    *  where they are — the band expands around them, as fitLanesToChildren does. */
-  const growLaneBandToContain = (band: DiagramElement, top: number, bottom: number) => {
+  const growLaneBandToContain = (band: DiagramElement, top: number, bottom: number, stay?: DiagramElement) => {
     const dTop = Math.max(0, band.y - top);
     const dBot = Math.max(0, bottom - (band.y + band.height));
     if (dTop === 0 && dBot === 0) return;
     const oldY = band.y;
-    band.y -= dTop;
-    band.height += dTop + dBot;
     const pool = band.parentId ? elMap.get(band.parentId) : undefined;
-    if (pool) {
+    // Paul, 2026-10-09 (V01.04: lanes overlapped by 72px; V01.02: the last lane stuck out of its pool by 11px). Two faults here:
+    //  1. A band inside a pool never grows UPWARD: under another band its top edge is the neighbour's bottom edge, so growing up
+    //     lays it over the neighbour, and the first band's top is the pool's (the pool restack just pushes it back). It grows AROUND
+    //     its content instead: the top stays, everything inside moves down by dTop (the element that asked for the room, `stay`,
+    //     keeps its place and so ends up in the new space).
+    //  2. The bands BELOW moved by dTop + dBot, but a band's bottom only moves by dBot when it grows upward, and the pool's
+    //     bottom edge likewise. They were left dTop past the pool's floor.
+    const total = dTop + dBot;
+    const shiftBelow = (by: number) => {
       for (const s of elements) {
-        if (s.type !== band.type || s.parentId !== pool.id || s.id === band.id) continue;
+        if (s.type !== band.type || s.parentId !== pool?.id || s.id === band.id) continue;
         if (s.y <= oldY) continue;                       // only the bands BELOW move
-        s.y += dTop + dBot;
-        shiftSubtree(s.id, dTop + dBot);
+        s.y += by;
+        shiftSubtree(s.id, by);
       }
+    };
+    if (pool && dTop > 0) {
+      const mine = collectSubtreeIds(band.id);
+      band.height += total;                              // y unchanged: it still touches the band above
+      shiftSubtree(band.id, dTop);                       // the contents make room…
+      if (stay && mine.has(stay.id)) stay.y -= dTop;     // …except the element that needed it
+      shiftBelow(total);
+      pool.height += total;
+      restackPoolsR52();
+      return;
+    }
+    band.y -= dTop;
+    band.height += total;
+    if (pool) {
+      shiftBelow(dBot);                                  // this band's bottom moved by dBot only
       pool.y -= dTop;
-      pool.height += dTop + dBot;
+      pool.height += total;
       restackPoolsR52();                                 // R8.03: pools may now overlap
     }
   };
@@ -5169,6 +5200,12 @@ export function layoutBpmnDiagram(
       if (el.parentId !== merge.parentId) break;                                              // another lane
       if (isGateway(el)) break;                                                               // owns its own Y
       const dy = mergeCy - (el.y + el.height / 2);
+      // Paul, 2026-10-09 (V01.02 "Send rejection notice to customer"): the merge can sit well outside this lane — R8.32 puts it
+      // in the middle of ITS paths, which may be a tall neighbouring lane — and the chain used to follow it there, leaving a
+      // Customer Service task drawn 1,100px down inside Order Processing. A task stays in its own lane: stop following.
+      const band = elMap.get(el.parentId ?? "");
+      if (band && (band.type === "lane" || band.type === "sublane")
+          && (el.y + dy < band.y || el.y + el.height + dy > band.y + band.height)) break;
       if (Math.abs(dy) > 0.5) { shiftSubtree(el.id, dy); el.y += dy; }
       curId = oneOut(curId);
     }
@@ -5343,29 +5380,6 @@ export function layoutBpmnDiagram(
         && cx >= l.x && cx <= l.x + l.width && cy >= l.y && cy <= l.y + l.height);
     };
 
-    /** Grow a lane band (with its pool, and the bands stacked after it) so the
-     *  span [top, bottom] fits. Growing upward leaves the band's own children
-     *  where they are — the band expands around them, as fitLanesToChildren does. */
-    const growLaneBandToContain = (band: DiagramElement, top: number, bottom: number) => {
-      const dTop = Math.max(0, band.y - top);
-      const dBot = Math.max(0, bottom - (band.y + band.height));
-      if (dTop === 0 && dBot === 0) return;
-      const oldY = band.y;
-      band.y -= dTop;
-      band.height += dTop + dBot;
-      const pool = band.parentId ? elMap.get(band.parentId) : undefined;
-      if (pool) {
-        for (const s of elements) {
-          if (s.type !== band.type || s.parentId !== pool.id || s.id === band.id) continue;
-          if (s.y <= oldY) continue;                       // only the bands BELOW move
-          s.y += dTop + dBot;
-          shiftSubtree(s.id, dTop + dBot);
-        }
-        pool.y -= dTop;
-        pool.height += dTop + dBot;
-        restackPoolsR52();                                 // R8.03: pools may now overlap
-      }
-    };
     for (const ev of elements) {
       if (!ev.boundaryHostId || ev.type !== "intermediate-event") continue;
       const c = seqConns.find(x => x.sourceId === ev.id);
@@ -5408,7 +5422,7 @@ export function layoutBpmnDiagram(
         if (band) {
           const kept = clampExitTargetToBand(ev, side, tgt.height, tgt.y, band, LANE_EDGE_PAD);
           tgt.y = kept.top;
-          if (kept.grow) growLaneBandToContain(band, kept.grow.top, kept.grow.bottom);
+          if (kept.grow) growLaneBandToContain(band, kept.grow.top, kept.grow.bottom, tgt);
         }
 
         // R7.07(b) — and its label sits to the RIGHT of it. The general
@@ -6099,6 +6113,19 @@ export function layoutBpmnDiagram(
     }
   }
 
+  // ── A data object / store inside a lane stays inside it ──
+  //
+  // Paul, 2026-10-09 (V01.02: "Sales order" 22px below the floor of Order Processing). Lane fitting counts data artifacts, but the
+  // data-artifact passes place them AFTER the last fit, 40px clear of their task — which is past the floor when the task sits low
+  // in a tight lane. Grow the lane to hold it (growing can't create an overlap; moving the artifact could), and let the pool
+  // re-stack the lanes below. Still before the connectors are built, so nothing is re-routed.
+  for (const d of elements) {
+    if (d.type !== "data-object" && d.type !== "data-store") continue;
+    const lane = d.parentId ? elMap.get(d.parentId) : undefined;
+    if (!lane || lane.type !== "lane") continue;
+    growLaneBandToContain(lane, d.y - LANE_EDGE_PAD, d.y + d.height + LANE_EDGE_PAD, d);   // top or bottom; a no-op when it already fits
+  }
+
   phase(`connectors built (${connectors.length})`);
 
   // ── R8.44: a Start Event's flow leaves by its RIGHT-hand point, and enters a level target by its LEFT ──
@@ -6552,6 +6579,10 @@ export function layoutBpmnDiagram(
               y: far.y - art.height - DATA_VGAP,
               parentId: far.parentId,          // the container rule, unchanged
             };
+            // Paul, 2026-10-09 (V01.02): the copy sits ABOVE its task, and a task near the top of the first lane put it above the
+            // lane (9px). The connectors are already routed, so the lane cannot grow here — the copy comes down to the lane's edge.
+            const farLane = far.parentId ? elMap.get(far.parentId) : undefined;
+            if (farLane && (farLane.type === "lane" || farLane.type === "sublane") && copy.y < farLane.y + LANE_EDGE_PAD) copy.y = farLane.y + LANE_EDGE_PAD;
             elements.push(copy);
             elMap.set(copy.id, copy);
             added.push(copy);

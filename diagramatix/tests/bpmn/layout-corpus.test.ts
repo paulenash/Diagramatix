@@ -107,7 +107,7 @@ const KNOWN: Record<string, number> = {
    *   • a branch label lying along its own horizontal run (the K/L family)
    */
   "VTT01.plan.json": 1,
-  "V04.01.plan.json": 2,
+  "V04.01.plan.json": 1,   // 2 -> 1 (2026-10-09): lanes now finish through their pool, so a grown lane no longer overlaps the one below
   // 3 -> 1 when R55.7 gave the exception path a row clear of the main line; 1 -> 0 on 2026-10-04 when the endpoint
   // allocator (slice 2) separated the two messages that shared pClaimant|bottom at the same x — the entry is gone.
   // The regenerated V22.01 (2026-09-06), kept alongside the older capture: it is
