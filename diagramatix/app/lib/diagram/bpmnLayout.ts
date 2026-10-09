@@ -2703,7 +2703,11 @@ export function layoutBpmnDiagram(
         // that grows finishes through its pool: later lanes (and their contents) shift down and the pool height follows.
         const owner = container.parentId ? elements.find(e => e.id === container.parentId) : undefined;
         if (containerType === "lane" && owner?.type === "pool") {
+          // Height only. The pool branch also widens the pool by its right-hand padding, which would leave this pool wider than its
+          // own lanes and than every other pool (V01.04: 3981 against 3951 — Paul, 2026-10-09). A lane growing taller changes no width.
+          const poolW = owner.width;
           expandContainerToFitChildren(owner.id, "pool");
+          owner.width = poolW;
           restackPoolsR52();                              // R8.03: the pool is taller now — pools below it must not be overlapped (V22.07)
         }
       }
@@ -5471,6 +5475,8 @@ export function layoutBpmnDiagram(
       if (predOut.length > 1) continue;
       // Follow the predecessor's lane, and align to its row.
       if (pred.parentId && (elMap.get(pred.parentId)?.type === "lane")) e.parentId = pred.parentId;
+      // (A collision on this row is NOT settled here: the gateways it would collide with are still to be centred, so it is judged
+      // against final positions by the late clearance pass before routing.)
       e.y = pred.y + pred.height / 2 - e.height / 2;
     }
   }
@@ -6126,6 +6132,48 @@ export function layoutBpmnDiagram(
     growLaneBandToContain(lane, d.y - LANE_EDGE_PAD, d.y + d.height + LANE_EDGE_PAD, d);   // top or bottom; a no-op when it already fits
   }
 
+  // ── Late clearance: a slight overlap between two flow nodes is nudged apart ──
+  //
+  // Paul, 2026-10-09 ("also element overlaps"): R8.17 only separates elements that are mostly on top of one another, and it runs
+  // early. Passes that run after it move things by a few pixels — a merge gateway takes its final row, an exception task is cleared
+  // off a row — and left a task 2px into a gateway (V01.02) and an End event 4px into a task. Resolve those here, before routing,
+  // by moving the TASK (else the later element) straight away from the other by the overlap plus a gap — and only when the move
+  // keeps it inside its own lane and lands on nothing else, so it can fix an overlap but never create one.
+  {
+    const LEAF = new Set(["task", "subprocess", "start-event", "end-event", "intermediate-event", "gateway", "data-object", "data-store"]);
+    const rank = (e: DiagramElement) => (e.type === "task" || e.type === "subprocess" ? 0 : e.type === "data-object" || e.type === "data-store" ? 1 : 2);
+    const leaves = elements.filter(e => LEAF.has(e.type) && !e.boundaryHostId);
+    const lap = (a: DiagramElement, b: DiagramElement) => ({
+      ox: Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x),
+      oy: Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y),
+    });
+    const free = (m: DiagramElement, y: number) => !elements.some(o => o !== m && !o.boundaryHostId && LEAF.has(o.type)
+      && o.x < m.x + m.width && m.x < o.x + o.width && o.y < y + m.height && y < o.y + o.height);
+    const inLane = (m: DiagramElement, y: number) => {
+      const band = m.parentId ? elMap.get(m.parentId) : undefined;
+      return !band || (band.type !== "lane" && band.type !== "sublane") || (y >= band.y + 4 && y + m.height <= band.y + band.height - 4);
+    };
+    for (let pass = 0; pass < 4; pass++) {
+      let moved = false;
+      for (let i = 0; i < leaves.length; i++) for (let k = i + 1; k < leaves.length; k++) {
+        const a = leaves[i], b = leaves[k];
+        const { ox, oy } = lap(a, b);
+        if (ox <= 1 || oy <= 1 || oy > 30) continue;                       // not touching, or a big overlap R8.17 owns
+        const [mover, anchor] = rank(a) < rank(b) || (rank(a) === rank(b) && a.x >= b.x) ? [a, b] : [b, a];
+        const down = mover.y + mover.height / 2 >= anchor.y + anchor.height / 2;
+        for (const dir of [down ? 1 : -1, down ? -1 : 1]) {
+          const dy = dir * (oy + 8);
+          if (!free(mover, mover.y + dy) || !inLane(mover, mover.y + dy)) continue;
+          shiftSubtree(mover.id, dy);
+          mover.y += dy;
+          moved = true;
+          break;
+        }
+      }
+      if (!moved) break;
+    }
+  }
+
   phase(`connectors built (${connectors.length})`);
 
   // ── R8.44: a Start Event's flow leaves by its RIGHT-hand point, and enters a level target by its LEFT ──
@@ -6581,8 +6629,13 @@ export function layoutBpmnDiagram(
             };
             // Paul, 2026-10-09 (V01.02): the copy sits ABOVE its task, and a task near the top of the first lane put it above the
             // lane (9px). The connectors are already routed, so the lane cannot grow here — the copy comes down to the lane's edge.
-            const farLane = far.parentId ? elMap.get(far.parentId) : undefined;
-            if (farLane && (farLane.type === "lane" || farLane.type === "sublane") && copy.y < farLane.y + LANE_EDGE_PAD) copy.y = farLane.y + LANE_EDGE_PAD;
+            // The same holds inside an Expanded Subprocess (V01.02: the copy sat 93px above "Repeat Until Order Details Complete"):
+            // there it goes BELOW its task when that keeps it inside, else down to the container's edge.
+            const farBox = far.parentId ? elMap.get(far.parentId) : undefined;
+            if (farBox && (farBox.type === "lane" || farBox.type === "sublane" || farBox.type === "subprocess-expanded") && copy.y < farBox.y + LANE_EDGE_PAD) {
+              const below = far.y + far.height + DATA_VGAP;
+              copy.y = farBox.type === "subprocess-expanded" && below + art.height + LANE_EDGE_PAD <= farBox.y + farBox.height ? below : farBox.y + LANE_EDGE_PAD;
+            }
             elements.push(copy);
             elMap.set(copy.id, copy);
             added.push(copy);
