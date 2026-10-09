@@ -20,8 +20,11 @@ describe("T5293 Process Repository model choice and room", () => {
     expect(ui).toMatch(/scope !== "org" && models\.length > 0/);
   });
   it("prompts have room to finish (8192 truncated V01.05 and V01.07)", () => {
-    const n = Number(/max_tokens: (\d+)/.exec(gen)![1]);
-    expect(n).toBeGreaterThanOrEqual(16000);
+    const ladder = /PROMPT_TOKEN_LIMITS = \[(\d+), (\d+)\]/.exec(gen)!;
+    expect(Number(ladder[1])).toBeGreaterThanOrEqual(16000);
+    expect(Number(ladder[2])).toBe(Number(ladder[1]) * 2);        // ONE retry with double the room
+    expect(gen).toMatch(/for \(const max_tokens of PROMPT_TOKEN_LIMITS\)/);
+    expect(gen).toContain("The model ran out of room");           // a run that fails both attempts is still refused, never saved
   });
   it("the duplicate System-menu link to the .md tool is gone (the SuperAdmin tile remains)", () => {
     expect(menu).not.toContain("Create Project Diagrams from .md");

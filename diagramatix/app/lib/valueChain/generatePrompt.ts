@@ -142,6 +142,9 @@ export function roundTrip(chainCode: string, chainTitleText: string, type: MdPro
   return { ok: !!found && found.prompt.trim().length > 0, name: found?.name ?? null };
 }
 
+/** First attempt, then one retry with double the room (see generateMdPrompt). Exported so a test can pin the ladder. */
+export const PROMPT_TOKEN_LIMITS = [16384, 32768] as const;
+
 export async function generateMdPrompt(args: {
   apiKey: string;
   model: string;
@@ -161,17 +164,22 @@ export async function generateMdPrompt(args: {
 
   const client = makeAiClient(model, apiKey);
   try {
-    const message = await client.messages.create({
-      model,
-      // 4096 was truncating real prompts: 7 of 35 calls in one V22 run stopped
-      // on max_tokens, and 6 of its 10 prompts were saved half-written (Paul,
-      // 2026-09-04). Headroom is cheap; a silently half-described process is not.
-      max_tokens: 16384, // was 8192; the v9 template + the question answers + models that reason before answering now overrun it (V01.05, V01.07, 2026-10-09)
-      system: briefing,
-      messages: [{ role: "user", content: buildUserMessage({ chainCode, chainTitle, narrative, subs, target, answers, entityNames }) }],
-    });
-    const textBlock = message.content.find((b) => b.type === "text");
-    if (!textBlock || textBlock.type !== "text") return { ok: false, error: "No response from the model" };
+    // 4096 was truncating real prompts: 7 of 35 calls in one V22 run stopped
+    // on max_tokens, and 6 of its 10 prompts were saved half-written (Paul,
+    // 2026-09-04). Headroom is cheap; a silently half-described process is not.
+    // 8192 then 16384 were not enough once the v9 template, the question answers and models that reason before answering were
+    // combined (V01.05, V01.07; Haiku 5.5 at maximum detail, 2026-10-09). So: try 16384, and if the model ran out of room — or
+    // used it all thinking and wrote nothing — ONE retry with double the room. Only a run that fails both is reported.
+    const userMessage = buildUserMessage({ chainCode, chainTitle, narrative, subs, target, answers, entityNames });
+    let message: Awaited<ReturnType<typeof client.messages.create>> | null = null;
+    let textBlock: { type: string; text?: string } | undefined;
+    for (const max_tokens of PROMPT_TOKEN_LIMITS) {
+      message = await client.messages.create({ model, max_tokens, system: briefing, messages: [{ role: "user", content: userMessage }] });
+      textBlock = message.content.find((b) => b.type === "text");
+      const ranOut = (message as { stop_reason?: string }).stop_reason === "max_tokens";
+      if (textBlock && !ranOut) break;
+    }
+    if (!message || !textBlock || textBlock.type !== "text" || typeof textBlock.text !== "string") return { ok: false, error: "No response from the model" };
     // A response that ran out of room is HALF A PROMPT, and half a prompt reads
     // as a whole one: V22.07 was saved and published ending on `- branch "` and
     // every existing check passed it. Refuse it here, where the stop reason is
