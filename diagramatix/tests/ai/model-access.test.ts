@@ -10,14 +10,16 @@ import { describe, it, expect } from "vitest";
 import { allowedGenerateModels, isModelAllowed, modelCostUsd } from "@/app/lib/ai/modelAccess";
 
 const HAIKU = "claude-haiku-4-5-20251001";
+const HAIKU_55 = "claude-haiku-5-5"; // cheapest of all since 2026-10-09
 const SONNET = "claude-sonnet-5";
 const FABLE = "claude-fable-5";
 const ids = (list: { id: string }[]) => list.map((m) => m.id).sort();
 
 describe("cost-gated generate-model access", () => {
   it("T1034 normal user: current default + only equal-or-cheaper; SA-mode: everything", () => {
-    // Haiku default (cheapest) → nothing cheaper, so only Haiku.
-    expect(ids(allowedGenerateModels(HAIKU, false))).toEqual([HAIKU]);
+    // Haiku 5.5 default (cheapest) → nothing cheaper, so only itself; Haiku 4.5 default → itself + Haiku 5.5.
+    expect(ids(allowedGenerateModels(HAIKU_55, false))).toEqual([HAIKU_55]);
+    expect(ids(allowedGenerateModels(HAIKU, false))).toEqual([HAIKU, HAIKU_55].sort());
 
     // Sonnet 5 default → Sonnet 5 + Haiku (cheaper), NOT Opus/Fable (dearer).
     const sonnetAllowed = ids(allowedGenerateModels(SONNET, false));

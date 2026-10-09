@@ -76,6 +76,8 @@ export const PRICING: Record<string, ModelPrice> = {
   "claude-sonnet-5": { in: 2, out: 10 },
   // Sonnet 5.5: $2 / $10 — platform.claude.com/docs/en/about-claude/pricing, read 2026-09-30.
   "claude-sonnet-5-5": { in: 2, out: 10 },
+  // Haiku 5.5: $0.10 / $0.50 for prompts up to 100k tokens ($0.50 / $2.50 above that) - platform.claude.com pricing, read 2026-10-09. The base tier is recorded: this app's prompts are far below 100k.
+  "claude-haiku-5-5": { in: 0.1, out: 0.5 },
   "claude-haiku-4-5-20251001": { in: 1, out: 5 },
   // Kimi / Moonshot — international USD (platform.kimi.ai). These three are the
   // current default lineup; the rest are priced for reference if registered via

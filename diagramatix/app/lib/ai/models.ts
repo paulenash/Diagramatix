@@ -60,6 +60,8 @@ export const AI_MODELS: AiModel[] = [
   // against the account's own key. $2 / $10, the same as Sonnet 5.
   { id: "claude-sonnet-5-5", label: "Sonnet 5.5", vision: true },
   { id: "claude-sonnet-5", label: "Sonnet 5", vision: true },
+  // Haiku 5.5 — added 2026-10-09 after GET /v1/models listed `claude-haiku-5-5` (1M input, 128k output, image_input supported) and a smoke call answered.
+  { id: "claude-haiku-5-5", label: "Haiku 5.5", vision: true },
   { id: "claude-haiku-4-5-20251001", label: "Haiku 4.5", vision: true },
 ];
 
