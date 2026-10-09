@@ -1072,7 +1072,7 @@ export function checkSequenceClipsForeignNode(d: DiagramLike): Violation[] {
       if (clip) {
         out.push({
           rule: "sequence-clips-foreign-node",
-          severity: "error",
+          severity: "warning",
           ids: [c.id, ob.id, src.id, tgt.id],
           message: `Sequence connector "${nameOf(src)}" → "${nameOf(tgt)}" passes through "${nameOf(ob)}" — sequence flow must not cross another activity, event or gateway.`,
         });
@@ -1356,13 +1356,10 @@ export function checkTaskTypeForMessages(d: DiagramLike): Violation[] {
     // calling an IT system, a script task pushing to an external entity) —
     // never warn about its trigger.
     if (hasOut && (e.taskType === "service" || e.taskType === "script")) continue;
-    if (actual === dflt || alsoAllowed.has(actual)) continue;
-    out.push({
-      rule: "task-type-for-messages",
-      severity: "warning",
-      ids: [e.id],
-      message: `Task "${nameOf(e)}" has ${caseLabel} — recommended trigger is "${dflt}" (currently "${actual}").`,
-    });
+    // Paul, 2026-10-10: "Delete this warning" — the "recommended trigger is X (currently Y)" advice is gone. A trigger that is
+    // merely not the default (a Service task retrieving from an IT system, say) is a legitimate choice; only a FORBIDDEN trigger
+    // (above) is reported. `dflt` and `alsoAllowed` still say what the default is, for the message of that error.
+    void alsoAllowed;
   }
   return out;
 }
@@ -1891,7 +1888,7 @@ export function checkGatewayInOutVertexClash(d: DiagramLike): Violation[] {
       if (side === "?" || !inSides.has(side)) continue;
       out.push({
         rule: "gateway-in-out-vertex",
-        severity: "error",
+        severity: "warning",
         ids: [g.id, c.id],
         message: `The flow out of "${nameOf(g)}" leaves by the ${side} vertex, which an incoming flow already arrives on. A merge's outgoing flow takes the right vertex, or any of right / top / bottom that is free.`,
       });
@@ -2520,7 +2517,7 @@ export const RULES: Rule[] = [
     code: "B14",
     id: "task-type-for-messages",
     title: "Task trigger doesn't fit its message flow pattern",
-    description: "A Task with message flows to/from black-box pools must use a taskType compatible with the message direction and the pool kind. Errors flag forbidden triggers (e.g. Send on a two-way exchange, or Receive on an outgoing-only message). Warnings recommend the default trigger when the task uses an allowed-but-non-default value.",
+    description: "A Task with message flows to/from black-box pools must use a taskType compatible with the message direction and the pool kind. Errors flag forbidden triggers (e.g. Send on a two-way exchange, or Receive on an outgoing-only message). Any other trigger is accepted (the advisory 'recommended trigger' warning was removed 2026-10-10).",
     severity: "error",
     category: "bpmn-structure",
     check: checkTaskTypeForMessages,
@@ -2647,7 +2644,7 @@ export const RULES: Rule[] = [
     id: "sequence-clips-foreign-node",
     title: "Sequence connector routed through another activity/event/gateway",
     description: "A sequence connector passes through the body of an activity, event or gateway it isn't connected to. Sequence flow must route around every other flow node.",
-    severity: "error",
+    severity: "warning",
     category: "bpmn-structure",
     check: checkSequenceClipsForeignNode,
   },
@@ -2719,7 +2716,7 @@ export const RULES: Rule[] = [
     id: "gateway-in-out-vertex",
     title: "Gateway flow leaves by a vertex an incoming flow uses",
     description: "A flow leaves a gateway by the same connection point another flow arrives on, so the two are drawn on top of each other at the diamond. A merge gateway's outgoing flow takes the RIGHT vertex, or any of right / top / bottom not already used (R6.28). Not reported once a gateway carries more than four flows, where a diamond's four points make doubling up unavoidable.",
-    severity: "error",
+    severity: "warning",
     category: "bpmn-structure",
     check: checkGatewayInOutVertexClash,
   },

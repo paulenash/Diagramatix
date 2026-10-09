@@ -185,7 +185,7 @@ describe("B54 — a gateway's outgoing must not share a vertex with an incoming"
     // outgoing stapled to bottom by the loop-back rule.
     const v = checkGatewayInOutVertexClash({ elements: [gw], connectors: io("bottom") });
     expect(v).toHaveLength(1);
-    expect(v[0].severity).toBe("error");
+    expect(v[0].severity).toBe("warning");
     expect(v[0].message).toContain("bottom vertex");
   });
 

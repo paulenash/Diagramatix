@@ -22,6 +22,7 @@ import { placeGatewayBranchLabels } from "./gatewayBranchLabels";
 import { enforceSilentFailureRules } from "./silentFailure";
 import { exceptionPath } from "./exceptionPaths";
 import { titleCaseName } from "./nameCase";
+import { dodgeForeignNodes } from "./connectorDodge";
 
 /**
  * Connector ids carry the INDEX of the connector within its own array.
@@ -5742,6 +5743,35 @@ export function layoutBpmnDiagram(
     }
   }
 
+  // ── R6.35: a gateway's outgoing flow never leaves by a vertex an incoming flow arrives on ──
+  //
+  // Paul, 2026-10-10 (V01.06 "Goods or services?"): an exception path joins the decision from below, so the gateway merges AND splits —
+  // two flows in (left, top), two out (top, bottom). The branch to the task above left by `top`, the vertex the exception arrives on,
+  // and the two lines were drawn on top of each other at the diamond. R6.31/R6.33/R6.34 each keep their own side of the diamond tidy
+  // but none looks across: this is the one place that does. The OUTGOING flow gives way (the inbound vertices are fixed by where
+  // their sources are) and takes a free vertex — right first, then the one pointing toward its target. If all four are in use
+  // nothing is free and it is left alone, as B54 tolerates.
+  for (const g of elements) {
+    if (!isGateway(g) || g.boundaryHostId) continue;
+    const ins = connectors.filter(c => c.type === "sequence" && c.targetId === g.id);
+    const outs = connectors.filter(c => c.type === "sequence" && c.sourceId === g.id);
+    if (ins.length === 0 || outs.length === 0) continue;
+    const inSides = new Set(ins.map(c => c.targetSide));
+    const outSides = new Set(outs.map(c => c.sourceSide));
+    const gcy = g.y + g.height / 2;
+    for (const c of outs) {
+      if (!inSides.has(c.sourceSide)) continue;
+      const t = elMap.get(c.targetId);
+      const toward = t && t.y + t.height / 2 < gcy ? ["top", "bottom"] : ["bottom", "top"];
+      const free = (["right", ...toward] as Connector["sourceSide"][]).find(s => !inSides.has(s) && !outSides.has(s));
+      if (!free) continue;
+      outSides.delete(c.sourceSide);
+      outSides.add(free);
+      c.sourceSide = free;
+      c.sourceOffsetAlong = 0.5;                        // R6.30: on the vertex
+    }
+  }
+
   // ── R55.6: an exception path clears the box it hangs off ──
   //
   // Paul, 2026-09-05 on V22.05: the connector to "Record provisional quantum on
@@ -6139,33 +6169,72 @@ export function layoutBpmnDiagram(
   // off a row — and left a task 2px into a gateway (V01.02) and an End event 4px into a task. Resolve those here, before routing,
   // by moving the TASK (else the later element) straight away from the other by the overlap plus a gap — and only when the move
   // keeps it inside its own lane and lands on nothing else, so it can fix an overlap but never create one.
+  //
+  // 2026-10-10 (V01.06): also an Expanded Subprocess, which is an obstacle but is never the one that moves — "Await customer service
+  // sign-off" sat 11px inside "Repeat Until Consignment Delivered". A narrow sideways overlap moves the element sideways (with the
+  // boundary events mounted on it); a shallow one moves it vertically.
   {
-    const LEAF = new Set(["task", "subprocess", "start-event", "end-event", "intermediate-event", "gateway", "data-object", "data-store"]);
-    const rank = (e: DiagramElement) => (e.type === "task" || e.type === "subprocess" ? 0 : e.type === "data-object" || e.type === "data-store" ? 1 : 2);
+    const LEAF = new Set(["task", "subprocess", "start-event", "end-event", "intermediate-event", "gateway", "data-object", "data-store", "subprocess-expanded"]);
+    const rank = (e: DiagramElement) => (e.type === "task" || e.type === "subprocess" ? 0 : e.type === "data-object" || e.type === "data-store" ? 1 : e.type === "subprocess-expanded" ? 3 : 2);
     const leaves = elements.filter(e => LEAF.has(e.type) && !e.boundaryHostId);
     const lap = (a: DiagramElement, b: DiagramElement) => ({
       ox: Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x),
       oy: Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y),
     });
-    const free = (m: DiagramElement, y: number) => !elements.some(o => o !== m && !o.boundaryHostId && LEAF.has(o.type)
-      && o.x < m.x + m.width && m.x < o.x + o.width && o.y < y + m.height && y < o.y + o.height);
-    const inLane = (m: DiagramElement, y: number) => {
+    const within = (inner: DiagramElement, outer: DiagramElement) => {      // is `outer` an ancestor of `inner`?
+      let cur: DiagramElement | undefined = inner;
+      for (let i = 0; i < 16 && cur; i++) {
+        const next: string | undefined = cur.boundaryHostId ?? cur.parentId;
+        if (!next) return false;
+        if (next === outer.id) return true;
+        cur = elMap.get(next);
+      }
+      return false;
+    };
+    const free = (m: DiagramElement, x: number, y: number) => !elements.some(o => o !== m && !o.boundaryHostId && LEAF.has(o.type)
+      && !within(m, o) && !within(o, m)
+      && o.x < x + m.width && x < o.x + o.width && o.y < y + m.height && y < o.y + o.height);
+    const inBand = (m: DiagramElement, x: number, y: number) => {
       const band = m.parentId ? elMap.get(m.parentId) : undefined;
-      return !band || (band.type !== "lane" && band.type !== "sublane") || (y >= band.y + 4 && y + m.height <= band.y + band.height - 4);
+      return !band || (band.type !== "lane" && band.type !== "sublane")
+        || (y >= band.y + 4 && y + m.height <= band.y + band.height - 4 && x >= band.x + 4 && x + m.width <= band.x + band.width - 4);
     };
     for (let pass = 0; pass < 4; pass++) {
       let moved = false;
       for (let i = 0; i < leaves.length; i++) for (let k = i + 1; k < leaves.length; k++) {
         const a = leaves[i], b = leaves[k];
+        if (within(a, b) || within(b, a)) continue;                           // a child inside its own container
         const { ox, oy } = lap(a, b);
-        if (ox <= 1 || oy <= 1 || oy > 30) continue;                       // not touching, or a big overlap R8.17 owns
+        if (ox <= 1 || oy <= 1) continue;
+        if (rank(a) === 3 && rank(b) === 3) continue;                         // two subprocess boxes: R8.17 / the container passes own that
+        // A narrow sideways overlap with an Expanded Subprocess: whichever of the two is on the RIGHT moves further right, the
+        // direction the flow runs. Moving the element left instead put its exit line through the task above it (V01.06), and a
+        // subprocess carries its children and mounted events with it.
+        if (ox <= 30 && oy > 30 && (rank(a) === 3) !== (rank(b) === 3)) {
+          const ep = rank(a) === 3 ? a : b, other = ep === a ? b : a;
+          const m = ep.x >= other.x ? ep : other;
+          const dx = ox + 8;
+          if (free(m, m.x + dx, m.y) && inBand(m, m.x + dx, m.y)) {
+            for (const id of collectSubtreeIds(m.id)) { const s = elMap.get(id); if (s) s.x += dx; }
+            m.x += dx;
+            moved = true;
+          }
+          continue;
+        }
         const [mover, anchor] = rank(a) < rank(b) || (rank(a) === rank(b) && a.x >= b.x) ? [a, b] : [b, a];
-        const down = mover.y + mover.height / 2 >= anchor.y + anchor.height / 2;
-        for (const dir of [down ? 1 : -1, down ? -1 : 1]) {
-          const dy = dir * (oy + 8);
-          if (!free(mover, mover.y + dy) || !inLane(mover, mover.y + dy)) continue;
-          shiftSubtree(mover.id, dy);
-          mover.y += dy;
+        if (rank(mover) === 3) continue;
+        let options: { dx: number; dy: number }[] = [];
+        if (oy <= 30) {
+          const down = mover.y + mover.height / 2 >= anchor.y + anchor.height / 2 ? 1 : -1;
+          options = [{ dx: 0, dy: down * (oy + 8) }, { dx: 0, dy: -down * (oy + 8) }];
+        } else if (ox <= 30) {
+          const right = mover.x + mover.width / 2 >= anchor.x + anchor.width / 2 ? 1 : -1;
+          options = [{ dx: right * (ox + 8), dy: 0 }, { dx: -right * (ox + 8), dy: 0 }];
+        } else continue;                                                      // a big overlap R8.17 owns
+        for (const o of options) {
+          if (!free(mover, mover.x + o.dx, mover.y + o.dy) || !inBand(mover, mover.x + o.dx, mover.y + o.dy)) continue;
+          if (o.dy) { shiftSubtree(mover.id, o.dy); mover.y += o.dy; }
+          if (o.dx) { for (const id of collectSubtreeIds(mover.id)) { const s = elMap.get(id); if (s) s.x += o.dx; } mover.x += o.dx; }
           moved = true;
           break;
         }
@@ -6505,6 +6574,9 @@ export function layoutBpmnDiagram(
   });
 
   phase("waypoints computed — done");
+
+  // A vertical run that passes through a foreign element slides to the nearest clear column (connectorDodge.ts).
+  dodgeForeignNodes(elements, computedConnectors);
 
   // ── R05.10: message flows sharing a vertical line are separated ──
   // A message flow drops from its task's centre to the pool it talks to, so two
