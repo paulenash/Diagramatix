@@ -92,7 +92,7 @@ export function buildChainNarrativeBriefing(additions: string | null | undefined
  * Same shape and rules as MD_PROMPT_TEMPLATE_HISTORY (promptTemplates.ts).
  */
 export const CHAIN_NARRATIVE_HISTORY: TemplateVersion[] = [
-  { version: 1, at: "2026-10-10", commit: "0000000", shippedAt: "2026-10-10T00:00:00Z",
+  { version: 1, at: "2026-10-10", commit: "13b7dc9c", shippedAt: "2026-10-10T06:50:30Z",
     description: "The template is introduced: a user's description and process details become the nine-part structured narrative the five prompt generators read, with unknown details marked \"(assumed)\" and no invented systems, parties or numbers." },
 ];
 
