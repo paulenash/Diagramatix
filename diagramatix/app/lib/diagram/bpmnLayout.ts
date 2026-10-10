@@ -6567,6 +6567,9 @@ export function layoutBpmnDiagram(
       const result = computeWaypoints(src, tgt, elements,
         conn.sourceSide, conn.targetSide, conn.routingType, srcOffset, tgtOffset);
       logSlow();
+      // (The sides stay as the plan chose them. When a walled-in face made the router draw from other sides, the editor adopts the
+      // drawn sides the first time the connector is edited — useDiagram.ts withDrawnSides. Storing them here instead would show the
+      // endpoint allocator collisions it had never been given a chance to resolve: it runs before routing.)
       return { ...conn, waypoints: result.waypoints,
         sourceInvisibleLeader: result.sourceInvisibleLeader,
         targetInvisibleLeader: result.targetInvisibleLeader };

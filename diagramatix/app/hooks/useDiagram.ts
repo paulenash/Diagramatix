@@ -68,6 +68,30 @@ import { fitShapeToLabel, holdsInternalLabel } from "@/app/lib/diagram/shapeFit"
 import { archiFitSize } from "@/app/lib/diagram/genericLayout";
 import { isArchiNodeIcon, archiNodeFrontRect } from "@/app/lib/diagram/nodeGeometry";
 
+/**
+ * The sides a sequence connector is REALLY drawn from. When a stub would land inside another element the router builds the line from
+ * other sides than the connector stores (routing.ts), so a stored side can describe a line that was never drawn. The first user edit
+ * adopts the drawn sides — an offset belongs to the side it was set on, so a changed side returns to the middle of its face — and
+ * the edit is then routed with honourSides, so it does what the user asked instead of snapping back (V01.06 "Immovable",
+ * Paul 2026-10-10). Message connectors have their own geometry and are returned untouched.
+ */
+export function withDrawnSides(conn: Connector, elements: DiagramElement[]): Connector {
+  if (conn.type === "messageBPMN") return conn;
+  const source = elements.find((e) => e.id === conn.sourceId);
+  const target = elements.find((e) => e.id === conn.targetId);
+  if (!source || !target) return conn;
+  let drawn: { source: Side; target: Side } | undefined;
+  computeWaypoints(source, target, elements, conn.sourceSide, conn.targetSide, conn.routingType,
+    conn.sourceOffsetAlong ?? 0.5, conn.targetOffsetAlong ?? 0.5, { onSides: (x) => { drawn = x; } });
+  if (!drawn || (drawn.source === conn.sourceSide && drawn.target === conn.targetSide)) return conn;
+  return {
+    ...conn,
+    sourceSide: drawn.source, targetSide: drawn.target,
+    ...(drawn.source !== conn.sourceSide ? { sourceOffsetAlong: 0.5 } : {}),
+    ...(drawn.target !== conn.targetSide ? { targetOffsetAlong: 0.5 } : {}),
+  };
+}
+
 /** Compute the autosize-driven dimensions for a task or subprocess based on
  *  its label and (optional) task marker. Returns the rounded element size
  *  for that label. Used by UPDATE_LABEL, UPDATE_LABEL_LIVE, SET_DATA migration,
@@ -7676,8 +7700,9 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
 
     case "UPDATE_CONNECTOR_ENDPOINT": {
       const { connectorId, endpoint, newElementId, newSide, newOffsetAlong } = action.payload;
-      const connectors = state.connectors.map((conn) => {
-        if (conn.id !== connectorId) return conn;
+      const connectors = state.connectors.map((conn0) => {
+        if (conn0.id !== connectorId) return conn0;
+        const conn = withDrawnSides(conn0, state.elements);
         // Clamp a parallel-bar endpoint to a long face (perpendicular only).
         let side = newSide;
         let off = newOffsetAlong ?? 0.5;
@@ -7730,7 +7755,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
                 updated.sourceOffsetAlong ?? 0.5, updated.targetOffsetAlong)
             : computeWaypoints(source, target, state.elements,
                 updated.sourceSide, updated.targetSide, updated.routingType,
-                updated.sourceOffsetAlong ?? 0.5, updated.targetOffsetAlong ?? 0.5);
+                updated.sourceOffsetAlong ?? 0.5, updated.targetOffsetAlong ?? 0.5, { honourSides: true });
         const labelAdj = adjustMsgLabelOffset(conn, conn.waypoints, waypoints, source, target);
         return { ...updated, waypoints, sourceInvisibleLeader, targetInvisibleLeader, ...labelAdj };
       });
@@ -7744,8 +7769,9 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
 
     case "NUDGE_CONNECTOR": {
       const { connectorId, dx, dy } = action.payload;
-      const connectors = state.connectors.map((conn) => {
-        if (conn.id !== connectorId) return conn;
+      const connectors = state.connectors.map((conn0) => {
+        if (conn0.id !== connectorId) return conn0;
+        const conn = withDrawnSides(conn0, state.elements);
         const source = state.elements.find((el) => el.id === conn.sourceId);
         const target = state.elements.find((el) => el.id === conn.targetId);
         if (!source || !target) return conn;
@@ -7785,7 +7811,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
                 updated.sourceOffsetAlong ?? 0.5, updated.targetOffsetAlong)
             : computeWaypoints(source, target, state.elements,
                 updated.sourceSide, updated.targetSide, updated.routingType,
-                updated.sourceOffsetAlong ?? 0.5, updated.targetOffsetAlong ?? 0.5);
+                updated.sourceOffsetAlong ?? 0.5, updated.targetOffsetAlong ?? 0.5, { honourSides: true });
         return { ...updated, waypoints, sourceInvisibleLeader, targetInvisibleLeader };
       });
       // Skip obstacle validation for messageBPMN nudges — they don't interact with obstacles
@@ -7798,8 +7824,9 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
 
     case "NUDGE_CONNECTOR_ENDPOINT": {
       const { connectorId, endpoint, dx, dy } = action.payload;
-      const connectors = state.connectors.map((conn) => {
-        if (conn.id !== connectorId) return conn;
+      const connectors = state.connectors.map((conn0) => {
+        if (conn0.id !== connectorId) return conn0;
+        const conn = withDrawnSides(conn0, state.elements);
         // Returns the new (side, offset) for the endpoint.
         function nudgeOffset(side: Side, offset: number, elId: string): { side: Side; offset: number } {
           const clamp = (v: number) => Math.max(0.02, Math.min(0.98, v));
@@ -7905,7 +7932,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
                 updated.sourceOffsetAlong ?? 0.5, updated.targetOffsetAlong)
             : computeWaypoints(source, target, state.elements,
                 updated.sourceSide, updated.targetSide, updated.routingType,
-                updated.sourceOffsetAlong ?? 0.5, updated.targetOffsetAlong ?? 0.5);
+                updated.sourceOffsetAlong ?? 0.5, updated.targetOffsetAlong ?? 0.5, { honourSides: true });
         return { ...updated, waypoints, sourceInvisibleLeader, targetInvisibleLeader };
       });
       return { ...state, connectors: validateConnectorsAgainstObstacles(connectors, state.elements) };

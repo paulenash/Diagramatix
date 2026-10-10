@@ -1298,6 +1298,21 @@ export function sidePoint(el: DiagramElement, side: Side, offset = 0.5): Point {
   }
 }
 
+/**
+ * Options for computeWaypoints.
+ *
+ * `honourSides` — route from EXACTLY the sides and offsets given. Without it, when a stub (the 24px lead-out at either end) would land
+ * inside another element, the router throws the caller's sides AND offsets away and re-picks sides at offset 0.5. For a connector the
+ * user is dragging that is the "immovable connector" (Paul, 2026-10-10, V01.06): every drag recomputed to the same forced route, and
+ * the stored sides no longer described the drawn path. A user's edit is honoured; the automatic layout is not.
+ *
+ * `onSides` — receives the sides the route was actually built from, so the caller can store the truth.
+ */
+export interface ComputeWaypointsOptions {
+  honourSides?: boolean;
+  onSides?: (sides: { source: Side; target: Side }) => void;
+}
+
 export function computeWaypoints(
   source: DiagramElement,
   target: DiagramElement,
@@ -1307,6 +1322,7 @@ export function computeWaypoints(
   routingType: RoutingType,
   sourceOffsetAlong = 0.5,
   targetOffsetAlong = 0.5,
+  opts?: ComputeWaypointsOptions,
 ): { waypoints: Point[]; sourceInvisibleLeader: boolean; targetInvisibleLeader: boolean } {
   const startPt = getConnectionPointBySide(source, sourceSide); // source centre
   const endPt   = getConnectionPointBySide(target, targetSide); // target centre
@@ -1547,11 +1563,50 @@ export function computeWaypoints(
   const testExitPt = perpendicularExitScaled(srcEdge, sourceSide, Math.min(testPerpOff, Math.min(source.width, source.height) * 0.5));
   const testApproachPt = perpendicularExitScaled(tgtEdge, targetSide, Math.min(testPerpOff, Math.min(target.width, target.height) * 0.5));
 
-  if (pointInsideAnyObstacle(testExitPt, obstacles) || pointInsideAnyObstacle(testApproachPt, obstacles)) {
+  if (!opts?.honourSides && (pointInsideAnyObstacle(testExitPt, obstacles) || pointInsideAnyObstacle(testApproachPt, obstacles))) {
     // Current sides cause exit/approach inside an obstacle — recalculate optimal facing sides
     const srcCx = source.x + source.width / 2, srcCy = source.y + source.height / 2;
     const tgtCx = target.x + target.width / 2, tgtCy = target.y + target.height / 2;
     const ddx = tgtCx - srcCx, ddy = tgtCy - srcCy;
+    // FIRST choice (Paul, 2026-10-10, V01.06): a pair whose whole simple route is clear — and that includes the PERPENDICULAR pairs
+    // (right→top, bottom→left …) the four facing pairs below never offered. "Send shipment notification" → the subprocess beside
+    // "Await customer service sign-off" had its left face walled in 8px away; the facing pair picked bottom→top and ran the line
+    // along and through the subprocess, where right→top was a clean three-segment line.
+    {
+      const horiz = (s: Side) => s === "left" || s === "right";
+      const sign = (s: Side) => (s === "right" || s === "bottom" ? 1 : -1);
+      const SIDES: Side[] = ["right", "left", "bottom", "top"];
+      const order: [Side, Side][] = [
+        [ddx > 0 ? "right" : "left", ddx > 0 ? "left" : "right"],
+        [ddy > 0 ? "bottom" : "top", ddy > 0 ? "top" : "bottom"],
+        ...SIDES.flatMap(ss => SIDES.filter(ts => horiz(ss) !== horiz(ts)).map(ts => [ss, ts] as [Side, Side])),
+      ];
+      for (const [ss, ts] of order) {
+        const se = sidePoint(source, ss, 0.5);
+        const te = sidePoint(target, ts, 0.5);
+        const po = adaptedPerpOffset(se, ss, te, ts);
+        const ep = perpendicularExitScaled(se, ss, Math.min(po, Math.min(source.width, source.height) * 0.5));
+        const ap = perpendicularExitScaled(te, ts, Math.min(po, Math.min(target.width, target.height) * 0.5));
+        if (pointInsideAnyObstacle(ep, obstacles) || pointInsideAnyObstacle(ap, obstacles)) continue;
+        let route: Point[] | null = null;
+        if (horiz(ss) !== horiz(ts)) {
+          // perpendicular: one corner, and both legs must run OUTWARD from their faces
+          const corner: Point = horiz(ss) ? { x: te.x, y: se.y } : { x: se.x, y: te.y };
+          const out1 = horiz(ss) ? (corner.x - se.x) * sign(ss) > 0 : (corner.y - se.y) * sign(ss) > 0;
+          const out2 = horiz(ts) ? (corner.x - te.x) * sign(ts) > 0 : (corner.y - te.y) * sign(ts) > 0;
+          if (out1 && out2) route = [se, corner, te];
+        } else if (horiz(ss)) {
+          if ((ap.x - ep.x) * sign(ss) > 0 && ss !== ts) route = [se, ep, { x: (ep.x + ap.x) / 2, y: ep.y }, { x: (ep.x + ap.x) / 2, y: ap.y }, ap, te];
+        } else if ((ap.y - ep.y) * sign(ss) > 0 && ss !== ts) {
+          route = [se, ep, { x: ep.x, y: (ep.y + ap.y) / 2 }, { x: ap.x, y: (ep.y + ap.y) / 2 }, ap, te];
+        }
+        if (route && !pathHitsObstacles(route, obstacles, L_SHAPE_CLEARANCE)) {
+          effectiveSrcSide = ss; effectiveTgtSide = ts; effectiveSrcEdge = se; effectiveTgtEdge = te;
+          break;
+        }
+      }
+    }
+    const foundClear = effectiveSrcSide !== sourceSide || effectiveTgtSide !== targetSide;
     // Try all 4 side combinations and pick one where exit/approach don't hit obstacles
     const sidePairs: [Side, Side][] = [
       [ddx > 0 ? "right" : "left", ddx > 0 ? "left" : "right"],
@@ -1559,7 +1614,7 @@ export function computeWaypoints(
       [ddx > 0 ? "left" : "right", ddx > 0 ? "right" : "left"],
       [ddy > 0 ? "top" : "bottom", ddy > 0 ? "bottom" : "top"],
     ];
-    for (const [ss, ts] of sidePairs) {
+    for (const [ss, ts] of foundClear ? [] : sidePairs) {   // a clear route was already found above
       const se = sidePoint(source, ss, 0.5);
       const te = sidePoint(target, ts, 0.5);
       const po = adaptedPerpOffset(se, ss, te, ts);
@@ -1575,6 +1630,7 @@ export function computeWaypoints(
     }
   }
 
+  opts?.onSides?.({ source: effectiveSrcSide, target: effectiveTgtSide });   // the sides the route is REALLY built from
   const perpOff    = adaptedPerpOffset(effectiveSrcEdge, effectiveSrcSide, effectiveTgtEdge, effectiveTgtSide);
   const srcPerpOff = Math.min(perpOff, Math.min(source.width, source.height) * 0.5);
   const tgtPerpOff = Math.min(perpOff, Math.min(target.width, target.height) * 0.5);
