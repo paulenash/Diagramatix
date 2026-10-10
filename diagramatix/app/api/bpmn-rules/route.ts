@@ -4,6 +4,7 @@ import { prisma } from "@/app/lib/db";
 import { isSuperuser } from "@/app/lib/superuser";
 import { builtinFor } from "@/app/lib/ai/builtinRuleCategories";
 import { MD_PROMPT_CATEGORIES } from "@/app/lib/valueChain/promptTemplates";
+import { CHAIN_NARRATIVE_CATEGORY } from "@/app/lib/valueChain/chainNarrative";
 
 /** Some briefings are split into a read-only built-in (managed in code, so it
  *  improves for everyone on a deploy) and the editable additions stored in the
@@ -44,7 +45,7 @@ export async function POST(req: Request) {
 
   // Action: "list" — return all categories with default rules
   if (action === "list") {
-    const categories = ["general", "bpmn", "state-machine", "value-chain", "domain", "context", "process-context", "archimate", "flowchart", "staff-narrative", ...MD_PROMPT_CATEGORIES];
+    const categories = ["general", "bpmn", "state-machine", "value-chain", "domain", "context", "process-context", "archimate", "flowchart", "staff-narrative", ...MD_PROMPT_CATEGORIES, CHAIN_NARRATIVE_CATEGORY];
     const result = [];
 
     for (const cat of categories) {

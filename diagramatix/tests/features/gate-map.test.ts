@@ -91,7 +91,7 @@ describe("T5113 — every feature says what enforces it", () => {
     expect(unwired).toEqual([]);
     const count = (s: string) => FEATURES.filter((f) => FEATURE_GATES[f.key].status === s).length;
     expect({ wired: count("wired"), partial: count("partial"), unwired: count("unwired"), informational: count("informational") })
-      .toEqual({ wired: 36, partial: 9, unwired: 0, informational: 2 });
+      .toEqual({ wired: 37, partial: 9, unwired: 0, informational: 2 });   // 37: + create-value-chain
   });
 });
 

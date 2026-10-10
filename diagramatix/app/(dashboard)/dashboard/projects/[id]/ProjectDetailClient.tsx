@@ -15,6 +15,8 @@ import { LinkScanDialog } from "./LinkScanDialog";
 import { PcfSeedFoldersDialog } from "./PcfSeedFoldersDialog";
 import { PcfCreateProcessDialog } from "./PcfCreateProcessDialog";
 import { CreateFromRepositoryDialog } from "@/app/components/repository/CreateFromRepositoryDialog";
+import { NewValueChainWizard } from "@/app/components/repository/NewValueChainWizard";
+import { useNewChainAccess } from "@/app/hooks/useNewChainAccess";
 import { useFeatureStates } from "@/app/components/FeatureGate";
 import { folderSubtree, folderCode } from "@/app/lib/pcf/bulkFolders";
 import { usePcfLevelColors } from "@/app/lib/pcf/usePcfLevelColors";
@@ -683,6 +685,9 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
     repoFeatureStates["process-repository-complete"] === "available" || repoFeatureStates["process-repository-restricted"] === "available" ? "available"
       : repoFeatureStates["process-repository-complete"] === "disabled" || repoFeatureStates["process-repository-restricted"] === "disabled" ? "disabled" : "hidden";
   const [showRepoCreate, setShowRepoCreate] = useState(false);
+  // Create a New Value Chain (Paul, 2026-10-10; Expert and above): the server says whether to offer it.
+  const [showNewChain, setShowNewChain] = useState(false);
+  const newChainAccess = useNewChainAccess();
   // Project-menu popups (Paul, 2026-09-14): the SOP list, the Entity Structure
   // and the Risk & Controls launcher moved out of the header and sidebar into
   // small dialogs opened from the Project menu.
@@ -2920,6 +2925,25 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
                     {"▤"} Create Project from Process Repository…
                   </button>
                   )}
+                  {!readOnly && aiAllowed && newChainAccess.allowed && (
+                  <button
+                    className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100"
+                    onClick={() => { setShowProjectMenu(false); setShowNewChain(true); }}
+                    title="Describe a value chain and its processes and have its diagram prompts written for you; it joins your organisation's list of value chains"
+                  >
+                    {"✚"} Create a New Value Chain…
+                  </button>
+                  )}
+                  {!readOnly && newChainAccess.allowed && (
+                  <a
+                    href="/dashboard/my-value-chains"
+                    className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100"
+                    onClick={() => setShowProjectMenu(false)}
+                    title="The value chains you created — edit, regenerate, publish or withdraw them"
+                  >
+                    {"☰"} My Value Chains…
+                  </a>
+                  )}
                   {!readOnly && <div className="my-1 border-t border-gray-100" />}
                   {!readOnly && (<>
                   <button
@@ -3933,6 +3957,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
       )}
 
       {showRepoCreate && <CreateFromRepositoryDialog currentProjectId={project.id} onClose={() => setShowRepoCreate(false)} />}
+      {showNewChain && <NewValueChainWizard onClose={() => setShowNewChain(false)} />}
       {showPcfCreate && (() => {
         const selFolder = selectedFolderId !== ROOT_ID ? folderTree.folders.find(f => f.id === selectedFolderId) : null;
         const subtree = selFolder ? folderSubtree(folderTree.folders, selFolder.id) : [];

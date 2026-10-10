@@ -418,6 +418,16 @@ export const FEATURE_GATES: Record<string, FeatureGateInfo> = {
     ],
     alsoLimitedBy: ["AI attempts limit (one attempt per diagram generated)", "Projects limit", "Organisation policy: allowAi"],
   },
+  "create-value-chain": {
+    description: "Create a New Value Chain — describe a value chain and its 5–12 processes and the Master Prompt templates write its diagram prompts; the chain joins the Org's repository as C01, C02… Expert and above.",
+    status: "wired", ui: [],
+    server: [
+      { file: "app/lib/valueChain/newChainAccess.ts", needle: "gateFeature(session.user.id, CREATE_VALUE_CHAIN_FEATURE)", what: "Every new-chain route (suggest, build the narrative, questions, create, resume)" },
+      { file: "app/api/repository/new-chain/create/route.ts", needle: "requireNewChainAccess(", what: "POST create the chain and write its prompts" },
+    ],
+    alsoLimitedBy: ["AI attempts limit (one attempt per prompt written)", "Chains per Org limit (default 10)", "Organisation policy: allowAi"],
+    note: "A code floor of Expert backs the grid until its cells are seeded (a feature with no cells fails open). Removed once the seed has run.",
+  },
   "mobile": {
     description: "Mobile Access: the phone app (view, review, edit by voice). Needs Process Review and Voice Assist.",
     status: "wired",

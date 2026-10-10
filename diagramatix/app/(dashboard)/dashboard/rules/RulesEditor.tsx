@@ -52,9 +52,10 @@ const CATEGORY_LABELS: Record<string, string> = {
   "md-prompt-context": "Repository Prompt — Context",
   "md-prompt-process-context": "Repository Prompt — Process Context",
   "md-prompt-archimate": "Repository Prompt — ArchiMate",
+  "md-prompt-chain-narrative": "Repository Prompt — Value Chain Narrative",
 };
 
-const CATEGORY_ORDER = ["general", "bpmn", "state-machine", "value-chain", "domain", "context", "process-context", "archimate", "flowchart", "epc", "staff-narrative", "assist", "md-prompt-bpmn", "md-prompt-value-chain", "md-prompt-context", "md-prompt-process-context", "md-prompt-archimate"];
+const CATEGORY_ORDER = ["general", "bpmn", "state-machine", "value-chain", "domain", "context", "process-context", "archimate", "flowchart", "epc", "staff-narrative", "assist", "md-prompt-bpmn", "md-prompt-value-chain", "md-prompt-context", "md-prompt-process-context", "md-prompt-archimate", "md-prompt-chain-narrative"];
 
 interface ClassifiedLine {
   index: number;       // original line index

@@ -20,6 +20,7 @@ import {
 import {
   DEFAULT_MD_PROMPT, MD_PROMPT_TYPES, mdPromptCategory, extractMdPromptAdditions,
 } from "@/app/lib/valueChain/promptTemplates";
+import { CHAIN_NARRATIVE_CATEGORY, DEFAULT_CHAIN_NARRATIVE_BRIEFING } from "@/app/lib/valueChain/chainNarrative";
 
 export interface BuiltinRule {
   /** The read-only house standard, shown above the editable box. */
@@ -54,6 +55,14 @@ export const BUILTIN_BY_CATEGORY: Record<string, BuiltinRule> = {
       hint: `How ${type} diagram prompts are written into a Process Repository .md by the prompt generator.`,
     } satisfies BuiltinRule,
   ])),
+  // The SIXTH master template (Create a New Value Chain, 2026-10-10): a user's description becomes the structured narrative the five
+  // prompt generators read. Same built-in + additions split, same version history (chainNarrative.ts).
+  [CHAIN_NARRATIVE_CATEGORY]: {
+    builtin: DEFAULT_CHAIN_NARRATIVE_BRIEFING,
+    extractAdditions: extractMdPromptAdditions,
+    label: "Repository prompt — value chain narrative",
+    hint: "How a user's description of a new value chain and its processes is turned into the structured narrative the diagram-prompt generators read.",
+  } satisfies BuiltinRule,
 };
 
 /** Null for an ordinary single-blob category. */

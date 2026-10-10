@@ -18,7 +18,7 @@ describe("feature availability registry + seed", () => {
   it("T2264 — registry keys are unique and every feature has a label + category", () => {
     expect(new Set(FEATURE_KEYS).size).toBe(FEATURE_KEYS.length);
     for (const f of FEATURES) { expect(f.key).toBeTruthy(); expect(f.label).toBeTruthy(); expect(f.category).toBeTruthy(); }
-    expect(FEATURES.length).toBe(47);   // 35 + the ten Simulator / Process Mining sub-features (2026-09-30) + the two Process Repository features (2026-10-08)
+    expect(FEATURES.length).toBe(48);   // + create-value-chain (2026-10-10)   // 35 + the ten Simulator / Process Mining sub-features (2026-09-30) + the two Process Repository features (2026-10-08)
   });
 
   it("T2265 — the seed covers every registry key × 5 levels (incl. enterprise) with valid states", () => {

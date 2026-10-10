@@ -23,6 +23,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import {
   MD_PROMPT_TYPES, MD_PROMPT_LABEL, latestTemplateVersion, promptIsStale,
   type MdPromptType,
@@ -57,13 +58,30 @@ interface Chain {
   processes: Process[]; prompts: Prompt[];
   /** Org repository only: the master has published since this chain was adopted or last updated. */
   masterMoved?: boolean;
+  /** A chain a USER made with "Create a New Value Chain" (coded C01…): who, and a flag. Absent/false for the master's and adopted chains. */
+  userChain?: boolean;
+  createdByUserId?: string | null;
+  createdByName?: string;
 }
 
 type Row = { index: number; name: string; type: MdPromptType; status: string; message?: string; chars?: number; ms?: number; roundTrips?: boolean };
 
-export function ValueChainLibraryClient({ scope = "master" }: { scope?: "master" | "org" } = {}) {
-  // The MASTER repository (SuperAdmin) or this Org's own (OrgAdmin: "Master Template Value Chain Generation"). Same screen, different rows.
-  const API = scope === "org" ? "/api/org-admin/value-chain-library" : "/api/admin/value-chain-library";
+export function ValueChainLibraryClient({ scope = "master" }: { scope?: "master" | "org" | "mine" } = {}) {
+  // The MASTER repository (SuperAdmin), this Org's own (OrgAdmin: "Master Template Value Chain Generation"), or "mine": the value chains a user made
+  // with "Create a New Value Chain" (the owner's own, or all of the Org's for an OrgAdmin). Same screen, different rows.
+  // A SuperAdmin can also pick ONE Org's repository from the header: that is the "mine" view of that Org (target set).
+  const [target, setTarget] = useState("");
+  const [orgs, setOrgs] = useState<{ id: string; name: string; chains: number; userChains: number }[]>([]);
+  const view: "master" | "org" | "mine" = scope === "master" && target ? "mine" : scope;
+  const API = scope === "mine" ? "/api/repository/my-chains"
+    : scope === "org" ? "/api/org-admin/value-chain-library"
+    : target ? `/api/admin/org-value-chain-library/${target}`
+    : "/api/admin/value-chain-library";
+  const { data: sessionData } = useSession();
+  const me = (sessionData?.user as { id?: string } | undefined)?.id ?? "";
+  /** OrgAdmin / SuperAdmin only: the members a chain can be handed to (null = not allowed, or not loaded). */
+  const [members, setMembers] = useState<{ userId: string; name: string }[] | null>(null);
+  const [ownerFilter, setOwnerFilter] = useState<"all" | "users" | "adopted">("all");
   const [chains, setChains] = useState<Chain[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -121,8 +139,19 @@ export function ValueChainLibraryClient({ scope = "master" }: { scope?: "master"
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [API]);
   useEffect(() => { void load(); }, [load]);
+  // The Org picker (SuperAdmin, master screen), and the members to hand chains to (OrgAdmin / SuperAdmin, an Org's chains).
+  useEffect(() => {
+    if (scope !== "master") return;
+    fetch("/api/admin/org-value-chain-library").then((r) => r.json()).then((j) => setOrgs(Array.isArray(j.orgs) ? j.orgs : [])).catch(() => setOrgs([]));
+  }, [scope]);
+  useEffect(() => { setSelected(""); setRows([]); setOwnerFilter("all"); }, [target]);
+  useEffect(() => {
+    setMembers(null);
+    if (view !== "mine") return;
+    fetch(`${API}?members=1`).then(async (r) => (r.ok ? r.json() : null)).then((j) => setMembers(j && Array.isArray(j.members) ? j.members : null)).catch(() => setMembers(null));
+  }, [API, view]);
 
   const post = useCallback(async (payload: Record<string, unknown>, okNote?: string) => {
     setBusy(true); setError(null); setNote(null);
@@ -282,16 +311,26 @@ export function ValueChainLibraryClient({ scope = "master" }: { scope?: "master"
         />
       )}
       <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-3">
-        <Link href={scope === "org" ? "/dashboard/org-admin" : "/dashboard/admin"} className="text-sm text-blue-600 hover:text-blue-800 underline">
-          {scope === "org" ? "← OrgAdmin" : "← SuperAdmin"}
+        <Link href={scope === "org" ? "/dashboard/org-admin" : scope === "mine" ? "/dashboard" : "/dashboard/admin"} className="text-sm text-blue-600 hover:text-blue-800 underline">
+          {scope === "org" ? "← OrgAdmin" : scope === "mine" ? "← Dashboard" : "← SuperAdmin"}
         </Link>
-        <h1 className="text-lg font-semibold text-gray-900">{scope === "org" ? "Master Template Value Chain Generation" : "Process Repository"}</h1>
+        <h1 className="text-lg font-semibold text-gray-900">{scope === "org" ? "Master Template Value Chain Generation" : scope === "mine" ? "My Value Chains" : "Process Repository"}</h1>
+        {scope === "master" && orgs.length > 0 && (
+          <label className="flex items-center gap-1.5 text-xs text-gray-600" title="Look after one organisation's own value chains (adopted from the master, or created by its users)">
+            Repository
+            <select value={target} disabled={busy || asking} onChange={(e) => setTarget(e.target.value)}
+              className="border border-gray-300 rounded px-1.5 py-0.5 text-xs bg-white text-gray-900">
+              <option value="">Master</option>
+              {orgs.map((o) => <option key={o.id} value={o.id}>{o.name} ({o.chains}{o.userChains ? `, ${o.userChains} by users` : ""})</option>)}
+            </select>
+          </label>
+        )}
         <span className="text-xs text-gray-500">
           {totals.chains} chains · {totals.processes} processes · {totals.prompts} prompts ·{" "}
           <strong>{totals.published} published</strong>
           {totals.dirty > 0 && <> · <span className="text-amber-700">{totals.dirty} with unpublished edits</span></>}
         </span>
-        {scope !== "org" && models.length > 0 && (
+        {view === "master" && models.length > 0 && (
           <label className="ml-auto flex items-center gap-1.5 text-xs text-gray-600" title="The AI model used to write prompts on this screen. Remembered for next time.">
             AI model
             <select value={model} disabled={busy || asking}
@@ -302,7 +341,7 @@ export function ValueChainLibraryClient({ scope = "master" }: { scope?: "master"
             </select>
           </label>
         )}
-        <a href={`${API}?format=md`} className={`${scope !== "org" && models.length > 0 ? "" : "ml-auto "}text-xs text-blue-600 hover:text-blue-800 underline`}>
+        <a href={`${API}?format=md`} className={`${view === "master" && models.length > 0 ? "" : "ml-auto "}text-xs text-blue-600 hover:text-blue-800 underline`}>
           Export the whole library as .md
         </a>
       </header>
@@ -310,7 +349,7 @@ export function ValueChainLibraryClient({ scope = "master" }: { scope?: "master"
       <main className="max-w-[100rem] mx-auto p-6 grid gap-5 lg:grid-cols-[22rem_1fr] items-start">
         {/* ── Chains ─────────────────────────────────────────────── */}
         <div className="space-y-3">
-          {scope !== "org" && (
+          {view === "master" && (
           <section className="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
             <h2 className="text-sm font-semibold text-gray-900 mb-2">Import</h2>
             <p className="text-[11px] text-gray-500 mb-2">
@@ -398,17 +437,27 @@ export function ValueChainLibraryClient({ scope = "master" }: { scope?: "master"
           <section className="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
             <div className="flex items-baseline justify-between mb-2">
               <h2 className="text-sm font-semibold text-gray-900">Value chains</h2>
+              {view !== "mine" && (
               <button disabled={busy || chains.length === 0}
                 onClick={() => void post({ action: "publish" }, "Every chain published.")}
                 className="text-[11px] underline text-blue-600 hover:text-blue-800 disabled:opacity-40">
                 Publish all
               </button>
+              )}
             </div>
+            {view !== "master" && chains.some((c) => c.userChain) && chains.some((c) => !c.userChain) && (
+              <select value={ownerFilter} onChange={(e) => setOwnerFilter(e.target.value as "all" | "users" | "adopted")}
+                className="w-full mb-2 border border-gray-300 rounded px-1.5 py-1 text-[11px] bg-white text-gray-900" aria-label="Show">
+                <option value="all">All value chains</option>
+                <option value="users">Created by users</option>
+                <option value="adopted">Adopted from the master</option>
+              </select>
+            )}
             {loading ? <p className="text-xs text-gray-500">Loading…</p>
-              : chains.length === 0 ? <p className="text-xs text-gray-500">Nothing here yet — import a .md to seed the library.</p>
+              : chains.length === 0 ? <p className="text-xs text-gray-500">{view === "mine" ? "No value chains yet — use Create a New Value Chain from the Project menu." : "Nothing here yet — import a .md to seed the library."}</p>
               : (
                 <ul className="space-y-1 max-h-[34rem] overflow-y-auto">
-                  {chains.map((c) => (
+                  {chains.filter((c) => ownerFilter === "all" || (ownerFilter === "users" ? !!c.userChain : !c.userChain)).map((c) => (
                     <li key={c.id}>
                       <button onClick={() => { setSelected(c.id); setRows([]); }}
                         className={"w-full text-left px-2.5 py-1.5 rounded border transition-colors "
@@ -423,7 +472,7 @@ export function ValueChainLibraryClient({ scope = "master" }: { scope?: "master"
                         </span>
                         <span className="block text-[10px] text-gray-500">
                           {c.processes.length} processes · {c.prompts.length} prompts
-                          {c.groupName && ` · ${c.groupName}`}
+                          {c.userChain ? ` · by ${c.createdByName || "a user"}` : c.groupName && ` · ${c.groupName}`}
                         </span>
                         {/* A chain whose prompts predate the current master template.
                             RED because the remedy costs AI spend and the consequence
@@ -452,7 +501,7 @@ export function ValueChainLibraryClient({ scope = "master" }: { scope?: "master"
         <div className="space-y-4">
           {/* Org repository: a NEW master template version is the OrgAdmin's cue to regenerate and publish (Paul, 2026-10-08). Counted from the same
               per-chain staleness the list shows, so the banner and the red marks cannot disagree. */}
-          {scope === "org" && (() => {
+          {(view === "org" || view === "mine") && (() => {
             const behind = chains.reduce((n, c) => n + chainStaleness(c.processes, c.prompts).count, 0);
             const t = latestTemplateVersion("bpmn");
             return (
@@ -473,6 +522,9 @@ export function ValueChainLibraryClient({ scope = "master" }: { scope?: "master"
           ) : (
             <>
               <ChainEditor chain={chain} busy={busy} tone={tone} apiBase={API}
+                members={view === "mine" ? members : null}
+                canDelete={scope === "mine" ? chain.createdByUserId === me : true}
+                onReassign={(userId) => void post({ action: "reassign-owner", id: chain.id, userId }, "Handed over.")}
                 onSave={(patch) => void post({ action: "save-chain", id: chain.id, ...patch }, "Saved.")}
                 onPublish={() => void post({ action: "publish", code: chain.code }, `${chain.code} published.`)}
                 onUnpublish={() => void post({ action: "unpublish", code: chain.code }, `${chain.code} withdrawn.`)}
@@ -548,8 +600,13 @@ function AdoptFromMaster({ api, busy, reloadKey, onAdopt, onSync }: {
   );
 }
 
-function ChainEditor({ chain, busy, tone, apiBase, onSave, onPublish, onUnpublish, onDelete }: {
+function ChainEditor({ chain, busy, tone, apiBase, members, canDelete, onReassign, onSave, onPublish, onUnpublish, onDelete }: {
   apiBase: string;
+  /** The Org's members a chain can be handed to; null = the caller may not do that. */
+  members: { userId: string; name: string }[] | null;
+  /** May the caller delete this chain? (The server decides again.) */
+  canDelete: boolean;
+  onReassign: (userId: string) => void;
   chain: Chain; busy: boolean; tone: { bg: string; text: string };
   onSave: (p: Record<string, unknown>) => void;
   onPublish: () => void; onUnpublish: () => void; onDelete: () => void;
@@ -560,9 +617,24 @@ function ChainEditor({ chain, busy, tone, apiBase, onSave, onPublish, onUnpublis
   const [confirmDelete, setConfirmDelete] = useState(false);
   useEffect(() => { setTitle(chain.title); setGroupName(chain.groupName); setNarrative(chain.narrative); setConfirmDelete(false); }, [chain.id, chain.title, chain.groupName, chain.narrative]);
   const dirty = title !== chain.title || groupName !== chain.groupName || narrative !== chain.narrative;
+  const [handTo, setHandTo] = useState("");
 
   return (
     <section className="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
+      {chain.userChain && (
+        <p className="text-[11px] text-gray-600 mb-2 flex flex-wrap items-center gap-2">
+          <span>Created by <strong>{chain.createdByName || "a user"}</strong> with Create a New Value Chain. Its owner, your OrgAdmin and the SuperAdmin manage it.</span>
+          {members && members.length > 0 && (
+            <span className="inline-flex items-center gap-1">
+              <select value={handTo} onChange={(e) => setHandTo(e.target.value)} className="border border-gray-300 rounded px-1 py-0.5 text-[11px] bg-white text-gray-900" aria-label="Hand over to">
+                <option value="">Hand over to…</option>
+                {members.filter((m) => m.userId !== chain.createdByUserId).map((m) => <option key={m.userId} value={m.userId}>{m.name}</option>)}
+              </select>
+              <button disabled={busy || !handTo} onClick={() => { onReassign(handTo); setHandTo(""); }} className="px-2 py-0.5 text-[11px] border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40">Hand over</button>
+            </span>
+          )}
+        </p>
+      )}
       <div className="flex items-center gap-2 mb-3">
         <h2 className="text-sm font-semibold text-gray-900">{chain.code}</h2>
         {chain.published
@@ -611,11 +683,15 @@ function ChainEditor({ chain, busy, tone, apiBase, onSave, onPublish, onUnpublis
           Save
         </button>
         {dirty && <span className="text-[11px] text-amber-700">unsaved changes</span>}
+        {canDelete ? (
         <button disabled={busy} onClick={() => (confirmDelete ? onDelete() : setConfirmDelete(true))}
           className={"ml-auto px-2.5 py-1.5 text-xs rounded border disabled:opacity-50 "
             + (confirmDelete ? "border-red-500 bg-red-50 text-red-700" : "border-gray-300 hover:bg-gray-50 text-gray-600")}>
           {confirmDelete ? "Delete this chain — click again" : "Delete chain"}
         </button>
+        ) : (
+        <span className="ml-auto text-[11px] text-gray-500">Only the owner or a SuperAdmin can delete this value chain; you can withdraw it instead.</span>
+        )}
       </div>
     </section>
   );

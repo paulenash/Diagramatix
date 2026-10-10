@@ -17,7 +17,7 @@ describe("T5293 Process Repository model choice and room", () => {
   });
   it("the screen shows and sets the model for the master only", () => {
     expect(ui).toContain('action: "set-model"');
-    expect(ui).toMatch(/scope !== "org" && models\.length > 0/);
+    expect(ui).toMatch(/view === "master" && models\.length > 0/);   // (2026-10-10: `view` — the master repository itself, not an Org picked from the header)
   });
   it("prompts have room to finish (8192 truncated V01.05 and V01.07)", () => {
     const ladder = /PROMPT_TOKEN_LIMITS = \[(\d+), (\d+)\]/.exec(gen)!;

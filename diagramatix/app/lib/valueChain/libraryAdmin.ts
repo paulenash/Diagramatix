@@ -10,8 +10,8 @@ import { chooseModel } from "@/app/lib/ai/modelAccess";
 import { allModels, isKnownAiModel } from "@/app/lib/ai/models";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { AI_INVOCATION_POINTS, enterAiContext } from "@/app/lib/ai/aiTelemetry";
-import { writeChainPrompt } from "@/app/lib/valueChain/writeChainPrompt";
-import { stampFor } from "@/app/lib/valueChain/promptStamp";
+import { generateAndStorePrompt, loadPromptBriefing } from "@/app/lib/valueChain/storePrompt";
+import { publishChainById } from "@/app/lib/valueChain/publishChain";
 import { checkPromptBranches } from "@/app/lib/valueChain/checkPromptBranches";
 import { checkPromptShapes } from "@/app/lib/valueChain/checkPromptShapes";
 import { selectRegenerationTargets } from "@/app/lib/valueChain/regenerationTargets";
@@ -49,9 +49,16 @@ export const maxDuration = 300;
 const MAX_MD_CHARS = 8 * 1024 * 1024;
 
 /** Everything the maintenance screen needs about one chain. */
-async function chainPayload(scopeOrg: string, code?: string) {
+/** Which of an Org's chains to list: all of them, only those USERS created ("Create a New Value Chain"), or only those one user created. */
+export interface ChainFilter { userChains?: boolean; ownedBy?: string }
+
+async function chainPayload(scopeOrg: string, code?: string, filter?: ChainFilter) {
   return prisma.valueChainLibrary.findMany({
-    where: code ? { orgId: scopeOrg, code } : { orgId: scopeOrg },
+    where: {
+      orgId: scopeOrg,
+      ...(code ? { code } : {}),
+      ...(filter?.ownedBy ? { createdByUserId: filter.ownedBy } : filter?.userChains ? { createdByUserId: { not: null } } : {}),
+    },
     orderBy: [{ sortOrder: "asc" }, { code: "asc" }],
     include: {
       processes: { orderBy: { sortOrder: "asc" } },
@@ -69,7 +76,7 @@ export type LibrarySession = Session & { user: { id: string } };
  * (app/api/admin/value-chain-library, app/api/org-admin/value-chain-library) do the authorising and pass the scope. Every query below is
  * bounded by `scopeOrg`, so an OrgAdmin can never read or change the master or another Org's chain — pinned in tests/valueChain/org-repository.test.ts.
  */
-export async function libraryGet(req: Request, scopeOrg: string) {
+export async function libraryGet(req: Request, scopeOrg: string, filter?: ChainFilter) {
   const url = new URL(req.url);
   const code = url.searchParams.get("code") ?? undefined;
 
@@ -106,7 +113,7 @@ export async function libraryGet(req: Request, scopeOrg: string) {
     });
   }
 
-  const chains = await chainPayload(scopeOrg, code);
+  const chains = await chainPayload(scopeOrg, code, filter);
   // Org scope: when did the master chain of each of these codes last publish? (to say "the master has moved on since you adopted it")
   const masterAt = scopeOrg
     ? new Map((await prisma.valueChainLibrary.findMany({ where: { orgId: "", code: { in: chains.map((c) => c.code) } }, select: { code: true, publishedAt: true } }))
@@ -118,6 +125,8 @@ export async function libraryGet(req: Request, scopeOrg: string) {
     chains: chains.map((c) => ({
       id: c.id, code: c.code, title: c.title, groupName: c.groupName, hidden: c.hidden,
       sortOrder: c.sortOrder,
+      // Who made it ("Create a New Value Chain"); null/"" for the master's and for chains adopted from it.
+      createdByUserId: c.createdByUserId, createdByName: c.createdByName, userChain: c.createdByUserId !== null,
       masterPublishedAt: c.masterPublishedAt,
       masterMoved: !!scopeOrg && !!c.masterPublishedAt && !!masterAt.get(c.code) && masterAt.get(c.code)! > c.masterPublishedAt,
       narrative: c.narrative,
@@ -327,13 +336,7 @@ export async function libraryPost(req: Request, session: LibrarySession, scopeOr
         await prisma.valueChainLibrary.update({ where: { id: c.id }, data: { publishedAt: null } });
         continue;
       }
-      await prisma.valueChainLibrary.update({
-        where: { id: c.id },
-        data: { publishedNarrative: c.narrative, publishedTitle: c.title, publishedAt: new Date() },
-      });
-      for (const p of c.prompts) {
-        await prisma.valueChainPrompt.update({ where: { id: p.id }, data: { publishedPrompt: p.prompt } });
-      }
+      await publishChainById(c.id);                      // the one implementation of "publish" (publishChain.ts)
     }
     return NextResponse.json({ ok: true, chains: rows.length });
   }
@@ -545,16 +548,10 @@ export async function libraryPost(req: Request, session: LibrarySession, scopeOr
         const briefs = new Map<MdPromptType, string>();
         const additionsByType = new Map<MdPromptType, string>();
         for (const t of types) {
-          const row = await prisma.diagramRules
-            .findFirst({ where: { category: mdPromptCategory(t), isDefault: true }, select: { rules: true } })
-            .catch(() => null);
           // An Org's repository is written to the SAME master template (so a new template version reaches it) plus the Org's OWN additions.
-          const orgRow = scopeOrg
-            ? await prisma.diagramRules.findFirst({ where: { category: mdPromptCategory(t), orgId: scopeOrg, userId: null }, select: { rules: true } }).catch(() => null)
-            : null;
-          const additions = [row?.rules, orgRow?.rules].filter(Boolean).join("\n\n");
-          additionsByType.set(t, additions);
-          briefs.set(t, buildMdPromptBriefing(t, additions || undefined));
+          const loaded = await loadPromptBriefing(t, scopeOrg || null);
+          additionsByType.set(t, loaded.additions);
+          briefs.set(t, loaded.briefing);
         }
 
         // WHICH MODEL. Paul changed the default to Kimi K3 after hitting an
@@ -583,20 +580,21 @@ export async function libraryPost(req: Request, session: LibrarySession, scopeOr
           }
           send({ t: "prompt", index: i + 1, total: targets.length, name, type: target.type, status: "generating" });
           const t0 = Date.now();
-          const res = await generateMdPrompt({
-            apiKey, model, briefing: briefs.get(target.type)!,
-            chainCode: chain.code, chainTitle: chain.title, narrative: chain.narrative, subs, target,
+          // The shared step (storePrompt.ts): ask, refuse what fails its own checks or asks for a loop-back, then store through the one writer.
+          const out = await generateAndStorePrompt({
+            apiKey, model, briefing: briefs.get(target.type)!, additions: additionsByType.get(target.type) ?? "",
+            chainId: chain.id, chainCode: chain.code, chainTitle: chain.title, narrative: chain.narrative, subs, target, name,
             ...(target.type === "bpmn" ? { answers: answersText || undefined, entityNames: entityNames || undefined } : {}),
           });
-          if (!res.ok) {
+          if (out.status === "error") {
             failed++;
-            send({ t: "prompt", index: i + 1, total: targets.length, name, type: target.type, status: "error", message: res.error });
+            send({ t: "prompt", index: i + 1, total: targets.length, name, type: target.type, status: "error", message: out.message });
             // A spend cap is not THIS prompt failing, it is every REMAINING
             // prompt failing. Carrying on made one doomed call per target and
             // buried the reason in a wall of identical rows. Stop, say it once,
             // and say where the run got to so it can be picked up from there.
-            if (isQuotaExhausted(res.error)) {
-              const back = quotaResumesAt(res.error);
+            if (isQuotaExhausted(out.message)) {
+              const back = quotaResumesAt(out.message);
               const notAttempted = targets.length - i - 1;
               send({
                 t: "halted",
@@ -614,25 +612,17 @@ export async function libraryPost(req: Request, session: LibrarySession, scopeOr
             }
             continue;
           }
-          // The same guard the script applies: a loop-back asks for a shape the
-          // layout code prunes, so the repetition would vanish from the diagram.
-          const audit = auditPrompts(res.prompt);
-          if (audit.loopBacks > 0) {
+          if (out.status === "refused") {
             refused++;
-            send({ t: "prompt", index: i + 1, total: targets.length, name, type: target.type, status: "refused", message: "asks for a loop-back — not stored" });
+            send({ t: "prompt", index: i + 1, total: targets.length, name, type: target.type, status: "refused", message: out.message });
             continue;
           }
-          // The ONE writer (writeChainPrompt.ts): it stamps the template version, the house rules and the briefing hash.
-          await writeChainPrompt({
-            chainId: chain.id, type: target.type, processCode: target.code, name, prompt: res.prompt, roundTrips: res.roundTrips, model,
-            stamp: stampFor(target.type, briefs.get(target.type)!, additionsByType.get(target.type) ?? ""),
-          });
           written++;
           if (scopeOrg) await recordUsage(userId, "aiAttempts");
           send({
             t: "prompt", index: i + 1, total: targets.length, name, type: target.type,
-            status: "done", roundTrips: res.roundTrips, chars: res.prompt.length, ms: Date.now() - t0,
-            dataObjects: audit.dataObjects, standardLoops: audit.standardLoops,
+            status: "done", roundTrips: out.roundTrips, chars: out.chars, ms: Date.now() - t0,
+            dataObjects: out.dataObjects, standardLoops: out.standardLoops,
           });
         }
         send({ t: "done", written, failed, refused });

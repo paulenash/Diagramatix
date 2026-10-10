@@ -89,6 +89,9 @@ export const FEATURES: FeatureDef[] = [
   // Chain diagram + V01.01 + V01.02; Introductory: all of V01). Complete = every value chain. Complete wins when both are on.
   { key: "process-repository-restricted", label: "Process Repository — Restricted (Order to Cash only)", category: "Platform" },
   { key: "process-repository-complete",   label: "Process Repository — Complete (all value chains)",     category: "Platform" },
+  // Create a New Value Chain (Paul, 2026-10-10): a user describes a value chain and its processes and the Master Prompt templates write the
+  // diagram prompts for it; the chain joins the Org's repository as C01, C02… Expert and above.
+  { key: "create-value-chain",            label: "Create a New Value Chain",                              category: "Platform" },
   // AI Models
   { key: "choice-of-llms",         label: "Choice of LLMs",              category: "AI Models" },
   { key: "local-llm",              label: "Local LLM Support",           category: "AI Models" },

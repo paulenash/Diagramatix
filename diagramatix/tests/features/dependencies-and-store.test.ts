@@ -61,7 +61,7 @@ describe("T5101 — a feature that requires others is only as available as the w
   it("the real registry: every requirement names a real feature, none is circular, and Mobile needs Process Review and Voice Assist", () => {
     expect(dependencyProblems(FEATURE_DEF)).toEqual([]);
     expect([...(FEATURE_DEF["mobile"].requires ?? [])].sort()).toEqual(["process-review", "voice-assist"]);
-    expect(FEATURES.length).toBe(47);
+    expect(FEATURES.length).toBe(48);   // + create-value-chain (2026-10-10)
   });
 
   it("the resolver applies it after the overrides (source pin)", async () => {

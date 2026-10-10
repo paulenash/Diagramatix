@@ -35,7 +35,8 @@ function routeFiles(dir: string, prefix = ""): string[] {
 }
 
 const MUTATING = /export\s+(async\s+)?function\s+(POST|PUT|PATCH|DELETE)/;
-const GUARDED = /isReadOnlyImpersonation|blockReadOnlyImpersonation|guardProjectRoute|guardOrgRoute|guardProject|guardOrg/;
+// requireNewChainAccess (app/lib/valueChain/newChainAccess.ts) blocks read-only impersonation itself and is asserted to in tests/valueChain/new-chain-pipeline.test.ts.
+const GUARDED = /isReadOnlyImpersonation|blockReadOnlyImpersonation|guardProjectRoute|guardOrgRoute|guardProject|guardOrg|requireNewChainAccess/;
 /** A route that never resolves a user session has no impersonation to block. */
 const AUTHENTICATES = /\bawait auth\(\)/;
 

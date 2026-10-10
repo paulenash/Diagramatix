@@ -128,10 +128,13 @@ describe("T5297 the .md export and import keep working for a user's chain", () =
 describe("T5297 one writer", () => {
   const admin = readFileSync("app/lib/valueChain/libraryAdmin.ts", "utf8");
   const writer = readFileSync("app/lib/valueChain/writeChainPrompt.ts", "utf8");
-  it("the regenerate handler saves through writeChainPrompt with a stamp, and nothing else upserts a generated prompt", () => {
-    expect(admin).toContain("await writeChainPrompt({");
-    expect(admin).toContain("stampFor(target.type, briefs.get(target.type)!");
+  const store = readFileSync("app/lib/valueChain/storePrompt.ts", "utf8");
+  it("the regenerate handler stores through the shared step, which saves through writeChainPrompt with a stamp; nothing else upserts a generated prompt", () => {
+    expect(admin).toContain("await generateAndStorePrompt({");
+    expect(store).toContain("await writeChainPrompt({");
+    expect(store).toContain("stampFor(a.target.type, a.briefing, a.additions)");
     expect(admin).not.toContain("valueChainPrompt.upsert");
+    expect(admin).not.toContain("generateMdPrompt(");                              // the handler no longer calls the model directly
   });
   it("the writer stores the version, the house-rule hash and the briefing hash with the model and the date", () => {
     for (const col of ["templateVersion", "additionsHash", "templateHash", "model", "generatedAt"]) expect(writer).toContain(col);

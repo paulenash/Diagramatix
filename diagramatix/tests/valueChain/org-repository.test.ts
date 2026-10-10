@@ -124,7 +124,9 @@ describe("T5290 the maintenance handlers keep an Org inside its own repository",
   });
   it("an Org's regeneration uses the Org's model and its own template additions, and is metered one attempt per prompt", () => {
     expect(lib).toContain("scopeOrg ? await resolveOrgModel() : await masterLibraryModel()");
-    expect(lib).toContain("where: { category: mdPromptCategory(t), orgId: scopeOrg, userId: null }");
+    // The Org's own additions are loaded by the shared loader (storePrompt.ts), which the handler calls with the Org's id.
+    expect(lib).toContain("loadPromptBriefing(t, scopeOrg || null)");
+    expect(readFileSync("app/lib/valueChain/storePrompt.ts", "utf8")).toContain("where: { category: mdPromptCategory(type), orgId, userId: null }");
     expect(lib).toContain('if (scopeOrg) await recordUsage(userId, "aiAttempts");');
     expect(lib).toContain('const blocked = await gateLimit(userId, "aiAttempts");');
   });
@@ -151,8 +153,10 @@ describe("T5290 the OrgAdmin tile, page and screen", () => {
   });
   it("the same screen, pointed at the Org's API: no file import, an adopt list, 'master updated' marks and the new-template-version banner", () => {
     const ui = readFileSync("app/(dashboard)/dashboard/admin/value-chain-library/ValueChainLibraryClient.tsx", "utf8");
-    expect(ui).toContain('const API = scope === "org" ? "/api/org-admin/value-chain-library" : "/api/admin/value-chain-library";');
-    expect(ui).toContain('{scope !== "org" && (');
+    // (2026-10-10: the same screen also serves "mine" and a SuperAdmin's picked Org, so the API and the master-only sections key off `scope` and `view`.)
+    expect(ui).toContain('scope === "org" ? "/api/org-admin/value-chain-library"');
+    expect(ui).toContain('"/api/admin/value-chain-library"');
+    expect(ui).toContain('{view === "master" && (');
     expect(ui).toContain("<AdoptFromMaster api={API}");
     expect(ui).toContain("master updated");
     expect(ui).toContain("The master template is now <strong>v{t.version}</strong>");

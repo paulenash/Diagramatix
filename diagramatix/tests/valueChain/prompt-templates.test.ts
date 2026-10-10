@@ -198,8 +198,9 @@ describe("Process Repository — the master templates", () => {
     // An ordinary diagram-rules category is a single editable blob, not a split.
     expect(builtinFor("bpmn")).toBeNull();
     expect(builtinFor("general")).toBeNull();
+    // (2026-10-10: the sixth template, Value Chain Narrative — chainNarrative.ts — joins the five prompt kinds.)
     expect(Object.keys(BUILTIN_BY_CATEGORY).sort()).toEqual([
-      "md-prompt-archimate", "md-prompt-bpmn", "md-prompt-context",
+      "md-prompt-archimate", "md-prompt-bpmn", "md-prompt-chain-narrative", "md-prompt-context",
       "md-prompt-process-context", "md-prompt-value-chain", "staff-narrative",
     ]);
   });

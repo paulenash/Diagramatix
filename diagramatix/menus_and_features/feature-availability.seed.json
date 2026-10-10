@@ -476,6 +476,16 @@
         "expert": "available",
         "enterprise": "available"
       }
+    },
+    {
+      "key": "create-value-chain",
+      "states": {
+        "free": "hidden",
+        "introductory": "hidden",
+        "professional": "hidden",
+        "expert": "available",
+        "enterprise": "available"
+      }
     }
   ]
 }

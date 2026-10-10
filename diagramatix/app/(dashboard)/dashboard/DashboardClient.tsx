@@ -28,6 +28,8 @@ import { CollapsibleSection } from "./CollapsibleSection";
 import { ProjectShareDialog } from "./ProjectShareDialog";
 import { PcfCreateProjectDialog } from "./PcfCreateProjectDialog";
 import { CreateFromRepositoryDialog } from "@/app/components/repository/CreateFromRepositoryDialog";
+import { NewValueChainWizard } from "@/app/components/repository/NewValueChainWizard";
+import { useNewChainAccess } from "@/app/hooks/useNewChainAccess";
 import { useFeatureStates } from "@/app/components/FeatureGate";
 import { NotificationsClient } from "../notifications/NotificationsClient";
 import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
@@ -479,6 +481,9 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const [showPcfProject, setShowPcfProject] = useState(false);
   // Create Project from Process Repository (Paul, 2026-10-08): shown when either Process Repository feature is available to this level.
   const [showRepoCreate, setShowRepoCreate] = useState(false);
+  // Create a New Value Chain (Paul, 2026-10-10; Expert and above): the server says whether to offer it.
+  const [showNewChain, setShowNewChain] = useState(false);
+  const newChainAccess = useNewChainAccess();
   const { states: repoFeatureStates } = useFeatureStates();
   const repoState = repoFeatureStates["process-repository-complete"] === "available" || repoFeatureStates["process-repository-restricted"] === "available"
     ? "available" : "hidden";
@@ -2022,6 +2027,21 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                 ▤ Create Project from Process Repository
               </button>
               )}
+              {newChainAccess.allowed && (
+              <button
+                onClick={() => setShowNewChain(true)}
+                className="px-3 py-1.5 rounded-md border border-indigo-300 text-indigo-700 hover:bg-indigo-50 text-xs font-medium"
+                title="Describe a value chain and its processes and have its diagram prompts written for you; it joins your organisation's list of value chains"
+              >
+                ✚ Create a New Value Chain
+              </button>
+              )}
+              {newChainAccess.allowed && (
+              <a href="/dashboard/my-value-chains" className="px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 text-xs font-medium"
+                title="The value chains you created — edit, regenerate, publish or withdraw them">
+                My Value Chains
+              </a>
+              )}
             </div>
           ) : undefined}
         >
@@ -3294,6 +3314,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
 
       {showPcfProject && <PcfCreateProjectDialog onClose={() => setShowPcfProject(false)} />}
       {showRepoCreate && <CreateFromRepositoryDialog onClose={() => setShowRepoCreate(false)} />}
+      {showNewChain && <NewValueChainWizard onClose={() => setShowNewChain(false)} />}
 
       {/* New Project dialog */}
       {showNewProject && (
