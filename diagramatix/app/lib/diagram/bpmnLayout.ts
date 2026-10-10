@@ -5211,6 +5211,11 @@ export function layoutBpmnDiagram(
       const band = elMap.get(el.parentId ?? "");
       if (band && (band.type === "lane" || band.type === "sublane")
           && (el.y + dy < band.y || el.y + el.height + dy > band.y + band.height)) break;
+      // …and it never lands on something already there (Paul's C01 run, 2026-10-10: "Record Decision and Release Order" was pulled onto
+      // the merge's row and sat 102x62px on top of "Request Refund Through PayPal", which already occupied that row in the same column).
+      if (Math.abs(dy) > 0.5 && elements.some(o => o !== el && o.id !== merge.id && !o.boundaryHostId
+          && ["task", "subprocess", "subprocess-expanded", "gateway", "start-event", "intermediate-event", "end-event"].includes(o.type)
+          && o.x < el.x + el.width && el.x < o.x + o.width && o.y < el.y + dy + el.height && el.y + dy < o.y + o.height)) break;
       if (Math.abs(dy) > 0.5) { shiftSubtree(el.id, dy); el.y += dy; }
       curId = oneOut(curId);
     }
@@ -6738,7 +6743,7 @@ export function layoutBpmnDiagram(
         if (copies.length > 0 && !computedConnectors.some(c => c.sourceId === art.id || c.targetId === art.id)) {
           const at = elements.indexOf(art);
           if (at >= 0) elements.splice(at, 1);
-          elMap.delete(art.id);
+          elMap.delete(art.id);
         }
       }
     }

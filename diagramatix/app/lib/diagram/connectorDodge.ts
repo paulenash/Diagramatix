@@ -1,6 +1,7 @@
 import type { Connector, DiagramElement, Point } from "./types";
-import { checkSequenceClipsForeignNode } from "./checks/diagramChecks";
+import { checkSequenceClipsForeignNode, checkSequenceClipsOwnEndpoint } from "./checks/diagramChecks";
 import { routeBetweenRocks, rockObstacles, type Dir } from "./routeBetweenRocks";
+import { computeWaypoints } from "./routing";
 
 /**
  * Repair a sequence connector that runs through an element it is not connected to, or that takes an absurdly long way round.
@@ -41,6 +42,10 @@ export function dodgeForeignNodes(elements: DiagramElement[], connectors: Connec
   const byId = new Map(elements.map(e => [e.id, e]));
   const clips = (c: Connector, wps: Connector["waypoints"]) =>
     checkSequenceClipsForeignNode({ elements, connectors: [{ ...c, waypoints: wps }] } as never).length > 0;
+  // Paul's C01 run (2026-10-10): "Payment reversal method?" -> "Request Refund Through PayPal" ran through the body of its own target, whose top sat only
+  // 6px below the gateway's bottom vertex — no room for the usual shape. The gap router below can solve it if the connector's OWN ends are obstacles too.
+  const clipsOwn = (c: Connector, wps: Connector["waypoints"]) =>
+    checkSequenceClipsOwnEndpoint({ elements, connectors: [{ ...c, waypoints: wps }] } as never).length > 0;
 
   for (const c of connectors) {
     if (c.type !== "sequence" || !Array.isArray(c.waypoints) || c.waypoints.length < 4) continue;
@@ -51,13 +56,13 @@ export function dodgeForeignNodes(elements: DiagramElement[], connectors: Connec
     const src = byId.get(c.sourceId), tgt = byId.get(c.targetId);
     if (!src || !tgt) continue;
     const man = Math.abs(src.x + src.width / 2 - tgt.x - tgt.width / 2) + Math.abs(src.y + src.height / 2 - tgt.y - tgt.height / 2);
-    const clipping = clips(c, w0);
+    const clipping = clips(c, w0) || clipsOwn(c, w0);
     const absurd = pathLength(visible) > ABSURD_FACTOR * man + ABSURD_EXTRA;
     if (!clipping && !absurd) continue;
 
     // 1. Slide an interior vertical run (a horizontal segment on each side of it) to the nearest clear column.
     let done = false;
-    if (clipping) {
+    if (clipping && !clipsOwn(c, w0)) {
       const w = c.waypoints;
       for (let i = 1; i < w.length - 2 && !done; i++) {
         const a = w[i], b = w[i + 1];
@@ -86,18 +91,54 @@ export function dodgeForeignNodes(elements: DiagramElement[], connectors: Connec
     const aDir = headingOf(vis[0], vis[1]);
     const bDir = headingOf(vis[vis.length - 1], vis[vis.length - 2]);   // the outward normal of the face it lands on
     if (!aDir || !bDir) continue;
-    const route = routeBetweenRocks(vis[0], aDir, vis[vis.length - 1], bDir, rockObstacles(elements, c.sourceId, c.targetId));
-    if (!route || route.length < 2) continue;
+    const ownClip = clipsOwn(c, c.waypoints);
+    const obstacles = rockObstacles(elements, c.sourceId, c.targetId);
+    // An own-endpoint clip: the ends themselves are obstacles for the new route (it must leave and arrive without crossing either body).
+    if (ownClip) for (const e of [src, tgt]) obstacles.push({ x: e.x, y: e.y, width: e.width, height: e.height });
+    const route = routeBetweenRocks(vis[0], aDir, vis[vis.length - 1], bDir, obstacles);
+    if (!route || route.length < 2) {
+      if (tryOtherFaces(c, src, tgt, elements, clips, clipsOwn)) fixed++;
+      continue;
+    }
     const candidate = [
       ...(c.sourceInvisibleLeader ? [c.waypoints[0]] : []),
       ...route,
       ...(c.targetInvisibleLeader ? [c.waypoints[c.waypoints.length - 1]] : []),
     ];
-    if (clips(c, candidate)) continue;
-    const stillClipping = clips(c, c.waypoints);
+    if (clips(c, candidate) || clipsOwn(c, candidate)) { if (tryOtherFaces(c, src, tgt, elements, clips, clipsOwn)) fixed++; continue; }
+    const stillClipping = clips(c, c.waypoints) || ownClip;
     if (!stillClipping && pathLength(route) > 0.5 * pathLength(vis)) continue;   // not clearly better: leave the existing route alone
     c.waypoints = candidate;
     fixed++;
   }
   return fixed;
+}
+
+/**
+ * Last resort: leave and arrive by OTHER faces. When a face is walled in (another element within a stub's reach — V01.06's subprocess; C01.04's task
+ * 29px above the target's top) no route can use it, so try every other pair of faces through the router and keep the SHORTEST that clips nothing.
+ * The sides stored on the connector are left as they were: the editor adopts the sides a line is really drawn from the first time it is edited
+ * (useDiagram.ts withDrawnSides), exactly as for any connector the router re-routed.
+ */
+const FACES = ["right", "bottom", "left", "top"] as const;
+function tryOtherFaces(
+  c: Connector, src: DiagramElement, tgt: DiagramElement, elements: DiagramElement[],
+  clips: (c: Connector, w: Connector["waypoints"]) => boolean, clipsOwn: (c: Connector, w: Connector["waypoints"]) => boolean,
+): boolean {
+  let best: { w: Connector["waypoints"]; sl: boolean; tl: boolean; len: number } | null = null;
+  for (const ss of FACES) for (const ts of FACES) {
+    if (ss === c.sourceSide && ts === c.targetSide) continue;
+    let r;
+    try { r = computeWaypoints(src, tgt, elements, ss, ts, c.routingType, 0.5, 0.5, { honourSides: true }); } catch { continue; }
+    const cand = { ...c, waypoints: r.waypoints, sourceInvisibleLeader: r.sourceInvisibleLeader, targetInvisibleLeader: r.targetInvisibleLeader };
+    if (clips(cand, cand.waypoints) || clipsOwn(cand, cand.waypoints)) continue;
+    const a = r.sourceInvisibleLeader ? 1 : 0, b = r.targetInvisibleLeader ? r.waypoints.length - 1 : r.waypoints.length;
+    const len = pathLength(r.waypoints.slice(a, b));
+    if (!best || len < best.len) best = { w: r.waypoints, sl: r.sourceInvisibleLeader, tl: r.targetInvisibleLeader, len };
+  }
+  if (!best) return false;
+  c.waypoints = best.w;
+  c.sourceInvisibleLeader = best.sl;
+  c.targetInvisibleLeader = best.tl;
+  return true;
 }
