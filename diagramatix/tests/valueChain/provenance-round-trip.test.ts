@@ -97,10 +97,12 @@ describe("provenance survives the .md round trip", () => {
   });
 
   it("T3280 a malformed provenance comment reads as unknown, never as a default", () => {
-    expect(parseProvenance(null)).toEqual({ model: null, generatedAt: null });
-    expect(parseProvenance("model=; generated=not-a-date")).toEqual({ model: null, generatedAt: null });
+    // (2026-10-10: also the stored template stamps — null whenever the comment does not carry them.)
+    const noStamps = { templateVersion: null, additionsHash: null, templateHash: null };
+    expect(parseProvenance(null)).toEqual({ model: null, generatedAt: null, ...noStamps });
+    expect(parseProvenance("model=; generated=not-a-date")).toEqual({ model: null, generatedAt: null, ...noStamps });
     expect(parseProvenance("generated=2026-09-06T02:12:00.000Z"))
-      .toEqual({ model: null, generatedAt: "2026-09-06T02:12:00.000Z" });
+      .toEqual({ model: null, generatedAt: "2026-09-06T02:12:00.000Z", ...noStamps });
   });
 
   it("T3281 nothing is written when there is nothing to say", () => {

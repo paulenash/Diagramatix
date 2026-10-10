@@ -141,6 +141,9 @@ export async function buildOrgBackup(
   onProgress?.("ValueChainProcess", valueChainProcesses.length);
   const valueChainPrompts = valueChainIds.length > 0 ? await prisma.valueChainPrompt.findMany({ where: { chainId: { in: valueChainIds } } }) : [];
   onProgress?.("ValueChainPrompt", valueChainPrompts.length);
+  // What the author typed for a chain made with "Create a New Value Chain" — their own words, kept so the chain can be regenerated or audited.
+  const valueChainBriefs = valueChainIds.length > 0 ? await prisma.valueChainBrief.findMany({ where: { chainId: { in: valueChainIds } } }) : [];
+  onProgress?.("ValueChainBrief", valueChainBriefs.length);
 
   // System config — only when a SuperAdmin requests a self-contained scoped
   // backup. OrgAdmin backups leave these empty (they restore into a system
@@ -241,6 +244,7 @@ export async function buildOrgBackup(
       ValueChainLibrary: valueChains.length,
       ValueChainProcess: valueChainProcesses.length,
       ValueChainPrompt: valueChainPrompts.length,
+      ValueChainBrief: valueChainBriefs.length,
     },
     tables: {
       Org: serialise([org] as Record<string, unknown>[]),
@@ -278,6 +282,7 @@ export async function buildOrgBackup(
       ValueChainLibrary: serialise(valueChains as Record<string, unknown>[]),
       ValueChainProcess: serialise(valueChainProcesses as Record<string, unknown>[]),
       ValueChainPrompt: serialise(valueChainPrompts as Record<string, unknown>[]),
+      ValueChainBrief: serialise(valueChainBriefs as Record<string, unknown>[]),
     },
     ...(Object.keys(simulationPackages).length ? { simulationPackages } : {}),
     ...(Object.keys(simulationLibraries).length ? { simulationLibraries } : {}),
@@ -314,6 +319,7 @@ export function scopePayloadToOrg(payload: FullBackupPayload, orgId: string): Fu
   const valueChainIds = new Set(valueChains.map(c => String(c.id)));
   const valueChainProcesses = ((payload.tables.ValueChainProcess as AnyRow[] | undefined) ?? []).filter(p => valueChainIds.has(String(p.chainId)));
   const valueChainPrompts = ((payload.tables.ValueChainPrompt as AnyRow[] | undefined) ?? []).filter(p => valueChainIds.has(String(p.chainId)));
+  const valueChainBriefs = ((payload.tables.ValueChainBrief as AnyRow[] | undefined) ?? []).filter(p => valueChainIds.has(String(p.chainId)));
   // SOP: templates (org master OR this org's project copies), documents for this
   // org's diagrams, and their sections.
   const sopTemplates = ((payload.tables.SopTemplate as AnyRow[] | undefined) ?? []).filter(
@@ -369,6 +375,7 @@ export function scopePayloadToOrg(payload: FullBackupPayload, orgId: string): Fu
       ValueChainLibrary: valueChains,
       ValueChainProcess: valueChainProcesses,
       ValueChainPrompt: valueChainPrompts,
+      ValueChainBrief: valueChainBriefs,
     },
     // unused fields below kept from the original
     counts: {
@@ -683,6 +690,12 @@ export async function restoreOrgBackupAdditive(
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           await tx.valueChainPrompt.createMany({ data: prompts.map((p) => ({ ...convertDates("ValueChainPrompt", p), id: shortCuid(), chainId: newChainId })) as any[] });
           inserted.ValueChainPrompt = (inserted.ValueChainPrompt ?? 0) + prompts.length;
+        }
+        const briefs = ((payload.tables.ValueChainBrief as AnyRow[] | undefined) ?? []).filter((b) => String(b.chainId) === String(c.id));
+        if (briefs.length > 0) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await tx.valueChainBrief.createMany({ data: briefs.map((b) => ({ ...convertDates("ValueChainBrief", b), id: shortCuid(), chainId: newChainId })) as any[] });
+          inserted.ValueChainBrief = (inserted.ValueChainBrief ?? 0) + briefs.length;
         }
       }
 

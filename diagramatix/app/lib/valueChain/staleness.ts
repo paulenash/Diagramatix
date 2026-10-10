@@ -23,7 +23,7 @@
  * per-prompt badge, the "Needs attention" tick and the diagram's own warning
  * cannot disagree about what "stale" means.
  */
-import { promptIsStale, latestTemplateVersion, type MdPromptType } from "./promptTemplates";
+import { promptIsStaleStamped, latestTemplateVersion, type MdPromptType } from "./promptTemplates";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Level 1 — a value chain against the master template
@@ -34,6 +34,8 @@ export interface StalenessPrompt {
   type: MdPromptType;
   processCode: string;
   generatedAt: string | Date | null;
+  /** The template version stored on the prompt when it was written; absent/null on older prompts (they are judged by date). */
+  templateVersion?: number | null;
 }
 
 export interface ChainStaleness {
@@ -70,12 +72,12 @@ export function chainStaleness(
   for (const proc of processes) {
     const p = byProcess.get(proc.code);
     if (!p) missing.push(proc);
-    else if (promptIsStale(type, p.generatedAt)) stale.push(proc);
+    else if (promptIsStaleStamped(type, p.templateVersion, p.generatedAt)) stale.push(proc);
   }
   // A chain-level prompt has no processCode. Its staleness matters too — the
   // value-chain prompt is what the whole chain's narrative is drawn from.
   const staleChainPrompts = prompts
-    .filter((p) => !p.processCode && promptIsStale(p.type, p.generatedAt))
+    .filter((p) => !p.processCode && promptIsStaleStamped(p.type, p.templateVersion, p.generatedAt))
     .map((p) => p.type);
 
   const v = latestTemplateVersion(type);

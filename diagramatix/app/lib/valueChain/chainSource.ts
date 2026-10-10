@@ -93,7 +93,7 @@ export function chainNarrative(section: string): string {
 /** Every chain code the document declares, in order. */
 export function chainCodes(md: string): string[] {
   const out: string[] = [];
-  const h2 = /^##[ \t]+(V\d+)\b/gm;
+  const h2 = /^##[ \t]+([VC]\d+)\b/gm;
   let m: RegExpExecArray | null;
   while ((m = h2.exec(normalise(md))) !== null) if (!out.includes(m[1])) out.push(m[1]);
   return out;

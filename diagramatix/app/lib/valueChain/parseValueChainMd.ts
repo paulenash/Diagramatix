@@ -112,8 +112,8 @@ export function parseValueChainMd(md: string): ParsedValueChain[] {
   const chains: ParsedValueChain[] = [];
   for (let i = 0; i < headings.length; i++) {
     const h = headings[i];
-    // Only H2s shaped like "V01 — Order to Cash" are value chains.
-    const cm = /^(V\d+)\b\s*[—–-]\s*(.+)$/.exec(h.text);
+    // Only H2s shaped like "V01 — Order to Cash" (or a user's own "C01 — …") are value chains.
+    const cm = /^([VC]\d+)\b\s*[—–-]\s*(.+)$/.exec(h.text);
     if (!cm) continue;
     const code = cm[1];
     const title = cm[2].trim();

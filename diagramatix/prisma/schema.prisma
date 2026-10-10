@@ -517,39 +517,39 @@ model Diagram {
 /// deleted after a week. All-scalar on purpose: no Json column to write through
 /// pgPool. See app/lib/ai/generateJob.ts.
 model DiagramGenerateJob {
-  id           String    @id @default(cuid())
-  diagramId    String
-  diagram      Diagram   @relation(fields: [diagramId], references: [id], onDelete: Cascade)
+  id               String    @id @default(cuid())
+  diagramId        String
+  diagram          Diagram   @relation(fields: [diagramId], references: [id], onDelete: Cascade)
   /// The signed-in user who asked (plain field; eraseUser deletes their rows).
-  userId       String
-  orgId        String
+  userId           String
+  orgId            String
   /// queued | running | succeeded | failed
-  status       String    @default("queued")
+  status           String    @default("queued")
   /// queued | planning | shaping | saving | done
-  stage        String    @default("queued")
+  stage            String    @default("queued")
   /// What was sent, so a failed run can be tried again from the phone.
-  promptText   String    @db.Text
+  promptText       String    @db.Text
   /// The photo it was generated from (AiSourceImage.id), when it was — so a failed or
   /// reloaded run is tried again without sending the photo again. Plain field, no FK
   /// (eraseUser deletes images with raw SQL; a dangling id reads as "photo gone").
-  sourceImageId String?
+  sourceImageId    String?
   /// The saved prompt it was started from, when the server verified it was the
   /// caller's and unchanged — so a failed run tried again after a reload links it
   /// again. Plain field, no FK (a deleted prompt reads as "no link").
   selectedPromptId String?
   /// Free Form was asked for (a photo's layout reproduced) — so a failed run tried
   /// again keeps the choice.
-  freeForm     Boolean   @default(false)
-  model        String?
-  errorCode    String?
+  freeForm         Boolean   @default(false)
+  model            String?
+  errorCode        String?
   /// Curated for the user — never a raw exception string.
-  errorMessage String?
+  errorMessage     String?
   /// The diagram's version after the job saved it.
-  version      Int?
-  startedAt    DateTime?
-  finishedAt   DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  version          Int?
+  startedAt        DateTime?
+  finishedAt       DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   @@index([diagramId, userId, createdAt])
   @@index([status])
@@ -846,14 +846,14 @@ model Prompt {
   // existed is genuinely unknown, and claiming they were typed would be
   // inventing data about how somebody worked.
   /// "typed" | "dictated"
-  source    String?
+  source       String?
   /// Set when the clarifying-questions Refine pass last contributed to the text.
   /// Distinct from "has been edited", which falls out of createdAt != updatedAt.
-  refinedAt DateTime?
+  refinedAt    DateTime?
   /// True when the prompt was written against an IMAGE attachment (a photo of a
   /// whiteboard, a screenshot, somebody else's diagram). The image itself is not
   /// kept, so this records where the words came from, not a file you can open.
-  fromImage Boolean   @default(false)
+  fromImage    Boolean   @default(false)
   /// The diagram this prompt was auto-created FOR (2026-09-29). Set only by the
   /// server, when it creates the "<diagram> — AI prompt" row for a generation on a
   /// diagram the caller can edit — never from a request body. Whoever may edit
@@ -911,13 +911,39 @@ model ValueChainLibrary {
   /// "the master has moved on since". Null for the master itself and for a chain the Org wrote from scratch.
   masterPublishedAt DateTime?
 
+  /// A chain a USER wrote with "Create a New Value Chain" (Expert and above; coded C01, C02 … within the Org): the user who made it. It is
+  /// the OWNER, who manages it alongside the OrgAdmin and the SuperAdmin. Null for the master repository and for chains adopted from it.
+  createdByUserId String?
+  /// The owner's name when the chain was made, so the history survives the user leaving the Org.
+  createdByName   String  @default("")
+
   processes ValueChainProcess[]
   prompts   ValueChainPrompt[]
+  brief     ValueChainBrief?
   createdAt DateTime            @default(now())
   updatedAt DateTime            @updatedAt
 
   @@unique([orgId, code])
   @@index([orgId])
+  @@index([createdByUserId])
+}
+
+/// What the author typed to create a chain with "Create a New Value Chain": their own words, kept so the chain can be regenerated or
+/// audited from its source and not only from the AI-built narrative. One per user-created chain.
+model ValueChainBrief {
+  id                       String            @id @default(cuid())
+  chainId                  String            @unique
+  chain                    ValueChainLibrary @relation(fields: [chainId], references: [id], onDelete: Cascade)
+  generalNarrative         String
+  /// { processContext: boolean, archimate: boolean } — the optional prompts chosen.
+  options                  Json              @default("{}")
+  /// The clarifying-question answers [{label, answer}] applied to the BPMN prompts.
+  answers                  Json              @default("[]")
+  /// The version of the "Value Chain Narrative" master template that built the structured narrative the author approved.
+  narrativeTemplateVersion Int?
+  narrativeModel           String?
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @updatedAt
 }
 
 model ValueChainProcess {
@@ -927,6 +953,9 @@ model ValueChainProcess {
   /// "V01.03" — renumbered when processes are inserted or removed.
   code      String
   title     String
+  /// The specific details the author wrote for this process (what happens, who, which systems, decisions and exceptions). Empty for
+  /// the master's processes, whose detail lives in the chain narrative.
+  details   String            @default("")
   sortOrder Int
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
@@ -950,8 +979,14 @@ model ValueChainPrompt {
 
   prompt          String
   publishedPrompt String?
-  /// Which template version produced it, so a regeneration can skip what is current.
+  /// A short hash of the FULL briefing text that was sent (built-in template + house-rule additions): proof of exactly what produced it.
   templateHash    String?
+  /// The built-in template version in force for this prompt's type when it was written — STORED, not inferred from generatedAt. Null on
+  /// prompts written before this column existed; those keep the timestamp inference.
+  templateVersion Int?
+  /// A short hash of the house-rule additions (master + the Org's own) merged into the briefing; they change independently of the
+  /// built-in template, so a change here is "house rules changed", not "template moved".
+  additionsHash   String?
   /// Did it parse back through parseValueChainMd when it was generated?
   roundTripsOk    Boolean   @default(false)
   generatedAt     DateTime?

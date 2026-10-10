@@ -30,7 +30,7 @@ const SCOPED_COVERED = new Set<string>([
   // The Org's OWN Process Repository (orgId = the Org; Paul, 2026-10-09): the chains an OrgAdmin adopted from the master and modified, with their
   // processes and prompts. Carried by the org backup and restored additively (by code, never overwriting). The MASTER repository (orgId "") is
   // SuperAdmin's global catalog and rides only in the full backup, which reads the live schema.
-  "ValueChainLibrary", "ValueChainProcess", "ValueChainPrompt",
+  "ValueChainLibrary", "ValueChainProcess", "ValueChainPrompt", "ValueChainBrief",
 ]);
 
 // Simulator tables: project/org-scoped teams + project-scoped studies /

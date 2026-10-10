@@ -42,6 +42,10 @@ export interface ImportedPrompt {
    */
   model?: string | null;
   generatedAt?: string | null;
+  /** The template stamps (promptStamp.ts) — null where the file predates them. */
+  templateVersion?: number | null;
+  additionsHash?: string | null;
+  templateHash?: string | null;
 }
 
 export interface ImportedChain {
@@ -73,7 +77,7 @@ export function groupsFromMd(md: string): Map<string, string> {
   for (const line of section.split("\n")) {
     const h = /^###[ \t]+(.+?)[ \t\r]*$/.exec(line);
     if (h) { group = h[1].trim(); continue; }
-    const c = /^-[ \t]+\*\*(V\d+)\*\*/.exec(line);
+    const c = /^-[ \t]+\*\*([VC]\d+)\*\*/.exec(line);
     if (c && group) out.set(c[1], group);
   }
   return out;

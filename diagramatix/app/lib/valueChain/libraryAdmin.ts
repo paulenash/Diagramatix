@@ -10,6 +10,8 @@ import { chooseModel } from "@/app/lib/ai/modelAccess";
 import { allModels, isKnownAiModel } from "@/app/lib/ai/models";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { AI_INVOCATION_POINTS, enterAiContext } from "@/app/lib/ai/aiTelemetry";
+import { writeChainPrompt } from "@/app/lib/valueChain/writeChainPrompt";
+import { stampFor } from "@/app/lib/valueChain/promptStamp";
 import { checkPromptBranches } from "@/app/lib/valueChain/checkPromptBranches";
 import { checkPromptShapes } from "@/app/lib/valueChain/checkPromptShapes";
 import { selectRegenerationTargets } from "@/app/lib/valueChain/regenerationTargets";
@@ -131,6 +133,8 @@ export async function libraryGet(req: Request, scopeOrg: string) {
         id: p.id, type: p.type, processCode: p.processCode, name: p.name,
         prompt: p.prompt, chars: p.prompt.length,
         roundTripsOk: p.roundTripsOk, generatedAt: p.generatedAt,
+        // What it was written to (stored when it was written; null on older prompts, which are judged by date).
+        templateVersion: p.templateVersion, additionsHash: p.additionsHash,
         // null = unknown, which an imported chain always is. Reported as it is
         // stored so the screen can say "unknown" rather than invent a default.
         model: p.model,
@@ -173,6 +177,7 @@ const toImported = (c: ChainRow): ImportedChain => ({
     // Provenance rides along in the .md so an export-then-import keeps it. A
     // file is a copy of the library, not a laundering of it.
     model: p.model, generatedAt: p.generatedAt ? p.generatedAt.toISOString() : null,
+    templateVersion: p.templateVersion, additionsHash: p.additionsHash, templateHash: p.templateHash,
   })),
 });
 
@@ -302,6 +307,8 @@ export async function libraryPost(req: Request, session: LibrarySession, scopeOr
              */
             generatedAt: p.generatedAt ? new Date(p.generatedAt) : null,
             model: p.model ?? null,
+            // The stored template stamps ride in the file's provenance line; a file that predates them leaves them null (judged by date).
+            templateVersion: p.templateVersion ?? null, additionsHash: p.additionsHash ?? null, templateHash: p.templateHash ?? null,
           },
         });
         prompts++;
@@ -443,6 +450,8 @@ export async function libraryPost(req: Request, session: LibrarySession, scopeOr
         data: {
           chainId: chain.id, type: p.type, processCode: p.processCode, name: p.name,
           prompt: p.publishedPrompt!, roundTripsOk: p.roundTripsOk, generatedAt: p.generatedAt, model: p.model, templateHash: p.templateHash,
+          // An adopted prompt keeps the stamps of the master prompt it was copied from — it is that text, written to that template.
+          templateVersion: p.templateVersion, additionsHash: p.additionsHash,
         },
       });
     }
@@ -534,6 +543,7 @@ export async function libraryPost(req: Request, session: LibrarySession, scopeOr
         enterAiContext({ userId, orgId, invocationPoint: AI_INVOCATION_POINTS.DiagramGenerate });
 
         const briefs = new Map<MdPromptType, string>();
+        const additionsByType = new Map<MdPromptType, string>();
         for (const t of types) {
           const row = await prisma.diagramRules
             .findFirst({ where: { category: mdPromptCategory(t), isDefault: true }, select: { rules: true } })
@@ -542,7 +552,9 @@ export async function libraryPost(req: Request, session: LibrarySession, scopeOr
           const orgRow = scopeOrg
             ? await prisma.diagramRules.findFirst({ where: { category: mdPromptCategory(t), orgId: scopeOrg, userId: null }, select: { rules: true } }).catch(() => null)
             : null;
-          briefs.set(t, buildMdPromptBriefing(t, [row?.rules, orgRow?.rules].filter(Boolean).join("\n\n") || undefined));
+          const additions = [row?.rules, orgRow?.rules].filter(Boolean).join("\n\n");
+          additionsByType.set(t, additions);
+          briefs.set(t, buildMdPromptBriefing(t, additions || undefined));
         }
 
         // WHICH MODEL. Paul changed the default to Kimi K3 after hitting an
@@ -610,14 +622,10 @@ export async function libraryPost(req: Request, session: LibrarySession, scopeOr
             send({ t: "prompt", index: i + 1, total: targets.length, name, type: target.type, status: "refused", message: "asks for a loop-back — not stored" });
             continue;
           }
-          await prisma.valueChainPrompt.upsert({
-            where: { chainId_type_processCode: { chainId: chain.id, type: target.type, processCode: target.type === "bpmn" ? target.code : "" } },
-            create: {
-              chainId: chain.id, type: target.type, processCode: target.type === "bpmn" ? target.code : "",
-              name, prompt: res.prompt, roundTripsOk: res.roundTrips, generatedAt: new Date(),
-              model,
-            },
-            update: { name, prompt: res.prompt, roundTripsOk: res.roundTrips, generatedAt: new Date(), model },
+          // The ONE writer (writeChainPrompt.ts): it stamps the template version, the house rules and the briefing hash.
+          await writeChainPrompt({
+            chainId: chain.id, type: target.type, processCode: target.code, name, prompt: res.prompt, roundTrips: res.roundTrips, model,
+            stamp: stampFor(target.type, briefs.get(target.type)!, additionsByType.get(target.type) ?? ""),
           });
           written++;
           if (scopeOrg) await recordUsage(userId, "aiAttempts");

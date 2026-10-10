@@ -6732,6 +6732,14 @@ export function layoutBpmnDiagram(
             computedConnectors[i] = re;
           }
         }
+        // Paul, 2026-10-10 (V01.08 "Payment Record"): when EVERY consumer is remote, each gets its own copy and the original is left
+        // with no connector at all — an unattached duplicate that the scanner reports ("Data Object without an association") and that
+        // nobody can find on the diagram. The copies carry every link, so the empty original goes.
+        if (copies.length > 0 && !computedConnectors.some(c => c.sourceId === art.id || c.targetId === art.id)) {
+          const at = elements.indexOf(art);
+          if (at >= 0) elements.splice(at, 1);
+          elMap.delete(art.id);
+        }
       }
     }
     // Splitting changes what each copy is: the original may now only be WRITTEN

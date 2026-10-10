@@ -165,7 +165,8 @@ export async function runLibraryProject(req: Request, mode: RunMode = "superadmi
         // generation time. Stamping the latter would make a diagram built today
         // from a v5 prompt claim v7 and look current — the exact reassurance
         // this is meant to withhold.
-        templateVersion: templateVersionAt(
+        // The version STORED on the prompt when it was written; only a prompt from before that column existed is dated.
+        templateVersion: p.templateVersion ?? templateVersionAt(
           MD_PROMPT_TYPES.includes(p.type as MdPromptType) ? (p.type as MdPromptType) : "bpmn",
           p.generatedAt,
         ),

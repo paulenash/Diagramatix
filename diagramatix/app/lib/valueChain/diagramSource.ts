@@ -1,3 +1,4 @@
+import { PROCESS_CODE_PREFIX_RE } from "./chainCodes";
 /**
  * Which repository process a generated diagram came from.
  *
@@ -13,7 +14,7 @@
  * would put a "your prompt has moved on" warning on an unrelated diagram, which
  * is worse than saying nothing.
  */
-const CODE = /^(V\d{2}\.\d{2})(?:\s|$)/;
+const CODE = PROCESS_CODE_PREFIX_RE;   // V01.03 (master) or C01.03 (a user's own chain)
 
 export function processCodeForDiagram(name: string | null | undefined): string {
   if (!name) return "";

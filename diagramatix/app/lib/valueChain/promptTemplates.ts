@@ -176,6 +176,20 @@ export function promptIsStale(type: MdPromptType, generatedAt: Date | string | n
   return at.getTime() < shipped.getTime();
 }
 
+/**
+ * Is a prompt behind the current template — judged from the version STORED on it when it was written (Paul, 2026-10-10), not from its
+ * date. A prompt with no stored version (everything written before the column existed) falls back to the timestamp inference above, so
+ * no existing prompt changes state.
+ */
+export function promptIsStaleStamped(
+  type: MdPromptType,
+  storedVersion: number | null | undefined,
+  generatedAt: Date | string | null | undefined,
+): boolean {
+  if (typeof storedVersion === "number") return storedVersion < latestTemplateVersion(type).version;
+  return promptIsStale(type, generatedAt);
+}
+
 /** The five categories, for the rules editor's list. */
 export const MD_PROMPT_CATEGORIES: string[] = MD_PROMPT_TYPES.map(mdPromptCategory);
 
@@ -656,6 +670,12 @@ export interface PromptProvenance {
   model?: string | null;
   /** When it was written. null when genuinely unknown. */
   generatedAt?: Date | string | null;
+  /** The built-in template version stored on it when it was written. null/absent = unknown (an older prompt), never a default. */
+  templateVersion?: number | null;
+  /** Hash of the house-rule additions in force when it was written. */
+  additionsHash?: string | null;
+  /** Hash of the full briefing that produced it. */
+  templateHash?: string | null;
 }
 
 /**
@@ -673,16 +693,30 @@ export function renderProvenance(p: PromptProvenance): string {
   const bits: string[] = [];
   if (p.model) bits.push(`model=${p.model}`);
   if (p.generatedAt) bits.push(`generated=${new Date(p.generatedAt).toISOString()}`);
+  // Stored template stamps (2026-10-10): they must survive an export and a re-import, or a chain moved between environments would
+  // forget which master template its prompts were written to and fall back to being judged by date.
+  if (typeof p.templateVersion === "number") bits.push(`template=${p.templateVersion}`);
+  if (p.additionsHash) bits.push(`additions=${p.additionsHash}`);
+  if (p.templateHash) bits.push(`briefing=${p.templateHash}`);
   return bits.length ? `<!-- diagramatix: ${bits.join("; ")} -->` : "";
 }
 
 /** Read one back. Absent or malformed reads as UNKNOWN, never as a default. */
-export function parseProvenance(comment: string | null | undefined): { model: string | null; generatedAt: string | null } {
-  if (!comment) return { model: null, generatedAt: null };
+export function parseProvenance(comment: string | null | undefined): {
+  model: string | null; generatedAt: string | null; templateVersion: number | null; additionsHash: string | null; templateHash: string | null;
+} {
+  if (!comment) return { model: null, generatedAt: null, templateVersion: null, additionsHash: null, templateHash: null };
   const model = /\bmodel=([^;\s]+)/.exec(comment)?.[1] ?? null;
   const gen = /\bgenerated=([^;\s]+)/.exec(comment)?.[1] ?? null;
   const at = gen ? new Date(gen) : null;
-  return { model, generatedAt: at && !Number.isNaN(at.getTime()) ? at.toISOString() : null };
+  const tv = /\btemplate=(\d+)/.exec(comment)?.[1];
+  return {
+    model,
+    generatedAt: at && !Number.isNaN(at.getTime()) ? at.toISOString() : null,
+    templateVersion: tv ? Number(tv) : null,
+    additionsHash: /\badditions=([0-9a-f]+)/.exec(comment)?.[1] ?? null,
+    templateHash: /\bbriefing=([0-9a-f]+)/.exec(comment)?.[1] ?? null,
+  };
 }
 
 export function renderPromptBlock(type: MdPromptType, prompt: string, prov?: PromptProvenance): string {
